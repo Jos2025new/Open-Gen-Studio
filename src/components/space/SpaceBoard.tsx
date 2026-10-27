@@ -1,7 +1,7 @@
 import { ReuseButton } from '../assets/ReuseButton';
 import { TextTile } from '../assets/TextTile';
 import { useEta } from '../ui/useEta';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind, Generation } from '../../engine/types';
@@ -13,13 +13,14 @@ import { KindBackdrop } from '../ui/KindBackdrop';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Chip, IconButton, Segmented } from '../ui/primitives';
+import { InlineSlider } from '../designer/InlineControls';
+import { TILE_DEFAULT, TILE_MAX, TILE_MIN } from '../../store/persistUi';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
 import { batchCells, batchStart, doneMode, keepBatch, splitBoard, suggestedOps, targetAsset } from './boardModel';
 import { nounOf } from './actionRoute';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { goWithAction } from './actionGo';
 
-type Density = 'compact' | 'comfortable';
 type Layout = 'grid' | 'list';
 
 /** Generated Assets: finished results on top; running ones and the actions suggested for the chosen asset below. It cannot be closed. */
@@ -30,7 +31,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   const [kind, setKind] = useState<Kind>('all');
   const [scope, setScope] = useState<'session' | 'all'>(studio ? 'session' : 'all');
   const [sort, setSort] = useState<Sort>('newest');
-  const [density, setDensity] = useState<Density>('comfortable');
+  const tile = useStore((s) => s.ui.tileSize) ?? TILE_DEFAULT;
   const [layout, setLayout] = useState<Layout>('grid');
   const [starred, setStarred] = useState(false);
   const [showFailed, setShowFailed] = useState(false);
@@ -56,7 +57,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
     if (!picked) { setHint(id); setChosen(null); return; }
     setChosen(chosen === id ? null : id);
   };
-  const reset = () => { setKind('all'); setScope(studio ? 'session' : 'all'); setSort('newest'); setDensity('comfortable'); setLayout('grid'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
+  const reset = () => { setKind('all'); setScope(studio ? 'session' : 'all'); setSort('newest'); setUi({ tileSize: TILE_DEFAULT }); setLayout('grid'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
   const filtered = kind !== 'all' || scope !== (studio ? 'session' : 'all');
   const live = rows.ongoing.length > 0;
   const [running, setRunning] = useState(live);
@@ -85,7 +86,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
         <h2 className="space-board-title">Generations</h2>
         <IconButton ref={filter.ref} icon={SlidersHorizontal} label="Filter" size="sm" active={filter.open || filtered} onClick={filter.toggle} />
         <IconButton ref={order.ref} icon={ArrowUpDown} label="Sort" size="sm" active={order.open || sort !== 'newest'} onClick={order.toggle} />
-        <IconButton ref={view.ref} icon={LayoutGrid} label="View" size="sm" active={view.open || density !== 'comfortable' || layout !== 'grid'} onClick={view.toggle} />
+        <IconButton ref={view.ref} icon={LayoutGrid} label="View" size="sm" active={view.open || tile !== TILE_DEFAULT || layout !== 'grid'} onClick={view.toggle} />
       </div>
       <div className="space-board-tools">
         <IconButton icon={Star} label="Favorites only" size="sm" active={starred} aria-pressed={starred} onClick={() => setStarred(!starred)} />
@@ -117,9 +118,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
         <div className="sv-row"><span className="sv-label">Layout</span>
           <Segmented size="sm" value={layout} onChange={setLayout} options={[{ value: 'grid', label: 'Grid' }, { value: 'list', label: 'List' }]} />
         </div>
-        {layout === 'grid' ? <div className="sv-row"><span className="sv-label">Tiles</span>
-          <Segmented size="sm" value={density} onChange={setDensity} options={[{ value: 'comfortable', label: 'Large' }, { value: 'compact', label: 'Small' }]} />
-        </div> : null}
+        {layout === 'grid' ? <InlineSlider label="Tile size" value={tile} min={TILE_MIN} max={TILE_MAX} step={10} unit="px" onChange={(v) => setUi({ tileSize: v })} /> : null}
       </div>
     </Popover>
 
@@ -128,7 +127,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
       {studio && !rows.done.length && !rows.ongoing.length ? null : <button type="button" className="space-sub space-fold" aria-expanded={doneOpen} onClick={() => setUserDone(!doneOpen)}>
         <ChevronDown size={12} className={doneOpen ? '' : 'is-closed'} />Done <span className="num">{rows.done.length}</span>
       </button>}
-      {!doneOpen ? null : shown.length ? <div className={layout === 'list' ? 'space-list' : `space-grid is-${density}`}>
+      {!doneOpen ? null : shown.length ? <div className={layout === 'list' ? 'space-list' : 'space-grid'} style={layout === 'list' ? undefined : { '--tile': `${tile}px` } as CSSProperties}>
         {shown.map((c) => c.type === 'text' ? <TextTile key={c.generationId} g={generations[c.generationId]} /> : <div key={c.assetId} className={layout === 'list' ? 'space-list-row attach-host' : 'attach-host'}><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
@@ -150,7 +149,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
     {studio && !rows.ongoing.length ? null : <div className="space-lower">
       <div className="space-ongoing" aria-label="Ongoing">
         <div className="space-sub">Ongoing</div>
-        {rows.ongoing.length ? rows.ongoing.map((g) => studio ? <OngoingTiles key={g.id} g={g} density={density} layout={layout} selecting={selecting} selected={selected} setSelected={setSelected} /> : <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
+        {rows.ongoing.length ? rows.ongoing.map((g) => studio ? <OngoingTiles key={g.id} g={g} layout={layout} selecting={selecting} selected={selected} setSelected={setSelected} /> : <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
       </div>
       {studio ? null : <div className="space-actions" aria-label="Actions suggested">
         <div className="space-sub">Actions suggested</div>
@@ -199,8 +198,9 @@ export function PendingStatus({ g }: { g: Generation }) {
   </>;
 }
 
-function OngoingTiles({ g, density, layout, selecting, selected, setSelected }: { g: Generation; density: Density; layout: Layout; selecting: boolean; selected: string[]; setSelected: (fn: (s: string[]) => string[]) => void }) {
+function OngoingTiles({ g, layout, selecting, selected, setSelected }: { g: Generation; layout: Layout; selecting: boolean; selected: string[]; setSelected: (fn: (s: string[]) => string[]) => void }) {
   const assets = useStore((s) => s.assets);
+  const tile = useStore((s) => s.ui.tileSize) ?? TILE_DEFAULT;
   const slots = Math.max(0, (g.op ? 1 : g.settings.count) - g.assetIds.length);
   /** An arrived output: a button like Done's tile (select in select mode, else open the lightbox over this generation's outputs). */
   const arrived = (id: string) => <button type="button" className={`space-tile t-${assets[id]?.kind ?? 'image'} ${selected.includes(id) ? 'is-selected' : ''}`} aria-label={assets[id]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(id) : undefined}
@@ -214,7 +214,7 @@ function OngoingTiles({ g, density, layout, selecting, selected, setSelected }: 
     {g.assetIds.map((id) => <div key={id} className="space-list-row attach-host">{arrived(id)}<AgentAttachToggle assetId={id} /><ListInfo g={g} /></div>)}
     {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-list-row"><div className="space-tile is-pending"><div className="shimmer" /><PendingStatus g={g} /></div><ListInfo g={g} /></div>)}
   </div>;
-  return <div className={`space-grid is-${density}`} aria-label="Running generation">
+  return <div className="space-grid" style={{ '--tile': `${tile}px` } as CSSProperties} aria-label="Running generation">
     {g.assetIds.map((id) => <div key={id} className="attach-host">{arrived(id)}<AgentAttachToggle assetId={id} /></div>)}
     {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-tile is-pending"><div className="shimmer" /><PendingStatus g={g} /></div>)}
   </div>;

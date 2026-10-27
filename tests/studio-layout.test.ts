@@ -203,9 +203,9 @@ describe('Done / Ongoing rule', () => {
 });
 
 describe('Studio board: tile size and new-tile sheen (CSS)', () => {
-  it('Large tiles are at least 200px; the sheen sweeps 3 times in the first 3 s of every 5 s and is off for reduced motion', async () => {
+  it('Studio tiles follow the Tile size slider (var(--tile)); the sheen sweeps 3 times in the first 3 s of every 5 s and is off for reduced motion', async () => {
     const css = (await import('node:fs')).readFileSync('src/styles/studio.css', 'utf8');
-    expect(css).toMatch(/\.space-board\.is-studio \.space-grid \{[^}]*minmax\(200px/);
+    expect((await import('node:fs')).readFileSync('src/styles/space.css', 'utf8')).toMatch(/\.space-grid \{[^}]*minmax\(min\(var\(--tile\)/);
     expect(css).toMatch(/is-pending::after[^}]*animation: tile-sheen 5s [^;]*infinite/);
     expect(css).toMatch(/@keyframes tile-sheen \{[^\n]*59\.99%[^\n]*60%, 100% \{[^}]*opacity: 0/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{ \.space-board\.is-studio \.space-tile\.is-pending::after \{ animation: none/);
@@ -407,14 +407,11 @@ describe('compact generation in Studio chat', () => {
 
 describe('Board View popover', () => {
   const pick = (label: string) => act(() => [...document.body.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent === label)!.click());
-  it('Small applies is-compact to Done and Ongoing grids; List renders rows', () => {
+  it('List renders rows (tile size is a slider now, see tile-size.test.ts)', () => {
     setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never, createdAt: 5 })]);
     render(createElement(SpaceBoard, { studio: true }));
     act(() => q('[aria-label="View"]')!.click());
     act(() => q('.space-fold')!.click());
-    pick('Small');
-    expect(host.querySelectorAll('.space-grid.is-compact').length).toBeGreaterThan(0);
-    expect(host.querySelectorAll('.space-grid.is-comfortable')).toHaveLength(0);
     pick('List');
     expect(host.querySelectorAll('.space-grid')).toHaveLength(0);
     expect(host.querySelectorAll('.space-done .space-list-row')).toHaveLength(1);

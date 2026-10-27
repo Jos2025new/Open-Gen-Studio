@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 261 | 202 |
-| [store.ts](../src/store/store.ts) | 177 | 182 |
+| [types.ts](../src/engine/types.ts) | 261 | 204 |
+| [store.ts](../src/store/store.ts) | 177 | 183 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 77 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 3 |
 | [actions.ts](../src/engine/design/actions.ts) | 48 | 25 |
@@ -36,8 +36,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 28 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 27 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 21 | 8 |
+| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 20 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
-| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 18 | 0 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 18 | 1 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |
 
@@ -50,24 +50,24 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/chat` | 22 | 15 |
 | `src/components/composer` | 11 | 10 |
 | `src/components/designer` | 52 | 23 |
-| `src/components/gallery` | 1 | 1 |
+| `src/components/gallery` | 1 | 2 |
 | `src/components/node` | 8 | 4 |
 | `src/components/shell` | 26 | 16 |
-| `src/components/space` | 10 | 7 |
+| `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 2 |
 | `src/components/ui` | 17 | 6 |
-| `src/engine` | 60 | 256 |
-| `src/engine/agent` | 46 | 101 |
+| `src/engine` | 60 | 258 |
+| `src/engine/agent` | 46 | 102 |
 | `src/engine/design` | 98 | 118 |
 | `src/engine/flow` | 11 | 15 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 32 | 255 |
-| `src/store` | 13 | 184 |
+| `src/lib` | 32 | 257 |
+| `src/store` | 13 | 185 |
 
-157 de 464 módulos no tienen ningún test que los importe directamente.
+156 de 464 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
