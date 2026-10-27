@@ -5,8 +5,8 @@ export default [
     what: 'Las restricciones de fotogramas se declaran por adaptador y se validan con referencias, vídeo fuente y resolución efectivos; los modelos sin reglas conservan su ruta anterior.',
     sides: [
       ['src/engine/types.ts', 'frameRules?:'],
-      ['src/engine/params.ts', 'export function videoInputProblem'],
-      ['src/engine/params.ts', 'export function routeVideoInputs'],
+      ['src/engine/params/inputs.ts', 'export function videoInputProblem'],
+      ['src/engine/params/inputs.ts', 'export function routeVideoInputs'],
       ['src/engine/jobs.ts', "kind === 'video' && schema.slots.frameRules"],
       ['src/engine/actions.ts', 'sourceVideo: false'],
       ['src/engine/plan.ts', 'sourceVideo: false'],
