@@ -1,8 +1,8 @@
 import { SaveIndicator } from './SaveIndicator';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ChevronDown, Settings } from 'lucide-react';
-import { renameSession, setUi, useStore } from '../../store/store';
+import { ArrowLeft, ChevronDown, Plus, Settings } from 'lucide-react';
+import { newSession, renameSession, setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { SettingsPanel } from './SettingsPanel';
 import { SessionSwitcher } from './SessionSwitcher';
@@ -19,13 +19,13 @@ import '../../styles/topbar-home.css';
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 
 /** Workspaces render their contextual actions into the top bar through this. */
-export function TopbarActions({ children }: { children: ReactNode }) {
+export function TopbarActions({ children, side = 'right' }: { children: ReactNode; side?: 'left' | 'right' }) {
   const slot = useContext(TopbarSlotContext);
   const [destination, setDestination] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
-    setDestination(document.querySelector<HTMLDivElement>('#workspace-actions'));
-  }, [slot]);
-  const target = slot?.isConnected ? slot : destination;
+    setDestination(document.querySelector<HTMLDivElement>(side === 'left' ? '#workspace-actions-left' : '#workspace-actions'));
+  }, [slot, side]);
+  const target = side === 'right' && slot?.isConnected ? slot : destination;
   return target ? createPortal(children, target) : null;
 }
 
@@ -120,6 +120,8 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
           ) : (
             <SessionSwitcher activeId={sessionId} title={title} onRename={() => setEditing(true)} />
           )}
+          <div id="workspace-actions-left" className="topbar-slot-left" />
+          <IconButton className="topbar-plain topbar-new-session" icon={Plus} label="New session" size="sm" onClick={() => newSession()} />
         </>}
       </div>
       <div className="topbar-right">

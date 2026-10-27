@@ -19,11 +19,11 @@ import { setUi } from '../src/store/store';
 let root: Root | undefined;
 afterEach(() => { act(() => root?.unmount()); root = undefined; document.body.innerHTML = ''; });
 
-/** The import button is portalled into the TopBar's #workspace-actions slot, so the slot is put in place first. */
+/** The import button is portalled into the TopBar's #workspace-actions-left slot (next to the session title), so the slot is put in place first. */
 function mount(home: boolean): void {
   setUi({ home });
   const slot = document.createElement('div');
-  slot.id = 'workspace-actions';
+  slot.id = 'workspace-actions-left';
   document.body.append(slot);
   const host = document.createElement('div');
   document.body.append(host);

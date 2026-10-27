@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Check, ChevronDown, ListChecks, Pin, Plus, Search, Trash } from 'lucide-react';
-import { newSession, selectSession, setUi, useStore } from '../../store/store';
+import { Check, CheckSquare, ChevronDown, Pin, Search, Trash } from 'lucide-react';
+import { selectSession, setUi, useStore } from '../../store/store';
 import { formatRelative } from '../../lib/format';
 import { Popover, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
@@ -51,10 +51,7 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
             <Search size={14} />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
           </div>
-          <IconButton icon={ListChecks} label={selecting ? 'Stop selecting' : 'Select several'} size="sm" active={selecting} aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} />
-          <button type="button" className="ml-foot-icon session-new" aria-label="New session" data-tip="New session" onClick={() => go(() => newSession())}>
-            <Plus size={14} />
-          </button>
+          <IconButton icon={CheckSquare} label={selecting ? 'Stop selecting' : 'Select several'} size="sm" active={selecting} aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} />
         </div>
         <div className="switch-list">
           {list.slice(0, 50).map((s) => {

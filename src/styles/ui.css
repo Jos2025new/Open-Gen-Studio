@@ -115,8 +115,8 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 @media (hover: none) { .attach-toggle { opacity: 1; } }
 
 /* Import from Chat / Nodes in the top bar: boxed like the secondary buttons beside it, so it reads as an action. */
-.import-chat-btn { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; }
-.import-chat-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.import-chat-btn, .topbar-plain { background: transparent; border: 0; }
+.import-chat-btn:hover, .topbar-plain:hover { color: var(--text); }
 
 /* A parameter reads as one control: quiet label, clear value, then its adjustment. */
 .field:has(> input[type=range]), .op-field:has(> input[type=range]) {
@@ -142,3 +142,6 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 .accent-swatches { display: flex; flex-wrap: wrap; gap: 10px; padding: 3px; }
 .accent-swatch { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--grain, linear-gradient(#0000, #0000)), var(--accent-grad, var(--accent)); color: var(--accent-ink); }
 .accent-swatch.is-on { outline: 2px solid var(--text); outline-offset: 2px; }
+.topbar-slot-left:empty { display: none; }
+.topbar-slot-left { gap: 2px; }
+.topbar-slot-left + .topbar-new-session { margin-left: -6px; }
