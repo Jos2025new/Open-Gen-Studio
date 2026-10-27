@@ -10,8 +10,32 @@ import type { AgentState, FeedItem, MediaKind } from '../types';
  * model; anything else is the agent's recommendation. An older choice or the agent's own text never counts.
  */
 
-const flat = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
-const GENERIC = /\b(image|video|text|to)\b/gi;
+const strip = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+/** Words and numbers: "seedream5" -> seedream, 5; "v5.0" -> v, 5; "5.0" and "5" are one version. */
+const tokens = (s: string) => (strip(s).match(/[a-z]+|\d+(?:\.\d+)*/g) ?? []).map((t) => t.replace(/(\.0)+$/, ''));
+/** Tier and generic words a short name leaves out: they never decide which model was meant. */
+const TIER = new Set(['v', 'image', 'video', 'text', 'to', 'pro', 'max', 'turbo', 'fast', 'ultra', 'klein', 'preview', 'edit', 'mini', 'lite', 'standard', 'dev', 'schnell', 'by', 'the', 'ai']);
+const isNum = (t: string) => /^\d/.test(t);
+
+/** The model's brand words and its version, from its catalog name (else the id without its vendor segment). */
+function identity(name: string): { brand: string[]; version?: string } {
+  const t = tokens(name).filter((x) => !TIER.has(x));
+  return { brand: [...new Set(t.filter((x) => !isNum(x)))], version: t.find(isNum) };
+}
+
+/** Whether `words` name this identity: all brand words, and the version right after the last of them (a different version is another model). */
+function matches(words: string[], id: { brand: string[]; version?: string }): boolean {
+  if (!id.brand.length) return false;
+  const at = id.brand.map((b) => words.indexOf(b));
+  if (at.some((i) => i < 0)) return false;
+  if (!id.version) return true;
+  return words.some((w, j) => {
+    if (!id.brand.includes(w)) return false;
+    let i = j + 1;
+    while (words[i] === 'v' || id.brand.includes(words[i])) i++;
+    return words[i] === id.version;
+  });
+}
 
 /** What the user wrote for the current request: the last user message, its answered questions, and the draft. */
 export function requestWords(feed: FeedItem[], draft: AgentState['draft']): string {
@@ -22,12 +46,12 @@ export function requestWords(feed: FeedItem[], draft: AgentState['draft']): stri
 
 /** Whether `words` name the model written as `written` (a ref or a name) for `kind`. */
 export function namesModel(words: string, written: string, kind: MediaKind): boolean {
-  const said = flat(words);
   const w = written.trim();
-  if (!said || !w) return false;
+  const spoken = tokens(words);
+  if (!spoken.length || !w) return false;
   const found = w.includes('::') ? modelSummary(w) : (() => { const r = resolveNamedModel(w, kind, false); return 'ref' in r ? modelSummary(r.ref) : undefined; })();
-  const names = [w.includes('::') ? '' : w, found?.name ?? '', (found?.name ?? '').replace(GENERIC, ' ')].map(flat).filter((n) => n.length >= 4);
-  return names.some((n) => said.includes(n));
+  const fromId = w.includes('::') ? (() => { const p = w.split('::')[1].split('/'); return (p.length > 1 ? p.slice(1) : p).join(' '); })() : w;
+  return [found?.name ?? '', fromId].some((n) => n && matches(spoken, identity(n)));
 }
 
 type Written = { kind?: string; model?: string; user_requested?: boolean };
