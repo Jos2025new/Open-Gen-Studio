@@ -16,9 +16,10 @@ describe('explicit model choice, not name matching', () => {
     expect(modelPriority({ composer: 'Y', proposed: 'A' }).modelRef).toBe('Y');
     expect(modelPriority({ session: 'T', composer: 'Y', proposed: 'A', comparison: true }).reason).toBe('comparison');
   });
-  it('rejects missing provenance rather than guessing from names', () => {
-    expect(confirmSettingsSchema.safeParse({ parts: [{ kind: 'image', model: 'flux' }] }).success).toBe(false);
-    expect(proposePlanSchema.safeParse({ title: 'Test', steps: [{ id: 's', kind: 'image', model: 'flux', prompt: 'x' }] }).success).toBe(false);
+  it('accepts missing provenance (the app infers it, never from the agent\'s own words)', () => {
+    // The schema no longer bounces a missing flag: the app infers it (tests/user-choice-inferred.test.ts).
+    expect(confirmSettingsSchema.safeParse({ parts: [{ kind: 'image', model: 'flux' }] }).success).toBe(true);
+    expect(proposePlanSchema.safeParse({ title: 'Test', steps: [{ id: 's', kind: 'image', model: 'flux', prompt: 'x' }] }).success).toBe(true);
     expect(confirmSettingsSchema.safeParse({ parts: [{ kind: 'image', model: 'flux', user_requested: true }] }).success).toBe(true);
   });
 });

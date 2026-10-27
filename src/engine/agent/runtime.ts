@@ -104,6 +104,7 @@ import { waitHooks } from './schemaWait';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { failedStepSummary } from './failureContext';
+import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
@@ -1497,6 +1498,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { rou
           const ag = () => session(sessionId).agent;
           const v = confirmSettingsSchema.safeParse(parsed.value);
           if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
+          inferChoices(sessionId, 'confirm_settings', v.data.parts);
           if (workspace === 'node') { respond('The node canvas has its own settings on each node: call propose_plan directly.'); continue; }
           const parts = imagesFirst(v.data.parts);
           const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
@@ -1747,6 +1749,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { rou
             planFailures++;
             continue;
           }
+          inferChoices(sessionId, 'propose_plan', v.data.steps);
           if (!v.data.revision && (session(sessionId).agent.settingsParts?.length ?? 0) > 1) {
             const feed = session(sessionId).feed;
             const userAt = feed.findLastIndex((f) => f.type === 'user');

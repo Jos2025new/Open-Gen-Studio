@@ -20,14 +20,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 260 | 201 |
-| [store.ts](../src/store/store.ts) | 176 | 181 |
+| [types.ts](../src/engine/types.ts) | 261 | 202 |
+| [store.ts](../src/store/store.ts) | 177 | 182 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 77 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 3 |
 | [actions.ts](../src/engine/design/actions.ts) | 48 | 25 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
+| [catalog.ts](../src/engine/catalog.ts) | 41 | 22 |
 | [params.ts](../src/engine/params.ts) | 41 | 21 |
-| [catalog.ts](../src/engine/catalog.ts) | 40 | 22 |
 | [ops.ts](../src/engine/ops.ts) | 40 | 16 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 44 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
@@ -56,18 +56,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 7 |
 | `src/components/studio` | 8 | 2 |
 | `src/components/ui` | 17 | 6 |
-| `src/engine` | 60 | 255 |
-| `src/engine/agent` | 45 | 100 |
+| `src/engine` | 60 | 256 |
+| `src/engine/agent` | 46 | 101 |
 | `src/engine/design` | 98 | 118 |
 | `src/engine/flow` | 11 | 15 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 32 | 254 |
-| `src/store` | 13 | 183 |
+| `src/lib` | 32 | 255 |
+| `src/store` | 13 | 184 |
 
-156 de 463 módulos no tienen ningún test que los importe directamente.
+157 de 464 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

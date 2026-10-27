@@ -376,7 +376,7 @@ const settingsPartSchema = z.object({
   count: num.pipe(z.number().int().min(1).max(24)).optional(),
   duration: num.pipe(z.number().min(0).max(120)).optional(),
   aspect: z.string().max(20).optional(),
-  user_requested: z.boolean(),
+  user_requested: z.boolean().optional(),
   model: z.string().max(200).optional(),
   provider: z.string().max(40).optional(),
 });
@@ -427,7 +427,7 @@ const stepSchema = z
     shapes: z.array(z.record(z.string(), z.unknown())).optional(),
     strokes: z.array(z.record(z.string(), z.unknown())).optional(),
   })
-  .passthrough().superRefine((s, ctx) => { if (s.model?.trim() && typeof s.user_requested !== 'boolean') ctx.addIssue({ code: 'custom', path: ['user_requested'], message: 'Required when model is provided.' }); });
+  .passthrough();
 
 const STEPS_AS_TEXT = Symbol('steps sent as broken text');
 const STEPS_HELP =
