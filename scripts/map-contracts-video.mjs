@@ -25,7 +25,7 @@ export default [
       ['src/engine/continuity.ts', 'export function recurringSubjectErrors'],
       ['src/engine/plan.ts', 'ctx.strictContinuity'],
       ['src/engine/plan.ts', 'st.settings.shots'],
-      ['src/engine/agent/runtime.ts', 'strictContinuity:'],
+      ['src/engine/agent/runtimeShared.ts', 'strictContinuity:'],
       ['src/engine/jobs.ts', 'schema.slots.shots?.exclusivePrompt'],
       ['src/engine/subjectPrompts.ts', 'export function mapSubjectPrompts'],
     ],

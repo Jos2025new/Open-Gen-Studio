@@ -22,7 +22,7 @@ export default [
     sides: [
       ['src/engine/retryPartial.ts', 'export function estimateForRetry'],
       ['src/engine/jobs.ts', 'export function retryGeneration'],
-      ['src/engine/agent/runtime.ts', 'planRetryEstimate('],
+      ['src/engine/agent/planRun.ts', 'planRetryEstimate('],
       ['src/components/chat/RecoveryActions.tsx', 'estimateForRetry(g)'],
       ['src/engine/types.ts', 'export interface Generation'],
     ],
@@ -33,7 +33,7 @@ export default [
     what: 'El contexto del fallo conserva N/M salidas, IDs, faltantes y error literal; los bloqueos de contenido aconsejan revisar prompt o referencias antes de otro intento.',
     sides: [
       ['src/engine/agent/failureContext.ts', 'export function failedStepSummary'],
-      ['src/engine/agent/runtime.ts', 'failedStepSummary('],
+      ['src/engine/agent/planRun.ts', 'failedStepSummary('],
     ],
     tests: ['tests/failure-context.test.ts', 'tests/schema-guard.test.ts'],
   },
@@ -42,7 +42,7 @@ export default [
     what: 'OpenRouter reasoning_details se guardan tal cual en el mensaje assistant y se reenvían; ningún otro proveedor los recibe. Cambiar el lado de llm.ts exige revisar runtime.ts y el tipo LlmMessage.',
     sides: [
       ['src/engine/providers/llm.ts', 'function withoutDetails'],
-      ['src/engine/agent/runtime.ts', 'reasoning_details: result.reasoningDetails'],
+      ['src/engine/agent/llmTurn.ts', 'reasoning_details: result.reasoningDetails'],
       ['src/engine/types.ts', 'reasoning_details?: unknown[]'],
     ],
     tests: ['tests/reasoning-details.test.ts'],
