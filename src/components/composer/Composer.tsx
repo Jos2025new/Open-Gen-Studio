@@ -370,7 +370,8 @@ export function Composer() {
       : routes.image ?? routes.reference;
     if (want && want !== currentRef) {
       recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_switched', reason: 'React attachment-count effect selected an available same-line route', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: want, imageCount, inputFunctions: roleSnapshot(want, imageCount) } });
-      void pickComposerModel(mode, want);
+      // The same line in the variant the attachments need: not a model choice, so the session keeps its own.
+      void pickComposerModel(mode, want, false);
       toast(`Switched to ${modelSummary(want)?.name ?? 'the matching variant'} for ${imageCount ? 'the attached image' + (imageCount > 1 ? 's' : '') : 'text only'}.`, 'info');
     } else {
       recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_retained', reason: want ? 'resolved route already selected' : 'no compatible same-line route was found', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: currentRef, imageCount, inputFunctions: roleSnapshot(currentRef, imageCount) } });

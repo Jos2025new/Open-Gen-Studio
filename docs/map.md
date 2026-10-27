@@ -27,7 +27,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/design/actions.ts) | 48 | 25 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
 | [params.ts](../src/engine/params.ts) | 41 | 21 |
-| [catalog.ts](../src/engine/catalog.ts) | 40 | 21 |
+| [catalog.ts](../src/engine/catalog.ts) | 40 | 22 |
 | [ops.ts](../src/engine/ops.ts) | 40 | 16 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 44 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |

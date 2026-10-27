@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 import { rememberSessionModel, setSessionModelAsDefault } from '../src/engine/agent/sessionModel';
+import { pickComposerModel } from '../src/engine/catalog';
 import { useStore } from '../src/store/store';
 import type { SettingsChoice } from '../src/engine/types';
 
@@ -30,5 +31,13 @@ describe('session model choices and composer defaults', () => {
     await setSessionModelAsDefault(sid, 'image');
     expect(useStore.getState().composer.image.modelRef).toBe(choice.modelRef);
     expect(useStore.getState().composer.userPicked?.image).toBe(true);
+  });
+
+  it('a picked composer model is a session choice; an automatic variant switch is not', async () => {
+    rememberSessionModel(sid, 'image', choice);
+    await pickComposerModel('image', 'atlas::other/image', false);
+    expect(useStore.getState().sessions[sid].agent.settings?.image?.modelRef).toBe(choice.modelRef);
+    await pickComposerModel('image', 'atlas::other/image');
+    expect(useStore.getState().sessions[sid].agent.settings?.image?.modelRef).toBe('atlas::other/image');
   });
 });
