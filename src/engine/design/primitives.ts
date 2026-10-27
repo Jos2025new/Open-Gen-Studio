@@ -1,4 +1,5 @@
 import type { ShapeSpec } from '../types';
+import { clamp } from '../../lib/format';
 
 /*
  * Parametric primitives: polygon, star, sector, arc and chord. Each is kept as its parameters (`prim`) and as the
@@ -42,7 +43,6 @@ export function normalizePrim(p: Partial<PrimSpec> & { kind: PrimKind }): PrimSp
   return out;
 }
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const norm360 = (deg: number) => ((deg % 360) + 360) % 360;
 
 /** The vertices of a polygon (sides = corners) or star (2·sides vertices, alternating outer and inner). */

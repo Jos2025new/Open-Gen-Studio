@@ -1,4 +1,5 @@
 import type { ShapeSpec } from '../types';
+import { clamp } from '../../lib/format';
 import { pageBox, toLocal } from './shapeTransform';
 
 /*
@@ -190,5 +191,4 @@ export function paintOpacityPatch(which: 'fill' | 'stroke', opacity: number): Pa
   return which === 'fill' ? { fillOpacity: v } : { strokeOpacity: v };
 }
 
-function clamp(v: number, lo: number, hi: number): number { return Math.min(hi, Math.max(lo, v)); }
 function r3(v: number): number { return Math.round(v * 1000) / 1000; }
