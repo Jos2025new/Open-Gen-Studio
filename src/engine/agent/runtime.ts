@@ -288,14 +288,10 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.reply_received', reason: 'typed message is not confirmation', sessionId, approvalId: pendingItem.id, before: { status: pendingItem.status, confirmed: false }, after: { status: 'skipped', confirmed: false } });
     updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
     const engine = agentEngine();
-    if (engine.kind === 'llm' && pending.toolCallId) {
+    if (engine.kind === 'llm') {
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
-      pushHistory(sessionId, {
-        role: 'tool',
-        tool_call_id: pending.toolCallId,
-        content: `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`,
-      });
+      replyToCard(sessionId, pending.toolCallId, `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`);
       patchAgent(sessionId, { pending: undefined });
       await llmTurn(sessionId, workspace, { route: 'settings-reply' });
       return;
