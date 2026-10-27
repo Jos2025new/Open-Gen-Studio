@@ -5,6 +5,9 @@
 .workspace.ws-chat.has-studio-board > .chat { height: 100%; }
 .workspace.is-home > .studio-board, .workspace.is-space > .studio-board { visibility: hidden; }
 .studio-board { position: absolute; top: 0; right: 0; bottom: 0; z-index: 13; display: flex; min-width: 0; border-left: 1px solid var(--frame-border); background: var(--surface); }
+.workspace.is-resizing { user-select: none; }
+.workspace.ws-chat.has-studio-board > .chat { min-width: 0; overflow-x: clip; }
+.studio-board { contain: layout; }
 .studio-board > .space-board { flex: 1; min-width: 0; }
 .studio-divider { position: absolute; top: 0; bottom: 0; left: calc(var(--sp-1) * -1); width: var(--sp-2); cursor: col-resize; z-index: 1; touch-action: none; }
 .studio-divider::after { content: ''; position: absolute; inset: 0 calc(50% - 1px); transition: background .12s; }

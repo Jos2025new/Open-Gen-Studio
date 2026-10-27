@@ -12,6 +12,7 @@ vi.mock('../src/lib/idb', () => ({
   loadAssetUrl: async () => undefined,
 }));
 
+import { readFileSync } from 'node:fs';
 import { Fragment, act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StudioBoard } from '../src/components/studio/StudioBoard';
@@ -457,5 +458,36 @@ describe('Studio board: an arrived output of a running generation opens like a D
     act(() => ongoingTiles()[0].click());
     expect(ongoingTiles()[0].getAttribute('aria-pressed')).toBe('true');
     expect(useStore.getState().ui.lightbox).toBeNull();
+  });
+});
+
+describe('Studio board divider drag', () => {
+  it('moves the board and the workspace --studio-w by direct style writes, and commits only on pointerup', async () => {
+    const raf: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (f: FrameRequestCallback) => { raf.push(f); return raf.length; });
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    const ws = host;
+    ws.style.setProperty('--studio-w', '400px');
+    render(createElement(StudioBoard));
+    const board = q('.studio-board')!, div = q('.studio-divider')!;
+    div.setPointerCapture = () => undefined;
+    ws.getBoundingClientRect = () => ({ right: 1000, left: 0 }) as DOMRect;
+    act(() => { div.dispatchEvent(new PointerEvent('pointerdown', { clientX: 600, pointerId: 1, bubbles: true })); });
+    act(() => { div.dispatchEvent(new PointerEvent('pointermove', { clientX: 500, pointerId: 1, bubbles: true })); });
+    expect(getStudioBoard().width).toBe(400);
+    raf.splice(0).forEach((f) => f(0));
+    expect(board.style.width).toBe('500px');
+    expect(ws.style.getPropertyValue('--studio-w')).toBe('500px');
+    expect(div.classList.contains('is-dragging')).toBe(true);
+    expect(getStudioBoard().width).toBe(400);
+    act(() => { div.dispatchEvent(new PointerEvent('pointerup', { clientX: 500, pointerId: 1, bubbles: true })); });
+    expect(getStudioBoard().width).toBe(500);
+    expect(div.classList.contains('is-dragging')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+  it('contains both panes so they cannot overlap', () => {
+    const css = readFileSync('src/styles/studio.css', 'utf8');
+    expect(css).toMatch(/\.studio-board \{ contain: layout; \}/);
+    expect(css).toMatch(/> \.chat \{ min-width: 0; overflow-x: clip; \}/);
   });
 });

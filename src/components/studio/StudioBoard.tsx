@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useRef, type PointerEvent } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from '../ui/primitives';
 import { SpaceBoard } from '../space/SpaceBoard';
@@ -11,19 +11,36 @@ const VIEWS: Array<{ id: StudioView; label: string }> = [{ id: 'assets', label: 
 /** Studio's right column: the Generations board (Done and Ongoing), resizable and closable. Closed, the composer's Show generations control reopens it. */
 export function StudioBoard() {
   const { open, width, view } = useStudioBoard();
-  const [drag, setDrag] = useState<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ w: number; raf: number } | null>(null);
   if (!open) return null;
-  const shown = drag ?? width;
-  const move = (e: PointerEvent<HTMLDivElement>) => {
-    if (drag == null) return;
-    const right = root.current?.parentElement?.getBoundingClientRect().right ?? 0;
-    setDrag(Math.min(boardMax(), Math.max(BOARD_MIN, Math.round(right - e.clientX))));
+  // While dragging nothing goes through React: one frame at a time the board width and the workspace's --studio-w (the chat's padding and the composer) move together.
+  const paint = (w: number) => {
+    const el = root.current;
+    if (!el) return;
+    el.style.width = `${w}px`;
+    el.parentElement?.style.setProperty('--studio-w', `${w}px`);
   };
-  const end = () => { if (drag != null) { setStudioBoard({ width: drag }); setDrag(null); } };
-  return <div ref={root} className="studio-board" aria-label="Studio board" style={{ width: shown }}>
-    <div className={`studio-divider ${drag != null ? 'is-dragging' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize board" aria-valuenow={shown} aria-valuemin={BOARD_MIN} aria-valuemax={boardMax()} tabIndex={0}
-      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setDrag(width); }} onPointerMove={move} onPointerUp={end} onPointerCancel={end}
+  const move = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const right = root.current?.parentElement?.getBoundingClientRect().right ?? 0;
+    d.w = Math.min(boardMax(), Math.max(BOARD_MIN, Math.round(right - e.clientX)));
+    if (!d.raf) d.raf = requestAnimationFrame(() => { d.raf = 0; paint(d.w); });
+  };
+  const end = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
+    cancelAnimationFrame(d.raf);
+    e.currentTarget.classList.remove('is-dragging');
+    root.current?.parentElement?.classList.remove('is-resizing');
+    paint(d.w);
+    setStudioBoard({ width: d.w });
+  };
+  return <div ref={root} className="studio-board" aria-label="Studio board" style={{ width }}>
+    <div className="studio-divider" role="separator" aria-orientation="vertical" aria-label="Resize board" aria-valuenow={width} aria-valuemin={BOARD_MIN} aria-valuemax={boardMax()} tabIndex={0}
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { w: width, raf: 0 }; e.currentTarget.classList.add('is-dragging'); root.current?.parentElement?.classList.add('is-resizing'); }} onPointerMove={move} onPointerUp={end} onPointerCancel={end}
       onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setStudioBoard({ width: width + (e.key === 'ArrowLeft' ? 16 : -16) }); } }} />
     <div className="studio-board-main">
       <div className="studio-views" role="tablist" aria-label="Board view">
