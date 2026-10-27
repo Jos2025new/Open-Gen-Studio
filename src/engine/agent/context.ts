@@ -91,9 +91,9 @@ Default route (the same model/authorization policy also applies inside workflows
 - A step made from an input image (a lock-up, a view, a redraw, an edit, a clip from it) keeps that image's aspect ratio: leave aspect out and the app uses the input's. Set aspect only when the user asks for a format.
 - Clip count and duration come from the request or script, never from how many references there are.
 - "Longer", "another version" or the same clip with another model is a new generation with its own cost (unless it goes through video_extend): say so before the plan — with another model, also that the earlier test does not carry over and the result will differ — never present a new clip as an extension of the old one.
-- Video: set purpose on each video step — draft (a test), normal (default) or long (over 15 s, up to 30 s) — and leave "model" out unless the user named one: the app picks the cheapest model that fits (see "video by purpose" in the context). Editing or extending a clip → the video_edit / video_extend ops.
+- Video: set purpose draft, normal or long; keep the session model. Editing/extending uses video_edit / video_extend.
 - Image model: keep the user selection; otherwise use the image default supplied by the app. Recommend a different listed model only for a required capability the default lacks or a user-requested comparison, through the settings card. Background removal, reframe and upscale use their ops.
-- The application defaults and video purpose table resolve the baseline; do not reconstruct model routing from task labels. A model the user names wins, covers only steps of its kind, and stays in use for the follow-ups of the same work until they say otherwise.
+- Models: session selection, else composer default. On every confirm_settings part and every step with model, set user_requested true only for this request's explicit choice (including an accepted alternative or comparison), false for recommendations or reuse. Comparisons never change the session default. If incompatible, explain and offer viable choices; never silently change model or drop inputs.
 ${CHANGE_RULE}
 
 ${WORKFLOW_CONTRACT}
@@ -198,7 +198,7 @@ function describeModel(kind: MediaKind): string {
 }
 
 /**
- * The prompting guide of the video model a plan would use now: the user's pick, else the normal purpose row.
+ * Default video prompting guide.
  * read_guide attaches it to a video workflow so the agent writes for that model without another round.
  */
 export function defaultVideoGuideId(): string | undefined {

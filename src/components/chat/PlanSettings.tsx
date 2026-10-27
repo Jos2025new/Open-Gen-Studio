@@ -16,7 +16,7 @@ export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem
   return (
     <div className="plan-set">
       {sections.map((x, i) => (
-        <div key={x.kind} className={titled ? 'set-section' : undefined}>
+        <div key={`${x.kind}:${x.recommended.modelRef}`} className={titled ? 'set-section' : undefined}>
           {titled ? <div className="set-section-title">{x.kind === 'image' ? 'Images' : 'Video'} · {models[x.recommended.modelRef]?.name ?? x.recommended.modelRef}</div> : null}
           <SettingsSectionBlock
             section={x}
@@ -24,7 +24,7 @@ export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem
             itemId={item.id}
             sessionId={sessionId}
             draft={x.kind === 'video' ? draft : undefined}
-            onPick={(c) => void changePlanChoice(sessionId, item.id, x.kind as GenKind, c)}
+            onPick={(c) => void changePlanChoice(sessionId, item.id, x.kind as GenKind, c, x.recommended.modelRef)}
             onUnlock={() => changePlanDraft(sessionId, item.id, draft.kind, draft.text, true)}
             extra={<>
               {x.kind === 'video' ? <DraftChoice compact draft={draft} onSelect={(kind, text) => changePlanDraft(sessionId, item.id, kind, text)} /> : null}
@@ -48,7 +48,7 @@ export function RewriteFailed({ text, item, sessionId, sections }: { text: strin
   return (
     <p className="plan-error">
       {text}{' '}
-      <Button size="sm" variant="ghost" onClick={() => { for (const x of sections) void rewritePrompts(sessionId, item.id, x.kind as GenKind); }}>Retry</Button>
+      <Button size="sm" variant="ghost" onClick={() => { for (const x of sections) void rewritePrompts(sessionId, item.id, x.kind as GenKind, x.recommended.modelRef); }}>Retry</Button>
     </p>
   );
 }

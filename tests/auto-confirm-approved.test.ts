@@ -46,7 +46,15 @@ describe('approving an Auto plan confirms what it runs', () => {
 
   it('keeps the confirmed choice when the plan compares two models of a kind', () => {
     setup();
+    const composer = useStore.getState().composer;
     confirmApproved(sid(), [img('s1', TEXT), img('s2', OTHER)]);
+    expect(confirmed()?.image?.modelRef).toBe(OTHER);
+    expect(useStore.getState().composer).toEqual(composer);
+  });
+
+  it('keeps the prior choice when only one comparison group is selected to run', () => {
+    setup();
+    confirmApproved(sid(), [img('s1', TEXT)], ['image']);
     expect(confirmed()?.image?.modelRef).toBe(OTHER);
   });
 

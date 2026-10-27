@@ -23,7 +23,9 @@ const ATLAS = 'atlas::google/nano-banana-2/text-to-image';
 const NANO = 'nanogpt::nano-banana-2';
 const LITE = 'atlas::google/nano-banana-2-lite/text-to-image';
 const PRO = 'atlas::google/nano-banana-pro/text-to-image';
-const NAME: Record<string, string> = { [ATLAS]: 'Nano Banana 2', [NANO]: 'Nano Banana 2', [LITE]: 'Nano Banana 2 Lite', [PRO]: 'Nano Banana Pro' };
+const FLUX = 'atlas::bfl/flux-3-klein/text-to-image';
+const SEEDREAM = 'atlas::bytedance/seedream-v5.0-pro/text-to-image';
+const NAME: Record<string, string> = { [ATLAS]: 'Nano Banana 2', [NANO]: 'Nano Banana 2', [LITE]: 'Nano Banana 2 Lite', [PRO]: 'Nano Banana Pro', [FLUX]: 'FLUX 3 Image Klein', [SEEDREAM]: 'Seedream 5.0 Pro' };
 const before = useStore.getState();
 const sid = () => before.activeSessionId;
 const st = () => useStore.getState().sessions[sid()];
@@ -38,12 +40,12 @@ let primed = false;
 function prime() {
   if (primed) return;
   primed = true;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } }, settingsParts: [{ kind: 'image', modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' }] } } } }));
 }
 
 function setup() {
   primed = false;
-  const refs = [ATLAS, NANO, LITE, PRO];
+  const refs = [ATLAS, NANO, LITE, PRO, FLUX, SEEDREAM];
   const models = Object.fromEntries(refs.map((ref) => [ref, { ref, id: ref.split('::')[1], provider: ref.split('::')[0], kind: 'image', name: NAME[ref], acceptsText: true, acceptsImage: ref === NANO, tags: [], price: { skus: [{ unit: 'image', usd: ref === PRO ? 0.13 : 0.067 }] } } as unknown as ModelSummary]));
   const schemas = Object.fromEntries(refs.map((ref) => [ref, { ref, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema]));
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
@@ -64,22 +66,23 @@ function setup() {
 }
 const card = () => st().feed.find((f) => f.type === 'settings') as SettingsFeedItem | undefined;
 const plan = () => st().feed.filter((f) => f.type === 'plan').at(-1) as PlanFeedItem | undefined;
-const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', ...part }] } });
-const steps = (...m: Array<string | undefined>) => ({ name: 'propose_plan', args: { title: 'P', steps: m.map((model, i) => ({ id: `s${i + 1}`, kind: 'image', title: `I${i}`, prompt: `p${i}`, count: 1, ...(model ? { model } : {}) })) } });
+const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, ...part }] } });
+const steps = (...m: Array<string | undefined>) => ({ name: 'propose_plan', args: { title: 'P', steps: m.map((model, i) => ({ id: `s${i + 1}`, kind: 'image', title: `I${i}`, prompt: `p${i}`, count: 1, ...(model ? { model, user_requested: false } : {}) })) } });
+const requestedSteps = (...m: Array<string | undefined>) => ({ name: 'propose_plan', args: { title: 'P', steps: m.map((model, i) => ({ id: `s${i + 1}`, kind: 'image', title: `I${i}`, prompt: `p${i}`, count: 1, ...(model ? { model, user_requested: true } : {}) })) } });
 const refs = () => plan()!.plan.steps.map((x) => (x as ImageStep).modelRef);
 
 describe('the same model at another provider is a change the user confirms', () => {
   beforeEach(() => { script = []; seen = []; setup(); });
 
   it('the plan that writes the other provider\'s model is refused, never swapped for the confirmed Atlas one', async () => {
-    script = [steps(NANO)];
+    script = [requestedSteps(NANO)];
     await sendAgentMessage('Cambia a nanogpt como proveedor');
     expect(plan()).toBeUndefined();
     expect(seen.join('\n')).toContain(`call confirm_settings for image with model ${NANO} first.`);
   });
 
   it('confirm_settings with the model and the provider makes the Keep / Change card', async () => {
-    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt' })];
+    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt', user_requested: true })];
     await sendAgentMessage('Cambia a nanogpt como proveedor');
     const c = card()!;
     expect(c).toMatchObject({ status: 'pending' });
@@ -89,19 +92,22 @@ describe('the same model at another provider is a change the user confirms', () 
   });
 
   it('a provider alone means the confirmed model at that provider', async () => {
-    script = [ask({ provider: 'NanoGPT' })];
+    script = [ask({ provider: 'NanoGPT', user_requested: true })];
     await sendAgentMessage('Cambia a nanogpt como proveedor');
     expect(card()?.sections[0].recommended.modelRef).toBe(NANO);
     expect(card()?.switchFrom?.modelRef).toBe(ATLAS);
   });
 
   it('Change adds the other provider as a part; steps that write it keep it, the rest keep the confirmed one', async () => {
-    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt' })];
+    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt', user_requested: true })];
     await sendAgentMessage('Cambia a nanogpt como proveedor');
     const c = card()!;
-    script = [steps(NANO, undefined)];
+    script = [{ name: 'propose_plan', args: { title: 'P', steps: [
+      { id: 's1', kind: 'image', title: 'I1', prompt: 'p1', count: 1, model: NANO, user_requested: true },
+      { id: 's2', kind: 'image', title: 'I2', prompt: 'p2', count: 1, model: ATLAS, user_requested: false },
+    ] } }];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
+    expect(st().agent.settings?.image?.modelRef).toBe(NANO);
     expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
     expect(refs()).toEqual([NANO, ATLAS]);
     // The agent is told which is which even though both are called Nano Banana 2.
@@ -109,13 +115,32 @@ describe('the same model at another provider is a change the user confirms', () 
   });
 
   it('F-02: an A/B between providers of one line: each step that writes its ref keeps its own provider, and the note says so', async () => {
-    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt' })];
+    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt', user_requested: true })];
     await sendAgentMessage('Cambia a nanogpt como proveedor');
     const c = card()!;
-    script = [steps(ATLAS, NANO)];
+    script = [{ name: 'propose_plan', args: { title: 'P', steps: [
+      { id: 's1', kind: 'image', title: 'I1', prompt: 'p1', count: 1, model: ATLAS, user_requested: false },
+      { id: 's2', kind: 'image', title: 'I2', prompt: 'p2', count: 1, model: NANO, user_requested: true },
+    ] } }];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
     expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
     expect(refs()).toEqual([ATLAS, NANO]);
+  });
+
+  it('a misspelt Seedream name and FLUX stay on their own model in a confirmed comparison', async () => {
+    script = [{ name: 'confirm_settings', args: { parts: [
+      { kind: 'image', model: 'Seedrem 5.0 Pro', user_requested: true },
+      { kind: 'image', model: 'FLUX 3 Image Klein', user_requested: true },
+    ] } }];
+    await sendAgentMessage('Compara Seedrem 5.0 Pro y FLUX 3 Image Klein');
+    const c = card()!;
+    expect(c.sections.map((section) => section.recommended.modelRef)).toEqual([SEEDREAM, FLUX]);
+    script = [{ name: 'propose_plan', args: { title: 'P', steps: [
+      { id: 's1', kind: 'image', title: 'Seedream', prompt: 'p1', model: 'Seedrem 5.0 Pro', user_requested: true },
+      { id: 's2', kind: 'image', title: 'FLUX', prompt: 'p2', model: 'FLUX 3 Image Klein', user_requested: true },
+    ] } }];
+    await confirmSettings(sid(), c.id, c.sections.map((section) => section.recommended));
+    expect(refs()).toEqual([SEEDREAM, FLUX]);
   });
 
   it('F-02: with one confirmed provider, a step that writes the other provider is told it was adjusted', async () => {
@@ -126,7 +151,7 @@ describe('the same model at another provider is a change the user confirms', () 
   });
 
   it('a provider the user never named is not a change: the app\'s own default stays an ordinary confirmation', async () => {
-    script = [ask({ model: NANO })];
+    script = [ask({ model: NANO, user_requested: false })];
     await sendAgentMessage('Otra imagen con nano banana 2');
     expect(card()?.switchFrom).toBeUndefined();
     primed = false;
@@ -141,28 +166,28 @@ describe('a model written with a typo resolves; one that does not exist goes bac
   beforeEach(() => { script = []; seen = []; setup(); });
 
   it('"NANO BANAN 2 LITE" is Nano Banana 2 Lite and asks to change the model', async () => {
-    script = [ask({ model: 'NANO BANAN 2 LITE' })];
+    script = [ask({ model: 'NANO BANAN 2 LITE', user_requested: true })];
     await sendAgentMessage('Usa NANO BANAN 2 LITE');
     expect(card()?.sections[0].recommended.modelRef).toBe(LITE);
     expect(card()?.switchFrom?.modelRef).toBe(ATLAS);
   });
 
   it('the validator uses the same resolution: the misspelt name of the step is still refused until confirmed', async () => {
-    script = [steps('NANO BANAN 2 LITE')];
+    script = [requestedSteps('NANO BANAN 2 LITE')];
     await sendAgentMessage('Usa NANO BANAN 2 LITE');
     expect(plan()).toBeUndefined();
     expect(seen.join('\n')).toContain(`The user named Nano Banana 2 Lite (${LITE}); call confirm_settings for image with model ${LITE} first.`);
   });
 
   it('a model that does not exist is returned with the reason and the closest one', async () => {
-    script = [ask({ model: 'Zorblax Quantum 9000' })];
+    script = [ask({ model: 'Zorblax Quantum 9000', user_requested: true })];
     await sendAgentMessage('Usa Zorblax Quantum 9000');
     expect(card()).toBeUndefined();
     expect(seen.join('\n')).toMatch(/Unknown model "Zorblax Quantum 9000"/);
   });
 
   it('a model that is not at the declared provider says so and names the closest', async () => {
-    script = [ask({ model: 'nano banana 2 lite', provider: 'nanogpt' })];
+    script = [ask({ model: 'nano banana 2 lite', provider: 'nanogpt', user_requested: true })];
     await sendAgentMessage('Usa nano banana 2 lite en nanogpt');
     expect(card()).toBeUndefined();
     expect(seen.join('\n')).toMatch(/Unknown model "nano banana 2 lite" at NanoGPT\. The closest is Nano Banana 2 Lite \(atlas::google\/nano-banana-2-lite\/text-to-image\)/);
@@ -202,10 +227,10 @@ describe('name resolution without false positives', () => {
     expect(providersIn('hazlo en Atlas Cloud, no en fal')).toEqual(['atlas']);
     expect(providersIn('Una imagen fallida de un faro')).toEqual([]);
     const m = useStore.getState().catalog.models;
-    expect(changeNamed(m[NANO], m[ATLAS], 'Cambia a nanogpt como proveedor')).toBe('provider');
-    expect(changeNamed(m[NANO], m[ATLAS], 'Otra imagen con nano banana 2')).toBeUndefined();
-    expect(changeNamed(m[LITE], m[ATLAS], 'Usa nano banana 2 lite')).toBe('model');
-    expect(changeNamed(m[LITE], m[ATLAS], 'Una taza')).toBeUndefined();
+    expect(changeNamed(m[NANO], m[ATLAS], true)).toBe('provider');
+    expect(changeNamed(m[NANO], m[ATLAS], false)).toBeUndefined();
+    expect(changeNamed(m[LITE], m[ATLAS], true)).toBe('model');
+    expect(changeNamed(m[LITE], m[ATLAS], false)).toBeUndefined();
   });
 
   it('F-05: a negated provider is not asked for, and two asked providers are ambiguous', () => {
@@ -213,10 +238,10 @@ describe('name resolution without false positives', () => {
     const FAL = { ...m[NANO], provider: 'fal', ref: 'fal::fal-ai/nano-banana-2', id: 'fal-ai/nano-banana-2' } as ModelSummary;
     for (const [said, only] of [['hazlo en Atlas Cloud, no en fal', ['atlas']], ['use atlas, not fal', ['atlas']], ['atlas instead of fal', ['atlas']], ['fal en vez de nanogpt', ['fal']], ['sin nanogpt, con atlas', ['atlas']], ['rather than fal use nanogpt', ['nanogpt']], ['No sé, usa atlas', ['atlas']], ['otra vez en nanogpt', ['nanogpt']]] as const) expect(providersIn(said), said).toEqual(only);
     // Confirmed at Atlas: "Atlas, not fal" asks for no other provider; "fal, no atlas" asks for fal; nanogpt and fal together is ambiguous.
-    expect(changeNamed(FAL, m[ATLAS], 'hazlo en Atlas Cloud, no en fal')).toBeUndefined();
-    expect(changeNamed(m[NANO], m[ATLAS], 'hazlo en nanogpt, no en fal')).toBe('provider');
-    expect(changeNamed(FAL, m[ATLAS], 'hazlo en fal, no en atlas')).toBe('provider');
-    expect(changeNamed(m[NANO], m[ATLAS], 'nanogpt o fal, lo que sea')).toBeUndefined();
-    expect(changeNamed(FAL, m[ATLAS], 'nanogpt o fal, lo que sea')).toBeUndefined();
+    expect(changeNamed(FAL, m[ATLAS], false)).toBeUndefined();
+    expect(changeNamed(m[NANO], m[ATLAS], true)).toBe('provider');
+    expect(changeNamed(FAL, m[ATLAS], true)).toBe('provider');
+    expect(changeNamed(m[NANO], m[ATLAS], false)).toBeUndefined();
+    expect(changeNamed(FAL, m[ATLAS], false)).toBeUndefined();
   });
 });

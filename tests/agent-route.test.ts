@@ -23,7 +23,7 @@ describe('medium quality by default (R1)', () => {
 
 describe('default route and prompting rules in the system prompt (R1, R2)', () => {
   it('states the default route, the purpose tables and the prompting rules', () => {
-    for (const s of ['Default route', 'set purpose on each video step', 'cheapest model that fits', 'keep the user selection', 'use the image default supplied by the app', 'never from how many references', 'do not describe the image again', 'Never paraphrase a reference']) {
+    for (const s of ['Default route', 'set purpose draft, normal or long', 'session selection, else composer default', 'user_requested', 'Comparisons never change the session default', 'keep the user selection', 'use the image default supplied by the app', 'never from how many references', 'do not describe the image again', 'Never paraphrase a reference']) {
       expect(SYSTEM_PROMPT).toContain(s);
     }
     expect(SYSTEM_PROMPT).not.toMatch(/Usually 40-120 words\. Write prompts/);

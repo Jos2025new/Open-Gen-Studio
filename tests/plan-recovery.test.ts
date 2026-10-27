@@ -89,15 +89,15 @@ const ugcPlan = {
   args: {
     title: 'Anuncio UGC del vestido de crochet',
     steps: [
-      { id: 's1', kind: 'image', title: 'Fotograma clave UGC', model: 'local::studio-image', prompt: 'key frame' },
-      { id: 's2', kind: 'video', title: 'Clip UGC con audio', model: 'local::studio-video', prompt: 'she shows the dress', first_frame: 's1' },
+      { id: 's1', kind: 'image', title: 'Fotograma clave UGC', user_requested: false, model: 'local::studio-image', prompt: 'key frame' },
+      { id: 's2', kind: 'video', title: 'Clip UGC con audio', user_requested: false, model: 'local::studio-video', prompt: 'she shows the dress', first_frame: 's1' },
     ],
   },
 };
 
 // Phase 2 as in real use (Auto): the agent confirms the settings, the app does it silently (no card) and the same turn goes on to the plan.
 async function sendWithSettings(text: string) {
-  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }, { kind: 'video', start_image: true, model: 'local::studio-video' }] } }, ugcPlan];
+  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, model: 'local::studio-image' }, { kind: 'video', start_image: true, user_requested: false, model: 'local::studio-video' }] } }, ugcPlan];
   await sendAgentMessage(text);
 }
 

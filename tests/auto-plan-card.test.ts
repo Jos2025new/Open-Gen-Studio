@@ -20,9 +20,10 @@ import { useStore } from '../src/store/store';
 import type { FeedItem, ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
 const ATLAS = 'atlas::google/nano-banana-2/text-to-image';
+const NANO = 'nanogpt::nano-banana-2';
 const LITE = 'atlas::google/nano-banana-2-lite/text-to-image';
 const VID = 'local::studio-video';
-const NAME: Record<string, string> = { [ATLAS]: 'Nano Banana 2', [LITE]: 'Nano Banana 2 Lite' };
+const NAME: Record<string, string> = { [ATLAS]: 'Nano Banana 2', [NANO]: 'Nano Banana 2', [LITE]: 'Nano Banana 2 Lite' };
 const before = useStore.getState();
 const sid = () => before.activeSessionId;
 const st = () => useStore.getState().sessions[sid()];
@@ -40,7 +41,7 @@ function setup() {
   script = [];
   calls = 0;
   bodies = [];
-  const refs = [ATLAS, LITE];
+  const refs = [ATLAS, NANO, LITE];
   const models = Object.fromEntries(refs.map((ref) => [ref, { ref, id: ref.split('::')[1], provider: 'atlas', kind: 'image', name: NAME[ref], acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'image', usd: 0.067 }] } } as unknown as ModelSummary]));
   const schemas = Object.fromEntries(refs.map((ref) => [ref, { ref, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema]));
   const base = useStore.getState().catalog.schemas[VID] ?? ({ slots: {}, params: [] } as unknown as ModelSchema);
@@ -62,8 +63,8 @@ function setup() {
   usePlanRewrite.setState({ busy: {}, failed: {} });
 }
 
-const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', ...part }] } });
-const proposal = (model?: string) => ({ name: 'propose_plan', args: { title: 'P', steps: [{ id: 's1', kind: 'image', title: 'I', prompt: 'a lighthouse', count: 1, ...(model ? { model } : {}) }] } });
+const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, ...part }] } });
+const proposal = (model?: string, userRequested = false) => ({ name: 'propose_plan', args: { title: 'P', steps: [{ id: 's1', kind: 'image', title: 'I', prompt: 'a lighthouse', count: 1, ...(model ? { model, user_requested: userRequested } : {}) }] } });
 const settingsItems = () => st().feed.filter((f): f is SettingsFeedItem => f.type === 'settings');
 const planItem = () => st().feed.filter((f): f is PlanFeedItem => f.type === 'plan').at(-1);
 
@@ -83,7 +84,7 @@ describe('Auto: confirm_settings without a card', () => {
   });
 
   it('(b) a model the user names in the request is applied with no Keep / Change card', async () => {
-    script = [ask({ model: 'nano banana 2 lite' }), proposal(LITE)];
+    script = [ask({ model: 'nano banana 2 lite', user_requested: true }), proposal(LITE, true)];
     await sendAgentMessage('Una imagen de un faro con nano banana 2 lite');
     expect(settingsItems()).toHaveLength(1);
     expect(settingsItems()[0]).toMatchObject({ status: 'confirmed', inline: true, sections: [{ chosen: { modelRef: LITE } }] });
@@ -132,6 +133,20 @@ describe('plan card settings', () => {
     await changePlanChoice(sid(), 'pl1', 'video', { modelRef: VID, aspect: '9:16', duration: 8, resolution: '1080p', needsImage: false });
     expect(steps().find((x) => x.kind === 'video')).toMatchObject({ modelRef: VID, settings: { aspect: '9:16', duration: 8 } });
     expect(st().agent.settings?.video).toMatchObject({ aspect: '9:16', duration: 8 });
+  });
+
+  it('(d2) changing one image line in a comparison leaves the other model, session, and composer alone', async () => {
+    put([img('a1'), img('a2'), img('b1', { modelRef: NANO }), img('b2', { modelRef: NANO })]);
+    useStore.setState((s) => ({
+      composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE } },
+      sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, settings: { image: { modelRef: LITE, needsImage: false, count: 1, aspect: '1:1' } } } } },
+    }));
+    setPromptWriter(sid(), 'pl1', false);
+    expect(planSections(st().feed, planItem()!).map((x) => [x.recommended.modelRef, x.count])).toEqual([[ATLAS, 2], [NANO, 2]]);
+    await changePlanChoice(sid(), 'pl1', 'image', { modelRef: LITE, aspect: '1:1', count: 1, needsImage: false }, NANO);
+    expect(steps().filter((x) => x.kind === 'image').map((x) => x.modelRef)).toEqual([ATLAS, ATLAS, LITE, LITE]);
+    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    expect(useStore.getState().composer.image.modelRef).toBe(LITE);
   });
 
   it('(e) rewritePrompts replaces only the prompts and clears busy; a bad answer sets failed and leaves them unchanged', async () => {
@@ -205,21 +220,21 @@ describe('Auto: which model and values, without a card (sandbox session 2026-10-
 
   it('(g) a model switch keeps the values this request asked for, not the ones confirmed before', async () => {
     withAspects();
-    script = [ask({ model: 'nano banana 2 lite', aspect: '4:3' }), proposal(LITE)];
+    script = [ask({ model: 'nano banana 2 lite', user_requested: true, aspect: '4:3' }), proposal(LITE, true)];
     await sendAgentMessage('Ahora con nano banana 2 lite, en 4:3');
     expect(settingsItems()[0].sections[0].chosen).toMatchObject({ modelRef: LITE, aspect: '4:3' });
   });
 
-  it('(h) no model named: the one picked in the composer is the model, not the confirmed one', async () => {
+  it('(h) no model requested: the confirmed session model wins over a later composer pick', async () => {
     useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } } }));
     script = [ask({ model: ATLAS }), proposal()];
     await sendAgentMessage('Una imagen de un faro');
-    expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(LITE);
+    expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(ATLAS);
   });
 
   it('(i) a model named in the request wins over the composer pick', async () => {
     useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } }, sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, settings: undefined } } } }));
-    script = [ask({ model: ATLAS }), proposal(ATLAS)];
+    script = [ask({ model: ATLAS, user_requested: true }), proposal(ATLAS, true)];
     await sendAgentMessage('Una imagen de un faro con nano banana 2');
     expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(ATLAS);
   });
@@ -234,7 +249,7 @@ describe('Auto: a model named in a reply to the waiting plan (sandbox session 20
     script = [ask({}), proposal()];
     await sendAgentMessage('Una imagen de un faro');
     expect(planItem()?.status).toBe('awaiting');
-    script = [ask({ model: LITE }), proposal(LITE)];
+    script = [ask({ model: LITE, user_requested: true }), proposal(LITE, true)];
     await sendAgentMessage('Nano banana 2 es muy caro. Usa mejor nano banana 2 lite');
     expect(planItem()?.plan.steps.map((x) => (x as ImageStep).modelRef)).toEqual([LITE]);
   });
@@ -253,9 +268,9 @@ describe('Auto: approving a plan confirms what it runs', () => {
 
 describe('confirm_settings numbers as text', () => {
   it('a numeric string duration is accepted as a number', () => {
-    const r = confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', duration: '8' }] });
+    const r = confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', user_requested: false, duration: '8' }] });
     expect(r.success).toBe(true);
     expect(r.success && r.data.parts[0].duration).toBe(8);
-    expect(confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', duration: '121' }] }).success).toBe(false);
+    expect(confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', user_requested: false, duration: '121' }] }).success).toBe(false);
   });
 });

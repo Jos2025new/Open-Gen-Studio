@@ -62,10 +62,10 @@ afterEach(() => vi.unstubAllGlobals());
 const sid = () => useStore.getState().activeSessionId;
 const feed = () => useStore.getState().sessions[sid()].feed;
 const card = () => feed().find((f): f is SettingsFeedItem => f.type === 'settings')!;
-const plan = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', title: 'Clip', model: REF, prompt: 'a cat', resolution: '1080p' }] } };
+const plan = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', title: 'Clip', model: REF, user_requested: false, prompt: 'a cat', resolution: '1080p' }] } };
 
 async function openCard() {
-  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'video', model: REF }] } }];
+  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'video', model: REF, user_requested: false }] } }];
   await sendAgentMessage('un video de un gato');
 }
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ensureSchema, inputVariant, modelSummary } from '../catalog';
+import { ensureSchema, inputVariant, lineRoutes, modelSummary } from '../catalog';
 import { guideForModel } from '../guides';
 import { chat } from '../providers/llm';
 import { VIDEO_DIRECTION_POLICY } from '../procedure';
@@ -11,6 +11,7 @@ import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
 import { agentEngine, llmCallUsd } from './runtime';
 import { settingsOptions } from './settingsCard';
+import { rememberSessionModel } from './sessionModel';
 
 /*
  * Auto's one card (docs/features/agente.md, "Auto: una tarjeta"): the plan card carries the settings card's model,
@@ -22,6 +23,7 @@ import { settingsOptions } from './settingsCard';
 export type GenKind = 'image' | 'video';
 type GenStep = Extract<PlanStep, { kind: GenKind }>;
 const get = useStore.getState;
+const modelGroup = (ref: string) => lineRoutes(ref).text ?? ref;
 
 /** Rewrites in flight and the last failure, per plan card. */
 export const usePlanRewrite = create<{ busy: Record<string, boolean>; failed: Record<string, string> }>(() => ({ busy: {}, failed: {} }));
@@ -50,13 +52,15 @@ export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSect
   if (plan.style !== 'auto' || plan.nodeRun || plan.plan.workspace === 'node') return [];
   const out: SettingsSection[] = [];
   for (const kind of ['image', 'video'] as const) {
-    const steps = plan.plan.steps.filter(isGen).filter((s) => s.kind === kind);
-    if (!steps.length) continue;
-    const s = steps[0];
-    const choice: SettingsChoice = { modelRef: s.modelRef, aspect: s.settings.aspect, resolution: s.settings.resolution, needsImage: needsImage(s), ...(kind === 'video' ? { duration: s.settings.duration } : { count: s.settings.count }) };
-    const was = inlineSection(feed, plan.id, kind)?.section;
-    const alternatives = was ? [was.recommended.modelRef, ...was.alternatives].filter((r) => r !== s.modelRef) : [];
-    out.push({ kind, count: steps.length, recommended: choice, chosen: choice, alternatives });
+    const all = plan.plan.steps.filter(isGen).filter((s) => s.kind === kind);
+    for (const group of new Set(all.map((s) => modelGroup(s.modelRef)))) {
+      const steps = all.filter((s) => modelGroup(s.modelRef) === group);
+      const s = steps[0];
+      const choice: SettingsChoice = { modelRef: group, aspect: s.settings.aspect, resolution: s.settings.resolution, needsImage: needsImage(s), ...(kind === 'video' ? { duration: s.settings.duration } : { count: s.settings.count }) };
+      const was = inlineSection(feed, plan.id, kind)?.section;
+      const alternatives = was ? [was.recommended.modelRef, ...was.alternatives].filter((r) => r !== group) : [];
+      out.push({ kind, count: steps.length, recommended: choice, chosen: choice, alternatives });
+    }
   }
   return out;
 }
@@ -74,16 +78,17 @@ function applyChoice(s: GenStep, c: SettingsChoice): GenStep {
 
 /** The session's confirmed choice of this kind follows the card, so the next request starts from it. */
 function remember(sessionId: string, kind: GenKind, c: SettingsChoice, draft?: DraftMode) {
-  patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, settings: { ...s.agent.settings, [kind]: c }, ...(draft ? { draftMode: draft } : {}) } }));
+  rememberSessionModel(sessionId, kind, c, true);
+  if (draft) patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, draftMode: draft } }));
   const feed = get().sessions[sessionId].feed;
   const last = [...feed].reverse().find((f): f is SettingsFeedItem => f.type === 'settings' && Boolean(f.inline) && f.sections.some((x) => x.kind === kind));
   if (last) updateFeedItem<SettingsFeedItem>(sessionId, last.id, { sections: last.sections.map((x) => (x.kind === kind ? { ...x, chosen: c } : x)), ...(draft ? { draft } : {}) });
 }
 
 /** The user changed the model or a value of one kind on the plan card. */
-export async function changePlanChoice(sessionId: string, itemId: string, kind: GenKind, next: SettingsChoice): Promise<void> {
+export async function changePlanChoice(sessionId: string, itemId: string, kind: GenKind, next: SettingsChoice, sourceModelRef?: string): Promise<void> {
   const item = planOf(sessionId, itemId);
-  const before = item?.plan.steps.find((s): s is GenStep => isGen(s) && s.kind === kind);
+  const before = item?.plan.steps.find((s): s is GenStep => isGen(s) && s.kind === kind && (!sourceModelRef || modelGroup(s.modelRef) === modelGroup(sourceModelRef)));
   if (!item || !before) return;
   await Promise.all([ensureSchema(next.modelRef), ...item.plan.steps.filter(isGen).map((s) => ensureSchema(stepModel(next.modelRef, s)))]);
   const draft = kind === 'video' ? planDraft(sessionId) : undefined;
@@ -92,10 +97,14 @@ export async function changePlanChoice(sessionId: string, itemId: string, kind: 
   const c = kind === 'video' && !picked ? withModeResolution(next, draft, settingsOptions(get().catalog.schemas[next.modelRef], 'video').resolutions, next.resolution) : next;
   const now = planOf(sessionId, itemId);
   if (!now) return;
-  updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...now.plan, steps: now.plan.steps.map((s) => (isGen(s) && s.kind === kind ? applyChoice(s, c) : s)) } });
-  remember(sessionId, kind, c);
+  const group = modelGroup(before.modelRef);
+  const comparison = now.comparisonKinds?.includes(kind) || new Set(now.plan.steps.filter(isGen).filter((s) => s.kind === kind).map((s) => modelGroup(s.modelRef))).size > 1;
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, { comparisonKinds: comparison ? [...new Set([...(now.comparisonKinds ?? []), kind])] : now.comparisonKinds, plan: { ...now.plan, steps: now.plan.steps.map((s) => (isGen(s) && s.kind === kind && modelGroup(s.modelRef) === group ? applyChoice(s, c) : s)) } });
+  if (!comparison) remember(sessionId, kind, c);
+  else patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, settingsParts: s.agent.settingsParts?.map((p) => p.kind === kind && modelGroup(p.modelRef) === group ? { ...c, kind } : p) } }));
+  const changedIds = now.plan.steps.filter(isGen).filter((s) => s.kind === kind && modelGroup(s.modelRef) === group).map((s) => s.id);
   const prompts = stepModel(c.modelRef, before) !== before.modelRef;
-  if (promptWriterOn(sessionId) && (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect)) await rewritePrompts(sessionId, itemId, kind);
+  if (promptWriterOn(sessionId) && (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect)) await rewritePrompts(sessionId, itemId, kind, c.modelRef, changedIds);
 }
 
 /** Borrador / Alta calidad / the user's words on the plan card: the app sets (a draft locks) the video resolution. */
@@ -114,7 +123,9 @@ export function changePlanDraft(sessionId: string, itemId: string, kind: DraftMo
   });
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...item.plan, steps } });
   const video = planSections(get().sessions[sessionId].feed, { ...item, plan: { ...item.plan, steps } }).find((x) => x.kind === 'video');
-  if (video) remember(sessionId, 'video', { ...video.recommended, ...(chosen ? { resolution: chosen.resolution } : {}) }, mode);
+  const comparison = item.comparisonKinds?.includes('video') || new Set(item.plan.steps.filter(isGen).filter((s) => s.kind === 'video').map((s) => modelGroup(s.modelRef))).size > 1;
+  if (video && !comparison) remember(sessionId, 'video', { ...video.recommended, ...(chosen ? { resolution: chosen.resolution } : {}) }, mode);
+  else patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, draftMode: mode } }));
 }
 
 /** The price button: ask the provider's price again for the plan's steps (Atlas quotes; schemas that had not loaded). */
@@ -153,10 +164,10 @@ function stepInputs(s: GenStep): string {
  * Rewrite the prompts of one kind for the card as it is now: its model (and prompting guide), duration, aspect and the
  * images each step sends, with the agent's video rules. The agent is told that the card's writer wrote them, not it.
  */
-export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind): Promise<void> {
+export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[]): Promise<void> {
   const engine = agentEngine();
   const item = planOf(sessionId, itemId);
-  const steps = item?.plan.steps.filter(isGen).filter((s) => s.kind === kind && s.prompt.trim()) ?? [];
+  const steps = item?.plan.steps.filter(isGen).filter((s) => s.kind === kind && s.prompt.trim() && (stepIds ? stepIds.includes(s.id) : !groupModelRef || modelGroup(s.modelRef) === modelGroup(groupModelRef))) ?? [];
   if (engine.kind !== 'llm' || !item || !steps.length) return;
   const run = (runs.get(itemId) ?? 0) + 1;
   runs.set(itemId, run);
@@ -184,7 +195,7 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
       const done: string[] = [];
       const next = now.plan.steps.map((s) => {
         const p = out[s.id];
-        if (!isGen(s) || s.kind !== kind || typeof p !== 'string' || !p.trim()) return s;
+        if (!isGen(s) || !steps.some((x) => x.id === s.id) || typeof p !== 'string' || !p.trim()) return s;
         done.push(`${s.id}: "${p.trim()}"`);
         return { ...s, prompt: p.trim() } as GenStep;
       });

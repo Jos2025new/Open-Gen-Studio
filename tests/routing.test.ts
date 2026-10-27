@@ -123,16 +123,16 @@ describe('the plan follows the table unless the user picked the composer model (
   });
 
   it('the composer model wins over one only the plan names; a model the user named wins', async () => {
-    const plan = (said: string) =>
+    const plan = (said: string, requested: boolean) =>
       normalizePlan(
-        { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: 'atlas::alibaba/wan-3.0/text-to-video' }] },
+        { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', user_requested: requested, model: 'atlas::alibaba/wan-3.0/text-to-video' }] },
         { ...ctx(true), userText: () => said },
         'p',
       );
-    const kept = await plan('haz un video de un gato');
+    const kept = await plan('haz un video de un gato', false);
     expect((kept.plan!.steps[0] as { modelRef: string }).modelRef).toBe('atlas::kwaivgi/kling-v3.0-pro/text-to-video');
     expect(kept.plan!.adjustments.join(' ')).toMatch(/kept your video model/);
-    const asked = await plan('hazlo con wan 3');
+    const asked = await plan('hazlo con wan 3', true);
     expect((asked.plan!.steps[0] as { modelRef: string }).modelRef).toBe('atlas::alibaba/wan-3.0/text-to-video');
   });
 

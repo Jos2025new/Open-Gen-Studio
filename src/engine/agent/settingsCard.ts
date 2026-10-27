@@ -139,6 +139,8 @@ export async function buildSettings(req: SettingsRequest, deps: SettingsDeps): P
   } else {
     recommended = deps.defaultModel('image', needsImage) ?? undefined;
   }
+  const selected = recommended ? await deps.getModel(recommended) : null;
+  if (selected && selected.model.kind !== req.kind) return { error: `${selected.model.name} is an ${selected.model.kind} model, not a ${req.kind} model. Explain the limit and offer a compatible model or a feasible adapted request; do not substitute silently.` };
   // Images attached to a text-only endpoint: the app runs the family's variant, nobody picks it.
   if (recommended && needsImage && deps.inputVariant) {
     const cur = await deps.getModel(recommended);

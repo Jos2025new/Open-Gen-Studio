@@ -180,7 +180,7 @@ export default [
     what: 'Decisión del usuario (ADR 0009, enmienda a 0007-9): una operación con modelo de imagen confirma su modelo (Auto una vez por sesión, Guided en cada petición; Direct usa el compositor).',
     sides: [
       ['src/engine/procedure.ts', 'An op step that runs on an image model (edit engine) needs the image kind confirmed'],
-      ['src/engine/agent/runtime.ts', 'An operation that runs on an image model needs the image kind confirmed'],
+      ['src/engine/agent/runtime.ts', 'const kinds = v.data.steps.map'],
     ],
     tests: ['tests/agent-force.test.ts', 'tests/agent-fit-plan.test.ts'],
   },
@@ -218,7 +218,7 @@ export default [
     id: 'user-model-notes',
     what: 'Los cambios sobre un modelo elegido por el usuario («your … model») se ven siempre en la tarjeta y como aviso.',
     sides: [
-      ['src/engine/plan.ts', 'kept your ${kind} model'],
+      ['src/engine/plan.ts', 'your ${kind} model has no variant'],
       ['src/components/chat/PlanCard.tsx', 'const aboutUserModel'],
       ['src/engine/agent/runtime.ts', '/\\byour [\\w-]+ model\\b/'],
     ],

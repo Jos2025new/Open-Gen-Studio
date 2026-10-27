@@ -548,7 +548,7 @@ export interface QuestionsFeedItem extends FeedBase {
   toolCallId?: string;
 }
 
-/** Settings confirmed before prompts are written (phase 2): the model and its main values. */
+/** Confirmed model and values. */
 export interface SettingsChoice {
   modelRef: string;
   resolution?: string;
@@ -562,7 +562,7 @@ export interface SettingsChoice {
   count?: number;
 }
 
-/** One kind of step on the settings card (images first, then video). */
+/** One settings-card part. */
 export interface SettingsSection {
   kind: 'video' | 'image';
   /** Clips or images the plan will make with these settings. */
@@ -570,7 +570,8 @@ export interface SettingsSection {
   recommended: SettingsChoice;
   /** A few other models that take the same inputs. */
   alternatives: string[];
-  /** The selection while the card is open (typing confirms it), then the confirmed one. */
+  modelSelection?: { requested?: string; reason: string };
+  /** Card selection. */
   chosen?: SettingsChoice;
 }
 
@@ -630,6 +631,7 @@ export interface PlanFeedItem extends FeedBase {
   /** Approval of existing node IDs; never materialized again. */
   nodeRun?: { targets: string[]; force: boolean; signature: string };
   type: 'plan';
+  comparisonKinds?: Array<'image' | 'video'>;
   plan: Plan;
   style: AgentStyle;
   status: 'awaiting' | 'running' | 'done' | 'partial' | 'error' | 'canceled' | 'review';

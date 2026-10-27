@@ -68,7 +68,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const imagePlan = (count: number, model?: string) => ({
   name: 'propose_plan',
-  args: { title: 'Propuestas del vestido', steps: [{ id: 's1', kind: 'image', title: 'Propuestas', prompt: 'the dress on a model', count, ...(model ? { model } : {}) }] },
+  args: { title: 'Propuestas del vestido', steps: [{ id: 's1', kind: 'image', title: 'Propuestas', prompt: 'the dress on a model', count, ...(model ? { model, user_requested: false } : {}) }] },
 });
 
 describe('propose_plan with a confirmed image kind, decided by the plan cost', () => {
@@ -123,7 +123,7 @@ describe('Auto: the settings card comes once per kind; spending is approved on t
 describe('Guided: the settings card comes in every request', () => {
   it('two requests → two cards, even with the kind confirmed before', async () => {
     useStore.setState({ composer: { ...useStore.getState().composer, agentStyle: 'guided' } });
-    const ask = { name: 'confirm_settings', args: { parts: [{ kind: 'image', refs: 0 }] } };
+    const ask = { name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, refs: 0 }] } };
     replies = [ask];
     await sendAgentMessage('Una imagen de este vestido');
     const first = settingsCards()[0] as unknown as SettingsFeedItem;

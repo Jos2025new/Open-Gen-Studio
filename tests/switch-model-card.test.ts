@@ -35,7 +35,7 @@ let primed = false;
 function prime() {
   if (primed || useStore.getState().composer.agentStyle !== 'guided') return;
   primed = true;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } } } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } }, settingsParts: [{ kind: 'image', modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' }] } } } }));
 }
 
 function setup(style: 'guided' | 'direct' = 'guided') {
@@ -60,8 +60,9 @@ function setup(style: 'guided' | 'direct' = 'guided') {
 }
 const card = () => st().feed.find((f) => f.type === 'settings') as SettingsFeedItem | undefined;
 const plan = () => st().feed.filter((f) => f.type === 'plan').at(-1) as PlanFeedItem | undefined;
-const ask = { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: GROK }] } };
-const steps = (...m: Array<string | undefined>) => ({ name: 'propose_plan', args: { title: 'P', steps: m.map((model, i) => ({ id: `s${i + 1}`, kind: 'image', title: `I${i}`, prompt: `p${i}`, count: 1, ...(model ? { model } : {}) })) } });
+const ask = { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: GROK, user_requested: true }] } };
+const steps = (...m: Array<string | undefined>) => ({ name: 'propose_plan', args: { title: 'P', steps: m.map((model, i) => ({ id: `s${i + 1}`, kind: 'image', title: `I${i}`, prompt: `p${i}`, count: 1, ...(model ? { model, user_requested: false } : {}) })) } });
+const requestedSteps = (...m: Array<string | undefined>) => ({ name: 'propose_plan', args: { title: 'P', steps: m.map((model, i) => ({ id: `s${i + 1}`, kind: 'image', title: `I${i}`, prompt: `p${i}`, count: 1, ...(model ? { model, user_requested: true } : {}) })) } });
 const refs = () => plan()!.plan.steps.map((x) => (x as ImageStep).modelRef);
 
 describe('model switch: refusal, card, confirmation', () => {
@@ -69,7 +70,7 @@ describe('model switch: refusal, card, confirmation', () => {
 
   it('the plan is refused with the exact fix when the user named another model', async () => {
     setup();
-    script = [steps(GROK)];
+    script = [requestedSteps(GROK)];
     const tools: string[] = [];
     vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
@@ -93,9 +94,12 @@ describe('model switch: refusal, card, confirmation', () => {
     expect(c.switchFrom?.modelRef).toBe(FLUX);
     expect(c.sections).toHaveLength(1);
     expect(c.sections[0].recommended).toMatchObject({ modelRef: GROK, count: 2 });
-    script = [steps(GROK, undefined)];
+    script = [{ name: 'propose_plan', args: { title: 'P', steps: [
+      { id: 's1', kind: 'image', title: 'I1', prompt: 'p1', count: 1, model: GROK, user_requested: true },
+      { id: 's2', kind: 'image', title: 'I2', prompt: 'p2', count: 1, model: FLUX, user_requested: false },
+    ] } }];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(FLUX);
+    expect(st().agent.settings?.image?.modelRef).toBe(GROK);
     expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([GROK, FLUX]);
     expect(refs()).toEqual([GROK, FLUX]);
   });
@@ -105,7 +109,7 @@ describe('model switch: refusal, card, confirmation', () => {
     script = [ask];
     await sendAgentMessage('Prueba ahora con grok image imagine');
     const c = card()!;
-    script = [steps(GROK, GROK, GROK)];
+    script = [requestedSteps(GROK, GROK, GROK)];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
     expect(refs()).toEqual([GROK, GROK, GROK]);
   });

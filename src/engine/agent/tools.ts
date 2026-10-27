@@ -163,9 +163,10 @@ export const TOOLS: ToolSpec[] = [
           duration: { type: 'number', description: 'Video: seconds per clip you recommend.' },
           aspect: { type: 'string', description: 'Shape you recommend ("9:16"); leave out to keep a start image\'s shape.' },
           model: { type: 'string', description: 'The model named/selected by the user; omit to use the app recommendation. Recommend another listed model only for a required capability or requested comparison.' },
+          user_requested: { type: 'boolean', description: 'True only if the user requested this model, including an accepted alternative or a comparison. False for your recommendation. Never infer a new request from an older choice.' },
           provider: PROVIDER_PARAM,
               },
-              required: ['kind'],
+              required: ['kind', 'user_requested'],
             },
           },
         },
@@ -256,6 +257,7 @@ export const TOOLS: ToolSpec[] = [
                 prompt: { type: 'string', description: 'image/video: full generation prompt, at most 4000 characters (English, except quoted dialogue and on-screen text). model3d: the object (shape, materials, style). audio: the music description, or the lyrics theme for a lyrics model.' },
                 prompt_from: { type: 'string', description: 'image/video/audio: id of a text step whose text prefixes the prompt.' },
                 lyrics_from: { type: 'string', description: 'audio (music models): id of a step whose text becomes the song lyrics (a lyrics step or a text step).' },
+                user_requested: { type: 'boolean', description: 'Required with model: true only when the user requested it in this request; false for a recommendation or inherited selection.' },
                 model: { type: 'string', description: 'Confirmed or user-named/selected model ref "provider::id" or compatible family; also supported for edit/animate ops. Omit to use the app default/source precedence, not necessarily the composer model.' },
                 purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'video without "model": draft (test, cheapest), normal (default), long (over 15 s, up to 30 s). The app picks the cheapest fitting model.' },
                 aspect: { type: 'string', description: 'e.g. "16:9", "9:16", "1:1", "4:5".' },
@@ -368,17 +370,16 @@ export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'ret
 const num = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
 const settingsPartSchema = z.object({
   kind: z.enum(['video', 'image']),
-  // Video only; any other value (an image "purpose") is dropped instead of refusing the card.
   purpose: z.unknown().optional().transform((v) => (v === 'draft' || v === 'normal' || v === 'long' ? v : undefined)),
   start_image: z.boolean().optional(),
   refs: z.number().int().min(0).max(20).optional(),
   count: num.pipe(z.number().int().min(1).max(24)).optional(),
   duration: num.pipe(z.number().min(0).max(120)).optional(),
   aspect: z.string().max(20).optional(),
+  user_requested: z.boolean(),
   model: z.string().max(200).optional(),
   provider: z.string().max(40).optional(),
 });
-// One card per plan: its parts (a single object without "parts" is read as one part, for older calls).
 export const confirmSettingsSchema = z.preprocess(
   (v) => (v && typeof v === 'object' && !('parts' in v) && 'kind' in v ? { summary: (v as { summary?: unknown }).summary, parts: [v] } : v),
   z.object({ summary: z.string().max(300).optional(), parts: z.array(settingsPartSchema).min(1).max(4) }),
@@ -399,6 +400,7 @@ const stepSchema = z
     prompt_from: z.string().optional(),
     lyrics_from: z.string().optional(),
     model: z.string().optional(),
+    user_requested: z.boolean().optional(),
     purpose: z.enum(['draft', 'normal', 'long']).optional(),
     aspect: z.string().optional(),
     resolution: z.string().optional(),
@@ -425,7 +427,7 @@ const stepSchema = z
     shapes: z.array(z.record(z.string(), z.unknown())).optional(),
     strokes: z.array(z.record(z.string(), z.unknown())).optional(),
   })
-  .passthrough();
+  .passthrough().superRefine((s, ctx) => { if (s.model?.trim() && typeof s.user_requested !== 'boolean') ctx.addIssue({ code: 'custom', path: ['user_requested'], message: 'Required when model is provided.' }); });
 
 const STEPS_AS_TEXT = Symbol('steps sent as broken text');
 const STEPS_HELP =
@@ -442,7 +444,6 @@ export const proposePlanSchema = z.object({
     .array(z.object({ name: z.string().max(40), kind: z.enum(['character', 'object', 'product', 'location', 'style']).optional(), from: z.string().max(80), description: z.string().max(200).optional() }))
     .max(6)
     .optional(),
-  // Some models send the array as a JSON string: a valid one is read; a broken one gets an error that says how to fix it.
   steps: z.preprocess(
     (v) => {
       if (typeof v !== 'string') return v;
@@ -473,14 +474,12 @@ export function toRawPlan(v: z.infer<typeof proposePlanSchema>): RawPlan {
   return v as unknown as RawPlan;
 }
 
-/** What the agent has and has not, built from TOOLS so it never drifts from the real tool list. */
 export const CAPABILITIES = [
   'YOU HAVE these tools (call them; do not wonder whether you can):',
   ...TOOLS.map((t) => `- ${t.function.name}: ${t.function.description.split(/(?<=\.)\s/)[0]}`),
   'YOU DO NOT HAVE: files, the internet, a shell, or anything outside these tools and <app_context>. Never claim results you did not get from them.',
 ].join('\n');
 
-/** Anti-drift rules: first and last in the system prompt (models weigh the start and the end most). */
 export const MUST = `YOU MUST:
 - If a tool can answer it, call the tool now; do not speculate about what it would return.
 - If only the user has a piece of data, ask_questions; never invent it. Never cite step ids, asset ids or models that the context or a tool did not give you.

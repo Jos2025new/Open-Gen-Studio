@@ -18,14 +18,14 @@ const SEEDREAM = 'atlas::bytedance/seedream-v5.0-pro/text-to-image';
 const before = useStore.getState();
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(before); });
 
-async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: boolean; planModel?: string; text?: string; steps?: unknown[]; subjects?: unknown[]; continuity?: unknown[] }) {
+async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: boolean; planModel?: string; planModelRequested?: boolean; text?: string; steps?: unknown[]; subjects?: unknown[]; continuity?: unknown[] }) {
   vi.stubGlobal('location', { href: 'http://localhost/' });
   const sent: string[] = [];
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify(serve(String(url))));
     sent.push(JSON.stringify(body.messages));
-    const step = { id: 's1', kind: 'image', title: 'Imagen', prompt: 'a red bicycle', count: 1, ...(opts.planModel ? { model: opts.planModel } : {}) };
+    const step = { id: 's1', kind: 'image', title: 'Imagen', prompt: 'a red bicycle', count: 1, ...(opts.planModel ? { model: opts.planModel, user_requested: opts.planModelRequested ?? false } : {}) };
     const delta = sent.length > 1
       ? { content: 'Listo.' }
       : { tool_calls: [{ index: 0, id: 'p', function: { name: 'propose_plan', arguments: JSON.stringify({ title: 't', steps: opts.steps ?? [step], ...(opts.subjects ? { subjects: opts.subjects } : {}), ...(opts.continuity ? { continuity: opts.continuity } : {}) }) } }] };
@@ -45,20 +45,19 @@ async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: bo
   return { model: plan ? (plan.plan.steps[0] as ImageStep).modelRef : undefined, plan, first: sent[0] ?? '', messages: sent };
 }
 
-describe('Direct runs the composer model, not one confirmed earlier in the session', () => {
-  it('a card confirmed in Auto does not replace the composer model in Direct, and the guide matches the model that runs', async () => {
+describe('Direct uses an explicit request, then the session model, then the composer', () => {
+  it('a confirmed model from the session wins over a later composer pick, and the guide matches', async () => {
     for (const userPicked of [true, false]) {
       const r = await run({ style: 'direct', confirmed: SEEDREAM, userPicked });
-      expect(r.model).toBe(NANO);
-      expect(r.first).toContain('(model:nano-banana)');
-      expect(r.first).not.toContain('(model:seedream)');
+      expect(r.model).toBe(SEEDREAM);
+      expect(r.first).toContain('(model:seedream)');
     }
   });
 
-  it('a model the plan names is not run in Direct unless the user named it', async () => {
+  it('a plan recommendation cannot override the composer; a model the user requests can', async () => {
     const r = await run({ style: 'direct', userPicked: false, planModel: SEEDREAM });
     expect(r.model).toBe(NANO);
-    const named = await run({ style: 'direct', userPicked: false, planModel: SEEDREAM, text: 'Una bicicleta roja con Seedream 5.0 Pro' });
+    const named = await run({ style: 'direct', userPicked: false, planModel: SEEDREAM, planModelRequested: true, text: 'Una bicicleta roja con Seedream 5.0 Pro' });
     expect(named.model).toBe(SEEDREAM);
   });
 
@@ -69,15 +68,18 @@ describe('Direct runs the composer model, not one confirmed earlier in the sessi
 });
 
 describe('Direct video guides follow the models that can run', () => {
-  it('the per-route video models count, a session confirmation does not', () => {
+  it('a session model replaces composer routes; routes count when the session has no model', () => {
     const sid = before.activeSessionId;
     useStore.setState({
       composer: { ...before.composer, agentStyle: 'direct', attachments: [], video: { ...before.composer.video, modelRef: 'nanogpt::seedance-2.0' }, videoRoutes: { image: 'atlas::kwaivgi/kling-v3.0-pro/image-to-video' } },
       sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], agent: { ...before.sessions[sid].agent, settings: { video: { modelRef: 'atlas::alibaba/wan-3.0/text-to-video', needsImage: false } } } } },
     });
+    expect(directModelRefs(sid, 'video')).toEqual(['atlas::alibaba/wan-3.0/text-to-video']);
+    expect(earlyModelGuide(sid, 'model:seedance')).toContain('direct mode');
+    expect(earlyModelGuide(sid, 'model:kling')).toContain('direct mode');
+    expect(earlyModelGuide(sid, 'model:wan')).toBeUndefined();
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agent: { ...s.sessions[sid].agent, settings: undefined } } } }));
     expect(directModelRefs(sid, 'video')).toEqual(expect.arrayContaining(['nanogpt::seedance-2.0', 'atlas::kwaivgi/kling-v3.0-pro/image-to-video']));
-    expect(earlyModelGuide(sid, 'model:seedance')).toBeUndefined();
-    expect(earlyModelGuide(sid, 'model:kling')).toBeUndefined();
     expect(earlyModelGuide(sid, 'model:wan')).toContain('direct mode');
   });
 });
@@ -99,7 +101,7 @@ describe('a chained upscale reads the source size from the step it comes from', 
 
 describe('new agent proposals require declared continuity for recurring named subjects', () => {
   const steps = [
-    { id: 's1', kind: 'image', title: 'Reference', prompt: 'a person in a red scarf', count: 1 },
+      { id: 's1', kind: 'image', title: 'Reference', prompt: 'a person in a red scarf', count: 1 },
     { id: 's2', kind: 'image', title: 'Walk', prompt: '@Reto walks through a doorway', refs: ['s1'], count: 1 },
     { id: 's3', kind: 'image', title: 'Turn', prompt: '@reto turns toward the camera', refs: ['s1'], count: 1 },
   ];

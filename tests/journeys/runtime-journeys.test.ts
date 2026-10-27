@@ -60,7 +60,7 @@ const settingsCard = () => useStore.getState().sessions[sessionId].feed.find((f)
 
 describe('runtime request and card decisions', () => {
   it('a question or objection while settings are open does not confirm or approve', async () => {
-    replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF }] } }, { text: 'That was only a question.' }];
+    replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, user_requested: false }] } }, { text: 'That was only a question.' }];
     await sendAgentMessage('Create a cat');
     expect(settingsCard()?.status).toBe('pending');
     await sendAgentMessage('Why that model?');
@@ -87,12 +87,12 @@ describe('runtime request and card decisions', () => {
 
   it('presents a simulated revision that already preserves the unrequested step and its settings', async () => {
     const original = { title: 'Two options', steps: [
-      { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
-      { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },
+      { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, user_requested: false, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
+      { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, user_requested: false, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },
     ] };
     const revised = { ...original, revision: true, steps: [original.steps[0], { ...original.steps[1], prompt: 'back view, blue jacket' }] };
     replies = [
-      { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, count: 1 }] } },
+      { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, user_requested: false, count: 1 }] } },
       { name: 'propose_plan', args: original },
       { name: 'propose_plan', args: revised },
     ];
@@ -115,15 +115,15 @@ describe('runtime request and card decisions', () => {
 
   it('characterization: accepts an unrequested change to step one and includes it in the revised plan for user review', async () => {
     const original = { title: 'Two options', steps: [
-      { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
-      { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },
+      { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, user_requested: false, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
+      { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, user_requested: false, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },
     ] };
     const revised = { ...original, revision: true, steps: [
       { ...original.steps[0], prompt: 'portrait, red hat' },
       { ...original.steps[1], prompt: 'back view, blue jacket' },
     ] };
     replies = [
-      { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, count: 1 }] } },
+      { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, user_requested: false, count: 1 }] } },
       { name: 'propose_plan', args: original },
       { name: 'propose_plan', args: revised },
     ];

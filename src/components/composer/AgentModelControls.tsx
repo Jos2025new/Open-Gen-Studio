@@ -10,6 +10,7 @@ import { setComposer, setSettings, useStore } from '../../store/store';
 import { Chip } from '../ui/primitives';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { ModelList } from './ModelList';
+import { setSessionModelAsDefault } from '../../engine/agent/sessionModel';
 
 type PickerId = 'director' | 'image' | 'video' | 'audio' | 'model3d';
 const label: Record<PickerId, string> = { director: 'Director', image: 'Image', video: 'Video', audio: 'Music', model3d: '3D' };
@@ -22,14 +23,14 @@ function modelName(ref: string | null | undefined): string {
 
 const mediaModel = (m: ModelSummary) => !m.tags.length;
 
-function SummaryRow({ id, name, modelId, state, onClick }: { id: PickerId; name: string; modelId: string; state: 'auto' | 'manual' | 'default'; onClick: () => void }) {
+function SummaryRow({ id, name, modelId, state, onClick, setAsDefault }: { id: PickerId; name: string; modelId: string; state: 'auto' | 'manual' | 'default'; onClick: () => void; setAsDefault?: () => void }) {
   return (
-    <button type="button" className="agent-model-row" onClick={onClick}>
-      <span className="agent-model-role">{label[id]}</span>
-      <span className="agent-model-name" title={name}><ModelBrandIcon id={modelId} name={name} local={modelId.startsWith('local::') || name === 'Local planner'} className="model-brand-small" /><span className="agent-model-label">{name}</span></span>
-      <span className={`agent-model-state is-${state}`}>{state === 'manual' ? 'set' : state === 'default' ? 'default' : 'auto'}</span>
-      <ChevronRight size={13} />
-    </button>
+    <div className="agent-model-row">
+      <button type="button" className="agent-model-role" onClick={onClick}>{label[id]}</button>
+      <button type="button" className="agent-model-name" title={name} onClick={onClick}><ModelBrandIcon id={modelId} name={name} local={modelId.startsWith('local::') || name === 'Local planner'} className="model-brand-small" /><span className="agent-model-label">{name}</span></button>
+      {setAsDefault ? <button type="button" className="link-btn" onClick={setAsDefault}>Set as default</button> : <span className={`agent-model-state is-${state}`}>{state === 'manual' ? 'set' : state === 'default' ? 'default' : 'auto'}</span>}
+      <button type="button" aria-label={`Choose ${label[id]} model`} onClick={onClick}><ChevronRight size={13} /></button>
+    </div>
   );
 }
 
@@ -105,6 +106,8 @@ export function AgentModelControls() {
   const composer = useStore((s) => s.composer);
   const agent = useStore((s) => s.settings.agent);
   const ops = useStore((s) => s.settings.ops);
+  const activeSessionId = useStore((s) => s.activeSessionId);
+  const sessionChoices = useStore((s) => s.sessions[s.activeSessionId]?.agent.settings);
   useStore((s) => s.catalog.models);
 
   // Saved route overrides remain visible as a category choice until the user replaces or releases it.
@@ -164,7 +167,14 @@ export function AgentModelControls() {
           <>
             <PopoverHeader title="Models" sub="Input variants resolve automatically." />
             <div className="agent-model-summary">
-              {rows.map((r) => <SummaryRow key={r.id} {...r} onClick={() => setPicker(r.id)} />)}
+              {rows.map((r) => {
+                const kind = r.id === 'image' || r.id === 'video' ? r.id : null;
+                const choice = kind ? sessionChoices?.[kind] : undefined;
+                const setAsDefault = kind && choice?.modelRef && choice.modelRef !== composer[kind].modelRef
+                  ? () => { void setSessionModelAsDefault(activeSessionId, kind); }
+                  : undefined;
+                return <SummaryRow key={r.id} {...r} onClick={() => setPicker(r.id)} setAsDefault={setAsDefault} />;
+              })}
             </div>
             {manualCount > 0 && <div className="agent-model-foot">
               <button type="button" className="link-btn" onClick={resetAll}><RotateCcw size={12} /> Reset all to Auto</button>

@@ -54,7 +54,7 @@ import type {
 
 export interface Settings {
   keys: Record<RemoteProviderId, string>;
-  agent: { provider: LlmProviderId | 'offline'; model: string; /** True only when the user pinned this exact director model. */ modelPinned?: boolean; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; /** Stream the model's reasoning into the activity block (default on). */ showThinking?: boolean };
+  agent: { provider: LlmProviderId | 'offline'; model: string; /** True only when the user pinned this exact director model. */ modelPinned?: boolean; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; showThinking?: boolean; updateComposerDefaults?: boolean };
   guidedRounds: number;
   budgetUsd: number;
   /** false: no spending limit, spending is only shown. */

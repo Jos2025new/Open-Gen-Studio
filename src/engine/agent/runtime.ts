@@ -86,7 +86,7 @@ import { modelGuide } from '../guides';
 import { confirmedState, keepConfirmed, switchSection } from './switchModel';
 import { settingsResultText } from './settingsResult';
 import { durationOwed } from './modelLimits';
-import { autoAnswer, imagesFirst, sectionsOfParts, settingsForPlan } from './settingsParts';
+import { autoAnswer, imagesFirst, sectionsOfParts, settingsForPlan, modelsNeedSettings } from './settingsParts';
 import { rejectionOf, stoppedText } from './stopNotice';
 import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
@@ -94,6 +94,7 @@ import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
 import { describeChoice, sectionsOf } from './settingsCard';
 import { confirmApproved, inheritApproved } from './inherit';
+import { rememberSessionModel } from './sessionModel';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
@@ -175,9 +176,7 @@ function userBlock(text: string, canvas: Workspace): string {
 }
 
 /**
- * One agent conversation per session; the canvas only restricts what the agent may do there and which messages the
- * GUI shows. A session from before this keeps the conversation that was active; when that one is empty, the
- * conversation parked for this canvas comes back. Never while the agent is working.
+ * One conversation per session; restore an older parked canvas only when history is empty and the agent idle.
  */
 function toCanvas(sessionId: string, workspace: Workspace): void {
   const a = session(sessionId)?.agent;
@@ -212,14 +211,17 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
       const routes = lineRoutes(ref);
       return routes[route] ?? (route === 'edit' ? routes.reference : undefined);
     },
-    defaultModel: (kind: MediaKind, needsImage: boolean) => defaultModelFor(kind, needsImage),
+    defaultModel: (kind: MediaKind, needsImage: boolean) => {
+      const ref = (kind === 'image' || kind === 'video') && session(sessionId).agent.settings?.[kind]?.modelRef;
+      return ref ? (needsImage ? lineRoutes(ref)[kind === 'image' ? 'edit' : 'image'] ?? ref : lineRoutes(ref).text ?? ref) : defaultModelFor(kind, needsImage);
+    },
     defaultIsFallback: (kind: MediaKind, needsImage: boolean) => defaultModelChoice(kind, needsImage).source === 'fallback',
     defaultSettings: (kind: MediaKind) => get().composer[kind].settings,
     asset: (id: string) => get().assets[id],
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
     suggestModel,
-    // In Direct the composer is the choice (ADR 0007): its models run, whatever the plan names.
-    composerChosen: (kind: MediaKind) => get().composer.agentStyle === 'direct' || composerChosen(kind),
+    // Direct keeps session model precedence.
+    composerChosen: (kind: MediaKind) => get().composer.agentStyle === 'direct' || Boolean((kind === 'image' || kind === 'video') && session(sessionId).agent.settings?.[kind]) || composerChosen(kind),
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
     librarySubjects:()=>get().library,
     strictContinuity:strict,
@@ -237,8 +239,7 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
     opModel: () => (workspace === 'node' ? undefined : get().composer.agentStyle === 'direct' ? get().composer.image.modelRef : session(sessionId).agent.settings?.image?.modelRef),
-    // Phase 2: confirmed settings apply to every step of their kind (not on the node canvas, not in Direct, where an
-    // earlier card must not replace the composer's model the guide was sent for).
+    // Direct inherits the session model without forcing the other settings.
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
     switchedTo: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle === 'auto' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.switchedTo?.[kind] : undefined),
     confirmedParts: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' ? (session(sessionId).agent.settingsParts ?? []).filter((p) => p.kind === kind) : []),
@@ -309,8 +310,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`);
-      // Images attached to the comment: a user message after the tool result (tool results carry no images).
-      const parts = await visibleAttachments(sessionId, workspace, attachments);
+          const parts = await visibleAttachments(sessionId, workspace, attachments);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
@@ -328,9 +328,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // A fresh request.
   if (pending) resolvePendingAsSuperseded(sessionId);
   beginJourney(sessionId, 'settings-response');
-  // Cost/candidates in presentPlan still gate reuse of confirmed settings; per-request comparison parts are cleared.
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
-  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
+  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
@@ -349,9 +348,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');
     if (typeof view !== 'string') parts.push(...view);
   }
-  // A new request: images of earlier requests become a note instead of being sent again, and so do the results of
-  // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
-  // history grow without bound (T6).
+  // New requests retain earlier images/reference results as notes; tools can reload them (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
   // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
   // In the Designer filters and effects are FX layers (designer_fx), not the fx operation that makes a new image.
@@ -469,6 +466,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   const pending = s.agent.pending;
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
   patchAgent(sessionId, (a) => confirmedState(a, item, sections));
+  for (const x of sections) if (x.chosen && sections.filter((p) => p.kind === x.kind).length === 1) rememberSessionModel(sessionId, x.kind, x.chosen, true);
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
   pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` });
@@ -604,6 +602,7 @@ async function presentPlan(
     type: 'plan',
     plan,
     style,
+    comparisonKinds: (['image', 'video'] as const).filter((k) => new Set(plan.steps.flatMap((s) => s.kind === k && 'modelRef' in s ? [lineRoutes(s.modelRef).text ?? s.modelRef] : [])).size > 1),
     status: 'awaiting',
     stepStates: Object.fromEntries(plan.steps.map((st) => [st.id, 'pending' as StepState])),
     stepGenerations: {},
@@ -840,8 +839,8 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` });
     closeRequest(sessionId, 'approved', total.usd);
-    if (item.style === 'direct') inheritApproved(chosen);
-    else if (item.style === 'auto') confirmApproved(sessionId, chosen);
+    if (item.style === 'direct') inheritApproved(sessionId, chosen, item.comparisonKinds);
+    else if (item.style === 'auto') confirmApproved(sessionId, chosen, item.comparisonKinds);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
@@ -1100,10 +1099,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
 }
 
 /**
- * S4 · After a plan runs, one short text-only call so the agent says it is ready and offers next steps.
- * ⚠️ Traceable (AGENTS.md, "social ad" plan): if the chat stops answering right after a plan, an unrequested
- * message appears, or agent spending rises, check this first. Skipped without an LLM, while the agent is busy,
- * with a pending card, or when the user already wrote something after this plan.
+ * S4: brief closure after a plan. Skip without an LLM, while busy/pending, or after a new user message.
  */
 async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
   toCanvasOfItem(sessionId, itemId);
@@ -1340,8 +1336,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { rou
   armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
-      // The cap can also fall between two calls, where there is nothing to abort.
-      if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
+          if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
         if (!cutTurn) logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: Date.now() - turnStart });
         outcome = 'cut';
         limitNote();
@@ -1510,7 +1505,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { rou
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const sw = await switchSection(sections, ag().settings, ag().settingsParts, offerRequest(ag()), parts[0]?.model, undefined, parts[0]);
+          const sw = await switchSection(sections, ag().settings, ag().settingsParts, parts[0]?.user_requested === true, parts[0]?.model, undefined, parts[0]);
           const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }) };
           appendFeed(sessionId, item);
@@ -1752,18 +1747,20 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { rou
             planFailures++;
             continue;
           }
-          // Settings belong to generation kinds; revisions reuse confirmed kinds and confirm newly introduced ones.
-          // Before normalization: a kind never confirmed in this session still blocks.
-          // After normalization (presentPlan): reuse or expose (needsConfirmation). Guided always asks before a plan.
+          if (!v.data.revision && (session(sessionId).agent.settingsParts?.length ?? 0) > 1) {
+            const feed = session(sessionId).feed;
+            const userAt = feed.findLastIndex((f) => f.type === 'user');
+            if (!feed.slice(userAt + 1).some((f) => f.type === 'settings' && f.status === 'confirmed')) patchAgent(sessionId, { settingsParts: undefined });
+          }
+          // Guided confirms settings per request; the session model still persists.
           if (workspace !== 'node' && get().composer.agentStyle === 'guided' && session(sessionId).agent.questionRound === 0) {
             respond('Guided mode: ask your questions first (ask_questions, one card), then propose the plan.');
             continue;
           }
-          // An operation that runs on an image model needs the image kind confirmed, as an image step does.
           const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
-          const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, session(sessionId).agent.settings) : null;
+          const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((session(sessionId).agent.settingsParts ?? []).map((p) => [p.kind, p])) : session(sessionId).agent.settings)) : null;
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
-          if (gate || draft) {
+          if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, v.data.steps))) {
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
             const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log) : (gate ?? draft)!;
             if (told !== null) {

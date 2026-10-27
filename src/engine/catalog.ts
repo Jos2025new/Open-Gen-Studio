@@ -7,6 +7,7 @@ import { listLlmModels, pickDefaultLlm } from './providers/llm';
 import { parseModelRef } from './providers/types';
 import type { OpEngine } from './ops';
 import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId, TranscriberSummary } from './types';
+import { rememberSessionModel } from './agent/sessionModel';
 import { setCatalog, setComposer, setComposerMedia, setSettings, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -229,7 +230,8 @@ export function ensureComposerModels(preferRemote = false): void {
 }
 
 /** The user picks a model in the selector: from now on it is their choice, and the agent's default for that kind (C2). */
-export function pickComposerModel(kind: MediaKind, ref: string): Promise<void> {
+export function pickComposerModel(kind: MediaKind, ref: string, remember = true): Promise<void> {
+  const sessionId = get().activeSessionId;
   setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: true } }));
   // One image model everywhere: its edit twin becomes the edit model (tools, agent edits) too.
   if (kind === 'image') {
@@ -239,7 +241,21 @@ export function pickComposerModel(kind: MediaKind, ref: string): Promise<void> {
   }
   // One video model everywhere: its text, image and reference routes fill the agent's video rows.
   if (kind === 'video') fillVideoRoutes(ref);
-  return selectComposerModel(kind, ref);
+  return selectComposerModel(kind, ref).then(() => {
+    if (!remember || (kind !== 'image' && kind !== 'video')) return;
+    const state = get();
+    if (state.composer[kind].modelRef !== ref) return;
+    const settings = state.composer[kind].settings;
+    const routes = lineRoutes(ref);
+    rememberSessionModel(sessionId, kind, {
+      modelRef: routes.text ?? ref,
+      needsImage: false,
+      ...(settings.aspect ? { aspect: settings.aspect } : {}),
+      ...(settings.resolution ? { resolution: settings.resolution } : {}),
+      ...(settings.duration ? { duration: settings.duration } : {}),
+      ...(settings.count ? { count: settings.count } : {}),
+    });
+  });
 }
 
 /** Set the agent's text / image / reference → video rows to the routes of this model's line that exist. */

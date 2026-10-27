@@ -28,7 +28,7 @@ import { agentAccepts } from '../src/engine/agent/sendGate';
 import { useStore } from '../src/store/store';
 
 const REF = 'atlas::xai/grok-imagine-video-v1.5-lite/image-to-video';
-const plan = { name: 'propose_plan', args: { title: 'Switch model', steps: [{ id: 's1', kind: 'image', title: 'Frame', model: REF, prompt: 'a frame' }] } };
+const plan = { name: 'propose_plan', args: { title: 'Switch model', steps: [{ id: 's1', kind: 'image', title: 'Frame', model: REF, user_requested: true, prompt: 'a frame' }] } };
 const sse = (call: typeof plan) => new Response(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
 const text = (t: string) => new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
 let replies: Array<typeof plan | string> = [];

@@ -1,6 +1,22 @@
 /** Contracts of the agent's guides, checked by map.mjs. */
 export default [
   {
+    id: 'session-model-choice',
+    what: 'Elección explícita de sesión separada del composer; comparaciones temporales y guardado predeterminado optativo.',
+    sides: [
+      ['src/engine/agent/modelPriority.ts', 'export function modelPriority'],
+      ['src/engine/agent/settingsParts.ts', 'userRequested: d.user_requested'],
+      ['src/engine/agent/tools.ts', 'user_requested: z.boolean()'],
+      ['src/engine/plan.ts', 'Choose one confirmed model explicitly'],
+      ['src/engine/agent/sessionModel.ts', 'export function rememberSessionModel'],
+      ['src/engine/catalog.ts', 'rememberSessionModel('],
+      ['src/components/composer/AgentModelControls.tsx', 'Set as default'],
+      ['src/components/shell/SettingsPanel.tsx', 'updateComposerDefaults'],
+    ],
+    tests: ['tests/model-priority.test.ts', 'tests/session-model-flow.test.ts', 'tests/session-model-defaults.test.ts', 'tests/session-model-controls.test.ts'],
+  },
+
+  {
     id: 'workflow-ask-first',
     what: 'Un workflow pregunta antes de cargarse: read_guide devuelve su ficha hasta la primera ronda (o ready: true); el prompt lo dice.',
     sides: [
@@ -33,7 +49,7 @@ export default [
     sides: [
       ['src/engine/plan.ts', 'call confirm_settings for ${kind} with model'],
       ['src/engine/agent/runtime.ts', 'switchSection('],
-      ['src/engine/agent/autoSettings.ts', 'switchSection('],
+      ['src/engine/agent/autoSettings.ts', 'const chosen = sections'],
       ['src/engine/agent/switchModel.ts', 'export function confirmedState'],
       ['src/components/chat/SettingsCard.tsx', 'function SwitchModelCard'],
       ['src/components/chat/SettingsCard.tsx', 'function FollowUpCard'],

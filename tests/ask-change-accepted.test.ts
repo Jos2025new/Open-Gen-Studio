@@ -13,6 +13,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
+import { pickComposerModel } from '../src/engine/catalog';
 import { confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
 import { isAcceptance, offerRequest, userRequest } from '../src/engine/modelNamed';
 import { useStore } from '../src/store/store';
@@ -38,7 +39,7 @@ let primed = false;
 function prime() {
   if (primed) return;
   primed = true;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' }, ...s.sessions[sid()].agent.settings } } } } }));
 }
 
 function setup() {
@@ -63,7 +64,7 @@ function setup() {
   });
 }
 const card = () => st().feed.find((f) => f.type === 'settings') as SettingsFeedItem | undefined;
-const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', ...part }] } });
+const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, ...part }] } });
 /** The agent offered a change in plain text in an earlier turn. */
 const offered = (text: string) => useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, history: [{ role: 'user', content: '<user_message canvas="chat">\nUna imagen de un faro\n</user_message>' }, { role: 'assistant', content: text }] } } } }));
 
@@ -72,7 +73,7 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
 
   it('(a) the agent offered NanoGPT and the user says "sí, cámbialo": the provider-change card', async () => {
     offered('Nano Banana 2 is also on NanoGPT for $0.067 per image. Quieres cambiar?');
-    script = [ask({ provider: 'nanogpt' })];
+    script = [ask({ provider: 'nanogpt', user_requested: true })];
     await sendAgentMessage('sí, cámbialo');
     expect(card()?.switchFrom?.modelRef).toBe(ATLAS);
     expect(card()?.sections[0].recommended.modelRef).toBe(NANO);
@@ -85,27 +86,27 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
     expect(card()?.switchFrom).toBeUndefined();
     // F-01: the ordinary card recommends what is confirmed, never the provider the agent asked for anyway.
     expect(card()?.sections[0].recommended.modelRef).toBe(ATLAS);
-    expect(card()?.sections[0].alternatives).toContain(NANO);
+    expect(card()?.sections[0].modelSelection?.reason).toBe('session');
     await confirmSettings(sid(), card()!.id, [card()!.sections[0].recommended]);
     expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
     expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([ATLAS]);
   });
 
   it('(b2) F-01: another model line the user did not ask for does not slip through an ordinary card either, and the agent is told', async () => {
-    script = [ask({ model: 'nano banana 2 lite' })];
+    script = [ask({ model: 'nano banana 2 lite', user_requested: false })];
     await sendAgentMessage('Una imagen de un faro');
     expect(card()?.switchFrom).toBeUndefined();
     expect(card()?.sections[0].recommended.modelRef).toBe(ATLAS);
-    expect(card()?.sections[0].alternatives).toContain(LITE);
+    expect(card()?.sections[0].modelSelection).toEqual({ requested: 'nano banana 2 lite', reason: 'session' });
     await confirmSettings(sid(), card()!.id, [card()!.sections[0].recommended]);
     expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
     const told = st().agent.history.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
-    expect(told).toContain('did not ask to change the model');
-    expect(told).toContain('offer the change in text first');
+    expect(told).toContain('reason: session');
+    expect(told).toContain('Requested: nano banana 2 lite');
   });
 
   it('(b3) F-01: a model the user picked in the composer since is their own change: the card keeps it', async () => {
-    useStore.setState((s) => ({ composer: { ...s.composer, userPicked: { ...s.composer.userPicked, image: true }, image: { ...s.composer.image, modelRef: NANO } } }));
+    await pickComposerModel('image', NANO);
     script = [ask({})];
     await sendAgentMessage('Una imagen de un faro');
     expect(card()?.sections[0].recommended.modelRef).toBe(NANO);
@@ -113,21 +114,21 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
 
   it('(c) "sí" after a reply that named no provider: no change card', async () => {
     offered('Puedo hacerlo mas barato si quieres.');
-    script = [ask({ provider: 'nanogpt' })];
+    script = [ask({ provider: 'nanogpt', user_requested: false })];
     await sendAgentMessage('sí');
     expect(card()?.switchFrom).toBeUndefined();
   });
 
   it('(d) a model the agent offered and the user accepts ("dale"): the model-change card', async () => {
     offered('Nano Banana 2 Lite is cheaper here. Quieres que lo use?');
-    script = [ask({ model: 'nano banana 2 lite' })];
+    script = [ask({ model: 'nano banana 2 lite', user_requested: true })];
     await sendAgentMessage('dale');
     expect(card()?.switchFrom?.modelRef).toBe(ATLAS);
     expect(card()?.sections[0].recommended.modelRef).toBe(LITE);
   });
 
   it('(e) the user naming the provider directly still works', async () => {
-    script = [ask({ provider: 'nanogpt' })];
+    script = [ask({ provider: 'nanogpt', user_requested: true })];
     await sendAgentMessage('Cambia a nanogpt como proveedor');
     expect(card()?.switchFrom?.modelRef).toBe(ATLAS);
   });

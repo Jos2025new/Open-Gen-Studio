@@ -99,7 +99,7 @@ describe('confirm_settings in Auto: the length gate and the visible check', () =
   it('45 s asked of a 12 s model: no settings, the agent gets the options, and the check shows among the actions', async () => {
     const sent: string[] = [];
     const replies = [
-      { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED }] } },
+      { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED, user_requested: true }] } },
       'Seedance llega a 12 s por clip: ¿4 clips unidos, otro modelo o un clip de 12 s?',
     ];
     vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
@@ -218,7 +218,7 @@ describe('Auto: a plan sent before any settings makes the app confirm them (item
 describe('Auto: requested quality takes effect (item 4)', () => {
   beforeEach(() => setup());
   afterEach(() => vi.unstubAllGlobals());
-  const ask = () => ({ name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 5 }] } });
+  const ask = () => ({ name: 'confirm_settings', args: { parts: [{ kind: 'video', user_requested: false, duration: 5 }] } });
   /** An earlier request of the session confirmed high quality. */
   const hq = (): FeedItem[] => [{ id: 'old', createdAt: 0, workspace: 'chat', type: 'settings', status: 'confirmed', inline: true, sections: [], draft: { kind: 'hq', locked: false } } as unknown as FeedItem];
 
@@ -247,7 +247,7 @@ describe('Auto: requested quality takes effect (item 4)', () => {
 describe('Auto: the duration question reaches the user (item 5)', () => {
   beforeEach(() => setup());
   afterEach(() => vi.unstubAllGlobals());
-  const over = { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED }] } };
+  const over = { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED, user_requested: true }] } };
   const question = { name: 'ask_questions', args: { questions: [{ id: 'q1', question: '¿Cómo seguimos?', options: ['4 clips unidos', 'Un solo clip de 12 s'] }] } };
   /** A request whose one question round is used: a first card, answered. */
   const roundUsed = async (second: Reply[], text: string) => {
@@ -263,7 +263,7 @@ describe('Auto: the duration question reaches the user (item 5)', () => {
     expect(agentOf().history.map((m) => String(m.content)).join('')).not.toContain('Question rounds are used up');
   });
   it('without a duration problem the used-up rule still refuses the question', async () => {
-    await roundUsed([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 5 }] } }, question, 'ok'], 'Un video de 5 segundos');
+    await roundUsed([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 5, user_requested: false }] } }, question, 'ok'], 'Un video de 5 segundos');
     expect(feedOf().filter((f) => f.type === 'questions' && f.status === 'pending')).toHaveLength(0);
     expect(agentOf().history.map((m) => String(m.content)).join('')).toContain('Question rounds are used up');
   });
@@ -300,7 +300,7 @@ describe('the notice of a turn that really fails (item 6)', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('a scripted agent that keeps hitting the length limit ends with the code and an explanation', async () => {
-    const over = { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED }] } };
+    const over = { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED, user_requested: true }] } };
     await drive([over, over, over, over, over, over], 'Un video de 45 segundos con seedance 2.0 mini');
     const note = feedOf().filter((f) => f.type === 'notice').at(-1) as { text: string; level: string };
     expect(note.level).toBe('error');
@@ -347,13 +347,13 @@ describe('the agent knows what the chosen model takes before it writes (2026-10-
   });
 
   it('confirm_settings with three images on it: the answer says what it takes and that they do not fit, before any prompt is written', async () => {
-    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', refs: 3 }] } }, 'ok'], 'Usa estas tres imágenes para un video');
+    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', user_requested: false, refs: 3 }] } }, 'ok'], 'Usa estas tres imágenes para un video');
     expect(sent[1]).toContain('takes: 720p, 1080p');
     expect(sent[1]).toContain('Your 3 images do not fit it');
   });
 
   it('one start image on it: the answer says it fits', async () => {
-    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', start_image: true }] } }, 'ok'], 'Anima esta imagen');
+    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', user_requested: false, start_image: true }] } }, 'ok'], 'Anima esta imagen');
     expect(sent[1]).toContain('Your 1 image fits.');
   });
 });
@@ -369,7 +369,7 @@ describe('the composer model keeps the variant the declared images need (2026-10
   afterEach(() => vi.unstubAllGlobals());
 
   it('three images with the composer on the text/start-image line: the app confirms its reference variant, and they fit', async () => {
-    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', refs: 3 }] } }, 'ok'], 'Usa estas tres imágenes para un video');
+    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', user_requested: false, refs: 3 }] } }, 'ok'], 'Usa estas tres imágenes para un video');
     expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(R2V);
     expect(sent[1]).toContain('Your 3 images fit.');
   });

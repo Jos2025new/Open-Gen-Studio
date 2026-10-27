@@ -415,6 +415,14 @@ export function SettingsPanel() {
           </div>
           </>
         ) : null}
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={Boolean(settings.agent.updateComposerDefaults)}
+            onChange={(e) => setSettings((s) => ({ agent: { ...s.agent, updateComposerDefaults: e.target.checked } }))}
+          />
+          Update the composer's default model when I change the model in a session
+        </label>
         <div className="set-row">
           <span className="set-label" data-tip="Guided mode asks at most this many rounds of questions before proposing the plan">
             Guided rounds

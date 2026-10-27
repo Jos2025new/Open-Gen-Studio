@@ -12,6 +12,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
+import { pickComposerModel } from '../src/engine/catalog';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { ModelSchema, ModelSummary, SettingsFeedItem } from '../src/engine/types';
@@ -51,7 +52,7 @@ function setup(style: 'auto' | 'guided' = 'auto') {
 /** Visible cards; Auto confirms with an inline item the feed does not draw (docs/features/agente-auto-tarjeta.md). */
 const cards = () => st().feed.filter((f) => f.type === 'settings' && !f.inline) as SettingsFeedItem[];
 const inline = () => st().feed.filter((f) => f.type === 'settings' && f.inline) as SettingsFeedItem[];
-const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', ...part }] } });
+const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, ...part }] } });
 const plan = { name: 'propose_plan', args: { title: 'P', steps: [{ id: 's1', kind: 'image', title: 'I', prompt: 'p', count: 1 }] } };
 
 describe('A1: confirm_settings repeated after the first confirmation', () => {
@@ -101,7 +102,7 @@ describe('A1: confirm_settings repeated after the first confirmation', () => {
   });
 
   it('a model the user picked in the composer is never reported as the confirmed one', async () => {
-    useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } } }));
+    await pickComposerModel('image', LITE);
     script = [ask({ model: ATLAS })];
     await sendAgentMessage('Haz a la presentadora más blanca');
     expect(cards()).toHaveLength(0);

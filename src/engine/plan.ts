@@ -2,7 +2,7 @@ import { countFollowsCard } from './planCount';
 import { refsCap } from './officialLimits';
 import { fitTotal, promptTooLong, totalNote } from './planSent';
 import { aspectFor } from './planAspect';
-import { lineKey, type VariantRoute } from './variants';
+import { type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectErrors, transportsNamedSubjects } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
@@ -14,7 +14,7 @@ import { withCaptureSetting } from './captureStyles';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, ratioOf, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
-import { userNamed } from './modelNaming';
+import { modelPriority } from './agent/modelPriority';
 import { followUpProblem, modelChange, modelMove, namedOverConfirmed, partNamed } from './modelNamed';
 import type {
   AdvancedValue,
@@ -61,7 +61,8 @@ export interface RawStep {
   /** Audio steps: the text of an earlier step used as song lyrics. */
   lyrics_from?: string;
   model?: string;
-  /** Video steps: what the clip is for; the app picks the model by price (routing.ts). */
+  user_requested?: boolean;
+  /** Video purpose. */
   purpose?: string;
   aspect?: string;
   resolution?: string;
@@ -547,9 +548,13 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         let conf = kind === 'video' || kind === 'image' ? ctx.confirmed?.(kind) : undefined;
         // Several confirmed models of this kind (an A/B comparison): each step keeps the part of the model line it names.
         const parts = kind === 'video' || kind === 'image' ? ctx.confirmedParts?.(kind) ?? [] : [];
-        if (parts.length > 1 && s.model?.trim()) conf = (await partNamed(parts, s.model.trim(), ctx.getModel)) ?? conf;
+        if (parts.length > 1) {
+          const match = s.model?.trim() ? await partNamed(parts, s.model.trim(), ctx.getModel) : undefined;
+          if (!match) { errors.push(`${where}: Choose one confirmed model explicitly: ${parts.map((p) => p.modelRef).join(', ')}. Do not substitute another comparison model.`); continue; }
+          conf = match;
+        }
         // A model named in THIS request is never swapped silently: the user confirms first.
-        const asked = conf && parts.length <= 1 && s.model?.trim() ? await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef) : undefined;
+        const asked = conf && parts.length <= 1 && s.model?.trim() ? await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef, s.user_requested) : undefined;
         if (asked) {
           errors.push(`${where}: The user named ${asked.name} (${asked.ref}); call confirm_settings for ${kind} with model ${asked.ref} first.`);
           continue;
@@ -587,18 +592,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (kind === 'video') keep('duration', conf.duration);
           if (kind === 'image' && countFollowsCard(rawSteps, s)) keep('count', conf.count);
         }
-        // The user's own model pick (composer, or a video route) wins over a model only the plan names.
-        const named = conf ? undefined : s.model?.trim();
-        const userPicked = ctx.composerChosen?.(kind) || (kind === 'video' && Boolean(ctx.routeModel?.(routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length }))));
-        if (named && userPicked && ctx.userText) {
-          const found = await ctx.getModel(named);
-          if (!userNamed([named, found?.model.name ?? ''], ctx.userText())) {
-            // Noted only for another real model; an unknown name or the user's own line changes nothing.
-            const mine = ctx.defaultModel(kind, imageRefs.length > 0 || Boolean(s.first_frame));
-            const mineModel = mine ? (await ctx.getModel(mine))?.model : undefined;
-            if (found && (!mineModel || lineKey(found.model) !== lineKey(mineModel))) adjustments.push(`${s.id}: kept your ${kind} model (the plan had named ${found.model.name})`);
-            s.model = undefined;
-          }
+        if (!conf && (kind === 'image' || kind === 'video') && typeof s.user_requested === 'boolean' && ctx.composerChosen?.(kind)) {
+          const choice = modelPriority({ composer: ctx.defaultModel(kind, imageRefs.length > 0 || Boolean(s.first_frame)) ?? undefined, proposed: s.model?.trim(), userRequested: s.user_requested });
+          const wrote = s.model && (await ctx.getModel(s.model))?.model;
+          const kept = choice.modelRef && (await ctx.getModel(choice.modelRef))?.model;
+          if (wrote && kept && modelChange(wrote, kept)) adjustments.push(`${s.id}: kept your ${kind} model (the plan had named ${wrote.name})`);
+          s.model = choice.modelRef;
         }
         // Model choice depends on the image inputs; it runs again if video refs become frames (O1).
         const pickModel = async (pickNotes: string[], skipOverride = false) => {

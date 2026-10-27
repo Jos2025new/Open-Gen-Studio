@@ -1,7 +1,6 @@
 import type { AgentState, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { defaultChoice } from './settingsCard';
 import { modelSummary, resolveModel } from '../catalog';
-import { userNamed } from '../modelNaming';
 import { changeNamed, modelChange, type ModelChange } from '../modelNamed';
 
 /**
@@ -15,8 +14,8 @@ export async function switchSection(
   sections: SettingsSection[],
   confirmed: AgentState['settings'],
   parts: AgentState['settingsParts'],
-  requestText: string,
-  written: string | undefined,
+  userRequested: boolean,
+  _written: string | undefined,
   follow?: { switchedTo: AgentState['switchedTo']; auto: boolean },
   /** What this request's confirm_settings asked (duration, aspect): it wins over the values carried from the confirmed model. */
   asked?: { duration?: number; aspect?: string },
@@ -26,11 +25,11 @@ export async function switchSection(
   if (!sec || !from || (parts ?? []).filter((p) => p.kind === sec.kind).length > 1) return undefined;
   const [now, was] = await Promise.all([resolveModel(sec.recommended.modelRef), resolveModel(from.modelRef)]);
   if (!now || !was) return undefined;
-  const change = changeNamed(now.model, was.model, requestText, written);
+  const change = changeNamed(now.model, was.model, userRequested);
   if (!change) {
     // The follow-up (Auto): the last request switched this kind and this one names no model: continue with it, go back, or another.
     const to = follow?.auto ? follow.switchedTo?.[sec.kind] : undefined;
-    if (!to || userNamed([was.model.name], requestText)) return undefined;
+    if (!to || userRequested) return undefined;
     return { section: { ...sec, recommended: { ...to, needsImage: sec.recommended.needsImage }, alternatives: sec.alternatives.filter((r) => r !== to.modelRef && r !== from.modelRef) }, from, followUp: true };
   }
   const carried = defaultChoice(sec.recommended.modelRef, now.schema, { kind: sec.kind, startImage: sec.recommended.needsImage, count: from.count }, { ...from, modelRef: sec.recommended.modelRef, ...(asked?.duration ? { duration: asked.duration } : {}), ...(asked?.aspect ? { aspect: asked.aspect } : {}) });
@@ -53,7 +52,7 @@ export async function keepConfirmed(sections: SettingsSection[], confirmed: Agen
   for (const sec of sections) {
     const from = confirmed?.[sec.kind];
     const [now, was] = from && parts.filter((p) => p.kind === sec.kind).length <= 1 ? await Promise.all([resolveModel(sec.recommended.modelRef), resolveModel(from.modelRef)]) : [];
-    if (!from || !now || !was || !modelChange(now.model, was.model) || picked?.(sec.kind) === sec.recommended.modelRef) { out.push(sec); continue; }
+    if (sec.modelSelection?.reason === 'user request' || sec.modelSelection?.reason === 'comparison' || !from || !now || !was || !modelChange(now.model, was.model) || picked?.(sec.kind) === sec.recommended.modelRef) { out.push(sec); continue; }
     asked ??= sec.recommended.modelRef;
     const rec = sec.recommended;
     const kept = { ...defaultChoice(from.modelRef, was.schema, { kind: sec.kind, startImage: rec.needsImage, duration: rec.duration, aspect: rec.aspect, count: rec.count }), needsImage: rec.needsImage };
@@ -70,11 +69,11 @@ export function confirmedState(a: AgentState, item: SettingsFeedItem, sections: 
   const firstOfKind = sections.filter((x, i) => sections.findIndex((y) => y.kind === x.kind) === i);
   const parts: NonNullable<AgentState['settingsParts']> = sections.map((x) => ({ ...(x.chosen as SettingsChoice), kind: x.kind }));
   const kind = sections[0].kind;
-  if (switched(item, sections)) return { pending: undefined, settings: a.settings, settingsParts: [...parts, { ...(item.switchFrom as SettingsChoice), kind }], switchedTo: { ...a.switchedTo, [kind]: sections[0].chosen } };
+  if (switched(item, sections)) return { pending: undefined, settings: { ...a.settings, [kind]: sections[0].chosen }, settingsParts: [...parts, { ...(item.switchFrom as SettingsChoice), kind }], switchedTo: { ...a.switchedTo, [kind]: sections[0].chosen } };
   // An ordinary confirmation (and the follow-up's three answers) settles the question: nothing left to ask for these kinds.
   const left = { ...a.switchedTo };
   for (const x of firstOfKind) delete left[x.kind];
-  return { pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.map((x) => [x.kind, x.chosen])) }, settingsParts: parts, switchedTo: left };
+  return { pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.filter((x) => sections.filter((y) => y.kind === x.kind).length === 1).map((x) => [x.kind, x.chosen])) }, settingsParts: parts, switchedTo: left };
 }
 
 /** For the agent after a switch: which steps get the new model, which keep the confirmed one. */

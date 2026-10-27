@@ -17,7 +17,7 @@ it('publishes the plan after confirming Edit through the real runtime and record
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (body.messages) {
       llmCalls++;
-      const args = { title: 'Cuento', steps: [{ id: 's2', kind: 'image', model: edit, prompt: 'Invent the girl and cat' }, { id: 's3', kind: 'image', model: edit, refs: ['s2'], prompt: 'The same girl at the market' }] };
+      const args = { title: 'Cuento', steps: [{ id: 's2', kind: 'image', model: edit, user_requested: false, prompt: 'Invent the girl and cat' }, { id: 's3', kind: 'image', model: edit, user_requested: false, refs: ['s2'], prompt: 'The same girl at the market' }] };
       const chunk = { choices: [{ delta: { tool_calls: [{ index: 0, id: 'plan-call', function: { name: 'propose_plan', arguments: JSON.stringify(args) } }] }, finish_reason: 'tool_calls' }] };
       return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
     }

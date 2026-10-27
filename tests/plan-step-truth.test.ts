@@ -76,7 +76,7 @@ const bodies: Array<{ messages: Array<{ role: string; content: unknown }> }> = [
 const sid = () => useStore.getState().activeSessionId;
 const planItem = () => useStore.getState().sessions[sid()].feed.find((f): f is PlanFeedItem => f.type === 'plan')!;
 const oneStep: PlanStep = { id: 's1', kind: 'image', title: 'La chica con la corneta', prompt: 'chica', modelRef: 'local::studio-image', settings: { count: 1, advanced: {} }, refs: [] };
-const propose = { name: 'propose_plan', args: { title: 'Chica presentando la corneta', steps: [{ id: 's1', kind: 'image', title: 'La chica con la corneta', model: 'local::studio-image', prompt: 'chica' }] } };
+const propose = { name: 'propose_plan', args: { title: 'Chica presentando la corneta', steps: [{ id: 's1', kind: 'image', title: 'La chica con la corneta', user_requested: false, model: 'local::studio-image', prompt: 'chica' }] } };
 
 beforeEach(() => {
   mode = 'ok';
@@ -135,7 +135,7 @@ describe('a step is done only if its generation finished with results (T1)', () 
   it('the plan says failed and the closing message does not claim the image (ses_mursnwichu)', async () => {
     mode = 'error-status';
     // Phase 2 as in real use (Auto): confirm_settings is answered by the app with no card and the same turn proposes the plan.
-    replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }] } }, propose, 'Lista la imagen'];
+    replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, model: 'local::studio-image' }] } }, propose, 'Lista la imagen'];
     await sendAgentMessage('Crea una chica para vender una corneta bluetooth');
     await approvePlan(sid(), planItem().id);
     await vi.waitFor(() => expect(planItem().status).toBe('error'));

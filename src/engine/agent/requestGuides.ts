@@ -1,5 +1,5 @@
 import { useStore } from '../../store/store';
-import { defaultModelFor, modelSummary } from '../catalog';
+import { defaultModelFor, inputVariant, modelSummary } from '../catalog';
 import { guideForModel, modelGuide } from '../guides';
 import { readGuide, STAGED_GUIDE } from '../skills';
 
@@ -40,9 +40,11 @@ function requestHas(sessionId: string, kind: string): boolean {
  */
 export function directModelRefs(sessionId: string, kind: 'image' | 'video'): string[] {
   const c = get().composer;
-  const refs = [c[kind].modelRef];
-  if (requestHas(sessionId, 'image')) refs.push(defaultModelFor(kind, true));
-  if (kind === 'video') refs.push(...Object.values(c.videoRoutes ?? {}));
+  const selected = get().sessions[sessionId]?.agent.settings?.[kind]?.modelRef;
+  const ref = selected ?? c[kind].modelRef;
+  const refs = [ref];
+  if (requestHas(sessionId, 'image')) refs.push(selected ? inputVariant(ref, kind)?.ref ?? ref : defaultModelFor(kind, true));
+  if (kind === 'video' && !selected) refs.push(...Object.values(c.videoRoutes ?? {}));
   return [...new Set(refs.filter((r): r is string => Boolean(r)))];
 }
 
@@ -83,7 +85,7 @@ export function earlyModelGuide(sessionId: string, id: string): string | undefin
   if (isDirect()) {
     const refs = directModelRefs(sessionId, 'video');
     if (refs.some((ref) => guideForModel(ref.split('::')[1] ?? '')?.id === guide.id)) return undefined;
-    return `Not loaded: in direct mode the video model is the composer's (${refs.map((ref) => modelSummary(ref)?.name ?? ref).join(', ')}). Write its prompts with its own guide.`;
+    return `Not loaded: in direct mode the video model is the session's selection (${refs.map((ref) => modelSummary(ref)?.name ?? ref).join(', ')}). Write its prompts with its own guide.`;
   }
   const confirmed = get().sessions[sessionId].agent.settings?.video;
   const confirmedGuide = confirmed ? guideForModel(confirmed.modelRef.split('::')[1] ?? '')?.id : undefined;

@@ -121,7 +121,7 @@ describe('candidates end a plan', () => {
 
 describe('a video plan before the settings are confirmed', () => {
   const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
-  let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };
+  let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF, user_requested: false }] } };
   let roundDone = false;
   /** Guided refuses a plan before its question round, and a fresh request resets it: mark the round as done once the agent is called. */
   const primeGuided = () => {
@@ -164,7 +164,7 @@ describe('a video plan before the settings are confirmed', () => {
   });
 
   it('a revision cannot introduce unconfirmed video settings', async () => {
-    first = { name: 'propose_plan', args: { revision: true, title: 'Revision', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };
+    first = { name: 'propose_plan', args: { revision: true, title: 'Revision', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF, user_requested: false }] } };
     await sendAgentMessage('Change the plan to a video');
     const feed = useStore.getState().sessions[useStore.getState().activeSessionId].feed;
     expect(feed.some(f => f.type === 'plan')).toBe(false);
@@ -172,7 +172,7 @@ describe('a video plan before the settings are confirmed', () => {
   });
 
   it('typing while the settings card is open does not confirm it (16:04: a question confirmed Nano Banana)', async () => {
-    first = { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF }] } };
+    first = { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, user_requested: false }] } };
     await sendAgentMessage('Haz un gato');
     const sid = useStore.getState().activeSessionId;
     const card = () => useStore.getState().sessions[sid].feed.find((f) => f.type === 'settings') as { status: string } | undefined;
@@ -225,8 +225,8 @@ describe('comparing two image models in one plan (A/B)', () => {
     const ctxModel = async (ref: string) => (table[ref] ? { model: table[ref] as never, schema: { ref, params: [], slots: {} } as never } : getModel(ref));
     const nb: SettingsChoice = { modelRef: 'atlas::nb', needsImage: false, aspect: '3:4', count: 1 };
     const grok: SettingsChoice = { modelRef: 'atlas::grok', needsImage: false, aspect: '3:4', count: 1 };
-    const steps = ['nb', 'nb', 'grok', 'grok'].map((m, i) => ({ id: `s${i + 1}`, kind: 'image', prompt: `sheet ${i}`, model: `atlas::${m}` }));
-    const { plan, errors } = await normalizePlan({ steps }, { ...base, getModel: ctxModel, confirmed: (k) => (k === 'image' ? nb : undefined), confirmedParts: (k) => (k === 'image' ? [nb, grok] : []) }, 'p');
+    const steps = ['nb', 'nb', 'grok', 'grok'].map((m, i) => ({ id: `s${i + 1}`, kind: 'image', prompt: `sheet ${i}`, model: `atlas::${m}`, user_requested: true }));
+    const { plan, errors } = await normalizePlan({ steps }, { ...base, requestText: () => 'Compara Nano Banana 2 Lite y Grok Imagine 2', getModel: ctxModel, confirmed: (k) => (k === 'image' ? nb : undefined), confirmedParts: (k) => (k === 'image' ? [nb, grok] : []) }, 'p');
     expect(errors).toEqual([]);
     expect(plan!.steps.map((s) => (s as { modelRef: string }).modelRef)).toEqual(['atlas::nb', 'atlas::nb', 'atlas::grok', 'atlas::grok']);
     expect(plan!.adjustments.join(' ')).not.toMatch(/→ Nano Banana/);

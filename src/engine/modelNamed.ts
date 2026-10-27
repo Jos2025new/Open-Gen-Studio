@@ -1,5 +1,4 @@
 import { lineKey } from './variants';
-import { userNamed } from './modelNaming';
 import { modelSummary } from './catalog';
 import { indexedModels, searchIndex, suggestModel } from './agent/modelIndex';
 import { PROVIDER_LABELS } from './providers/types';
@@ -57,12 +56,8 @@ export function modelChange(now: ModelSummary, was: ModelSummary): ModelChange |
  * The change the user asked for in `said` (the current request): another line only when they named it, the same line
  * at another provider only when they named that provider. Anything else is the app's own default, not a request.
  */
-export function changeNamed(now: ModelSummary, was: ModelSummary, said: string, written?: string): ModelChange | undefined {
-  const change = modelChange(now, was);
-  if (change === 'model') return userNamed([now.name, written ?? ''], said) ? change : undefined;
-  // The provider asked for, other than the confirmed one: two of them is ambiguous, so no change is inferred.
-  const others = providersIn(said).filter((p) => p !== was.provider);
-  return change && others.length === 1 && others[0] === now.provider ? change : undefined;
+export function changeNamed(now: ModelSummary, was: ModelSummary, userRequested: boolean): ModelChange | undefined {
+  return userRequested ? modelChange(now, was) : undefined;
 }
 
 /** The adjustment note for a step that wrote another line or provider than the confirmed one; same names are told apart by ref. */
@@ -77,7 +72,9 @@ export function modelMove(wrote: ModelSummary, conf: ModelSummary): string {
  * wrong provider of a line compared across providers). Undefined: the step keeps the kind's confirmed choice.
  */
 export async function partNamed<P extends { modelRef: string }>(parts: P[], written: string, getModel: (ref: string) => Promise<{ model: ModelSummary } | null | undefined>): Promise<P | undefined> {
-  const named = (await getModel(written))?.model;
+  const kind = parts[0] && (await getModel(parts[0].modelRef))?.model.kind;
+  const resolved = kind && resolveNamedModel(written, kind, false);
+  const named = (await getModel(written))?.model ?? (resolved && 'ref' in resolved ? modelSummary(resolved.ref) : undefined);
   if (!named) return undefined;
   const exact = parts.find((p) => p.modelRef === named.ref);
   if (exact) return exact;
@@ -119,26 +116,19 @@ export function resolveNamedModel(name: string, kind: MediaKind, needsImage: boo
  * answers, never the whole history) and it is not what the card confirmed: another line they named, or the same line
  * at the provider they named. Then the user's words win over the card, after a question. Undefined when it is not.
  */
-export async function namedOverConfirmed(ctx: OfferContext, written: string, confirmedRef: string): Promise<ModelSummary | undefined> {
-  const asking = ctx.offerText ?? ctx.requestText;
-  if (!asking) return undefined;
-  const said = asking();
+export async function namedOverConfirmed(ctx: OfferContext, written: string, confirmedRef: string, userRequested = false): Promise<ModelSummary | undefined> {
+  if (!userRequested) return undefined;
   const conf = (await ctx.getModel(confirmedRef))?.model;
   if (!conf) return undefined;
-  // A name that is not a ref is read as the user wrote it: the provider they named (other than the confirmed one) decides.
-  const asked = providersIn(said).find((p) => p !== conf.provider);
-  const hit = (await ctx.getModel(written))?.model ?? modelSummary((resolveNamedModel(written, conf.kind, false, asked) as { ref?: string }).ref ?? '');
-  return hit && changeNamed(hit, conf, said, written) ? hit : undefined;
+  const hit = (await ctx.getModel(written))?.model ?? modelSummary((resolveNamedModel(written, conf.kind, false) as { ref?: string }).ref ?? '');
+  return hit && modelChange(hit, conf) ? hit : undefined;
 }
 
-/** After a switch, a request that names no model must first ask whether to continue with the switched one; undefined when it need not. */
+/** Guided's existing switch question; Auto settles its explicit selection immediately. */
 export async function followUpProblem(ctx: OfferContext, confirmedRef: string, kind: MediaKind): Promise<string | undefined> {
   const to = ctx.switchedTo?.(kind);
-  const [sw, conf] = to ? await Promise.all([ctx.getModel(to.modelRef), ctx.getModel(confirmedRef)]) : [];
-  if (!to || !sw || !conf || userNamed([conf.model.name], (ctx.offerText ?? ctx.requestText)?.() ?? '')) return undefined;
-  // The same model at another provider has the same name: say where each one is.
-  const tag = (m: ModelSummary) => (modelChange(sw.model, conf.model) === 'provider' ? `${m.name} at ${PROVIDER_LABELS[m.provider]}` : m.name);
-  return `The user switched ${kind} to ${tag(sw.model)} (${to.modelRef}) last time and has not said whether to continue with it; call confirm_settings for ${kind} with model ${to.modelRef} first (the app asks: continue with ${tag(sw.model)} or go back to ${tag(conf.model)}).`;
+  if (!to || to.modelRef === confirmedRef) return undefined;
+  return `Call confirm_settings for ${kind} with model ${to.modelRef} first to settle the previous switch.`;
 }
 
 const ACCEPT = new Set(['si', 'vale', 'ok', 'okay', 'dale', 'claro', 'hazlo', 'cambialo', 'cambia', 'cambiar', 'adelante', 'perfecto', 'venga', 'listo', 'bueno', 'yes', 'yeah', 'yep', 'sure', 'go', 'do', 'please']);
