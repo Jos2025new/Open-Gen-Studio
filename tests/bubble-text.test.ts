@@ -16,3 +16,11 @@ describe("the user's message bubble", () => {
     expect(composer).toMatch(/\.composer \{ background: var\(--surface\);/);
   });
 });
+
+// 2026-10-27: the model row became several buttons («Set as default»); its label keeps the left alignment and the chevron its faint colour.
+describe('the composer model row', () => {
+  it('keeps the row look after splitting it into buttons', () => {
+    expect(composer).toMatch(/\.agent-model-row > button \{ text-align: left; \}/);
+    expect(composer).toMatch(/\.agent-model-row > button > svg \{ color: var\(--text-3\); \}/);
+  });
+});

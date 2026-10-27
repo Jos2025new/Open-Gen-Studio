@@ -52,7 +52,8 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .agent-model-state.is-auto { color: var(--ok); }
 .agent-model-state.is-manual { color: var(--text); }
 .agent-model-state.is-default { color: var(--warn); }
-.agent-model-row > svg { color: var(--text-3); }
+.agent-model-row > svg, .agent-model-row > button > svg { color: var(--text-3); }
+.agent-model-row > button { text-align: left; }
 .agent-model-back { display: inline-flex; align-items: center; gap: 6px; margin: 5px 6px 0; padding: 5px 7px; border-radius: 5px; color: var(--text-2); font-size: 11px; }
 .agent-model-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 6px 8px; border-top: 1px solid var(--border); }
 .agent-model-foot .link-btn { display: inline-flex; align-items: center; gap: 5px; }
