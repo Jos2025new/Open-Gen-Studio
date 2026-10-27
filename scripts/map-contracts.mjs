@@ -49,6 +49,19 @@ export default [
     tests: ['tests/paint-mode.test.ts', 'tests/paint-mode-history.test.ts'],
   },
   {
+    id: 'designer-toolbox-dock',
+    what: 'El dock del Designer organiza las herramientas por modo y conserva sus variantes y ajustes reales en Composer y en la paleta flotante.',
+    sides: [
+      ['src/components/designer/toolboxModel.ts', 'export const TOOLBOXES'],
+      ['src/components/designer/toolboxModel.ts', 'export function reduceToolboxState'],
+      ['src/components/designer/ToolDock.tsx', 'export function ToolDock'],
+      ['src/components/composer/Composer.tsx', '<ToolDock sessionId={sessionId} doc={designDoc} />'],
+      ['src/components/designer/ToolPalette.tsx', '<ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} />'],
+      ['src/components/designer/ToolDock.tsx', '<PaintModeToggle sessionId={sessionId} doc={doc} />'],
+    ],
+    tests: ['tests/toolbox-model.test.ts', 'tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-context-menu.test.ts', 'tests/designer-keys.test.ts'],
+  },
+  {
     id: 'drawing-choice',
     what: 'ADR 0016: pintar trazos editables en Dibujo pregunta; cerrar cancela y Ajustes reinicia la preferencia.',
     sides: [

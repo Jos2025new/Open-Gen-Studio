@@ -20,7 +20,7 @@ import { StudioReopen } from '../studio/StudioReopen';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
-import { ToolRail } from '../designer/ToolRail';
+import { ToolDock } from '../designer/ToolDock';
 
 export function AttachStrip({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
@@ -441,7 +441,7 @@ export function Composer() {
         />
         {toolsDock && designDoc ? <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={false} onAdd={() => fileRef.current?.click()} />
-          <div className="designer-palette is-docked"><ToolRail sessionId={sessionId} doc={designDoc} /></div>
+          <div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} /></div>
         </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row">

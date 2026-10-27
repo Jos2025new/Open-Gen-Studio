@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ComponentProps, type ReactNode } from 'react';
-import { ToolRail } from './ToolRail';
+import { ToolDock } from './ToolDock';
 import { ToolSettings } from './ToolSettings';
 import { useStore } from '../../store/store';
 
@@ -21,7 +21,7 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
   }, [settings.doc.id, docked]);
   return <>
     {docked ? null : <div ref={palette} className="designer-palette">
-      <ToolRail sessionId={settings.sessionId} doc={settings.doc} />
+      <ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} />
     </div>}
     <div className="designer-view" role="toolbar" aria-label="Canvas view" aria-orientation="vertical">
       {history ? <div className="view-history">{history}</div> : null}
