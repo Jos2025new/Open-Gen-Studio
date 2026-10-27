@@ -131,7 +131,7 @@ export default [
     what: 'Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas.',
     sides: [
       ['src/engine/agent/context.ts', 'Guided, one questions card before every plan'],
-      ['src/engine/agent/runtime.ts', 'Guided mode: ask your questions first'],
+      ['src/engine/agent/llmTurn.ts', 'Guided mode: ask your questions first'],
       ['src/engine/agent/context.ts', "mode: guided (ask before each plan"],
     ],
     tests: ['tests/agent-mode.test.ts'],
@@ -152,7 +152,7 @@ export default [
     sides: [
       ['src/engine/procedure.ts', 'export const SETTINGS_POLICY'],
       ['src/engine/procedure.ts', 'export function planRequiresSettings'],
-      ['src/engine/agent/runtime.ts', 'planRequiresSettings(workspace, kinds'],
+      ['src/engine/agent/llmTurn.ts', 'planRequiresSettings(workspace, kinds'],
     ],
     tests: ['tests/general-model-gate.test.ts', 'tests/agent-force.test.ts'],
   },
@@ -180,7 +180,7 @@ export default [
     what: 'Decisión del usuario (ADR 0009, enmienda a 0007-9): una operación con modelo de imagen confirma su modelo (Auto una vez por sesión, Guided en cada petición; Direct usa el compositor).',
     sides: [
       ['src/engine/procedure.ts', 'An op step that runs on an image model (edit engine) needs the image kind confirmed'],
-      ['src/engine/agent/runtime.ts', 'const kinds = v.data.steps.map'],
+      ['src/engine/agent/llmTurn.ts', 'const kinds = v.data.steps.map'],
     ],
     tests: ['tests/agent-force.test.ts', 'tests/agent-fit-plan.test.ts'],
   },
@@ -188,8 +188,8 @@ export default [
     id: 'cost-recheck',
     what: 'Un plan caro se muestra tras confirmar su tarjeta en la misma petición; el mensaje de coste nombra cada tipo una vez (la tarjeta admite 4 partes).',
     sides: [
-      ['src/engine/agent/runtime.ts', 'const confirmedNow'],
-      ['src/engine/agent/runtime.ts', 'costAskMessage([...new Set(settingKinds)]'],
+      ['src/engine/agent/runtimeShared.ts', 'const confirmedNow'],
+      ['src/engine/agent/runtimeShared.ts', 'costAskMessage([...new Set(settingKinds)]'],
       ['src/engine/agent/tools.ts', 'parts: z.array(settingsPartSchema).min(1).max(4)'],
     ],
     tests: ['tests/general-model-gate.test.ts'],
@@ -199,7 +199,7 @@ export default [
     what: 'Todo plan con coste mayor que cero o desconocido espera aprobación, también en Auto.',
     sides: [
       ['src/engine/pricing.ts', 'export function needsSpendCheck'],
-      ['src/engine/agent/runtime.ts', "style === 'auto' && !needsSpendCheck(total)"],
+      ['src/engine/agent/runtimeShared.ts', "style === 'auto' && !needsSpendCheck(total)"],
     ],
     tests: ['tests/engine.test.ts'],
   },
@@ -220,7 +220,7 @@ export default [
     sides: [
       ['src/engine/plan.ts', 'your ${kind} model has no variant'],
       ['src/components/chat/PlanCard.tsx', 'const aboutUserModel'],
-      ['src/engine/agent/runtime.ts', '/\\byour [\\w-]+ model\\b/'],
+      ['src/engine/agent/runtimeShared.ts', '/\\byour [\\w-]+ model\\b/'],
     ],
     tests: ['tests/routing.test.ts'],
   },
@@ -240,7 +240,7 @@ export default [
       ['src/engine/agent/triggers.ts', 'export const OP_TRIGGERS'],
       ['src/engine/agent/force.ts', 'export function steerNote'],
       ['src/engine/agent/fit.ts', 'export function fitOp'],
-      ['src/engine/agent/runtime.ts', 'const forced = steerNote(gate, confirmFirst)'],
+      ['src/engine/agent/conversation.ts', 'const forced = steerNote(gate, confirmFirst)'],
     ],
     tests: ['tests/agent-force.test.ts', 'tests/agent-fit.test.ts'],
   },
@@ -344,7 +344,7 @@ export default [
     what: 'En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva.',
     sides: [
       ['src/engine/skills/app/designer.md', 'En el Designer no uses la operación fx'],
-      ['src/engine/agent/runtime.ts', "workspace !== 'designer' || g.op !== 'fx'"],
+      ['src/engine/agent/conversation.ts', "workspace !== 'designer' || g.op !== 'fx'"],
     ],
     tests: ['tests/fx-agent.test.ts'],
   },

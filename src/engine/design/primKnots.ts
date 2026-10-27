@@ -1,4 +1,5 @@
 import type { ShapeSpec } from '../shapeSpec';
+import { clamp } from '../../lib/format';
 import { normalizePrim, starVertices, withPrim } from './primitives';
 import { isWholeArc } from './shapeKinds';
 
@@ -13,7 +14,6 @@ import { isWholeArc } from './shapeKinds';
 export type PrimKnot = 'outer' | 'inner' | 'round' | 'from' | 'to';
 export type Pt = [number, number];
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Centre and half sizes of the box, the frame the unit circle maps to. */

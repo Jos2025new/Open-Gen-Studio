@@ -48,7 +48,7 @@ export default [
       ['src/store/saveRecovery.ts', 'export async function keepThisVersion'],
       ['src/engine/jobs.ts', 'if (!mayStartWork()) return Promise.reject'],
       ['src/engine/agent/sendGate.ts', 'mayStartWork()'],
-      ['src/engine/agent/runtime.ts', "|| !mayStartWork()) return;"],
+      ['src/engine/agent/llmTurn.ts', "|| !mayStartWork()) return;"],
       ['src/components/shell/WriterLockPanel.tsx', 'export function WriterLockPanel'],
       ['src/App.tsx', '<WriterLockPanel />'],
     ],

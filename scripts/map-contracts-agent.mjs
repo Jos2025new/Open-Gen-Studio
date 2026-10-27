@@ -21,7 +21,7 @@ export default [
     what: 'Un workflow pregunta antes de cargarse: read_guide devuelve su ficha hasta la primera ronda (o ready: true); el prompt lo dice.',
     sides: [
       ['src/engine/agent/tools.ts', "ready: { type: 'boolean' }"],
-      ['src/engine/agent/runtime.ts', 'cardInsteadOfGuide('],
+      ['src/engine/agent/canvasCalls.ts', 'cardInsteadOfGuide('],
       ['src/engine/skills/workflowCard.ts', 'export function cardInsteadOfGuide'],
       ['src/engine/agent/context.ts', 'read_guide of a workflow returns its card'],
     ],
@@ -48,7 +48,7 @@ export default [
     what: 'DELICADO: un modelo que el usuario nombra en la petición actual, o solo otro proveedor del mismo modelo (ADR 0025 D), se cambia solo con la tarjeta de una pregunta (plan rechazado, tarjeta compacta, parte añadida) en Guided; en Auto se aplica sin tarjeta (autoConfirmSettings).',
     sides: [
       ['src/engine/plan.ts', 'call confirm_settings for ${kind} with model'],
-      ['src/engine/agent/runtime.ts', 'switchSection('],
+      ['src/engine/agent/llmTurn.ts', 'switchSection('],
       ['src/engine/agent/autoSettings.ts', 'const chosen = sections'],
       ['src/engine/agent/switchModel.ts', 'export function confirmedState'],
       ['src/components/chat/SettingsCard.tsx', 'function SwitchModelCard'],
