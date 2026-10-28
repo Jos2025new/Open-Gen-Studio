@@ -10,22 +10,22 @@ related: [toolbox-dock, barra-superior, documentos, guias]
 
 `CanvasSize` (`CanvasSize.tsx:13`) existe en dos sitios con el mismo formulario: como popover del botón «Canvas size» de la barra superior, y como tarjeta en línea (`inline`) cuando se abre la variante Sizes de Layout en el dock (`ToolDock.tsx:135`). Los valores de ancho y alto son estado local hasta pulsar Apply; la unidad y el DPI sí persisten en `ui` (`pageUnit`, `pageDpi`). El lado máximo es `MAX_SIDE` = 8192 px (`canvasSize.ts:15`).
 
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas |
-| --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas |
-| Canvas size · W × H (botón) | Barra superior (`CanvasSize.tsx:84`) | Abre el popover | Hay documento | Solo en modo popover |
-| Format (select) | Formulario (`CanvasSize.tsx:63`) | Estado local `w`, `h`; 8 entradas: Custom, A4, A5, Letter, Square 1080×1080, Story 1080×1920, HD 1920×1080, 4K 3840×2160 (`pageUnits.ts:22`) | Formulario abierto | Los de papel guardan mm y recalculan con el DPI |
-| Portrait / Landscape (segmentado) | Formulario (`CanvasSize.tsx:64`) | Intercambia `w` y `h` locales | Formulario abierto | — |
-| W (campo numérico) | Formulario (`CanvasSize.tsx:65`) | `w` local (máx. 8192 px) | Formulario abierto | En la unidad elegida |
-| H (campo numérico) | Formulario (`CanvasSize.tsx:66`) | `h` local | Formulario abierto | — |
-| Unidad px / mm / in (segmentado) | Formulario (`CanvasSize.tsx:67`) | `ui.pageUnit` | Formulario abierto | Persiste |
-| DPI (campo 1–1200) | Formulario (`CanvasSize.tsx:68`) | `ui.pageDpi` | Unidad distinta de px | Defecto 96 |
-| Page color | Formulario (`CanvasSize.tsx:69`) | Color local; se aplica a `doc.background` con Apply | Formulario abierto | — |
-| Keep ratio (casilla) | Formulario (`CanvasSize.tsx:70`) | Estado local `lock` y `ratio` | Formulario abierto | No persiste |
-| Anchor (rejilla de 9 botones) | Formulario (`CanvasSize.tsx:73`) | Estado local `anchor` | Formulario abierto | Dice dónde queda la página actual; sin texto en cada botón (solo `aria-label`) |
-| Center (botón) | Formulario (`CanvasSize.tsx:76`) | `anchor` = middle-center | Anclaje distinto del centro | — |
-| Trim to content | Formulario (`CanvasSize.tsx:78`) | `trimToContent`: la página se ajusta a las capas visibles | Formulario abierto | Se rechaza si pasa de 8192 |
-| Apply | Formulario (`CanvasSize.tsx:79`) | `resizeCanvas` y, si cambió, `doc.background` | Formulario abierto | Error si el lado no está entre 1 y 8192 |
+| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
+| Canvas size · W × H (botón) | Barra superior (`CanvasSize.tsx:84`) | Abre el popover | Hay documento | Solo en modo popover | Igual que hoy | se conserva | no dibujado |
+| Format (select) | Formulario (`CanvasSize.tsx:63`) | Estado local `w`, `h`; 8 entradas: Custom, A4, A5, Letter, Square 1080×1080, Story 1080×1920, HD 1920×1080, 4K 3840×2160 (`pageUnits.ts:22`) | Formulario abierto | Los de papel guardan mm y recalculan con el DPI | Igual que hoy | se conserva | no dibujado |
+| Portrait / Landscape (segmentado) | Formulario (`CanvasSize.tsx:64`) | Intercambia `w` y `h` locales | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |
+| W (campo numérico) | Formulario (`CanvasSize.tsx:65`) | `w` local (máx. 8192 px) | Formulario abierto | En la unidad elegida | Igual que hoy | se conserva | no dibujado |
+| H (campo numérico) | Formulario (`CanvasSize.tsx:66`) | `h` local | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |
+| Unidad px / mm / in (segmentado) | Formulario (`CanvasSize.tsx:67`) | `ui.pageUnit` | Formulario abierto | Persiste | Igual que hoy | se conserva | no dibujado |
+| DPI (campo 1–1200) | Formulario (`CanvasSize.tsx:68`) | `ui.pageDpi` | Unidad distinta de px | Defecto 96 | Igual que hoy | se conserva | no dibujado |
+| Page color | Formulario (`CanvasSize.tsx:69`) | Color local; se aplica a `doc.background` con Apply | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |
+| Keep ratio (casilla) | Formulario (`CanvasSize.tsx:70`) | Estado local `lock` y `ratio` | Formulario abierto | No persiste | Igual que hoy | se conserva | no dibujado |
+| Anchor (rejilla de 9 botones) | Formulario (`CanvasSize.tsx:73`) | Estado local `anchor` | Formulario abierto | Dice dónde queda la página actual; sin texto en cada botón (solo `aria-label`) | Igual que hoy | se conserva | no dibujado |
+| Center (botón) | Formulario (`CanvasSize.tsx:76`) | `anchor` = middle-center | Anclaje distinto del centro | — | Igual que hoy | se conserva | no dibujado |
+| Trim to content | Formulario (`CanvasSize.tsx:78`) | `trimToContent`: la página se ajusta a las capas visibles | Formulario abierto | Se rechaza si pasa de 8192 | Igual que hoy | se conserva | no dibujado |
+| Apply | Formulario (`CanvasSize.tsx:79`) | `resizeCanvas` y, si cambió, `doc.background` | Formulario abierto | Error si el lado no está entre 1 y 8192 | Igual que hoy | se conserva | no dibujado |
 
 ## Enlaces
 
