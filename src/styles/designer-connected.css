@@ -314,3 +314,7 @@
 .opt .segmented { padding: 0; background: transparent; }
 .opt .segmented button.is-active { background: var(--field-on); color: var(--text); box-shadow: none; }
 
+/* Agent edits (AgentGlow.tsx): an outline that fades in 1.2 s; reduced motion keeps it still until it is gone. */
+.agent-glow { position: absolute; border: 2px solid var(--accent); border-radius: 3px; box-shadow: 0 0 14px var(--accent-line); pointer-events: none; animation: agent-glow 1.2s ease-out forwards; }
+@keyframes agent-glow { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .agent-glow { animation: none; } }

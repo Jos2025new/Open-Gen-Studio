@@ -14,6 +14,7 @@ import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import { SnapIndicator } from './SnapIndicator';
+import { AgentGlow } from './AgentGlow';
 import { moveMode, neighbourGaps } from '../../engine/design/neighbourGaps';
 import { stageWheel } from './wheelZoom';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
@@ -1319,6 +1320,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       {tool === 'move' && (!editLayers || shapeEditing) && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
       <SnapIndicator view={view} measures={guideLines.m} alignments={guideLines.a} />
+      <AgentGlow view={view} doc={doc} />
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {
