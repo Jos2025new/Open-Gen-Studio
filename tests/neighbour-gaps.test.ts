@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nearestGaps, neighbourGaps } from '../src/engine/design/neighbourGaps';
+import { moveMode, nearestGaps, neighbourGaps } from '../src/engine/design/neighbourGaps';
 import { newVectorLayer } from '../src/engine/design/doc';
 import type { VectorShape } from '../src/engine/types';
 
@@ -56,5 +56,22 @@ describe('neighbour gaps from the layers of a document', () => {
     const gaps = neighbourGaps(B(0, 0), layers as never, new Set(['moving']));
     expect(gaps).toHaveLength(1);
     expect(gaps[0].label).toBe(20); // the hidden box at 15 does not count; the nearest visible one is at 30
+  });
+});
+
+describe('move modes: Ctrl only measures when pressed during the drag', () => {
+  it('Ctrl pressed during the drag turns snapping off and keeps the measures', () => {
+    expect(moveMode(true, false, true, false)).toEqual({ snap: false, measure: true });
+  });
+  it('Ctrl already held at pointerdown (add to selection, then drag) keeps snapping', () => {
+    expect(moveMode(true, false, true, true)).toEqual({ snap: true, measure: true });
+  });
+  it('without Ctrl, measures show only when snapping is on and Alt is not held', () => {
+    expect(moveMode(true, false, false, false)).toEqual({ snap: true, measure: true });
+    expect(moveMode(false, false, false, false)).toEqual({ snap: false, measure: false });
+    expect(moveMode(true, true, false, false)).toEqual({ snap: false, measure: false });
+  });
+  it('Alt keeps its old meaning even with Ctrl', () => {
+    expect(moveMode(true, true, true, false)).toEqual({ snap: false, measure: true });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wheelZoomer, wheelZoomStep, ZOOM_STOPS } from '../src/components/designer/wheelZoom';
+import { stageWheel, wheelZoomer, wheelZoomStep, ZOOM_STOPS } from '../src/components/designer/wheelZoom';
 
 const RATE = 0.0022; // the wheel's zoom per unit of deltaY, as before the stops existed
 
@@ -82,10 +82,35 @@ describe('wheel zoom: dwell and reset', () => {
 });
 
 describe('wheel zoom: the stateful wrapper used by the stage', () => {
-  it('keeps the gesture state between events', () => {
+  it('keeps the gesture state and returns the zoomed view about the cursor', () => {
     const zoomBy = wheelZoomer();
-    const landing = zoomBy(0.9, -100, 0);
-    expect(0.9 * landing).toBeCloseTo(1, 12);
-    expect(zoomBy(1, -100, 40)).toBe(1); // the held tick, from the state the first call left behind
+    const landed = zoomBy({ zoom: 0.9, x: 0, y: 0 }, 100, 50, -100, 0);
+    expect(landed.zoom).toBeCloseTo(1, 12);
+    expect(zoomBy(landed, 100, 50, -10, 40).zoom).toBe(1); // the held tick, from the state the first call left behind
+  });
+});
+
+describe('stage wheel: zooms from the latest view, even before React re-renders', () => {
+  const fake = () => {
+    let view = { zoom: 0.9, x: 0, y: 0 };
+    const set = (action: any) => { view = typeof action === 'function' ? action(view) : action; };
+    return { set, get: () => view };
+  };
+  const rect = { left: 0, top: 0 };
+  it('two ctrl-wheel events in a row compound from the first result, not the rendered zoom', () => {
+    const f = fake();
+    const w = stageWheel(f.set);
+    w.sync(f.get());
+    w.wheel({ ctrlKey: true, metaKey: false, clientX: 0, clientY: 0, deltaX: 0, deltaY: -100, timeStamp: 0 }, rect);
+    expect(f.get().zoom).toBeCloseTo(1, 12); // landed on 100 %
+    w.wheel({ ctrlKey: true, metaKey: false, clientX: 0, clientY: 0, deltaX: 0, deltaY: -10, timeStamp: 40 }, rect);
+    expect(f.get().zoom).toBe(1); // held: from 1, not from the stale 0.9
+  });
+  it('a plain wheel pans without zooming', () => {
+    const f = fake();
+    const w = stageWheel(f.set);
+    w.sync(f.get());
+    w.wheel({ ctrlKey: false, metaKey: false, clientX: 0, clientY: 0, deltaX: 3, deltaY: 5, timeStamp: 0 }, rect);
+    expect(f.get()).toEqual({ zoom: 0.9, x: -3, y: -5 });
   });
 });

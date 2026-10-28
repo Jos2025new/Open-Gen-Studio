@@ -61,3 +61,12 @@ export function neighbourGaps(box: Box, layers: Layer[], skip: Set<string>, by?:
   }
   return nearestGaps({ ...box, x: box.x + (by?.dx ?? 0), y: box.y + (by?.dy ?? 0) }, others);
 }
+
+/**
+ * What a move does with snapping and measures. Ctrl/Meta pressed during the drag (not already held at pointerdown,
+ * where it adds to the selection) turns snapping off but keeps the measures; Alt turns both off, as before.
+ */
+export function moveMode(snapOn: boolean, alt: boolean, ctrlNow: boolean, ctrlAtDown: boolean): { snap: boolean; measure: boolean } {
+  const ctrl = ctrlNow && !ctrlAtDown;
+  return { snap: snapOn && !alt && !ctrl, measure: ctrl || (snapOn && !alt) };
+}

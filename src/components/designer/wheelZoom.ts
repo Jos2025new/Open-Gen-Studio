@@ -1,3 +1,6 @@
+import type { Dispatch, SetStateAction } from 'react';
+import { zoomAt, type View } from '../../engine/design/viewCoordinates';
+
 /*
  * Ctrl+wheel zoom that stops at the usual levels (25, 50, 100, 150, 200 %). Single-unit wheel jitter does nothing; a
  * faster spin zooms further per notch, up to MAX_BOOST times the base step. A step that passes a stop, or comes within
@@ -43,12 +46,38 @@ export function wheelZoomStep(zoom: number, deltaY: number, t: number, prev: Whe
   return { factor: next / zoom, state: stop === undefined ? { at: t } : { at: t, stop } };
 }
 
-/** The same step with the gesture state kept inside: one per stage, called once per wheel event. */
-export function wheelZoomer(): (zoom: number, deltaY: number, t: number) => number {
+/**
+ * The same step with the gesture state kept inside: one per stage. Each call zooms `view` about the cursor (px, py)
+ * and returns the new view.
+ */
+export function wheelZoomer(): (view: View, px: number, py: number, deltaY: number, t: number) => View {
   let state: WheelZoomState | null = null;
-  return (zoom, deltaY, t) => {
-    const step = wheelZoomStep(zoom, deltaY, t, state);
+  return (view, px, py, deltaY, t) => {
+    const step = wheelZoomStep(view.zoom, deltaY, t, state);
     state = step.state;
-    return step.factor;
+    return zoomAt(view, px, py, step.factor);
+  };
+}
+
+/** The part of a wheel event the stage reads. */
+export interface WheelLike { ctrlKey: boolean; metaKey: boolean; clientX: number; clientY: number; deltaX: number; deltaY: number; timeStamp: number }
+
+/**
+ * The stage's wheel: Ctrl/Meta zooms about the cursor from the latest view, which it keeps itself, so several events
+ * before a re-render compound; any other wheel pans. `sync` records the view React rendered.
+ */
+export function stageWheel(setView: Dispatch<SetStateAction<View>>) {
+  const zoomBy = wheelZoomer();
+  let latest: View = { zoom: 1, x: 0, y: 0 };
+  return {
+    sync(view: View) { latest = view; },
+    wheel(e: WheelLike, rect: { left: number; top: number }) {
+      if (e.ctrlKey || e.metaKey) {
+        latest = zoomBy(latest, e.clientX - rect.left, e.clientY - rect.top, e.deltaY, e.timeStamp);
+        setView(latest);
+      } else {
+        setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+      }
+    },
   };
 }

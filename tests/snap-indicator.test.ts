@@ -9,8 +9,10 @@ describe('spacing indicator', () => {
   it('draws nothing without measures, and each gap with its length', () => {
     expect(renderToStaticMarkup(createElement(SnapIndicator, { view, measures: [] }))).toBe('');
     const html = renderToStaticMarkup(createElement(SnapIndicator, { view, measures: [{ a: [10, 5], b: [20, 5], label: 10 }, { a: [30, 5], b: [40, 5], label: 10 }] }));
-    expect(html).toContain('>10.0</text>');
+    expect(html).toContain('>10</text>'); // whole units show no decimals
     expect(html.match(/<text/g)).toHaveLength(2);
+    const half = renderToStaticMarkup(createElement(SnapIndicator, { view, measures: [{ a: [0, 5], b: [10.5, 5], label: 10.5 }] }));
+    expect(half).toContain('>10.5</text>'); // a fraction keeps one decimal
     expect(html).toContain('class="stroke-ruler snap-indicator"'); // the stroke-ruler class lets pointer events through
   });
 });
