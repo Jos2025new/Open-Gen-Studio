@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockups de ajustes del Designer</title>
+<link rel="stylesheet" href="../../../src/styles/tokens.css">
+<link rel="stylesheet" href="../../../src/styles/base.css">
+<link rel="stylesheet" href="../../../src/styles/ui.css">
+<link rel="stylesheet" href="../../../src/styles/designer.css">
+<link rel="stylesheet" href="../../../src/styles/designer-connected.css">
+<link rel="stylesheet" href="../../../src/styles/tool-dock.css">
+<style>
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-size:13px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:14px;margin:0 0 12px}
+a{color:var(--text-2)}
+.mock-intro{color:var(--text-3);margin:0 0 20px;max-width:820px}
+.mock-block{margin:0 0 40px;border-top:1px solid var(--panel-line);padding-top:16px}
+.mock-pair{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.mock-col{margin:0;width:260px;flex:none}
+.mock-col.wide{width:420px}
+.mock-col>figcaption{display:block;font-size:12px;color:var(--text-3);margin:0 0 10px;position:relative;z-index:2}
+.mock-panel{isolation:isolate}
+.mock-panel .tool-dock{position:relative;left:auto;right:auto;bottom:auto;top:auto;transform:none;width:100%}
+.mock-changed{position:relative;outline:1px dashed var(--accent);outline-offset:4px;border-radius:6px}
+.mock-badge{position:absolute;top:-9px;right:-9px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:var(--bg);font-size:10px;line-height:16px;text-align:center;font-weight:600}
+.mock-panel{--layers-w:260px;width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--panel-line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;position:relative}
+.mock-caption{font-size:13px;color:var(--text-2);margin:14px 0 0;padding:0;list-style:none;max-width:820px}
+.mock-caption li{margin:0 0 6px}
+.mock-caption code{font-size:12px;color:var(--text-3)}
+.mock-note{font-size:12px;color:var(--text-3);border:1px dashed var(--panel-line);border-radius:6px;padding:6px 8px;max-width:820px}
+.mock-new{position:absolute;border:1px dashed currentColor;box-sizing:border-box}
+.mock-table{border-collapse:collapse;font-size:13px}
+.mock-table th,.mock-table td{border-bottom:1px solid var(--panel-line);padding:6px 8px;text-align:left;vertical-align:middle}
+.mock-table .ic-cell{width:48px}
+.mock-table svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mock-table .ic-name{color:var(--text-3);font-size:12px;padding-left:4px}
+</style>
+</head>
+<body>
+<p><a href="index.html">&larr; Índice de mockups</a></p>
+<h1>Mockups de ajustes del Designer</h1>
+<p class="mock-intro">Actual frente a propuesta, por bloque. Cada página cita archivo:línea del código de origen. Solo cambios de presentación; no hay código de la app modificado.</p>
+<ul class="mock-caption"><li><a href="a1-brush-orden.html">A1 · Pincel: Color/Tamaño/Opacidad antes de la vista previa; presets en 8 tamaños</a> <code>a1-brush-orden.html</code></li><li><a href="a2-capas-acciones.html">A2 · Capas: barra de acciones encima de la lista; ojo a la izquierda, candado a la derecha</a> <code>a2-capas-acciones.html</code></li><li><a href="a4-seleccion-modo.html">A4 · Selección: Modo justo después de Forma</a> <code>a4-seleccion-modo.html</code></li><li><a href="a5-fx-add-arriba.html">A5 · Editor FX: &quot;Add&quot; arriba</a> <code>a5-fx-add-arriba.html</code></li><li><a href="b-iconos.html">B6-B7 · Iconos: tabla de familias con icono actual y propuesto</a> <code>b-iconos.html</code></li><li><a href="b8-dock-toggle-duplicado.html">B8 · DESCARTADO: quitar el botón de panel repetido de la caja</a> <code>b8-dock-toggle-duplicado.html</code></li><li><a href="c9-brush-avanzado.html">C9 · Pincel: ajustes avanzados en un bloque plegado</a> <code>c9-brush-avanzado.html</code></li><li><a href="c10-guias.html">C10 · Tarjeta de guías: regrupar</a> <code>c10-guias.html</code></li><li><a href="c11-alinear.html">C11 · Alinear: distribuir dentro de la rejilla</a> <code>c11-alinear.html</code></li><li><a href="c13-gradiente-end.html">C13 · Gradiente: &quot;To&quot; → &quot;End&quot;</a> <code>c13-gradiente-end.html</code></li><li><a href="d14-navegador.html">D14 · Navegador plegable (único elemento nuevo: el rectángulo de vista)</a> <code>d14-navegador.html</code></li><li><a href="f-variantes.html">F · Variantes: Eraser y Text con controles rápidos; chips de color y tamaño en pinceles</a> <code>f-variantes.html</code></li><li><a href="g-swatch-dock.html">G · Muestra de color fija al final de la caja</a> <code>g-swatch-dock.html</code></li></ul>
+<p class="mock-note">Tema: oscuro por defecto (tokens.css, :root con color-scheme: dark; sin atributo data-theme). Cada página enlaza los CSS reales de src/styles/ (tokens, base, ui, designer, designer-connected, tool-dock). Los iconos son lucide-react 1.48 de node_modules. Los mockups son estáticos: sin JavaScript. Actual y Propuesta miden 260 px (--layers-w), salvo la caja de herramientas (420 px).</p>
+</body>
+</html>

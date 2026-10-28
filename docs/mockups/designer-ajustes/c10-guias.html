@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C10 · Tarjeta de guías: agrupación</title>
+<link rel="stylesheet" href="../../../src/styles/tokens.css">
+<link rel="stylesheet" href="../../../src/styles/base.css">
+<link rel="stylesheet" href="../../../src/styles/ui.css">
+<link rel="stylesheet" href="../../../src/styles/designer.css">
+<link rel="stylesheet" href="../../../src/styles/designer-connected.css">
+<link rel="stylesheet" href="../../../src/styles/tool-dock.css">
+<style>
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-size:13px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:14px;margin:0 0 12px}
+a{color:var(--text-2)}
+.mock-intro{color:var(--text-3);margin:0 0 20px;max-width:820px}
+.mock-block{margin:0 0 40px;border-top:1px solid var(--panel-line);padding-top:16px}
+.mock-pair{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.mock-col{margin:0;width:260px;flex:none}
+.mock-col.wide{width:420px}
+.mock-col>figcaption{display:block;font-size:12px;color:var(--text-3);margin:0 0 10px;position:relative;z-index:2}
+.mock-panel{isolation:isolate}
+.mock-panel .tool-dock{position:relative;left:auto;right:auto;bottom:auto;top:auto;transform:none;width:100%}
+.mock-changed{position:relative;outline:1px dashed var(--accent);outline-offset:4px;border-radius:6px}
+.mock-badge{position:absolute;top:-9px;right:-9px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:var(--bg);font-size:10px;line-height:16px;text-align:center;font-weight:600}
+.mock-panel{--layers-w:260px;width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--panel-line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;position:relative}
+.mock-caption{font-size:13px;color:var(--text-2);margin:14px 0 0;padding:0;list-style:none;max-width:820px}
+.mock-caption li{margin:0 0 6px}
+.mock-caption code{font-size:12px;color:var(--text-3)}
+.mock-note{font-size:12px;color:var(--text-3);border:1px dashed var(--panel-line);border-radius:6px;padding:6px 8px;max-width:820px}
+.mock-new{position:absolute;border:1px dashed currentColor;box-sizing:border-box}
+.mock-table{border-collapse:collapse;font-size:13px}
+.mock-table th,.mock-table td{border-bottom:1px solid var(--panel-line);padding:6px 8px;text-align:left;vertical-align:middle}
+.mock-table .ic-cell{width:48px}
+.mock-table svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mock-table .ic-name{color:var(--text-3);font-size:12px;padding-left:4px}
+</style>
+</head>
+<body>
+<p><a href="index.html">&larr; Índice de mockups</a></p>
+<h1>C10 · Tarjeta de guías: agrupación</h1>
+<p class="mock-intro">Tarjeta de guías con los mismos componentes (InlineToggle, InlineChoice, Button).</p>
+<section class="mock-block">
+<h2>C10 · GuidesCard</h2>
+<div class="mock-pair">
+<figure class="mock-col wide"><figcaption>Actual</figcaption><div class="mock-panel"><div class="guides-card"><div class="guides-col"><button type="button" role="switch" aria-checked="true" class="opt opt-toggle is-on" data-tip="Shift+R"><span class="opt-label">Show rulers</span><span class="toggle is-on" aria-hidden="true"><span></span></span></button><button type="button" role="switch" aria-checked="true" class="opt opt-toggle is-on"><span class="opt-label">Show guides</span><span class="toggle is-on" aria-hidden="true"><span></span></span></button><button type="button" role="switch" aria-checked="false" class="opt opt-toggle" data-tip="Edit cannot move or remove locked guides"><span class="opt-label">Lock guides</span><span class="toggle" aria-hidden="true"><span></span></span></button><button type="button" role="switch" aria-checked="true" class="opt opt-toggle is-on"><span class="opt-label">Snap to guides</span><span class="toggle is-on" aria-hidden="true"><span></span></span></button></div><div class="guides-col"><div class="opt opt-choice" role="radiogroup" aria-label="Orientation"><span class="opt-label">Orientation</span><span class="opt-choices"><button type="button" role="radio" aria-checked="true" aria-label="Vertical" data-tip="Vertical" class="is-on">Vertical</button><button type="button" role="radio" aria-checked="false" aria-label="Horizontal" data-tip="Horizontal" class="">Horizontal</button></span></div><div class="canvas-size-dims"><label>Position<input type="number" aria-label="Guide position" value="120"></label></div><div class="opt opt-choice" role="radiogroup" aria-label="Unit"><span class="opt-label">Unit</span><span class="opt-choices"><button type="button" role="radio" aria-checked="true" aria-label="px" data-tip="px" class="is-on">px</button><button type="button" role="radio" aria-checked="false" aria-label="%" data-tip="%" class="">%</button></span></div><div class="confirm-pop-actions"><button type="button" class="btn btn-primary btn-sm">Add</button><button type="button" class="btn btn-ghost btn-sm">Guides around page</button><button type="button" class="btn btn-ghost btn-sm">Clear all guides</button></div></div></div></div></figure>
+<figure class="mock-col wide"><figcaption>Propuesta</figcaption><div class="mock-panel"><div class="guides-card"><div class="guides-col"><button type="button" role="switch" aria-checked="true" class="opt opt-toggle is-on" data-tip="Shift+R"><span class="opt-label">Show rulers</span><span class="toggle is-on" aria-hidden="true"><span></span></span></button><button type="button" role="switch" aria-checked="true" class="opt opt-toggle is-on"><span class="opt-label">Show guides</span><span class="toggle is-on" aria-hidden="true"><span></span></span></button><button type="button" role="switch" aria-checked="false" class="opt opt-toggle" data-tip="Edit cannot move or remove locked guides"><span class="opt-label">Lock guides</span><span class="toggle" aria-hidden="true"><span></span></span></button><button type="button" role="switch" aria-checked="true" class="opt opt-toggle is-on"><span class="opt-label">Snap to guides</span><span class="toggle is-on" aria-hidden="true"><span></span></span></button></div><div class="guides-col"><div class="mock-changed"><div class="guides-add"><span class="field-label">Add guide</span><div class="opt opt-choice" role="radiogroup" aria-label="Orientation"><span class="opt-label">Orientation</span><span class="opt-choices"><button type="button" role="radio" aria-checked="true" aria-label="Vertical" data-tip="Vertical" class="is-on">Vertical</button><button type="button" role="radio" aria-checked="false" aria-label="Horizontal" data-tip="Horizontal" class="">Horizontal</button></span></div><div class="canvas-size-dims"><label>Position<input type="number" aria-label="Guide position" value="120"></label></div><div class="opt opt-choice" role="radiogroup" aria-label="Unit"><span class="opt-label">Unit</span><span class="opt-choices"><button type="button" role="radio" aria-checked="true" aria-label="px" data-tip="px" class="is-on">px</button><button type="button" role="radio" aria-checked="false" aria-label="%" data-tip="%" class="">%</button></span></div><button type="button" class="btn btn-primary btn-sm">Add</button></div><span class="mock-badge">1</span></div></div></div><div class="confirm-pop-actions"><button type="button" class="btn btn-ghost btn-sm">Guides around page</button><button type="button" class="btn btn-ghost btn-sm">Clear all guides</button></div></div></figure>
+</div>
+<ul class="mock-caption"><li>Grupo "Add guide" con su propio título pequeño (field-label): Orientación, Posición, Unidad y el botón Add, juntos. <code>src/components/designer/GuidesCard.tsx:35-39</code></li><li>Los cuatro interruptores (mostrar reglas, guías, bloquear, ajustar) van aparte, en su propia columna. <code>src/components/designer/GuidesCard.tsx:28-33</code></li><li>Guides around page y Clear all quedan en el pie. <code>src/components/designer/GuidesCard.tsx:40-44</code></li></ul>
+<p class="mock-note">El título "Add guide" usa la clase field-label, la misma que el título "Recent" del selector de color (InlineControls.tsx:77). Guardas de disabled (Clear sin guías) no se muestran.</p>
+</section>
+</body>
+</html>
