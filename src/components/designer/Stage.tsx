@@ -14,6 +14,7 @@ import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import { SnapIndicator } from './SnapIndicator';
+import { neighbourGaps } from '../../engine/design/neighbourGaps';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
@@ -1018,13 +1019,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const group = [d.base, ...(d.others ?? [])];
       let dx = p.x - d.startX, dy = p.y - d.startY;
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
-      const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
+      // Ctrl/Meta: no snap, still measured (neighbourGaps.ts).
+      const ctrl = e.ctrlKey || e.metaKey;
+      const box = (snap.on && !e.altKey) || ctrl ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
         const ids = new Set(group.map((l) => l.id));
-        const s = snapSessionOf(d, doc, ids, d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
-        dx += s.dx;
-        dy += s.dy;
-        showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
+        const session = snapSessionOf(d, doc, ids, d.layerId, snap, view, size);
+        const s = ctrl ? (session.clear(), null) : session.step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
+        dx += s?.dx ?? 0; dy += s?.dy ?? 0;
+        showGuides({ x: s?.viewGuides?.x, y: s?.viewGuides?.y, m: [...(s?.measures ?? []), ...neighbourGaps(box, doc.layers, ids, s)], a: s?.alignments });
       } else {
         snapSessionOf(d, doc, new Set(group.map((l) => l.id)), d.layerId, snap, view, size).clear();
         showGuides({});

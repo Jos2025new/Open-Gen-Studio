@@ -20,6 +20,7 @@ export default [
     what: 'Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes.',
     sides: [
       ['src/engine/design/snap.ts', 'export function equalSpacing'],
+      ['src/engine/design/neighbourGaps.ts', 'export function nearestGaps'],
       ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],
       ['src/engine/design/snapSession.ts', 'export interface AlignmentGuide'],
       ['src/components/designer/SnapIndicator.tsx', 'data-snap-alignment="true"'],
@@ -30,7 +31,7 @@ export default [
       ['src/components/designer/snapIdle.ts', 'export function snapIdleStart'],
       ['src/store/store.ts', 'snapByMode?: SnapByMode'],
     ],
-    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-spacing.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts', 'tests-e2e/snapping.spec.ts'],
+    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-spacing.test.ts', 'tests/neighbour-gaps.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts', 'tests-e2e/snapping.spec.ts'],
   },
   {
     id: 'paint-mode',
