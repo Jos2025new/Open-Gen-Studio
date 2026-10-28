@@ -12,7 +12,6 @@ Las guías pertenecen al documento (`doc.guides` {x, y}); lo que se ve y se bloq
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Show rulers (interruptor) | Dock › tarjeta Guides (`GuidesCard.tsx:29`) | `ui.rulers` | Variante Guides abierta | Atajo Shift+R; en Studio no hay atajo (`tools` definido) | Tarjeta Guides: columna propia de cuatro interruptores | se conserva | [c10-guias](../mockups/designer-ajustes/c10-guias.html) |
 | Show guides (interruptor) | Dock › tarjeta Guides (`GuidesCard.tsx:30`) | `ui.showGuides` (defecto true) | Variante Guides abierta | — | Tarjeta Guides: columna propia de cuatro interruptores | se conserva | [c10-guias](../mockups/designer-ajustes/c10-guias.html) |
 | Lock guides (interruptor) | Dock › tarjeta Guides (`GuidesCard.tsx:31`) | `ui.lockGuides` | Variante Guides abierta | Edit no puede mover ni quitar guías bloqueadas | Tarjeta Guides: columna propia de cuatro interruptores | se conserva | [c10-guias](../mockups/designer-ajustes/c10-guias.html) |

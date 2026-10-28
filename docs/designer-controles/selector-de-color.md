@@ -12,7 +12,6 @@ related: [pincel, relleno, degradado, formas, texto, lineart, propiedades, estad
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Botón de color (swatch + etiqueta + valor opcional) | Cada herramienta con color (`InlineControls.tsx:64`) | Abre/cierra el popover (`usePopover`); al cerrar guarda el color como reciente (`rememberColor`, `InlineControls.tsx:57`) | Siempre que el llamador lo pinte | `iconOnly` = chip redondo sin texto (pincel, Studio); `showValue` añade el hex (Fill, Stroke, Text color) | Igual que hoy | se conserva | no dibujado |
 | Plano de color (saturación × brillo) | Popover (`InlineControls.tsx:69`); definición `ColorPlane.tsx:16` | El color del llamador | Popover abierto | Puntero (arrastrar) o flechas (1 %, con Shift 10 %) | Igual que hoy | se conserva | no dibujado |
 | Selector HSLA / RGBA | Popover (`ColorChannels.tsx:11`, selector `ColorChannels.tsx:32`) | Estado local `mode` del popover | Popover abierto | Alterna H S L ↔ R G B | Igual que hoy | se conserva | no dibujado |

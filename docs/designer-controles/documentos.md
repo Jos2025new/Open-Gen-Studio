@@ -12,7 +12,6 @@ Las acciones de archivo del Designer están repartidas entre la barra superior (
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Pantalla vacía «Start a design» (6 presets) | Espacio de trabajo (`DesignerWorkspace.tsx:153`) | Crea documento (`newBlankDoc`) | Sesión sin documentos | Mismos presets que el menú New document | Igual que hoy | se conserva | no dibujado |
 | New document › Square 1:1 (1080×1080) | Menú New document (`doc.ts:36`) | `newBlankDoc` | Menú abierto | Los 6 presets son filas de un único menú | Igual que hoy | se conserva | no dibujado |
 | New document › Portrait 4:5 (1080×1350) | Menú New document (`doc.ts:37`) | `newBlankDoc` | Menú abierto | — | Igual que hoy | se conserva | no dibujado |

@@ -12,8 +12,7 @@ Lineart (tecla P) dibuja trazos vectoriales editables con presión en una capa v
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
-| Mode (Draw / Edit) | Dock › tarjeta; Panel Tool; tira (`ToolSettings.tsx:264`) | `ui.lineartMode` (`setUi`, no persiste) | Tool = lineart | Edit: mueve puntos de un trazo; cambiar a Edit no cambia la herramienta | Igual que hoy | se conserva | no dibujado |
+| Mode (Draw / Edit) | Dock › tarjeta; Panel Tool (`ToolSettings.tsx:264`) | `ui.lineartMode` (`setUi`, no persiste) | Tool = lineart | Edit: mueve puntos de un trazo; cambiar a Edit no cambia la herramienta | Igual que hoy | se conserva | no dibujado |
 | Size (slider 1 a 120 px) | Dock › tarjeta / Panel Tool (`StrokeStyleFields.tsx:17`) | `ui.lineart.size` | Lineart en modo Draw | Tope distinto al del pincel (240) | Igual que hoy | se conserva | no dibujado |
 | Presets de tamaño (12: 2 a 96) | Dock › tarjeta / Panel Tool (`StrokeStyleFields.tsx:18`) | `ui.lineart.size` | Lineart en modo Draw | El mismo componente que el pincel, filtrado a 1 a 120 | Igual que hoy | se conserva | no dibujado |
 | Color | Dock › tarjeta / Panel Tool (`StrokeStyleFields.tsx:19`) | `ui.lineart.color` | Lineart en modo Draw | Muestra el hex; NO tiene alfa en el popover (usa Opacity) | Igual que hoy | se conserva | no dibujado |

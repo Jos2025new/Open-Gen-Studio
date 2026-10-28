@@ -12,7 +12,6 @@ related: [propiedades, fx, alinear-editar, documentos, atajos, lienzo-gestos]
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Show layers panel (botón) | Panel plegado (`LayersPanel.tsx:155`) | Preferencia `ogs:layers-collapsed` | Panel plegado | Icono PanelRightOpen | Igual que hoy | se conserva | no dibujado |
 | Open layers panel to confirm painting (botón) | Panel plegado (`LayersPanel.tsx:156`) | Despliega el panel | Plegado y hay una capa raster pendiente de aprobar | Icono AlertTriangle | Igual que hoy | se conserva | no dibujado |
 | Collapse layers panel (botón) | Cabecera de pestañas (`LayersPanel.tsx:178`) | `ogs:layers-collapsed` | Panel abierto | Evento `ogs:layers-toggle` hace lo mismo (`LayersPanel.tsx:111`) | Igual que hoy | se conserva | no dibujado |

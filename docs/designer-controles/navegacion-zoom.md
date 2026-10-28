@@ -12,7 +12,6 @@ La vista (zoom y posición) es estado local del `Stage` (`Stage.tsx:167`); el es
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Zoom in (botón) | Barra vertical «Canvas view» (`DesignerWorkspace.tsx:132`) | Evento `ogs:designer-zoom` ×1.25 al centro del lienzo | Hay documento | No tiene atajo | Barra vertical Canvas view, sin cambio; además fila Zoom del navegador (D14). Si la barra se retira queda por decidir | se conserva | [d14-navegador](../mockups/designer-ajustes/d14-navegador.html) |
 | Zoom percent (campo editable) | Barra vertical (`DesignerWorkspace.tsx:134`) | Evento `ogs:designer-zoom` con el factor para llegar al % tecleado (5 % a 3200 %) | Hay documento | Enter aplica, Esc cancela; se actualiza por `ogs:designer-view` | Se conserva el campo editable; el navegador dibuja un slider en %, no sustituye al campo | se conserva | [d14-navegador](../mockups/designer-ajustes/d14-navegador.html) |
 | Zoom out (botón) | Barra vertical (`DesignerWorkspace.tsx:144`) | Evento ×0,8 | Hay documento | — | Barra vertical Canvas view, sin cambio; además fila Zoom del navegador (D14). Si la barra se retira queda por decidir | se conserva | [d14-navegador](../mockups/designer-ajustes/d14-navegador.html) |

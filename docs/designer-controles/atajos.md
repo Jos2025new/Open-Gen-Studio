@@ -12,7 +12,6 @@ El manejador es `designerKey` (`designerKeys.ts:31`), registrado en la ventana p
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | V: Edit | Tecla (`shortcuts.ts:4`) | `ui.tool = move` | Si `toolBlockReason` no la bloquea | Aparece en Settings → Shortcuts | Igual que hoy | se conserva | no dibujado |
 | H: Pan | Tecla (`shortcuts.ts:4`) | `ui.tool = hand` | Igual | Listada | Igual que hoy | se conserva | no dibujado |
 | M: Select pixels | Tecla (`shortcuts.ts:4`) | `ui.tool = select` | Igual | Listada | Igual que hoy | se conserva | no dibujado |

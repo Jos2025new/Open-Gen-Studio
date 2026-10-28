@@ -12,7 +12,6 @@ El Designer NO tiene un menú de clic derecho general: una búsqueda de `onConte
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Clic derecho en una regla | Reglas del lienzo (`Stage.tsx:1336`) | `clearGuides`; aviso «Guides cleared» | Reglas visibles y hay guías | Sin menú: borra todas las guías al instante, sin confirmar | Igual que hoy | se conserva | no dibujado |
 | Clic derecho en una muestra guardada | Selector de color (`InlineControls.tsx:61`) | `removeSwatch` (la quita de `ui.swatches`) | Muestra guardada (no las recientes) | Sin menú ni confirmación; detalle en [[selector-de-color]] | Igual que hoy | se conserva | no dibujado |
 | Popover Snap | Barra Edit (`SnapControl.tsx:17`) | Casillas de snap ([[alinear-editar]]) | Tool = move | 220 px, `bottom-start` | Igual que hoy | se conserva | no dibujado |

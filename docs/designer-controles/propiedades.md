@@ -12,7 +12,6 @@ Todo esto vive en `LayersPanel` (`LayersPanel.tsx:271`) y se deshabilita con la 
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Opacity (slider %) | Panel, apariencia (`LayersPanel.tsx:183`) | `layer.opacity` (`patchLayer`) | Hay capa activa, cualquier pestaña | — | Igual que hoy | se conserva | no dibujado |
 | Blend (select) | Panel, apariencia (`LayersPanel.tsx:184`) | `layer.blend`; lista = `BLEND_MODES` | Hay capa activa | Sin vista previa | Igual que hoy | se conserva | no dibujado |
 | Layer properties (resumen plegable) | Pestaña Properties (`LayersPanel.tsx:270`) | Estado local `propertiesOpen` | Pestaña Properties con capa | Se abre por defecto | Igual que hoy | se conserva | no dibujado |

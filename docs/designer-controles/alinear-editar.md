@@ -12,7 +12,6 @@ Edit es la herramienta `move`. Su barra (`ToolSettings`, `ToolSettings.tsx:250`)
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Edit: Object / Layer (segmentado) | Barra Edit (`ToolSettings.tsx:62`); también en propiedades de capa | `ui.selectMode` | Tool = move | Object se deshabilita (con motivo) si la capa activa es raster sin objetos | Igual que hoy | se conserva | no dibujado |
 | Auto-select (interruptor) | Barra Edit (`ToolSettings.tsx:72`) | `ui.autoSelect` | Tool = move | Un clic actúa sobre la capa superior bajo el puntero | Igual que hoy | se conserva | no dibujado |
 | Move selection · drag inside (texto) | Barra Edit (`ToolSettings.tsx:250`) | Ninguno | Tool = move y hay selección de píxeles | Solo informa; arrastrar dentro corta la selección a una capa | Igual que hoy | se conserva | no dibujado |

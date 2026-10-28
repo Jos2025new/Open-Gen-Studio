@@ -12,7 +12,6 @@ related: [toolbox-dock, barra-superior, documentos, guias]
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Canvas size · W × H (botón) | Barra superior (`CanvasSize.tsx:84`) | Abre el popover | Hay documento | Solo en modo popover | Igual que hoy | se conserva | no dibujado |
 | Format (select) | Formulario (`CanvasSize.tsx:63`) | Estado local `w`, `h`; 8 entradas: Custom, A4, A5, Letter, Square 1080×1080, Story 1080×1920, HD 1920×1080, 4K 3840×2160 (`pageUnits.ts:22`) | Formulario abierto | Los de papel guardan mm y recalculan con el DPI | Igual que hoy | se conserva | no dibujado |
 | Portrait / Landscape (segmentado) | Formulario (`CanvasSize.tsx:64`) | Intercambia `w` y `h` locales | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |

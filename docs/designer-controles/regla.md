@@ -12,7 +12,6 @@ Ruler (tecla K) coloca una guía discontinua que el **pincel** sigue (líneas pa
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Ruler (select Straight / Ellipse / Perspective) | Dock › tarjeta / Panel Tool (`StrokeRulerOverlay.tsx:58`) | `ui.strokeRulerKind` y, si hay guía, `ui.strokeRuler.kind` (`setRuler`) | Tool = ruler | Duplica las tres variantes del dock (Straight, Ellipse, Perspective ruler) | Igual que hoy | se conserva | no dibujado |
 | Vanishing points (One / Two) | Dock › tarjeta / Panel Tool (`StrokeRulerOverlay.tsx:59`) | `ui.strokeRuler.points` (solo si ya existe una guía) | Tool = ruler y tipo Perspective | Sin guía colocada no hace nada | Igual que hoy | se conserva | no dibujado |
 | Snap brush to ruler (interruptor) | Dock › tarjeta / Panel Tool (`StrokeRulerOverlay.tsx:60`) | `ui.strokeRuler.on` | Tool = ruler; no actúa sin guía | DUPLICADO en la tira del pincel como «Follow stroke ruler» ([[pincel]]) | Igual que hoy | se conserva | no dibujado |

@@ -12,7 +12,6 @@ Todo lo de aquí vive en `Stage` (`Stage.tsx:588`) y no tiene botón. La lista s
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Pan: herramienta Pan, Espacio o botón central | Lienzo (`Stage.tsx:594`) | Vista del Stage | Cualquier herramienta con Espacio o botón 1 | Detalle en [[navegacion-zoom]] | Igual que hoy | se conserva | no dibujado |
 | Gradient: arrastrar una línea | Lienzo (`Stage.tsx:603`) | Capa nueva con el degradado; dentro de la selección si existe | Tool = gradient | Shift fija la línea a pasos de 45° (`Stage.tsx:1090`) | Igual que hoy | se conserva | no dibujado |
 | Select pixels: arrastrar rectángulo, lazo o clic de varita | Lienzo (`Stage.tsx:609`) | Selección de píxeles (`setSelection`) | Tool = select | Shift añade, Alt resta; la varita tiene su modo propio (New / Add / Subtract) | Igual que hoy | se conserva | no dibujado |

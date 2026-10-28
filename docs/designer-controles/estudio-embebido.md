@@ -12,7 +12,6 @@ Comparte `Stage`, el `ToolDock` y el estado `ui` con el Designer completo, pero 
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | File (botón + menú) | Barra superior del tablero (`EmbeddedFileMenu.tsx:31`) | Abre el menú con vistas menu/new/open/save/export | Siempre | Equivale a New document, Choose canvas, Import, Save y Export del Designer completo | Igual que hoy | se conserva | no dibujado |
 | File › New… (6 presets) | Menú File (`EmbeddedFileMenu.tsx:36`) | `newBlankDoc` | Menú abierto | Mismos presets que [[documentos]] | Igual que hoy | se conserva | no dibujado |
 | File › Open… | Menú File (`EmbeddedFileMenu.tsx:37`) | `selectDoc` (lista de miniaturas) | Hay documentos | Reutiliza `DocumentChoices` | Igual que hoy | se conserva | no dibujado |

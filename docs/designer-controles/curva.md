@@ -12,9 +12,8 @@ Curve es una forma de trazo que se curva respecto a la recta entre dos puntos. C
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | Bend (slider −100 a 100 %) | Dock › tarjeta / Panel Tool (`ToolSettings.tsx:273`) | `ui.shape.bend` (defecto 30) | Tool = curve | Tooltip: negativo curva al otro lado. Es el único ajuste propio | Igual que hoy | se conserva | no dibujado |
-| Stroke, Width, Join, Cap, Dashes, Dash offset, Stroke behind fill | Dock › tarjeta / Panel Tool (misma rama que [[formas]]) | `ui.shape.*` | Tool = curve; Fill no se ofrece | Join, Cap, Dashes y Stroke behind fill no salen en la tira | Igual que hoy | se conserva | no dibujado |
+| Stroke, Width, Join, Cap, Dashes, Dash offset, Stroke behind fill | Dock › tarjeta / Panel Tool (misma rama que [[formas]]) | `ui.shape.*` | Tool = curve; Fill no se ofrece | Join, Cap, Dashes y Stroke behind fill no salen en la rama compacta (tira con otra herramienta: «no alcanzable por lectura — requiere prueba en sandbox») | Igual que hoy | se conserva | no dibujado |
 | Dibujar (arrastrar) | Lienzo (`Stage.tsx:540`) | Forma nueva con `toolPath('curve', …)` | Tool = curve | Pista: «Drag to draw a curve · Bend sets how far it bows» | Igual que hoy | se conserva | no dibujado |
 | Variante Bezier pen (soon) | Dock › Pen (`toolboxModel.ts:27`) | Ninguno | Deshabilitada | «A vector Bezier pen is planned.» | Igual que hoy | se conserva | no dibujado |
 | Variante Cutter (soon) | Dock › Pen (`toolboxModel.ts:27`) | Ninguno | Deshabilitada | «A path cutter is planned.» | Igual que hoy | se conserva | no dibujado |

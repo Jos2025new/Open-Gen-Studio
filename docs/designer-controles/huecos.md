@@ -40,7 +40,7 @@ Ninguno está en la matriz de estado actual (no existen hoy). Todos los de la fi
 | Fila Zoom: slider en %, botón `100 %` | Navegador | El mismo zoom (`ogs:designer-zoom`) | [D14](../mockups/designer-ajustes/d14-navegador.html) | Duplica zoom in / out / porcentaje de la barra vertical |
 | Fila Angle: slider en °, girar izquierda, girar derecha, `0°` | Navegador | **Lógica nueva**: hoy no hay rotación ni volteo de la vista del lienzo | [D14](../mockups/designer-ajustes/d14-navegador.html) | Sin estado ni motor hoy; aprobar o descartar (decisión 7) |
 | Size, Opacity, Hardness en la fila de variantes de Eraser | Dock, fila de variantes | `ui.brush.size`, `ui.brush.opacity`, `ui.brush.hardness` | [F1](../mockups/designer-ajustes/f-variantes.html) | Mismo estado que la tarjeta |
-| Font y Size en la fila de variantes de Text | Dock, fila de variantes | `ui.text.fontFamily` y `ui.text.fontSize` | [F2](../mockups/designer-ajustes/f-variantes.html) | Con un texto seleccionado la tira edita ESA capa, no «el siguiente texto»: la fila debe decir cuál (decisión 8) |
+| Font y Size en la fila de variantes de Text | Dock, fila de variantes | `ui.text.fontFamily` y `ui.text.fontSize` | [F2](../mockups/designer-ajustes/f-variantes.html) | Con un texto seleccionado la tira (solo con Edit abierto: «no alcanzable por lectura — requiere prueba en sandbox») edita ESA capa, no «el siguiente texto»: la fila debe decir cuál (decisión 8) |
 | Chip de color y chip de tamaño en las variantes de pincel | Dock, fila de variantes (Brush, Pencil, Airbrush, Fill, Gradient) | Color y tamaño de la herramienta activa | [F3](../mockups/designer-ajustes/f-variantes.html) | Precedente: `useToolPaint` del Designer embebido ([[estudio-embebido]]) |
 | Muestra de color fija al final del dock | Dock, tras Settings | Ver decisión 9 | [G](../mockups/designer-ajustes/g-swatch-dock.html) | Un color secundario global (G-B) sería **estado nuevo**; opcional |
 | Bloque plegable Advanced | Panel del pincel | Preferencia de «abierto» (como `propertiesOpen`) | [C9](../mockups/designer-ajustes/c9-brush-avanzado.html) | Sustituye al interruptor «Advanced settings» |
@@ -48,24 +48,32 @@ Ninguno está en la matriz de estado actual (no existen hoy). Todos los de la fi
 | Títulos de fila «Align», «Distribute», «Page» y «Add guide» | Alinear y tarjeta Guides | Ninguno (solo etiquetas) | [C11](../mockups/designer-ajustes/c11-alinear.html), [C10](../mockups/designer-ajustes/c10-guias.html) | Etiquetas nuevas |
 | Etiqueta visible «Texture» con su valor | Panel del pincel | Ninguno (hoy el select solo muestra icono) | [A1](../mockups/designer-ajustes/a1-brush-orden.html) | Cambio de presentación |
 
-## 3. Decisiones abiertas
+## 3. Ya decidido
+
+- **Presets de tamaño**: se mantienen los 14; la reducción a 8 de la maqueta no está aprobada y `SizePresets` no tiene prop de subconjunto que la justifique.
+
+## 4. Decisiones pendientes
 
 1. **Vista previa del pincel**: P1 (arriba, bloque plegable abierto por defecto) o P2 (popover flotante mientras se ajusta). Sin decidir.
-2. **Presets de tamaño**: se mantienen los 14; la reducción a 8 de la maqueta no está aprobada y no hay prop de subconjunto en `SizePresets` que justificarla.
-3. **Icono de Guides**: `Grid2X2Plus` (elegido en la maqueta) o `LayoutGrid`. Sin decidir.
-4. **Dónde van dentro de Advanced** `Hardness`, el widget de punta (`Angle`, `Roundness`), `Follow stroke`, `Mirror`, el subgrupo Pressure y `Keep opacity`. La maqueta C9 solo fija Tip, Blend, Taper start + end, Stabilize y Smoothing; el resto es propuesta mía, sin confirmar. Alternativa: dejar `Hardness` en el bloque principal.
-5. **Las 4 acciones borde a ancla** de C11: segunda línea del grupo «Align» o grupo propio «Edge to anchor». Además, la maqueta avisa de que la regla `.align-action-row` (`designer.css:134`) puede estar pensada para tres columnas: confirmar.
-6. **Zoom**: los botones in / out / porcentaje / Fit canvas de la barra vertical se conservan; si el navegador los repite o los sustituye queda por decidir.
-7. **Fila Angle** del navegador: es lógica nueva (rotación de vista); aprobar o dejarla fuera.
-8. **Controles rápidos de Text**: cómo distinguir «siguiente texto» de «capa de texto seleccionada» (la tira ya lo distingue con «New text» frente a «<nombre> (selected)»).
-9. **Muestra de color fija**: qué representa por herramienta. Hoy hay cuatro estados distintos: `ui.brush.color` (Brush, Pencil, Airbrush, Fill, Gradient, Eyedropper), `ui.lineart.color`, `ui.shape.fill` (y `ui.shape.stroke`) y `ui.text.color`; Eraser no tiene color. Un color secundario global sería estado nuevo (con una tecla X para intercambiar, también nueva).
-10. **Rama tarjeta del pincel**: reagrupar de forma análoga o dejarla.
-11. **Ojo en la cabecera de carpeta**: llevarlo también a la izquierda por coherencia con A2 (propuesta mía).
-12. **A4**: la maqueta marca «pendiente de confirmar» la interpretación de «Modo primero» (Mode justo tras Shape).
-13. **Icono de capa de filtro**: la tabla B solo cambia la capa de efecto (`Flame`); el filtro conserva `Contrast`.
-14. **Texto del estado vacío de FX** («add one below» → «above»): revisar las cadenas (`FxPanel.tsx:92`).
+2. **Icono de Guides**: `Grid2X2Plus` (elegido en la maqueta) o `LayoutGrid`. Sin decidir.
+3. **Dónde van dentro de Advanced** `Hardness`, el widget de punta (`Angle`, `Roundness`), `Follow stroke`, `Mirror`, el subgrupo Pressure y `Keep opacity`. La maqueta C9 solo fija Tip, Blend, Taper start + end, Stabilize y Smoothing; el resto es propuesta mía, sin confirmar. Alternativa: dejar `Hardness` en el bloque principal.
+4. **Las 4 acciones borde a ancla** de C11: segunda línea del grupo «Align» o grupo propio «Edge to anchor». Además, la maqueta avisa de que la regla `.align-action-row` (`designer.css:134`) puede estar pensada para tres columnas (comprobación abajo).
+5. **Zoom**: los botones in / out / porcentaje / Fit canvas de la barra vertical se conservan; si el navegador los repite o los sustituye queda por decidir.
+6. **Fila Angle** del navegador: es lógica nueva (rotación de vista); aprobar o dejarla fuera.
+7. **Controles rápidos de Text**: cómo distinguir «siguiente texto» de «capa de texto seleccionada». La tira ya lo distingue con «New text» frente a «<nombre> (selected)», pero esa rama es «no alcanzable por lectura — requiere prueba en sandbox» (la tira solo se monta con la variante Edit); no sirve como precedente hasta probarlo.
+8. **Muestra de color fija**: qué representa por herramienta. Hoy hay cuatro estados distintos: `ui.brush.color` (Brush, Pencil, Airbrush, Fill, Gradient, Eyedropper), `ui.lineart.color`, `ui.shape.fill` (y `ui.shape.stroke`) y `ui.text.color`; Eraser no tiene color. Un color secundario global sería estado nuevo (con una tecla X para intercambiar, también nueva).
+9. **Rama tarjeta del pincel**: reagrupar de forma análoga o dejarla.
+10. **Ojo en la cabecera de carpeta**: llevarlo también a la izquierda por coherencia con A2 (propuesta mía).
+11. **A4**: la maqueta marca «pendiente de confirmar» la interpretación de «Modo primero» (Mode justo tras Shape).
+12. **Icono de capa de filtro**: la tabla B solo cambia la capa de efecto (`Flame`); el filtro conserva `Contrast`.
 
-## 4. Sin confirmar en la matriz de estado actual
+## 5. Comprobaciones y descripciones (no son decisiones)
+
+- Regla `.align-action-row` (`designer.css:134`): confirmar si está pensada para tres columnas antes de añadir las 4 acciones borde a ancla de C11.
+- Textos del estado vacío de FX («add one below» → «above»): revisar las cadenas (`FxPanel.tsx:92`).
+- Hoy hay cuatro estados de color distintos (descripción del punto «Muestra de color fija»): `ui.brush.color`, `ui.lineart.color`, `ui.shape.fill`/`stroke` y `ui.text.color`; Eraser no tiene color.
+
+## 6. Sin confirmar en la matriz de estado actual
 
 - Criterio exacto con que `AgentGlow` ilumina el lienzo ([[lienzo-gestos]]).
 - Las filas de [[lienzo-gestos]] tomadas de `TOOL_HELP` sin leer toda la rama del puntero (marcadas en cada fila).

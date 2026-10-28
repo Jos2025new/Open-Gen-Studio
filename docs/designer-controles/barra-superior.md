@@ -12,7 +12,6 @@ related: [documentos, tamanos, navegacion-zoom, alinear-editar, capas]
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Igual que hoy | se conserva | no dibujado |
 | New document (botón + menú de 6 presets) | Barra superior (`DesignerWorkspace.tsx:85`) | Crea un documento (`newBlankDoc`) | Siempre | Detalle de presets en [[documentos]] | Igual que hoy | se conserva | no dibujado |
 | Undo | Barra superior (`DesignerWorkspace.tsx:91`) | `undoDoc` | Hay documento; deshabilitado sin historia | Ctrl+Z | Igual que hoy | se conserva | no dibujado |
 | Redo | Barra superior (`DesignerWorkspace.tsx:92`) | `redoDoc` | Hay documento; deshabilitado sin rehacer | Ctrl+Shift+Z o Ctrl+Y | Igual que hoy | se conserva | no dibujado |
