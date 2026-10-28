@@ -18,7 +18,7 @@ Cada hallazgo sale de leer el código en esta pasada (el mismo `file:línea` est
 - Transform (espejo y giro) está en la barra superior (`DesignerWorkspace.tsx:96`), en la barra Edit (`ToolSettings.tsx:129`) y en la Edit card (`EditCard.tsx:38`) ([[barra-superior]]).
 - Show or hide right panel (barra superior, `DesignerWorkspace.tsx:97`) y Collapse layers panel (`LayersPanel.tsx:178`) hacen lo mismo ([[capas]]).
 - El nombre de la capa activa se edita con un campo fijo (`LayersPanel.tsx:221`) y además con doble clic en las demás filas.
-- El texto de una capa (Text, Font, Size, Weight, Color, Align) se edita en Properties (`LayersPanel.tsx:276`) y en la tira de texto seleccionado (`ContextStrip.tsx:78`) ([[propiedades]]).
+- El texto de una capa (Text, Font, Size, Weight, Color, Align) se edita en Properties (`LayersPanel.tsx:276`) ([[propiedades]]). La tira de texto seleccionado (`ContextStrip.tsx:78`) existe en el código, pero no es alcanzable por lectura (la tira solo se monta con la variante Edit): requiere prueba en sandbox ([[tira-contextual]]).
 - Fill y Stroke de una forma son un `InlineColor` simple en Properties (`LayersPanel.tsx:298`) y un `PaintSwatch` con degradados en la tira (`ContextStrip.tsx:102`).
 - Selection chip de la barra superior (`ToolSettings.tsx:141`) repite Deselect de la tarjeta Select ([[seleccion]]).
 
