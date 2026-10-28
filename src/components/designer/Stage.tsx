@@ -15,6 +15,7 @@ import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import { SnapIndicator } from './SnapIndicator';
 import { neighbourGaps } from '../../engine/design/neighbourGaps';
+import { wheelZoomer } from './wheelZoom';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
@@ -162,6 +163,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
+  const zoomBy = useRef(wheelZoomer()).current;
   usePanRequest(setView);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
@@ -1244,7 +1246,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const onWheel = (e: React.WheelEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
     if (e.ctrlKey || e.metaKey) {
-      const factor = Math.exp(-e.deltaY * 0.0022);
+      const factor = zoomBy(view.zoom, e.deltaY, e.timeStamp);
       setView((v) => zoomAt(v, e.clientX - r.left, e.clientY - r.top, factor));
     } else {
       setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
