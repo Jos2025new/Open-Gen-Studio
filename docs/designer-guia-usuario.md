@@ -1,6 +1,6 @@
 # Guía del Designer
 
-Guía para quien usa el Designer, sin rutas de código. Los nombres de botones y ajustes van en inglés, tal como salen en pantalla. Cada herramienta enlaza a su ficha técnica por si necesitas el detalle exacto de un ajuste: [[inventario-herramientas-designer]] (herramientas) y [[designer-tecnico]] (cómo está hecho). Esta guía describe lo que el código permite; no se ejecutó la app para escribirla.
+Guía para quien usa el Designer, sin rutas de código. Los nombres de botones y ajustes van en inglés, tal como salen en pantalla. Cada herramienta enlaza a su ficha técnica por si necesitas el detalle exacto de un ajuste: [[designer-controles/README]] (herramientas) y [[designer-tecnico]] (cómo está hecho). Esta guía describe lo que el código permite; no se ejecutó la app para escribirla.
 
 ## Índice
 
@@ -63,7 +63,7 @@ Cuando eliges un texto o una forma, la barra rápida cambia para editar ese obje
 
 Todos los campos numéricos son deslizadores: arrastra, escribe un valor o usa la rueda del ratón para mover un paso. Los colores abren un selector con plano, canales (`HSLA` o `RGBA`), campo `Hex`, una lista `Recent` y otra `Saved` (el botón `Save` guarda el color actual; clic derecho en uno guardado lo borra). Algunos colores aceptan también transparencia con el canal `A`.
 
-Qué ajustes existen en cada barra: [[inventario-herramientas-designer#1. Cómo leer las tablas]]. Superficies: [[designer-tecnico-2#Superficies de la interfaz]].
+Qué ajustes existen en cada barra: [[designer-controles/README]]. Superficies: [[designer-tecnico-2#Superficies de la interfaz]].
 
 ## Edit (mover y editar)
 
@@ -78,13 +78,13 @@ Qué ajustes existen en cada barra: [[inventario-herramientas-designer#1. Cómo 
 - Doble clic en una forma entra en su edición: tiradores de esquinas y tamaño, o nodos si es un camino. `Esc` o `Done` sale.
 - Las flechas del teclado mueven lo elegido 1 px (Shift: 10 px).
 
-Técnico: [[inventario-herramientas-designer#3.1 Edit (`move`, tecla V)]]; atajos y acciones: [[inventario-herramientas-designer-2#5. Acciones de objeto y de capa]]; arquitectura: [[designer-tecnico#Edit y Pan]].
+Técnico: [[alinear-editar]]; atajos y acciones: [[alinear-editar]]; arquitectura: [[designer-tecnico#Edit y Pan]].
 
 ## Pan (mover la vista)
 
 **Qué hace**: arrastra el lienzo para moverte por él; no cambia el diseño. **Cuándo usarla**: al hacer zoom. Tecla: H. También vale mantener Espacio con cualquier otra herramienta. No tiene ajustes.
 
-Técnico: [[inventario-herramientas-designer#3.2 Pan (`hand`, tecla H)]]; [[designer-tecnico#Edit y Pan]].
+Técnico: [[navegacion-zoom]]; [[designer-tecnico#Edit y Pan]].
 
 ## Select pixels (selección)
 
@@ -96,13 +96,13 @@ Técnico: [[inventario-herramientas-designer#3.2 Pan (`hand`, tecla H)]]; [[desi
 - Botones: `Deselect`, `To layer` (los píxeles elegidos pasan a una capa nueva), `All`, `Invert`, `Grow / shrink` con `Grow` y `Shrink`, `Delete` (borra los píxeles elegidos de la capa ráster activa) y `Fill` (rellena con el color y la opacidad del pincel, en una capa nueva). `Grow / shrink`, `All`, `Invert`, `Delete` y `Fill` solo salen en la pestaña `Tool`.
 - Con la herramienta Edit puedes arrastrar dentro de la selección para mover los píxeles.
 
-Ver [[#Selección]]. Técnico: [[inventario-herramientas-designer#3.3 Select pixels (`select`, tecla M)]]; [[designer-tecnico#Selección de píxeles]].
+Ver [[#Selección]]. Técnico: [[seleccion]]; [[designer-tecnico#Selección de píxeles]].
 
 ## Eyedropper (cuentagotas)
 
 **Qué hace**: toma el color visible bajo el clic y lo deja como color del pincel. **Cuándo usarla**: para repetir un color que ya está en la imagen. Tecla: I. También funciona Alt-clic con el pincel o el cubo. El ajuste `Picked` muestra el color tomado.
 
-Técnico: [[inventario-herramientas-designer#3.4 Eyedropper (`eyedropper`, tecla I)]]; [[designer-tecnico#Cuentagotas, cubo y degradado]].
+Técnico: [[cuentagotas]]; [[designer-tecnico#Cuentagotas, cubo y degradado]].
 
 ## Fill (cubo)
 
@@ -110,7 +110,7 @@ Técnico: [[inventario-herramientas-designer#3.4 Eyedropper (`eyedropper`, tecla
 
 Ajustes: `Color`, `Opacity`, `Threshold` (cuánto color parecido se rellena) y, en la pestaña `Tool`, `Expand` y `Smooth` del borde.
 
-Técnico: [[inventario-herramientas-designer#3.5 Fill (`fill`, tecla G)]]; [[designer-tecnico#Cuentagotas, cubo y degradado]].
+Técnico: [[relleno]]; [[designer-tecnico#Cuentagotas, cubo y degradado]].
 
 ## Gradient (degradado)
 
@@ -118,7 +118,7 @@ Técnico: [[inventario-herramientas-designer#3.5 Fill (`fill`, tecla G)]]; [[des
 
 Ajustes: `Shape` (`Linear` o `Radial`), `Color`, `To` (`Second color` o `Transparent`), `Second` (el segundo color) y `Opacity`. En la pestaña `Tool` también `Reverse` y el botón ⇄ que intercambia los dos colores.
 
-Técnico: [[inventario-herramientas-designer#3.6 Gradient (`gradient`, tecla U)]]; [[designer-tecnico#Cuentagotas, cubo y degradado]].
+Técnico: [[degradado]]; [[designer-tecnico#Cuentagotas, cubo y degradado]].
 
 ## Brush (pincel)
 
@@ -128,13 +128,13 @@ Ajustes rápidos: `Paint mode` (`Drawing` o `Design`, ver [[#Drawing y Design]])
 
 Si usas lápiz con presión, la presión cambia tamaño y densidad. Sin lápiz, la presión se simula a partir de la velocidad de la mano; hay un ajuste de `Speed influence`. Las imágenes colocadas o generadas están protegidas del pincel hasta que actives `Allow painting on this image` en `Properties`.
 
-Técnico: [[inventario-herramientas-designer#3.7 Brush (`brush`, tecla B) y 3.8 Eraser (`eraser`, tecla E)]]; [[designer-tecnico#Pincel y borrador]].
+Técnico: [[pincel]]; [[designer-tecnico#Pincel y borrador]].
 
 ## Eraser (borrador)
 
 **Qué hace**: borra píxeles de una capa ráster. **Cuándo usarla**: corregir trazos o recortar una imagen. Tecla: E. Solo actúa sobre una capa ráster visible y desbloqueada; si no, la herramienta se desactiva y su consejo dice por qué. Comparte ajustes con el pincel salvo `Color` y `Blend`.
 
-Técnico: [[inventario-herramientas-designer#3.7 Brush (`brush`, tecla B) y 3.8 Eraser (`eraser`, tecla E)]]; [[designer-tecnico#Pincel y borrador]].
+Técnico: [[pincel]]; [[designer-tecnico#Pincel y borrador]].
 
 ## Lineart (línea artística)
 
@@ -144,7 +144,7 @@ Técnico: [[inventario-herramientas-designer#3.7 Brush (`brush`, tecla B) y 3.8 
 - Ajustes del trazo: `Size`, `Color`, `Opacity`, `Pressure thinning`, `Smoothing`, `Streamline`, `Texture` (`Solid ink`, `Pencil grain`, `Chalk`, `Dry bristle`; con textura salen `Spacing`, `Jitter` y `Seed`), `Taper start` y `Taper end`.
 - Alt al arrastrar dobla un trazo existente.
 
-Técnico: [[inventario-herramientas-designer#3.9 Lineart (`lineart`, tecla P)]]; [[designer-tecnico#Lineart y Ruler]].
+Técnico: [[lineart]]; [[designer-tecnico#Lineart y Ruler]].
 
 ## Ruler (regla de trazos)
 
@@ -152,7 +152,7 @@ Técnico: [[inventario-herramientas-designer#3.9 Lineart (`lineart`, tecla P)]];
 
 Ajustes: `Ruler` (`Straight`, `Ellipse`, `Perspective`), `Vanishing points` (`One` o `Two`, solo en perspectiva), `Snap brush to ruler` (los trazos del pincel siguen la guía) y `Clear ruler`. Mientras la regla está colocada, Brush y Eraser ofrecen `Follow stroke ruler`.
 
-Técnico: [[inventario-herramientas-designer#3.10 Ruler (`ruler`, tecla K)]]; [[designer-tecnico#Lineart y Ruler]].
+Técnico: [[regla]]; [[designer-tecnico#Lineart y Ruler]].
 
 ## Text (texto)
 
@@ -160,7 +160,7 @@ Técnico: [[inventario-herramientas-designer#3.10 Ruler (`ruler`, tecla K)]]; [[
 
 Ajustes: `Font` (Inter, Grotesk, Serif, Display, Condensed, Mono), `Size`, `Weight`, `Color`, `Align` y, en la pestaña `Tool`, `Line` (interlineado) y `Spacing` (entre letras). Estos ajustes valen para el **texto siguiente**; un texto ya creado se cambia en `Properties` (texto, fuente, tamaño, peso, color, alineación). Hoy el interlineado y el espaciado de un texto ya creado no se pueden editar.
 
-Técnico: [[inventario-herramientas-designer#3.11 Text (`text`, tecla T)]]; [[designer-tecnico#Text]].
+Técnico: [[texto]]; [[designer-tecnico#Text]].
 
 ## Formas y líneas
 
@@ -170,7 +170,7 @@ Ajustes comunes: `Fill` (con casilla `No fill`; no en las líneas), `Stroke` (co
 
 Una forma ya creada se edita con Edit: elige la forma y cambia `Fill`, `Stroke`, `Blur`, y en `Stroke` las puntas `Start arrow` y `End arrow` (`None`, `Triangle`, `Open arrow`, `Circle`, `Square`, `Bar`). `Edit shape` o doble clic muestra tiradores; en un camino, nodos (`Cusp`, `Smooth`, `Symmetric`) con `Break`, `Join`, `Delete segment`, `Make line`, `Make curve` y `Delete node`. `Convert to path` convierte una forma en nodos editables. Todos los ajustes de una forma están en la pestaña `Properties`, salvo los degradados, las puntas de flecha y `Shape`.
 
-Técnico: [[inventario-herramientas-designer#3.12 Formas y líneas]]; forma elegida: [[inventario-herramientas-designer-2#4.3 Forma elegida (CS:80-106)]]; [[designer-tecnico#Formas y líneas]].
+Técnico: [[formas]]; forma elegida: [[tira-contextual]]; [[designer-tecnico#Formas y líneas]].
 
 ## Drawing y Design
 
@@ -195,7 +195,7 @@ El panel derecho tiene tres pestañas: `Properties` (la capa elegida), `Tool` y 
 - **Carpetas**: agrupa dos o más capas; el ojo, el candado y el clic actúan sobre todas.
 - **Capa con píxeles ilegibles**: se marca en la lista; un clic reintenta leerla. Hasta entonces el Designer no la sobrescribe con píxeles en blanco.
 
-Técnico: [[designer-tecnico-2#Panel derecho]]; acciones: [[inventario-herramientas-designer-2#5. Acciones de objeto y de capa]]; modelo: [[designer-tecnico#Visión general]].
+Técnico: [[designer-tecnico-2#Panel derecho]]; acciones: [[capas]]; modelo: [[designer-tecnico#Visión general]].
 
 ## Selección
 
@@ -217,7 +217,7 @@ Los filtros y efectos son capas FX: no tocan los píxeles originales y se pueden
 - Filtros: Brightness, Contrast, Saturation, Hue, Grayscale, Sepia, Invert, Levels, Curves. Efectos: Blur, Glow, Drop shadow, Lens flare.
 - En una pila, cada operación se puede apagar (`Turn off`), subir o bajar (se aplican de abajo arriba) y quitar (`Remove`, con confirmación). `Add filter` / `Add effect` añade otra.
 
-Los rangos de cada parámetro están en el inventario. Técnico: [[inventario-herramientas-designer-2#7. Controles fuera de ToolSettings]]; [[designer-tecnico#Capas FX]].
+Los rangos de cada parámetro están en el inventario. Técnico: [[fx]]; [[designer-tecnico#Capas FX]].
 
 ## Tamaño del lienzo
 
@@ -241,7 +241,7 @@ Técnico: [[designer-tecnico#Importar y exportar]].
 
 **Nodos de un camino**: Shift+C / S / Y cambian el tipo de nodo; Shift+L / U vuelven rectos o curvos los segmentos; Shift+J y Alt+J unen; Shift+B rompe; Delete borra el nodo.
 
-Tabla completa: [[inventario-herramientas-designer-2#6. Atajos de teclado]]; [[designer-tecnico-2#Atajos]].
+Tabla completa: [[atajos]]; [[designer-tecnico-2#Atajos]].
 
 ## Consejos
 

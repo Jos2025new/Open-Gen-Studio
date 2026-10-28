@@ -1,6 +1,6 @@
 # Designer: documento técnico, parte 2
 
-Continuación de [[designer-tecnico]], que tiene el índice, la arquitectura, el motor, la persistencia y el mapa de herramientas. Esta parte cubre las superficies de la interfaz, los hallazgos, el trabajo pendiente y las pruebas. Mismas abreviaturas: `UI/` es `src/components/designer/` y `ENG/` es `src/engine/design/`. Fuente de los ajustes: [[inventario-herramientas-designer]] y [[inventario-herramientas-designer-2]]. Para usuarios: [[designer-guia-usuario]].
+Continuación de [[designer-tecnico]], que tiene el índice, la arquitectura, el motor, la persistencia y el mapa de herramientas. Esta parte cubre las superficies de la interfaz, los hallazgos, el trabajo pendiente y las pruebas. Mismas abreviaturas: `UI/` es `src/components/designer/` y `ENG/` es `src/engine/design/`. Fuente de los ajustes: [[designer-controles/README]]. Para usuarios: [[designer-guia-usuario]].
 
 ## Superficies de la interfaz
 
@@ -20,15 +20,15 @@ Dónde se dibuja: `ui.designerDock` (`'tools'` por defecto o `'prompt'`) decide 
 
 ### Barra contextual
 
-`ContextStrip.tsx:42`. Etiqueta "<Herramienta> → <capa>" más el contenido según un orden fijo de decisión (varios caminos, texto, forma elegida, ajustes compactos). Orden y controles en [[inventario-herramientas-designer-2#4. Controles que dependen de la selección]]. Con Pan no se muestra nada (`ContextStrip.tsx:59`). Guía: [[designer-guia-usuario#Ajustes de una herramienta]].
+`ContextStrip.tsx:42`. Etiqueta "<Herramienta> → <capa>" más el contenido según un orden fijo de decisión (varios caminos, texto, forma elegida, ajustes compactos). Orden y controles en [[tira-contextual]]. Con Pan no se muestra nada (`ContextStrip.tsx:59`). Guía: [[designer-guia-usuario#Ajustes de una herramienta]].
 
 ### Panel derecho
 
-`LayersPanel.tsx:85`, ancho redimensionable de 200 a 520 px (`MIN_W`, `MAX_W`, líneas 31-32; doble clic en el borde restaura 260). Tres pestañas: `Properties` (capa seleccionada), `Tool` (ajustes completos de la herramienta) y `Layers` (solo la lista). La pestaña recordada es `ogs:layers-tab` (defecto `props`). Encima de la lista, `Layer appearance` con `Opacity` y `Blend`. La lista inferior se redimensiona con el separador (doble clic: 240 px). Acciones y menús: [[inventario-herramientas-designer-2#5. Acciones de objeto y de capa]]. Capas FX: `FxPanel.tsx`. Guía: [[designer-guia-usuario#Capas]].
+`LayersPanel.tsx:85`, ancho redimensionable de 200 a 520 px (`MIN_W`, `MAX_W`, líneas 31-32; doble clic en el borde restaura 260). Tres pestañas: `Properties` (capa seleccionada), `Tool` (ajustes completos de la herramienta) y `Layers` (solo la lista). La pestaña recordada es `ogs:layers-tab` (defecto `props`). Encima de la lista, `Layer appearance` con `Opacity` y `Blend`. La lista inferior se redimensiona con el separador (doble clic: 240 px). Acciones y menús: [[capas]]. Capas FX: `FxPanel.tsx`. Guía: [[designer-guia-usuario#Capas]].
 
 ### Popovers
 
-Todos usan `Popover` y `usePopover` de `src/components/ui/Popover.tsx`: presets de documento, formato de exportación, confirmación de "Save to gallery" (`confirm-pop`; no se usa el `confirm()` nativo, regla de AGENTS.md), `Canvas size` (ancho, alto, "Keep ratio", cuadrícula `Anchor`, `Trim to content`, `Apply`; límite 8192), `Snap`, selector de color (260 px), relleno y trazo de formas, y el panel Shape. Detalle de Snap, Align, límite de trazos y selector de color: [[inventario-herramientas-designer-2#7. Controles fuera de ToolSettings]]. Guía: [[designer-guia-usuario#Tamaño del lienzo]].
+Todos usan `Popover` y `usePopover` de `src/components/ui/Popover.tsx`: presets de documento, formato de exportación, confirmación de "Save to gallery" (`confirm-pop`; no se usa el `confirm()` nativo, regla de AGENTS.md), `Canvas size` (ancho, alto, "Keep ratio", cuadrícula `Anchor`, `Trim to content`, `Apply`; límite 8192), `Snap`, selector de color (260 px), relleno y trazo de formas, y el panel Shape. Detalle de Snap, Align, límite de trazos y selector de color: [[menus-contextuales]]. Guía: [[designer-guia-usuario#Tamaño del lienzo]].
 
 ### Pregunta de Dibujo o Diseño
 
@@ -36,11 +36,11 @@ Todos usan `Popover` y `usePopover` de `src/components/ui/Popover.tsx`: presets 
 
 ### Atajos
 
-Dos fuentes: la lista que ve Ajustes → Shortcuts (`src/engine/shortcuts.ts`, `DESIGN_TOOL_KEYS` en la línea 4) y el manejador `designerKey` (`designerKeys.ts:31`). Hay un test que las compara con el README (`tests/readme-shortcuts.test.ts`, contrato `shortcuts` de [map-contracts.md](map-contracts.md)). Tabla completa en [[inventario-herramientas-designer-2#6. Atajos de teclado]]. Se ignoran con foco en un campo de texto o con un popover abierto. Guía: [[designer-guia-usuario#Atajos de teclado]].
+Dos fuentes: la lista que ve Ajustes → Shortcuts (`src/engine/shortcuts.ts`, `DESIGN_TOOL_KEYS` en la línea 4) y el manejador `designerKey` (`designerKeys.ts:31`). Hay un test que las compara con el README (`tests/readme-shortcuts.test.ts`, contrato `shortcuts` de [map-contracts.md](map-contracts.md)). Tabla completa en [[atajos]]. Se ignoran con foco en un campo de texto o con un popover abierto. Guía: [[designer-guia-usuario#Atajos de teclado]].
 
 ## Hallazgos conocidos
 
-Copiados del apartado 8 de [[inventario-herramientas-designer-2#8. Hallazgos]], con el estado de verificación. Ninguno se comprobó ejecutando la app.
+Copiados del apartado 8 de [[hallazgos]], con el estado de verificación. Ninguno se comprobó ejecutando la app.
 
 1. **Compacto frente a completo**: Brush y Eraser pierden casi todo en la barra contextual; Fill, Gradient, Text, Select y las formas también pierden campos. Cierto por lectura (`ToolSettings.tsx`, `BrushSettings.tsx`).
 2. **Sin lugar de edición**: `Line` y `Spacing` de un texto ya creado. Además `Weight` en Properties va de 300 a 900 y en Text de 100 a 900.
@@ -57,7 +57,7 @@ Si se corrige alguno, cambia también la guía ([[designer-guia-usuario]]) y el 
 ## Trabajo de diseño pendiente
 
 - **Toolbox como dock con barra contextual**: [[propuesta-toolbox-dock]] (2026-10-23, sin implementar). Principios: una sola zona de control, tres profundidades (familia, tira de variantes, panel completo), barra contextual única, píldora "Modo · Herramienta" y huecos "Pronto" deshabilitados. Plan en seis pasos; empieza por la píldora y Deshacer/Rehacer en iconos. Decisiones pendientes del usuario al final de la propuesta.
-- **Maqueta**: [toolbox-dock.html](mockups/toolbox-dock.html), con variantes de icono arriba, ajustes en medio y once iconos abajo. Sus ajustes todavía hay que corregirlos con el inventario: [[inventario-herramientas-designer]] es la fuente de verdad, no la maqueta.
+- **Maqueta**: [toolbox-dock.html](mockups/toolbox-dock.html), con variantes de icono arriba, ajustes en medio y once iconos abajo. Sus ajustes todavía hay que corregirlos con el inventario: [[designer-controles/README]] es la fuente de verdad, no la maqueta.
 - **Identidad visual**: cualquier cambio de tarjetas o temas exige aprobación explícita (regla 6 de AGENTS.md; [propuesta-temas.md](propuesta-temas.md)). La propuesta adopta el comportamiento de la prueba de concepto, no su estética.
 - **Los hallazgos de arriba** (sobre todo el 6) son candidatos a trabajo; el hallazgo 6 necesita primero una prueba que lo demuestre.
 

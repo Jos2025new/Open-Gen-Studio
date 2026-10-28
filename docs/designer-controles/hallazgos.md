@@ -41,6 +41,14 @@ Cada hallazgo sale de leer el código en esta pasada (el mismo `file:línea` est
 
 - Delete layer (`LayersPanel.tsx:244`), Clear all guides (`GuidesCard.tsx:43`), el clic derecho en una regla (`Stage.tsx:1336`) y el clic derecho en una muestra guardada (`InlineControls.tsx:61`) ejecutan al instante ([[menus-contextuales]]).
 
+## Hallazgos del inventario antiguo (2026-10-23), recomprobados
+
+Los nueve puntos del apartado 8 de [Inventario 2](../inventario-herramientas-designer-2.md) se volvieron a comprobar contra el código actual.
+
+- **Siguen vigentes**: (1) Brush, Eraser, Fill, Gradient, Text, Select y las formas pierden campos en la rama compacta (cada nota de herramienta marca cuáles); (2) Line y Spacing de un texto ya creado no se editan en ningún sitio, y Weight va de 100 a 900 en la herramienta (`ToolSettings.tsx:202`) pero de 300 a 900 en Properties (`LayersPanel.tsx:277`); (3) con una forma elegida la tira sustituye a los ajustes de Edit, y Object/Layer y Auto-select solo quedan en la tarjeta o la pestaña Tool ([[alinear-editar]]); (4) Grow / shrink y el estado de Advanced settings son locales y se pierden al cambiar de herramienta ([[seleccion]], [[pincel-avanzado]]); (5) Influence se ve en Edit aunque no haya curvas, y la edición de la curva elegida pasa `selectedCurve={null}` en la tira (`ContextStrip.tsx:107`); (8) siete herramientas siguen sin tecla (Polygon, Star, Sector, Arc, Chord, Curve, Arrow, `shortcuts.ts:4`).
+- **Han cambiado**: (9) Arrow ya tiene un interruptor «Arrow» dentro de los ajustes de Line (`ShapeKindFields.tsx:43`); sus puntas siguen cambiándose después desde el popover de Stroke de una forma elegida ([[formas]]).
+- **Ya no se reproducen**: (7) el máximo de Sides: hoy `Corners` llega a 24 tanto al crear (`ShapeKindFields.tsx:35`) como al editar (`PrimFields.tsx:29`). (6) Las «ramas inalcanzables» de `designerKeys`: en el código actual la cadena es plana y las ramas de Delete de capas (`designerKeys.ts:88`) y de teclas de herramienta (`designerKeys.ts:93`) son alcanzables. El punto 6 de [Técnico 2](../designer-tecnico-2.md) repite el hallazgo antiguo y conviene corregirlo (no se ha tocado en esta pasada).
+
 ## Enlaces
 
 - [[README]] · [README.md](README.md)

@@ -1,6 +1,6 @@
 # Plan: toolbox del Designer por flujo de trabajo
 
-2026-10-23. Pasada 1 implementada en la rama nueva solicitada por el usuario. Aprobó el dock real, las variantes y el selector de modo; pidió no crear otra maqueta ni hacer las pasadas 2/3 o rediseños. Diseño de referencia: [propuesta](propuesta-toolbox-dock.md). La maqueta existente [toolbox-dock.html](mockups/toolbox-dock.html) sirvió solo como referencia de interacción. Datos de cada control: [inventario](inventario-herramientas-designer.md).
+2026-10-23. Pasada 1 implementada en la rama nueva solicitada por el usuario. Aprobó el dock real, las variantes y el selector de modo; pidió no crear otra maqueta ni hacer las pasadas 2/3 o rediseños. Diseño de referencia: [propuesta](propuesta-toolbox-dock.md). La maqueta existente [toolbox-dock.html](mockups/toolbox-dock.html) sirvió solo como referencia de interacción. Datos de cada control: [inventario](designer-controles/README.md).
 
 ## 1. Qué se propone
 

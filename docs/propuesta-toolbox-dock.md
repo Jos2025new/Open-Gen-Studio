@@ -81,7 +81,7 @@ Transformar y Alinear dejan la barra superior y sus popovers: entran en la barra
 
 ## Revisión 2026-10-23: lo acordado tras las maquetas
 
-Sustituye a las tablas de arriba donde choquen. Datos de cada control: [inventario verificado](inventario-herramientas-designer.md). Maqueta: [toolbox-dock.html](mockups/toolbox-dock.html).
+Sustituye a las tablas de arriba donde choquen. Datos de cada control: [inventario verificado](designer-controles/README.md). Maqueta: [toolbox-dock.html](mockups/toolbox-dock.html).
 
 - **Toolbox (11 iconos):** + · Puntero · Layout · Shapes · Bezier · Brocha · Borrar · Texto · Reglas | Capas · Settings.
 - **Variantes:** fila de iconos encima de la tarjeta, solo si la herramienta tiene variantes; el nombre y la tecla, al pasar el ratón. Puntero: Edit, Pan, Nodes, Align, Boolean y Form Builder («Pronto»). Layout: Sizes, y Templates, Grids y Guides («Pronto»). Shapes: las siete formas más Line y Arrow. Bezier: Lineart y Curve. Brocha: Brush, Fill, Gradient y Select.
