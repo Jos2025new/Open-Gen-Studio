@@ -19,6 +19,15 @@
 .space-controls { display: flex; flex-direction: column; gap: var(--sp-2); }
 .space-controls > .chip { width: 100%; max-width: none; justify-content: flex-start; min-height: 44px; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-m); background: var(--bg-canvas); font-size: var(--fs-m); color: var(--text); text-align: left; white-space: normal; }
 .space-controls > .chip:hover { border-color: var(--border-strong); }
+.space-model-popover .ml-scroll { max-height: min(240px, 32dvh); }
+.space-model-popover .ml-row { gap: 7px; padding: 6px 8px; }
+.space-model-popover .ml-mono { width: 26px; height: 26px; border-radius: var(--r-s); }
+.space-model-popover .ml-mono img { width: 16px; height: 16px; }
+.space-model-popover .ml-side { gap: 3px; }
+.space-model-popover .ml-side .ml-price { min-width: 0; }
+.space-model-popover .ml-side .badge { padding: 2px 4px; }
+.space-model-popover .ml-group-head { padding: 7px 8px 4px; }
+.space-model-popover .ml-main .ml-name { font-size: var(--fs-s); }
 .space-controls > .space-format { gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg-canvas); }
 .space-format .fmt-aspects .fmt-opt { min-width: 48px; min-height: 46px; }
 .space-format .fmt-opt { flex-basis: auto; }

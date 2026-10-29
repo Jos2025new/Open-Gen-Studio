@@ -137,6 +137,20 @@ describe('Generate in the panel', () => {
     expect(history?.textContent).toContain('Prompt history');
     expect(model && references && (model.compareDocumentPosition(references) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
   });
+  it('fits the model picker to the available panel width', () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    const rect = { left: 80, right: 300, top: 120, bottom: 152, width: 220, height: 32, x: 80, y: 120, toJSON: () => ({}) };
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect as DOMRect);
+    try {
+      act(() => window.dispatchEvent(new Event('resize')));
+      act(() => host.querySelector<HTMLButtonElement>('.model-chip')!.click());
+      const picker = document.querySelector<HTMLElement>('.space-model-popover');
+      expect(picker?.style.width).toBe('220px');
+      expect(picker?.style.left).toBe('80px');
+      expect(picker?.querySelector('[aria-label="Search models"]')).toBeTruthy();
+      act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    } finally { measure.mockRestore(); vi.unstubAllGlobals(); }
+  });
   it('the button runs the composer path (generateDirect) for the selected mode', () => {
     act(() => host.querySelector<HTMLButtonElement>('.send-btn.is-generate')!.click());
     expect(generateDirect).toHaveBeenCalledWith('video');

@@ -65,7 +65,7 @@ export function SpacePanel() {
             }
           }} />
       </div>
-      <div className="space-controls" aria-label="Model"><ModelChip kind={mode} /></div>
+      <div className="space-controls" aria-label="Model" data-pop-bound><ModelChip kind={mode} fitSpace /></div>
       <div className="space-card">
         <span className="space-card-label">References</span>
         <AttachStrip ids={live} />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, lyricsParam, paramByRole, pixelSizes, ratioOf, maxCountPerRequest, STRUCTURED_TYPES } from '../../engine/params';
@@ -24,11 +24,22 @@ export function AspectGlyph({ value, size = 14 }: { value: string; size?: number
   return <span className="aspect-glyph" style={{ width: w, height: h }} />;
 }
 
-export function ModelChip({ kind }: { kind: MediaKind }) {
+export function ModelChip({ kind, fitSpace = false }: { kind: MediaKind; fitSpace?: boolean }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const model = useStore((s) => s.catalog.models[ref]);
   const loading = useStore((s) => !s.catalog.schemas[ref]);
   const pop = usePopover();
+  const [spaceWidth, setSpaceWidth] = useState(320);
+  useLayoutEffect(() => {
+    const anchor = pop.ref.current;
+    if (!fitSpace || !anchor) return;
+    const measure = () => { const width = anchor.getBoundingClientRect().width; if (width > 0) setSpaceWidth(width); };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(anchor);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [fitSpace, pop.ref]);
   const name = !ref ? (kind === 'model3d' ? 'No 3D model' : 'No audio model') : model?.name ?? (ref.startsWith('local::') ? (kind === 'image' ? 'Local Sketch' : 'Local Motion') : ref.split('::')[1]);
   return (
     <>
@@ -36,7 +47,7 @@ export function ModelChip({ kind }: { kind: MediaKind }) {
         <span className="truncate">{name}</span>
         <ChevronDown size={12} />
       </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={480} label={`${kind} model`}>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={fitSpace ? spaceWidth : 480} placement={fitSpace ? 'bottom-start' : 'top-start'} className={fitSpace ? 'space-model-popover' : undefined} label={`${kind} model`}>
         <ModelList
           kind={kind}
           value={ref}
