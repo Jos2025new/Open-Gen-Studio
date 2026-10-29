@@ -384,7 +384,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
   // Right-click menu, anchored to an invisible point at the cursor.
   const menuAnchor = useRef<HTMLDivElement>(null);
   const connectionMenu = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string; from?: string } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string; from?: string; handle?: string | null } | null>(null);
   const openMenu = (e: React.MouseEvent | MouseEvent, nodeId?: string) => {
     e.preventDefault();
     const r = canvasRef.current?.getBoundingClientRect();
@@ -514,7 +514,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
               const r = canvasRef.current?.getBoundingClientRect();
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
               // From a dropped connection: the new node lands there, wired to the port that takes the source.
-              const id = menu.from ? addConnected(sessionId, menu.from, data, { x: pos.x, y: pos.y - 40 }) : addNode(sessionId, data, pos);
+              const id = menu.from ? addConnected(sessionId, menu.from, data, { x: pos.x, y: pos.y - 40 }, menu.handle) : addNode(sessionId, data, pos);
               if (id) setSelected(new Set([id]));
               setMenu(null);
             }}

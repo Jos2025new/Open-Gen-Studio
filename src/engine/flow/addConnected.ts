@@ -8,8 +8,8 @@ import { graphEditProblem } from './locks';
 const get = useStore.getState;
 
 /** Add a node to the right of `fromId`, wired to its first input that accepts the source's output. */
-/** `at`: where to put it (a connection dropped on empty canvas); otherwise to the right of the source, below its other children. */
-export function addConnected(sessionId: string, fromId: string, data: GraphNodeData, at?: { x: number; y: number }): string | null {
+/** `at`: where to put it (a connection dropped on empty canvas); `sourceHandle`: the result port the cable left from (`out-2`), so the new node gets that result; otherwise to the right of the source, below its other children. */
+export function addConnected(sessionId: string, fromId: string, data: GraphNodeData, at?: { x: number; y: number }, sourceHandle?: string | null): string | null {
   const st = get();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return null;
@@ -35,7 +35,7 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
   const id = uid('nd');
   const next = { ...graph, nodes: [...graph.nodes, { id, data, position: at ?? { x: from.position.x + NODE_WIDTH + 100, y } }] };
-  const edge = { source: fromId, target: id, targetHandle: port.id };
+  const edge = { source: fromId, target: id, targetHandle: port.id, sourceHandle };
   if (connectionError(next, st.assets, edge)) return null;
   // The picker is one action: rejected connections leave no orphan, and Undo removes node and edge together.
   const connected = connect(next, edge);

@@ -54,13 +54,13 @@ describe('repro 1: a link keeps its image (nodes.md 3.5 / 3.6)', () => {
   });
 
   // Cause: engine/actions.ts:556 filters g.assetIds without remapping data.outputIndex / edge.outputIndex.
-  it.fails('deleting result 1 of 3 leaves the link on the same image (a3)', () => {
+  it('deleting result 1 of 3 leaves the link on the same image (a3)', () => {
     deleteAssets(['a1']);
     expect(refsOf(smile)).toEqual(['asset:a3']);
   });
 
   // Cause: same line; link on result 2 (a2) silently moves to a3 (wrong image, no warning).
-  it.fails('deleting result 1 leaves a link fixed on a2 delivering a2, not a3', () => {
+  it('deleting result 1 leaves a link fixed on a2 delivering a2, not a3', () => {
     const g = graph();
     useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph: { ...g, edges: g.edges.map((e) => ({ ...e, outputIndex: 1, sourceHandle: 'out-2' })) } as never } } }));
     expect(refsOf(smile)).toEqual(['asset:a2']);
@@ -69,7 +69,7 @@ describe('repro 1: a link keeps its image (nodes.md 3.5 / 3.6)', () => {
   });
 
   // Cause: same line; the node pick (outputIndex 1 = a2) also shifts onto a3 once a1 is gone.
-  it.fails('deleting result 1 keeps the node pick on a2 (the image the node showed)', () => {
+  it('deleting result 1 keeps the node pick on a2 (the image the node showed)', () => {
     setup(1);
     deleteAssets(['a1']);
     const s = useStore.getState();
@@ -79,13 +79,13 @@ describe('repro 1: a link keeps its image (nodes.md 3.5 / 3.6)', () => {
   });
 
   // Cause: flow/actions.ts:151 copies the input edge without sourceHandle, so connect() (graph.ts:143) drops outputIndex.
-  it.fails('a duplicated node keeps receiving a3 from the fixed link', () => {
+  it('a duplicated node keeps receiving a3 from the fixed link', () => {
     const copy = duplicateNode(sid, graph().nodes.find((n) => n.id === smile)!);
     expect(refsOf(copy)).toEqual(['asset:a3']);
   });
 
   // Cause: arrange.ts:172 rebuilds the link to a node still on the canvas without sourceHandle/outputIndex.
-  it.fails('a pasted node keeps receiving a3 from the fixed link', () => {
+  it('a pasted node keeps receiving a3 from the fixed link', () => {
     copyNodes(sid, [smile]);
     const [pasted] = pasteNodes(sid);
     expect(refsOf(pasted)).toEqual(['asset:a3']);

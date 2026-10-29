@@ -1,6 +1,7 @@
 import { wrongRef } from './wrongRef';
 import { directModelRef } from './directModel';
 import { assetsInUse } from './flow/locks';
+import { dropResults } from './flow/dropResults';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
@@ -551,11 +552,8 @@ export function deleteAssets(ids: string[]): void {
   useStore.setState((st) => {
     const assets = { ...st.assets };
     ids.forEach((id) => delete assets[id]);
-    const generations = { ...st.generations };
-    for (const g of Object.values(st.generations)) {
-      if (g.assetIds.some((a) => set.has(a))) generations[g.id] = { ...g, assetIds: g.assetIds.filter((a) => !set.has(a)) };
-    }
-    return { assets, generations, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !set.has(a)) } };
+    const { generations, sessions } = dropResults(st, set);
+    return { assets, generations, sessions, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !set.has(a)) } };
   });
   void deleteAssetBlobs(ids);
 }

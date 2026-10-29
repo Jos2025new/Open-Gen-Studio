@@ -148,7 +148,7 @@ export function duplicateNode(sessionId: string, node: GraphNode): string {
   data.title = `${base} (copy ${Math.max(0, ...taken) + 1})`;
   let next: import('../types').Graph = { ...graph, nodes: [...graph.nodes, { id, position: { x: node.position.x + 40, y: node.position.y + 60 }, data }] };
   for (const e of graph.edges.filter((x) => x.target === node.id)) {
-    const c = { source: e.source, target: id, targetHandle: e.targetHandle };
+    const c = { source: e.source, target: id, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle };
     if (!connectionError(next, st.assets, c)) next = connect(next, c);
   }
   for (const e of graph.edges.filter((x) => x.source === node.id)) {

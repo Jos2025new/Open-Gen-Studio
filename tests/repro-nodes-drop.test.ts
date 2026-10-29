@@ -7,7 +7,7 @@ import { connectionDrop } from '../src/components/node/connectionDrop';
 // which port it left from, otherwise addConnected cannot give the new node that result (ConnectedNodeMenu.tsx:55 promises it).
 describe('repro 1: dropping a cable from port 2', () => {
   // Cause: connectionDrop.ts:13 returns only {x, y, from}; the handle id is lost (addConnected.ts:38-40 has no handle either).
-  it.fails('the drop result still carries the port the cable left from', () => {
+  it('the drop result still carries the port the cable left from', () => {
     const canvas = document.createElement('div');
     const pane = document.createElement('div');
     pane.className = 'react-flow__pane'; canvas.append(pane);

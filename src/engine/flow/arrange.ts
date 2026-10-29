@@ -170,7 +170,7 @@ export function pasteNodes(sessionId: string, at?: { x: number; y: number }): st
     const source = ids.get(e.source) ?? (graph.nodes.some((n) => n.id === e.source) ? e.source : undefined);
     const target = ids.get(e.target);
     if (!source || !target) continue;
-    const c = { source, target, targetHandle: e.targetHandle };
+    const c = { source, target, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle };
     const port = inputPorts(added.find((n) => n.id === target)!.data).find((p) => p.id === e.targetHandle);
     if (port && !connectionError(next, st.assets, c)) next = connect(next, c);
   }
