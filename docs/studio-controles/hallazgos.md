@@ -64,7 +64,7 @@ Estados: «respondido por lectura» (leído en el código; no es arreglado ni pr
 | H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
 | H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |
 | H9 | Respondido por lectura; requiere prueba y decisión | Corregido: `planRecoveryProblem` usa `rest` (pasos nuevos) para `check` | R12, 4.2 |
-| H10 | Respondido por lectura; requiere prueba | Corregido 2026-10-29 para los valores recomendados (`conversation.ts` envía los valores que la tarjeta mostraba); la opción pulsada y no enviada vive en `QuestionsCard.tsx` y sigue sin cubrir | R13, 4.2 |
+| H10 | Respondido por lectura; requiere prueba | Corregido 2026-10-29 para los valores recomendados (`conversation.ts` envía los valores que la tarjeta mostraba); la opción pulsada (o «Otra respuesta») sin pulsar Continue se corrigió después: la tarjeta la publica en `agent.cardPick` y escribir envía eso (`tests/questions-typed-choice.test.ts`) | R13, 4.2 |
 | H11 | Respondido por lectura; requiere prueba | Confirmado: la tarjeta pasa a `skipped` al escribir | R13, 4.2 |
 | H12, H13, H15, H16, H17 | Requiere decisión | La historia no los menciona; siguen abiertos y sin evaluar por el rastreo | 4.2 |
 | H14 | Respondido por lectura | Retirado en Auto con `cd15ef0` (2026-10-24); el código quedó. Deuda | R14, 4.2 |

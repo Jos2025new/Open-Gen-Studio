@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, FastForward } from 'lucide-react';
 import { EditAnswerButton } from './EditAnswerButton';
 import { ClampText } from './PlanParts';
-import { skipQuestions, submitAnswers } from '../../engine/agent/runtime';
+import { pickAnswers, skipQuestions, submitAnswers } from '../../engine/agent/runtime';
 import type { QuestionsFeedItem } from '../../engine/types';
 import { Button } from '../ui/primitives';
 
@@ -39,6 +39,20 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
   const [step, setStep] = useState(0);
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
 
+  const finalOf = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const q of item.questions) {
+      if (skipped.has(q.id)) continue;
+      const parts = [...(answers[q.id] ?? [])];
+      const c = custom[q.id]?.trim();
+      if (c) parts.push(c);
+      if (parts.length) out[q.id] = parts.join(', ');
+    }
+    return out;
+  };
+  // Typing in the Composer instead of pressing Continue sends what this card shows, so the selection is shared.
+  useEffect(() => { if (pending) pickAnswers(sessionId, item.id, finalOf()); });
+
   if (!pending) {
     return (
       <article className="q-card is-done">
@@ -66,17 +80,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
     if (!multi) setCustom((c) => ({ ...c, [qid]: '' }));
   };
 
-  const final = (): Record<string, string> => {
-    const out: Record<string, string> = {};
-    for (const q of item.questions) {
-      if (skipped.has(q.id)) continue;
-      const parts = [...(answers[q.id] ?? [])];
-      const c = custom[q.id]?.trim();
-      if (c) parts.push(c);
-      if (parts.length) out[q.id] = parts.join(', ');
-    }
-    return out;
-  };
+  const final = finalOf;
 
   const total = item.questions.length;
   const q = item.questions[Math.min(step, total - 1)];

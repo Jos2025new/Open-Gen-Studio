@@ -49,8 +49,9 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   // Typing while questions are open answers them.
   if (pending?.kind === 'questions' && pendingItem?.type === 'questions' && pendingItem.status === 'pending') {
-    // The card shows each recommended option selected: typing keeps those, plus the user's words as the note.
-    const shown = Object.fromEntries(pendingItem.questions.flatMap((q) => (q.default ? [[q.id, q.default]] : [])));
+    // Typing keeps what the card shows selected (the user's pick, else each recommended option), plus the user's words as the note.
+    const pick = s.agent.cardPick;
+    const shown = pick?.itemId === pendingItem.id ? pick.answers : Object.fromEntries(pendingItem.questions.flatMap((q) => (q.default ? [[q.id, q.default]] : [])));
     await submitAnswers(sessionId, pendingItem.id, { ...shown, note: clean }, 'typed');
     return;
   }
@@ -169,6 +170,15 @@ export function pushHistory(sessionId: string, msg: LlmMessage): void {
   patchAgent(sessionId, (a) => ({ history: [...a.history, msg] }));
 }
 
+/** The card reports what it shows selected, so typing instead of pressing Continue sends it. */
+export function pickAnswers(sessionId: string, itemId: string, answers: Record<string, string>): void {
+  const s = get().sessions[sessionId];
+  if (!s) return;
+  const cur = s.agent.cardPick;
+  if (cur?.itemId === itemId && JSON.stringify(cur.answers) === JSON.stringify(answers)) return;
+  patchAgent(sessionId, { cardPick: { itemId, answers } });
+}
+
 /** Answers chosen in a questions card. */
 export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips'): Promise<void> {
   toCanvasOfItem(sessionId, itemId);
@@ -179,7 +189,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.answered', reason: `answers submitted via ${how}`, sessionId, approvalId: itemId, before: { status: 'pending' }, after: { status: 'answered', answeredIds: item.questions.filter((q) => answers[q.id]?.trim()).map((q) => q.id), hasNote: Boolean(answers.note?.trim()) } });
   const workspace = turnCanvas(item.workspace);
   const pending = s.agent.pending;
-  patchAgent(sessionId, { pending: undefined });
+  patchAgent(sessionId, { pending: undefined, cardPick: undefined });
   const engine = agentEngine();
   if (engine.kind === 'llm') {
     const lines = item.questions.map((q) => `- ${q.question}: ${answers[q.id] ?? '(no answer)'}`);
@@ -205,7 +215,7 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
   if (!item || item.type !== 'questions' || item.status !== 'pending') return;
   updateFeedItem<QuestionsFeedItem>(sessionId, itemId, { status: 'skipped' });
   const pending = s.agent.pending;
-  patchAgent(sessionId, { pending: undefined, questionRound: get().settings.guidedRounds });
+  patchAgent(sessionId, { pending: undefined, cardPick: undefined, questionRound: get().settings.guidedRounds });
   const engine = agentEngine();
   if (engine.kind === 'llm') {
     const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));

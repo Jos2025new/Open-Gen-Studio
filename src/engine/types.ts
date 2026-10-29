@@ -925,6 +925,8 @@ export interface AgentState {
   revising?: string;
   /** Offline planner memory for the request being clarified. */
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
+  /** What the open questions card shows selected right now (its options, the user's own words), so typing in the Composer sends it. */
+  cardPick?: { itemId: string; answers: Record<string, string> };
   /** Canvas the conversation above belongs to (unset: older sessions). */
   canvas?: Workspace;
   /** The other canvases' conversations, kept while this one is active. */
