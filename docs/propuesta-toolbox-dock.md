@@ -2,6 +2,8 @@
 
 2026-10-23, sin implementar. Origen: prueba de concepto del usuario (capturas móviles). Se adopta su **simpleza y comportamiento**, no su estética: colores, formas y sombras salen de los temas actuales ([propuesta-temas.md](propuesta-temas.md)). Es trabajo de GUI y accesibilidad; no se crean herramientas nuevas.
 
+> **Estado actual (2026-10-28):** el dock está implementado (`ToolDock.tsx`, `toolboxModel.ts`) y `ToolRail.tsx` se eliminó en `f11a0dd`; las menciones a `ToolRail` más abajo son el estado de partida de la propuesta. Un solo toolbox para ambos modos (`1c2b24f`). Detalle: [toolbox-dock](designer-controles/toolbox-dock.md) y [rastreo 2.3 a 2.6](rastreo/designer.md).
+
 ## Principios (de la prueba de concepto)
 
 1. **Una sola zona de control.** Todo sale del dock y vuelve a él.

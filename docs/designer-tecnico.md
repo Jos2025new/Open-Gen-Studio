@@ -45,8 +45,8 @@ Todo está en `UI/` (45 archivos). Papel de los principales:
 | `DesignerWorkspace.tsx` | Raíz. Barra superior (`TopbarActions`), selector de documentos, paleta, ayuda, `Stage`, `LayersPanel`, atajos globales (`designerKey`, línea 63, en `DesignerWorkspace.tsx`) e importación (`DesignerWorkspace.tsx:84-120`) |
 | `Stage.tsx` (1388 líneas) | Lienzo: vista (zoom y desplazamiento), reglas, entrada de puntero para todas las herramientas, selección y edición de objetos (`Stage`, línea 157) |
 | `StagePaintCommit.ts` | Confirma un trazo de pincel: aplana, pide la decisión de Dibujo o Diseño, aplica el límite |
-| `ToolPalette.tsx` / `ToolRail.tsx` | Carril de herramientas por familias (`RAIL`, `ToolRail.tsx:30`); `railTools()` (línea 55) lo usa el test de inventario |
-| `ContextStrip.tsx` | Barra contextual sobre el carril (`ContextStrip`, línea 42); cambia de contenido según herramienta y selección |
+| `ToolDock.tsx` / `toolboxModel.ts` | Dock de herramientas por familias y variantes. El antiguo `ToolRail.tsx` (`RAIL`, `railTools`) se eliminó en `f11a0dd` (2026-10-23) |
+| `ContextStrip.tsx` | Tira contextual; hoy solo se monta dentro de `EditCard` (`EditCard.tsx:37`), no sobre un carril (`ContextStrip`, línea 42); cambia de contenido según herramienta y selección |
 | `ToolSettings.tsx` | Ajustes de la herramienta activa, en versión `compact` y completa (`ToolSettings`, línea 211) |
 | `BrushSettings.tsx`, `StrokeStyleFields.tsx`, `ShapeLookFields.tsx`, `ShapePaint.tsx`, `PrimFields.tsx` | Campos de pincel, trazos de Lineart, aspecto de formas, relleno y borde, parámetros de primitivos |
 | `LayersPanel.tsx` | Panel derecho: pestañas Properties, Tool y Layers; lista de capas, carpetas, acciones (`LayersPanel`, línea 85) |
@@ -208,6 +208,6 @@ Las 21 herramientas con todos sus ajustes, condiciones y `archivo:línea` están
 
 ### Formas y líneas
 
-Diez herramientas con `ui.shape` común: Rectangle (R), Ellipse (O), Polygon, Star, Sector, Arc, Chord, Line (L), Curve, Arrow. Inventario: [[formas]]. Guía: [[designer-guia-usuario#Formas y líneas]]. Edición de una forma ya creada: [[tira-contextual]]. Código: `shapeTools.ts`, `shapeDraw.ts`, `primitives.ts`, `ShapeKnots.tsx`, `PathNodes.tsx`.
+Diez herramientas (valores de `ui.tool`; la interfaz las agrupa en tres botones, `b955f45`) con `ui.shape` común: Rectangle (R), Ellipse (O), Polygon, Star, Sector, Arc, Chord, Line (L), Curve, Arrow. Inventario: [[formas]]. Guía: [[designer-guia-usuario#Formas y líneas]]. Edición de una forma ya creada: [[tira-contextual]]. Código: `shapeTools.ts`, `shapeDraw.ts`, `primitives.ts`, `ShapeKnots.tsx`, `PathNodes.tsx`.
 
 Atajos de todas las herramientas: [[atajos]]. Guía: [[designer-guia-usuario#Atajos de teclado]].

@@ -164,7 +164,7 @@ Técnico: [[texto]]; [[designer-tecnico#Text]].
 
 ## Formas y líneas
 
-**Qué hace**: crea formas vectoriales editables. **Cuándo usarla**: logotipos, iconos, marcos, flechas. Diez herramientas en un solo botón: Rectangle (R), Ellipse (O), Polygon, Star, Sector, Arc, Chord, Line (L), Curve y Arrow. Las que no traen letra no tienen tecla.
+**Qué hace**: crea formas vectoriales editables. **Cuándo usarla**: logotipos, iconos, marcos, flechas. Diez herramientas (valores de herramienta; la interfaz las agrupa en tres botones): Rectangle (R), Ellipse (O), Polygon, Star, Sector, Arc, Chord, Line (L), Curve y Arrow. Las que no traen letra no tienen tecla.
 
 Ajustes comunes: `Fill` (con casilla `No fill`; no en las líneas), `Stroke` (con `No stroke`), `Width`; en la pestaña `Tool`, `Join`, `Miter limit`, `Cap`, `Dashes`, `Dash offset` y `Stroke behind fill`. Propios: Rectangle tiene `Rx`, `Ry` y `Sharp corners` (esquinas redondeadas o rectas); Polygon y Star, `Sides` y `Round`; Star, además, `Inner`; Sector, Arc y Chord, `From` y `To` (ángulos); Curve, `Bend`. Shift al arrastrar hace la caja cuadrada o fija la dirección de la línea en pasos de 45°.
 

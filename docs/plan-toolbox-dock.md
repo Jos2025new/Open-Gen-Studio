@@ -1,5 +1,7 @@
 # Plan: toolbox del Designer por flujo de trabajo
 
+> **Estado actual (2026-10-28):** lo de abajo es lo que se planeó el 2026-10-23 y se conserva como historia. Hoy hay un solo toolbox para ambos modos (`1c2b24f`), sin familia «visitante»; Drawing/Design vive en la tarjeta del pincel (`ToolSettings.tsx:266`, `2f78f9c`); las formas están en la fila de Edit, sin familia propia (`b258f6e`); elegir una variante solo cambia la herramienta y la tarjeta se abre con el chevron o un segundo clic (`c1a1df7`). Fuente de verdad: [toolbox-dock](designer-controles/toolbox-dock.md). Rastreo: [2.3 a 2.5](rastreo/designer.md).
+
 2026-10-23. Pasada 1 implementada en la rama nueva solicitada por el usuario. Aprobó el dock real, las variantes y el selector de modo; pidió no crear otra maqueta ni hacer las pasadas 2/3 o rediseños. Diseño de referencia: [propuesta](propuesta-toolbox-dock.md). La maqueta existente [toolbox-dock.html](mockups/toolbox-dock.html) sirvió solo como referencia de interacción. Datos de cada control: [inventario](designer-controles/README.md).
 
 ## 1. Qué se propone

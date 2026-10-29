@@ -44,11 +44,11 @@ Copiados del apartado 8 de [[hallazgos]], con el estado de verificación. Ningun
 
 1. **Compacto frente a completo**: Brush y Eraser pierden casi todo en la barra contextual; Fill, Gradient, Text, Select y las formas también pierden campos. Cierto por lectura (`ToolSettings.tsx`, `BrushSettings.tsx`).
 2. **Sin lugar de edición**: `Line` y `Spacing` de un texto ya creado. Además `Weight` en Properties va de 300 a 900 y en Text de 100 a 900.
-3. **Barra de forma elegida**: sustituye a los ajustes de Edit, así que `Edit` (Object/Layer) y `Auto-select` solo quedan en la pestaña Tool.
+3. **Barra de forma elegida**: sustituye a los ajustes de Edit, así que `Edit` (Object/Layer) y `Auto-select` quedan ocultos con una forma elegida (ya no hay pestañas; están en el ajuste Edit, `ToolSettings.tsx:250`).
 4. **Sin guardar**: `Grow / shrink`, `Advanced settings` de Brush y el paso `Start`/`End` del degradado se pierden al cambiar de herramienta o de selección.
 5. **`Influence`** de Lineart aparece en Edit aunque no haya curvas; la edición de una curva elegida solo sale en la pestaña Tool (`ContextStrip` pasa `selectedCurve={null}`).
-6. **Ramas inalcanzables en `designerKeys.ts:78-97`** (lectura confirmada en esta revisión): el bloque de `Delete`/`Backspace` para borrar capas (líneas 87-92) y el de cambiar de herramienta con una tecla (líneas 93-96) quedan dentro de la rama que exige una flecha (`ARROW_STEP[e.key]`, línea 78), así que por lectura no se alcanzan. `tests/studio-designer.test.ts:163-175` solo comprueba que `b` no cambia de herramienta en el Designer incrustado, algo que se cumpliría igual. Pendiente de una prueba antes de decidir (cambia atajos de teclado: contrato `shortcuts`).
-7. **Límites distintos**: `Sides` llega a 12 al crear y a 24 al editar.
+6. **Ramas inalcanzables en `designerKeys.ts`** (cerrado en `1994e71`, 2026-10-23, «fix designer tool and delete shortcuts»; [rastreo 1.17](rastreo/designer.md)): la cadena es plana y las ramas de Delete de capas (`designerKeys.ts:88`) y de teclas de herramienta (`designerKeys.ts:93`) son alcanzables. El texto original de esta revisión (2026-10-23) las daba por inalcanzables.
+7. **Límites distintos** (ya no se reproduce): `Corners` llega a 24 al crear (`ShapeKindFields.tsx:35`) y al editar (`PrimFields.tsx:29`).
 8. **Siete herramientas sin tecla**: Polygon, Star, Sector, Arc, Chord, Curve, Arrow.
 9. **Arrow sin ajustes propios**: las puntas solo se cambian en el popover `Stroke` de una forma ya elegida.
 
