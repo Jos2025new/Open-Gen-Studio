@@ -10,6 +10,8 @@ related: [chat-estudio, tablero, tarjeta-plan, dependencias, hallazgos]
 
 En Chat, Nodes y Designer, el prompt empieza en una sola línea con «+» y enviar/parar o Generate dentro y crece al escribir; debajo están el selector de espacio y los controles del modo activo. En Chat también está el tablero. En Designer, cuando el dock muestra herramientas, se conserva la toolbox y la fila inferior incluye el selector de espacio. Un fondo del color del lienzo protege el dock y la fila inferior en Nodes y Designer.
 
+Por decisión del usuario, Auto y Models se ocultan en Designer; permanecen en Chat y Nodes.
+
 `Composer` (`Composer.tsx:237`) se monta debajo del área de trabajo para todos los espacios (`App.tsx:76`) y recibe el espacio como `dock-chat` en Studio (`Composer.tsx:442`). En Studio no dibuja `ThreadPeek` (solo `workspace !== 'chat'`, `Composer.tsx:443`) ni la paleta de herramientas del Designer (`toolsDock`, `Composer.tsx:437`, solo en `designer`). El texto del compositor es `composer.text`; el modo, `composer.mode` (`agent`, `image`, `video`, `audio`, `model3d`; `ModeMenu.tsx:7-13`). El estilo del agente por defecto es `auto` (`store.ts:263`).
 
 Columnas: Control | Dónde (archivo:línea) | Cuándo | De qué depende | Qué modifica | Influye en | Notas.
