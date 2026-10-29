@@ -59,3 +59,13 @@ El usuario fijó también cómo se comporta cada modo. La revisión de `task/mod
 - **Guided pierde los ajustes heredados.** Cada petición empieza sin ajustes confirmados. Al volver a Auto, la tarjeta aparece una vez para lo no aprobado.
 
 - **Actualización 2026-10-20 ([ADR 0025 D](0025-revision-sesion-house-party.md)).** El modelo de imagen que confirma una operación también puede cambiarse por otra línea o por otro proveedor del mismo modelo con la tarjeta «Keep / Change»; nunca en silencio. Los pasos de imagen toman el aspecto de la tarjeta salvo una referencia que escribe el suyo o una imagen de fuera del plan ([ADR 0025 E](0025-revision-sesion-house-party.md)).
+
+## Estado actual del código (2026-10-28) — difiere, requiere decisión
+
+Lo decidido arriba no se toca. Esta sección solo describe lo que hace el código hoy; no es una decisión aprobada. Fuente: [rastreo de Studio](../rastreo/studio-2.md) (C1, C2, C4, C8) y [rastreo de Nodes](../rastreo/nodes.md) (1.18, 5.1).
+
+- **Decisión 4, Auto, umbral de 0,50 USD:** en Auto un tipo confirmado ya no vuelve a pedir la tarjeta por coste; el plan muestra el precio y el usuario aprueba ahí (`procedure.ts:68-70,93`, `2120c71`, 2026-10-15). El umbral sigue en Guided. Sin decisión encontrada que lo apruebe (no encontrarla no prueba que no se diera). Requiere decisión.
+- **Enmienda a 0007 (9), «una vez por sesión» en Auto:** `cd15ef0` (2026-10-24) hace que Auto confirme los ajustes sin tarjeta (`procedure.ts:93`). Requiere decisión.
+- **Enmienda a 0007 (9), modelo confirmado:** solo vale para planes de chat. En Nodes y en la ficha de assets el camino `nodeChoice` (`353628e`) no cambió: la operación de imagen sigue el modelo del origen (`catalog.ts:437`, `flow/actions.ts:217-228`, `executor.ts:87`, `jobs.ts:1074`) y el modelo que estampa el plan (`params._modelRef`) no manda sobre esa elección calculada en la ejecución. El ADR no dice que se limite a planes de chat. Requiere decisión y prueba aislada.
+- **«Nunca en silencio» (Actualización 2026-10-20):** `providerFit.betterProvider` cambia el proveedor del paso en Auto sin pulsar Cambiar y sin comparar precio (`providerFit.ts:41-55`, `6d97221`); la app lo avisa mediante una nota que el agente debe repetir. Sin decisión encontrada. Requiere decisión.
+- **Estado «Propuesto»:** sigue sin cambiarse aunque está implementado ([pendientes-sistema](../pendientes-sistema.md) G1).

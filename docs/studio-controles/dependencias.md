@@ -34,7 +34,7 @@ Tres capas: el Composer guarda el defecto global (`image/video/audio/model3d.mod
 
 ### Sin crédito: cambio de proveedor
 
-Orden observado en `credit.ts`: la generación fallida por crédito busca el mismo modelo en otro proveedor con precio menor o igual, lo relanza y avisa después; si no hay candidato, queda la alerta de crédito del Composer ([composer](composer.md)) o la fila de error ([resultados](resultados.md)). Para el agente el cambio es de Director. El texto de los avisos no se ha contrastado con el cambio realizado, por eso P3 queda «sin confirmar».
+Orden observado en `credit.ts`: la generación fallida por crédito busca el mismo modelo en otro proveedor con precio menor o igual, lo relanza y avisa después; si no hay candidato, queda la alerta de crédito del Composer ([composer](composer.md)) o la fila de error ([resultados](resultados.md)). Para el agente el cambio es de Director. Rastreo ([4.1](../rastreo/studio-2.md)): en la generación el aviso coincide con el cambio por construcción (`credit.ts:126,155`); en el agente, con precios desconocidos dice «same price or less» sin saberlo (`credit.ts:204-207`): P3 respondido parcialmente, requiere prueba.
 
 ## Precio, crédito y presupuesto
 
@@ -76,11 +76,26 @@ Orden observado en `credit.ts`: la generación fallida por crédito busca el mis
 
 ## Continuidad y estilo
 
-`continuityErrors` (`planRun.ts:192-199`) detiene un paso cuyo sujeto o estilo no encaja con los anteriores; la tarjeta de plan muestra las líneas de sujetos y estilo ([tarjeta-plan](tarjeta-plan.md)). Qué parte del estilo la fija el usuario y qué parte el agente no se ha rastreado en el código: ver [huecos](huecos.md). Promesa tocada: P3, el texto del error debe describir lo que realmente falló (sin confirmar).
+`continuityErrors` (`planRun.ts:192-199`) detiene un paso cuyo sujeto o estilo no encaja con los anteriores; la tarjeta de plan muestra las líneas de sujetos y estilo ([tarjeta-plan](tarjeta-plan.md)). Qué parte fija el usuario y cuál el agente: respondido parcialmente en [huecos](huecos.md) (G3). Promesa tocada: P3, el texto del error de `continuityErrors` sin verificar; falso positivo conocido (A13), requiere prueba.
 
 ## Storyboard
 
 El storyboard llega como tarjeta de preguntas del agente ([tarjeta-preguntas](tarjeta-preguntas.md)) según la documentación; no hay controles propios de storyboard leídos en el código de Studio. Promesa tocada: P2, cada plano generado cuenta como paso del plan con su precio.
+
+## Estado tras el rastreo (2026-10-28)
+
+Fuente: [rastreo de Studio](../rastreo/studio-2.md), contrastado con el código. «Respondido por lectura» no es arreglado ni prueba pasada; «sin decisión encontrada» no prueba que nunca se autorizara.
+
+| Cruce | Estado | Nota | Fila |
+| --- | --- | --- | --- |
+| Cambio por crédito de generación y de agente | Respondido por lectura; requiere decisión (agente) | Deliberado (`4cf18aa`, ADR 0025 C); el del agente fija `modelPinned` y puede afirmar «same price or less» sin precio | R2, R3 |
+| «Proveedor que encaja» (capacidad) | Respondido por lectura; requiere decisión | Sin decisión encontrada; no compara precio y puede subirlo; el proveedor nombrado en una petición anterior no se protege (`providerFit.ts:41-55`) | R1 |
+| Cambio automático de variante por adjuntos | Respondido parcialmente; requiere decisión | Sigue marcando `userPicked` | R6 |
+| Límite de gasto | Respondido por lectura; requiere decisión | Precios desconocidos ignorados (`budget.ts:24`); un presupuesto mostrado es estimación, no máximo | R7, R8 |
+| Reescritura y revisiones del plan | Respondido por lectura; requiere decisión | Turnos LLM cobrados sin precio previo; «nothing is spent» falso en dinero | R9, R10 |
+| Cancel con trabajo remoto | Respondido parcialmente; requiere prueba y pregunta al proveedor | Comportamiento de la app conocido; cobro real desconocido | R11 |
+| Check status con límite superado | Respondido por lectura; requiere decisión | Sin vía de continuar | R12 |
+| Reconfirmación de 0,50 USD en Auto | Respondido por lectura; requiere decisión | Quitada en `2120c71` (`procedure.ts:68-70,93`); docs que la prometían se corrigen con una sección «Estado actual» | C1 |
 
 ## Enlaces
 

@@ -15,7 +15,7 @@ related: [dependencias, composer, tarjeta-plan, tablero]
 | Campo | Línea | Defecto | Persistencia | Lo escriben | Lo leen |
 | --- | --- | --- | --- | --- | --- |
 | `agent.model`, `agent.provider`, `agent.tier` | `store.ts:57` | según motor | store | [barra-y-ajustes](barra-y-ajustes.md) (Engine, Tier, Model), `onAgentCredit` | Cada turno del Director |
-| `agent.modelPinned` | `store.ts:57` | sin fijar | store | Elegir modelo (lo fija), Tier (lo limpia), `onAgentCredit` (lo fija) | Selección automática del Director; ver [hallazgos](hallazgos.md) |
+| `agent.modelPinned` | `store.ts:57` | sin fijar | store | Elegir modelo (lo fija), Tier (lo limpia), `onAgentCredit` (lo fija) | Selección automática del Director; ver [hallazgos](hallazgos.md) Rastreo ([R2](../rastreo/studio-2.md)): `onAgentCredit` lo fija sin que el usuario elija; requiere decisión. |
 | `agent.updateComposerDefaults` | Settings `:418-425` | apagado | store | Casilla de Settings | `rememberSessionModel` |
 | `guidedRounds` | `store.ts:243` | 2 | store | Guided rounds | `roundsFor` ([tarjeta-preguntas](tarjeta-preguntas.md)) |
 | `budgetOn` | `store.ts:245` | encendido | store | Spending limit | `overLimit`, [composer](composer.md), [tarjeta-plan](tarjeta-plan.md) |

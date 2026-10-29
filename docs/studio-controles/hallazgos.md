@@ -14,7 +14,7 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 
 | N.º | Promesa | Hallazgo | Evidencia | Estado |
 | --- | --- | --- | --- | --- |
-| H1 | P1 | «Proveedor que encaja» cambia el proveedor del paso en Auto sin pulsar Cambiar y sin comparar precio; la divulgación depende de la frase del agente | `providerFit.betterProvider`; `features/agente-auto-tarjeta.md:34` | Crítico, documentado como diseño |
+| H1 | P1 | «Proveedor que encaja» cambia el proveedor del paso en Auto sin pulsar Cambiar y sin comparar precio; la divulgación depende de la frase del agente | `providerFit.betterProvider`; `features/agente-auto-tarjeta.md:34` | Crítico, documentado como diseño; ver rastreo abajo |
 | H2 | P1 | El cambio automático de variante por adjuntos marca `userPicked[kind]=true` como si el usuario lo hubiera elegido | `Composer.tsx:374` | Crítico |
 | H3 | P1 | `onAgentCredit` cambia el Director y fija `modelPinned: true`, pero el comentario del campo dice que solo lo fija el usuario | `credit.ts`; `store.ts:57` | Crítico |
 | H4 | P2 | Aprobar por encima del límite llama a `acceptOverLimit` global: las siguientes ejecuciones dejan de preguntar hasta Reset o cambio de límite | `budget.ts`; nota en `SettingsPanel.tsx:516` | Crítico, la nota lo avisa |
@@ -48,6 +48,28 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 | N.º | Hallazgo |
 | --- | --- |
 | H19 | Interfaz mezclada en español e inglés: Continuar, Cancelar paso, Necesita revisión, Ajustar prompt, Cambiar, Dejar de seguir, Mejorar esta toma, Borrador/Alta calidad, «Otra respuesta…», CaptureChip, frente al resto en inglés |
+
+## Respuesta del rastreo (2026-10-28)
+
+Estados: «respondido por lectura» (leído en el código; no es arreglado ni prueba pasada), «respondido parcialmente», «requiere prueba» (sandbox o proveedor) y «requiere decisión» (del usuario). Fuente: [rastreo de Studio, secciones 3 y 4](../rastreo/studio-2.md); el rastreo verifica contra el código, no ejecuta nada.
+
+| N.º | Estado | Qué dice la lectura | Fila |
+| --- | --- | --- | --- |
+| H1 | Respondido parcialmente; requiere decisión | Por crédito el cambio fue deliberado (`4cf18aa`, ADR 0025 C). Por capacidad (`providerFit.ts:41-55`, `6d97221`): sin decisión encontrada (no encontrarla no prueba que nunca se autorizara); `ec679f7` cita «sugerir otro modelo», que no es cambiar solo; no compara precio y puede subirlo; un proveedor nombrado antes no se protege (`:43`) | R1, 4.2 |
+| H2 | Respondido parcialmente; requiere decisión | `515dceb` evitó solo el recuerdo de sesión; `userPicked[kind]=true` sigue (`catalog.ts:235`) y luego cuenta como elección (`llmTurn.ts:281`) | R6, 4.2 |
+| H3 | Respondido por lectura; requiere decisión | Confirmado: `credit.ts:211` fija `modelPinned` sin el usuario; el aviso es veraz | R2, 4.2 |
+| H4 | Respondido por lectura; requiere decisión | Diseño avisado (`budget.ts:34`); deja sin tope hasta Reset. Que sea intencional no consta | R8, 4.2 |
+| H5 | Respondido por lectura; requiere decisión | Confirmado: precios desconocidos no cuentan (`budget.ts:24-27`) y el tooltip dice lo contrario | R7, 4.2 |
+| H6 | Respondido por lectura; requiere decisión | Confirmado; el gasto sí llega a Spending (`planSettings.ts:188`), solo falta el precio previo | R10, 4.2 |
+| H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
+| H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |
+| H9 | Respondido por lectura; requiere prueba y decisión | `mode === 'check'` cae en `planRun.ts:388`; solo `retry` acepta el límite (`RecoveryActions.tsx:24`) | R12, 4.2 |
+| H10 | Respondido por lectura; requiere prueba | Confirmado (`conversation.ts:51-54`); A28 arregló la respuesta al LLM, no la selección en pantalla | R13, 4.2 |
+| H11 | Respondido por lectura; requiere prueba | Confirmado: la tarjeta pasa a `skipped` al escribir | R13, 4.2 |
+| H12, H13, H15, H16, H17 | Sin respuesta del rastreo | La historia no los menciona; siguen abiertos | 4.2 |
+| H14 | Respondido por lectura | Retirado en Auto con `cd15ef0` (2026-10-24); el código quedó. Deuda | R14, 4.2 |
+| H18 | Respondido por lectura | Es petición del usuario (054); la ficha `studio.md` quedó desfasada y se corrige | C6, 4.2 |
+| H19 | Respondido parcialmente | Los textos vienen de peticiones del usuario; solo «Look» → «Apariencia» consta como decisión pendiente | 4.2 |
 
 ## Enlaces
 

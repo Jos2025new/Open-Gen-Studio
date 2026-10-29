@@ -39,3 +39,7 @@ E: la imagen única que usa un paso de referencia hereda su forma (descartado: u
 
 - `creditOptions` expone `ratio`; el aviso marca lo más caro.
 - Pruebas en `tests/credit.test.ts`.
+
+## Estado actual del código (2026-10-28) — difiere, requiere decisión
+
+Lo decidido arriba no se toca; esto no es una decisión aprobada. Regla D, «nunca se sustituye en silencio»: `providerFit.betterProvider` sustituye el proveedor del paso en Auto, sin Cambiar y sin comparar precio, y lo avisa con una nota que el agente debe repetir (`providerFit.ts:41-55`, `6d97221`, 2026-10-24); la regla D no lo cubre y no se encontró decisión que lo autorice (no encontrarla no prueba que no se diera). Regla C, crédito del agente: `onAgentCredit` fija `modelPinned: true` y, con dos precios desconocidos, afirma «same price or less» (`credit.ts:204-211`). Requiere decisión ([rastreo R1, R2, R3, C4](../rastreo/studio-2.md)).
