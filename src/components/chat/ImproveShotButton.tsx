@@ -27,7 +27,7 @@ export function ImproveShotButton({ g }: { g: Generation }) {
           lines={[plan.mode === 'rerender' ? `Mismo prompt y semilla en ${plan.resolution}.` : 'Este modelo no llega a 1080p: el clip pasa por el reescalador de video.']}
           estimate={estimate}
           confirmLabel="Mejorar"
-          onConfirm={() => { pop.close(); void improveShot(g.id); }}
+          onConfirm={() => { pop.close(); return improveShot(g.id); }}
           onCancel={pop.close}
         />
       </Popover>

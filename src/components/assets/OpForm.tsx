@@ -30,7 +30,7 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
         title={state.pickable && via ? <ViaPick op={op} state={state} /> : via ? `via ${via}` : 'Cost'}
         estimate={estimate}
         confirmLabel={def.engine === 'local' ? 'Run (free)' : 'Apply'}
-        onConfirm={() => { onClose(); state.run(); }}
+        onConfirm={() => { onClose(); return state.run(); }}
         onCancel={onClose}
         blocked={blocked}
       />

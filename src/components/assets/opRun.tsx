@@ -73,8 +73,7 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null, seed?: ToolSeed)
   /** The one launch: the same calls the op popover makes after its cost confirmation. */
   const run = () => {
     if (!target || pending) return;
-    if (target.kind === 'asset') void runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined);
-    else void runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
+    return target.kind === 'asset' ? runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined) : runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
   };
   return { params, setParams, estimate: pending ? CALCULATING : estimate, via, picked, setPicked, pickable, missing, blocked, run };
 }

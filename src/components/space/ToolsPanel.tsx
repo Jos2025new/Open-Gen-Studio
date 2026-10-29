@@ -94,7 +94,7 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
         <Zap size={14} strokeWidth={2} /><span>Generate</span>{target ? <span className="send-cost num">{costLabel(state.estimate, { short: true })}</span> : null}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Confirm cost">
-        <SpendConfirm title={<ViaPick op={op} state={state} />} estimate={state.estimate} confirmLabel="Generate" onConfirm={() => { pop.close(); state.run(); }} onCancel={pop.close} blocked={state.blocked} />
+        <SpendConfirm title={<ViaPick op={op} state={state} />} estimate={state.estimate} confirmLabel="Generate" onConfirm={() => { pop.close(); return state.run(); }} onCancel={pop.close} blocked={state.blocked} />
       </Popover>
     </footer>
   </>;

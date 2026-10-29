@@ -21,7 +21,8 @@ export function SpendConfirm({
   lines?: ReactNode[];
   estimate: Estimate;
   confirmLabel?: string;
-  onConfirm: () => void;
+  /** Return the action's promise (if any): the "Continue once" pass lives until it settles. */
+  onConfirm: () => unknown;
   onCancel: () => void;
   children?: ReactNode;
   blocked?: string | null;
@@ -78,8 +79,7 @@ export function SpendConfirm({
           icon={Zap}
           disabled={Boolean(blocked)}
           onClick={() => {
-            if (over) withOncePass(useStore.getState().activeSessionId, onConfirm);
-            else onConfirm();
+            void (over ? withOncePass(useStore.getState().activeSessionId, onConfirm) : onConfirm());
           }}
           autoFocus
         >

@@ -79,7 +79,7 @@ function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
             onCancel={pop.close}
             onConfirm={() => {
               if (previewRun(sessionId, ids, false).signature !== preview.signature) return;
-              void runNodes(sessionId, ids, preview, false).then(result => { if (result) pop.close(); });
+              return runNodes(sessionId, ids, preview, false).then(result => { if (result) pop.close(); });
             }}
           />
         ) : null}

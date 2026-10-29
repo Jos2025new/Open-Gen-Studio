@@ -49,7 +49,7 @@ function useSessionId() {
 }
 
 /** Run with spend confirmation. `primary` is the panel's big button and shows the estimated cost. */
-function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
+export function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
   const sessionId = useSessionId();
   const pop = usePopover();
   useStore(s => s); // Keep the reviewed request and price current.
@@ -69,7 +69,7 @@ function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
             onCancel={pop.close}
             onConfirm={() => {
               if (previewRun(sessionId, [node.id]).signature !== preview.signature) return;
-              void runNodes(sessionId, [node.id], preview).then(result => { if (result) pop.close(); });
+              return runNodes(sessionId, [node.id], preview).then(result => { if (result) pop.close(); });
             }}
           />
         ) : null}

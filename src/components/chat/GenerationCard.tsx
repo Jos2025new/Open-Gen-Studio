@@ -306,7 +306,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
           confirmLabel="Regenerate"
           onConfirm={() => {
             regen.close();
-            void regenerate(g.id);
+            return regenerate(g.id);
           }}
           onCancel={regen.close}
         />

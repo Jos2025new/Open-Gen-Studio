@@ -194,7 +194,7 @@ export function SendDirect({ kind, onLaunch }: { kind: MediaKind; onLaunch?: (te
   const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, workspace, models, quotes]);
   const pop = usePopover();
   const unknown = check.estimate.usd == null;
-  const launch = () => { onLaunch?.(useStore.getState().composer.text); void generateDirect(kind); };
+  const launch = () => { onLaunch?.(useStore.getState().composer.text); return generateDirect(kind); };
   const onClick = () => {
     if (!check.ok) {
       toast(check.reason ?? 'Not ready', 'error');
@@ -225,7 +225,7 @@ export function SendDirect({ kind, onLaunch }: { kind: MediaKind; onLaunch?: (te
           confirmLabel="Generate"
           onConfirm={() => {
             pop.close();
-            launch();
+            return launch();
           }}
           onCancel={pop.close}
         />

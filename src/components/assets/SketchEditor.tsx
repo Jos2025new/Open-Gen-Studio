@@ -276,7 +276,7 @@ export function SketchEditor() {
                   lines={[quote.modelName, change.trim() || 'Fill with the surrounding background']}
                   estimate={quote.estimate}
                   confirmLabel={change.trim() ? 'Edit region' : 'Remove object'}
-                  onConfirm={() => (apply.close(), void runMask())}
+                  onConfirm={() => (apply.close(), runMask())}
                   onCancel={apply.close}
                 />
               ) : null}
