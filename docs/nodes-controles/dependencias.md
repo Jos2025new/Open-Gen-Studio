@@ -8,7 +8,7 @@ related: [ejecucion, nodos-generacion, nodos-herramienta, hallazgos, estado-comp
 ---
 # Dependencias entre controles de Nodes
 
-Promesas del producto (las mismas que en [Studio](../studio-controles/dependencias.md)): **P1** el modelo o proveedor no cambia sin que el usuario pulse Cambiar; **P2** no se gasta por encima de lo mostrado; **P3** una alerta nunca afirma algo falso. En Nodes no hay botón «Cambiar»: la elección explícita es el clic en una fila de la lista de modelos del nodo. La columna «Promesa tocada» dice cuál roza cada cruce y cómo queda: «cumple», «excepción documentada», «sin confirmar» o «hallazgo» (ver [hallazgos](hallazgos.md)). Todo sale de leer el código; no se ejecutó nada.
+Promesas del producto (las mismas que en [Studio](../studio-controles/dependencias.md)): **P1** el modelo o proveedor no cambia sin que el usuario pulse Cambiar; **P2** no se gasta por encima de lo mostrado; **P3** una alerta nunca afirma algo falso. En Nodes no hay botón «Cambiar»: la elección explícita es el clic en una fila de la lista de modelos del nodo. La columna «Promesa tocada» dice cuál roza cada cruce y cómo queda: «cumple» (para P2 solo significa que se mostró una estimación, no un máximo garantizado), «excepción documentada», «sin confirmar» o «hallazgo» (ver [hallazgos](hallazgos.md)). Todo sale de leer el código; no se ejecutó nada.
 
 ## Modelo y ajustes
 
@@ -38,15 +38,15 @@ Promesas del producto (las mismas que en [Studio](../studio-controles/dependenci
 
 | Origen | Destino | Cómo se propaga | Promesa tocada |
 | --- | --- | --- | --- |
-| Botón Run (barra, panel) o Run all | Revisión de gasto | `prepareNodeRun` carga los esquemas y `previewRun` calcula pasos, errores y total (`flow/actions.ts:303`) | P2: cumple, el precio se ve antes de cualquier gasto |
-| Revisión mostrada | Ejecución | `runNodes` revalida la firma y no gasta si cambió (`flow/actions.ts:327`) | P2: cumple |
-| Nodos de los que depende el nodo (sin resultado o desactualizados) | Lista y precio de la revisión | `graphToSteps` los añade al conjunto que se ejecuta (`flow/graph.ts:363`) y la revisión los enumera | P2: cumple (se ven y suman) |
-| Run de un solo nodo con resultado vigente | Nuevo gasto | `force=true`: vuelve a ejecutarlo (`flow/actions.ts:243`) | P2: cumple (precio visible); la revisión no dice que el resultado ya estaba al día |
+| Botón Run (barra, panel) o Run all | Revisión de gasto | `prepareNodeRun` carga los esquemas y `previewRun` calcula pasos, errores y total (`flow/actions.ts:303`) | P2: se ve un precio estimado antes de gastar (no es un máximo garantizado de cobro) |
+| Revisión mostrada | Ejecución | `runNodes` revalida la firma y no gasta si cambió (`flow/actions.ts:327`) | P2: se muestra una estimación; no garantiza un máximo de cobro |
+| Nodos de los que depende el nodo (sin resultado o desactualizados) | Lista y precio de la revisión | `graphToSteps` los añade al conjunto que se ejecuta (`flow/graph.ts:363`) y la revisión los enumera | P2: los precios estimados se ven y suman (no son un máximo garantizado) |
+| Run de un solo nodo con resultado vigente | Nuevo gasto | `force=true`: vuelve a ejecutarlo (`flow/actions.ts:243`) | P2: precio estimado visible (no es un máximo garantizado); la revisión no dice que el resultado ya estaba al día |
 | Límite de gasto | Aviso, botón «Continue anyway» | `overLimit` (`budget.ts:19`) y `acceptOverLimit` global (`SpendConfirm.tsx:68`); el texto dice «Further runs will not ask again until you change the limit.» | P2: excepción documentada y divulgada en el propio aviso (hallazgo H4 de Studio, ver [hallazgos](../studio-controles/hallazgos.md)) |
 | Precio desconocido | Aviso y límite | La revisión dice «The provider bills the actual cost; it is not published in advance.»; `overLimit` y `budgetProblem` ignoran los desconocidos (`budget.ts:27`) | P2: no se muestra una cifra; la advertencia es veraz. Mismo hueco que H5 de Studio |
-| Composer directo en Nodes | Nodo + ejecución inmediata | El botón de envío es la aprobación; con precio desconocido o sobre el límite abre la revisión (`Composer.tsx:204`) | P2: cumple |
-| Estilo Auto del agente | Ejecución de un plan de Nodes | Aprueba solo si el coste es exactamente 0 (`pricing.ts:120`) | P2: cumple |
-| `run_nodes` del agente | Tarjeta «Run existing nodes» | Espera el clic del usuario también en Auto (`planRun.ts:91`) | P2: cumple |
+| Composer directo en Nodes | Nodo + ejecución inmediata | El botón de envío es la aprobación; con precio desconocido o sobre el límite abre la revisión (`Composer.tsx:204`) | P2: se muestra una estimación; no garantiza un máximo de cobro |
+| Estilo Auto del agente | Ejecución de un plan de Nodes | Aprueba solo si el coste es exactamente 0 (`pricing.ts:120`) | P2: se muestra una estimación; no garantiza un máximo de cobro |
+| `run_nodes` del agente | Tarjeta «Run existing nodes» | Espera el clic del usuario también en Auto (`planRun.ts:91`) | P2: se muestra una estimación; no garantiza un máximo de cobro |
 
 ## Historial, bloqueos y vistas
 
