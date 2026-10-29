@@ -197,7 +197,7 @@ export interface ModelSchema {
 export type AdvancedValue = string | number | boolean;
 
 export interface GenSettings {
-  /** Realism register added to realistic image and video prompts; default 'balanced' ('photographic' = cinematic). */
+  /** Realism register for realistic image and video prompts; default 'balanced' ('photographic' = cinematic). */
   realism?: 'balanced' | 'everyday' | 'cinematic' | 'photographic' | 'ugc' | 'studio' | 'none';
   /** Shot sheet id (cinematic or ugc families); chosen from the prompt when absent. */
   shot?: string;
@@ -466,7 +466,7 @@ export interface LayerStep extends StepBase {
   style?: Partial<TextStyle>;
   box?: { x: number; y: number; width: number };
   shapes?: ShapeSpec[];
-  /** Freehand strokes in document px: vector → editable Lineart strokes; raster → painted with the brush on a new layer. */
+  /** Freehand strokes in document px: vector → Lineart strokes; raster → painted on a new layer. */
   strokes?: StrokeSpec[];
 }
 
@@ -665,7 +665,7 @@ export interface NoticeFeedItem extends FeedBase {
   type: 'notice';
   level: 'info' | 'error';
   text: string;
-  /** A transient agent failure (connection lost, provider busy): Retry reruns the turn from the last completed step. */
+  /** A transient agent failure (connection lost, provider busy): Retry reruns the turn. */
   retry?: { partialItemId?: string };
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;
@@ -718,7 +718,7 @@ export interface GenNodeData {
   settings: GenSettings;
   generationId?: string;
   outputIndex: number;
-  /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
+  /** Painted-over copy of the result (Sketch): replaces it downstream; clearing restores the original. */
   sketchAssetId?: string;
   /** Audio nodes whose model answers with text (MiniMax Lyrics): the output port is text. Kept with `modelRef`. */
   textOutput?: boolean;
@@ -865,7 +865,7 @@ export interface LayerGroup {
   id: string;
   name: string;
   collapsed?: boolean;
-  /** Layers already hidden or locked when the group was hidden or locked: showing or unlocking the group keeps them so. */
+  /** Layers hidden or locked before the group was: showing/unlocking it keeps them so. */
   keptHidden?: string[];
   keptLocked?: string[];
 }
@@ -925,7 +925,7 @@ export interface AgentState {
   revising?: string;
   /** Offline planner memory for the request being clarified. */
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
-  /** What the open questions card shows selected right now (its options, the user's own words), so typing in the Composer sends it. */
+  /** The open questions card's selection (typing sends it). */
   cardPick?: { itemId: string; answers: Record<string, string> };
   /** Canvas the conversation above belongs to (unset: older sessions). */
   canvas?: Workspace;
