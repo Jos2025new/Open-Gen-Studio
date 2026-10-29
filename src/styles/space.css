@@ -11,6 +11,7 @@
 .space-panel-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-3); }
 .space-card { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg-canvas); }
 .space-card-label { font-size: var(--fs-xs); color: var(--text-3); }
+.space-prompt-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .space-prompt { width: 100%; resize: vertical; min-height: 84px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; font-size: var(--fs-m); line-height: 1.5; }
 .space-add { display: inline-flex; align-items: center; gap: var(--sp-2); align-self: flex-start; padding: var(--sp-1) var(--sp-2); border: 1px dashed var(--border-strong); border-radius: var(--r-s); color: var(--text-2); font-size: var(--fs-s); }
 .space-add:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
@@ -21,7 +22,6 @@
 .space-controls > .space-format { gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg-canvas); }
 .space-format .fmt-aspects .fmt-opt { min-width: 48px; min-height: 46px; }
 .space-format .fmt-opt { flex-basis: auto; }
-.space-references .space-add { align-self: stretch; justify-content: center; min-height: 56px; }
 .space-slot-empty { min-height: 68px; }
 .space-panel-foot { padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); background: var(--surface); }
 .space-panel-foot .send-btn { width: 100%; height: 44px; justify-content: center; border-radius: var(--r-m); font-size: var(--fs-l); }

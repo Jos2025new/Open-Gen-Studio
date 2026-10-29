@@ -24,7 +24,7 @@ export function AspectGlyph({ value, size = 14 }: { value: string; size?: number
   return <span className="aspect-glyph" style={{ width: w, height: h }} />;
 }
 
-function ModelChip({ kind }: { kind: MediaKind }) {
+export function ModelChip({ kind }: { kind: MediaKind }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const model = useStore((s) => s.catalog.models[ref]);
   const loading = useStore((s) => !s.catalog.schemas[ref]);
@@ -584,7 +584,7 @@ function LyricsChip({ kind }: { kind: MediaKind }) {
 }
 
 /** Contextual controls for image / video / audio / 3D mode. */
-export function MediaControls({ kind, formatInline = false }: { kind: MediaKind; formatInline?: boolean }) {
+export function MediaControls({ kind, formatInline = false, showModel = true }: { kind: MediaKind; formatInline?: boolean; showModel?: boolean }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const [, force] = useState(0);
   useEffect(() => {
@@ -592,7 +592,7 @@ export function MediaControls({ kind, formatInline = false }: { kind: MediaKind;
   }, [ref]);
   return (
     <>
-      <ModelChip kind={kind} />
+      {showModel ? <ModelChip kind={kind} /> : null}
       <FormatChip kind={kind} inline={formatInline} />
       {kind === 'image' || kind === 'video' ? <CaptureChip kind={kind} /> : null}
       {kind === 'audio' || kind === 'model3d' ? <LyricsChip kind={kind} /> : null}

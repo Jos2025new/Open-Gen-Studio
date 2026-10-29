@@ -130,6 +130,13 @@ describe('Generate in the panel', () => {
     expect(tabs.map((t) => t.textContent)).toEqual(['Image', 'Video', 'Audio', '3D']);
     expect(tabs[1].getAttribute('aria-selected')).toBe('true');
   });
+  it('keeps prompt history by the prompt and the model before references', () => {
+    const history = host.querySelector('.space-prompt-head button');
+    const model = host.querySelector('.space-controls .model-chip');
+    const references = [...host.querySelectorAll('.space-card-label')].find((label) => label.textContent === 'References');
+    expect(history?.textContent).toContain('Prompt history');
+    expect(model && references && (model.compareDocumentPosition(references) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  });
   it('the button runs the composer path (generateDirect) for the selected mode', () => {
     act(() => host.querySelector<HTMLButtonElement>('.send-btn.is-generate')!.click());
     expect(generateDirect).toHaveBeenCalledWith('video');
