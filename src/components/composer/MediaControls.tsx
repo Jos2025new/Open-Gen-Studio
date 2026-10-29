@@ -53,7 +53,7 @@ function ModelChip({ kind }: { kind: MediaKind }) {
 /** One pill button in a format section; the active one is raised. */
 function FmtOption({ active, onClick, children, tip }: { active: boolean; onClick: () => void; children: React.ReactNode; tip?: string }) {
   return (
-    <button type="button" className={`fmt-opt ${active ? 'is-active' : ''}`} onClick={onClick} data-tip={tip}>
+    <button type="button" className={`fmt-opt ${active ? 'is-active' : ''}`} aria-pressed={active} onClick={onClick} data-tip={tip}>
       {children}
     </button>
   );
@@ -63,7 +63,7 @@ function FmtOption({ active, onClick, children, tip }: { active: boolean; onClic
  * Format of the result in one chip ("▢ 1:1 · 1k · 1"): aspect ratio, resolution and, for images, how many, or for
  * video, how long. The panel shows only the sections the model has and stays open while choosing.
  */
-function FormatChip({ kind }: { kind: MediaKind }) {
+function FormatChip({ kind, inline = false }: { kind: MediaKind; inline?: boolean }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const schema = useStore((s) => s.catalog.schemas[ref]);
   const settings = useStore((s) => s.composer[kind].settings);
@@ -84,15 +84,7 @@ function FormatChip({ kind }: { kind: MediaKind }) {
     kind === 'image' ? String(settings.count) : null,
     durations.length ? durationLabel(settings.duration ?? durations[0]) : null,
   ].filter(Boolean);
-  return (
-    <>
-      <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} data-tip="Format" data-card="Output" className="fmt-chip">
-        {aspect?.options?.length ? <AspectGlyph value={pxNow?.ratio ?? settings.aspect ?? ''} /> : <Layers size={14} strokeWidth={1.8} />}
-        <span>{summary.join(' · ')}</span>
-        <ChevronDown size={12} />
-      </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={430} label="Format">
-        <div className="fmt-pop">
+  const format = <div className={`fmt-pop ${inline ? 'space-format' : ''}`}>
           {px ? (
             <>
               <section className="fmt-sect">
@@ -171,10 +163,15 @@ function FormatChip({ kind }: { kind: MediaKind }) {
               </div>
             </section>
           ) : null}
-        </div>
-      </Popover>
-    </>
-  );
+        </div>;
+  if (inline) return format;
+  return <>
+    <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} data-tip="Format" data-card="Output" className="fmt-chip">
+      {aspect?.options?.length ? <AspectGlyph value={pxNow?.ratio ?? settings.aspect ?? ''} /> : <Layers size={14} strokeWidth={1.8} />}
+      <span>{summary.join(' · ')}</span><ChevronDown size={12} />
+    </Chip>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={430} label="Format">{format}</Popover>
+  </>;
 }
 
 function AudioChip() {
@@ -587,7 +584,7 @@ function LyricsChip({ kind }: { kind: MediaKind }) {
 }
 
 /** Contextual controls for image / video / audio / 3D mode. */
-export function MediaControls({ kind }: { kind: MediaKind }) {
+export function MediaControls({ kind, formatInline = false }: { kind: MediaKind; formatInline?: boolean }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const [, force] = useState(0);
   useEffect(() => {
@@ -596,7 +593,7 @@ export function MediaControls({ kind }: { kind: MediaKind }) {
   return (
     <>
       <ModelChip kind={kind} />
-      <FormatChip kind={kind} />
+      <FormatChip kind={kind} inline={formatInline} />
       {kind === 'image' || kind === 'video' ? <CaptureChip kind={kind} /> : null}
       {kind === 'audio' || kind === 'model3d' ? <LyricsChip kind={kind} /> : null}
       {kind === 'video' ? <AudioChip /> : null}

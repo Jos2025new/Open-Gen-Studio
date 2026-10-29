@@ -134,6 +134,14 @@ describe('Generate in the panel', () => {
     act(() => host.querySelector<HTMLButtonElement>('.send-btn.is-generate')!.click());
     expect(generateDirect).toHaveBeenCalledWith('video');
   });
+  it('exposes image count directly and updates the same composer settings', () => {
+    act(() => (host.querySelectorAll('[role="tab"]')[0] as HTMLButtonElement).click());
+    const two = [...host.querySelectorAll<HTMLButtonElement>('.space-format .fmt-opt')].find((b) => b.textContent === '2');
+    expect(two).toBeDefined();
+    act(() => two!.click());
+    expect(useStore.getState().composer.image.settings.count).toBe(2);
+    expect(two!.getAttribute('aria-pressed')).toBe('true');
+  });
   it('Enter in the prompt does the same; changing tab changes the mode', () => {
     const ta = host.querySelector('textarea')!;
     act(() => ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));

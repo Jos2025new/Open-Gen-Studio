@@ -66,15 +66,17 @@ export function SpacePanel() {
           }} />
         <PromptHistory history={history.history} onChoose={history.choose} />
       </div>
-      <div className="space-card">
+      <div className="space-card space-references"
+        onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); }}
+        onDrop={(e) => { if (!e.dataTransfer.types.includes('Files')) return; e.preventDefault(); onFiles(e.dataTransfer.files); }}>
         <span className="space-card-label">References</span>
         <AttachStrip ids={live} />
         <input ref={fileRef} type="file" hidden multiple accept={['image/png,image/jpeg,image/webp', slots?.clips || slots?.refVideos || slots?.mixedRefs ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')} onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
         <button type="button" className="space-add" disabled={!takesInput && !takesAudio} onClick={() => fileRef.current?.click()}>
-          <Paperclip size={14} />{takesInput || takesAudio ? 'Add references' : 'This model takes no input files'}
+          <Paperclip size={16} />{takesInput || takesAudio ? 'Add or drop references' : 'This model takes no input files'}
         </button>
       </div>
-      <div className="space-controls" aria-label="Model and settings"><MediaControls kind={mode} /></div>
+      <div className="space-controls" aria-label="Model and settings"><MediaControls kind={mode} formatInline /></div>
     </div>
     <footer ref={foot} className="space-panel-foot"><SendDirect kind={mode} onLaunch={recordCreatePrompt} /></footer>
   </aside>;

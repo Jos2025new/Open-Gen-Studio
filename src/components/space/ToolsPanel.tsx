@@ -125,7 +125,9 @@ export function InputSlot({ kind, verb, value, onChange }: { kind: AssetKind; ve
     <span className="space-card-label">Input · {kind}</span>
     {value ? <div className="space-slot-row"><span className="space-slot-thumb"><AssetMedia assetId={value} hoverPlay={false} autoPlay={false} draggable={false} /></span>
       <button ref={pop.ref} type="button" className="space-add" onClick={pop.toggle}>Change</button></div>
-      : <button ref={pop.ref} type="button" className="space-add space-slot-empty" onClick={pop.toggle}><ImagePlus size={14} />Add {NOUN[kind]} to {verb}</button>}
+      : <button ref={pop.ref} type="button" className="space-add space-slot-empty" onClick={pop.toggle}>
+        <ImagePlus size={18} /><span><strong>Add {NOUN[kind]} to {verb}</strong><span className="space-slot-help">Choose, upload or drop a file</span></span>
+      </button>}
     <input ref={file} type="file" hidden accept={accept} onChange={(e) => { void upload(e.target.files); e.target.value = ''; }} />
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={340} label="Pick input">
       <div className="space-pick">
