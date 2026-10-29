@@ -91,6 +91,6 @@ Ninguno está en la matriz de estado actual (no existen hoy). Todos los de la fi
 
 - Criterio exacto con que `AgentGlow` ilumina el lienzo ([[lienzo-gestos]]): **respondido por lectura**: se ilumina cada capa cuyo objeto cambió entre el documento anterior y el posterior en la ruta del agente, 1,2 s (`agentGlow.ts`, `GLOW_MS`, `44311e3`), solo en memoria. Que se vea bien en pantalla **requiere prueba**.
 - Las filas de [[lienzo-gestos]] tomadas de `TOOL_HELP` sin leer toda la rama del puntero (marcadas en cada fila).
-- Detalles de `Auto-select` más allá de su tooltip ([[alinear-editar]]).
+- `Auto-select`: con una forma elegida no aparece en la tarjeta Edit; se vio en sandbox ([revisión P5/S10](revision-ubicacion.md#visto-en-sandbox)). Detalles de comportamiento más allá de su tooltip siguen sin confirmar ([[alinear-editar]]).
 - Pendiente de decisión además: Sculpt aparece como «soon» sin icono propio (`toolboxModel.ts:28`); respondido por lectura, requiere decisión sobre el icono. La ayuda de Polygon («Sides») es un texto a corregir, no una decisión.
 - **Prueba visual pendiente:** el criterio de `AgentGlow` en pantalla, los detalles de `Auto-select` más allá del tooltip y las filas de `TOOL_HELP` cuyo recorrido del puntero no se siguió. La revisión de ubicación sí ejecutó la app y documentó otros casos visuales; eso no confirma estos puntos. El resto de esta sección queda respondido por lectura, con Sculpt aún pendiente de decisión.
