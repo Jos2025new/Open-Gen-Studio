@@ -12,6 +12,8 @@ La propuesta es la reagrupación de las maquetas de [ajustes](../mockups/designe
 
 ## Qué queda abierto
 
+- **Bugs y decisiones del sandbox del 2026-10-29** (S1, S3, S6, «Edit → Text 3», Guides recortada, ayudas con «strip»/«Sides»/«From and To», Select/Lasso/Wand en Brush): tabla en [hallazgos](hallazgos.md#sandbox-y-decisiones-del-2026-10-29-todo-abierto-nada-corregido). Nada corregido ni con prueba automatizada.
+
 Estados usados abajo: «respondido por lectura» (no es arreglado ni prueba pasada), «respondido parcialmente», «requiere prueba», «requiere decisión». Fuente: [rastreo del Designer](../rastreo/designer.md), secciones 4 y 5.
 
 - **Pruebas en sandbox** (puerto 5183, sin datos reales): encaje visual de las 4 acciones borde a ancla en `.align-action-row`; el criterio de brillo de `AgentGlow` a la vista; Delete layer con varias capas deshace en un solo paso; qué hace la rama de texto de la tira si se conecta; peso 100/200 puesto desde la herramienta frente a Properties (rastreo 3.7, ya respondido por lectura; la decisión va abajo); rama `compact` de formas del grupo Edit y de Select con la variante Edit abierta y R/O/L/M (`ToolDock.tsx:60,64-67`); rasterizeLayer sin test propio (respondido parcialmente).

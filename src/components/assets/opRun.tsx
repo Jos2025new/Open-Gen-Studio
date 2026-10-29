@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { opFollowsSource } from '../../engine/catalog';
 import { OPS, defaultOpParams } from '../../engine/ops';
-import { layerOpEstimate, opEstimate, runAssetOp, runLayerOp } from '../../engine/actions';
+import { layerOpEstimate, opEstimate, opSessionId, runAssetOp, runLayerOp } from '../../engine/actions';
 import type { AdvancedValue, Estimate, OpId } from '../../engine/types';
 import type { ToolSeed } from '../../store/spaceUi';
 import { useStore } from '../../store/store';
@@ -75,7 +75,8 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null, seed?: ToolSeed)
     if (!target || pending) return;
     return target.kind === 'asset' ? runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined) : runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
   };
-  return { params, setParams, estimate: pending ? CALCULATING : estimate, via, picked, setPicked, pickable, missing, blocked, run };
+  const sessionId = target ? (target.kind === 'asset' ? opSessionId(target.assetId) : target.sessionId) : undefined;
+  return { params, setParams, sessionId, estimate: pending ? CALCULATING : estimate, via, picked, setPicked, pickable, missing, blocked, run };
 }
 export type OpRun = ReturnType<typeof useOpRun>;
 

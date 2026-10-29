@@ -66,6 +66,7 @@ export function RunButton({ node, primary }: { node: GraphNode; primary?: boolea
             lines={preview.runIds.map(id => `${id} · ${useStore.getState().sessions[sessionId].graph.nodes.find(n => n.id === id)?.data.title}`)}
             estimate={preview.estimate}
             blocked={preview.errors[0] ?? null}
+            sessionId={sessionId}
             onCancel={pop.close}
             onConfirm={() => {
               if (previewRun(sessionId, [node.id]).signature !== preview.signature) return;

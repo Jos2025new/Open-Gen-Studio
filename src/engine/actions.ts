@@ -671,6 +671,13 @@ export async function opEstimate(assetId: string, op: OpId, params: Record<strin
   return { estimate: spec.estimate ?? { usd: null, approximate: true }, modelName: name, modelRef: ref };
 }
 
+/** The session an operation on this asset runs in (and checks its limit against). */
+export function opSessionId(assetId: string): string {
+  const st = get();
+  const asset = st.assets[assetId];
+  return st.ui.space ? ensureSpaceSession() : asset?.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
+}
+
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
 export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode): Promise<string[]> {
   const st = get();
@@ -681,7 +688,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(`${def.label} needs an ${def.input}.`, 'error');
     return [];
   }
-  const sessionId = st.ui.space ? ensureSpaceSession() : asset.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
+  const sessionId = opSessionId(assetId);
   const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef, place: place ?? placeFor(st.ui, st.ui.workspace), mode: mode ?? modeFor(st.composer.mode, op) });
   const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId);
   if (problem) {

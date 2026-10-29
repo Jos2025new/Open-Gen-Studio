@@ -16,7 +16,7 @@ Rastreo de commits y docs para cada área, con el estado de hoy comprobado en el
 
 ## Pendiente (2026-10-28)
 
-Nada de lo siguiente está hecho. Siguiente fase decidida por el usuario: terminar de ajustar los documentos y después convertir estos puntos en pruebas automatizadas que busquen fallos reales.
+Estado 2026-10-29: los puntos 1 (reproducciones de Nodes) y 3 (límite con precios desconocidos) están reproducidos y corregidos (91ea576, ea47987, e978427; [auditoría](../audits/repro-2026-10-29.md)); quedan los de decisiones de producto. Antes: nada de lo siguiente estaba hecho. Siguiente fase decidida por el usuario: terminar de ajustar los documentos y después convertir estos puntos en pruebas automatizadas que busquen fallos reales.
 
 1. **Dos reproducciones de Nodes, gratuitas y aisladas** (pruebas sin gasto ni datos reales), antes de arreglar nada:
    - Imagen equivocada: borrar un resultado ([nodes.md](nodes.md), 3.6) o duplicar un nodo / soltar un cable en el fondo (3.5) deja una conexión apuntando a otro resultado.
