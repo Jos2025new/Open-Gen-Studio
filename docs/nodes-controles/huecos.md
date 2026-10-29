@@ -12,12 +12,14 @@ Esta auditoría es de **lectura de código**. No cubre comportamiento en pantall
 
 ## Qué queda abierto (2026-10-28)
 
-Nada de esto está hecho; el trabajo está en pausa por decisión del usuario. Fuente: [rastreo de Nodes](../rastreo/nodes.md) y [Pendiente](../rastreo/README.md#pendiente-2026-10-28).
+Nada de esto está hecho. Es la lista completa de lo que la tabla deja abierto; será el punto de partida de las pruebas automatizadas. Fuente: [rastreo de Nodes](../rastreo/nodes.md) y [Pendiente](../rastreo/README.md#pendiente-2026-10-28).
 
 - **Pruebas en sandbox** (sin gasto ni datos reales):
   - Imagen equivocada: borrar un resultado ([3.6](../rastreo/nodes.md#3-regresiones-y-contradicciones-con-promesas)) o duplicar un nodo / soltar un cable en el fondo (3.5) deja una conexión apuntando a otro resultado. Reproducción gratuita.
   - Modelo distinto: la estimación usa `params._modelRef` (`executor.ts:87`) y la ejecución de operaciones de imagen lo ignora (`flow/actions.ts:217-228`, `jobs.ts:1074`). Reproducción gratuita.
+  - Ejecución de `edit_region`, `remove_object` y `create_voice` desde un nodo (H12), con proveedor de coste 0 o simulado.
   - `edit_node.model_ref` con un agente real; campos `required` vacíos; recarga durante una ejecución; accesibilidad por teclado; ajustes ocultos hasta el proveedor; coste de `previewRun`.
+- **Lectura pendiente** (sin ejecutar la app): migraciones del formato de guardado de `graph` (solo lectura: zona protegida).
 - **Decisiones del usuario** (sin decisión encontrada en historial ni ADR): guarda para `edit_node` (H1); modelo visible de las operaciones de imagen (H2); confirmar «Delete asset» (H3); aviso al soltar enlaces (H5/H6); marca de desactualizado (H15); si el bloqueo de Undo durante un Run debe permanecer (H10).
 - **Preguntas a proveedor**: qué responde con una instrucción vacía en `edit`, `replace_background`, `video_edit`, `video_extend` (H13); efecto real de los ajustes ocultos copiados (H8).
 - **Comentario obsoleto en `locks.ts:11-13`** («cannot be edited»): cambio de código, para después; `locks.ts:8-10` y `:27` dicen que editar es libre.

@@ -16,7 +16,7 @@ Rastreo de commits y docs para cada área, con el estado de hoy comprobado en el
 
 ## Pendiente (2026-10-28)
 
-En pausa por decisión del usuario: antes quiere automatizar más pruebas o corroborar detalles. Nada de lo siguiente está hecho.
+Nada de lo siguiente está hecho. Siguiente fase decidida por el usuario: terminar de ajustar los documentos y después convertir estos puntos en pruebas automatizadas que busquen fallos reales.
 
 1. **Dos reproducciones de Nodes, gratuitas y aisladas** (pruebas sin gasto ni datos reales), antes de arreglar nada:
    - Imagen equivocada: borrar un resultado ([nodes.md](nodes.md), 3.6) o duplicar un nodo / soltar un cable en el fondo (3.5) deja una conexión apuntando a otro resultado.
