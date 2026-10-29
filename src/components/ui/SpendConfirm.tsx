@@ -16,6 +16,8 @@ export function SpendConfirm({
   onCancel,
   children,
   blocked,
+  sessionId,
+  resolveSessionId,
 }: {
   title: ReactNode;
   lines?: ReactNode[];
@@ -26,12 +28,16 @@ export function SpendConfirm({
   onCancel: () => void;
   children?: ReactNode;
   blocked?: string | null;
+  /** The session the action will check its limit against (a result or asset of another session is not the active one). */
+  sessionId?: string;
+  resolveSessionId?: () => string | undefined;
 }) {
   // Re-render when spending or the limit change.
   useStore((s) => s.spentUsd);
   useStore((s) => s.settings);
   const remaining = remainingBudget();
-  const over = overLimit(estimate);
+  const sid = sessionId ?? useStore.getState().activeSessionId;
+  const over = overLimit(estimate, sid);
   return (
     <div className="spend">
       <div className="spend-head">
@@ -66,7 +72,7 @@ export function SpendConfirm({
             variant="secondary"
             disabled={Boolean(blocked)}
             onClick={() => {
-              dontAskAgain();
+              dontAskAgain(resolveSessionId?.() ?? sid);
               onConfirm();
             }}
             data-tip="Go ahead and stop asking in this session. Change it in Settings → Budget."
@@ -79,7 +85,7 @@ export function SpendConfirm({
           icon={Zap}
           disabled={Boolean(blocked)}
           onClick={() => {
-            void (over ? withOncePass(useStore.getState().activeSessionId, onConfirm) : onConfirm());
+            void (over ? withOncePass(resolveSessionId?.() ?? sid, onConfirm) : onConfirm());
           }}
           autoFocus
         >

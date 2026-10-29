@@ -332,6 +332,7 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
 }
 
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
+  if (index === NO_RESULT) return null;
   const d = node.data;
   if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;

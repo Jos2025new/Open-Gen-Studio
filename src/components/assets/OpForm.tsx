@@ -33,6 +33,8 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
         onConfirm={() => { onClose(); return state.run(); }}
         onCancel={onClose}
         blocked={blocked}
+        sessionId={state.sessionId}
+        resolveSessionId={state.resolveSessionId}
       />
     </div>
   );

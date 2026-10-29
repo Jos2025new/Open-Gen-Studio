@@ -76,6 +76,7 @@ function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
             lines={preview.runIds.map(id => `${id} · ${useStore.getState().sessions[sessionId].graph.nodes.find(n => n.id === id)?.data.title}`)}
             estimate={preview.estimate}
             blocked={preview.errors[0] ?? null}
+            sessionId={sessionId}
             onCancel={pop.close}
             onConfirm={() => {
               if (previewRun(sessionId, ids, false).signature !== preview.signature) return;

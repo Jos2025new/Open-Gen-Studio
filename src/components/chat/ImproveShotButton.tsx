@@ -29,6 +29,7 @@ export function ImproveShotButton({ g }: { g: Generation }) {
           confirmLabel="Mejorar"
           onConfirm={() => { pop.close(); return improveShot(g.id); }}
           onCancel={pop.close}
+          sessionId={g.sessionId}
         />
       </Popover>
     </>

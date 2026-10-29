@@ -2,6 +2,7 @@ import { wrongRef } from './wrongRef';
 import { directModelRef } from './directModel';
 import { assetsInUse } from './flow/locks';
 import { dropResults } from './flow/dropResults';
+import { opSessionId } from './opSession';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
@@ -681,7 +682,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(`${def.label} needs an ${def.input}.`, 'error');
     return [];
   }
-  const sessionId = st.ui.space ? ensureSpaceSession() : asset.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
+  const sessionId = opSessionId(assetId, true);
   const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef, place: place ?? placeFor(st.ui, st.ui.workspace), mode: mode ?? modeFor(st.composer.mode, op) });
   const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId);
   if (problem) {

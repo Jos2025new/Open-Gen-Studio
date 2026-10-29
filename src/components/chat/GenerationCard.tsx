@@ -309,6 +309,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
             return regenerate(g.id);
           }}
           onCancel={regen.close}
+          sessionId={g.sessionId}
         />
       </Popover>
       <Popover open={del.open} anchor={del.ref} onClose={del.close} width={280} label="Delete generation">

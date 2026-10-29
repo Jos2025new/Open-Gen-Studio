@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { getBezierPath, Handle, Position, useInternalNode, useReactFlow, useViewport } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { addConnected } from '../../engine/flow/actions';
-import { resultHandle, runsGeneration } from '../../engine/flow/graph';
+import { GONE_HANDLE, NO_RESULT, resultHandle, runsGeneration } from '../../engine/flow/graph';
 import type { GraphNode, PortType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
@@ -47,14 +47,20 @@ export function ResultPorts({ node, out }: { node: GraphNode; out: PortType }) {
   const used = useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.filter((e) => e.source === node.id && e.outputIndex != null).map((e) => e.outputIndex!).join(',') ?? '');
   const linked = new Set(used ? used.split(',').map(Number) : []);
   const count = Math.max('settings' in d ? d.settings.count ?? 1 : 1, made, ...[...linked].map((i) => i + 1));
-  if (count < 2) return null;
-  return <>{Array.from({ length: count }, (_, i) => (
+  const gone = linked.has(NO_RESULT);
+  if (count < 2 && !gone) return null;
+  return <>{count >= 2 && Array.from({ length: count }, (_, i) => (
     <Handle key={i} id={resultHandle(i)} type="source" position={Position.Right}
       className={`nc-result nodrag port-${out} ${linked.has(i) ? 'is-linked' : ''}`}
       style={{ top: `calc(50% + ${22 + i * 18}px)` }}
       data-tip={`Result ${i + 1}: links from here always use it`}
     >{i + 1}</Handle>
-  ))}</>;
+  ))}{gone && <Handle id={GONE_HANDLE} type="source" position={Position.Right}
+    isConnectable={false} className={`nc-result nodrag port-${out} is-linked`}
+    style={{ top: `calc(50% + ${22 + (count >= 2 ? count : 0) * 18}px)` }}
+    data-tip="The linked result was deleted. Connect the input again."
+    aria-label="Deleted result; reconnect the input"
+  >!</Handle>}</>;
 }
 
 /** Keep the curve while the picker is open. End at its measured position, including Popover's viewport clamping. */

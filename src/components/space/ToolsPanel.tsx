@@ -79,7 +79,7 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
   const generate = () => {
     if (!target) { toast(`Add ${NOUN[def.input]} first.`, 'error'); return; }
     if (state.blocked) { toast(state.blocked, 'error'); return; }
-    if (unknown || overLimit(state.estimate)) pop.toggle();
+    if (unknown || overLimit(state.estimate, state.sessionId)) pop.toggle();
     else state.run();
   };
   return <>
@@ -94,7 +94,7 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
         <Zap size={14} strokeWidth={2} /><span>Generate</span>{target ? <span className="send-cost num">{costLabel(state.estimate, { short: true })}</span> : null}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Confirm cost">
-        <SpendConfirm title={<ViaPick op={op} state={state} />} estimate={state.estimate} confirmLabel="Generate" onConfirm={() => { pop.close(); return state.run(); }} onCancel={pop.close} blocked={state.blocked} />
+        <SpendConfirm title={<ViaPick op={op} state={state} />} estimate={state.estimate} confirmLabel="Generate" onConfirm={() => { pop.close(); return state.run(); }} onCancel={pop.close} blocked={state.blocked} sessionId={state.sessionId} resolveSessionId={state.resolveSessionId} />
       </Popover>
     </footer>
   </>;
