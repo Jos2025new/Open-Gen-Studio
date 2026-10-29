@@ -178,6 +178,7 @@
 - [052-2026-10-W43: un solo toolbox, tarjeta del pincel con pestañas, tarjeta Sizes y tarjeta Edit (2026-10-23)](history/052-2026-10-W43.md).
 - [053-2026-10-W43: Auto con una tarjeta, Studio independiente del tablero, límites del modelo y rechazos del agente (2026-10-24), abierto y frágil](history/053-2026-10-W43.md).
 - [054-2026-10-W44: origen y cierre del toolbox, limpieza de ramas del 2026-10-27 y typecheck en `npm test` (2026-10-27)](history/054-2026-10-W44.md).
+- [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
 - [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
 - [Auditoría OpenRouter contra su doc oficial (2026-10-25)](audits/auditoria-openrouter.md): modelos de vídeo e imagen principales; vídeo sin `input_references` ni passthrough; nada corregido aún.
 - [Verificación de Manus AI de la auditoría OpenRouter, cruzada con el código (2026-10-25)](audits/auditoria-openrouter-manus.md): 10 puntos de código comprobados; nada corregido aún.
