@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
-import { aspectLabel, durationChoices, durationLabel, lyricsParam, paramByRole, pixelSizes, ratioOf, maxCountPerRequest, STRUCTURED_TYPES } from '../../engine/params';
+import { aspectLabel, durationChoices, durationLabel, lyricsParam, paramByRole, pixelSizes, maxCountPerRequest, STRUCTURED_TYPES } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
 import type { ProviderId } from '../../engine/types';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
@@ -15,14 +15,8 @@ import { Button, Chip, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { StyleField, setExtra } from './StyleFields';
 import { ModelList, priceHint } from './ModelList';
 import { CaptureChip } from './CaptureChip';
-
-export function AspectGlyph({ value, size = 14 }: { value: string; size?: number }) {
-  const r = ratioOf(value);
-  if (r == null) return <span className="aspect-glyph is-auto" />;
-  const w = r >= 1 ? size : Math.max(5, size * r);
-  const h = r >= 1 ? Math.max(5, size / r) : size;
-  return <span className="aspect-glyph" style={{ width: w, height: h }} />;
-}
+import { AspectChoices, AspectGlyph } from './AspectChoices';
+export { AspectGlyph } from './AspectChoices';
 
 export function ModelChip({ kind, fitSpace = false }: { kind: MediaKind; fitSpace?: boolean }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
@@ -98,17 +92,7 @@ function FormatChip({ kind, inline = false }: { kind: MediaKind; inline?: boolea
   const format = <div className={`fmt-pop ${inline ? 'space-format' : ''}`}>
           {px ? (
             <>
-              <section className="fmt-sect">
-                <div className="fmt-label">Aspect ratio</div>
-                <div className="fmt-row fmt-aspects">
-                  {px.ratios.map((r) => (
-                    <FmtOption key={r} active={r === pxNow?.ratio} onClick={() => set({ aspect: px.pick(pxNow?.tier, r) })}>
-                      <AspectGlyph value={r} />
-                      <span>{r}</span>
-                    </FmtOption>
-                  ))}
-                </div>
-              </section>
+              <AspectChoices key={ref} values={px.ratios} selected={pxNow?.ratio} onSelect={(r) => set({ aspect: px.pick(pxNow?.tier, r) })} label="Aspect ratio" compact={inline} />
               {px.tiers.length > 1 ? (
                 <section className="fmt-sect">
                   <div className="fmt-label">Resolution</div>
@@ -123,20 +107,7 @@ function FormatChip({ kind, inline = false }: { kind: MediaKind; inline?: boolea
               ) : null}
             </>
           ) : aspect?.options?.length ? (
-            <section className="fmt-sect">
-              <div className="fmt-label">{aspect.label || 'Aspect ratio'}</div>
-              <div className="fmt-row fmt-aspects">
-                {aspect.options.map((o) => {
-                  const v = String(o);
-                  return (
-                    <FmtOption key={v} active={v === settings.aspect} onClick={() => set({ aspect: v })}>
-                      <AspectGlyph value={v} />
-                      <span>{aspectLabel(v)}</span>
-                    </FmtOption>
-                  );
-                })}
-              </div>
-            </section>
+            <AspectChoices key={ref} values={aspect.options.map(String)} selected={settings.aspect} onSelect={(v) => set({ aspect: v })} label={aspect.label || 'Aspect ratio'} compact={inline} />
           ) : null}
           {resolution?.options?.length ? (
             <section className="fmt-sect">

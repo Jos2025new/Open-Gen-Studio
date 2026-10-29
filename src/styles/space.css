@@ -29,8 +29,11 @@
 .space-model-popover .ml-group-head { padding: 7px 8px 4px; }
 .space-model-popover .ml-main .ml-name { font-size: var(--fs-s); }
 .space-controls > .space-format { gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg-canvas); }
-.space-format .fmt-aspects .fmt-opt { min-width: 48px; min-height: 46px; }
 .space-format .fmt-opt { flex-basis: auto; }
+.space-format .fmt-aspects .fmt-opt { flex: 1 1 48px; min-width: 48px; min-height: 46px; }
+.space-format .space-aspect-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.space-format .space-aspect-more { color: var(--text-2); font-size: var(--fs-xs); padding: 2px 4px; }
+.space-format .space-aspect-more:hover { color: var(--text); }
 .space-slot-empty { min-height: 68px; }
 .space-panel-foot { padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); background: var(--surface); }
 .space-panel-foot .send-btn { width: 100%; height: 44px; justify-content: center; border-radius: var(--r-m); font-size: var(--fs-l); }
