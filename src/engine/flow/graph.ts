@@ -128,6 +128,13 @@ export function connectionError(
 
 /** A node with several results has one output port per result (`out-2` = the second), like Houdini/Nuke outputs. */
 export const resultHandle = (index: number) => `out-${index + 1}`;
+/**
+ * A link whose image was deleted: it keeps `outputIndex: NO_RESULT`, an index no result can ever have, so it delivers
+ * nothing (the input shows «no output») until the user connects it again. Never a position past the last result: when the
+ * node regenerates, that position would become valid and the link would silently deliver another image.
+ */
+export const NO_RESULT = -1;
+export const GONE_HANDLE = 'out-gone';
 /** The result a source port names, or undefined for `out` (the node's chosen result). */
 export function handleIndex(handle: string | null | undefined): number | undefined {
   const m = handle ? /^out-(\d+)$/.exec(handle) : null;
@@ -140,8 +147,9 @@ export function connect(graph: Graph, c: { source: string; target: string; targe
   const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
   let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === c.targetHandle));
   if (port && !port.multi) edges = edges.filter((e) => !(e.target === c.target && e.targetHandle === c.targetHandle));
-  const outputIndex = handleIndex(c.sourceHandle);
-  edges.push({ id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) });
+  // A copy of a link that lost its image stays without one (it must not fall back to the node's chosen result).
+  const outputIndex = c.sourceHandle === GONE_HANDLE ? NO_RESULT : handleIndex(c.sourceHandle);
+  edges.push({ id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) });
   return { ...graph, edges };
 }
 

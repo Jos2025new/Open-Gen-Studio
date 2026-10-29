@@ -90,4 +90,32 @@ describe('repro 1: a link keeps its image (nodes.md 3.5 / 3.6)', () => {
     const [pasted] = pasteNodes(sid);
     expect(refsOf(pasted)).toEqual(['asset:a3']);
   });
+
+  // Audit 2026-10-29: deleting the image a link was fixed on left outputIndex past the last result; once the node held
+  // enough results again that index was valid and the link silently delivered a NEW image.
+  it('a link whose image was deleted does not deliver a new image when the node regenerates', () => {
+    deleteAssets(['a3']);
+    expect(refsOf(smile)).toEqual([]);
+    useStore.setState((st) => ({
+      assets: { ...st.assets, ...Object.fromEntries(['b1', 'b2', 'b3'].map((a) => [a, asset(a)])) } as never,
+      generations: { g1: { ...st.generations.g1, assetIds: ['b1', 'b2', 'b3'] } },
+    }));
+    expect(refsOf(smile)).toEqual([]);
+  });
+
+  it('the input thumbnail of that link shows no output, before and after regeneration', async () => {
+    const { nodeOutputAsset } = await import('../src/engine/flow/graph');
+    const edge = () => graph().edges.find((e) => e.target === smile)!;
+    const src = () => graph().nodes.find((n) => n.id === face)!;
+    deleteAssets(['a3']);
+    expect(nodeOutputAsset(src() as never, useStore.getState().generations, edge().outputIndex)).toBeNull();
+    useStore.setState((st) => ({ generations: { g1: { ...st.generations.g1, assetIds: ['b1', 'b2', 'b3'] } } }));
+    expect(nodeOutputAsset(src() as never, useStore.getState().generations, edge().outputIndex)).toBeNull();
+  });
+
+  it('a duplicated node keeps the no-output state of a link whose image was deleted', () => {
+    deleteAssets(['a3']);
+    const copy = duplicateNode(sid, graph().nodes.find((n) => n.id === smile)!);
+    expect(refsOf(copy)).toEqual([]);
+  });
 });

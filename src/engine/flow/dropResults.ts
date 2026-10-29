@@ -1,10 +1,10 @@
 import type { Generation, Session } from '../types';
-import { resultHandle } from './graph';
+import { GONE_HANDLE, NO_RESULT, resultHandle } from './graph';
 
 /**
  * Remove deleted assets from their generations AND move every Nodes index that points into them, so each node pick and
  * each fixed link keeps delivering the same image. A pick whose image is gone falls back to the nearest result; a link
- * whose image is gone is left past the last result (no output) instead of jumping to another image.
+ * whose image is gone is marked NO_RESULT (no output, for good) instead of jumping to another image, now or after a regeneration.
  */
 export function dropResults<S extends { generations: Record<string, Generation>; sessions: Record<string, Session> }>(st: S, gone: Set<string>): { generations: Record<string, Generation>; sessions: Record<string, Session> } {
   const generations = { ...st.generations };
@@ -36,12 +36,12 @@ export function dropResults<S extends { generations: Record<string, Generation>;
     });
     const edges = graph.edges.map((e) => {
       const m = gen.has(e.source) ? moved.get(gen.get(e.source)!) : undefined;
-      if (!m || e.outputIndex == null) return e;
+      if (!m || e.outputIndex == null || e.outputIndex === NO_RESULT) return e;
       const to = m.to[e.outputIndex];
-      const next = to == null ? e.outputIndex : to >= 0 ? to : m.len;
+      const next = to == null ? e.outputIndex : to >= 0 ? to : NO_RESULT;
       if (next === e.outputIndex) return e;
       changed = true;
-      return { ...e, outputIndex: next, sourceHandle: resultHandle(next) };
+      return { ...e, outputIndex: next, sourceHandle: next === NO_RESULT ? GONE_HANDLE : resultHandle(next) };
     });
     if (changed) sessions[sid] = { ...s, graph: { ...graph, nodes, edges } };
   }
