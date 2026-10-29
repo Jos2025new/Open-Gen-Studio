@@ -93,13 +93,13 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         {home && hasSession && <BackToWorkspace workspace={workspace} title={title} />}
         {!home && <>
         <button type="button" className="topbar-home" aria-label="Home" title="Home" onClick={openHome}><HomeIcon size={16} /></button>
-        <button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
+        {workspace !== 'chat' && <><button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
             {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
           </button>
           <Popover open={workspacePop.open} anchor={workspacePop.ref} onClose={workspacePop.close} placement="bottom-start" width={240} label="Canvases">
             <div className="menu" role="menu"><WorkspaceMenuItems workspace={workspace} onClose={workspacePop.close} /></div>
           </Popover>
-          <span className="topbar-sep">/</span>
+          <span className="topbar-sep">/</span></>}
           {editing ? (
             <input
               ref={inputRef}

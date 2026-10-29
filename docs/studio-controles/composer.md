@@ -8,6 +8,8 @@ related: [chat-estudio, tablero, tarjeta-plan, dependencias, hallazgos]
 ---
 # Compositor en Studio
 
+En Chat con Agent, el prompt empieza en una sola línea con «+» y enviar/parar dentro y crece al escribir; debajo están el selector de espacio, el tablero, el modo del agente y Models. En los modos de creación directa se conserva la disposición de sus ajustes. En Nodes y Designer el selector de espacio permanece en la barra superior.
+
 `Composer` (`Composer.tsx:237`) se monta debajo del área de trabajo para todos los espacios (`App.tsx:76`) y recibe el espacio como `dock-chat` en Studio (`Composer.tsx:442`). En Studio no dibuja `ThreadPeek` (solo `workspace !== 'chat'`, `Composer.tsx:443`) ni la paleta de herramientas del Designer (`toolsDock`, `Composer.tsx:437`, solo en `designer`). El texto del compositor es `composer.text`; el modo, `composer.mode` (`agent`, `image`, `video`, `audio`, `model3d`; `ModeMenu.tsx:7-13`). El estilo del agente por defecto es `auto` (`store.ts:263`).
 
 Columnas: Control | Dónde (archivo:línea) | Cuándo | De qué depende | Qué modifica | Influye en | Notas.

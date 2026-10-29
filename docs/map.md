@@ -24,7 +24,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [store.ts](../src/store/store.ts) | 184 | 198 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 77 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 3 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 49 | 3 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
 | [catalog.ts](../src/engine/catalog.ts) | 44 | 22 |
 | [ops.ts](../src/engine/ops.ts) | 41 | 16 |
@@ -48,7 +48,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src` | 2 | 0 |
 | `src/components/assets` | 16 | 5 |
 | `src/components/chat` | 22 | 18 |
-| `src/components/composer` | 11 | 10 |
+| `src/components/composer` | 12 | 10 |
 | `src/components/designer` | 54 | 24 |
 | `src/components/gallery` | 1 | 2 |
 | `src/components/node` | 8 | 7 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 32 | 275 |
 | `src/store` | 13 | 200 |
 
-169 de 485 módulos no tienen ningún test que los importe directamente.
+170 de 486 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

@@ -110,24 +110,22 @@ export function AgentOptions({ activeOnly = false, onPicked }: { activeOnly?: bo
   </>;
 }
 
-export function AgentControls() {
+export function AgentMode() {
   const style = useStore((s) => s.composer.agentStyle);
+  return <select className="ml-filter agent-mode" aria-label="Agent mode" value={style}
+    title={AGENT_MODES.find((m) => m.value === style)?.tip}
+    onChange={(e) => setComposer({ agentStyle: e.target.value as AgentStyle })}>
+    {AGENT_MODES.map((m) => <option key={m.value} value={m.value} title={m.tip}>{m.label}</option>)}
+  </select>;
+}
+
+export function AgentControls({ showMode = true }: { showMode?: boolean }) {
   const workflowId = useStore((s) => s.composer.workflowId);
   const workspace = useStore((s) => s.ui.workspace);
   const wf = workflowById(workflowId);
   return (
     <>
-      <select
-        className="ml-filter agent-mode"
-        aria-label="Agent mode"
-        value={style}
-        title={AGENT_MODES.find((m) => m.value === style)?.tip}
-        onChange={(e) => setComposer({ agentStyle: e.target.value as AgentStyle })}
-      >
-        {AGENT_MODES.map((m) => (
-          <option key={m.value} value={m.value} title={m.tip}>{m.label}</option>
-        ))}
-      </select>
+      {showMode ? <AgentMode /> : null}
       <AgentOptions activeOnly />
       {wf && !wf.workspaces.includes(workspace) ? (
         <Chip icon={X} muted onClick={() => setComposer({ workflowId: null })} data-tip="This workflow does not apply here; it will be ignored">

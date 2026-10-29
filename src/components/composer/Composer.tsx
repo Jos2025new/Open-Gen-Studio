@@ -2,9 +2,9 @@ import { ComposerAlerts } from './ComposerAlerts';
 import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
 import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowUp, CircleStop, Layers, Pencil, X, Zap } from 'lucide-react';
+import { Layers, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
-import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
+import { sendAgentMessage } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';
 import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
@@ -16,13 +16,15 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip, costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { AgentControls } from './AgentControls';
+import { AgentControls, AgentMode } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
 import { StudioReopen } from '../studio/StudioReopen';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
 import { ToolDock } from '../designer/ToolDock';
+import { ComposerWorkspaceMenu } from '../shell/WorkspaceMenu';
+import { AgentSend } from './AgentSend';
 
 export function AttachStrip({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
@@ -437,6 +439,7 @@ export function Composer() {
   const toolsDock = workspace === 'designer' && dockPref === 'tools';
   const optionsLabel = takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files';
   const optionsDisabled = !takesImages && !takesAudio && mode !== 'model3d';
+  const compactChat = workspace === 'chat' && mode === 'agent';
 
   return (
     <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
@@ -483,7 +486,8 @@ export function Composer() {
           <div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} /></div>
         </div> : <>
         <AttachStrip ids={liveAttachments} />
-        <div className="composer-prompt-row">
+        <div className={`composer-prompt-row ${compactChat ? 'is-compact-chat' : ''}`}>
+          {compactChat ? <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent onAdd={() => fileRef.current?.click()} /> : null}
           <textarea
             ref={taRef}
             className="composer-input"
@@ -511,14 +515,15 @@ export function Composer() {
             aria-label="Prompt"
           />
           {mentions.menu}
+          {compactChat ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : null}
         </div>
         <div className="composer-bar">
-          <ComposerOptions
+          {!compactChat && <ComposerOptions
             label={optionsLabel}
             disabled={optionsDisabled}
             agent={mode === 'agent'}
             onAdd={() => fileRef.current?.click()}
-          />
+          />}
           {editing ? (
             <span className="editing-chip" data-tip={editingPrompt}>
               <Pencil size={12} />
@@ -529,29 +534,23 @@ export function Composer() {
             </span>
           ) : null}
           <div className="composer-controls">
-            {mode === 'agent' ? <AgentControls /> : <MediaControls kind={mode} />}
+            {mode === 'agent' ? <AgentControls showMode={!compactChat} /> : <MediaControls kind={mode} />}
             {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
           </div>
           <div className="composer-end">
-            {workspace === 'chat' ? <StudioReopen /> : null}
-            {mode === 'agent' ? <AgentModelControls /> : null}
-            {mode === 'agent' ? (
-              busy ? (
-                <button type="button" className="send-btn is-stop" onClick={() => stopAgent()} aria-label="Stop" data-tip="Stop the agent">
-                  <CircleStop size={16} />
-                </button>
-              ) : (
-                <button type="button" className="send-btn is-agent" disabled={!canSendAgent} onClick={submit} aria-label="Send" data-tip="Send (Enter)">
-                  <ArrowUp size={16} strokeWidth={2.2} />
-                </button>
-              )
-            ) : (
+            {workspace === 'chat' && !compactChat ? <StudioReopen /> : null}
+            {mode === 'agent' && !compactChat ? <AgentModelControls /> : null}
+            {mode === 'agent' && !compactChat ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : mode !== 'agent' ? (
               <SendDirect kind={mode} />
-            )}
+            ) : null}
           </div>
         </div>
         </>}
       </div>
+      {workspace === 'chat' ? <div className="composer-footer">
+        <ComposerWorkspaceMenu />
+        {compactChat ? <div className="composer-footer-end"><StudioReopen /><AgentMode /><AgentModelControls /></div> : null}
+      </div> : null}
     </div>
   );
 }

@@ -45,14 +45,17 @@ describe('top bar on Home', () => {
     act(() => (host.querySelector('.topbar-pill') as HTMLButtonElement).click());
     expect(host.querySelector('.topbar-pill')?.getAttribute('aria-expanded')).toBe('true');
   });
-  it('outside Home the breadcrumb, Generations and the plain Connected button are unchanged', () => {
+  it('outside Home the session, Generations and the plain Connected button remain available', () => {
+    setUi({ workspace: 'chat' });
     const host = mount(false);
-    expect(host.querySelector('.ws-tag')).not.toBeNull();
+    expect(host.querySelector('.ws-tag')).toBeNull();
+    expect(host.querySelector('[aria-label="Switch session"]')).not.toBeNull();
     expect(host.textContent).toContain('Generations');
     expect(host.querySelector('.topbar-pill')).toBeNull();
     expect(host.querySelector('.topbar-menu')?.textContent).toContain('Connected');
   });
   it('outside Home a Home button sits before the breadcrumb and opens Home', () => {
+    setUi({ workspace: 'designer' });
     const host = mount(false);
     const btn = host.querySelector('.topbar-home') as HTMLButtonElement;
     expect(btn.getAttribute('aria-label')).toBe('Home');
