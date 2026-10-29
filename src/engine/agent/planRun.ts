@@ -364,7 +364,7 @@ function approvedSteps(item: PlanFeedItem): { chosen: PlanStep[]; off: Set<strin
 }
 
 /** Failed plan recovery options and the remaining retry price. */
-export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: PlanStep[]; estimate: Estimate } | null {
+export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: PlanStep[]; estimate: Estimate; rest: Estimate } | null {
   if ((item.status !== 'error' && item.status !== 'partial') || item.plan.workspace === 'node') return null;
   const gens = get().generations;
   const { chosen } = approvedSteps(item);
@@ -375,7 +375,8 @@ export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: 
     return item.stepStates[st.id] === 'error' && g && canRecheck(g);
   }).map((st) => st.id);
   const price = estimateSteps(retry);
-  return { checkable, retry, estimate: planRetryEstimate(retry, price.perStep, item, gens) };
+  // `rest`: what a check can spend (steps that run for the first time); asking about a submitted job costs nothing.
+  return { checkable, retry, estimate: planRetryEstimate(retry, price.perStep, item, gens), rest: planRetryEstimate(retry.filter((st) => !checkable.includes(st.id)), price.perStep, item, gens) };
 }
 
 /** Why a recovery cannot start, in words for the user or the agent; null when it can. */
@@ -385,8 +386,8 @@ export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode):
   if (mode === 'check' && !r.checkable.length) {
     return 'No failed step has a submitted job to check: the provider gave no job id (NanoGPT returns images in the same request, so a dropped connection leaves nothing to ask for). Retry runs them again.';
   }
-  if (overLimit(r.estimate)) return overLimitText(r.estimate);
-  return null;
+  const cost = mode === 'check' ? r.rest : r.estimate;
+  return overLimit(cost) ? overLimitText(cost) : null;
 }
 
 /**

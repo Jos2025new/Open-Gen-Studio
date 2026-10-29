@@ -22,13 +22,13 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 | H6 | P2 | «Ajustar prompt» llama al LLM del agente y suma gasto sin mostrar su precio antes | `planSettings.ts rewritePrompts` | Crítico |
 | H7 | P3 | El texto «nothing is spent» de Suggest/Edit es cierto para generación, pero con un agente LLM cada revisión es un turno que cuesta (motor local: sin confirmar) | `PlanCard.tsx` (edición), `llmTurn.ts` | Crítico, aviso falso por omisión |
 | H8 | P2 | Cancel en ejecución llama `stopPlanRun` y `cancelGeneration` sin aviso; un trabajo remoto puede seguir cobrando, mientras «Dejar de seguir» sí avisa | `PlanCard.tsx:189` | Sin confirmar el cargo del proveedor |
-| H9 | Fricción | Con el límite superado, «Check status» solo muestra un toast con el texto del límite y no hay forma de continuar | `RecoveryActions.tsx:23-30`; `planRun.ts:388` | Crítico, callejón sin salida |
+| H9 | Fricción | Corregido 2026-10-29: Check status no depende del límite (preguntar por un trabajo ya enviado no cuesta); solo cuentan los pasos que se ejecutan por primera vez y entonces el botón dice «Check anyway». Antes, con el límite superado solo mostraba un toast | `RecoveryActions.tsx:23-30`; `planRun.ts:388` | Crítico, callejón sin salida |
 
 ## Entregables equivocados o pérdida de entrada
 
 | N.º | Hallazgo | Evidencia |
 | --- | --- | --- |
-| H10 | Escribir en el Composer con una tarjeta de preguntas abierta envía solo `{note}` y descarta las selecciones en pantalla, incluidos los valores recomendados | `conversation.ts:51-54` |
+| H10 | Escribir en el Composer con una tarjeta de preguntas abierta envía solo `{note}` y descarta las selecciones en pantalla, incluidos los valores recomendados (corregido 2026-10-29 para los recomendados; una opción pulsada y no enviada sigue sin cubrir) | `conversation.ts:51-54` |
 | H11 | Escribir con una tarjeta de ajustes abierta la cierra como «skipped» sin confirmar | `conversation.ts` |
 | H12 | «Open in Node» y «Open in Designer» del plan salen de Studio aunque el tablero ya tiene esas vistas | `PlanCard.tsx:362` |
 | H13 | «Otra cosa…» existe en la tarjeta de ajustes pero no en el interruptor de borrador del plan | `tarjeta-ajustes.md`, `tarjeta-plan.md` |
@@ -63,8 +63,8 @@ Estados: «respondido por lectura» (leído en el código; no es arreglado ni pr
 | H6 | Respondido por lectura; requiere decisión | Confirmado; el gasto sí llega a Spending (`planSettings.ts:188`), solo falta el precio previo | R10, 4.2 |
 | H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
 | H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |
-| H9 | Respondido por lectura; requiere prueba y decisión | `mode === 'check'` cae en `planRun.ts:388`; solo `retry` acepta el límite (`RecoveryActions.tsx:24`) | R12, 4.2 |
-| H10 | Respondido por lectura; requiere prueba | Confirmado (`conversation.ts:51-54`); A28 arregló la respuesta al LLM, no la selección en pantalla | R13, 4.2 |
+| H9 | Respondido por lectura; requiere prueba y decisión | Corregido: `planRecoveryProblem` usa `rest` (pasos nuevos) para `check` | R12, 4.2 |
+| H10 | Respondido por lectura; requiere prueba | Corregido 2026-10-29 para los valores recomendados (`conversation.ts` envía los valores que la tarjeta mostraba); la opción pulsada y no enviada vive en `QuestionsCard.tsx` y sigue sin cubrir | R13, 4.2 |
 | H11 | Respondido por lectura; requiere prueba | Confirmado: la tarjeta pasa a `skipped` al escribir | R13, 4.2 |
 | H12, H13, H15, H16, H17 | Requiere decisión | La historia no los menciona; siguen abiertos y sin evaluar por el rastreo | 4.2 |
 | H14 | Respondido por lectura | Retirado en Auto con `cd15ef0` (2026-10-24); el código quedó. Deuda | R14, 4.2 |

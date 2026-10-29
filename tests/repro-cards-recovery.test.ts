@@ -32,8 +32,8 @@ beforeEach(() => {
 
 describe('repro 4 / H9: Check status with the limit used up', () => {
   // Cause: RecoveryActions.tsx:23-30 only accepts the limit for 'retry'; planRun.ts:388 blocks 'check' with a toast, so the card has no way forward.
-  // DECISION NEEDED: whether Check status itself should be gated by the limit is not decided; the test asserts only "not a dead end".
-  it.fails('pressing Check status either starts it or offers a way to continue', () => {
+  // Decided 2026-10-29: asking about a submitted job costs nothing, so Check status ignores the limit; only steps that run for the first time count (button reads "Check anyway").
+  it('pressing Check status either starts it or offers a way to continue', () => {
     const host = document.createElement('div');
     document.body.replaceChildren(host);
     const root = createRoot(host);

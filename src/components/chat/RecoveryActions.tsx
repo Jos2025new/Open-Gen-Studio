@@ -21,7 +21,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
   const r = planRecovery(item);
   if (!r) return null;
   const run = (mode: PlanRecoveryMode) => {
-    if (mode === 'retry' && overLimit(r.estimate)) acceptOverLimit();
+    if (overLimit(mode === 'retry' ? r.estimate : r.rest)) acceptOverLimit();
     const problem = planRecoveryProblem(item, mode);
     if (problem) {
       toast(problem, 'info');
@@ -33,8 +33,8 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
   return (
     <div className="recover-chips">
       {r.checkable.length ? (
-        <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => run('check')} data-tip="Ask the provider again about the jobs it received; the steps waiting for them run next">
-          Check status
+        <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => run('check')} data-tip={overLimit(r.rest) ? overLimitText(r.rest) : 'Ask the provider again about the jobs it received; the steps waiting for them run next'}>
+          {overLimit(r.rest) ? 'Check anyway' : 'Check status'}
         </Button>
       ) : null}
       <Button size="sm" variant="secondary" icon={RotateCw} onClick={() => run('retry')} data-tip={over ? overLimitText(r.estimate) : r.checkable.length ? 'Runs the failed steps again (charged again)' : NO_JOB_TIP}>
