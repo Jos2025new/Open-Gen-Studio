@@ -149,3 +149,33 @@ Estados: **respondido por lectura**, **requiere prueba**, **requiere decisión**
 | S8 | Controles que dependen de otro (Texture strength, Second, Influence, Speed influence, Vanishing points) aparecen/desaparecen sin pista. | `BrushSettings.tsx:122,141`, `ToolSettings.tsx:242,265` | requiere prueba (P4) |
 | S9 | Zoom sin atajos; FX se edita con doble clic; Ctrl+E y Ctrl+Y fuera de la lista de atajos. | `designerKeys.ts:51`, `shortcuts.ts:49`, `LayersPanel.tsx:208` | respondido por lectura; requiere decisión (P8) |
 | S10 | Edit con forma elegida: la tira sustituye a los ajustes de Edit y Object/Layer y Auto-select quedan solo en Tool. | `ContextStrip.tsx:107`, `EditCard.tsx:35` | respondido por lectura; requiere prueba (P5) |
+
+## Visto en sandbox (pendiente)
+
+**Pendiente: no se pudo ejecutar (2026-10-29).** El puerto 5183 ya estaba ocupado por un proceso ajeno (node, pid 7466, escuchando en 127.0.0.1:5183) y no se lanzó otro sandbox ni se mató ese proceso. No hay capturas. Hasta que el puerto quede libre o se confirme que ese proceso es el sandbox del usuario, todos los casos P1-P8 y S1, S3, S5, S6, S10 siguen en «requiere prueba». Las capturas irán a `.sandbox/capturas/<caso>.png` (ignorado por git), un nombre por caso (p1, p2, ..., s3, s5, s6, s10).
+
+Prioridad indicada por el usuario: S3 (rangos de peso 100-900 frente a 300-900, tamaño 1-500 frente a 4-1000, Line/Spacing sin edición en texto existente) parece grave; los nombres de la ayuda que no coinciden (S5), importante; S6 (Join, Cap, Dashes, Stroke behind fill ausentes de la tira), clave, porque el subtoolbox debía evitarlo; todo debe quedar accesible y agrupado como lo esperaría una persona.
+
+## Investigaciones previas
+
+Fechas del documento o de su commit. «Usuario» = lo dice el documento como decisión o aprobación suya; «agente» = propuesta sin aprobación localizada.
+
+| Ruta | Fecha | Qué decide o recomienda | Origen |
+| --- | --- | --- | --- |
+| [propuesta-gui-pintura.md](../propuesta-gui-pintura.md) | 2026-10-10 | Paleta agrupada por familias, barra de estado que enseña la herramienta y sus modificadores; superada el mismo día por plan-designer-ux. Cita del usuario: todo accesible, lo no descubierto se aprende al usar (SketchUp, ibisPaint, Feather 3D) | principios del usuario; el resto, agente |
+| [plan-designer-ux.md](../plan-designer-ux.md) | 2026-10-10 | Paso 1: franja contextual con los controles esenciales y destino visible; paso 4: herramientas por familia, Relleno y degradado en un grupo, Regla y cuentagotas visibles. Principio: lugares estables, contenido contextual, acceso reconocible | el usuario aprobó el plan; el reparto concreto, agente |
+| [propuesta-toolbox-dock.md](../propuesta-toolbox-dock.md) | 2026-10-23 | Barra contextual única que sustituye a ContextStrip; texto o forma seleccionada mantienen lo de `ContextStrip.tsx:72-80`; ▲ abre el panel completo con `ToolSettings` (extender a formas y texto). Descarta el contador n/m (usuario). Sin implementar | simpleza del usuario; diseño, agente |
+| [plan-toolbox-dock.md](../plan-toolbox-dock.md) | 2026-10-23 | Drawing: familia **Color** = Fill, Gradient, Magic wand, Lasso, Rect; Design: familia Shapes con las 9 formas; Pen y Layout. Referencias Photoshop, Illustrator, Affinity, SAI 2, Krita. Aprobado por el usuario: dock real, variantes y selector de modo; pidió no hacer pasadas 2/3 ni rediseños | usuario (dock, variantes, modo); agrupación por familias, agente |
+| [mockups/designer-ajustes/](../mockups/designer-ajustes/index.html) | 2026-10-28 | Maquetas A1-G (orden del pincel, selección, guías, alinear, gradiente «End», navegador, variantes); no dibujan texto ni los controles de forma de S6 | agente; propuesta abierta |
+| [designer-controles/huecos.md](huecos.md) y [README.md](README.md) | 2026-10-28 | Qué pierden las maquetas y decisiones abiertas | agente |
+| [rastreo/designer.md](../rastreo/designer.md) | 2026-10-28 | Estado de cada hallazgo (3.7 pesos de texto, 2.6 tira muerta) | agente |
+| `git log` b258f6e, 1c2b24f, f11a0dd, d057856 | 2026-10-23 | b258f6e: las formas viven en la fila Edit, sin familia Shapes; 1c2b24f: una caja de herramientas para ambos modos «en el orden de la maqueta»; f11a0dd: ContextStrip se queda porque «aún tiene los controles de forma/texto/nodos que el dock no tiene» | commits del agente en la rama de implementación |
+
+Sobre los cuatro asuntos, lo localizado:
+
+- **Select/Lasso/Wand/Fill/Gradient/Eyedropper en Brush** (`toolboxModel.ts:28`): el plan proponía una familia **Color** (Fill, Gradient, Wand, Lasso, Rect) separada de Brush; el código final los reúne en Brush. No encontré decisión del usuario sobre ese reparto; solo aprobó el dock y las variantes. Estado: requiere decisión.
+- **Texto, herramienta frente a Properties**: propuesta-toolbox-dock.md quiere extender el panel completo al texto y conservar la rama de texto de la tira; la tira de texto no se monta hoy (S2). No hay decisión sobre los rangos 100-900 / 300-900 ni sobre Line/Spacing. Estado: requiere decisión.
+- **Join, Cap, Dashes, Stroke behind fill**: ninguna investigación los trata; f11a0dd dice que la tira conserva los controles de forma, pero no los cuatro. Estado: requiere decisión.
+- **Formas sin botón propio**: b258f6e las puso en la fila Edit; plan-toolbox-dock.md proponía Shapes con las 9 formas. No hay decisión sobre Sector/Arc/Chord/Star/Arrow. Estado: requiere decisión.
+
+No hay informes de subagentes anteriores sobre este tema en `/tmp/claude-1000/*/` (solo copias de maquetas y scripts de otras sesiones). No se hallaron documentos de quant-ux ni pencil sobre la disposición; los de Krita, SAI, Photoshop, Illustrator y Affinity están citados en plan-toolbox-dock.md.
