@@ -40,7 +40,7 @@ La barra y Settings son compartidas con los otros lienzos. Aquí solo lo que cam
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
-| Spending limit On/Off | `SettingsPanel.tsx:460-463` | Siempre | `budgetOn` (defecto encendido) | `settings.budgetOn` | `overLimit` en `budget.ts` | El tooltip dice «a run that goes over it asks first»; ver hallazgo de precios desconocidos Rastreo ([R7](../rastreo/studio-2.md)): respondido por lectura, el tooltip afirma algo que `overLimit` no cumple con precios desconocidos (`budget.ts:24-27`); requiere decisión, no está corregido. |
+| Spending limit On/Off | `SettingsPanel.tsx:460-463` | Siempre | `budgetOn` (defecto encendido) | `settings.budgetOn` | `overLimit` en `budget.ts` | El tooltip dice «a run that goes over it asks first»; ver hallazgo de precios desconocidos Rastreo ([R7](../rastreo/studio-2.md)): respondido por lectura, el tooltip afirma algo que `overLimit` no cumple con precios desconocidos (`budget.ts:25-27`); requiere decisión, no está corregido. |
 | Limit (USD) | `SettingsPanel.tsx:475` | Límite encendido | `budgetUsd` (defecto 25) | Redondea a centavos al salir del campo | `overLimit`, `SpendConfirm`, aprobar plan | Un valor inválido restaura el anterior |
 | Price margin 5/25/50/Off | `SettingsPanel.tsx:491-494` | Siempre | `priceMargin()` | `settings.priceMargin` | Revisión de pasos en [tarjeta-plan](tarjeta-plan.md) | Off: corre y la tarjeta muestra la diferencia |
 | Spent | `SettingsPanel.tsx:502` | Siempre | `spentUsd` | Solo lectura | Comparación con el límite | Incluye llamadas del agente (nota al pie) |

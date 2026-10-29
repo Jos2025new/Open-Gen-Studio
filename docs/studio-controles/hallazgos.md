@@ -55,18 +55,18 @@ Estados: «respondido por lectura» (leído en el código; no es arreglado ni pr
 
 | N.º | Estado | Qué dice la lectura | Fila |
 | --- | --- | --- | --- |
-| H1 | Respondido parcialmente; requiere decisión | Por crédito el cambio fue deliberado (`4cf18aa`, ADR 0025 C). Por capacidad (`providerFit.ts:41-55`, `6d97221`): sin decisión encontrada (no encontrarla no prueba que nunca se autorizara); `ec679f7` cita «sugerir otro modelo», que no es cambiar solo; no compara precio y puede subirlo; un proveedor nombrado antes no se protege (`:43`) | R1, 4.2 |
+| H1 | Respondido parcialmente; requiere decisión | Por crédito de generación el cambio fue deliberado (`4cf18aa`, ADR 0025 C); para el agente, sin confirmar. Por capacidad (`providerFit.ts:41-55`, `6d97221`): sin decisión encontrada (no encontrarla no prueba que nunca se autorizara); `ec679f7` cita «sugerir otro modelo», que no es cambiar solo; no compara precio y puede subirlo; un proveedor nombrado antes no se protege (`:43`) | R1, 4.2 |
 | H2 | Respondido parcialmente; requiere decisión | `515dceb` evitó solo el recuerdo de sesión; `userPicked[kind]=true` sigue (`catalog.ts:235`) y luego cuenta como elección (`llmTurn.ts:281`) | R6, 4.2 |
 | H3 | Respondido por lectura; requiere decisión | Confirmado: `credit.ts:211` fija `modelPinned` sin el usuario; el aviso es veraz | R2, 4.2 |
 | H4 | Respondido por lectura; requiere decisión | Diseño avisado (`budget.ts:34`); deja sin tope hasta Reset. Que sea intencional no consta | R8, 4.2 |
-| H5 | Respondido por lectura; requiere decisión | Confirmado: precios desconocidos no cuentan (`budget.ts:24-27`) y el tooltip dice lo contrario | R7, 4.2 |
+| H5 | Respondido por lectura; requiere decisión | Confirmado: precios desconocidos no cuentan (`budget.ts:25-27`) y el tooltip dice lo contrario | R7, 4.2 |
 | H6 | Respondido por lectura; requiere decisión | Confirmado; el gasto sí llega a Spending (`planSettings.ts:188`), solo falta el precio previo | R10, 4.2 |
 | H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
 | H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |
 | H9 | Respondido por lectura; requiere prueba y decisión | `mode === 'check'` cae en `planRun.ts:388`; solo `retry` acepta el límite (`RecoveryActions.tsx:24`) | R12, 4.2 |
 | H10 | Respondido por lectura; requiere prueba | Confirmado (`conversation.ts:51-54`); A28 arregló la respuesta al LLM, no la selección en pantalla | R13, 4.2 |
 | H11 | Respondido por lectura; requiere prueba | Confirmado: la tarjeta pasa a `skipped` al escribir | R13, 4.2 |
-| H12, H13, H15, H16, H17 | Sin respuesta del rastreo | La historia no los menciona; siguen abiertos | 4.2 |
+| H12, H13, H15, H16, H17 | Requiere decisión | La historia no los menciona; siguen abiertos y sin evaluar por el rastreo | 4.2 |
 | H14 | Respondido por lectura | Retirado en Auto con `cd15ef0` (2026-10-24); el código quedó. Deuda | R14, 4.2 |
 | H18 | Respondido por lectura | Es petición del usuario (054); la ficha `studio.md` quedó desfasada y se corrige | C6, 4.2 |
 | H19 | Respondido parcialmente | Los textos vienen de peticiones del usuario; solo «Look» → «Apariencia» consta como decisión pendiente | 4.2 |

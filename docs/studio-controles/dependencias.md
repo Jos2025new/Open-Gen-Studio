@@ -34,13 +34,13 @@ Tres capas: el Composer guarda el defecto global (`image/video/audio/model3d.mod
 
 ### Sin crédito: cambio de proveedor
 
-Orden observado en `credit.ts`: la generación fallida por crédito busca el mismo modelo en otro proveedor con precio menor o igual, lo relanza y avisa después; si no hay candidato, queda la alerta de crédito del Composer ([composer](composer.md)) o la fila de error ([resultados](resultados.md)). Para el agente el cambio es de Director. Rastreo ([4.1](../rastreo/studio-2.md)): en la generación el aviso coincide con el cambio por construcción (`credit.ts:126,155`); en el agente, con precios desconocidos dice «same price or less» sin saberlo (`credit.ts:204-207`): P3 respondido parcialmente, requiere prueba.
+Orden observado en `credit.ts`: la generación fallida por crédito busca el mismo modelo en otro proveedor con precio menor o igual, lo relanza y avisa después; si no hay candidato, queda la alerta de crédito del Composer ([composer](composer.md)) o la fila de error ([resultados](resultados.md)). Para el agente el cambio es de Director. Rastreo ([4.1](../rastreo/studio-2.md)): en la generación el aviso coincide con el cambio por construcción (`credit.ts:126,155`); en el agente, con precios desconocidos dice «same price or less» sin saberlo (`credit.ts:199,206`): P3 respondido parcialmente, requiere prueba.
 
 ## Precio, crédito y presupuesto
 
 | Origen | Destino | Cómo se propaga | Promesa tocada |
 | --- | --- | --- | --- |
-| Spending limit, Limit (USD) | `overLimit` | `budget.ts`; precios desconocidos no cuentan (`budget.ts:24`) | P2: hallazgo, el tooltip promete preguntar |
+| Spending limit, Limit (USD) | `overLimit` | `budget.ts`; precios desconocidos no cuentan (`budget.ts:25-27`) | P2: hallazgo, el tooltip promete preguntar |
 | Price margin | Revisión de paso (Continuar/Cancelar paso) | `priceAuthorization.ts` | P2: cumple con 5/25/50 %; con Off solo muestra la diferencia, por diseño |
 | Aprobar por encima del límite | `budgetAccepted` global | `acceptOverLimit` | P2: hallazgo, las ejecuciones siguientes dejan de preguntar hasta Reset o cambio de límite (la nota de Settings lo avisa) |
 | Generar directo | `SpendConfirm` | `costLabel` | P2: cumple |
@@ -88,14 +88,14 @@ Fuente: [rastreo de Studio](../rastreo/studio-2.md), contrastado con el código.
 
 | Cruce | Estado | Nota | Fila |
 | --- | --- | --- | --- |
-| Cambio por crédito de generación y de agente | Respondido por lectura; requiere decisión (agente) | Deliberado (`4cf18aa`, ADR 0025 C); el del agente fija `modelPinned` y puede afirmar «same price or less» sin precio | R2, R3 |
+| Cambio por crédito de generación y de agente | Respondido por lectura; requiere decisión (agente) | Deliberado en la generación (`4cf18aa`, ADR 0025 C); para el agente, sin confirmar; el del agente fija `modelPinned` y puede afirmar «same price or less» sin precio | R2, R3 |
 | «Proveedor que encaja» (capacidad) | Respondido por lectura; requiere decisión | Sin decisión encontrada; no compara precio y puede subirlo; el proveedor nombrado en una petición anterior no se protege (`providerFit.ts:41-55`) | R1 |
 | Cambio automático de variante por adjuntos | Respondido parcialmente; requiere decisión | Sigue marcando `userPicked` | R6 |
-| Límite de gasto | Respondido por lectura; requiere decisión | Precios desconocidos ignorados (`budget.ts:24`); un presupuesto mostrado es estimación, no máximo | R7, R8 |
-| Reescritura y revisiones del plan | Respondido por lectura; requiere decisión | Turnos LLM cobrados sin precio previo; «nothing is spent» falso en dinero | R9, R10 |
+| Límite de gasto | Respondido por lectura; requiere decisión | Precios desconocidos ignorados (`budget.ts:25-27`); un presupuesto mostrado es estimación, no máximo | R7, R8 |
+| Reescritura y revisiones del plan | Respondido por lectura; requiere decisión | Turnos LLM cobrados sin precio previo; «nothing is spent» falso en dinero con agente LLM | R9, R10 |
 | Cancel con trabajo remoto | Respondido parcialmente; requiere prueba y pregunta al proveedor | Comportamiento de la app conocido; cobro real desconocido | R11 |
 | Check status con límite superado | Respondido por lectura; requiere decisión | Sin vía de continuar | R12 |
-| Reconfirmación de 0,50 USD en Auto | Respondido por lectura; requiere decisión | Quitada en `2120c71` (`procedure.ts:68-70,93`); docs que la prometían se corrigen con una sección «Estado actual» | C1 |
+| Reconfirmación de 0,50 USD en Auto | Respondido por lectura; requiere decisión | Quitada en `2120c71` (`procedure.ts:68-70`; texto al agente en `:93`); docs que la prometían se corrigen con una sección «Estado actual» | C1 |
 
 ## Enlaces
 

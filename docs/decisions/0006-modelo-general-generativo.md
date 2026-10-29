@@ -33,4 +33,4 @@ El modelo general separa operación (qué se pide) e intento (una corrida concre
 
 ## Estado actual del código (2026-10-28) — difiere, requiere decisión
 
-Lo decidido arriba no se toca; esto no es una decisión aprobada. En Auto el umbral de 0,50 USD (`LOW_COST_USD`) ya no hace volver la tarjeta: el coste desconocido o mayor pasa a `expose` y el plan muestra el precio (`procedure.ts:68-70,93`, `2120c71`). El umbral sigue en Guided. Sin decisión encontrada que lo apruebe. Requiere decisión ([rastreo C1](../rastreo/studio-2.md)).
+Lo decidido arriba no se toca; esto no es una decisión aprobada. En Auto el umbral de 0,50 USD (`LOW_COST_USD`) ya no hace volver la tarjeta: el coste desconocido o mayor pasa a `expose` y el plan muestra el precio (`procedure.ts:68-70`; texto al agente en `:93`, `2120c71`). El umbral sigue en Guided. Sin decisión encontrada que lo apruebe. Requiere decisión ([rastreo C1](../rastreo/studio-2.md)).
