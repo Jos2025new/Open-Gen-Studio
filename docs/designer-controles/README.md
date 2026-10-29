@@ -48,6 +48,8 @@ Columnas del estado actual: **Control**, **Dónde está hoy** (superficie y cont
 
 El único `se elimina` es el interruptor «Advanced settings» del panel del pincel, que sustituye el bloque plegable Advanced (misma función). Los controles `nuevo` no son filas de estas matrices (no existen hoy): están en la sección 2 de [[huecos]].
 
+Revisión de localización y accesibilidad para hacer en el sandbox: [[revision-ubicacion]] · [revision-ubicacion.md](revision-ubicacion.md) (controles clave por herramienta, casillas de prueba y sospechas por lectura).
+
 Notas de apoyo: [[estado-compartido]] · [estado-compartido.md](estado-compartido.md) (campos de `ui` y del documento con su línea en `store.ts`), [[hallazgos]] · [hallazgos.md](hallazgos.md) (duplicados, controles escondidos y textos desfasados, con los hallazgos del inventario antiguo recomprobados) y [[huecos]] · [huecos.md](huecos.md) (lo que las maquetas pierden o no dibujan, controles nuevos y decisiones abiertas).
 
 ## Antes de usar estos números
