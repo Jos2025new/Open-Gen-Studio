@@ -35,7 +35,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('repro 4 / H10: typing with a questions card open', () => {
   // Cause: conversation.ts:51-54 submits only { note } (typed), so the recommended default shown selected becomes "(no answer)" (conversation.ts:183).
-  it.fails('the recommended option the card showed selected still reaches the agent', async () => {
+  it('the recommended option the card showed selected still reaches the agent', async () => {
     replies = [{ name: 'ask_questions', args: { questions: [{ id: 'who', question: 'Who?', options: ['A gamer', 'A chef'], default: 'A gamer' }] } }];
     await sendAgentMessage('Crea una chica para vender una corneta');
     const card = s().feed.find((f): f is QuestionsFeedItem => f.type === 'questions')!;

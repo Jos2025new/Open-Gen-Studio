@@ -49,7 +49,9 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   // Typing while questions are open answers them.
   if (pending?.kind === 'questions' && pendingItem?.type === 'questions' && pendingItem.status === 'pending') {
-    await submitAnswers(sessionId, pendingItem.id, { note: clean }, 'typed');
+    // The card shows each recommended option selected: typing keeps those, plus the user's words as the note.
+    const shown = Object.fromEntries(pendingItem.questions.flatMap((q) => (q.default ? [[q.id, q.default]] : [])));
+    await submitAnswers(sessionId, pendingItem.id, { ...shown, note: clean }, 'typed');
     return;
   }
   // Typing while the settings card is open never confirms it: it closes unconfirmed and the agent answers.
