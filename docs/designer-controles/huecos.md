@@ -60,6 +60,9 @@ Ninguno está en la matriz de estado actual (no existen hoy). Todos los de la fi
 ## 3. Ya decidido
 
 - **Presets de tamaño** [respondido por lectura: los 14 se confirmaron en código y en `4f37e64`]: se mantienen los 14; la reducción a 8 de la maqueta no está aprobada y `SizePresets` no tiene prop de subconjunto que la justifique.
+- **Controles básicos siempre visibles** (decisión del usuario, 2026-10-29): Size, Opacity y Color sin atajos, en ese orden; Texture junto a Color o dentro. Vale para toda herramienta con bordes y rellenos: raster (Brush, Eraser y similares) y vector (Stroke y Fill). En vector, Fill puede ser textura o degradado de varios tipos (lineal/axial, radial, rejilla o similares).
+- **Ajustes del objeto elegido en la toolbox** (decisión del usuario, 2026-10-29): Join, Cap, Dashes y Stroke behind fill no deben quedar solo en Properties; lo que hagan otras apps es referencia de familiaridad, no techo ([investigación](investigacion-disposicion-interfaz.md)). Una barra contextual junto al objeto, al estilo de la Contextual Task Bar de Photoshop, es una idea que el usuario ya tenía.
+- **Son bugs, no decisiones abiertas** (usuario, 2026-10-29): la tarjeta de ajustes que no sigue a la tecla de herramienta (S1 de [[revision-ubicacion]], visto en sandbox) y los rangos distintos entre superficies, como Weight 100-900 en la herramienta frente a 300-900 en Properties.
 
 ## 4. Decisiones pendientes
 
