@@ -157,6 +157,7 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .node-canvas { position: relative; }
 .nc-next.react-flow__handle { right: -34px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; border-color: var(--border-strong); background: var(--surface-2); color: var(--text-2); }
 .node-canvas .nc-next.react-flow__handle { background: var(--surface-2) !important; }
+.node-canvas .react-flow__node:has(.nc.k-text) .nc-next.react-flow__handle { right: -18px; }
 .nc.k-text .nc-text-grip { min-height: 26px; cursor: grab; }
 .nc.k-text .nc-text-grip:active { cursor: grabbing; }
 .nc.k-text .nc-text-grip .nc-title-text { cursor: inherit; }

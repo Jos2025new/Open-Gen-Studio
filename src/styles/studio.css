@@ -94,5 +94,11 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 @keyframes tile-sheen { 0%, 20%, 40% { background-position: 100% 0; opacity: 1; } 19.99%, 39.99%, 59.99% { background-position: 0 0; opacity: 1; } 60%, 100% { background-position: 0 0; opacity: 0; } }
 /* Chat placeholder: the quietest, a flat tile with the kind icon; the label sits under the icon. */
 .studio-thumb.is-pending .studio-pending-text.is-quiet { justify-content: flex-end; padding-bottom: var(--sp-4); color: var(--text-3); }
+.studio-thumb.is-pending { background: linear-gradient(145deg, var(--surface-3), var(--surface) 75%); }
+.space-board.is-studio .space-tile.is-pending .shimmer { opacity: .35; }
+.space-board.is-studio .space-tile.is-pending::after { display: none; }
+.space-board.is-studio .space-tile.is-pending .studio-pending-text { gap: 4px; }
+.space-board.is-studio .space-tile.is-pending .studio-spinner { width: 24px; height: 24px; margin-bottom: 4px; }
+.space-board.is-studio .space-tile.is-pending .studio-pending-label { color: var(--text); font-size: var(--fs-l); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .space-board.is-studio .space-tile.is-pending::after { animation: none; display: none; } }
 .studio-size-pop { padding: var(--sp-2); }
