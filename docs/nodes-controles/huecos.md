@@ -20,7 +20,7 @@ La tabla y la lista siguiente son pendientes, no el inventario de todo lo ya res
 
 - **Pruebas en sandbox** (sin gasto ni datos reales):
   - **Enlace sin salida tras borrar su imagen:** corregido en `ba66e08` (`NO_RESULT`) y `5c65acc` (Run all no lo convierte en la primera imagen). `tests/repro-nodes-image.test.ts` y `tests/no-result-run-all.test.ts` cubren regeneración y ejecución conjunta; no se comprobó esta variante visual en sandbox. La reconexión deliberada sigue sin probarse en pantalla.
-  - **Modelo estimado distinto del ejecutado:** corregido en `ea47987`; `tests/repro-nodes-model.test.ts` compara modelo de precio y modelo preparado. En sandbox con gasto real, la edición aprobada con Seedream 5.0 Flash mostró estimado y facturado de 0,027 USD. No implica que se haya probado cada operación/modelo.
+  - **Modelo estimado distinto del ejecutado:** corregido en `ea47987`; `tests/repro-nodes-model.test.ts` compara modelo de precio y modelo preparado. La prueba con gasto real mostró estimado y facturado de 0,027 USD para Seedream 5.0 Flash en un plan de Studio; el informe no acredita que se ejecutara desde un grafo de Nodes. La ruta de Nodes queda cubierta por el test automatizado, sin prueba real acreditada ([auditoría](../audits/repro-2026-10-29.md)).
   - Ejecución de `edit_region`, `remove_object` y `create_voice` desde un nodo (H12), con proveedor de coste 0 o simulado.
   - `edit_node.model_ref` con un agente real; campos `required` vacíos; recarga durante una ejecución; accesibilidad por teclado; ajustes ocultos hasta el proveedor; coste de `previewRun`.
 - **Lectura pendiente** (sin ejecutar la app): migraciones del formato de guardado de `graph` (solo lectura: zona protegida).
