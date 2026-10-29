@@ -39,10 +39,23 @@ async function main() {
   await collect(docs);
   const indexPath = join(docs, 'README.md');
   const index = await readFile(indexPath, 'utf8');
-  const indexed = new Set(links(index).filter((href) => !/^(https?:|mailto:|#)/.test(href))
-    .map((href) => resolve(docs, decodeURIComponent(href.split('#')[0]))));
+  const targets = (from, text) => links(text).filter((href) => !/^(https?:|mailto:|#)/.test(href))
+    .map((href) => resolve(dirname(from), decodeURIComponent(href.split('#')[0])));
+  const indexed = new Set(targets(indexPath, index));
+  // A folder index (docs/<folder>/README.md) linked from docs/README.md indexes the files of its folder.
+  const folderIndexes = files.filter(({ path }) => path !== indexPath && path.endsWith('/README.md')
+    && dirname(dirname(path)) === docs && indexed.has(path));
+  const folderOf = new Map();
+  for (const { path } of folderIndexes) {
+    const text = await readFile(path, 'utf8');
+    folderOf.set(dirname(path), new Set(targets(path, text)));
+    await validateLinks(path, text);
+  }
   for (const file of files) {
-    if (file.path !== indexPath && !indexed.has(file.path)) errors.push(`${label(file.path)}: missing from docs/README.md`);
+    if (file.path === indexPath || indexed.has(file.path)) continue;
+    const folder = [...folderOf.keys()].find((dir) => file.path.startsWith(`${dir}/`));
+    if (folder) { if (!folderOf.get(folder).has(file.path)) errors.push(`${label(file.path)}: missing from ${label(join(folder, 'README.md'))}`); }
+    else errors.push(`${label(file.path)}: missing from docs/README.md`);
   }
   await validateLinks(indexPath, index);
   const adrs = files.filter(({ path }) => relative(docs, path).startsWith('decisions/') && path.endsWith('.md'));
