@@ -72,7 +72,7 @@ Ver [rastreo del Designer](../rastreo/designer.md).
 
 ## Sandbox y decisiones del 2026-10-29 (todo abierto, nada corregido)
 
-Fuente: [[revision-ubicacion]] (prueba en `npm run dev:sandbox`, puerto 5183, `agent-browser`; capturas en `.sandbox/capturas/`) y [[huecos]] §3 (decisiones del usuario). Las filas «bug» las declaró el usuario; el código se releyó el mismo día y no ha cambiado desde. Ningún commit posterior a a4377c9 toca el Designer: **no hay arreglos ni pruebas automatizadas** de estas filas.
+Fuente: [[revision-ubicacion]] (prueba en `npm run dev:sandbox`, puerto 5183, `agent-browser`; capturas en `.sandbox/capturas/` de `task/workflow-ask-first`, con copia en el ZIP indicado en la revisión) y [[huecos]] §3 (decisiones del usuario). Las filas «bug» las declaró el usuario; el código se releyó el mismo día y no ha cambiado desde. Ningún commit posterior a a4377c9 toca el Designer: **no hay arreglos ni pruebas automatizadas** de estas filas.
 
 | Id | Qué pasa | Evidencia | Estado |
 | --- | --- | --- | --- |

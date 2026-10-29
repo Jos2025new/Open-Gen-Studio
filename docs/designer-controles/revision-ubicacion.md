@@ -152,7 +152,7 @@ Estados: **respondido por lectura**, **requiere prueba**, **requiere decisión**
 
 ## Visto en sandbox
 
-Prueba del 2026-10-29 en `npm run dev:sandbox` (puerto 5183, `.sandbox/data`) con `agent-browser`, documento Square 1:1 con dos rectángulos y una capa de texto. Capturas en `.sandbox/capturas/` (ignorado por git). Resultado: **visto** (como decía la lectura), **no visto** o **distinto** (la pantalla no coincide con la lectura).
+Prueba del 2026-10-29 en `npm run dev:sandbox` (puerto 5183, `.sandbox/data`) con `agent-browser`, documento Square 1:1 con dos rectángulos y una capa de texto. Capturas copiadas a `.sandbox/capturas/` de `task/workflow-ask-first` (ignorado por git); respaldo íntegro en `~/Descargas/ogs-backup-2026-10-29/carpetas-cierre-y-designer.zip`, bajo `home/samuel/Documentos/Projects/My New App/ogs-designer-ubicacion/.sandbox/capturas/`. Resultado: **visto** (como decía la lectura), **no visto** o **distinto** (la pantalla no coincide con la lectura).
 
 | Caso | Resultado | Qué se ve | Captura |
 | --- | --- | --- | --- |
