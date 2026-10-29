@@ -20,7 +20,7 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 | H4 | P2 | Aprobar por encima del límite llama a `acceptOverLimit` global: las siguientes ejecuciones dejan de preguntar hasta Reset o cambio de límite | `budget.ts`; nota en `SettingsPanel.tsx:516` | Crítico, la nota lo avisa |
 | H5 | P2 | El tooltip del límite dice que una ejecución que lo pasa pregunta antes, pero `overLimit` ignora precios desconocidos | `budget.ts:24`; `SettingsPanel.tsx:460` | Crítico |
 | H6 | P2 | «Ajustar prompt» llama al LLM del agente y suma gasto sin mostrar su precio antes | `planSettings.ts rewritePrompts` | Crítico |
-| H7 | P3 | El texto «nothing is spent» de Suggest/Edit es cierto para generación, pero cada revisión es un turno LLM que cuesta | `PlanCard.tsx` (edición), `llmTurn.ts` | Crítico, aviso falso por omisión |
+| H7 | P3 | El texto «nothing is spent» de Suggest/Edit es cierto para generación, pero con un agente LLM cada revisión es un turno que cuesta (motor local: sin confirmar) | `PlanCard.tsx` (edición), `llmTurn.ts` | Crítico, aviso falso por omisión |
 | H8 | P2 | Cancel en ejecución llama `stopPlanRun` y `cancelGeneration` sin aviso; un trabajo remoto puede seguir cobrando, mientras «Dejar de seguir» sí avisa | `PlanCard.tsx:189` | Sin confirmar el cargo del proveedor |
 | H9 | Fricción | Con el límite superado, «Check status» solo muestra un toast con el texto del límite y no hay forma de continuar | `RecoveryActions.tsx:23-30`; `planRun.ts:388` | Crítico, callejón sin salida |
 
