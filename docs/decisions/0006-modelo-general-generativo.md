@@ -30,3 +30,7 @@ El modelo general separa operación (qué se pide) e intento (una corrida concre
 - Los planes con vídeo o varios candidatos se muestran en la tarjeta de aprobación en lugar de pedir ajustes.
 - La aprobación del plan y la autorización de gasto siguen siendo independientes (SETTINGS_POLICY).
 - Límites: el umbral y la reversión de la regla de ajustes necesitan aprobación del usuario. No se implementan traits, Project, Export/Assemble, estado outdated ni decisiones editoriales por contexto; no hay caso real que los exija todavía. No hay prueba en sandbox ni con proveedores reales de los tres recorridos (una imagen suelta, «ahora en un sofá» y regenerar un nodo).
+
+## Estado actual del código (2026-10-28) — difiere, requiere decisión
+
+Lo decidido arriba no se toca; esto no es una decisión aprobada. En Auto el umbral de 0,50 USD (`LOW_COST_USD`) ya no hace volver la tarjeta: el coste desconocido o mayor pasa a `expose` y el plan muestra el precio (`procedure.ts:68-70`; texto al agente en `:93`, `2120c71`). El umbral sigue en Guided. Sin decisión encontrada que lo apruebe. Requiere decisión ([rastreo C1](../rastreo/studio-2.md)).

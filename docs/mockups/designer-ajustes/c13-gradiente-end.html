@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C13 · Gradiente: &quot;To&quot; pasa a &quot;End&quot;</title>
+<link rel="stylesheet" href="../../../src/styles/tokens.css">
+<link rel="stylesheet" href="../../../src/styles/base.css">
+<link rel="stylesheet" href="../../../src/styles/ui.css">
+<link rel="stylesheet" href="../../../src/styles/designer.css">
+<link rel="stylesheet" href="../../../src/styles/designer-connected.css">
+<link rel="stylesheet" href="../../../src/styles/tool-dock.css">
+<style>
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-size:13px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:14px;margin:0 0 12px}
+a{color:var(--text-2)}
+.mock-intro{color:var(--text-3);margin:0 0 20px;max-width:820px}
+.mock-block{margin:0 0 40px;border-top:1px solid var(--panel-line);padding-top:16px}
+.mock-pair{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.mock-col{margin:0;width:260px;flex:none}
+.mock-col.wide{width:420px}
+.mock-col>figcaption{display:block;font-size:12px;color:var(--text-3);margin:0 0 10px;position:relative;z-index:2}
+.mock-panel{isolation:isolate}
+.mock-panel .tool-dock{position:relative;left:auto;right:auto;bottom:auto;top:auto;transform:none;width:100%}
+.mock-changed{position:relative;outline:1px dashed var(--accent);outline-offset:4px;border-radius:6px}
+.mock-badge{position:absolute;top:-9px;right:-9px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:var(--bg);font-size:10px;line-height:16px;text-align:center;font-weight:600}
+.mock-panel{--layers-w:260px;width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--panel-line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;position:relative}
+.mock-caption{font-size:13px;color:var(--text-2);margin:14px 0 0;padding:0;list-style:none;max-width:820px}
+.mock-caption li{margin:0 0 6px}
+.mock-caption code{font-size:12px;color:var(--text-3)}
+.mock-note{font-size:12px;color:var(--text-3);border:1px dashed var(--panel-line);border-radius:6px;padding:6px 8px;max-width:820px}
+.mock-new{position:absolute;border:1px dashed currentColor;box-sizing:border-box}
+.mock-table{border-collapse:collapse;font-size:13px}
+.mock-table th,.mock-table td{border-bottom:1px solid var(--panel-line);padding:6px 8px;text-align:left;vertical-align:middle}
+.mock-table .ic-cell{width:48px}
+.mock-table svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mock-table .ic-name{color:var(--text-3);font-size:12px;padding-left:4px}
+</style>
+</head>
+<body>
+<p><a href="index.html">&larr; Índice de mockups</a></p>
+<h1>C13 · Gradiente: &quot;To&quot; pasa a &quot;End&quot;</h1>
+<p class="mock-intro">Ajustes del gradiente dentro del contenedor real del panel (section.sidebar-tool-settings, 260 px), con envoltura como en A4.</p>
+<section class="mock-block">
+<h2>C13 · ToolSettings · gradiente</h2>
+<div class="mock-pair">
+<figure class="mock-col"><figcaption>Actual</figcaption><div class="mock-panel"><section class="sidebar-tool-settings settings-gradient" aria-label="Active tool settings"><div class="tool-settings" role="toolbar" aria-label="Gradient settings"><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Shape</span><span class="opt-value">Linear</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><button type="button" class="opt opt-color" aria-label="Color · #d4f25a" data-tip="Color" aria-haspopup="dialog" aria-expanded="false"><span class="opt-label">Color</span><span class="opt-swatch" style="background:#d4f25a"></span></button><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">To</span><span class="opt-value">Second color</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><button type="button" class="opt opt-color" aria-label="Second · #000000" data-tip="Second" aria-haspopup="dialog" aria-expanded="false"><span class="opt-label">Second</span><span class="opt-swatch" style="background:#000000"></span></button><button type="button" class="opt" data-tip="Swap the two colors">⇄</button><button type="button" role="switch" aria-checked="false" class="opt opt-toggle"><span class="opt-label">Reverse</span><span class="toggle" aria-hidden="true"><span></span></span></button></div></section></div></figure>
+<figure class="mock-col"><figcaption>Propuesta</figcaption><div class="mock-panel"><section class="sidebar-tool-settings settings-gradient" aria-label="Active tool settings"><div class="tool-settings" role="toolbar" aria-label="Gradient settings"><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Shape</span><span class="opt-value">Linear</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><button type="button" class="opt opt-color" aria-label="Color · #d4f25a" data-tip="Color" aria-haspopup="dialog" aria-expanded="false"><span class="opt-label">Color</span><span class="opt-swatch" style="background:#d4f25a"></span></button><div class="mock-changed"><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">End</span><span class="opt-value">Second color</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><span class="mock-badge">1</span></div><button type="button" class="opt opt-color" aria-label="Second · #000000" data-tip="Second" aria-haspopup="dialog" aria-expanded="false"><span class="opt-label">Second</span><span class="opt-swatch" style="background:#000000"></span></button><button type="button" class="opt" data-tip="Swap the two colors">⇄</button><button type="button" role="switch" aria-checked="false" class="opt opt-toggle"><span class="opt-label">Reverse</span><span class="toggle" aria-hidden="true"><span></span></span></button></div></section></div></figure>
+</div>
+<ul class="mock-caption">
+<li>Qué controla: el final del degradado. Puede ser el segundo color o transparente. "End" dice eso mejor que "To", que se lee como un destino y no explica qué se elige. <code>src/components/designer/ToolSettings.tsx:241</code></li>
+<li>Mismo control y mismas opciones; solo cambia la etiqueta.</li>
+</ul>
+<p class="mock-note">Los controles son los reales. El selector de "End" es un opt-pick: sus opciones (Second color / Transparent) se abren en un menú que aquí no se muestra.</p>
+</section>
+</body>
+</html>

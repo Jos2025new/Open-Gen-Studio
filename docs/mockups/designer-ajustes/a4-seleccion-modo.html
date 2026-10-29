@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A4 · Ajustes de selección: Modo primero</title>
+<link rel="stylesheet" href="../../../src/styles/tokens.css">
+<link rel="stylesheet" href="../../../src/styles/base.css">
+<link rel="stylesheet" href="../../../src/styles/ui.css">
+<link rel="stylesheet" href="../../../src/styles/designer.css">
+<link rel="stylesheet" href="../../../src/styles/designer-connected.css">
+<link rel="stylesheet" href="../../../src/styles/tool-dock.css">
+<style>
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-size:13px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:14px;margin:0 0 12px}
+a{color:var(--text-2)}
+.mock-intro{color:var(--text-3);margin:0 0 20px;max-width:820px}
+.mock-block{margin:0 0 40px;border-top:1px solid var(--panel-line);padding-top:16px}
+.mock-pair{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start}
+.mock-col{margin:0;width:260px;flex:none}
+.mock-col.wide{width:420px}
+.mock-col>figcaption{display:block;font-size:12px;color:var(--text-3);margin:0 0 10px;position:relative;z-index:2}
+.mock-panel{isolation:isolate}
+.mock-panel .tool-dock{position:relative;left:auto;right:auto;bottom:auto;top:auto;transform:none;width:100%}
+.mock-changed{position:relative;outline:1px dashed var(--accent);outline-offset:4px;border-radius:6px}
+.mock-badge{position:absolute;top:-9px;right:-9px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:var(--bg);font-size:10px;line-height:16px;text-align:center;font-weight:600}
+.mock-panel{--layers-w:260px;width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--panel-line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;position:relative}
+.mock-caption{font-size:13px;color:var(--text-2);margin:14px 0 0;padding:0;list-style:none;max-width:820px}
+.mock-caption li{margin:0 0 6px}
+.mock-caption code{font-size:12px;color:var(--text-3)}
+.mock-note{font-size:12px;color:var(--text-3);border:1px dashed var(--panel-line);border-radius:6px;padding:6px 8px;max-width:820px}
+.mock-new{position:absolute;border:1px dashed currentColor;box-sizing:border-box}
+.mock-table{border-collapse:collapse;font-size:13px}
+.mock-table th,.mock-table td{border-bottom:1px solid var(--panel-line);padding:6px 8px;text-align:left;vertical-align:middle}
+.mock-table .ic-cell{width:48px}
+.mock-table svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mock-table .ic-name{color:var(--text-3);font-size:12px;padding-left:4px}
+</style>
+</head>
+<body>
+<p><a href="index.html">&larr; Índice de mockups</a></p>
+<h1>A4 · Ajustes de selección: Modo primero</h1>
+<p class="mock-intro">Ajustes de la herramienta Selección con la varita mágica, dentro del contenedor real del panel (section.sidebar-tool-settings, 260 px).</p>
+<section class="mock-block">
+<h2>A4 · ToolSettings · selección</h2>
+<div class="mock-pair">
+<figure class="mock-col"><figcaption>Actual</figcaption><div class="mock-panel"><section class="sidebar-tool-settings settings-select" aria-label="Active tool settings"><div class="tool-settings" role="toolbar" aria-label="Selection settings"><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Shape</span><span class="opt-value">Magic wand</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><label class="opt opt-slider" style="--fill:9.411764705882353%"><input type="range" class="range opt-range" min="0" max="255" step="1" value="24" aria-label="Tolerance" style="--fill:9.411764705882353%"><span class="opt-label">Tolerance</span><span class="opt-readout"><input class="opt-num num" type="number" value="24" aria-label="Tolerance value" min="0" max="255" step="1" style="width:2.6ch"></span></label><label class="opt opt-slider" style="--fill:0%"><span class="opt-ticks" aria-hidden="true"><i style="left:8.333333333333332%"></i><i style="left:16.666666666666664%"></i><i style="left:25%"></i><i style="left:33.33333333333333%"></i><i style="left:41.66666666666667%"></i><i style="left:50%"></i><i style="left:58.333333333333336%"></i><i style="left:66.66666666666666%"></i><i style="left:75%"></i><i style="left:83.33333333333334%"></i><i style="left:91.66666666666666%"></i></span><input type="range" class="range opt-range" min="0" max="12" step="1" value="0" aria-label="Expand" style="--fill:0%"><span class="opt-label">Expand</span><span class="opt-readout"><input class="opt-num num" type="number" value="0" aria-label="Expand value" min="0" max="12" step="1" style="width:1.6ch"><span class="opt-unit">px</span></span></label><label class="opt opt-slider" style="--fill:0%"><span class="opt-ticks" aria-hidden="true"><i style="left:12.5%"></i><i style="left:25%"></i><i style="left:37.5%"></i><i style="left:50%"></i><i style="left:62.5%"></i><i style="left:75%"></i><i style="left:87.5%"></i></span><input type="range" class="range opt-range" min="0" max="4" step="0.5" value="0" aria-label="Smooth" style="--fill:0%"><span class="opt-label">Smooth</span><span class="opt-readout"><input class="opt-num num" type="number" value="0" aria-label="Smooth value" min="0" max="4" step="0.5" style="width:1.6ch"><span class="opt-unit">px</span></span></label><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Mode</span><span class="opt-value">New</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Sample</span><span class="opt-value">Active layer</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button></div></section></div></figure>
+<figure class="mock-col"><figcaption>Propuesta</figcaption><div class="mock-panel"><section class="sidebar-tool-settings settings-select" aria-label="Active tool settings"><div class="tool-settings" role="toolbar" aria-label="Selection settings"><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Shape</span><span class="opt-value">Magic wand</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><div class="mock-changed"><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Mode</span><span class="opt-value">New</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button><span class="mock-badge">1</span></div><label class="opt opt-slider" style="--fill:9.411764705882353%"><input type="range" class="range opt-range" min="0" max="255" step="1" value="24" aria-label="Tolerance" style="--fill:9.411764705882353%"><span class="opt-label">Tolerance</span><span class="opt-readout"><input class="opt-num num" type="number" value="24" aria-label="Tolerance value" min="0" max="255" step="1" style="width:2.6ch"></span></label><label class="opt opt-slider" style="--fill:0%"><span class="opt-ticks" aria-hidden="true"><i style="left:8.333333333333332%"></i><i style="left:16.666666666666664%"></i><i style="left:25%"></i><i style="left:33.33333333333333%"></i><i style="left:41.66666666666667%"></i><i style="left:50%"></i><i style="left:58.333333333333336%"></i><i style="left:66.66666666666666%"></i><i style="left:75%"></i><i style="left:83.33333333333334%"></i><i style="left:91.66666666666666%"></i></span><input type="range" class="range opt-range" min="0" max="12" step="1" value="0" aria-label="Expand" style="--fill:0%"><span class="opt-label">Expand</span><span class="opt-readout"><input class="opt-num num" type="number" value="0" aria-label="Expand value" min="0" max="12" step="1" style="width:1.6ch"><span class="opt-unit">px</span></span></label><label class="opt opt-slider" style="--fill:0%"><span class="opt-ticks" aria-hidden="true"><i style="left:12.5%"></i><i style="left:25%"></i><i style="left:37.5%"></i><i style="left:50%"></i><i style="left:62.5%"></i><i style="left:75%"></i><i style="left:87.5%"></i></span><input type="range" class="range opt-range" min="0" max="4" step="0.5" value="0" aria-label="Smooth" style="--fill:0%"><span class="opt-label">Smooth</span><span class="opt-readout"><input class="opt-num num" type="number" value="0" aria-label="Smooth value" min="0" max="4" step="0.5" style="width:1.6ch"><span class="opt-unit">px</span></span></label><button type="button" class="opt opt-pick" aria-haspopup="listbox" aria-expanded="false"><span class="opt-label">Sample</span><span class="opt-value">Active layer</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button></div></section></div></figure>
+</div>
+<ul class="mock-caption"><li>Modo (Nuevo / Añadir / Restar) va justo después de Forma, antes de Tolerancia, Expandir y Suavizar. <code>src/components/designer/ToolSettings.tsx:172 (actual 167-173)</code></li><li>Los deslizadores no se aplastan en el panel real: .sidebar-tool-settings .tool-settings es flex con wrap y cada slider tiene flex 1 1 140px. La versión anterior fallaba porque faltaba ese contenedor en la maqueta. <code>src/styles/designer-connected.css:137-138</code></li><li>Fuera del panel, .tool-settings usa max-width min(48vw,760px) y desplazamiento horizontal (designer.css:7): ahí sí se ve como una tira, no aplastada. <code>src/styles/designer.css:7</code></li></ul>
+<p class="mock-note">Interpretación: "Mode first" dentro de la rama de varita; Forma queda primero porque elige la herramienta. Pendiente de confirmar.</p>
+</section>
+</body>
+</html>

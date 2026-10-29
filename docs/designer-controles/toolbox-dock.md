@@ -1,0 +1,85 @@
+---
+type: inventario
+title: Toolbox dock (familias, variantes, chevron)
+description: La caja de herramientas del Designer: 8 familias, 31 variantes (7 «soon»), chevron, tirador y botón de panel, con su estado y condiciones.
+tags: [designer, toolbox, dock]
+updated: 2026-10-28
+related: [estado-compartido, pincel, seleccion, alinear-editar, guias, tamanos, atajos, estudio-embebido]
+---
+# Toolbox dock (familias, variantes, chevron)
+
+Fuente de verdad: `TOOLBOX` (`toolboxModel.ts:24`) y `ToolDock` (`ToolDock.tsx:48`). Una sola caja para los dos modos de pintura; Drawing/Design es un ajuste del documento dentro de la tarjeta del pincel (`toolboxModel.ts:23`).
+
+## Dónde vive la caja
+
+- **Composer** (por defecto): barra inferior del Designer cuando `ui.designerDock === 'tools'` (`Composer.tsx:437`, JSX en `Composer.tsx:483`). Se cambia desde el menú «+» del composer (`Design`, `ComposerOptions.tsx:52`).
+- **Paleta del Designer**: si `designerDock === 'prompt'`, `ToolPalette` pinta la caja dentro del Designer (`ToolPalette.tsx:24`); con `'tools'` devuelve `null` (`ToolPalette.tsx:23`).
+- **Studio** (tablero embebido): subconjunto sin Edit ni Pan, ver [[estudio-embebido]].
+
+## Cómo se abre y se cierra
+
+Estado local `dockState` (`useReducer`, `toolboxModel.ts:48`): `depth` = `closed` / `folded` (solo fila de variantes) / `open` (variantes + tarjeta). Pulsar una familia distinta abre `folded`; la misma, cierra. Escape baja un nivel (`ToolDock.tsx:107`). Cambiar de herramienta por teclado mueve la familia (efecto `ToolDock.tsx:65`).
+
+## Controles de la caja
+
+| Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Familia Edit (mouse-pointer-2) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Estado local del dock (`dispatch({type:'family'})` (`ToolDock.tsx:151`)) y `ui.tool` vía `chooseVariant` (`ToolDock.tsx:69`) con su primera variante con herramienta (Edit) | Siempre | Segunda pulsación sobre la activa cierra. Su tarjeta es `EditCard` ([[alinear-editar]]) | Igual | se conserva | no dibujado |
+| Familia Layout (layout-panel-top) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Dock local; abre `Sizes` (acción `size`, sin herramienta) | Siempre | Ninguna variante de Layout tiene `tool`, así que pulsarla solo abre la fila y no cambia `ui.tool` (`ToolDock.tsx:148`) | Igual | se conserva | no dibujado |
+| Familia Pen (pen-tool) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Dock local + `ui.tool='lineart'` | Siempre | Icono `pen-tool` compartido con la variante «soon» Bezier pen | Igual | se conserva | no dibujado |
+| Familia Brush (brush) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Dock local + `ui.tool='brush'` | Siempre | Agrupa pincel, relleno, degradado, selección y cuentagotas (11 variantes) | Igual | se conserva | no dibujado |
+| Familia Eraser (eraser) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Dock local + `ui.tool='eraser'` | Siempre | Una sola variante: la fila de variantes solo repite el icono | Igual | se conserva | no dibujado |
+| Familia Text (type) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Dock local + `ui.tool='text'` | Siempre | Una sola variante | Igual | se conserva | no dibujado |
+| Familia Ruler (drafting-compass) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) | Dock local + `ui.tool='ruler'` y `ui.strokeRulerKind` | Siempre | Icono `drafting-compass` | Igual | se conserva | no dibujado |
+| Familia Settings (settings-2) | Toolbox dock › fila de familias (`ToolDock.tsx:140`) (tras el separador, `ToolDock.tsx:154`) | Ninguno: es «soon» | Siempre visible | Deshabilitada con aviso «Soon: Toolbox preferences are planned.» (`toolboxModel.ts:32`) | Igual | se conserva | no dibujado |
+| Botón «Show or hide right panel» (icono Layers) | Toolbox dock › fila de familias (`ToolDock.tsx:140`), antes de Settings (`ToolDock.tsx:156`) | Evento `ogs:layers-toggle` → `collapsed` de `LayersPanel` (`ogs:layers-collapsed`) | Siempre | DUPLICADO: el mismo evento lo emite el botón de la barra superior (`DesignerWorkspace.tsx:97`); B8 (quitarlo) fue descartado por el usuario | Se queda donde está: la propuesta B8 de quitarlo fue DESCARTADA | se conserva | [b8-dock-toggle-duplicado](../mockups/designer-ajustes/b8-dock-toggle-duplicado.html) |
+| Variante Edit (mouse-pointer-2) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:25`) | `chooseVariant` (`ToolDock.tsx:69`) → `ui.tool='move'` | Familia Edit abierta; deshabilitada si `toolBlockReason` da motivo (`rules.ts:50`); el motivo no se muestra en el botón (solo `disabled`) (sin capa activa o bloqueada) | Abre `EditCard` (no `ToolSettings`) `ToolDock.tsx:133` | Igual que hoy | se conserva | no dibujado |
+| Variante Pan (hand) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:25`) | `ui.tool='hand'` | Familia Edit | Su tarjeta queda vacía: `ToolSettings` devuelve `null` con `hand` (`ToolSettings.tsx:232`) | Igual que hoy | se conserva | no dibujado |
+| Variante Rectangle (square) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:25`) | `ui.tool='rect'` | Familia Edit; deshabilitada si `toolBlockReason` da motivo (`rules.ts:50`); el motivo no se muestra en el botón (solo `disabled`) si la capa activa es vector bloqueada | Ajustes en [[formas]] | Igual que hoy | se conserva | no dibujado |
+| Variante Ellipse (circle) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:25`) | `ui.tool='ellipse'` (también `sector`, `arc`, `chord` vía `also`) | Familia Edit | Pulsarla de nuevo no pisa el tipo elegido en Type (`ToolDock.tsx:80`) | Igual que hoy | se conserva | no dibujado |
+| Variante Line (minus) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:25`) | `ui.tool='line'` (`arrow` vía `also`) | Familia Edit | Icono `minus` compartido con Straight ruler | Igual que hoy | se conserva | no dibujado |
+| Variante Polygon / Star (pentagon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:25`) | `ui.tool='polygon'` (`star` vía `also`) | Familia Edit | Sin tecla de atajo | Igual que hoy | se conserva | no dibujado |
+| Variante Sizes (crop) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:26`) | Solo estado del dock (`action:'size'`, abre la tarjeta) | Familia Layout | Tarjeta = `CanvasSize inline`, ver [[tamanos]] | Igual que hoy | se conserva | no dibujado |
+| Variante Grid (grid-3x3, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:26`) | Ninguno | Familia Layout | Deshabilitada: «A layout grid is planned.» | Igual que hoy | se conserva | no dibujado |
+| Variante Guides (ruler-dimension-line) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:26`) | Solo estado del dock (`action:'guides'`) | Familia Layout | Tarjeta = `GuidesCard`, ver [[guias]]. Icono compartido con Perspective ruler | Mismo sitio; icono grid-2x2-plus (o layout-grid, sin decidir) | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Templates (layout-template, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:26`) | Ninguno | Familia Layout | Deshabilitada: «Templates are planned.» | Igual que hoy | se conserva | no dibujado |
+| Variante Lineart (pen-tool) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:27`) | `ui.tool='lineart'` | Familia Pen; deshabilitada si `toolBlockReason` da motivo (`rules.ts:50`); el motivo no se muestra en el botón (solo `disabled`) si la capa activa es vector bloqueada | Ver [[lineart]] | Igual que hoy | se conserva | no dibujado |
+| Variante Curve (spline) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:27`) | `ui.tool='curve'` | Familia Pen; igual que Lineart | Ver [[curva]]. Sin tecla | Igual que hoy | se conserva | no dibujado |
+| Variante Bezier pen (pen-tool, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:27`) | Ninguno | Familia Pen | Deshabilitada; mismo icono que Lineart | Mismo sitio; icono waypoints | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Cutter (scissors, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:27`) | Ninguno | Familia Pen | Deshabilitada: «A path cutter is planned.» | Igual que hoy | se conserva | no dibujado |
+| Variante Brush (brush) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='brush'` | Familia Brush | Ver [[pincel]]. El resaltado de la variante sale de `dockState.variantId`; sin él, `toolFor` devuelve siempre Brush (`ToolDock.tsx:33`) | Mismo sitio; chip de color y chip de tamaño al final de la fila de variantes (F3) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Pencil (pencil) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='brush'` y `ui.brush.hardness = TIP_PRESETS[0]` (1) (`ToolDock.tsx:35`) | Familia Brush | Mismo estado que Brush con dureza máxima; no hay ajustes propios | Mismo sitio; chip de color y chip de tamaño al final de la fila de variantes (F3) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Airbrush (airbrush) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='brush'` y `ui.brush.hardness = TIP_PRESETS[3]` (0.05) (`ToolDock.tsx:35`) | Familia Brush | Icono propio `airbrush` (AirVent) | Mismo sitio; chip de color y chip de tamaño al final de la fila de variantes (F3) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Fill (paint-bucket) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='fill'` | Familia Brush | Ver [[relleno]] | Mismo sitio; chip de color y chip de tamaño al final de la fila de variantes (F3) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Gradient (blend) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='gradient'` | Familia Brush | Ver [[degradado]]. Icono `blend` compartido con Blur «soon» | Mismo sitio; chip de color y chip de tamaño al final de la fila de variantes (F3) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Rectangular selection (square-dashed) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='select'` y `ui.selectShape='rect'` | Familia Brush | Ver [[seleccion]] | Igual que hoy | se conserva | no dibujado |
+| Variante Lasso (lasso) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='select'` y `ui.selectShape='lasso'` | Familia Brush | Ver [[seleccion]] | Igual que hoy | se conserva | no dibujado |
+| Variante Magic wand (wand-sparkles) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='select'` y `ui.selectShape='wand'` | Familia Brush | Icono WandSparkles (B7 propone Wand) | Mismo sitio; icono wand | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Eyedropper (pipette) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | `ui.tool='eyedropper'` | Familia Brush | Ver [[cuentagotas]] | Igual que hoy | se conserva | no dibujado |
+| Variante Sculpt (sin icono, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | Ninguno | Familia Brush | Icono `sculpt` no está en `ICONS` (`ToolDock.tsx:17`): cae al «?» (`CircleHelp`) | Mismo sitio; icono mountain (hoy sin icono) | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Blur (blend, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:28`) | Ninguno | Familia Brush | Mismo icono `blend` que Gradient | Mismo sitio; icono waves | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Eraser (eraser) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:29`) | `ui.tool='eraser'` | Familia Eraser; deshabilitada si `toolBlockReason` da motivo (`rules.ts:50`); el motivo no se muestra en el botón (solo `disabled`) si la capa activa no es raster, está bloqueada, oculta o es una imagen protegida (`rules.ts:60`) | Ver [[borrador]] | Fila de variantes con controles rápidos Size, Opacity y Hardness (F1) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Text (type) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:30`) | `ui.tool='text'` | Familia Text; deshabilitada si `toolBlockReason` da motivo (`rules.ts:50`); el motivo no se muestra en el botón (solo `disabled`) si la capa activa es texto bloqueada | Ver [[texto]] | Fila de variantes con controles rápidos Font y Size (F2) | se conserva | [f-variantes](../mockups/designer-ajustes/f-variantes.html) |
+| Variante Straight ruler (minus) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:31`) | `ui.tool='ruler'`, `ui.strokeRulerKind='line'` y `ui.strokeRuler.kind` si hay regla | Familia Ruler | Ver [[regla]] | Mismo sitio; icono ruler | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Ellipse ruler (circle) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:31`) | `ui.tool='ruler'`, `strokeRulerKind='ellipse'` | Familia Ruler | Igual | Mismo sitio; icono circle-dashed | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Perspective ruler (ruler-dimension-line) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:31`) | `ui.tool='ruler'`, `strokeRulerKind='perspective'` | Familia Ruler | Igual | Mismo sitio; icono move-3d | se conserva | [b-iconos](../mockups/designer-ajustes/b-iconos.html) |
+| Variante Toolbox settings (settings-2, soon) | Toolbox dock › fila de variantes (`ToolDock.tsx:114`) (`toolboxModel.ts:32`) | Ninguno | Familia Settings | La familia entera es «soon»: no abre fila | Igual que hoy | se conserva | no dibujado |
+| Chevron «Show/Hide tool settings» | Toolbox dock › fila de variantes (`ToolDock.tsx:114`), extremo derecho (`ToolDock.tsx:120`) | `dispatch({type:'settings'})`: alterna `folded`/`open` | Fila abierta y variante activa no «soon» | Pulsar de nuevo la variante activa hace lo mismo (`ToolDock.tsx:117` | Igual que hoy | se conserva | no dibujado |
+| Tirador «Resize tool settings» | Borde superior de la tarjeta (`ToolDock.tsx:125`) | `height` local (140 px a 60 % de la ventana), no persiste | Tarjeta abierta | Arrastre con puntero o ArrowUp/ArrowDown (16 px) `ToolDock.tsx:98` | Igual que hoy | se conserva | no dibujado |
+| Navegación con flechas | Ambas filas (`ToolDock.tsx:87`) | Solo foco | Foco dentro de una fila | ArrowLeft/ArrowRight recorren los botones habilitados | Igual que hoy | se conserva | no dibujado |
+| Tooltip de cada icono (data-tip) | Cada botón (`ToolDock.tsx:30`) | Ninguno | Hover/foco | Solo hover; los iconos inactivos bajan a opacity .55 y los «soon» a .3 (`tool-dock.css:110`) | Igual que hoy | se conserva | no dibujado |
+| Tarjeta: Edit | Tarjeta abierta de la variante Edit (`ToolDock.tsx:133`) | Ver [[alinear-editar]] y [[tira-contextual]] | Variante Edit abierta | Es la única que lleva `ContextStrip`: por eso las ramas de la tira de texto, pincel, borrador y similares son código muerto por lectura, y las de formas del grupo Edit y Select requieren prueba (ver [[tira-contextual]]) | Igual que hoy | se conserva | no dibujado |
+| Tarjeta: ajustes de herramienta | Tarjeta abierta de cualquier variante con herramienta (`ToolDock.tsx:134`) | `ToolSettings` con `card` | Variante abierta | `card` solo cambia Brush/Eraser (tabs); el resto se ve completo, no compacto | Igual que hoy | se conserva | no dibujado |
+| Tarjeta: Sizes / Guides | Tarjeta abierta (`ToolDock.tsx:135`, `ToolDock.tsx:136`) | Ver [[tamanos]], [[guias]] | Variantes Sizes/Guides | Sin `ToolSettings` | Igual que hoy | se conserva | no dibujado |
+
+## Enlaces
+
+- [[estado-compartido]] · [estado-compartido.md](estado-compartido.md)
+- [[pincel]] · [pincel.md](pincel.md)
+- [[seleccion]] · [seleccion.md](seleccion.md)
+- [[alinear-editar]] · [alinear-editar.md](alinear-editar.md)
+- [[guias]] · [guias.md](guias.md)
+- [[tamanos]] · [tamanos.md](tamanos.md)
+- [[atajos]] · [atajos.md](atajos.md)
+- [[estudio-embebido]] · [estudio-embebido.md](estudio-embebido.md)
+- [[README]] · [Índice](README.md)

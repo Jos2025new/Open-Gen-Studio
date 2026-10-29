@@ -14,6 +14,9 @@ import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import { SnapIndicator } from './SnapIndicator';
+import { AgentGlow } from './AgentGlow';
+import { moveMode, neighbourGaps } from '../../engine/design/neighbourGaps';
+import { stageWheel } from './wheelZoom';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
@@ -161,6 +164,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
+  const wheel = useRef(stageWheel(setView)).current;
+  wheel.sync(view);
+  const ctrlAtDown = useRef(false);
   usePanRequest(setView);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
@@ -580,6 +586,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const blocked = toolBlockReason(tool, active);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    ctrlAtDown.current = e.ctrlKey || e.metaKey;
     if (editingText) return;
     cursor.move(e);
     const p = toDoc(e.clientX, e.clientY);
@@ -1018,13 +1025,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const group = [d.base, ...(d.others ?? [])];
       let dx = p.x - d.startX, dy = p.y - d.startY;
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
-      const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
+      // Ctrl/Meta pressed in the drag: no snap, still measured (neighbourGaps.ts).
+      const mode = moveMode(snap.on, e.altKey, e.ctrlKey || e.metaKey, ctrlAtDown.current);
+      const box = mode.measure ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
         const ids = new Set(group.map((l) => l.id));
-        const s = snapSessionOf(d, doc, ids, d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
-        dx += s.dx;
-        dy += s.dy;
-        showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
+        const session = snapSessionOf(d, doc, ids, d.layerId, snap, view, size);
+        const s = mode.snap ? session.step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp) : (session.clear(), null);
+        dx += s?.dx ?? 0; dy += s?.dy ?? 0;
+        showGuides({ x: s?.viewGuides?.x, y: s?.viewGuides?.y, m: [...(s?.measures ?? []), ...neighbourGaps(box, doc.layers, ids, s)], a: s?.alignments });
       } else {
         snapSessionOf(d, doc, new Set(group.map((l) => l.id)), d.layerId, snap, view, size).clear();
         showGuides({});
@@ -1238,15 +1247,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
   };
 
-  const onWheel = (e: React.WheelEvent) => {
-    const r = canvasRef.current!.getBoundingClientRect();
-    if (e.ctrlKey || e.metaKey) {
-      const factor = Math.exp(-e.deltaY * 0.0022);
-      setView((v) => zoomAt(v, e.clientX - r.left, e.clientY - r.top, factor));
-    } else {
-      setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
-    }
-  };
+  const onWheel = (e: React.WheelEvent) => wheel.wheel(e, canvasRef.current!.getBoundingClientRect());
 
   // Native listener so preventDefault works (React wheel handlers are passive).
   useEffect(() => {
@@ -1319,6 +1320,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       {tool === 'move' && (!editLayers || shapeEditing) && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
       <SnapIndicator view={view} measures={guideLines.m} alignments={guideLines.a} />
+      <AgentGlow view={view} doc={doc} />
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {

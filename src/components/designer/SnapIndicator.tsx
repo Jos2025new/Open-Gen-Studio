@@ -23,7 +23,7 @@ export function SnapIndicator({ view, measures, alignments }: { view: View; meas
       return <g key={i}>
         <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={INK} strokeWidth={1} />
         {tick(a)}{tick(b)}
-        <text x={mx} y={horizontal ? my - 6 : my} fontSize={11} fill={INK} textAnchor="middle" dominantBaseline={horizontal ? 'auto' : 'middle'}>{m.label.toFixed(1)}</text>
+        <text x={mx} y={horizontal ? my - 6 : my} fontSize={11} fill={INK} textAnchor="middle" dominantBaseline={horizontal ? 'auto' : 'middle'}>{String(Math.round(m.label * 10) / 10)}</text>
       </g>;
     })}
   </svg>;

@@ -1,6 +1,6 @@
 # Designer: documento técnico
 
-Maestro técnico del Designer (2026-10-23, rama `task/workflow-ask-first`). Todo sale de la lectura del código, con `archivo:línea`; no se ejecutó la app. Los ajustes exactos de cada herramienta no se repiten aquí: la fuente de verdad es [[inventario-herramientas-designer]] (partes 1) y [[inventario-herramientas-designer-2]] (parte 2). La explicación para usuarios está en [[designer-guia-usuario]]. Detalle de comportamiento y pruebas por rasgo: [features/designer.md](features/designer.md) y [features/designer-selection.md](features/designer-selection.md).
+Maestro técnico del Designer (2026-10-23, rama `task/workflow-ask-first`). Todo sale de la lectura del código, con `archivo:línea`; no se ejecutó la app. Los ajustes exactos de cada herramienta no se repiten aquí: la fuente de verdad es [[designer-controles/README]] (las notas de `designer-controles/`). La explicación para usuarios está en [[designer-guia-usuario]]. Detalle de comportamiento y pruebas por rasgo: [features/designer.md](features/designer.md) y [features/designer-selection.md](features/designer-selection.md).
 
 Este documento tiene dos partes: esta (arquitectura, motor, persistencia, importar y exportar, herramientas) y [[designer-tecnico-2]] (superficies de la interfaz, hallazgos, trabajo pendiente y pruebas).
 
@@ -45,8 +45,8 @@ Todo está en `UI/` (45 archivos). Papel de los principales:
 | `DesignerWorkspace.tsx` | Raíz. Barra superior (`TopbarActions`), selector de documentos, paleta, ayuda, `Stage`, `LayersPanel`, atajos globales (`designerKey`, línea 63, en `DesignerWorkspace.tsx`) e importación (`DesignerWorkspace.tsx:84-120`) |
 | `Stage.tsx` (1388 líneas) | Lienzo: vista (zoom y desplazamiento), reglas, entrada de puntero para todas las herramientas, selección y edición de objetos (`Stage`, línea 157) |
 | `StagePaintCommit.ts` | Confirma un trazo de pincel: aplana, pide la decisión de Dibujo o Diseño, aplica el límite |
-| `ToolPalette.tsx` / `ToolRail.tsx` | Carril de herramientas por familias (`RAIL`, `ToolRail.tsx:30`); `railTools()` (línea 55) lo usa el test de inventario |
-| `ContextStrip.tsx` | Barra contextual sobre el carril (`ContextStrip`, línea 42); cambia de contenido según herramienta y selección |
+| `ToolDock.tsx` / `toolboxModel.ts` | Dock de herramientas por familias y variantes. El antiguo `ToolRail.tsx` (`RAIL`, `railTools`) se eliminó en `f11a0dd` (2026-10-23) |
+| `ContextStrip.tsx` | Tira contextual; hoy solo se monta dentro de `EditCard` (`EditCard.tsx:37`), no sobre un carril (`ContextStrip`, línea 42); cambia de contenido según herramienta y selección |
 | `ToolSettings.tsx` | Ajustes de la herramienta activa, en versión `compact` y completa (`ToolSettings`, línea 211) |
 | `BrushSettings.tsx`, `StrokeStyleFields.tsx`, `ShapeLookFields.tsx`, `ShapePaint.tsx`, `PrimFields.tsx` | Campos de pincel, trazos de Lineart, aspecto de formas, relleno y borde, parámetros de primitivos |
 | `LayersPanel.tsx` | Panel derecho: pestañas Properties, Tool y Layers; lista de capas, carpetas, acciones (`LayersPanel`, línea 85) |
@@ -69,7 +69,7 @@ Los componentes grandes se dividieron para respetar el límite de 30 KB por arch
 El estado del Designer está en dos sitios:
 
 - **Persistido en la sesión**: `session.docs` y `session.activeDocId`. Los cambios de documento pasan por `mutateDoc` (`ENG/actions.ts:42`), que registra el paso de deshacer salvo `record: false`.
-- **Preferencias de interfaz** (`ui`, `store.ts`): `DEFAULT_UI` (`store.ts:232`) da `tool: 'move'`, `brush`, `lineart`, `shape` y `text`. El resto de campos (`wand`, `gradient`, `lineartMode`, `lineartInfluence`, `selectShape`, `selectMode`, `autoSelect`, `snapByMode`, `rulers`, `strokeRuler`, `strokeRulerKind`, `shapeLockRadii`, `toolHelp`, `designerDock`) se declaran en `UiState` (`store.ts:120`, campos hasta ~170) sin valor inicial. La tabla de valores por defecto y de qué herramienta comparte qué campo está en [[inventario-herramientas-designer#2. Estado compartido y valores por defecto]].
+- **Preferencias de interfaz** (`ui`, `store.ts`): `DEFAULT_UI` (`store.ts:232`) da `tool: 'move'`, `brush`, `lineart`, `shape` y `text`. El resto de campos (`wand`, `gradient`, `lineartMode`, `lineartInfluence`, `selectShape`, `selectMode`, `autoSelect`, `snapByMode`, `rulers`, `strokeRuler`, `strokeRulerKind`, `shapeLockRadii`, `toolHelp`, `designerDock`) se declaran en `UiState` (`store.ts:120`, campos hasta ~170) sin valor inicial. La tabla de valores por defecto y de qué herramienta comparte qué campo está en [[estado-compartido]].
 - **Fuera del store persistido, a propósito** (seleccionar no debe guardar): la selección de capas (`useLayerSelection`, `ENG/selection.ts:10`), la de objetos (`useObjectSelection`, `ENG/objectSelection.ts:13`), la edición de forma (`useShapeEdit`, `objectSelection.ts:29`), la selección de píxeles (`ENG/pixelSelection.ts:44`) y la regla de trazos (`ENG/strokeRuler.ts:27`).
 - **Preferencias del navegador** (`usePref`): `ogs:layers-tab` (pestaña del panel, defecto `props`; `LayersPanel.tsx:103`) y `ogs:canvas-picker-open` (`DocumentPicker.tsx`).
 
@@ -118,7 +118,7 @@ Todo el motor está en `ENG/` (`src/engine/design/`, unos 100 archivos), puro sa
 
 ### Capas FX
 
-Registro único en `src/engine/fx/defs.ts` (ADR 0011, [decisión 0011](decisions/0011-capas-fx.md)); trece tipos: brightness, contrast, saturation, hue, grayscale, sepia, invert, blur, levels, curves, glow, shadow, flare (`fx/types.ts:9`). `fxPlan` (`fx/plan.ts:18`) decide qué filtra cada capa y en qué orden; lo usan el lienzo y la exportación SVG (contrato `fx-plan`). Los comandos (`runFx`, `ENG/fx.ts:6`) los comparten el panel y el agente (`designerFx.ts`, `designerTools.ts` en `src/engine/agent/`). Parámetros y rangos: [[inventario-herramientas-designer-2#7. Controles fuera de ToolSettings]].
+Registro único en `src/engine/fx/defs.ts` (ADR 0011, [decisión 0011](decisions/0011-capas-fx.md)); trece tipos: brightness, contrast, saturation, hue, grayscale, sepia, invert, blur, levels, curves, glow, shadow, flare (`fx/types.ts:9`). `fxPlan` (`fx/plan.ts:18`) decide qué filtra cada capa y en qué orden; lo usan el lienzo y la exportación SVG (contrato `fx-plan`). Los comandos (`runFx`, `ENG/fx.ts:6`) los comparten el panel y el agente (`designerFx.ts`, `designerTools.ts` en `src/engine/agent/`). Parámetros y rangos: [[fx]].
 
 ### Límites de recursos
 
@@ -180,34 +180,34 @@ Studio muestra una versión reducida en su tablero (`StudioBoard.tsx:33` monta `
 
 ## Herramientas
 
-Las 21 herramientas con todos sus ajustes, condiciones y `archivo:línea` están en [[inventario-herramientas-designer#3. Herramientas, una a una]]. Aquí solo el mapa y a quién pertenece cada comportamiento. Cada subsección enlaza al apartado de la guía de usuario.
+Las 21 herramientas con todos sus ajustes, condiciones y `archivo:línea` están en [[designer-controles/README]]. Aquí solo el mapa y a quién pertenece cada comportamiento. Cada subsección enlaza al apartado de la guía de usuario.
 
 ### Edit y Pan
 
-`move` (V) y `hand` (H). Edit actúa sobre objetos o capas (`Object`/`Layer`), con Auto-select, Snap, Align y Transform. Pan no tiene ajustes. Inventario: [[inventario-herramientas-designer#3.1 Edit (`move`, tecla V)]] y [[inventario-herramientas-designer#3.2 Pan (`hand`, tecla H)]]. Guía: [[designer-guia-usuario#Edit (mover y editar)]], [[designer-guia-usuario#Pan (mover la vista)]]. Código clave: `StageEditMarquee.ts`, `objectOps.ts`, `transform.ts`, `snap*.ts`, `AlignControls.tsx`.
+`move` (V) y `hand` (H). Edit actúa sobre objetos o capas (`Object`/`Layer`), con Auto-select, Snap, Align y Transform. Pan no tiene ajustes. Inventario: [[alinear-editar]] y [[navegacion-zoom]]. Guía: [[designer-guia-usuario#Edit (mover y editar)]], [[designer-guia-usuario#Pan (mover la vista)]]. Código clave: `StageEditMarquee.ts`, `objectOps.ts`, `transform.ts`, `snap*.ts`, `AlignControls.tsx`.
 
 ### Selección de píxeles
 
-`select` (M): rectángulo, lazo y varita mágica. Inventario: [[inventario-herramientas-designer#3.3 Select pixels (`select`, tecla M)]]. Guía: [[designer-guia-usuario#Select pixels (selección)]]. Código clave: `pixelSelection.ts`, `pixelMove.ts`, `ToolSettings.tsx:165-188`.
+`select` (M): rectángulo, lazo y varita mágica. Inventario: [[seleccion]]. Guía: [[designer-guia-usuario#Select pixels (selección)]]. Código clave: `pixelSelection.ts`, `pixelMove.ts`, `ToolSettings.tsx:165-188`.
 
 ### Cuentagotas, cubo y degradado
 
-`eyedropper` (I), `fill` (G) y `gradient` (U). Inventario: [[inventario-herramientas-designer#3.4 Eyedropper (`eyedropper`, tecla I)]], [[inventario-herramientas-designer#3.5 Fill (`fill`, tecla G)]], [[inventario-herramientas-designer#3.6 Gradient (`gradient`, tecla U)]]. Guía: [[designer-guia-usuario#Eyedropper (cuentagotas)]], [[designer-guia-usuario#Fill (cubo)]], [[designer-guia-usuario#Gradient (degradado)]]. Código: `fill.ts`, `gradient.ts`.
+`eyedropper` (I), `fill` (G) y `gradient` (U). Inventario: [[cuentagotas]], [[relleno]], [[degradado]]. Guía: [[designer-guia-usuario#Eyedropper (cuentagotas)]], [[designer-guia-usuario#Fill (cubo)]], [[designer-guia-usuario#Gradient (degradado)]]. Código: `fill.ts`, `gradient.ts`.
 
 ### Pincel y borrador
 
-`brush` (B) y `eraser` (E) comparten `BrushSettings`. Inventario: [[inventario-herramientas-designer#3.7 Brush (`brush`, tecla B) y 3.8 Eraser (`eraser`, tecla E)]]. Guía: [[designer-guia-usuario#Brush (pincel)]], [[designer-guia-usuario#Eraser (borrador)]]. Código: `brushEngine.ts`, `brushStroke.ts`, `StagePaintCommit.ts`, `paintMode.ts`, `drawingChoice.ts`.
+`brush` (B) y `eraser` (E) comparten `BrushSettings`. Inventario: [[pincel]]. Guía: [[designer-guia-usuario#Brush (pincel)]], [[designer-guia-usuario#Eraser (borrador)]]. Código: `brushEngine.ts`, `brushStroke.ts`, `StagePaintCommit.ts`, `paintMode.ts`, `drawingChoice.ts`.
 
 ### Lineart y Ruler
 
-`lineart` (P) dibuja trazos vectoriales con presión; `ruler` (K) coloca una guía que el pincel puede seguir. Inventario: [[inventario-herramientas-designer#3.9 Lineart (`lineart`, tecla P)]], [[inventario-herramientas-designer#3.10 Ruler (`ruler`, tecla K)]]. Guía: [[designer-guia-usuario#Lineart (línea artística)]], [[designer-guia-usuario#Ruler (regla de trazos)]]. Código: `strokes.ts`, `strokeRuler.ts`, `StrokeRulerOverlay.tsx`.
+`lineart` (P) dibuja trazos vectoriales con presión; `ruler` (K) coloca una guía que el pincel puede seguir. Inventario: [[lineart]], [[regla]]. Guía: [[designer-guia-usuario#Lineart (línea artística)]], [[designer-guia-usuario#Ruler (regla de trazos)]]. Código: `strokes.ts`, `strokeRuler.ts`, `StrokeRulerOverlay.tsx`.
 
 ### Text
 
-`text` (T). Inventario: [[inventario-herramientas-designer#3.11 Text (`text`, tecla T)]]. Guía: [[designer-guia-usuario#Text (texto)]]. Código: `TextEditor.tsx`, `textLayout.ts`, `TextStyleFields` en `ToolSettings.tsx:197-209`.
+`text` (T). Inventario: [[texto]]. Guía: [[designer-guia-usuario#Text (texto)]]. Código: `TextEditor.tsx`, `textLayout.ts`, `TextStyleFields` en `ToolSettings.tsx:197-209`.
 
 ### Formas y líneas
 
-Diez herramientas con `ui.shape` común: Rectangle (R), Ellipse (O), Polygon, Star, Sector, Arc, Chord, Line (L), Curve, Arrow. Inventario: [[inventario-herramientas-designer#3.12 Formas y líneas]]. Guía: [[designer-guia-usuario#Formas y líneas]]. Edición de una forma ya creada: [[inventario-herramientas-designer-2#4.3 Forma elegida (CS:80-106)]]. Código: `shapeTools.ts`, `shapeDraw.ts`, `primitives.ts`, `ShapeKnots.tsx`, `PathNodes.tsx`.
+Diez herramientas (valores de `ui.tool`; la interfaz las agrupa en tres botones, `b955f45`) con `ui.shape` común: Rectangle (R), Ellipse (O), Polygon, Star, Sector, Arc, Chord, Line (L), Curve, Arrow. Inventario: [[formas]]. Guía: [[designer-guia-usuario#Formas y líneas]]. Edición de una forma ya creada: [[tira-contextual]]. Código: `shapeTools.ts`, `shapeDraw.ts`, `primitives.ts`, `ShapeKnots.tsx`, `PathNodes.tsx`.
 
-Atajos de todas las herramientas: [[inventario-herramientas-designer-2#6. Atajos de teclado]]. Guía: [[designer-guia-usuario#Atajos de teclado]].
+Atajos de todas las herramientas: [[atajos]]. Guía: [[designer-guia-usuario#Atajos de teclado]].
