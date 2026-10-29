@@ -384,6 +384,8 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const refFor = (sourceId: string, index?: number): string | null => {
     const n = byId.get(sourceId);
     if (!n || n.data.kind === 'text') return null;
+    // A link whose image was deleted delivers nothing, even when its source runs in this batch (never `source#0`).
+    if (index === NO_RESULT) { errors.push(`The link from "${n.data.title}" has no output: its image was deleted. Connect it again.`); return null; }
     // A 3D source gives its view image (rendered when the model is shown or its view changes).
     if (n.data.kind === 'model3d' || (n.data.kind === 'asset' && options.assets?.[n.data.assetId ?? '']?.kind === 'model3d')) {
       if (run.has(sourceId)) { errors.push(`Run "${n.data.title}" first: its view image is made from the finished model.`); return null; }
