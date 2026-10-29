@@ -34,4 +34,4 @@ Las filas no son funciones únicas: un mismo control puede aparecer en varias su
 
 Total: 393 filas de datos (contadas por script, sin cabeceras ni separadores).
 
-Resumen de hallazgos: ver [hallazgos](hallazgos.md). Los de mayor peso son H1 (capacidad sin guarda: `edit_node` cambia el modelo sin tarjeta; comportamiento real pendiente de reproducir), H2 (modelo de las operaciones de imagen y `animate` invisible; solo 4 operaciones de vídeo lo muestran; decisión), H3 (Delete asset sin confirmar) y H11 (sin Stop ni Comprobar por nodo; reintento = Run otra vez).
+Resumen de hallazgos: ver [hallazgos](hallazgos.md). Los de mayor peso son H1 (capacidad sin guarda: `edit_node` cambia el modelo sin tarjeta; sin decisión escrita para esta herramienta; requiere prueba con un agente real), H2 (modelo de las operaciones de imagen y `animate` invisible; solo 4 operaciones de vídeo lo muestran; decisión), H3 (Delete asset sin confirmar) y H11 (sin Stop ni Comprobar por nodo; reintento = Run otra vez).
