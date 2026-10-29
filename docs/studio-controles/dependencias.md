@@ -42,17 +42,17 @@ Orden observado en `credit.ts`: la generación fallida por crédito busca el mis
 | --- | --- | --- | --- |
 | Spending limit, Limit (USD) | `overLimit` | `budget.ts`; precios desconocidos no cuentan (`budget.ts:25-27`) | P2: hallazgo, el tooltip promete preguntar |
 | Price margin | Revisión de paso (Continuar/Cancelar paso) | `priceAuthorization.ts` | P2: cumple con 5/25/50 %; con Off solo muestra la diferencia, por diseño |
-| Aprobar por encima del límite | `budgetAccepted` global | `acceptOverLimit` | P2: hallazgo, las ejecuciones siguientes dejan de preguntar hasta Reset o cambio de límite (la nota de Settings lo avisa) |
+| Aprobar por encima del límite | `Session.noAskOverLimit` (por sesión), `settings.budgetNoAsk` (app) y un pase de 4 s (`continueOnce`) | `continueOnce`, `dontAskAgain`, `askAgain` (`budget.ts`) | P2: H4 resuelto (2026-10-29): «Continue once» deja pasar solo esa acción; «Don’t ask again» vale para esa sesión; el interruptor de Settings > Budget lo hace global |
 | Generar directo | `SpendConfirm` | `costLabel` | P2: cumple |
 | Reescritura de prompt | `addSpend` categoría agente | Llamada LLM del agente | P2: hallazgo, el coste no se muestra antes |
 | Cada revisión del plan (Edit, Suggest) | Turno LLM del agente | `llmTurn.ts` | P2/P3: el texto «nothing is spent» es cierto para generación, no para el turno LLM |
-| Reset | `spentUsd=0`, `budgetAccepted=null` | Settings > Budget | P2: cumple |
+| Reset | `spentUsd=0`, `budgetAccepted=null`, `askAgain()` de la sesión activa | Settings > Budget | P2: cumple |
 
 ## Aprobación del plan
 
 | Origen | Destino | Cómo se propaga | Promesa tocada |
 | --- | --- | --- | --- |
-| Approve | Ejecución del plan (`planRun.ts`) | Comprueba límite; si se pasa pide confirmar y llama a `acceptOverLimit` | P2: ver arriba |
+| Approve | Ejecución del plan (`planRun.ts`) | Comprueba el límite de su sesión; si se pasa, la tarjeta ofrece «Continue once» / «Don’t ask again» | P2: ver arriba |
 | Revisión de paso | Pausa del paso | Si el precio real supera el aprobado más el margen, espera Continuar o Cancelar paso | P2: cumple |
 | Cancel en ejecución | `stopPlanRun` + `cancelGeneration` | Sin aviso | P2/P3: sin confirmar si el trabajo remoto sigue cobrando; «Dejar de seguir» sí avisa ([resultados](resultados.md)) |
 | Check status (recuperación) | Reconsulta | Con el límite superado solo muestra un aviso (`RecoveryActions.tsx:23-30`) | Hallazgo: sin salida |

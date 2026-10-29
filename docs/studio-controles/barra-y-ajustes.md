@@ -44,8 +44,8 @@ La barra y Settings son compartidas con los otros lienzos. Aquí solo lo que cam
 | Limit (USD) | `SettingsPanel.tsx:475` | Límite encendido | `budgetUsd` (defecto 25) | Redondea a centavos al salir del campo | `overLimit`, `SpendConfirm`, aprobar plan | Un valor inválido restaura el anterior |
 | Price margin 5/25/50/Off | `SettingsPanel.tsx:491-494` | Siempre | `priceMargin()` | `settings.priceMargin` | Revisión de pasos en [tarjeta-plan](tarjeta-plan.md) | Off: corre y la tarjeta muestra la diferencia |
 | Spent | `SettingsPanel.tsx:502` | Siempre | `spentUsd` | Solo lectura | Comparación con el límite | Incluye llamadas del agente (nota al pie) |
-| Reset | `SettingsPanel.tsx:504-513` | Siempre | Estado | `spentUsd=0` y `budgetAccepted=null` | Vuelve a preguntar tras haber aceptado pasarse | El historial queda en el panel Spending |
-| Nota «You chose to continue past this limit» | `SettingsPanel.tsx:516` | `budgetAccepted === budgetUsd` | Aceptación previa | Informativa | Avisa de que ya no se pregunta | Se limpia cambiando el límite o con Reset |
+| Reset | `SettingsPanel.tsx` (pestaña Budget) | Siempre | Estado | `spentUsd=0`, `budgetAccepted=null` y `askAgain()` de la sesión activa | Vuelve a preguntar tras haber aceptado pasarse | El historial queda en el panel Spending |
+| Interruptor «Don’t ask in any session» y fila «This session · not asking · Ask again» | `SettingsPanel.tsx` (pestaña Budget) | Límite activo; la fila solo si la sesión activa no pregunta y el interruptor está en Off | `settings.budgetNoAsk` (o `budgetAccepted === budgetUsd` de versiones anteriores) y `Session.noAskOverLimit` | `setSettings({ budgetNoAsk })` / `askAgain()` | Deja de preguntar en todas las sesiones / vuelve a preguntar en esta | Reset también reactiva la sesión activa |
 | Enlace Spending | `SettingsPanel.tsx:520` | Siempre | — | `ui.panel='spending'` | Abre `SpendingPanel` (gasto por periodo) | Cierra Settings |
 
 ## Enlaces

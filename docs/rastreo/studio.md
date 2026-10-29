@@ -43,7 +43,7 @@ Fuente de las filas: [pendientes-agente.md](../pendientes-agente.md) (A1 a A28, 
 | A24–A28 | pendientes-agente.md | Cerrados 2026-10-23 y 2026-10-27 | **Cerrados**, con las salvedades de 1.3 | `a6f1ea8`, `67757c1`, `b43fb48`, `bf64252` |
 | B1 | B1, 2026-10-16 | Posible cobro de $0,068 por una generación interrumpida | **No verificable** (panel del proveedor) | Ver respuesta a G1 en 4.1 |
 | B2 | B2, 2026-10-21 | Arreglos del relay sin llevar a la app real | **Abierto fuera del repo** | En esta rama `mediaHosts.ts` ya trae el host R2 de NanoGPT (`MEDIA_EXACT`) |
-| B3 | B3, 2026-10-08 | El presupuesto no es un máximo | **Abierto** | `budget.ts:25-27`: los precios desconocidos no cuentan; «Continue anyway» sigue |
+| B3 | B3, 2026-10-08 | El presupuesto no es un máximo | **Abierto** | Decidido 2026-10-29: el límite avisa, no bloquea. Precio desconocido con límite activo pide confirmar («Continue once» / «Don’t ask again») y, si el coste real lo pasa, un aviso único con «Review limit» / «Ignore» |
 | B4 | B4, 2026-10-21 | El gasto bajó de $15,46 a $15,45 sin generar | **Sin verificar** | Sin hipótesis en el código leído |
 | B5 | B5, 2026-10-18 | 3D (Tripo) «Failed to fetch»; host de 3D fuera de `MEDIA_HOSTS` | **Abierto** | `mediaHosts.ts:7-8`: ningún host de 3D |
 | B8 | B8, 2026-10-08 | Modelos `-spicy` excluidos de forma provisional | **Abierto, provisional** | `modelIndex.ts:81-86` |

@@ -20,7 +20,7 @@ related: [dependencias, composer, tarjeta-plan, tablero]
 | `guidedRounds` | `store.ts:243` | 2 | store | Guided rounds | `roundsFor` ([tarjeta-preguntas](tarjeta-preguntas.md)) |
 | `budgetOn` | `store.ts:245` | encendido | store | Spending limit | `overLimit`, [composer](composer.md), [tarjeta-plan](tarjeta-plan.md) |
 | `budgetUsd` | `store.ts:244` | 25 | store | Limit (USD) | Igual |
-| `budgetAccepted` | `store.ts:246` | `null` | store | `acceptOverLimit` (Aprobar o Generar por encima del límite), Reset | `overLimit`: vale mientras `budgetUsd` no cambie |
+| `budgetAccepted` (solo lectura, antiguo) · `budgetNoAsk` · `Session.noAskOverLimit` | `store.ts` / `types.ts` | `undefined` | store (ajustes y sesión) | `dontAskAgain` (sesión), interruptor de Settings (app), Reset; un `budgetAccepted` guardado vale como `budgetNoAsk` mientras `budgetUsd` no cambie | `overLimit` (`overLimitAccepted`) |
 | `priceMargin` | `store.ts:65` | 25 % (`priceMargin()`) | store | Price margin | `priceAuthorization.ts` |
 
 ## Composer (`ComposerState`, `store.ts:74`)

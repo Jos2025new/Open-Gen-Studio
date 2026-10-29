@@ -28,7 +28,7 @@ related: [dependencias, ejecucion, deshacer-bloqueos]
 | Portapapeles de nodos | `arrange.ts:126` | No | `null` | Pegar |
 | `composer[kind]` (modelo y ajustes) | `flow/actions.ts:45` | Sí (Composer) | Ver Studio | Valores con que nace un nodo |
 | `composer.attachments` | `engine/actions.ts:599` | Ver Studio | — | Casillas «agent context», «Attach to prompt» |
-| `settings.budgetOn` / `budgetUsd` / `budgetAccepted` / `spentUsd` | `store.ts:63` | Sí (ajustes) | Límite activado de 25 USD (`store.ts:244`), `budgetAccepted: null` | Revisión de gasto y «Continue anyway» |
+| `settings.budgetOn` / `budgetUsd` / `budgetNoAsk` / `budgetAccepted` (antiguo) / `spentUsd` | `store.ts` | Sí (ajustes) | Límite activado de 25 USD, sin aceptación | Revisión de gasto y «Continue once» / «Don’t ask again» |
 | `settings.ops` (modelo por operación) | `engine/catalog.ts:469` | Sí (ajustes) | Ver Ajustes | Modelo de las herramientas |
 | `ui.lightbox`, `ui.sketch`, `ui.panel` | `nodes.tsx:142` | No | `null` | Visor, editor Sketch, galería |
 | `ui.threadOpen` | `ThreadPeek.tsx:8` | Sin confirmar | — | Hilo de Nodes |
