@@ -21,8 +21,8 @@ La barra y Settings son compartidas con los otros lienzos. Aquí solo lo que cam
 | SessionSwitcher | `TopBar.tsx:121` | Hay sesión | `activeId` | Sesión activa | Chat, agente y tablero de esa sesión | Contenido sin inventariar |
 | New session | `TopBar.tsx:124` | Siempre | `newSession` | Crea sesión | Chat vacío | Sin confirmación |
 | Connected | `TopBar.tsx:135-142` | Siempre (en Home es una píldora) | Proveedores con clave | Abre popover de proveedores | Qué proveedores puede usar el agente | Indicador `pool-dot` encendido si hay alguno |
-| Generations | `TopBar.tsx:138,145` | Fuera de Home | Cola de trabajos | Abre popover de 680 px | Seguimiento de trabajos | Cierra los otros popovers al abrir |
-| Settings | `TopBar.tsx:140,148` | Siempre | `settingsOpen` | `ui.settingsOpen` | Panel de 400 px con pestañas | Cierra Connected y Generations al abrir |
+| Generations | `TopBar.tsx` | Fuera de Home | Cola de trabajos | Abre popover de 540 px | Seguimiento de trabajos | Cierra los otros popovers al abrir |
+| Settings | `TopBar.tsx` | Siempre | `settingsOpen` | `ui.settingsOpen` | Panel de 380 px con pestañas desplazables | Cierra Connected y Generations al abrir |
 
 ## Settings: pestaña Agent (`SettingsPanel.tsx:351`)
 

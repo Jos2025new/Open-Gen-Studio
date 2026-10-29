@@ -15,6 +15,7 @@ import { WORKSPACES } from './WorkspaceMenu';
 import { HomeIcon } from './Sidebar';
 import { openHome } from './navModel';
 import '../../styles/topbar-home.css';
+import '../../styles/compact-popovers.css';
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 
@@ -134,10 +135,10 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={shownProviders.length ? 340 : 180} label="Connected providers" className="provider-connections-popover">
         <ConnectedProviders providers={shownProviders} onAdd={(p) => setAddedProviders((prev) => prev.includes(p) ? prev : [...prev, p])} />
       </Popover>
-      <Popover open={generationsPop.open} anchor={generationsPop.ref} onClose={generationsPop.close} width={680} label="Generations" className="generations-popover">
+      <Popover open={generationsPop.open} anchor={generationsPop.ref} onClose={generationsPop.close} width={540} label="Generations" className="generations-popover">
         <GenerationsPanel onClose={generationsPop.close} />
       </Popover>
-      <Popover open={settingsOpen} anchor={settingsRef} onClose={() => setUi({ settingsOpen: false })} width={400} label="Settings" className="pop-scroll">
+      <Popover open={settingsOpen} anchor={settingsRef} onClose={() => setUi({ settingsOpen: false })} width={380} label="Settings" className="pop-scroll settings-popover">
         <SettingsPanel />
       </Popover>
     </header>

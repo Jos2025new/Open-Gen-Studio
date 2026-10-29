@@ -26,7 +26,7 @@ export function ComposerOptions({ label, disabled, agent, onAdd }: { label: stri
     <button ref={pop.ref} type="button" className={`composer-options-trigger ${pop.open ? 'is-open' : ''}`} aria-label="Add files, switch mode or open Design" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>
       <Plus size={19} />
     </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={270} label="Add and mode" className="composer-options">
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={224} label="Add and mode" className="composer-options">
       <button type="button" className="composer-options-file" disabled={disabled} onClick={pick(onAdd)}>
         <Paperclip size={17} /><span>{label}</span>
       </button>
