@@ -179,6 +179,7 @@
 - [052-2026-10-W43: un solo toolbox, tarjeta del pincel con pestañas, tarjeta Sizes y tarjeta Edit (2026-10-23)](history/052-2026-10-W43.md).
 - [053-2026-10-W43: Auto con una tarjeta, Studio independiente del tablero, límites del modelo y rechazos del agente (2026-10-24), abierto y frágil](history/053-2026-10-W43.md).
 - [054-2026-10-W44: origen y cierre del toolbox, limpieza de ramas del 2026-10-27 y typecheck en `npm test` (2026-10-27)](history/054-2026-10-W44.md).
+- [055-2026-10-W44: cierre de mapas, integración y limpieza (2026-10-29)](history/055-2026-10-W44.md).
 - [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
 - [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` (bugs confirmados) en `tests/repro-*.test.ts`; H11 descartado.
 - [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
