@@ -49,3 +49,29 @@ describe('check-docs folder indexes', () => {
     expect(r.out).toContain('docs/f/README.md: broken link gone.md');
   });
 });
+
+describe('check-docs links inside folder-indexed notes', () => {
+  const base = { 'docs/README.md': '- [F](f/README.md)\n- [G](g/README.md)\n', 'docs/g/README.md': '- [B](b.md)\n', 'docs/g/b.md': '# B\n' };
+  const withNote = (a: string) => run({ ...base, 'docs/f/README.md': '- [A](a.md)\n', 'docs/f/a.md': a });
+
+  it('accepts working links, wikilinks, aliases, headings and the own-folder README', () => {
+    expect(withNote('# A\n## Parte\n[b](../g/b.md) [[b]] [[b|otra]] [[a#Parte]] [[README]] `[[ejemplo]]`\n').out).toContain('check-docs: PASS');
+  });
+
+  it('reports a broken markdown link in a note', () => {
+    expect(withNote('[b](../g/gone.md)\n').out).toContain('docs/f/a.md: broken link ../g/gone.md');
+  });
+
+  it('reports a wikilink to a renamed or missing note', () => {
+    expect(withNote('[[gone]]\n').out).toContain('docs/f/a.md: broken wikilink [[gone]]');
+  });
+
+  it('reports a wikilink whose name exists in several folders and not in its own', () => {
+    const r = run({ ...base, 'docs/h/README.md': '- [B](b.md)\n', 'docs/h/b.md': '# B\n', 'docs/README.md': '- [F](f/README.md)\n- [G](g/README.md)\n- [H](h/README.md)\n', 'docs/f/README.md': '- [A](a.md)\n', 'docs/f/a.md': '[[b]]\n' });
+    expect(r.out).toContain('docs/f/a.md: ambiguous wikilink [[b]]');
+  });
+
+  it('reports a wikilink to a missing heading', () => {
+    expect(withNote('# A\n[[b#Nada]]\n').out).toContain('docs/f/a.md: wikilink [[b#Nada]] names a missing heading');
+  });
+});

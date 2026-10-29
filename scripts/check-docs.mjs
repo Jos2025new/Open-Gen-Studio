@@ -35,6 +35,30 @@ async function validateLinks(path, text) {
   }
 }
 
+const headings = (text) => [...text.matchAll(/^#{1,6}\s+(.+?)\s*#*\s*$/gm)].map((m) => m[1].trim().toLowerCase());
+
+/**
+ * [[wikilinks]] in a folder-indexed note (Obsidian style: [[name]], [[name#Heading]], [[name|alias]]). A name resolves
+ * to name.md in the note's own folder first, then to the one file with that name anywhere in docs/; none is broken,
+ * several is ambiguous. A #Heading must match a heading of the target. Inline code is skipped.
+ */
+async function validateWikilinks(path, text) {
+  for (const [, inner] of text.replace(/`[^`\n]*`/g, '').matchAll(/\[\[([^\]]+)\]\]/g)) {
+    const [target, section] = inner.split('|')[0].split('#').map((part) => part.trim());
+    let dest = null;
+    if (!target) dest = path;
+    else {
+      const name = target.endsWith('.md') ? target : `${target}.md`;
+      const near = files.find((f) => f.path === join(dirname(path), name));
+      const all = files.filter((f) => f.path.endsWith(`/${name}`));
+      if (near) dest = near.path;
+      else if (all.length === 1) dest = all[0].path;
+      else { errors.push(`${label(path)}: ${all.length ? 'ambiguous' : 'broken'} wikilink [[${inner}]]`); continue; }
+    }
+    if (section && !headings(await readFile(dest, 'utf8')).includes(section.toLowerCase())) errors.push(`${label(path)}: wikilink [[${inner}]] names a missing heading`);
+  }
+}
+
 async function main() {
   await collect(docs);
   const indexPath = join(docs, 'README.md');
@@ -50,6 +74,12 @@ async function main() {
     const text = await readFile(path, 'utf8');
     folderOf.set(dirname(path), new Set(targets(path, text)));
     await validateLinks(path, text);
+  }
+  // Every note of a folder-indexed folder: its markdown links and its wikilinks must resolve.
+  for (const { path } of files.filter((f) => f.path.endsWith('.md') && [...folderOf.keys()].some((dir) => f.path.startsWith(`${dir}/`)))) {
+    const text = await readFile(path, 'utf8');
+    if (!path.endsWith('/README.md')) await validateLinks(path, text);
+    await validateWikilinks(path, text);
   }
   for (const file of files) {
     if (file.path === indexPath || indexed.has(file.path)) continue;
