@@ -66,8 +66,10 @@ describe('the limit warns, it does not block (G2)', () => {
     expect(toasts()).toEqual([]);
   });
 
-  it('an unknown price does not count as over (its confirmation says it is billed at cost)', () => {
+  it('an unknown price cannot be checked against the limit, so it asks like going over (until accepted)', () => {
     addSpend(0.99, entry);
+    expect(overLimit({ usd: null, approximate: true })).toBe(true);
+    useStore.setState((s) => ({ settings: { ...s.settings, budgetAccepted: s.settings.budgetUsd } }));
     expect(overLimit({ usd: null, approximate: true })).toBe(false);
   });
 });

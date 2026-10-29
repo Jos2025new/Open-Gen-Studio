@@ -28,12 +28,12 @@ describe('repro 3: limit already used up and the price is unknown', () => {
   });
 
   // Cause: budget.ts:25-27 requires e.usd != null, so an unknown price is never "over"; budgetProblem (actions.ts:192-193) returns null.
-  it.fails('the gate does not report all-clear for an unknown price when nothing is left under the limit', () => {
+  it('the gate does not report all-clear for an unknown price when nothing is left under the limit', () => {
     expect(overLimit(unknown) || budgetProblem(unknown) !== null).toBe(true);
   });
 
   // Cause: same gate; runNodes (flow/actions.ts:329) lets an unpriced node run start with limit exhausted and no toast.
-  it.fails('a Nodes run with an unpriced model does not start silently when the limit is exhausted', async () => {
+  it('a Nodes run with an unpriced model does not start silently when the limit is exhausted', async () => {
     const st = useStore.getState();
     const sid = st.activeSessionId;
     const ref = 'fal::fal-ai/nopriced';

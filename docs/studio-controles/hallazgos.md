@@ -18,7 +18,7 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 | H2 | P1 | El cambio automático de variante por adjuntos marca `userPicked[kind]=true` como si el usuario lo hubiera elegido | `Composer.tsx:374` | Crítico |
 | H3 | P1 | `onAgentCredit` cambia el Director y fija `modelPinned: true`, pero el comentario del campo dice que solo lo fija el usuario | `credit.ts`; `store.ts:57` | Crítico |
 | H4 | P2 | Aprobar por encima del límite llama a `acceptOverLimit` global: las siguientes ejecuciones dejan de preguntar hasta Reset o cambio de límite | `budget.ts`; nota en `SettingsPanel.tsx:516` | Crítico, la nota lo avisa |
-| H5 | P2 | El tooltip del límite dice que una ejecución que lo pasa pregunta antes, pero `overLimit` ignora precios desconocidos | `budget.ts:24`; `SettingsPanel.tsx:460` | Crítico |
+| H5 | P2 | El tooltip del límite dice que una ejecución que lo pasa pregunta antes; corregido 2026-10-29: `overLimit` trata un precio desconocido como no comprobable y pide la misma confirmación | `budget.ts:24`; `SettingsPanel.tsx:460` | Crítico |
 | H6 | P2 | «Ajustar prompt» llama al LLM del agente y suma gasto sin mostrar su precio antes | `planSettings.ts rewritePrompts` | Crítico |
 | H7 | P3 | El texto «nothing is spent» de Suggest/Edit es cierto para generación, pero con un agente LLM cada revisión es un turno que cuesta (motor local: sin confirmar) | `PlanCard.tsx` (edición), `llmTurn.ts` | Crítico, aviso falso por omisión |
 | H8 | P2 | Cancel en ejecución llama `stopPlanRun` y `cancelGeneration` sin aviso; un trabajo remoto puede seguir cobrando, mientras «Dejar de seguir» sí avisa | `PlanCard.tsx:189` | Sin confirmar el cargo del proveedor |
@@ -59,7 +59,7 @@ Estados: «respondido por lectura» (leído en el código; no es arreglado ni pr
 | H2 | Respondido parcialmente; requiere decisión | `515dceb` evitó solo el recuerdo de sesión; `userPicked[kind]=true` sigue (`catalog.ts:235`) y luego cuenta como elección (`llmTurn.ts:281`) | R6, 4.2 |
 | H3 | Respondido por lectura; requiere decisión | Confirmado: `credit.ts:211` fija `modelPinned` sin el usuario; el aviso es veraz | R2, 4.2 |
 | H4 | Respondido por lectura; requiere decisión | Diseño avisado (`budget.ts:34`); deja sin tope hasta Reset. Que sea intencional no consta | R8, 4.2 |
-| H5 | Respondido por lectura; requiere decisión | Confirmado: precios desconocidos no cuentan (`budget.ts:25-27`) y el tooltip dice lo contrario | R7, 4.2 |
+| H5 | Respondido por lectura; requiere decisión | Decidido y corregido: con límite sin aceptar, un precio desconocido pide la confirmación de sobrepasar el límite con texto honesto (`budget.ts`) | R7, 4.2 |
 | H6 | Respondido por lectura; requiere decisión | Confirmado; el gasto sí llega a Spending (`planSettings.ts:188`), solo falta el precio previo | R10, 4.2 |
 | H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
 | H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |

@@ -21,17 +21,18 @@ export function overLimitAccepted(): boolean {
   return !budgetOn || budgetAccepted === budgetUsd;
 }
 
-/** This run would go over an active limit the user has not accepted going past (unknown prices do not count). */
+/** This run would go over an active limit the user has not accepted going past. An unknown price cannot be checked against it, so it asks too. */
 export function overLimit(e: Estimate): boolean {
   const left = remainingBudget();
-  return left != null && !overLimitAccepted() && e.usd != null && e.usd > left + 1e-9;
+  return left != null && !overLimitAccepted() && (e.usd == null || e.usd > left + 1e-9);
 }
 
 /** What the confirmation says when a run goes over the limit. */
 export function overLimitText(e: Estimate): string {
   const { budgetUsd } = get().settings;
   const left = Math.max(0, remainingBudget() ?? 0);
-  return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left${e.usd != null ? `, this costs ${formatUsd(e.usd)}` : ''}). Continue anyway? Further runs will not ask again until you change the limit.`;
+  if (e.usd == null) return `The price of this run is not published, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). Continue anyway? Further runs will not ask again until you change the limit.`;
+  return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). Continue anyway? Further runs will not ask again until you change the limit.`;
 }
 
 /** "Continue anyway": runs stop asking until the limit changes or spending is reset. */
