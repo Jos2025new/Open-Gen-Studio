@@ -6,7 +6,7 @@ Investigación de solo lectura; no hay cambios de código. Síntoma del usuario:
 
 ## Causa más probable
 
-**El taper no escala con el trazo.** `transformStroke` (`src/engine/design/affine.ts:52-54`) multiplica `size` por la escala, pero no toca `taperStart` ni `taperEnd`. Un trazo de 4 px con taper de 6 px, tras cinco reducciones a 0,7, mide 0,67 px de grosor y conserva un taper de 6 px: el taper ocupa todo el trazo y el contorno se convierte en una mancha. La función `scaleStroke` (`src/engine/design/strokes.ts:133-142`) sí escala los tapers con la media de escala, y los dos caminos han divergido.
+**El taper no escala con el trazo.** `transformStroke` (`src/engine/design/affine.ts`; antes de `6319284`, ya no son las líneas 52-54) multiplica `size` por la escala, pero no toca `taperStart` ni `taperEnd`. Un trazo de 4 px con taper de 6 px, tras cinco reducciones a 0,7, mide 0,67 px de grosor y conserva un taper de 6 px: el taper ocupa todo el trazo y el contorno se convierte en una mancha. La función `scaleStroke` (`src/engine/design/strokes.ts:133-142`) sí escala los tapers con la media de escala, y los dos caminos han divergido.
 
 Segunda causa, de fondo: el contorno lo calcula `perfect-freehand` con umbrales en unidades absolutas (ver H3). El resultado no es una función equivariante de la geometría escalada, así que cada reducción cambia un poco más el contorno.
 

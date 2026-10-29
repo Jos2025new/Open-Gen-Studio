@@ -33,7 +33,7 @@ Cada hallazgo sale de leer el código en esta pasada (el mismo `file:línea` est
 
 ## Textos desfasados
 
-- **Estado:** respondido por lectura, no corregido ([rastreo 5](../rastreo/designer.md)); corregir el texto no necesita prueba. La ayuda de Polygon también dice «Sides is in the strip» (`ToolHelp.tsx:24`) y el control es Corners.
+- **Estado:** respondido por lectura, no corregido (sin fila propia en [rastreo 5](../rastreo/designer.md)); corregir el texto no necesita prueba. La ayuda de Polygon también dice «Sides is in the strip» (`ToolHelp.tsx:24`) y el control es Corners. Referencia de rastreo: sin confirmar la fila exacta.
 - La ayuda de Star dice «Sides, Inner and Round are in the strip» (`ToolHelp.tsx:25`), pero los controles se llaman Corners, Spoke ratio y Rounded (`ShapeKindFields.tsx:36`).
 - La ayuda de Sector, Arc y Chord dice «From and To (degrees)» (`ToolHelp.tsx:26`), pero los controles se llaman Start y End (`ShapeKindFields.tsx:23`). Es un texto desfasado distinto de C13: C13 propone renombrar el selector «To» → «End» del degradado ([[degradado]]), no estos campos de ángulo.
 - El comentario de `ViewToggles` habla de «page rulers and guides», pero el componente solo contiene el botón de ayuda (`ToolHelp.tsx:47`).
