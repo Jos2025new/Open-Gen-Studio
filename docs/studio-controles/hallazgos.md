@@ -17,7 +17,7 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 | H1 | P1 | «Proveedor que encaja» cambia el proveedor del paso en Auto sin pulsar Cambiar y sin comparar precio; la divulgación depende de la frase del agente | `providerFit.betterProvider`; `features/agente-auto-tarjeta.md:34` | Crítico, documentado como diseño; ver rastreo abajo |
 | H2 | P1 | El cambio automático de variante por adjuntos marca `userPicked[kind]=true` como si el usuario lo hubiera elegido | `Composer.tsx:374` | Crítico |
 | H3 | P1 | `onAgentCredit` cambia el Director y fija `modelPinned: true`, pero el comentario del campo dice que solo lo fija el usuario | `credit.ts`; `store.ts:57` | Crítico |
-| H4 | P2 | **Resuelto 2026-10-29.** Antes: aprobar por encima del límite dejaba de preguntar en todo. Ahora «Continue once» solo vale para esa acción y «Don’t ask again» solo para la sesión; el interruptor de la app es explícito | `budget.ts`; Settings > Budget | Resuelto |
+| H4 | P2 | Antes: aprobar por encima del límite dejaba de preguntar en todo. Ahora «Continue once» crea un pase por sesión durante la acción y «Don’t ask again» se guarda por sesión; el interruptor de la app es explícito. Falta probar acciones solapadas | `budget.ts`; Settings > Budget | Corregido parcialmente; requiere prueba |
 | H5 | P2 | El tooltip del límite dice que una ejecución que lo pasa pregunta antes; corregido 2026-10-29: `overLimit` trata un precio desconocido como no comprobable y pide la misma confirmación | `budget.ts:24`; `SettingsPanel.tsx:460` | Crítico |
 | H6 | P2 | «Ajustar prompt» llama al LLM del agente y suma gasto sin mostrar su precio antes | `planSettings.ts rewritePrompts` | Crítico |
 | H7 | P3 | El texto «nothing is spent» de Suggest/Edit es cierto para generación, pero con un agente LLM cada revisión es un turno que cuesta (motor local: sin confirmar) | `PlanCard.tsx` (edición), `llmTurn.ts` | Crítico, aviso falso por omisión |
@@ -28,7 +28,7 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 
 | N.º | Hallazgo | Evidencia |
 | --- | --- | --- |
-| H10 | Escribir en el Composer con una tarjeta de preguntas abierta envía solo `{note}` y descarta las selecciones en pantalla, incluidos los valores recomendados (corregido 2026-10-29 para los recomendados; una opción pulsada y no enviada sigue sin cubrir) | `conversation.ts:51-54` |
+| H10 | Escribir en el Composer con una tarjeta de preguntas abierta envía solo `{note}` y descarta las selecciones en pantalla, incluidos los valores recomendados (corregido 2026-10-29: 4403f32 envía los recomendados y df8bc05 la opción pulsada, `agent.cardPick`; pruebas `tests/repro-cards-typing.test.ts`, `tests/questions-typed-choice.test.ts`; en pantalla se vio solo el caso de recomendada, ver [auditoría](../audits/repro-2026-10-29.md)) | `conversation.ts:51-54` |
 | H11 | Escribir con una tarjeta de ajustes abierta la cierra como «skipped» sin confirmar | `conversation.ts` |
 | H12 | «Open in Node» y «Open in Designer» del plan salen de Studio aunque el tablero ya tiene esas vistas | `PlanCard.tsx:362` |
 | H13 | «Otra cosa…» existe en la tarjeta de ajustes pero no en el interruptor de borrador del plan | `tarjeta-ajustes.md`, `tarjeta-plan.md` |
@@ -58,12 +58,12 @@ Estados: «respondido por lectura» (leído en el código; no es arreglado ni pr
 | H1 | Respondido parcialmente; requiere decisión | Por crédito de generación el cambio fue deliberado (`4cf18aa`, ADR 0025 C); para el agente, sin confirmar. Por capacidad (`providerFit.ts:41-55`, `6d97221`): sin decisión encontrada (no encontrarla no prueba que nunca se autorizara); `ec679f7` cita «sugerir otro modelo», que no es cambiar solo; no compara precio y puede subirlo; un proveedor nombrado antes no se protege (`:43`) | R1, 4.2 |
 | H2 | Respondido parcialmente; requiere decisión | `515dceb` evitó solo el recuerdo de sesión; `userPicked[kind]=true` sigue (`catalog.ts:235`) y luego cuenta como elección (`llmTurn.ts:281`) | R6, 4.2 |
 | H3 | Respondido por lectura; requiere decisión | Confirmado: `credit.ts:211` fija `modelPinned` sin el usuario; el aviso es veraz | R2, 4.2 |
-| H4 | Respondido por lectura; requiere decisión | Diseño avisado (`budget.ts:34`); deja sin tope hasta Reset. Que sea intencional no consta | R8, 4.2 |
+| H4 | Corregido parcialmente; requiere prueba | «Continue once» crea un pase por sesión durante la acción; «Don’t ask again» es por sesión y el interruptor de Settings > Budget para la app. Hay pruebas de los casos individuales; el solapamiento de acciones sigue por comprobar y no se vio en pantalla | R8, 4.2 |
 | H5 | Respondido por lectura; requiere decisión | Decidido y corregido: con límite sin aceptar, un precio desconocido pide la confirmación de sobrepasar el límite con texto honesto (`budget.ts`) | R7, 4.2 |
 | H6 | Respondido por lectura; requiere decisión | Confirmado; el gasto sí llega a Spending (`planSettings.ts:188`), solo falta el precio previo | R10, 4.2 |
 | H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
 | H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |
-| H9 | Respondido por lectura; requiere prueba y decisión | Corregido: `planRecoveryProblem` usa `rest` (pasos nuevos) para `check` | R12, 4.2 |
+| H9 | Respondido por lectura; requiere prueba y decisión | Corregido en 1de23c1: `planRecoveryProblem` usa `rest` (pasos nuevos) para `check`; prueba automatizada (`tests/repro-cards-recovery.test.ts`), **no visto en pantalla** (sin plan interrumpido en el sandbox) | R12, 4.2 |
 | H10 | Respondido por lectura; requiere prueba | Corregido 2026-10-29 para los valores recomendados (`conversation.ts` envía los valores que la tarjeta mostraba); la opción pulsada (o «Otra respuesta») sin pulsar Continue se corrigió después: la tarjeta la publica en `agent.cardPick` y escribir envía eso (`tests/questions-typed-choice.test.ts`) | R13, 4.2 |
 | H11 | Respondido por lectura; requiere prueba | Confirmado: la tarjeta pasa a `skipped` al escribir | R13, 4.2 |
 | H12, H13, H15, H16, H17 | Requiere decisión | La historia no los menciona; siguen abiertos y sin evaluar por el rastreo | 4.2 |

@@ -40,9 +40,9 @@ Orden observado en `credit.ts`: la generación fallida por crédito busca el mis
 
 | Origen | Destino | Cómo se propaga | Promesa tocada |
 | --- | --- | --- | --- |
-| Spending limit, Limit (USD) | `overLimit` | `budget.ts`; precios desconocidos no cuentan (`budget.ts:25-27`) | P2: hallazgo, el tooltip promete preguntar |
+| Spending limit, Limit (USD) | `overLimit` | `budget.ts`; con límite activo sin aceptar, un precio desconocido pide la misma confirmación (`overLimit`: `e.usd == null`, e978427) | P2: cumple lo que promete el tooltip. Prueba automatizada (`tests/repro-spend-unknown.test.ts`); en pantalla (sandbox con gasto real) se vio la tarjeta con «Price n/a» y el texto antiguo «Continue anyway», no los botones nuevos |
 | Price margin | Revisión de paso (Continuar/Cancelar paso) | `priceAuthorization.ts` | P2: cumple con 5/25/50 %; con Off solo muestra la diferencia, por diseño |
-| Aprobar por encima del límite | `Session.noAskOverLimit` (por sesión), `settings.budgetNoAsk` (app) y un pase por sesión que dura lo que la acción aprobada (`withOncePass`: se retira al terminar o fallar la acción, y se gasta antes al crear la primera generación) | `continueOnce`, `dontAskAgain`, `askAgain` (`budget.ts`) | P2: H4 resuelto (2026-10-29): «Continue once» deja pasar solo esa acción; «Don’t ask again» vale para esa sesión; el interruptor de Settings > Budget lo hace global |
+| Aprobar por encima del límite | `Session.noAskOverLimit` (por sesión), `settings.budgetNoAsk` (app) y un pase por sesión que dura lo que la acción aprobada (`withOncePass`: se retira al terminar o fallar la acción, y se gasta antes al crear la primera generación) | `withOncePass`, `dontAskAgain`, `askAgain` (`budget.ts`) | H4: cambio implementado; solapamiento de acciones requiere prueba. «Don’t ask again» vale para esa sesión; el interruptor de Settings > Budget lo hace global |
 | Generar directo | `SpendConfirm` | `costLabel` | P2: cumple |
 | Reescritura de prompt | `addSpend` categoría agente | Llamada LLM del agente | P2: hallazgo, el coste no se muestra antes |
 | Cada revisión del plan (Edit, Suggest) | Turno LLM del agente | `llmTurn.ts` | P2/P3: el texto «nothing is spent» es cierto para generación, no para el turno LLM |

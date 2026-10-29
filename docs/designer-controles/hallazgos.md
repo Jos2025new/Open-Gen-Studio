@@ -33,7 +33,7 @@ Cada hallazgo sale de leer el código en esta pasada (el mismo `file:línea` est
 
 ## Textos desfasados
 
-- **Estado:** respondido por lectura, no corregido (sin fila propia en [rastreo 5](../rastreo/designer.md)); corregir el texto no necesita prueba. La ayuda de Polygon también dice «Sides is in the strip» (`ToolHelp.tsx:24`) y el control es Corners. Referencia de rastreo: sin confirmar la fila exacta.
+- **Estado (2026-10-29):** sigue abierto, no corregido: la ayuda dice «Sides» (código `ToolHelp.tsx:24`, releído); en pantalla se vieron las ayudas con «strip» (ver abajo) pero no se comprobó «Sides»/«From and To». Antes: respondido por lectura, no corregido (sin fila propia en [rastreo 5](../rastreo/designer.md)); corregir el texto no necesita prueba. La ayuda de Polygon también dice «Sides is in the strip» (`ToolHelp.tsx:24`) y el control es Corners. Referencia de rastreo: sin confirmar la fila exacta.
 - La ayuda de Star dice «Sides, Inner and Round are in the strip» (`ToolHelp.tsx:25`), pero los controles se llaman Corners, Spoke ratio y Rounded (`ShapeKindFields.tsx:36`).
 - La ayuda de Sector, Arc y Chord dice «From and To (degrees)» (`ToolHelp.tsx:26`), pero los controles se llaman Start y End (`ShapeKindFields.tsx:23`). Es un texto desfasado distinto de C13: C13 propone renombrar el selector «To» → «End» del degradado ([[degradado]]), no estos campos de ángulo.
 - El comentario de `ViewToggles` habla de «page rulers and guides», pero el componente solo contiene el botón de ayuda (`ToolHelp.tsx:47`).
@@ -55,7 +55,7 @@ Los nueve puntos del apartado 8 de [Inventario 2](../inventario-herramientas-des
 Ver [rastreo del Designer](../rastreo/designer.md).
 
 - Rama de texto de la tira (`ContextStrip.tsx:78`): código muerto por lectura desde `f11a0dd`; respondido por lectura, requiere decisión (quitar o conectar) y prueba en sandbox.
-- Weight 100-900 frente a 300-900: respondido por lectura (confirmado hoy, rastreo 3.7); no corregido, requiere decisión.
+- Weight 100-900 frente a 300-900: confirmado en código (`ToolSettings.tsx:202`, `LayersPanel.tsx:277`) y visto en sandbox (2026-10-29). El usuario lo declaró **bug**, no decisión (S3); sigue sin corregir.
 - Sculpt aparece como «soon» sin icono propio (`toolboxModel.ts:28`): respondido por lectura; requiere decisión sobre el icono.
 - `rasterizeLayer` sin test propio en ningún test (rastreo 1.1): respondido parcialmente; fusionar sí tiene tests (`tests/designer-layer-fixes.test.ts:31`).
 - Ctrl pulsado durante el arrastre apaga el imán y muestra distancias a los vecinos (`Stage.tsx:1028-1036`): respondido por lectura; completa la nota de [[lienzo-gestos]].
@@ -69,3 +69,23 @@ Ver [rastreo del Designer](../rastreo/designer.md).
 - [[propiedades]] · [propiedades.md](propiedades.md)
 - [[menus-contextuales]] · [menus-contextuales.md](menus-contextuales.md)
 - [[README]] · [Índice](README.md)
+
+## Sandbox y decisiones del 2026-10-29 (todo abierto, nada corregido)
+
+Fuente: [[revision-ubicacion]] (prueba en `npm run dev:sandbox`, puerto 5183, `agent-browser`; capturas en `.sandbox/capturas/`) y [[huecos]] §3 (decisiones del usuario). Las filas «bug» las declaró el usuario; el código se releyó el mismo día y no ha cambiado desde. Ningún commit posterior a a4377c9 toca el Designer: **no hay arreglos ni pruebas automatizadas** de estas filas.
+
+| Id | Qué pasa | Evidencia | Estado |
+| --- | --- | --- | --- |
+| S1 | Tras pulsar una variante (p. ej. Edit) y luego R, O, L o M, la tarjeta no sigue a la tecla: sigue llamándose «Edit settings» con otra herramienta activa y ninguna variante marcada. Abriendo desde el botón de familia sí sigue. Con la familia Brush, M y G cambian la herramienta pero la tarjeta sigue «Brush settings» | Visto en sandbox; `ToolDock.tsx:60,64-67`, `toolboxModel.ts:50-52` | **Bug abierto** (usuario) |
+| S3 | Weight 100-900 en la herramienta y 300-900 en Properties; Properties de un texto creado no tiene Line ni Spacing | Visto en sandbox; Size 1-500 frente a 4-1000 solo por lectura | **Bug abierto** (usuario); prioridad grave |
+| S6 | Join, Cap, Dashes y Stroke behind fill de una forma elegida solo están en Properties (panel de ~4 filas con desplazamiento); la tira compacta de Edit no los trae | Visto en sandbox; `ShapeLookFields.tsx:34` | **Decidido** que van en la toolbox ([[huecos]] §3); sin implementar. Prioridad clave |
+| S10 extra | Con una capa de texto activa y una forma de otra capa aún elegida, la tarjeta dice «Edit → Text 3» pero muestra los controles de la forma («On 1 object of Rectangle 2») | Visto en sandbox | **Bug abierto**: muestra controles de otra capa |
+| S4 | Select, Lasso y Wand (y Fill, Gradient, Eyedropper) cuelgan de la familia Brush | `toolboxModel.ts:28`; visto en sandbox | Requiere decisión (sin decisión del usuario) |
+| S5 | Sector, Arc, Chord, Star y Arrow no tienen botón (fila Edit: Edit, Pan, Rectangle, Ellipse, Line, Polygon/Star) | Visto en sandbox | Requiere decisión |
+| Ayudas | Las ayudas de Text, Brush y Eraser dicen «strip» aunque los ajustes están en la tarjeta (`ToolHelp.tsx:17,21,32`); Polygon/Star dicen «Sides» (control: Corners) y Sector/Arc/Chord «From and To» (control: Start/End) | «strip» visto en sandbox; Sides y From/To solo por lectura | Texto a corregir, abierto |
+| Guides | La fila de la tarjeta Guides sale cortada (Orientation y «Clear all guides» recortados) | Visto en sandbox (`p8-guides-card.png`) | Bug abierto de maquetación |
+| S7 | Eraser deshabilitado sobre una capa de texto: el motivo sale en el tooltip de la variante; el botón de familia sigue activo y la tecla E no hace nada ni avisa | Visto en sandbox (corrige la lectura anterior, que decía «sin motivo visible») | Requiere decisión |
+| Dock | La fila de variantes se solapa con el botón «Conversation»; Sculpt y Blur («soon») se pintan con icono «?»; los iconos de variante no tienen etiqueta visible | Visto en sandbox | Abierto, sin decisión |
+| Layout (decisión) | Size, Opacity y Color siempre visibles y en ese orden, con textura junto al color; el relleno vectorial es textura o degradado; Contextual Task Bar como idea del usuario | [[huecos]] §3; [investigación](investigacion-disposicion-interfaz.md) | Decidido, sin implementar |
+
+No se probó en pantalla: doble clic para editar un FX, los límites de Size, ni «Sides»/«From and To».

@@ -8,6 +8,10 @@ updated: 2026-10-28
 
 # Rastreo de historia por área
 
+## Consulta y mantenimiento
+
+Antes de cambiar Designer, Studio o Nodes, lee el índice de `docs/<área>-controles/` y las notas de los componentes y funciones afectados. Contrasta el mapa con el código y las decisiones; corrige discrepancias con evidencia y distingue lectura, test y prueba visual. Compara antes y después: una función que desaparece sin autorización es una posible regresión que debe conservarse o recuperarse. Un diff o test puede revelar la pérdida; los enlaces válidos no demuestran que una función sea accesible ni que funcione. Actualiza el mapa afectado y conserva las dudas sin prueba.
+
 Rastreo de commits y docs para cada área, con el estado de hoy comprobado en el código (2026-10-28). Los docs y los mensajes de commit son pistas; la evidencia es el código. Lo que solo se ve en pantalla queda «sin verificar».
 
 - [Designer](designer.md): 17 pendientes, 12 decisiones revertidas, 8 regresiones, 10 contradicciones. Registro: [designer-controles](../designer-controles/README.md).
@@ -16,7 +20,7 @@ Rastreo de commits y docs para cada área, con el estado de hoy comprobado en el
 
 ## Pendiente (2026-10-28)
 
-Nada de lo siguiente está hecho. Siguiente fase decidida por el usuario: terminar de ajustar los documentos y después convertir estos puntos en pruebas automatizadas que busquen fallos reales.
+Estado 2026-10-29: los puntos 1 (reproducciones de Nodes) y 3 (límite con precios desconocidos) están reproducidos y corregidos (91ea576, ea47987, e978427; [auditoría](../audits/repro-2026-10-29.md)); quedan los de decisiones de producto. Antes: nada de lo siguiente estaba hecho. Siguiente fase decidida por el usuario: terminar de ajustar los documentos y después convertir estos puntos en pruebas automatizadas que busquen fallos reales.
 
 1. **Dos reproducciones de Nodes, gratuitas y aisladas** (pruebas sin gasto ni datos reales), antes de arreglar nada:
    - Imagen equivocada: borrar un resultado ([nodes.md](nodes.md), 3.6) o duplicar un nodo / soltar un cable en el fondo (3.5) deja una conexión apuntando a otro resultado.
