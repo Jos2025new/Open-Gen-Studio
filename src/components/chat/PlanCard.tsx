@@ -345,7 +345,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               className="cc-approve"
               disabled={revising || rewriting || Boolean(rewriteFailed) || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
-                if (over) continueOnce();
+                if (over) continueOnce(sessionId);
                 void approvePlan(sessionId, item.id);
               }}
               data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}

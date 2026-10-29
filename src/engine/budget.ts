@@ -16,9 +16,12 @@ export function remainingBudget(): number | null {
   return settings.budgetOn ? settings.budgetUsd - spentUsd : null;
 }
 
-/** "Continue once" lasts this long: enough for the one action that was confirmed, short enough that the next run asks again. */
-export const ONCE_MS = 4000;
-let oncePassUntil = 0;
+/**
+ * "Continue once": a single-use pass for ONE session, spent when the approved action creates its first generation
+ * (so a batch such as Run all, approved once, is one run). Painting never spends it. It expires if that action never starts.
+ */
+export const ONCE_MS = 30_000;
+let pass: { sessionId: string; until: number } | null = null;
 
 /** The session whose runs no longer ask (the active one by default). */
 function sessionNoAsk(sessionId?: string): boolean {
@@ -29,7 +32,16 @@ function sessionNoAsk(sessionId?: string): boolean {
 /** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", or a "Continue once" just given. */
 export function overLimitAccepted(sessionId?: string): boolean {
   const { budgetOn, budgetUsd, budgetAccepted, budgetNoAsk } = get().settings;
-  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || sessionNoAsk(sessionId) || Date.now() < oncePassUntil;
+  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
+}
+
+function passFor(sessionId: string): boolean {
+  return pass?.sessionId === sessionId && Date.now() < pass.until;
+}
+
+/** The approved action started spending: the pass is used up. */
+export function consumeOnce(sessionId: string): void {
+  if (pass?.sessionId === sessionId) pass = null;
 }
 
 /** This run would go over an active limit nobody agreed to go past. An unknown price cannot be checked against it, so it asks too. */
@@ -47,20 +59,20 @@ export function overLimitText(e: Estimate): string {
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
 
-/** "Continue once": this run goes ahead; the next one that goes over asks again. */
-export function continueOnce(): void {
-  oncePassUntil = Date.now() + ONCE_MS;
+/** "Continue once": the approved action goes ahead; the next run that goes over asks again. */
+export function continueOnce(sessionId: string = get().activeSessionId): void {
+  pass = { sessionId, until: Date.now() + ONCE_MS };
 }
 
 /** "Don't ask again": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
 export function dontAskAgain(sessionId: string = get().activeSessionId): void {
-  continueOnce();
+  continueOnce(sessionId);
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: true }));
 }
 
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
-  oncePassUntil = 0;
+  pass = null;
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }
 

@@ -37,7 +37,7 @@ import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
-import { noteExcess } from './budget';
+import { consumeOnce, noteExcess } from './budget';
 
 const get = useStore.getState;
 export const controllers = new Map<string, AbortController>();
@@ -97,6 +97,7 @@ function requestEstimate(spec: GenerationSpec): Estimate {
 }
 
 export function createGeneration(spec: GenerationSpec): Generation {
+  consumeOnce(spec.sessionId);
   const parsed = parseModelRef(spec.modelRef);
   const estimate = spec.estimate ?? estimateSpec(spec);
   const g: Generation = {

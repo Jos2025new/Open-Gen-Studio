@@ -21,7 +21,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
   const r = planRecovery(item);
   if (!r) return null;
   const run = (mode: PlanRecoveryMode) => {
-    if (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId)) continueOnce();
+    if (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId)) continueOnce(sessionId);
     const problem = planRecoveryProblem(item, mode);
     if (problem) {
       toast(problem, 'info');
@@ -68,7 +68,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
         icon={RotateCw}
         data-tip={over ? overLimitText(g.estimate) : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
         onClick={() => {
-          if (over) continueOnce();
+          if (over) continueOnce(g.sessionId);
           void retryGeneration(g.id);
         }}
       >

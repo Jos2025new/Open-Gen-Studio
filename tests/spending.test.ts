@@ -4,7 +4,7 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
 import { addSpend, setSettings, useStore } from '../src/store/store';
-import { askAgain, continueOnce, overLimit, remainingBudget } from '../src/engine/budget';
+import { askAgain, consumeOnce, continueOnce, overLimit, remainingBudget } from '../src/engine/budget';
 import { budgetProblem } from '../src/engine/actions';
 import { periodStart, summarizeSpend } from '../src/engine/spending';
 import { llmCallUsd } from '../src/engine/agent/runtime';
@@ -56,7 +56,7 @@ describe('the limit warns, it does not block (G2)', () => {
     continueOnce();
     expect(overLimit(run)).toBe(false);
     expect(budgetProblem(run)).toBeNull();
-    vi.advanceTimersByTime(10_000);
+    consumeOnce(useStore.getState().activeSessionId);
     expect(overLimit(run)).toBe(true);
     askAgain();
     vi.useRealTimers();
