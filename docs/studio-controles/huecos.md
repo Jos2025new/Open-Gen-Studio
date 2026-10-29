@@ -3,18 +3,18 @@ type: huecos
 title: Huecos del inventario de Studio
 description: Lo que no se pudo confirmar o no se leyó línea a línea al inventariar Studio, para cerrarlo en una pasada posterior.
 tags: [studio, huecos]
-updated: 2026-10-28
+updated: 2026-10-29
 related: [hallazgos, dependencias, estado-compartido]
 ---
 # Huecos del inventario de Studio
 
-Inventario contrastado con el [rastreo de Studio](../rastreo/studio-2.md), hallazgos, commits y pruebas presentes en `task/workflow-ask-first` (HEAD `880bc54`). Esta pasada no ejecutó pruebas ni la app. «Prueba existente» no significa ejecutada en esta pasada; código, test automatizado, prueba visual y confirmación del proveedor son evidencias distintas. No encontrar una decisión no demuestra que nunca se diera.
+Inventario contrastado con el [rastreo de Studio](../rastreo/studio-2.md), hallazgos, commits y pruebas presentes en `task/workflow-ask-first` (HEAD `a41bf38`). La pasada del 2026-10-29 revisó además los commits `cc16a1b`, `80ca898`, `75dc572`, `df8bc05` y `1de23c1`, y el rastro de auditoría enlazado. No ejecutó pruebas ni la app. «Prueba existente» no significa ejecutada en esta pasada; código, test automatizado, prueba visual y confirmación del proveedor son evidencias distintas. No encontrar una decisión no demuestra que nunca se diera.
 
 ## Qué queda abierto
 
 **Límite: concurrencia por comprobar.** `withOncePass` identifica la sesión mientras una acción se prepara; otra comprobación solapada en esa sesión podría ver el mismo pase. `tests/once-pass.test.ts` cubre el pase de una sola acción, pero no acredita una prueba concurrente. La coincidencia por lectura no demuestra un gasto: reproducir con proveedor simulado antes de decidir el alcance del arreglo.
 
-- **Pruebas visuales pendientes**: tarjeta única de Auto con el agente y su velocidad ([053](../history/053-2026-10-W43.md)); texto escrito con una tarjeta de preguntas o ajustes abierta (H10-H11: hay pruebas automatizadas, pero la interacción no se verificó visualmente en esta pasada); «Check status» con el límite superado (H9: `1de23c1` y `tests/repro-cards-recovery.test.ts` cubren la lógica; la pantalla sigue sin comprobarse); etiqueta de proveedor tras cambiar por crédito (A2); aviso «same price or less» con precios desconocidos (R3); textos del límite en pantalla; selectores de nodo que aún ofrecen `edit_region` y `remove_object` (rastreo 5.8).
+- **Pruebas visuales pendientes**: tarjeta única de Auto con el agente y su velocidad ([053](../history/053-2026-10-W43.md)); tarjeta de ajustes al escribir (H11; cerrar como `skipped` es el diseño, falta observar la interacción); «Check status» con el límite superado (H9: `1de23c1` y `tests/repro-cards-recovery.test.ts` cubren lógica, no pantalla); etiqueta tras cambio de proveedor por crédito (A2) y aviso «same price or less» con precios desconocidos (R3); textos del límite en pantalla (solo se vio `Price n/a`, explicación de coste real, `Budget left $0` y «Continue anyway · n/a» en una ejecución sin iniciar); selectores de nodo con `edit_region` y `remove_object` (ofrecidos según código/rastreo 5.8, no verificados visualmente). La tarjeta de preguntas al escribir sí se vio en sandbox: en la prueba local el texto exacto enviado no era visible; en otra prueba con agente real, el historial registró la opción recomendada y la nota. La opción pulsada tiene prueba automatizada; no consta su prueba en pantalla ([auditoría](../audits/repro-2026-10-29.md)).
 - **Decisiones aún pendientes o no localizadas**: cambio de proveedor por capacidad (`providerFit.ts:41-55`, no se encontró decisión y puede subir el precio); `modelPinned` por crédito; aceptar el límite como global; precio previo de la reescritura y de las revisiones; «nothing is spent» (R9/H7, motor local sin confirmar); alcance del aviso al cancelar un plan en marcha (H8; el cobro del proveedor no se verificó). La reconfirmación de 0,50 USD fue retirada en `2120c71`, pero sigue pendiente decidir la discrepancia con el ADR 0009; el callejón de Check status se corrigió en `1de23c1` y falta verlo en pantalla.
 - **Otras decisiones o revisiones sin cerrar**: la marca `userPicked` al cambiar variante por adjuntos (H2); escribir en el Composer y cerrar la tarjeta de ajustes como `skipped` (H11); aviso de crédito sin comparación fiable de unidades (R4); deuda de `FollowUpCard` y `switchedTo` (H14); aviso «same price or less» con precio desconocido (R3); enmiendas pendientes de ADR 0007 y 0009 y estado propuesto de ADR 0005, 0006, 0008 y 0009.
 - **Preguntas al proveedor**: si cancelar con trabajo remoto en curso cobra la estimación (B1, G1).
@@ -32,11 +32,11 @@ Inventario contrastado con el [rastreo de Studio](../rastreo/studio-2.md), halla
 
 | Pieza | Qué falta |
 | --- | --- |
-| `TextTile` y `TextResult` | No se leyeron |
+| `TextTile` y `TextResult` | Leídos en código (`src/components/assets/TextTile.tsx`, `TextResult.tsx`): la baldosa abre `textView`, presenta el resultado compacto y ofrece Reuse; el resultado permite copiar, usar como prompt y, según modelo/operación, usar como letra. Sin prueba visual en esta pasada. |
 | `nodes.tsx` | Controles propios de cada tipo de nodo |
 | `AssetActions` | Formularios internos de cada operación |
 | `MediaControls` y `StyleFields` | Campos dinámicos por modelo, no enumerados |
-| `canvasCalls.ts` | Cuerpo de `continue_in_*` sin leer por líneas |
+| `canvasCalls.ts` | Leído parcialmente: `recover_plan` busca el plan fallido/parcial, valida con `planRecoveryProblem` y lanza `resumePlan` en segundo plano; `run_nodes` bloquea errores y presenta revisión antes de correr. El cuerpo específico de `continue_in_*` sigue sin inventariar línea a línea (ver [tablero](tablero.md)). |
 | Nodes | Manejador de deshacer y rehacer |
 | Barra y paneles | `SessionSwitcher`, `SessionsPanel`, `GenerationsPanel`, `ProviderPool` y las pestañas Providers, Operations, Look, Keys y Data de Settings |
 | Estudio embebido | Se enlaza a [estudio-embebido](../designer-controles/estudio-embebido.md), no se repite |
