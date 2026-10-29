@@ -34,6 +34,6 @@ Las filas no son funciones únicas: un mismo control puede aparecer en varias su
 
 Total: 393 filas de datos (contadas por script, sin cabeceras ni separadores).
 
-Resumen de hallazgos: ver [hallazgos](hallazgos.md). Los de mayor peso son H1 (capacidad sin guarda: `edit_node` cambia el modelo sin tarjeta; sin decisión escrita para esta herramienta; requiere prueba con un agente real), H2 (modelo de las operaciones de imagen y `animate` invisible; solo 4 operaciones de vídeo lo muestran; decisión), H3 (Delete asset sin confirmar) y H11 (sin Stop ni Comprobar por nodo; reintento = Run otra vez).
+Resumen de hallazgos: ver [hallazgos](hallazgos.md). Los de mayor peso son H1 (capacidad sin guarda: `edit_node` cambia el modelo sin tarjeta; falta probar el criterio contextual con un agente real), H2 (modelo de las operaciones de imagen y `animate` invisible; solo 4 operaciones de vídeo lo muestran; falta decidir si deben mostrarse), H3 (Delete asset sin confirmar) y H11 (sin Stop ni «Comprobar estado» por nodo; reintentar es volver a pulsar Run). Los arreglos de resultados y límite tienen evidencia automatizada; algunos casos se observaron en sandbox, como detalla cada nota.
 
 Investigación de ComfyUI (código), Figma Weave, Magnific, Freepik y Krea sobre salidas, precio, límite y recuperación (2026-10-29): [[investigacion-nodos-pro]] · [investigacion-nodos-pro.md](investigacion-nodos-pro.md).
