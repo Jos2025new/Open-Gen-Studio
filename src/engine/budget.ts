@@ -17,11 +17,11 @@ export function remainingBudget(): number | null {
 }
 
 /**
- * "Continue once": a single-use pass for ONE session, spent when the approved action creates its first generation
- * (so a batch such as Run all, approved once, is one run). Painting never spends it. It expires if that action never starts.
+ * "Continue once": a pass for ONE session that lives exactly as long as the approved action (withOncePass). It is also spent
+ * when that action creates its first generation (so a batch such as Run all, approved once, is one run). Painting never
+ * spends it. If the action ends without creating one (the graph changed, a recovery was refused, an error), it dies with it.
  */
-export const ONCE_MS = 30_000;
-let pass: { sessionId: string; until: number } | null = null;
+let pass: { sessionId: string } | null = null;
 
 /** The session whose runs no longer ask (the active one by default). */
 function sessionNoAsk(sessionId?: string): boolean {
@@ -36,7 +36,7 @@ export function overLimitAccepted(sessionId?: string): boolean {
 }
 
 function passFor(sessionId: string): boolean {
-  return pass?.sessionId === sessionId && Date.now() < pass.until;
+  return pass?.sessionId === sessionId;
 }
 
 /** The approved action started spending: the pass is used up. */
@@ -59,14 +59,23 @@ export function overLimitText(e: Estimate): string {
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
 
-/** "Continue once": the approved action goes ahead; the next run that goes over asks again. */
-export function continueOnce(sessionId: string = get().activeSessionId): void {
-  pass = { sessionId, until: Date.now() + ONCE_MS };
+/**
+ * "Continue once": run the approved action with this session's pass, and retire the pass when the action ends, finishes
+ * or fails, whether or not it created a generation. The next run that goes over asks again.
+ */
+export function withOncePass<T>(sessionId: string, action: () => T): T {
+  const mine = { sessionId };
+  pass = mine;
+  const end = () => { if (pass === mine) pass = null; };
+  let result: T;
+  try { result = action(); } catch (e) { end(); throw e; }
+  if (result instanceof Promise) return result.finally(end) as T;
+  end();
+  return result;
 }
 
 /** "Don't ask again": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
 export function dontAskAgain(sessionId: string = get().activeSessionId): void {
-  continueOnce(sessionId);
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: true }));
 }
 

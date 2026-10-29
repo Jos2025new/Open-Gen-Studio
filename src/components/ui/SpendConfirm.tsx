@@ -3,7 +3,7 @@ import { Zap } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
 import type { Estimate } from '../../engine/types';
 import { useStore } from '../../store/store';
-import { continueOnce, dontAskAgain, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
+import { dontAskAgain, withOncePass, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import { Button, CostTag, costLabel } from './primitives';
 
 /** The one cost checkpoint: shown right before anything that spends money. */
@@ -78,8 +78,8 @@ export function SpendConfirm({
           icon={Zap}
           disabled={Boolean(blocked)}
           onClick={() => {
-            if (over) continueOnce();
-            onConfirm();
+            if (over) withOncePass(useStore.getState().activeSessionId, onConfirm);
+            else onConfirm();
           }}
           autoFocus
         >

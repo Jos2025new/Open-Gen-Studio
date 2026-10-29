@@ -1,6 +1,6 @@
 import { RefreshCw, RotateCw } from 'lucide-react';
 import { planRecovery, planRecoveryProblem, resumePlan, type PlanRecoveryMode } from '../../engine/agent/runtime';
-import { continueOnce, dontAskAgain, overLimit, overLimitText } from '../../engine/budget';
+import { dontAskAgain, withOncePass, overLimit, overLimitText } from '../../engine/budget';
 import { canRecheck, recheckGeneration, retryGeneration } from '../../engine/jobs';
 import { estimateForRetry } from '../../engine/retryPartial';
 import type { Generation, PlanFeedItem } from '../../engine/types';
@@ -21,13 +21,15 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
   const r = planRecovery(item);
   if (!r) return null;
   const run = (mode: PlanRecoveryMode) => {
-    if (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId)) continueOnce(sessionId);
-    const problem = planRecoveryProblem(item, mode);
-    if (problem) {
-      toast(problem, 'info');
-      return;
-    }
-    void resumePlan(sessionId, item.id, mode);
+    const go = () => {
+      const problem = planRecoveryProblem(item, mode);
+      if (problem) {
+        toast(problem, 'info');
+        return;
+      }
+      return resumePlan(sessionId, item.id, mode);
+    };
+    void (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId) ? withOncePass(sessionId, go) : go());
   };
   const quiet = (mode: PlanRecoveryMode) => { dontAskAgain(sessionId); run(mode); };
   const over = overLimit(r.estimate, sessionId);
@@ -68,8 +70,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
         icon={RotateCw}
         data-tip={over ? overLimitText(g.estimate) : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
         onClick={() => {
-          if (over) continueOnce(g.sessionId);
-          void retryGeneration(g.id);
+          void (over ? withOncePass(g.sessionId, () => retryGeneration(g.id)) : retryGeneration(g.id));
         }}
       >
         {over ? 'Continue once' : 'Retry'} · {costLabel(estimate, { short: true })}

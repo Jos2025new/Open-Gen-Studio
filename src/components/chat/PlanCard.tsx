@@ -12,7 +12,7 @@ import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
-import { continueOnce, dontAskAgain, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
+import { dontAskAgain, withOncePass, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import type { Estimate, Generation, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
@@ -345,8 +345,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               className="cc-approve"
               disabled={revising || rewriting || Boolean(rewriteFailed) || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
-                if (over) continueOnce(sessionId);
-                void approvePlan(sessionId, item.id);
+                void (over ? withOncePass(sessionId, () => approvePlan(sessionId, item.id)) : approvePlan(sessionId, item.id));
               }}
               data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}
             >
