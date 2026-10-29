@@ -28,3 +28,12 @@ En pausa por decisión del usuario: antes quiere automatizar más pruebas o corr
    - Designer: la rama de texto de la tira es código muerto desde `f11a0dd` (hoy «no alcanzable por lectura»); la ayuda de Polygon dice «Sides»; Sculpt sin icono; `.align-action-row` es de 5 columnas (responde a huecos).
    - Studio: el cambio por crédito fue deliberado (`4cf18aa`, ADR 0025 C); el de capacidad no tiene decisión citada.
    - Nodes: respuestas a H1–H17 de la sección 4 de [nodes.md](nodes.md). Ya aplicadas: H1, H2 y H10 (commit `699e479`).
+
+**Cómo marcar los huecos al pasarlos a los registros** (punto 5): nunca «cerrado» a secas. Usar «respondido por lectura», «respondido parcialmente», «requiere prueba» o «requiere decisión», con enlace a la fila del rastreo. Responder una pregunta no es arreglar el problema ni conocer la intención original. Matices ya acordados:
+- H1 (Nodes): la regla citada era de otra acción y no hay decisión escrita para `edit_node`; abierto si un agente lo hace en una sesión real y qué protección debe existir.
+- H2: «sin decisión encontrada», no «olvido»; la decisión de producto sigue pendiente.
+- H10: el bloqueo de deshacer viene de una decisión cambiada, pero sigue existiendo y no consta si su permanencia es intencional.
+- Campos obligatorios: hay validaciones de entradas y assets (`flow/actions.ts:258`); falta la equivalente para los campos `required` de operaciones; requiere prueba.
+- Borrar un resultado: respondido por lectura (desplaza índices); requiere prueba en pantalla y no está corregido.
+- Rejilla de Alinear: cinco columnas es un dato; que las cuatro acciones de ancla encajen bien es una conclusión de diseño que requiere prueba visual.
+- Studio: no encontrar autorización del cambio por capacidad no demuestra que no se diera (requiere decisión); el cobro tras cancelar sigue abierto.
