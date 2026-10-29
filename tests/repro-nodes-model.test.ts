@@ -48,7 +48,7 @@ describe('repro 2: estimated model equals executed model (hallazgos H2, nodes.md
     await runNodes(sid, ['op']);
     expect(execute).toHaveBeenCalled();
     const ctx = execute.mock.calls[0][1] as { nodeOperations: Record<string, never> };
-    const node = useStore.getState().sessions[sid].graph.nodes.find((n) => n.id === 'op')!.data as { params: Record<string, unknown> };
+    const node = useStore.getState().sessions[sid].graph.nodes.find((n) => n.id === 'op')!.data as { params: Record<string, never> };
     const spec = await opSpec({ sessionId: sid, origin: 'node', sourceAssetId: 'made', op: 'relight', params: node.params, nodeChoice: ctx.nodeOperations.op });
     expect(spec.modelRef).toBe(priced);
   });
