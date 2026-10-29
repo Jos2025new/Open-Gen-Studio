@@ -385,7 +385,9 @@ function InputRefs({ node }: { node: GraphNode }) {
     .map((e) => {
       const src = graph.nodes.find((n) => n.id === e.source);
       const out = src ? nodeOutput(src, generations) : undefined;
-      return { edge: e, assetId: out?.assetId, edited: Boolean(out?.sketch), is3d: out?.assetId ? assets[out.assetId]?.kind === 'model3d' : false, label: ports.find((p) => p.id === e.targetHandle)?.label };
+      // The thumbnail shows what the link delivers: its own result (edge.outputIndex), as graphToSteps sends it.
+      const assetId = src ? nodeOutputAsset(src, generations, e.outputIndex) ?? undefined : undefined;
+      return { edge: e, assetId, edited: Boolean(out?.sketch), is3d: assetId ? assets[assetId]?.kind === 'model3d' : false, label: ports.find((p) => p.id === e.targetHandle)?.label };
     });
   const free = ports.find((p) => p.multi || !linked.some((l) => l.edge.targetHandle === p.id));
   const recent = Object.values(assets)
