@@ -8,6 +8,7 @@ import { nodeOutputAsset } from '../../engine/flow/graph';
 import { generationTitle } from '../assets/GenerationInfo';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { IconButton, MenuItem } from '../ui/primitives';
+import { dockLift } from './dockPlacement';
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const parts = [];
@@ -41,10 +42,8 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
     const place = () => {
       const p = panel.getBoundingClientRect();
       const top = p.top + liftRef.current, bottom = p.bottom + liftRef.current;
-      const obstacles = [...dock.querySelectorAll('.composer, .thread-toggle, .thread-body')]
-        .map(el => el.getBoundingClientRect())
-        .filter(r => p.right > r.left && p.left < r.right && bottom > r.top && top < r.bottom);
-      const next = obstacles.length ? Math.max(0, bottom - Math.min(...obstacles.map(r => r.top)) + 8) : 0;
+      const obstacles = [...dock.querySelectorAll('.composer, .composer-footer, .thread-toggle, .thread-body')].map(el => el.getBoundingClientRect());
+      const next = dockLift({ left: p.left, right: p.right, top, bottom }, obstacles);
       if (Math.abs(next - liftRef.current) < 0.5) return;
       liftRef.current = next;
       panel.style.bottom = `${next}px`;

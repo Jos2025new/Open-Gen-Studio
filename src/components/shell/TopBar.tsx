@@ -1,7 +1,7 @@
 import { SaveIndicator } from './SaveIndicator';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ChevronDown, Plus, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Settings } from 'lucide-react';
 import { newSession, renameSession, setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { SettingsPanel } from './SettingsPanel';
@@ -11,7 +11,7 @@ import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { ConnectedProviders } from './ConnectedProviders';
 import type { RemoteProviderId } from '../../engine/types';
 import { IconButton } from '../ui/primitives';
-import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
+import { WORKSPACES } from './WorkspaceMenu';
 import { HomeIcon } from './Sidebar';
 import { openHome } from './navModel';
 import '../../styles/topbar-home.css';
@@ -51,7 +51,6 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const keys = useStore((s) => s.settings.keys);
   const settingsOpen = useStore((s) => s.ui.settingsOpen);
   const settingsRef = useRef<HTMLButtonElement>(null);
-  const workspacePop = usePopover();
   const connectedPop = usePopover();
   const [addedProviders, setAddedProviders] = useState<RemoteProviderId[]>([]);
   const generationsPop = usePopover();
@@ -93,13 +92,6 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         {home && hasSession && <BackToWorkspace workspace={workspace} title={title} />}
         {!home && <>
         <button type="button" className="topbar-home" aria-label="Home" title="Home" onClick={openHome}><HomeIcon size={16} /></button>
-        {workspace !== 'chat' && <><button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
-            {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
-          </button>
-          <Popover open={workspacePop.open} anchor={workspacePop.ref} onClose={workspacePop.close} placement="bottom-start" width={240} label="Canvases">
-            <div className="menu" role="menu"><WorkspaceMenuItems workspace={workspace} onClose={workspacePop.close} /></div>
-          </Popover>
-          <span className="topbar-sep">/</span></>}
           {editing ? (
             <input
               ref={inputRef}

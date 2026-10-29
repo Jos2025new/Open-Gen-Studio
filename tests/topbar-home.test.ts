@@ -54,13 +54,14 @@ describe('top bar on Home', () => {
     expect(host.querySelector('.topbar-pill')).toBeNull();
     expect(host.querySelector('.topbar-menu')?.textContent).toContain('Connected');
   });
-  it('outside Home a Home button sits before the breadcrumb and opens Home', () => {
+  it('outside Home a Home button sits before the session and opens Home', () => {
     setUi({ workspace: 'designer' });
     const host = mount(false);
     const btn = host.querySelector('.topbar-home') as HTMLButtonElement;
     expect(btn.getAttribute('aria-label')).toBe('Home');
     expect(btn.getAttribute('title')).toBe('Home');
-    expect(btn.compareDocumentPosition(host.querySelector('.ws-tag')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(host.querySelector('.ws-tag')).toBeNull();
+    expect(btn.compareDocumentPosition(host.querySelector('[aria-label="Switch session"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     act(() => btn.click());
     expect(useStore.getState().ui.home).toBe(true);
   });

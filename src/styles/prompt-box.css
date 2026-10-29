@@ -82,16 +82,20 @@
 .composer-options-file.is-open { background: var(--surface-hover); }
 .composer-options-file.is-active { background: var(--active-bg); color: var(--active-text); }
 /* In the chat, what scrolls under the composer is hidden from the box's middle down to the window's edge, as chat apps do. */
-.composer-dock.dock-chat::before { content: ''; position: absolute; z-index: -1; left: -24px; right: -24px; top: 28px; bottom: -40px; background: var(--bg-canvas); pointer-events: none; }
+.composer-dock.dock-chat::before { content: ''; position: absolute; z-index: -1; left: -24px; right: -24px; top: 0; bottom: -40px; background: var(--bg-canvas); pointer-events: none; }
 .ws-chat:has(.chat-empty) .composer-dock.dock-chat::before { content: none; }
 
-/* Studio's compact prompt keeps actions beside the expanding text. */
-.dock-chat .composer:has(.is-compact-chat) { padding: 8px 12px; }
-.dock-chat .composer-prompt-row.is-compact-chat { display: flex; align-items: flex-end; gap: 10px; margin: 0; }
-.dock-chat .is-compact-chat .composer-input { flex: 1; min-width: 0; }
-.dock-chat .is-compact-chat .send-btn { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; padding: 0; }
-.dock-chat .composer:has(.is-compact-chat) .composer-bar:not(:has(.composer-controls > *, .editing-chip)) { display: none; }
-.dock-chat .composer:has(.is-compact-chat) .composer-bar:has(.composer-controls > *, .editing-chip) { margin-top: 8px; }
+/* Protect both the prompt and its controls from canvas content. */
+.composer-dock.dock-node::before, .composer-dock.dock-designer::before { content: ''; position: absolute; z-index: -1; inset: 0 -12px -40px; background: var(--bg-canvas); pointer-events: none; }
+.composer-dock .composer, .composer-dock .composer:focus-within { border-color: transparent; background: transparent; box-shadow: none; }
+.composer-dock .composer.is-drop { outline: 2px solid var(--accent); }
+.composer:has(.is-compact) { padding: 8px 12px; }
+.composer-prompt-row.is-compact { display: flex; align-items: flex-end; gap: 10px; margin: 0; }
+.is-compact .composer-input { flex: 1; min-width: 0; }
+.is-compact .composer-input:focus-visible { outline: 1px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-s); }
+.is-compact .send-btn.is-agent, .is-compact .send-btn.is-stop { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; padding: 0; }
+.composer:has(.is-compact) .composer-bar:not(:has(.composer-controls > *, .editing-chip)) { display: none; }
+.composer:has(.is-compact) .composer-bar:has(.composer-controls > *, .editing-chip) { margin-top: 8px; }
 .composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 6px 0; }
 .composer-footer-end { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; flex-wrap: wrap; }
 .composer-footer .models-chip { background: transparent; color: var(--text-2); }

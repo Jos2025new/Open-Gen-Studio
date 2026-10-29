@@ -8,6 +8,8 @@ related: [ejecucion, deshacer-bloqueos, dependencias, hallazgos]
 ---
 # El agente y el Composer en Nodes
 
+El selector de espacio y los controles del modo están debajo del prompt compacto. La zona del dock tiene un fondo del color del lienzo para mantenerlos legibles sobre el grafo.
+
 En el espacio Nodes se monta el mismo `Composer` que en el resto (`App.tsx:76`). Lo que cambia en Nodes está aquí; el resto (modelos, ajustes, adjuntos, tarjetas de plan y de preguntas) está descrito en [composer](../studio-controles/composer.md), [tarjeta-plan](../studio-controles/tarjeta-plan.md) y [tarjeta-preguntas](../studio-controles/tarjeta-preguntas.md). No existe ningún objeto llamado «parche candidato» en el código de Nodes: lo más parecido son los nodos borrador de un plan y las ediciones de `edit_node`; «candidato» solo aparece como campo de operaciones (`count: Candidates`, `engine/ops.ts:222`) y en la documentación como el resultado elegido (`outputIndex`).
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |

@@ -299,13 +299,6 @@ export function Composer() {
     }
   }, [workspace, mode]);
 
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = '0px';
-    ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
-  }, [text, mode]);
-
   const liveAttachments = attachments.filter((id) => assets[id]);
   // The model follows what is attached, within its own line: no image → its text route; an image → edit (image) or
   // image to video; two or more images in video → references. Only when the attachments change, so a variant the user
@@ -439,7 +432,13 @@ export function Composer() {
   const toolsDock = workspace === 'designer' && dockPref === 'tools';
   const optionsLabel = takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files';
   const optionsDisabled = !takesImages && !takesAudio && mode !== 'model3d';
-  const compactChat = workspace === 'chat' && mode === 'agent';
+  const showTools = Boolean(toolsDock && designDoc);
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = '0px';
+    ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
+  }, [text, mode, showTools]);
 
   return (
     <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
@@ -481,13 +480,13 @@ export function Composer() {
             e.target.value = '';
           }}
         />
-        {toolsDock && designDoc ? <div className="composer-bar composer-tools-bar">
+        {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={false} onAdd={() => fileRef.current?.click()} />
           <div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} /></div>
         </div> : <>
         <AttachStrip ids={liveAttachments} />
-        <div className={`composer-prompt-row ${compactChat ? 'is-compact-chat' : ''}`}>
-          {compactChat ? <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent onAdd={() => fileRef.current?.click()} /> : null}
+        <div className="composer-prompt-row is-compact">
+          <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={mode === 'agent'} onAdd={() => fileRef.current?.click()} />
           <textarea
             ref={taRef}
             className="composer-input"
@@ -515,15 +514,9 @@ export function Composer() {
             aria-label="Prompt"
           />
           {mentions.menu}
-          {compactChat ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : null}
+          {mode === 'agent' ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : <SendDirect kind={mode} />}
         </div>
         <div className="composer-bar">
-          {!compactChat && <ComposerOptions
-            label={optionsLabel}
-            disabled={optionsDisabled}
-            agent={mode === 'agent'}
-            onAdd={() => fileRef.current?.click()}
-          />}
           {editing ? (
             <span className="editing-chip" data-tip={editingPrompt}>
               <Pencil size={12} />
@@ -534,23 +527,21 @@ export function Composer() {
             </span>
           ) : null}
           <div className="composer-controls">
-            {mode === 'agent' ? <AgentControls showMode={!compactChat} /> : <MediaControls kind={mode} />}
-            {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
-          </div>
-          <div className="composer-end">
-            {workspace === 'chat' && !compactChat ? <StudioReopen /> : null}
-            {mode === 'agent' && !compactChat ? <AgentModelControls /> : null}
-            {mode === 'agent' && !compactChat ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : mode !== 'agent' ? (
-              <SendDirect kind={mode} />
-            ) : null}
+            {mode === 'agent' ? <AgentControls showMode={false} /> : null}
           </div>
         </div>
         </>}
       </div>
-      {workspace === 'chat' ? <div className="composer-footer">
+      <div className="composer-footer">
         <ComposerWorkspaceMenu />
-        {compactChat ? <div className="composer-footer-end"><StudioReopen /><AgentMode /><AgentModelControls /></div> : null}
-      </div> : null}
+        <div className="composer-footer-end">
+          {workspace === 'chat' ? <StudioReopen /> : null}
+          {mode === 'agent' ? <><AgentMode /><AgentModelControls /></> : !showTools ? <>
+            <MediaControls kind={mode} />
+            {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
+          </> : null}
+        </div>
+      </div>
     </div>
   );
 }

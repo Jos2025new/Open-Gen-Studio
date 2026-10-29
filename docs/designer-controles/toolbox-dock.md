@@ -8,6 +8,8 @@ related: [estado-compartido, pincel, seleccion, alinear-editar, guias, tamanos, 
 ---
 # Toolbox dock (familias, variantes, chevron)
 
+El selector de espacio está debajo del dock, también cuando se muestran las herramientas en vez del prompt. El fondo del color del lienzo protege esta fila y el dock del contenido del canvas.
+
 Fuente de verdad: `TOOLBOX` (`toolboxModel.ts:24`) y `ToolDock` (`ToolDock.tsx:48`). Una sola caja para los dos modos de pintura; Drawing/Design es un ajuste del documento dentro de la tarjeta del pincel (`toolboxModel.ts:23`).
 
 ## Dónde vive la caja
