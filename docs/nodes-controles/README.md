@@ -10,7 +10,7 @@ related: [dependencias, hallazgos, huecos]
 
 Inventario hecho **leyendo el código** (nada de memoria ni de documentos previos; nada se ejecutó). Mismo método y columnas que [Designer](../designer-controles/README.md) y [Studio](../studio-controles/README.md); lo compartido se enlaza, no se repite (selector de modelos, revisión de gasto, tablero embebido, Composer). Todo lo no confirmado va como «sin confirmar».
 
-Las filas no son funciones únicas: un mismo control puede aparecer en varias superficies. Los números de línea se generan desde el código con un script y se comprueban que existen en el archivo citado.
+Las filas no son funciones únicas: un mismo control puede aparecer en varias superficies. Las citas se generaron a partir del código y se revisó manualmente una parte; no se dispone aquí de un registro verificable de cuántas se revisaron. No hay en el repositorio una comprobación que valide que cada cita sostiene su frase: la [auditoría externa](../audits/auditoria-externa-2026-10-29.md) encontró 11 anclas de una muestra de 39 que existen pero apuntan a otra línea (la cifra vale para esa muestra, no para el inventario completo).
 
 | Nota | Contenido | Filas |
 | --- | --- | --- |

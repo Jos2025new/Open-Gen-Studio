@@ -38,7 +38,7 @@ Solo informe, sin cambios de producto. El inventario original fue por lectura; l
 | N.º | Hallazgo | Evidencia |
 | --- | --- | --- |
 | H14 | `FollowUpCard` no se alcanza para tarjetas nuevas: el único `switchSection` pasa `follow=undefined`; la documentación dice que se retiró en Auto el 2026-10-24 | `llmTurn.ts:280` |
-| H15 | El interruptor «Show the other canvases too» de FeedList nunca aparece en Studio: `studioCanvases` incluye los tres lienzos | `FeedList.tsx:202-206` |
+| H15 | El interruptor «Show the other canvases too» de FeedList nunca aparece en Studio: `studioCanvases` incluye los tres lienzos | `lib/studioBoard.ts:43-45`, `FeedList.tsx:200,209-211` |
 | H16 | `ModeMenu` se exporta pero no se monta; solo se usa `MODES` | `ComposerOptions`, `SpacePanel` |
 | H17 | El botón Select del SpaceBoard de Studio marca fichas, pero el bloque «Actions suggested» que las consume está desactivado con `studio` | `SpaceBoard.tsx:154` |
 | H18 | `studio.md` dice «Large/Small funciona también en Studio», pero el código tiene un deslizador «Tile size» y no existen Large ni Small | `tablero.md`, `docs/features/studio.md` |

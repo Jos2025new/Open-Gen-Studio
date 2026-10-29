@@ -182,6 +182,7 @@
 - [055-2026-10-W44: cierre de mapas, integración y limpieza (2026-10-29)](history/055-2026-10-W44.md).
 - [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
 - [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` (bugs confirmados) en `tests/repro-*.test.ts`; H11 descartado.
+- [Auditoría externa (2026-10-29)](audits/auditoria-externa-2026-10-29.md): 11 de 39 citas no sostenían su frase; la rama compacta de formas es alcanzable; la objeción inicial sobre H3 fue retractada.
 - [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
 - [Auditoría OpenRouter contra su doc oficial (2026-10-25)](audits/auditoria-openrouter.md): modelos de vídeo e imagen principales; vídeo sin `input_references` ni passthrough; nada corregido aún.
 - [Verificación de Manus AI de la auditoría OpenRouter, cruzada con el código (2026-10-25)](audits/auditoria-openrouter-manus.md): 10 puntos de código comprobados; nada corregido aún.
