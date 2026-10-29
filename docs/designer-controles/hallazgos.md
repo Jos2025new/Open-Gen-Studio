@@ -57,7 +57,7 @@ Ver [rastreo del Designer](../rastreo/designer.md).
 - Rama de texto de la tira (`ContextStrip.tsx:78`): código muerto por lectura desde `f11a0dd`; respondido por lectura, requiere decisión (quitar o conectar) y prueba en sandbox.
 - Weight 100-900 frente a 300-900: confirmado en código (`ToolSettings.tsx:202`, `LayersPanel.tsx:277`) y visto en sandbox (2026-10-29). El usuario lo declaró **bug**, no decisión (S3); sigue sin corregir.
 - Sculpt aparece como «soon» sin icono propio (`toolboxModel.ts:28`): respondido por lectura; requiere decisión sobre el icono.
-- `rasterizeLayer` sin test propio en ningún test (rastreo 1.1): respondido parcialmente; fusionar sí tiene tests (`tests/designer-layer-fixes.test.ts:31`).
+- `rasterizeLayer` no tiene un test unitario propio según el rastreo 1.1, pero sí está cubierto dentro del E2E combinado «merge, rasterize, grow/shrink and mirror» (`tests-e2e/designer-tools.spec.ts:4,30,52`). La auditoría de ubicación no ejecutó ese E2E; no inferir ejecución desde su existencia. Fusionar también tiene tests (`tests/designer-layer-fixes.test.ts:31`).
 - Ctrl pulsado durante el arrastre apaga el imán y muestra distancias a los vecinos (`Stage.tsx:1028-1036`): respondido por lectura; completa la nota de [[lienzo-gestos]].
 - Ctrl+E y Ctrl+Y fuera de la lista de atajos: sin decisión encontrada; requiere decisión.
 
@@ -72,7 +72,9 @@ Ver [rastreo del Designer](../rastreo/designer.md).
 
 ## Sandbox y decisiones del 2026-10-29 (todo abierto, nada corregido)
 
-Fuente: [[revision-ubicacion]] (prueba en `npm run dev:sandbox`, puerto 5183, `agent-browser`; capturas en `.sandbox/capturas/` de `task/workflow-ask-first`, con copia en el ZIP indicado en la revisión) y [[huecos]] §3 (decisiones del usuario). Las filas «bug» las declaró el usuario; el código se releyó el mismo día y no ha cambiado desde. Ningún commit posterior a a4377c9 toca el Designer: **no hay arreglos ni pruebas automatizadas** de estas filas.
+Fuente visual: [[revision-ubicacion]] (prueba en `npm run dev:sandbox`, puerto 5183, `agent-browser`; capturas en `.sandbox/capturas/` de `task/workflow-ask-first`, con copia en el ZIP indicado en la revisión). Las filas «bug» S1 y S3 las declaró el usuario; S6 es una decisión de ubicación; S10 extra es un hallazgo sin atribución al usuario ([[huecos]] §3). Los commits posteriores a a4377c9 no cambiaron las rutas de código que corresponden a S1–S10; por eso siguen sin arreglo integrado. Esto no significa que no haya cobertura automatizada para comportamientos relacionados: por ejemplo, `Auto-select` tiene tests unitarios y un recorrido E2E documentado en historia 032 (ver [[huecos]] §6); no se ejecutaron en esta revisión visual.
+
+La misma sesión delegó cambios independientes de distancias entre vecinos, zoom con rueda y `AgentGlow` (commits b9bc783, c04a908, a0be491 y 44311e3), que luego se integraron en esta rama. El reporte de esa implementación registra `npm test` completo en verde (407 archivos aprobados, 5 omitidos; 2749 pruebas aprobadas, 5 omitidas) y aclara que no comprobó el navegador. Esos tests cubren los cambios citados, no los casos S1–S10 de esta revisión.
 
 | Id | Qué pasa | Evidencia | Estado |
 | --- | --- | --- | --- |
@@ -80,7 +82,7 @@ Fuente: [[revision-ubicacion]] (prueba en `npm run dev:sandbox`, puerto 5183, `a
 | S3 | Weight 100-900 en la herramienta y 300-900 en Properties; Properties de un texto creado no tiene Line ni Spacing | Visto en sandbox; Size 1-500 frente a 4-1000 solo por lectura | **Bug abierto** (usuario); prioridad grave |
 | S6 | Join, Cap, Dashes y Stroke behind fill de una forma elegida solo están en Properties (panel de ~4 filas con desplazamiento); la tira compacta de Edit no los trae | Visto en sandbox; `ShapeLookFields.tsx:34` | **Decidido** que van en la toolbox ([[huecos]] §3); sin implementar. Prioridad clave |
 | S10 extra | Con una capa de texto activa y una forma de otra capa aún elegida, la tarjeta dice «Edit → Text 3» pero muestra los controles de la forma («On 1 object of Rectangle 2») | Visto en sandbox | **Bug abierto**: muestra controles de otra capa |
-| S4 | Select, Lasso y Wand (y Fill, Gradient, Eyedropper) cuelgan de la familia Brush | `toolboxModel.ts:28`; visto en sandbox | Requiere decisión (sin decisión del usuario) |
+| S4 | Select, Lasso y Wand (y Fill, Gradient, Eyedropper) cuelgan de la familia Brush | `toolboxModel.ts:28` (lectura); en sandbox se probaron M (Select) y G (Fill), no las demás variantes | Requiere decisión (sin decisión del usuario) |
 | S5 | Sector, Arc, Chord, Star y Arrow no tienen botón (fila Edit: Edit, Pan, Rectangle, Ellipse, Line, Polygon/Star) | Visto en sandbox | Requiere decisión |
 | Ayudas | Las ayudas de Text, Brush y Eraser dicen «strip» aunque los ajustes están en la tarjeta (`ToolHelp.tsx:17,21,32`); Polygon/Star dicen «Sides» (control: Corners) y Sector/Arc/Chord «From and To» (control: Start/End) | «strip» visto en sandbox; Sides y From/To solo por lectura | Texto a corregir, abierto |
 | Guides | La fila de la tarjeta Guides sale cortada (Orientation y «Clear all guides» recortados) | Visto en sandbox (`p8-guides-card.png`) | Bug abierto de maquetación |

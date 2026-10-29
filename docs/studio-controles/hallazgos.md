@@ -3,12 +3,12 @@ type: hallazgos
 title: Hallazgos del inventario de Studio
 description: Inconsistencias, promesas en riesgo y código sin alcanzar encontrados al leer Studio; solo informe, sin cambios de código.
 tags: [studio, hallazgos, promesas]
-updated: 2026-10-28
+updated: 2026-10-29
 related: [dependencias, huecos, composer, tarjeta-plan]
 ---
 # Hallazgos del inventario de Studio
 
-Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según el criterio del proyecto: promesa rota, entregable equivocado o fricción de uso son críticos. P1, P2 y P3 son las promesas de [dependencias](dependencias.md).
+Solo informe, sin cambios de producto. El inventario original fue por lectura; las actualizaciones posteriores separan lectura, tests y prueba en pantalla, sin presentar una como otra. Gravedad según el criterio del proyecto: promesa rota, entregable equivocado o fricción de uso son críticos. P1, P2 y P3 son las promesas de [dependencias](dependencias.md).
 
 ## Promesas en riesgo
 
@@ -17,12 +17,12 @@ Solo informe. Todo viene de leer el código; nada se ejecutó. Gravedad según e
 | H1 | P1 | «Proveedor que encaja» cambia el proveedor del paso en Auto sin pulsar Cambiar y sin comparar precio; la divulgación depende de la frase del agente | `providerFit.betterProvider`; `features/agente-auto-tarjeta.md:34` | Crítico, documentado como diseño; ver rastreo abajo |
 | H2 | P1 | El cambio automático de variante por adjuntos marca `userPicked[kind]=true` como si el usuario lo hubiera elegido | `Composer.tsx:374` | Crítico |
 | H3 | P1 | `onAgentCredit` cambia el Director y fija `modelPinned: true`, pero el comentario del campo dice que solo lo fija el usuario | `credit.ts`; `store.ts:57` | Crítico |
-| H4 | P2 | Antes: aprobar por encima del límite dejaba de preguntar en todo. Ahora «Continue once» crea un pase por sesión durante la acción y «Don’t ask again» se guarda por sesión; el interruptor de la app es explícito. Falta probar acciones solapadas | `budget.ts`; Settings > Budget | Corregido parcialmente; requiere prueba |
-| H5 | P2 | El tooltip del límite dice que una ejecución que lo pasa pregunta antes; corregido 2026-10-29: `overLimit` trata un precio desconocido como no comprobable y pide la misma confirmación | `budget.ts:24`; `SettingsPanel.tsx:460` | Crítico |
+| H4 | P2 | El exceso no bloquea: «Continue once» limita el pase a la acción confirmada y «Don’t ask again» se guarda por sesión; el interruptor de Settings > Budget lo aplica a todas las sesiones. Pruebas cubren los casos individuales, la operación en su sesión y que el pase no detenga la acción aprobada. La pantalla posterior a estos cambios no se volvió a probar; la concurrencia durante una acción sigue sin prueba dedicada | `budget.ts`; Settings > Budget; `tests/over-limit-choices.test.ts`, `tests/once-pass.test.ts`, `tests/session-limit-rule.test.ts`, `tests/spend-confirm-run.test.ts` | Corregido por lectura y tests; pantalla y concurrencia pendientes |
+| H5 | P2 | Decidido y corregido 2026-10-29: con límite activo, un precio desconocido también pide confirmación. Si se acepta y el coste real supera el límite, se añade una notificación única para esa generación, con «Review limit» e «Ignore» | `budget.ts:48-59, 95-111`; `FeedList.tsx:136-137`; `tests/repro-spend-unknown.test.ts`, `tests/over-limit-choices.test.ts` | Corregido por lectura y tests; pantalla posterior al cambio pendiente |
 | H6 | P2 | «Ajustar prompt» llama al LLM del agente y suma gasto sin mostrar su precio antes | `planSettings.ts rewritePrompts` | Crítico |
 | H7 | P3 | El texto «nothing is spent» de Suggest/Edit es cierto para generación, pero con un agente LLM cada revisión es un turno que cuesta (motor local: sin confirmar) | `PlanCard.tsx` (edición), `llmTurn.ts` | Crítico, aviso falso por omisión |
 | H8 | P2 | Cancel en ejecución llama `stopPlanRun` y `cancelGeneration` sin aviso; un trabajo remoto puede seguir cobrando, mientras «Dejar de seguir» sí avisa | `PlanCard.tsx:189` | Sin confirmar el cargo del proveedor |
-| H9 | Fricción | Corregido 2026-10-29: Check status no depende del límite (preguntar por un trabajo ya enviado no cuesta); solo cuentan los pasos que se ejecutan por primera vez y entonces el botón dice «Check anyway». Antes, con el límite superado solo mostraba un toast | `RecoveryActions.tsx:23-30`; `planRun.ts:388` | Crítico, callejón sin salida |
+| H9 | Fricción | Corregido 2026-10-29: consultar trabajos ya enviados no se bloquea por el límite; para pasos nuevos se comprueba el coste de esos pasos y el control muestra «Check once» si exceden el límite. La prueba cubre que no haya callejón sin salida; no se vio en pantalla | `RecoveryActions.tsx:23-30`; `planRun.ts:388`; `tests/repro-cards-recovery.test.ts` | Corregido por lectura y test; pantalla pendiente |
 
 ## Entregables equivocados o pérdida de entrada
 
@@ -58,12 +58,12 @@ Estados: «respondido por lectura» (leído en el código; no es arreglado ni pr
 | H1 | Respondido parcialmente; requiere decisión | Por crédito de generación el cambio fue deliberado (`4cf18aa`, ADR 0025 C); para el agente, sin confirmar. Por capacidad (`providerFit.ts:41-55`, `6d97221`): sin decisión encontrada (no encontrarla no prueba que nunca se autorizara); `ec679f7` cita «sugerir otro modelo», que no es cambiar solo; no compara precio y puede subirlo; un proveedor nombrado antes no se protege (`:43`) | R1, 4.2 |
 | H2 | Respondido parcialmente; requiere decisión | `515dceb` evitó solo el recuerdo de sesión; `userPicked[kind]=true` sigue (`catalog.ts:235`) y luego cuenta como elección (`llmTurn.ts:281`) | R6, 4.2 |
 | H3 | Respondido por lectura; requiere decisión | Confirmado: `credit.ts:211` fija `modelPinned` sin el usuario; el aviso es veraz | R2, 4.2 |
-| H4 | Corregido parcialmente; requiere prueba | «Continue once» crea un pase por sesión durante la acción; «Don’t ask again» es por sesión y el interruptor de Settings > Budget para la app. Hay pruebas de los casos individuales; el solapamiento de acciones sigue por comprobar y no se vio en pantalla | R8, 4.2 |
-| H5 | Respondido por lectura; requiere decisión | Decidido y corregido: con límite sin aceptar, un precio desconocido pide la confirmación de sobrepasar el límite con texto honesto (`budget.ts`) | R7, 4.2 |
+| H4 | Corregido por lectura y tests; requiere prueba visual y de concurrencia | El pase está ligado a la acción confirmada y se retira al terminar; una acción de otra sesión no lo consume. «Don’t ask again» es por sesión; el interruptor de Settings > Budget es global. La prueba de UI previa mostraba el botón antiguo; no demuestra el nuevo texto ni el comportamiento visual | R8, 4.2; `tests/once-pass.test.ts`, `tests/session-limit-rule.test.ts`, `tests/spend-confirm-run.test.ts` |
+| H5 | Decidido; corregido por lectura y tests; requiere prueba visual | El precio desconocido pide confirmación con límite activo. El coste real que deja el total sobre el límite crea una sola notificación con generación y acciones «Review limit» / «Ignore». El sandbox mostró antes el flujo viejo («Continue anyway»); la nueva interfaz no está verificada en pantalla | R7, 4.2; `tests/repro-spend-unknown.test.ts`, `tests/over-limit-choices.test.ts` |
 | H6 | Respondido por lectura; requiere decisión | Confirmado; el gasto sí llega a Spending (`planSettings.ts:188`), solo falta el precio previo | R10, 4.2 |
 | H7 | Respondido por lectura; requiere decisión | Confirmado: el turno LLM de cada revisión suma gasto (`llmTurn.ts:218`) | R9, 4.2 |
 | H8 | Respondido parcialmente; requiere prueba y pregunta al proveedor | Aviso ausente confirmado; el cobro del proveedor tras cancelar consta solo en el texto de la app, no verificado (B1) | R11, 4.1 G1 |
-| H9 | Respondido por lectura; requiere prueba y decisión | Corregido en 1de23c1: `planRecoveryProblem` usa `rest` (pasos nuevos) para `check`; prueba automatizada (`tests/repro-cards-recovery.test.ts`), **no visto en pantalla** (sin plan interrumpido en el sandbox) | R12, 4.2 |
+| H9 | Respondido por lectura; requiere prueba visual | Corregido en `1de23c1`: `planRecoveryProblem` usa `rest` (pasos nuevos) para `check`; el botón es «Check once» cuando ese coste supera el límite. Prueba automatizada (`tests/repro-cards-recovery.test.ts`); **no visto en pantalla** (no había plan interrumpido en el sandbox) | R12, 4.2 |
 | H10 | Respondido por lectura; requiere prueba | Corregido 2026-10-29 para los valores recomendados (`conversation.ts` envía los valores que la tarjeta mostraba); la opción pulsada (o «Otra respuesta») sin pulsar Continue se corrigió después: la tarjeta la publica en `agent.cardPick` y escribir envía eso (`tests/questions-typed-choice.test.ts`) | R13, 4.2 |
 | H11 | Respondido por lectura; requiere prueba | Confirmado: la tarjeta pasa a `skipped` al escribir | R13, 4.2 |
 | H12, H13, H15, H16, H17 | Requiere decisión | La historia no los menciona; siguen abiertos y sin evaluar por el rastreo | 4.2 |

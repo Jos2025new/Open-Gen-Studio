@@ -3,7 +3,7 @@ type: mapa
 title: Dependencias entre controles de Studio
 description: Qué controles de Studio se influyen entre sí (modelo, proveedor, precio, aprobación, reescritura, continuidad, estilo, storyboard) y qué promesa toca cada cruce.
 tags: [studio, dependencias, promesas]
-updated: 2026-10-28
+updated: 2026-10-29
 related: [composer, tarjeta-plan, tarjeta-ajustes, resultados, estado-compartido, hallazgos]
 ---
 # Dependencias entre controles de Studio
@@ -40,13 +40,13 @@ Orden observado en `credit.ts`: la generación fallida por crédito busca el mis
 
 | Origen | Destino | Cómo se propaga | Promesa tocada |
 | --- | --- | --- | --- |
-| Spending limit, Limit (USD) | `overLimit` | `budget.ts`; con límite activo sin aceptar, un precio desconocido pide la misma confirmación (`overLimit`: `e.usd == null`, e978427) | P2: cumple lo que promete el tooltip. Prueba automatizada (`tests/repro-spend-unknown.test.ts`); en pantalla (sandbox con gasto real) se vio la tarjeta con «Price n/a» y el texto antiguo «Continue anyway», no los botones nuevos |
+| Spending limit, Limit (USD) | `overLimit` | `budget.ts`; con límite activo sin aceptar, tanto un precio conocido que supera el saldo como uno desconocido piden confirmación (`e.usd == null`, `e978427`). Si se acepta un precio desconocido y el coste real deja el gasto sobre el límite, `noteExcess` añade una notificación única para esa generación | P2: cumple el tooltip según lectura y pruebas (`tests/repro-spend-unknown.test.ts`, `tests/over-limit-choices.test.ts`). En la prueba de pantalla anterior se vio «Price n/a» y «Continue anyway» antes de estos cambios; la interfaz nueva no se ha vuelto a probar |
 | Price margin | Revisión de paso (Continuar/Cancelar paso) | `priceAuthorization.ts` | P2: cumple con 5/25/50 %; con Off solo muestra la diferencia, por diseño |
-| Aprobar por encima del límite | `Session.noAskOverLimit` (por sesión), `settings.budgetNoAsk` (app) y un pase por sesión que dura lo que la acción aprobada (`withOncePass`: se retira al terminar o fallar la acción, y se gasta antes al crear la primera generación) | `withOncePass`, `dontAskAgain`, `askAgain` (`budget.ts`) | H4: cambio implementado; solapamiento de acciones requiere prueba. «Don’t ask again» vale para esa sesión; el interruptor de Settings > Budget lo hace global |
+| Aprobar por encima del límite | `Session.noAskOverLimit` (por sesión), `settings.budgetNoAsk` (app) y un pase temporal ligado a la acción aprobada (`withOncePass`) | `withOncePass`, `dontAskAgain`, `askAgain` (`budget.ts`) | H4: pruebas cubren pase, sesión comprobada y ejecución confirmada; no hay prueba visual posterior ni prueba dedicada de dos acciones concurrentes en la misma sesión. «Don’t ask again» vale para esa sesión; el interruptor de Settings > Budget lo hace global |
 | Generar directo | `SpendConfirm` | `costLabel` | P2: cumple |
 | Reescritura de prompt | `addSpend` categoría agente | Llamada LLM del agente | P2: hallazgo, el coste no se muestra antes |
 | Cada revisión del plan (Edit, Suggest) | Turno LLM del agente | `llmTurn.ts` | P2/P3: el texto «nothing is spent» es cierto para generación, no para el turno LLM |
-| Reset | `spentUsd=0`, `budgetAccepted=null`, `askAgain()` de la sesión activa | Settings > Budget | P2: cumple |
+| Reset | `spentUsd=0`, `budgetAccepted=null`, `askAgain()` de la sesión activa | Settings > Budget | Reactiva la pregunta por exceso en esa sesión; `budgetAccepted` antiguo mantiene compatibilidad global si coincide con el límite actual |
 
 ## Aprobación del plan
 
@@ -55,7 +55,7 @@ Orden observado en `credit.ts`: la generación fallida por crédito busca el mis
 | Approve | Ejecución del plan (`planRun.ts`) | Comprueba el límite de su sesión; si se pasa, la tarjeta ofrece «Continue once» / «Don’t ask again» | P2: ver arriba |
 | Revisión de paso | Pausa del paso | Si el precio real supera el aprobado más el margen, espera Continuar o Cancelar paso | P2: cumple |
 | Cancel en ejecución | `stopPlanRun` + `cancelGeneration` | Sin aviso | P2/P3: sin confirmar si el trabajo remoto sigue cobrando; «Dejar de seguir» sí avisa ([resultados](resultados.md)) |
-| Check status (recuperación) | Reconsulta | Con el límite superado solo muestra un aviso (`RecoveryActions.tsx:23-30`) | Hallazgo: sin salida |
+| Check status (recuperación) | Reconsulta del trabajo enviado y, si corresponde, lanza los pasos nuevos dependientes | `RecoveryActions.tsx:23-30` comprueba el coste de `rest` para los pasos nuevos; muestra «Check once» cuando excede el límite | El callejón se corrigió en `1de23c1` y tiene prueba (`tests/repro-cards-recovery.test.ts`); falta verlo en pantalla |
 
 ## Reescritura de prompt
 
@@ -91,10 +91,10 @@ Fuente: [rastreo de Studio](../rastreo/studio-2.md), contrastado con el código.
 | Cambio por crédito de generación y de agente | Respondido por lectura; requiere decisión (agente) | Deliberado en la generación (`4cf18aa`, ADR 0025 C); para el agente, sin confirmar; el del agente fija `modelPinned` y puede afirmar «same price or less» sin precio | R2, R3 |
 | «Proveedor que encaja» (capacidad) | Respondido por lectura; requiere decisión | Sin decisión encontrada; no compara precio y puede subirlo; el proveedor nombrado en una petición anterior no se protege (`providerFit.ts:41-55`) | R1 |
 | Cambio automático de variante por adjuntos | Respondido parcialmente; requiere decisión | Sigue marcando `userPicked` | R6 |
-| Límite de gasto | Respondido por lectura; requiere decisión | Precios desconocidos ignorados (`budget.ts:25-27`); un presupuesto mostrado es estimación, no máximo | R7, R8 |
+| Límite de gasto | Decidido; respondido por lectura y tests; requiere prueba visual | Los precios desconocidos también piden confirmación; después de aceptar, un exceso real produce una notificación única. El coste presupuestado sigue siendo estimación, no máximo | R7, R8 |
 | Reescritura y revisiones del plan | Respondido por lectura; requiere decisión | Turnos LLM cobrados sin precio previo; «nothing is spent» falso en dinero con agente LLM | R9, R10 |
 | Cancel con trabajo remoto | Respondido parcialmente; requiere prueba y pregunta al proveedor | Comportamiento de la app conocido; cobro real desconocido | R11 |
-| Check status con límite superado | Respondido por lectura; requiere decisión | Sin vía de continuar | R12 |
+| Check status con límite superado | Corregido por lectura y test; requiere prueba visual | Consultar trabajos enviados no se bloquea; el coste de pasos nuevos se comprueba por separado | R12 |
 | Reconfirmación de 0,50 USD en Auto | Respondido por lectura; requiere decisión | Quitada en `2120c71` (`procedure.ts:68-70`; texto al agente en `:93`); docs que la prometían se corrigen con una sección «Estado actual» | C1 |
 
 ## Enlaces

@@ -12,7 +12,7 @@ La propuesta es la reagrupación de las maquetas de [ajustes](../mockups/designe
 
 ## Qué queda abierto
 
-- **Bugs y decisiones del sandbox del 2026-10-29** (S1, S3, S6, S10 extra, Guides recortada, ayudas con «strip»/«Sides»/«From and To», Select/Lasso/Wand en Brush): tabla y evidencia visual en [hallazgos](hallazgos.md#sandbox-y-decisiones-del-2026-10-29-todo-abierto-nada-corregido) y [revisión de ubicación](revision-ubicacion.md#visto-en-sandbox). Siguen abiertos; hallazgos no registra arreglos ni pruebas automatizadas posteriores.
+- **Bugs, decisiones y comprobaciones visuales del 2026-10-29** (S1, S3, S6, S10 extra, Guides recortada, ayudas con «strip»/«Sides»/«From and To», familia Brush): tabla y evidencia en [hallazgos](hallazgos.md#sandbox-y-decisiones-del-2026-10-29-todo-abierto-nada-corregido) y [revisión de ubicación](revision-ubicacion.md#visto-en-sandbox). La familia se confirma por lectura; en pantalla solo se probaron M (Select) y G (Fill), no Lasso, Wand, Gradient ni Eyedropper. Las filas siguen abiertas en esta rama; eso no equivale a ausencia total de tests relacionados (ver la precisión sobre `Auto-select` en §6).
 
 Estados usados abajo: «respondido por lectura» (no es arreglado ni prueba pasada), «respondido parcialmente», «requiere prueba», «requiere decisión». Fuente: [rastreo del Designer](../rastreo/designer.md), secciones 4 y 5.
 
