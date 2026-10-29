@@ -533,13 +533,16 @@ export function Composer() {
         </>}
       </div>
       <div className="composer-footer">
-        <ComposerWorkspaceMenu />
-        <div className="composer-footer-end">
-          {workspace === 'chat' ? <StudioReopen /> : null}
-          {mode === 'agent' && workspace !== 'designer' ? <><AgentMode /><AgentModelControls /></> : mode !== 'agent' && !showTools ? <>
+        <div className="composer-footer-start">
+          <ComposerWorkspaceMenu />
+          {mode !== 'agent' && !showTools ? <>
             <MediaControls kind={mode} />
             {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
           </> : null}
+        </div>
+        <div className="composer-footer-end">
+          {workspace === 'chat' ? <StudioReopen /> : null}
+          {mode === 'agent' && workspace !== 'designer' ? <><AgentMode /><AgentModelControls /></> : null}
         </div>
       </div>
     </div>
