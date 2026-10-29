@@ -41,7 +41,7 @@ function install() {
 describe('repro 2: estimated model equals executed model (hallazgos H2, nodes.md 5.1)', () => {
   // Cause: flow/actions.ts:224-228 builds nodeChoice from the source asset for non-PICKABLE ops and ignores params._modelRef;
   // jobs.ts:1074 then prefers nodeChoice over params._modelRef, while executor.ts:87 prices params._modelRef.
-  it.fails('the model priced for a relight with _modelRef is the model the run is prepared with', async () => {
+  it('the model priced for a relight with _modelRef is the model the run is prepared with', async () => {
     const sid = install();
     execute.mockResolvedValue({ outputs: new Map(), failed: [], skipped: [], waiting: [] });
     const priced = estimateSteps(previewRun(sid, ['op']).steps).authorizations.op.modelRef;
