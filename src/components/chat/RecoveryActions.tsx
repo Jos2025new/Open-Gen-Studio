@@ -1,6 +1,6 @@
 import { RefreshCw, RotateCw } from 'lucide-react';
 import { planRecovery, planRecoveryProblem, resumePlan, type PlanRecoveryMode } from '../../engine/agent/runtime';
-import { acceptOverLimit, overLimit, overLimitText } from '../../engine/budget';
+import { continueOnce, dontAskAgain, overLimit, overLimitText } from '../../engine/budget';
 import { canRecheck, recheckGeneration, retryGeneration } from '../../engine/jobs';
 import { estimateForRetry } from '../../engine/retryPartial';
 import type { Generation, PlanFeedItem } from '../../engine/types';
@@ -21,7 +21,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
   const r = planRecovery(item);
   if (!r) return null;
   const run = (mode: PlanRecoveryMode) => {
-    if (overLimit(mode === 'retry' ? r.estimate : r.rest)) acceptOverLimit();
+    if (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId)) continueOnce();
     const problem = planRecoveryProblem(item, mode);
     if (problem) {
       toast(problem, 'info');
@@ -29,16 +29,18 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
     }
     void resumePlan(sessionId, item.id, mode);
   };
-  const over = overLimit(r.estimate);
+  const quiet = (mode: PlanRecoveryMode) => { dontAskAgain(sessionId); run(mode); };
+  const over = overLimit(r.estimate, sessionId);
   return (
     <div className="recover-chips">
       {r.checkable.length ? (
-        <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => run('check')} data-tip={overLimit(r.rest) ? overLimitText(r.rest) : 'Ask the provider again about the jobs it received; the steps waiting for them run next'}>
-          {overLimit(r.rest) ? 'Check anyway' : 'Check status'}
+        <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => run('check')} data-tip={overLimit(r.rest, sessionId) ? overLimitText(r.rest) : 'Ask the provider again about the jobs it received; the steps waiting for them run next'}>
+          {overLimit(r.rest, sessionId) ? 'Check once' : 'Check status'}
         </Button>
       ) : null}
+      {over ? <Button size="sm" variant="ghost" onClick={() => quiet('retry')} data-tip="Retry and stop asking in this session. Change it in Settings → Budget.">Don’t ask again</Button> : null}
       <Button size="sm" variant="secondary" icon={RotateCw} onClick={() => run('retry')} data-tip={over ? overLimitText(r.estimate) : r.checkable.length ? 'Runs the failed steps again (charged again)' : NO_JOB_TIP}>
-        {over ? 'Retry anyway' : 'Retry failed'} · {costLabel(r.estimate, { short: true })}
+        {over ? 'Continue once' : 'Retry failed'} · {costLabel(r.estimate, { short: true })}
       </Button>
     </div>
   );
@@ -51,7 +53,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
   if (planItem && planRecovery(planItem)) return <PlanRecoveryChips sessionId={g.sessionId} item={planItem} />;
   const checkable = canRecheck(g);
   const estimate = estimateForRetry(g);
-  const over = overLimit(estimate);
+  const over = overLimit(estimate, g.sessionId);
   return (
     <div className="recover-chips">
       {checkable ? (
@@ -59,17 +61,18 @@ export function GenerationRecovery({ g }: { g: Generation }) {
           Check status
         </Button>
       ) : null}
+      {over ? <Button size="sm" variant="ghost" onClick={() => { dontAskAgain(g.sessionId); void retryGeneration(g.id); }} data-tip="Retry and stop asking in this session. Change it in Settings → Budget.">Don’t ask again</Button> : null}
       <Button
         size="sm"
         variant="secondary"
         icon={RotateCw}
         data-tip={over ? overLimitText(g.estimate) : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
         onClick={() => {
-          if (over) acceptOverLimit();
+          if (over) continueOnce();
           void retryGeneration(g.id);
         }}
       >
-        {over ? 'Retry anyway' : 'Retry'} · {costLabel(estimate, { short: true })}
+        {over ? 'Continue once' : 'Retry'} · {costLabel(estimate, { short: true })}
       </Button>
     </div>
   );

@@ -11,6 +11,7 @@ import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine/types';
 import type { OpEngine } from '../../engine/ops';
 import { formatUsd } from '../../lib/format';
+import { askAgain } from '../../engine/budget';
 import { setCatalog, setSettings, setUi, toast, useStore, wipeAllData, type Settings } from '../../store/store';
 import { setDrawingPreference } from '../../engine/design/drawingChoice';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
@@ -288,6 +289,7 @@ function DrawingChoiceSetting() {
 
 export function SettingsPanel() {
   const settings = useStore((s) => s.settings);
+  const sessionNoAsk = useStore((s) => Boolean(s.sessions[s.activeSessionId]?.noAskOverLimit));
   const spent = useStore((s) => s.spentUsd);
   const [budget, setBudget] = useState(String(settings.budgetUsd));
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -457,7 +459,7 @@ export function SettingsPanel() {
 
       {tab === 'budget' ? <section className="set-section">
         <div className="set-row">
-          <span className="set-label" data-tip="With a limit, a run that goes over it asks first. Nothing running is ever stopped for its cost.">
+          <span className="set-label" data-tip="Compares each run with the prices known before it runs. A run over the limit, or with no published price, asks first. Nothing running is ever stopped, and the real cost can be higher than the estimate.">
             Spending limit
           </span>
           <Segmented
@@ -507,13 +509,31 @@ export function SettingsPanel() {
             onClick={() => {
               useStore.setState({ spentUsd: 0 });
               setSettings({ budgetAccepted: null });
+              askAgain();
             }}
             data-tip="Start counting against the limit again. The Spending panel keeps the history."
           >
             Reset
           </Button>
         </div>
-        {settings.budgetOn && settings.budgetAccepted === settings.budgetUsd ? <p className="set-note">You chose to continue past this limit: runs no longer ask. Change the limit or reset to be asked again.</p> : null}
+        {settings.budgetOn ? (
+          <div className="set-row">
+            <span className="set-label" data-tip="Over-limit runs go ahead without asking, in every session.">Don’t ask in any session</span>
+            <Segmented
+              value={settings.budgetNoAsk || settings.budgetAccepted === settings.budgetUsd ? 'on' : 'off'}
+              options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'On' }]}
+              onChange={(v) => setSettings({ budgetNoAsk: v === 'on', budgetAccepted: null })}
+              size="sm"
+            />
+          </div>
+        ) : null}
+        {settings.budgetOn && !settings.budgetNoAsk && sessionNoAsk ? (
+          <div className="set-row set-row-3">
+            <span className="set-label">This session</span>
+            <span>not asking</span>
+            <Button size="sm" variant="ghost" onClick={() => askAgain()}>Ask again</Button>
+          </div>
+        ) : null}
         <p className="set-note">
           Every paid run shows its estimated cost first. {settings.budgetOn ? 'A run over the limit asks before it starts.' : 'Without a limit, spending is only shown.'} Agent (LLM) calls count too. Details:{' '}
           <button type="button" className="link-btn" onClick={() => setUi({ panel: 'spending', settingsOpen: false })}>

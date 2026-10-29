@@ -1,4 +1,5 @@
 import { memo, useMemo, useState } from 'react';
+import { ignoreExcess, openBudgetSettings } from '../../engine/budget';
 import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
@@ -129,6 +130,12 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
         <button type="button" className="notice-retry" disabled={busy} onClick={() => deleteGarbled(sessionId, item.id)}>
           Delete
         </button>
+      ) : null}
+      {item.overLimitFor && !item.overLimitFor.ignored ? (
+        <>
+          <button type="button" className="notice-retry" onClick={openBudgetSettings}>Review limit</button>
+          <button type="button" className="notice-retry" onClick={() => ignoreExcess(sessionId, item.id)}>Ignore</button>
+        </>
       ) : null}
       {item.retry && isLast ? (
         <button type="button" className="notice-retry" disabled={busy} onClick={() => void retryAgentTurn(sessionId, item.id)}>

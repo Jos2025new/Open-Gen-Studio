@@ -62,8 +62,8 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   // Re-estimate: models or prices may have loaded since the plan was shown.
   const { total, authorizations } = estimateSteps(chosen);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approval_attempted', reason: 'approval requested; budget check pending', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: item.status, stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd } });
-  // Over an active limit, the card asks first ("Continue anyway"); approving without that stops here.
-  if (overLimit(total)) {
+  // Over an active limit, the card asks first ("Continue once"); approving without that stops here.
+  if (overLimit(total, sessionId)) {
     toast(overLimitText(total), 'error');
     return;
   }
@@ -124,7 +124,7 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
     });
     return;
   }
-  if (overLimit(preview.estimate)) { updateFeedItem(sessionId, item.id, { estimate: preview.estimate, error: overLimitText(preview.estimate) }); return; }
+  if (overLimit(preview.estimate, sessionId)) { updateFeedItem(sessionId, item.id, { estimate: preview.estimate, error: overLimitText(preview.estimate) }); return; }
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'running', error: undefined, stepStates: {} });
   const result = await runNodes(sessionId, request.targets, preview, request.force, (id, state, info) => {
     updateFeedItem<PlanFeedItem>(sessionId, item.id, it => ({ ...it, stepStates: { ...it.stepStates, [id]: state }, stepGenerations: info?.generationId ? { ...it.stepGenerations, [id]: info.generationId } : it.stepGenerations }));

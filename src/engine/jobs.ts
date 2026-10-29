@@ -37,6 +37,7 @@ import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
+import { noteExcess } from './budget';
 
 const get = useStore.getState;
 export const controllers = new Map<string, AbortController>();
@@ -750,6 +751,7 @@ function finishText(id: string, text: string, actualUsd: number | undefined): vo
   if (!g) return;
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  noteExcess(id);
 }
 
 /** O3: never fails a generation; a file that cannot be read gives no note. */
@@ -775,6 +777,7 @@ function finish(id: string, assetIds: string[], actualUsd: number | undefined, d
     remoteJob: undefined,
   });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  noteExcess(id);
 }
 
 function chargePartial(g: Generation): void {

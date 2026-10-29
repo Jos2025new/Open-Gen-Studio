@@ -3,7 +3,7 @@ import { Zap } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
 import type { Estimate } from '../../engine/types';
 import { useStore } from '../../store/store';
-import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
+import { continueOnce, dontAskAgain, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import { Button, CostTag, costLabel } from './primitives';
 
 /** The one cost checkpoint: shown right before anything that spends money. */
@@ -47,7 +47,7 @@ export function SpendConfirm({
       {children}
       <div className="spend-meta">
         {estimate.usd == null ? (
-          <span>The provider bills the actual cost; it is not published in advance.</span>
+          <span>The provider bills the actual cost; it is not published in advance.{remaining != null ? ' With your limit on, it cannot be checked beforehand and the real cost can pass it.' : ''}</span>
         ) : estimate.approximate || estimate.lowerBound ? (
           <span>{estimate.note ?? 'Estimate from provider prices.'}</span>
         ) : (
@@ -60,17 +60,30 @@ export function SpendConfirm({
         <Button variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
+        {over ? (
+          <Button
+            variant="secondary"
+            disabled={Boolean(blocked)}
+            onClick={() => {
+              dontAskAgain();
+              onConfirm();
+            }}
+            data-tip="Go ahead and stop asking in this session. Change it in Settings → Budget."
+          >
+            Don’t ask again
+          </Button>
+        ) : null}
         <Button
           variant="primary"
           icon={Zap}
           disabled={Boolean(blocked)}
           onClick={() => {
-            if (over) acceptOverLimit();
+            if (over) continueOnce();
             onConfirm();
           }}
           autoFocus
         >
-          {over ? 'Continue anyway' : confirmLabel} · {costLabel(estimate, { short: true })}
+          {over ? 'Continue once' : confirmLabel} · {costLabel(estimate, { short: true })}
         </Button>
       </div>
     </div>

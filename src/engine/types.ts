@@ -669,6 +669,8 @@ export interface NoticeFeedItem extends FeedBase {
   retry?: { partialItemId?: string };
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;
+  /** Real cost of an unpriced run passed the limit. */
+  overLimitFor?: { gen: string; ignored?: boolean };
 }
 
 /** One thing the agent did during a turn, shown in its activity block (L3). */
@@ -1048,4 +1050,6 @@ export interface Session {
   agentMetrics?: AgentRequestMetrics[];
   subjects?: Subject[];
   styles?: SavedStyle[];
+  /** "Don't ask again": over-limit runs here no longer ask. */
+  noAskOverLimit?: boolean;
 }

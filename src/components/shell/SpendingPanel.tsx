@@ -55,7 +55,7 @@ export function SpendingPanel() {
     return ref.includes('::') ? ref.split('::')[1] : ref;
   };
   const limitLeft = settings.budgetOn ? settings.budgetUsd - spent : null;
-  const accepted = settings.budgetOn && settings.budgetAccepted === settings.budgetUsd;
+  const accepted = settings.budgetOn && (settings.budgetNoAsk || settings.budgetAccepted === settings.budgetUsd);
 
   return (
     <div className="spending">
@@ -82,7 +82,7 @@ export function SpendingPanel() {
               <div className="bar">
                 <span className={limitLeft < 0 ? 'over' : ''} style={{ width: `${Math.min(100, (spent / Math.max(settings.budgetUsd, 1e-9)) * 100)}%` }} />
               </div>
-              {accepted ? <p className="faint">You chose to continue past this limit; runs no longer ask.</p> : null}
+              {accepted ? <p className="faint">You chose not to be asked past this limit, in any session.</p> : null}
             </>
           )}
           <button type="button" className="link-btn" onClick={() => setUi({ settingsOpen: true })}>

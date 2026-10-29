@@ -12,7 +12,7 @@ import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
-import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
+import { continueOnce, dontAskAgain, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import type { Estimate, Generation, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
@@ -176,7 +176,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
     const st = plan.steps.find((x) => x.id === ref.split('#')[0]);
     return st ? `“${st.title}”` : ref;
   };
-  const over = awaiting && overLimit(total);
+  const over = awaiting && overLimit(total, sessionId);
   const [showAdj, setShowAdj] = useState(false);
   const [suggest, setSuggest] = useState(false);
   const generations = useStore((s) => s.generations);
@@ -335,17 +335,22 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               Cancel
             </Button>
             {sections.length ? <IconButton icon={RotateCw} label="Check the price again" className="cc-recheck" disabled={rewriting} onClick={() => void recheckPlanPrice(sessionId, item.id)} /> : null}
+            {over ? (
+              <Button variant="secondary" disabled={revising || rewriting || Boolean(rewriteFailed) || none} onClick={() => { dontAskAgain(sessionId); void approvePlan(sessionId, item.id); }} data-tip="Approve and stop asking in this session. Change it in Settings → Budget.">
+                Don’t ask again
+              </Button>
+            ) : null}
             <Button
               variant="primary"
               className="cc-approve"
               disabled={revising || rewriting || Boolean(rewriteFailed) || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
-                if (over) acceptOverLimit();
+                if (over) continueOnce();
                 void approvePlan(sessionId, item.id);
               }}
               data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}
             >
-              {free ? 'Approve' : <>{over ? 'Approve anyway' : 'Approve'}<span className="cc-ap-sep" aria-hidden>·</span><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
+              {free ? 'Approve' : <>{over ? 'Continue once' : 'Approve'}<span className="cc-ap-sep" aria-hidden>·</span><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
             </Button>
           </>
         ) : running ? (

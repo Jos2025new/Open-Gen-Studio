@@ -4,7 +4,7 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
 import { addSpend, setSettings, useStore } from '../src/store/store';
-import { acceptOverLimit, overLimit, remainingBudget } from '../src/engine/budget';
+import { askAgain, continueOnce, overLimit, remainingBudget } from '../src/engine/budget';
 import { budgetProblem } from '../src/engine/actions';
 import { periodStart, summarizeSpend } from '../src/engine/spending';
 import { llmCallUsd } from '../src/engine/agent/runtime';
@@ -46,16 +46,20 @@ describe('the limit warns, it does not block (G2)', () => {
     expect(toasts().filter((t) => /passed your spending limit/.test(t))).toHaveLength(1);
   });
 
-  it('a run over the limit asks first; after "Continue anyway" it does not ask again until the limit changes', () => {
+  // Changed 2026-10-29: "Continue anyway" used to stop all asking until the limit changed. Now "Continue once" lets only one action through (tests/over-limit-choices.test.ts has the rest).
+  it('a run over the limit asks first; "Continue once" lets one action through and the next one asks again', () => {
+    vi.useFakeTimers();
     addSpend(0.9, entry);
     const run = { usd: 0.5, approximate: false };
     expect(overLimit(run)).toBe(true);
-    expect(budgetProblem(run)).toMatch(/Continue anyway/);
-    acceptOverLimit();
+    expect(budgetProblem(run)).toMatch(/Continue once/);
+    continueOnce();
     expect(overLimit(run)).toBe(false);
     expect(budgetProblem(run)).toBeNull();
-    setSettings({ budgetUsd: 2 });
-    expect(overLimit({ usd: 1.5, approximate: false })).toBe(true);
+    vi.advanceTimersByTime(10_000);
+    expect(overLimit(run)).toBe(true);
+    askAgain();
+    vi.useRealTimers();
   });
 
   it('without a limit nothing asks and nothing is left to count', () => {

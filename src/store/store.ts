@@ -59,8 +59,10 @@ export interface Settings {
   budgetUsd: number;
   /** false: no spending limit, spending is only shown. */
   budgetOn: boolean;
-  /** The limit the user chose to go past ("Continue anyway"); valid while budgetUsd stays the same. */
+  /** Older "Continue anyway": as budgetNoAsk while budgetUsd is the same. */
   budgetAccepted?: number | null;
+  /** Over-limit runs never ask. */
+  budgetNoAsk?: boolean;
   /** % over approval before a step waits (default 5). */
   priceMargin?: number | 'off';
   /** Browser notification when generations finish in a hidden tab (default off; permission is asked only when turned on). */
@@ -243,7 +245,6 @@ export const DEFAULT_SETTINGS: Settings = {
   guidedRounds: 2,
   budgetUsd: 25,
   budgetOn: true,
-  budgetAccepted: null,
   ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null, videoExtend: null, transcribe: null, editRegion: null, removeObject: null },
 };
 
@@ -593,10 +594,7 @@ export function setCatalog(patch: Partial<CatalogState> | ((c: CatalogState) => 
 
 export const MAX_SPEND_LOG = 5000;
 
-/**
- * Count money spent (never blocks: what is running keeps running). With `entry` it is itemized for the Spending
- * panel. Crossing an active, not accepted limit shows one notice; the next paid run asks before going on.
- */
+/** Count money spent (never blocks). With `entry` it is itemized in the Spending panel; crossing the limit shows one notice. */
 export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): void {
   if (!Number.isFinite(usd) || usd <= 0) return;
   const before = get().spentUsd;
@@ -604,8 +602,9 @@ export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): v
     spentUsd: Math.round((st.spentUsd + usd) * 10000) / 10000,
     spendLog: entry ? [...st.spendLog, { ...entry, at: Date.now(), usd }].slice(-MAX_SPEND_LOG) : st.spendLog,
   }));
-  const { budgetOn, budgetUsd, budgetAccepted } = get().settings;
-  if (budgetOn && budgetAccepted !== budgetUsd && before <= budgetUsd && get().spentUsd > budgetUsd) {
+  const { budgetOn, budgetUsd, budgetAccepted, budgetNoAsk } = get().settings;
+  const quiet = budgetNoAsk || budgetAccepted === budgetUsd || get().sessions[entry?.sessionId ?? '']?.noAskOverLimit;
+  if (budgetOn && !quiet && before <= budgetUsd && get().spentUsd > budgetUsd) {
     toast(`You passed your spending limit (${formatUsd(budgetUsd)}). What is running continues; new paid runs will ask first.`, 'error');
   }
 }

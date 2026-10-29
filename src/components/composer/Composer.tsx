@@ -186,7 +186,7 @@ export function SendDirect({ kind, onLaunch }: { kind: MediaKind; onLaunch?: (te
   const schema = useStore((s) => s.catalog.schemas);
   const assets = useStore((s) => s.assets);
   const spent = useStore((s) => s.spentUsd);
-  const budget = useStore((s) => `${s.settings.budgetOn}|${s.settings.budgetUsd}|${s.settings.budgetAccepted}`);
+  const budget = useStore((s) => `${s.settings.budgetOn}|${s.settings.budgetUsd}|${s.settings.budgetAccepted}|${s.settings.budgetNoAsk}|${s.sessions[s.activeSessionId]?.noAskOverLimit}`);
   const workspace = useStore((s) => s.ui.workspace);
   const models = useStore((s) => s.catalog.models);
   const quotes = useStore((s) => s.quotes);
