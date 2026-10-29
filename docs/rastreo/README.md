@@ -10,7 +10,9 @@ updated: 2026-10-28
 
 ## Consulta y mantenimiento
 
-Antes de cambiar Designer, Studio o Nodes, lee el índice de `docs/<área>-controles/` y las notas de los componentes y funciones afectados. Contrasta el mapa con el código y las decisiones; corrige discrepancias con evidencia y distingue lectura, test y prueba visual. Compara antes y después: una función que desaparece sin autorización es una posible regresión que debe conservarse o recuperarse. Un diff o test puede revelar la pérdida; los enlaces válidos no demuestran que una función sea accesible ni que funcione. Actualiza el mapa afectado y conserva las dudas sin prueba.
+Antes de cambiar Designer, Studio o Nodes, consulta el índice del área y solo las notas pertinentes a los controles o funciones que puedan verse afectados. Si el trabajo no toca lo que registra un mapa, no hace falta cargarlo.
+
+Contrasta esas notas con el código y la evidencia disponible. Si un hecho del mapa está desactualizado o una función existe aunque el mapa diga lo contrario, corrige solo lo afectado y señala la evidencia; mantén las dudas que no estén resueltas. Compara antes y después: si una capacidad documentada se pierde sin autorización, investiga y consérvala o recupérala. Un diff o una prueba pueden demostrar una pérdida concreta; la existencia del código no demuestra que un control sea visible o accesible, y `check-docs` no comprueba que lo documentado siga funcionando. Distingue lectura, test, pantalla y proveedor.
 
 Rastreo de commits y docs para cada área, con el estado de hoy comprobado en el código (2026-10-28). Los docs y los mensajes de commit son pistas; la evidencia es el código. Lo que solo se ve en pantalla queda «sin verificar».
 
