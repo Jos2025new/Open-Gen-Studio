@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, useConnection, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
+import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
@@ -793,7 +793,8 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
         <PortHandle key={p.id} id={p.id} type="target" side={Position.Left} top={`${((i + 1) / (shown.length + 1)) * 100}%`} label={connecting ? p.label : undefined} portType={p.type} quiet={p.id === 'prompt' && !wired.has('prompt') && !connecting} />
       ))}
       <div className={`nc ${kindClass} ${selected ? 'is-selected' : ''}`}>
-        <div className="nc-label">
+        <div className={`nc-label ${d.kind === 'text' ? 'nc-text-grip' : ''}`}>
+          {d.kind === 'text' ? <GripVertical size={14} aria-hidden="true" /> : null}
           <Icon size={12} />
           <NodeTitle sessionId={sessionId} node={node} />
           <NodeHistory node={node} />

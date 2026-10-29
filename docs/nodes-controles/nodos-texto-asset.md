@@ -10,6 +10,8 @@ related: [tarjeta-nodo, biblioteca-nodos, puertos-enlaces]
 
 Ninguno de los dos tiene panel inferior (`nodes.tsx:776`); comparten título, estado y barra flotante con el resto ([tarjeta-nodo](tarjeta-nodo.md)). No ejecutan nada (`runsGeneration` es falso para ellos, `flow/graph.ts:32`): no tienen botón Run ni historial.
 
+El nodo de texto tiene un agarre en su encabezado para moverlo; el campo sigue reservado para editar. El botón de salida conserva su área de interacción, con fondo neutro en vez de una esfera blanca.
+
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
 | Nodo de texto: cuadro «Prompt or copy…» | `nodes.tsx:803` | Todo nodo `text` (creado desde «Text», el estado vacío, el plan del agente o el Composer en Nodes) | `d.text` | `patchNodeData({ text })` por pulsación (`nodes.tsx:804`) | Prompt o letras de los nodos conectados | El texto va directo al paso (`flow/graph.ts:407`); cambiarlo deja desactualizados a sus destinos |

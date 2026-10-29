@@ -1,13 +1,15 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { ChevronDown, MessageSquare } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
-import { FeedList } from '../chat/FeedList';
+import { FeedList, NoticeView } from '../chat/FeedList';
 
 /** The session conversation in the Node and Designer workspaces: a foldable card on the left, clear of the canvas centre. */
 export function ThreadPeek({ workspace }: { workspace: string }) {
   const open = useStore((s) => s.ui.threadOpen);
   const sessionId = useStore((s) => s.activeSessionId);
   const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => f.workspace === s.ui.workspace).length ?? 0);
+  const hasNodeMessage = useStore((s) => s.sessions[s.activeSessionId]?.feed.some((f) => f.workspace === 'node' && f.type === 'user' && f.mode === 'agent') ?? false);
+  const feed = useStore((s) => s.sessions[s.activeSessionId]?.feed);
   const pending = useStore((s) => {
     const sess = s.sessions[s.activeSessionId];
     return Boolean(sess?.agent.pending) || Boolean(sess?.agent.busy);
@@ -31,6 +33,11 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
     const id = requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
     return () => cancelAnimationFrame(id);
   }, [open, lastKey]);
+
+  if (workspace === 'node' && !hasNodeMessage) {
+    const deletions = feed?.filter((f) => f.workspace === 'node' && f.type === 'notice' && f.undoNodes && !f.undone) ?? [];
+    return deletions.length ? <div className="composer-alerts">{deletions.map((item) => item.type === 'notice' && <NoticeView key={item.id} item={item} sessionId={sessionId} />)}</div> : null;
+  }
 
   const toggle = (
     <button type="button" className="thread-toggle" onClick={() => setUi({ threadOpen: !open })} aria-expanded={open}>

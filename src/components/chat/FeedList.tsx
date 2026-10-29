@@ -117,7 +117,7 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
   );
 }
 
-function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: string }) {
+export function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: string }) {
   // Retry only on the latest item: after a new message it would answer out of order.
   const isLast = useStore((s) => s.sessions[sessionId]?.feed.at(-1)?.id === item.id);
   const busy = useStore((s) => Boolean(s.sessions[sessionId]?.agent.busy));

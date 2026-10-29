@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
 import { Hand, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
 import { setGraph, toast, useStore } from '../../store/store';
@@ -8,7 +8,6 @@ import { nodeOutputAsset } from '../../engine/flow/graph';
 import { generationTitle } from '../assets/GenerationInfo';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { IconButton, MenuItem } from '../ui/primitives';
-import { dockLift } from './dockPlacement';
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const parts = [];
@@ -31,32 +30,6 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
   const rf = useReactFlow();
   const { zoom } = useViewport();
   const [mapOpen, setMapOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const liftRef = useRef(0);
-  const [lift, setLift] = useState(0);
-  useEffect(() => {
-    const panel = panelRef.current;
-    const canvas = panel?.closest('.node-canvas');
-    const dock = canvas?.parentElement?.querySelector('.composer-dock');
-    if (!panel || !canvas || !dock) return;
-    const place = () => {
-      const p = panel.getBoundingClientRect();
-      const top = p.top + liftRef.current, bottom = p.bottom + liftRef.current;
-      const obstacles = [...dock.querySelectorAll('.composer, .composer-footer, .thread-toggle, .thread-body')].map(el => el.getBoundingClientRect());
-      const next = dockLift({ left: p.left, right: p.right, top, bottom }, obstacles);
-      if (Math.abs(next - liftRef.current) < 0.5) return;
-      liftRef.current = next;
-      panel.style.bottom = `${next}px`;
-      setLift(next);
-    };
-    const observer = new ResizeObserver(place);
-    observer.observe(panel);
-    observer.observe(canvas);
-    observer.observe(dock);
-    window.addEventListener('resize', place);
-    place();
-    return () => { observer.disconnect(); window.removeEventListener('resize', place); };
-  }, []);
   const [direction, setDirection] = useState<'undo' | 'redo'>('undo');
   const history = usePopover();
   const undoPop = usePopover();
@@ -101,8 +74,8 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
   const showHistory = (e: React.MouseEvent, dir: 'undo' | 'redo') => { e.preventDefault(); e.stopPropagation(); setDirection(dir); history.setOpen(true); };
   return (
     <>
-      {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" style={{ bottom: 60 + lift }} maskColor="var(--overlay)" nodeColor="var(--text-4)" /> : null}
-      <Panel ref={panelRef} position="bottom-left" className="canvas-navigation" style={{ bottom: lift }}>
+      {mapOpen ? <MiniMap pannable zoomable position="top-left" className="canvas-map" maskColor="var(--overlay)" nodeColor="var(--text-4)" /> : null}
+      <Panel position="top-left" className="canvas-navigation">
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
         <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />

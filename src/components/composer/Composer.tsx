@@ -2,7 +2,7 @@ import { ComposerAlerts } from './ComposerAlerts';
 import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
 import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Layers, Pencil, X, Zap } from 'lucide-react';
+import { ArrowUp, Layers, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';
@@ -182,7 +182,7 @@ function DesignerTargetChip() {
   );
 }
 
-export function SendDirect({ kind, onLaunch }: { kind: MediaKind; onLaunch?: (text: string) => void }) {
+export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKind; onLaunch?: (text: string) => void; compact?: boolean }) {
   const composer = useStore((s) => s.composer);
   // All schemas: the check may use the family's edit variant (directModelRef), whose schema loads later.
   const schema = useStore((s) => s.catalog.schemas);
@@ -208,17 +208,17 @@ export function SendDirect({ kind, onLaunch }: { kind: MediaKind; onLaunch?: (te
   };
   return (
     <>
+      {compact ? <span className="send-cost num" aria-hidden="true">{costLabel(check.estimate, { short: true })}</span> : null}
       <button
         ref={pop.ref}
         type="button"
         className={`send-btn is-generate ${check.ok ? '' : 'is-blocked'}`}
+        aria-label={`Generate · ${costLabel(check.estimate, { short: true })}`}
         onClick={onClick}
         aria-disabled={!check.ok}
         data-tip={check.ok ? (unknown ? 'Price not published: you will confirm first' : check.overLimit ? 'Over your spending limit: you will confirm first' : 'Generate (Enter)') : check.reason}
       >
-        <Zap size={14} strokeWidth={2} />
-        <span>Generate</span>
-        <span className="send-cost num">{costLabel(check.estimate, { short: true })}</span>
+        {compact ? <ArrowUp size={16} strokeWidth={2.2} /> : <><Zap size={14} strokeWidth={2} /><span>Generate</span><span className="send-cost num">{costLabel(check.estimate, { short: true })}</span></>}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Confirm cost">
         <SpendConfirm
@@ -514,7 +514,7 @@ export function Composer() {
             aria-label="Prompt"
           />
           {mentions.menu}
-          {mode === 'agent' ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : <SendDirect kind={mode} />}
+          {mode === 'agent' ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : <SendDirect kind={mode} compact />}
         </div>
         <div className="composer-bar">
           {editing ? (

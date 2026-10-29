@@ -1,14 +1,14 @@
 ---
 type: inventario
 title: Panel de navegación de Nodes
-description: Panel inferior izquierdo del lienzo de Nodes (herramientas Select y Pan, borrar, mapa, deshacer, rehacer, historial, zoom, búsqueda) y los controles reducidos del tablero de Studio.
+description: Panel superior izquierdo del lienzo de Nodes (herramientas Select y Pan, borrar, mapa, deshacer, rehacer, historial, zoom, búsqueda) y los controles reducidos del tablero de Studio.
 tags: [nodes, navegacion, zoom, deshacer]
 updated: 2026-10-28
 related: [lienzo, deshacer-bloqueos, atajos-gestos]
 ---
 # Panel de navegación de Nodes
 
-`CanvasNavigation` se monta dentro de `ReactFlow` solo cuando el lienzo no es embebido (`NodeWorkspace.tsx:471`). En el tablero de Studio se monta `EmbeddedControls` (3 botones). El panel se sube solo para no quedar bajo el Composer: mide los obstáculos del dock con `ResizeObserver` (`CanvasNavigation.tsx:41`) y no tiene control propio. Los botones de icono llevan su nombre como `label`; el texto largo del botón Pan sale como consejo.
+`CanvasNavigation` se monta dentro de `ReactFlow` solo cuando el lienzo no es embebido (`NodeWorkspace.tsx:471`). En el tablero de Studio se monta `EmbeddedControls` (3 botones). El panel está arriba a la izquierda, y el minimapa se abre debajo. Los botones de icono llevan su nombre como `label`; el texto largo del botón Pan sale como consejo.
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
