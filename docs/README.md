@@ -17,6 +17,7 @@
 - [Problemas conocidos del 2026-10-18](problemas-conocidos-2026-10-18.md): 3D que falla al descargar, pérdida sin aviso tras parar el servidor, conflicto de guardado, auditoría y pendientes antiguos revisados.
 - [Fusión de task/agent-forcing](fusion-agent-forcing.md): comparación con modelo-general y decisiones que no deben revertirse.
 - [Catálogo de voz y efectos](catalogo-voz-y-efectos.md): modelos de texto a voz y efectos de Atlas y NanoGPT, precios por 1000 caracteres y propuesta (2026-10-08).
+- [Propuesta: conocimiento del agente en archivos y vistas guardadas](propuesta-conocimiento-y-vistas.md): vistas de filtros, reglas del agente en `.md` al estilo OKF y carga por partes (2026-10-27, sin implementar).
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
 - [Importar SVG de Inkscape](inkscape-importacion.md): qué queda editable (carpetas, formas, opacidades, blur) y qué se rasteriza, y cómo se sanea.
 - [Formas al estilo de Inkscape](inkscape-formas.md): fórmulas de esquinas, trazo y desenfoque, con la línea exacta del código de Inkscape y las diferencias deliberadas.
