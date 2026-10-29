@@ -112,6 +112,6 @@ export function ignoreExcess(sessionId: string, itemId: string): void {
 }
 
 /** A Nodes run that did not start: the real reason for the card (the limit, or the graph changed). */
-export function rerunNote(e: Estimate): string {
-  return overLimit(e) ? overLimitText(e) : 'The execution changed. Review and approve again.';
+export function rerunNote(e: Estimate, sessionId?: string): string {
+  return overLimit(e, sessionId) ? overLimitText(e) : 'The execution changed. Review and approve again.';
 }

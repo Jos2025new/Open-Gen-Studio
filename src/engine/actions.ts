@@ -190,8 +190,8 @@ export async function createSubjectVoice(sessionId: string, subjectId: string): 
 // Budget
 
 /** Why a run needs confirmation: it goes over a limit not yet accepted. */
-export function budgetProblem(e: Estimate): string | null {
-  return overLimit(e) ? overLimitText(e) : null;
+export function budgetProblem(e: Estimate, sessionId?: string): string | null {
+  return overLimit(e, sessionId) ? overLimitText(e) : null;
 }
 
 export { needsSpendCheck };
@@ -442,7 +442,7 @@ export async function regenerate(generationId: string): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
   const estimate = regenerateEstimate(generationId) ?? g.estimate;
-  const problem = budgetProblem(estimate);
+  const problem = budgetProblem(estimate, g.sessionId);
   if (problem) {
     toast(problem, 'error');
     return;
@@ -683,7 +683,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
   }
   const sessionId = st.ui.space ? ensureSpaceSession() : asset.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
   const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef, place: place ?? placeFor(st.ui, st.ui.workspace), mode: mode ?? modeFor(st.composer.mode, op) });
-  const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true });
+  const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId);
   if (problem) {
     toast(problem, 'error');
     return [];
@@ -708,7 +708,7 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
   try {
     const source = await layerToAsset(sessionId, docId, layerId);
     const spec = await opSpec({ sessionId, sourceAssetId: source.id, op, params, origin: 'designer', place: 'designer', mode: 'image' });
-    const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true });
+    const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId);
     if (problem) {
       toast(problem, 'error');
       return;

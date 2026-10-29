@@ -327,7 +327,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const preview = await prepareNodeRun(sessionId, targets, force);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
-  const problem = budgetProblem(preview.estimate);
+  const problem = budgetProblem(preview.estimate, sessionId);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);

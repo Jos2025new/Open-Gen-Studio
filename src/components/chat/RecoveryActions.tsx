@@ -22,7 +22,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
   if (!r) return null;
   const run = (mode: PlanRecoveryMode) => {
     const go = () => {
-      const problem = planRecoveryProblem(item, mode);
+      const problem = planRecoveryProblem(item, mode, sessionId);
       if (problem) {
         toast(problem, 'info');
         return;

@@ -60,7 +60,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   }
   const mode = v.data.action === 'check_status' ? 'check' : 'retry';
   const target = [...session(sessionId).feed].reverse().find((f): f is PlanFeedItem => f.type === 'plan' && (f.status === 'error' || f.status === 'partial'));
-  const problem = target ? planRecoveryProblem(target, mode) : 'There is no failed plan in this chat.';
+  const problem = target ? planRecoveryProblem(target, mode, sessionId) : 'There is no failed plan in this chat.';
   if (target && !problem) {
     log.action({ icon: 'fix', label: mode === 'check' ? 'Checked the status of the failed steps' : 'Retried the failed steps', detail: target.plan.title });
     void resumePlan(sessionId, target.id, mode);

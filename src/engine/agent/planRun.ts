@@ -131,7 +131,7 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
   });
   if (!result) {
     const next = previewRun(sessionId, request.targets, request.force);
-    updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || rerunNote(next.estimate) });
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || rerunNote(next.estimate, sessionId) });
     return;
   }
   const status = result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';
@@ -380,14 +380,14 @@ export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: 
 }
 
 /** Why a recovery cannot start, in words for the user or the agent; null when it can. */
-export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode): string | null {
+export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode, sessionId: string): string | null {
   const r = planRecovery(item);
   if (!r) return item.plan.workspace === 'node' ? 'Plans on the Node canvas are rerun from their nodes.' : 'This plan has no failed steps.';
   if (mode === 'check' && !r.checkable.length) {
     return 'No failed step has a submitted job to check: the provider gave no job id (NanoGPT returns images in the same request, so a dropped connection leaves nothing to ask for). Retry runs them again.';
   }
   const cost = mode === 'check' ? r.rest : r.estimate;
-  return overLimit(cost) ? overLimitText(cost) : null;
+  return overLimit(cost, sessionId) ? overLimitText(cost) : null;
 }
 
 /**
@@ -400,7 +400,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan') return 'No such plan.';
-  const problem = planRecoveryProblem(item, mode);
+  const problem = planRecoveryProblem(item, mode, sessionId);
   if (problem) return problem;
   const { chosen, off } = approvedSteps(item);
   const failedIds = chosen.filter((st) => item.stepStates[st.id] === 'error').map((st) => st.id);
