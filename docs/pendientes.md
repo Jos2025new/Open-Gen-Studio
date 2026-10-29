@@ -96,6 +96,8 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | C8 | Tests intermitentes con carga (4, 11 y `writer-lock` 15c) | medio | 2026-10-08 |
 | C15 | CI: flujo en `.github/workflows` (el usuario activa Actions y protección de ramas) | medio | 2026-10-27 |
 | C16 | ESLint gradual (propuesta del auditor externo) | bajo | 2026-10-27 |
+| C17 | Probar en pantalla el cierre de gasto y la reconexión del cable sin salida | medio | 2026-10-29 |
+| C18 | Investigar posible solapamiento de acciones con «Continue once» | medio | 2026-10-29 |
 | C9 | Partir los 11 archivos de más de 30 KB | medio | 2026-10-07 |
 | C10 | Cobertura por riesgo: recorridos completos en sandbox | medio | 2026-10-08 |
 | C11 | Contraste de `--text-4` (2,8 a 3,7:1) | medio | 2026-10-07 |

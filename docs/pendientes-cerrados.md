@@ -4,6 +4,13 @@ Lo que salió de las listas abiertas ([índice](pendientes.md)). Una línea por 
 
 Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se movieron tal cual estaban marcados `[x]`.
 
+## Cierre de la sesión del 2026-10-29 (detalle en [055](history/055-2026-10-W44.md))
+
+- **Mapas y regla de consulta:** actualizados e integrados en `task/workflow-ask-first` (`d8b3869`); consultar los `huecos.md` para lo que sigue abierto. El comprobador de enlaces no demuestra accesibilidad ni comportamiento.
+- **Sesión de confirmación y conexiones sin salida:** trabajo interrumpido integrado y completado con pruebas (`543035c`); la comprobación visual pendiente está en C17 y la sospecha del pase en C18. No se declara cerrada la verificación en pantalla.
+- **Integración y limpieza de ramas locales:** `task/workflow-ask-first` avanzó a `d8b3869`; quedaron tres ramas locales y se verificaron los respaldos antes de retirar las demás. La integración en la app y el remoto siguen en G2 y G8.
+- **Capturas de Designer:** 32 preservadas en `.sandbox/capturas/` de `ask-first` y en el ZIP; referencias actualizadas en `9899443`. Son archivos ignorados por Git.
+
 ## Hechos el 2026-10-23 (detalle y commits en [050](history/050-2026-10-W43.md))
 
 - **B10** precio del plan con el modelo enviado (`43203ea`, `tests/plan-price-variant.test.ts`), más el margen de precio del usuario (`5eaa8ec`).
