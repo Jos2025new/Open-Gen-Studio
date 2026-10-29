@@ -17,4 +17,4 @@ Reacoplar restaura ese original y conserva las conexiones nuevas compatibles; la
 La validación exige igualdad del grafo en la ida y vuelta y que el nodo de abajo reciba el mismo resultado.
 
 ## Estado actual (2026-10-28)
-Lo anterior es el diseño aprobado y se conserva como historial. El código de desacoplar existe (`arrange.ts`, `Operations.tsx`) con su test; la verificación visual sigue sin hacerse. Las operaciones `join_clips` y las ediciones con máscara no se ejecutan en Nodes (`fromChat.ts:26`); los selectores de nodo aún ofrecen `edit_region` y `remove_object` (rastreo 5.8, requiere prueba).
+Lo anterior es el diseño aprobado y se conserva como historial. El código de desacoplar existe (`arrange.ts`, `Operations.tsx`) con su test; la verificación visual sigue sin hacerse. Las operaciones `join_clips` y las ediciones con máscara entran del chat como resultado (`chatToNodes`, `fromChat.ts:26`); si se ejecutan desde un nodo, sin leer; los selectores de nodo aún ofrecen `edit_region` y `remove_object` (rastreo 5.8, requiere prueba).
