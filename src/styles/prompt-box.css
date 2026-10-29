@@ -1,4 +1,4 @@
-.composer-dock { bottom: 24px; }
+.composer-dock { bottom: 4px; }
 .composer-dock { width: min(800px, calc(100% - 48px)); }
 .composer { padding: 12px 18px; border-radius: var(--r-l); }
 .composer-prompt-row { display: block; margin-bottom: 8px; }
@@ -69,7 +69,7 @@
   .chat-welcome h1 { font-size: 26px; }
 }
 @media (max-width: 600px) {
-  .composer-dock { bottom: 10px; }
+  .composer-dock { bottom: 4px; }
   .composer-dock { width: calc(100% - 20px); }
   .composer-prompt-row .composer-input { max-height: min(130px, 25dvh); }
   .chat-empty .suggestions { display: none; }
