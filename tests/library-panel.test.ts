@@ -269,6 +269,19 @@ describe('Library cards', () => {
     expect(host.querySelector('.g-tile.pc-row .attach-toggle.is-on')?.textContent).toBe('1');
   });
 
+  it('overlay controls share one style and the agent-context toggle has its own glyph, distinct from the select box', () => {
+    const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
+    expect(css).toMatch(/\.pc-card \.pc-check, \.pc-card \.attach-toggle, \.pc-card \.pc-tools \.icon-btn \{[^}]*width: 30px; height: 30px[^}]*background: var\(--pc-btn-bg\)/);
+    const tile = q('.g-tile');
+    const attach = tile.querySelector('.attach-toggle')!;
+    expect(attach.querySelector('.is-glyph svg')).not.toBeNull(); // off: a paperclip, not a plain box
+    expect(tile.querySelector('.pc-check .pc-box')).not.toBeNull();
+    expect(tile.querySelector('.pc-check svg')).toBeNull(); // unchecked select box stays plain
+    click(attach);
+    expect(tile.querySelector('.attach-toggle.is-on')?.textContent).toBe('1');
+    expect(tile.querySelector('.attach-toggle.is-on svg')).toBeNull();
+  });
+
   it('list rows keep the actions', () => {
     click(q('[aria-label="List view"]'));
     const row = q('.g-tile.pc-row');

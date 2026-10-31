@@ -36,33 +36,46 @@
 .pc-menu-item:disabled { opacity: .45; }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
-.pc-card { position: relative; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.pc-card { --pc-btn-bg: rgba(255, 255, 255, .3); --pc-btn-bg-hover: rgba(255, 255, 255, .5); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .pc-card.is-selected, .pc-card.is-active { border-color: var(--accent); }
+.pc-card.is-hidden-item .pc-open, .pc-card.is-hidden-item .g-open { opacity: .45; }
 .pc-card .g-open, .pc-card .pc-open { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pc-card .g-open .media, .pc-card .pc-open .media { width: 100%; height: 100%; object-fit: cover; }
 .pc-hover { opacity: 0; transition: opacity .12s; }
 .pc-card:hover .pc-hover, .pc-card:focus-within .pc-hover, .pc-card.is-armed .pc-hover, .pc-card.is-selecting .pc-check, .pc-card .pc-check.is-on, .pc-card .pc-hover.is-on, .pc-hover[aria-expanded="true"] { opacity: 1; }
-.pc-check { position: absolute; top: 6px; left: 6px; z-index: 2; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 1.5px solid var(--text); border-radius: 5px; background: var(--overlay); color: var(--accent-ink); }
-.pc-check.is-on { background: var(--accent); border-color: transparent; }
-.pc-tools { position: absolute; top: 4px; right: 4px; z-index: 2; display: flex; gap: 2px; }
-.pc-tools .icon-btn { background: var(--overlay); color: var(--text); backdrop-filter: blur(3px); }
-.pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
+/* Every overlay control on a card shares one look: 30px light glass button, white 16px glyph. */
+.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(6px); box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+.pc-card .pc-check:hover, .pc-card .attach-toggle:hover, .pc-card .pc-tools .icon-btn:hover { background: var(--pc-btn-bg-hover); }
+.pc-card .pc-tools .icon-btn svg { width: 17px; height: 17px; }
+.pc-check { position: absolute; top: 5px; left: 5px; z-index: 2; padding: 0; }
+.pc-box { display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid currentColor; border-radius: 5px; }
+.pc-check.is-on .pc-box { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+.pc-card > .attach-toggle { top: 5px; left: 39px; z-index: 2; }
+.pc-card > .attach-toggle .attach-toggle-box { width: 22px; height: 22px; border: 0; background: none; font-size: 12px; color: var(--pc-btn-fg); }
+.pc-card > .attach-toggle.is-on .attach-toggle-box { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); }
+.pc-tools { position: absolute; top: 5px; right: 5px; z-index: 2; display: flex; gap: 4px; }
+.pc-tools .icon-btn.pc-fav.is-on { color: #ffd34d; }
 .pc-tools .icon-btn.pc-fav.is-on svg { fill: currentColor; }
-.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 1px; padding: 22px 8px 6px; background: linear-gradient(transparent, var(--overlay)); color: var(--text); font-size: 11px; pointer-events: none; }
-.pc-info-title { overflow: hidden; font-size: 12px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
-.pc-info-sub { overflow: hidden; color: var(--text-2); text-overflow: ellipsis; white-space: nowrap; }
+.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 2px; padding: 36px 10px 9px; background: linear-gradient(transparent, rgba(0, 0, 0, .55) 35%, rgba(0, 0, 0, .85)); color: #fff; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+.pc-info-title { overflow: hidden; font-size: 13px; font-weight: 650; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.pc-info-sub { overflow: hidden; color: rgba(255, 255, 255, .88); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .pc-badge { position: absolute; left: 6px; bottom: 6px; z-index: 2; }
 .pc-card:hover .pc-badge, .pc-card:focus-within .pc-badge, .pc-card.is-armed .pc-badge { opacity: 0; }
+.pc-hidden-badge { position: absolute; right: 28px; bottom: 6px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 10px; background: var(--overlay); color: var(--text); pointer-events: none; }
+.pc-row .pc-hidden-badge { position: static; flex: none; color: var(--text-3); background: none; }
 
 /* Compact row: thumbnail, title, details, date and the same actions. */
 .pc-row { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .pc-row:hover { background: var(--surface-hover); }
 .pc-row.is-selected, .pc-row.is-active { border-color: var(--accent); }
-.pc-row .pc-check { position: static; flex: none; }
+.pc-row .pc-check { position: static; flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: 0; background: none; color: var(--text-2); }
+.pc-row.is-hidden-item { opacity: .55; }
+.pc-row .pc-info-title { color: var(--text); }
+.pc-row .pc-info-sub { color: var(--text-2); font-size: 11px; text-shadow: none; }
+.pc-row .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
 .pc-row .pc-thumb { position: relative; flex: none; width: 36px; height: 36px; overflow: hidden; border-radius: 7px; background: var(--surface-3); }
 .pc-row .pc-thumb .media { width: 100%; height: 100%; object-fit: cover; }
 .pc-row .pc-text { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: left; }
-.pc-row .pc-info-title { font-size: 12px; }
 .pc-row .pc-when { flex: none; color: var(--text-3); font-size: 11px; white-space: nowrap; }
 .pc-row .pc-tools { position: static; }
 .pc-row .pc-tools .icon-btn { background: none; color: var(--text-3); backdrop-filter: none; }

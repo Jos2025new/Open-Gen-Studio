@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import { useStore } from '../../store/store';
 import { AGENT_ATTACHABLE, toggleAgentAttachment } from '../../engine/actions';
 
@@ -6,7 +7,7 @@ import { AGENT_ATTACHABLE, toggleAgentAttachment } from '../../engine/actions';
  * agent's attachment list, or removes it, in the order the boxes were ticked. Only existing assets:
  * nothing is imported, copied or sent — the checkbox just names an asset the agent may reuse from the chat.
  */
-export function AgentAttachToggle({ assetId, className }: { assetId: string; className?: string }) {
+export function AgentAttachToggle({ assetId, className, glyph: Glyph }: { assetId: string; className?: string; /** Shown instead of the empty box while the asset is not in the context (on keeps the numbered box). */ glyph?: LucideIcon }) {
   const attachable = useStore((s) => AGENT_ATTACHABLE.includes(s.assets[assetId]?.kind ?? ''));
   const order = useStore((s) => s.composer.attachments.indexOf(assetId));
   if (!attachable) return null;
@@ -28,7 +29,7 @@ export function AgentAttachToggle({ assetId, className }: { assetId: string; cla
       onDoubleClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <span className="attach-toggle-box">{on ? order + 1 : null}</span>
+      <span className={`attach-toggle-box${Glyph && !on ? ' is-glyph' : ''}`}>{on ? order + 1 : Glyph ? <Glyph size={16} strokeWidth={2} /> : null}</span>
     </button>
   );
 }

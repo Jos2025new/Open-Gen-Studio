@@ -97,7 +97,7 @@ export function useTapReveal(open: () => void) {
 /** Square checkbox shown over a card; stays visible while checked or while any card is being selected. */
 export function CardCheck({ checked, label, onToggle }: { checked: boolean; label: string; onToggle: () => void }) {
   return <button type="button" role="checkbox" aria-checked={checked} aria-label={label} className={`pc-check pc-hover${checked ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle(); }} onDoubleClick={(e) => e.stopPropagation()}>
-    {checked ? <Check size={12} strokeWidth={2.5} /> : null}
+    <span className="pc-box">{checked ? <Check size={13} strokeWidth={2.75} /> : null}</span>
   </button>;
 }
 
