@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Funnel, Image, LayoutGrid, MessageSquare, Paperclip, Star, Trash, X } from 'lucide-react';
+import { Archive, AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Funnel, Image, LayoutGrid, MessageSquare, Paperclip, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -13,7 +13,7 @@ import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type Place
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 import { JustifiedGrid } from '../ui/JustifiedGrid';
 import { rowHeightFor } from '../../lib/justifiedRows';
-import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, ToggleRow, type ItemView } from '../ui/PanelControls';
+import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
 import { usePref } from '../ui/hooks';
@@ -108,6 +108,11 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
     setUi({ lightbox: { assetIds: list.map((x) => x.id), index: list.findIndex((x) => x.id === a.id) } });
   };
   const filtered = canvas !== 'all' || place !== 'all' || mode !== 'all';
+  // Show hidden / Show archived: visible toggles at the far end of the sort row, so their state is always in sight.
+  const shelfToggles = <>
+    <IconButton icon={showHidden ? Eye : EyeOff} label={`Show hidden · ${hiddenCount}`} size="sm" active={showHidden} aria-pressed={showHidden} onClick={() => { setShowHidden(!showHidden); setSelected(new Set()); }} />
+    <IconButton icon={Archive} label={`Show archived · ${archivedCount}`} size="sm" active={showArchived} aria-pressed={showArchived} onClick={() => { setShowArchived(!showArchived); setSelected(new Set()); }} />
+  </>;
   const allHidden = ids.length > 0 && ids.every((id) => assets[id]?.userHidden);
   const allPicked = list.length > 0 && list.every((a) => selected.has(a.id));
 
@@ -123,15 +128,13 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
                 <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
                 {view === 'card' ? <div className="sv-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
               </PanelPopover>
-              <PanelPopover icon={Funnel} label="Filters" dot={filtered || showHidden || showArchived}>
+              <PanelPopover icon={Funnel} label="Filters" dot={filtered}>
                 <div className="sv-row">
                   <span className="sv-label">Canvas</span>
                   <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
                 </div>
                 <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
-                <ToggleRow label="Show hidden" count={hiddenCount} checked={showHidden} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
-                <ToggleRow label="Show archived" count={archivedCount} checked={showArchived} onChange={(v) => { setShowArchived(v); setSelected(new Set()); }} />
-                <Button size="sm" variant="ghost" disabled={!filtered && !showHidden && !showArchived} onClick={() => { setCanvas('all'); setPlace('all'); setMode('all'); setShowHidden(false); setShowArchived(false); setSelected(new Set()); }}>Clear filters</Button>
+                <Button size="sm" variant="ghost" disabled={!filtered} onClick={() => { setCanvas('all'); setPlace('all'); setMode('all'); setSelected(new Set()); }}>Clear filters</Button>
               </PanelPopover>
               <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" hint={`${results.length} ${results.length === 1 ? 'result' : 'results'}`} />
             </div>
@@ -183,7 +186,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
         ) : null}
       </div>
       <div className="gallery-scroll" style={view === 'list' ? widthVars(colWidths) : undefined}>
-        {results.length ? view === 'list' ? <ListHeader sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} /> : <ListHeader sort={sort} onSort={setSort} strip /> : null}
+        {results.length || hiddenCount || archivedCount || showHidden || showArchived ? view === 'list' ? <ListHeader sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} end={shelfToggles} /> : <ListHeader sort={sort} onSort={setSort} strip end={shelfToggles} /> : null}
         {results.length ? (
           groups.map((g) => {
             const gids = g.items.flatMap((x) => (x.type === 'asset' ? [x.id] : []));

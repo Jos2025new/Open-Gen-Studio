@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
+import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Asset, Generation } from '../../engine/types';
 import { formatDuration } from '../../lib/format';
 import type { SortKey } from '../ui/PanelControls';
@@ -104,8 +104,9 @@ function ResizeHandle({ k, label, widths, onResize }: { k: WidthKey; label: stri
 }
 
 /** The list header: pressing a column sorts by it; pressing it again flips the direction. Dates start newest first.
- *  `strip` is the same set for the card grid: one compact row of sort labels, without column widths. */
-export function ListHeader({ sort, onSort, widths, onResize, strip }: { sort: ListSort; onSort: (s: ListSort) => void; widths?: ColumnWidths; onResize?: (w: ColumnWidths) => void; strip?: boolean }) {
+ *  `strip` is the same set for the card grid: one compact row of sort labels, without column widths.
+ *  `end` sits at the opposite end of the row (the show-hidden and show-archived toggles). */
+export function ListHeader({ sort, onSort, widths, onResize, strip, end }: { sort: ListSort; onSort: (s: ListSort) => void; widths?: ColumnWidths; onResize?: (w: ColumnWidths) => void; strip?: boolean; end?: ReactNode }) {
   return <div className={strip ? 'pc-sort-strip' : 'pc-list-head'} role="group" aria-label="Sort by column">
     {HEADS.map((h) => {
       const on = sort.by === h.by;
@@ -119,6 +120,6 @@ export function ListHeader({ sort, onSort, widths, onResize, strip }: { sort: Li
         </button>
       </span>;
     })}
-    {strip ? null : <span className="pc-col-tools" aria-hidden="true" />}
+    <span className="pc-col-tools pc-strip-end">{end}</span>
   </div>;
 }

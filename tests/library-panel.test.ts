@@ -25,6 +25,7 @@ const names = () => [...host.querySelectorAll('.g-tile .g-open')].map((b) => b.g
 const bar = (label: string) => q(`.pc-bar [aria-label^="${label}"]`);
 const radio = (text: string) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === text) ?? null;
 const source = (name: string) => { click(q('.pc-source')); click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith(name)) ?? null); };
+const shelf = (label: string) => q<HTMLButtonElement>(`.pc-strip-end [aria-label^="${label}"]`);
 const mount = () => act(() => root.render(createElement(GalleryPanel)));
 
 beforeEach(() => {
@@ -147,7 +148,7 @@ describe('Library top bar', () => {
     expect(names()).toHaveLength(3);
   });
 
-  it('Filters holds Canvas, Place, Mode, Show hidden and Show archived; Favorites only is a star in the bar', () => {
+  it('Filters holds Canvas, Place and Mode; Show hidden and Show archived are icons at the end of the sort row; Favorites only is a star', () => {
     const star = bar('Favorites only');
     expect(star.getAttribute('aria-pressed')).toBe('false');
     click(star);
@@ -156,7 +157,9 @@ describe('Library top bar', () => {
     click(star);
     click(bar('Filters'));
     const labels = [...document.querySelectorAll('.sv-row .sv-label, .sv-switch > span')].map((e) => e.textContent?.trim());
-    for (const l of ['Canvas', 'Place', 'Mode', 'Show hidden · 0', 'Show archived · 0']) expect(labels).toContain(l);
+    for (const l of ['Canvas', 'Place', 'Mode']) expect(labels).toContain(l);
+    expect(labels).not.toContain('Show hidden · 0');
+    expect([...host.querySelectorAll('.pc-strip-end button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Show hidden · 0', 'Show archived · 0']);
     expect(labels).not.toContain('Favorites only');
     expect(bar('Filters').getAttribute('aria-label')).toBe('Filters');
   });
@@ -165,23 +168,23 @@ describe('Library top bar', () => {
     click(bar('Filters'));
     const pop = () => document.querySelector('[role="dialog"][aria-label="Filters"]')!;
     expect(host.querySelector('.pc-dot')).toBeNull();
-    click(pop().querySelector('[role="switch"][aria-label="Show hidden"]'));
+    click(shelf('Show hidden'));
+    expect(host.querySelector('.pc-dot')).toBeNull(); // the shelf toggles show their own state
+    click([...pop().querySelectorAll('button')].find((b) => b.textContent?.startsWith('No mode')) ?? null);
     expect(host.querySelector('.pc-dot')).not.toBeNull();
     expect(bar('Filters').getAttribute('aria-label')).toBe('Filters (active)');
     click([...pop().querySelectorAll('button')].find((b) => b.textContent === 'Clear filters') ?? null);
     expect(host.querySelector('.pc-dot')).toBeNull();
-    expect(pop().querySelector('[role="switch"][aria-label="Show hidden"]')?.getAttribute('aria-checked')).toBe('false');
+    expect(shelf('Show hidden').getAttribute('aria-pressed')).toBe('true'); // Clear filters leaves the shelf toggles alone
   });
 
-  it('Show hidden and Show archived in Filters include hidden assets and those of archived sessions', () => {
+  it('Show hidden and Show archived include hidden assets and those of archived sessions', () => {
     const other = createSession('Old'); other.archived = true;
     act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [other.id]: other }, assets: { ...st.assets, h: asset('h', { userHidden: true, createdAt: 2 }), z: asset('z', { sessionId: other.id, createdAt: 3, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zed', { sessionId: other.id }) } })));
     expect(names()).toHaveLength(3);
-    click(bar('Filters'));
-    const pop = () => document.querySelector('[role="dialog"][aria-label="Filters"]')!;
-    click(pop().querySelector('[role="switch"][aria-label="Show hidden"]'));
+    click(shelf('Show hidden'));
     expect(names()).toHaveLength(4);
-    click(pop().querySelector('[role="switch"][aria-label="Show archived"]'));
+    click(shelf('Show archived'));
     expect(names()).toHaveLength(5);
   });
 
@@ -367,12 +370,11 @@ describe('Library cards', () => {
     expect(useStore.getState().assets.c.userHidden).toBe(true);
     expect(useStore.getState().assets.c).toBeDefined(); // hidden is not deleted
     expect(names()).toEqual(['Apple', 'Mango']);
-    click(bar('Filters'));
-    const eye = () => document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Show hidden"]')!;
-    expect(eye().closest('.sv-switch')?.textContent).toContain('1');
-    expect(eye().getAttribute('aria-checked')).toBe('false');
+    const eye = () => shelf('Show hidden');
+    expect(eye().getAttribute('aria-label')).toBe('Show hidden · 1');
+    expect(eye().getAttribute('aria-pressed')).toBe('false');
     click(eye());
-    expect(eye().getAttribute('aria-checked')).toBe('true');
+    expect(eye().getAttribute('aria-pressed')).toBe('true');
     expect(names()).toHaveLength(3);
     const dim = host.querySelector('.is-hidden-item')!;
     expect(dim.querySelector('.pc-hidden-badge')).not.toBeNull();
@@ -399,12 +401,11 @@ describe('Library cards', () => {
     const old = createSession('Old'); old.archived = true;
     act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [old.id]: old }, assets: { ...st.assets, z: asset('z', { sessionId: old.id, createdAt: 99, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zebra', { sessionId: old.id }) } })));
     expect(names()).not.toContain('Zebra');
-    click(bar('Filters'));
-    const arch = document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Show archived"]')!;
-    expect(arch.closest('.sv-switch')?.textContent).toContain('1');
-    expect(arch.getAttribute('aria-checked')).toBe('false');
-    click(arch);
-    expect(arch.getAttribute('aria-checked')).toBe('true');
+    const arch = () => shelf('Show archived');
+    expect(arch().getAttribute('aria-label')).toBe('Show archived · 1');
+    expect(arch().getAttribute('aria-pressed')).toBe('false');
+    click(arch());
+    expect(arch().getAttribute('aria-pressed')).toBe('true');
     expect(names()).toContain('Zebra');
     const btns = [...q('.pc-right').querySelectorAll(':scope > .pc-chrome button')].map((b) => b.getAttribute('aria-label'));
     expect(btns).toEqual(['Collapse', 'Close']); // close/collapse end the bar
