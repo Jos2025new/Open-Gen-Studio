@@ -121,7 +121,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       </div>
       <div className="topbar-right">
         <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
-        {workspace === 'designer' && <SaveIndicator />}
+        {workspace === 'designer' && !home && <SaveIndicator />}
         <button type="button" ref={connectedPop.ref} className={`topbar-menu topbar-pill ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
           <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${connected.length ? 'is-on' : ''}`} />
         </button>

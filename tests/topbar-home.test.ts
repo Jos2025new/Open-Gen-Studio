@@ -40,6 +40,12 @@ describe('top bar on Home', () => {
     expect(pill.getAttribute('aria-expanded')).toBe('false');
     expect(host.querySelector('[aria-label="Settings"]')).not.toBeNull();
   });
+  it('on Home the Designer save state is not shown', () => {
+    setUi({ workspace: 'designer' });
+    const host = mount(true);
+    expect(host.textContent).not.toMatch(/Saved|Saving/);
+    act(() => root!.unmount()); root = undefined; setUi({ workspace: 'chat' });
+  });
   it('the pill opens the Connected popover as before', () => {
     const host = mount(true);
     act(() => (host.querySelector('.topbar-pill') as HTMLButtonElement).click());
@@ -110,6 +116,8 @@ describe('top bar on Home', () => {
     const topbar = readFileSync('src/styles/topbar-home.css', 'utf8');
     const home = readFileSync('src/styles/home.css', 'utf8');
     expect(topbar).toMatch(/\.topbar\.is-home\s*\{\s*background:\s*var\(--bg-canvas\)/);
+    // The workspace under Home keeps its tools in the slot; Home hides them (Nodes showed Add node and Run all).
+    expect(topbar).toMatch(/\.topbar\.is-home \.topbar-slot \{ display: none; \}/);
     expect(home).toMatch(/\.workspace \.home \{[^}]*background: var\(--bg-canvas\)/);
   });
 });
