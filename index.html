@@ -16,6 +16,7 @@
         } catch (e) {}
         r.setAttribute('data-base', b);
         r.setAttribute('data-accent', a);
+        try { if (localStorage.getItem('ogs-contrast') === 'soft') r.setAttribute('data-contrast', 'soft'); } catch (e) {}
       })();
     </script>
     <title>Open Gen Studio</title>

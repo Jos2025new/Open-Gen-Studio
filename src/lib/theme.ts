@@ -56,6 +56,21 @@ export function setAccent(accent: AccentChoice): void {
   applyTheme({ ...readTheme(), accent });
 }
 
+/** Soft contrast: one on/off rule over every base (src/styles/soft-contrast.css). Kept apart from base and accent;
+ *  the pre-paint script applies it too. */
+export const CONTRAST_KEY = 'ogs-contrast';
+export function readSoftContrast(): boolean {
+  try { return localStorage.getItem(CONTRAST_KEY) === 'soft'; } catch { return false; }
+}
+export function applyContrast(soft = readSoftContrast()): void {
+  if (soft) document.documentElement.setAttribute('data-contrast', 'soft');
+  else document.documentElement.removeAttribute('data-contrast');
+}
+export function setSoftContrast(soft: boolean): void {
+  try { if (soft) store()?.setItem(CONTRAST_KEY, 'soft'); else store()?.removeItem(CONTRAST_KEY); } catch { /* applied for this session only */ }
+  applyContrast(soft);
+}
+
 /** While Sistema is selected, re-apply when the OS switches between light and dark. Returns the stop function. */
 export function watchSystemTheme(): () => void {
   try {

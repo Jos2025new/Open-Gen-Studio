@@ -22,7 +22,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 283 | 223 |
 | [store.ts](../src/store/store.ts) | 193 | 205 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 84 | 0 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 85 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 54 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |

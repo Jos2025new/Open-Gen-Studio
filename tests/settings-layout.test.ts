@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
@@ -52,4 +53,27 @@ it('Look shows each base as a small picture in its own colours; System shows dar
   expect(thumbs.map((t) => t.textContent)).toEqual(['System', 'Atlas', 'Graphite', 'Light', 'White', 'Original (old)']);
   expect([...thumbs[0].querySelectorAll('.theme-mini')].map((m) => m.getAttribute('data-base'))).toEqual(['atlas', 'claro']);
   expect(thumbs[2].querySelector('.theme-mini')?.getAttribute('data-base')).toBe('grafito');
+});
+
+it('Soft contrast is one on/off rule for every base: the toggle sets html[data-contrast], is remembered, and the pre-paint script restores it', () => {
+  tab('Look');
+  const toggle = host.querySelector<HTMLElement>('[role="switch"][aria-label="Soft contrast"]')!;
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  act(() => toggle.click());
+  expect(document.documentElement.getAttribute('data-contrast')).toBe('soft');
+  expect(localStorage.getItem('ogs-contrast')).toBe('soft');
+  const script = /<script>([\s\S]*?)<\/script>/.exec(readFileSync('index.html', 'utf8'))?.[1] ?? '';
+  const got: Record<string, string> = {};
+  new Function('document', 'localStorage', 'matchMedia', script)({ documentElement: { setAttribute: (k: string, v: string) => (got[k] = v) } }, localStorage, matchMedia);
+  expect(got['data-contrast']).toBe('soft');
+  act(() => toggle.click());
+  expect(document.documentElement.hasAttribute('data-contrast')).toBe(false);
+  expect(localStorage.getItem('ogs-contrast')).toBeNull();
+});
+
+it('the soft rule only moves surfaces, borders and what derives from them: never text or highlight colours', () => {
+  const css = readFileSync('src/styles/soft-contrast.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const set = [...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]);
+  expect(set.filter((t) => /^--(text|accent|select|danger|warn|ok)/.test(t))).toEqual([]);
+  expect(set).toContain('--surface-2');
 });

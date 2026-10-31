@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Check, Droplet, Palette, SwatchBook } from 'lucide-react';
-import { ACCENT_CHOICES, BASE_CHOICES, readTheme, setAccent, setBase, watchSystemTheme, type AccentChoice, type BaseChoice } from '../../lib/theme';
+import { Check, Contrast, Droplet, Palette, SwatchBook } from 'lucide-react';
+import { ACCENT_CHOICES, BASE_CHOICES, readSoftContrast, readTheme, setAccent, setBase, setSoftContrast, watchSystemTheme, type AccentChoice, type BaseChoice } from '../../lib/theme';
+import { Toggle } from '../ui/primitives';
 import { SetGroup, SetRow } from './settings/SettingsRows';
 
 const BASE_LABELS: Record<BaseChoice, string> = { sistema: 'System', atlas: 'Atlas', grafito: 'Graphite', claro: 'Light', blanco: 'White', original: 'Original (old)' };
@@ -12,6 +13,7 @@ const Mini = ({ base }: { base: string }) => <span className="theme-mini" data-b
 /** Settings → Appearance: base and highlight colour. Applied at once; kept in localStorage only (not in the store). */
 export function AppearanceSection() {
   const [theme, setTheme] = useState(readTheme);
+  const [soft, setSoft] = useState(readSoftContrast);
   useEffect(() => watchSystemTheme(), []);
   return (
     <SetGroup icon={Palette} title="Theme">
@@ -33,6 +35,9 @@ export function AppearanceSection() {
             </button>
           ))}
         </div>
+      </SetRow>
+      <SetRow icon={Contrast} label="Soft contrast" tip="Brings panels, popovers, fields and lines closer to each other, in every base. Text and highlight colours keep their contrast.">
+        <Toggle checked={soft} onChange={(v) => { setSoftContrast(v); setSoft(v); }} label="Soft contrast" />
       </SetRow>
     </SetGroup>
   );

@@ -29,10 +29,10 @@ function run(env: Env = {}) {
 }
 
 describe('pre-paint theme script', () => {
-  it('is an inline script ahead of the app module, reading only the two UI keys', () => {
+  it('is an inline script ahead of the app module, reading only the UI keys (base, accent, contrast)', () => {
     expect(script).toBeTruthy();
     expect(html.indexOf('<script>')).toBeLessThan(html.indexOf('/src/main.tsx'));
-    expect(run({ stored: { 'ogs-base': 'claro' } }).reads.sort()).toEqual(['ogs-accent', 'ogs-base']);
+    expect(run({ stored: { 'ogs-base': 'claro' } }).reads.sort()).toEqual(['ogs-accent', 'ogs-base', 'ogs-contrast']);
     expect(script).not.toMatch(/ogs-state|setItem|indexedDB/);
   });
 
