@@ -6,26 +6,34 @@
 .sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 /* Grid: the cover on top and the details always visible beneath it, on the theme's surface instead of a veil. */
+.sess-card.pc-card, .sess-tile.pc-card { border-radius: 14px; }
 .sess-card.pc-card { display: flex; flex-direction: column; aspect-ratio: auto; border: 1px solid var(--border); background: var(--surface); }
 /* One frame only: the open and selected states recolour the border instead of adding a ring around it. */
 .sess-card.pc-card.is-active, .sess-tile.pc-card.is-active { border-color: var(--border-strong); box-shadow: none; }
 .sess-card.pc-card.is-selected, .sess-tile.pc-card.is-selected { border-color: var(--accent); box-shadow: none; }
-.sess-card.pc-card .pc-open { position: relative; inset: auto; flex: none; height: auto; aspect-ratio: 16 / 9; }
+.sess-card.pc-card .pc-open { position: relative; inset: auto; flex: none; height: auto; aspect-ratio: 4 / 3; }
 .sess-card .pc-info, .sess-tile .pc-text { position: static; gap: 3px; padding: 8px 10px 9px; background: none; color: var(--text); text-shadow: none; pointer-events: auto; }
 .sess-card .pc-info::before { display: none; }
-.sess-card .pc-info { gap: 4px; padding: 10px 12px 12px; }
-.sess-card .pc-info .pc-info-title { display: -webkit-box; font-size: 14px; font-weight: 500; line-height: 1.3; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sess-card .pc-info { gap: 4px; padding: 12px 14px; }
+.sess-card .pc-info .pc-info-title { display: -webkit-box; font-size: 15px; font-weight: 500; line-height: 1.3; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 /* As in every Sessions view, the checkbox (top left of the cover) and pin and menu (top right) are always in view. */
 .sess-card .pc-hover { opacity: 1; }
-.sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 11.5px; }
-.sess-card .pc-hidden-badge { top: 6px; right: auto; bottom: auto; left: 38px; }
+/* The actions sit in a quiet footer under a hairline, as plain icons; the checkbox stays alone on the cover. */
+.sess-card-foot { display: flex; align-items: center; justify-content: flex-end; padding: 5px 8px 6px 14px; border-top: 1px solid var(--border); }
+.sess-card-foot .pc-tools { position: static; gap: 2px; }
+.sess-card-foot .pc-tools .icon-btn { border: 0; background: none; color: var(--text-3); backdrop-filter: none; box-shadow: none; }
+.sess-card-foot .pc-tools .icon-btn:hover { color: var(--text); }
+.sess-card-foot .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
+/* The checkbox keeps the overlay controls' smoked glass but one step smaller than a button: a 22px tile holding a 12px box. */
+.sess-card .pc-check, .sess-tile .pc-check { top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 6px; }
+.sess-card .pc-check .pc-box, .sess-tile .pc-check .pc-box { width: 12px; height: 12px; border-width: 1.5px; border-radius: 3px; }
+.sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 12px; }
+.sess-card .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
 /* Cards: the cover fills the whole left side, edge to edge (checkbox on its corner); pin and menu top right; title
    and details at the bottom. */
 .sess-tile.pc-card { display: flex; aspect-ratio: auto; min-height: 92px; padding: 0; border: 1px solid var(--border); background: var(--surface); }
 .sess-tile-cover { position: relative; flex: none; align-self: stretch; width: 104px; }
 .sess-tile .pc-thumb { display: grid; width: 100%; height: 100%; border-radius: 0; }
-.sess-tile .pc-check { top: 6px; left: 6px; }
-.sess-tile .pc-check .pc-box { width: 13px; height: 13px; }
 .sess-tile-body { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: 6px 6px 10px 12px; }
 .sess-tile .pc-tools { position: static; align-self: flex-end; align-items: center; gap: 2px; }
 .sess-tile .pc-hover { opacity: 1; }

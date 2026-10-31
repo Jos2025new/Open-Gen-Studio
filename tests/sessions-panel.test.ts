@@ -116,8 +116,7 @@ describe('Sessions top bar', () => {
   });
 
   it('Show archived switches to the archived sessions and shows the count; pressing it again returns', () => {
-    click(q('.sess-card [aria-label="Session actions"]'));
-    click(item('Archive session'));
+    click(q('.sess-card [aria-label="Archive session"]'));
     const arch = () => shelf('Show archived');
     expect(arch().getAttribute('aria-label')).toBe('Show archived · 1');
     expect(arch().getAttribute('aria-pressed')).toBe('false');
@@ -200,10 +199,12 @@ describe('Sessions cards', () => {
     expect(q('.session-bar').textContent).toContain('1 selected');
   });
 
-  it('the menu renames, archives and deletes with a contextual confirmation', () => {
+  it('the card footer archives; its menu keeps Rename and Delete, with a contextual confirmation', () => {
+    expect([...card('Alpha').querySelectorAll('.sess-card-foot button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Hide', 'Archive session', 'Pin', 'Session actions']);
     click(card('Alpha').querySelector('[aria-label="Session actions"]'));
-    expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Rename', 'Archive session', 'Hide', 'Delete']);
-    click(item('Archive session'));
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Rename', 'Delete']);
+    act(() => document.body.click());
+    click(card('Alpha').querySelector('[aria-label="Archive session"]'));
     expect(useStore.getState().sessions[ids.Alpha].archived).toBe(true);
     click(card('Charlie').querySelector('[aria-label="Session actions"]'));
     click(item('Delete'));
@@ -239,8 +240,7 @@ describe('Sessions cards', () => {
   });
 
   it('Hide removes a session from the panel; the eye shows it dimmed with a badge; Unhide restores it', () => {
-    click(card('Alpha').querySelector('[aria-label="Session actions"]'));
-    click(item('Hide'));
+    click(card('Alpha').querySelector('[aria-label="Hide"]'));
     expect(useStore.getState().sessions[ids.Alpha].userHidden).toBe(true);
     expect(useStore.getState().sessions[ids.Alpha].hidden).toBeUndefined(); // not the Space-container flag
     expect(titles()).toEqual(['Bravo', 'Charlie']);
@@ -252,8 +252,7 @@ describe('Sessions cards', () => {
     expect(card('Alpha').classList.contains('is-hidden-item')).toBe(true);
     expect(card('Alpha').querySelector('.pc-hidden-badge')).not.toBeNull();
     expect(card('Bravo').querySelector('.pc-hidden-badge')).toBeNull();
-    click(card('Alpha').querySelector('[aria-label="Session actions"]'));
-    click(item('Unhide'));
+    click(card('Alpha').querySelector('[aria-label="Unhide"]'));
     expect(useStore.getState().sessions[ids.Alpha].userHidden).toBeUndefined();
     expect(card('Alpha').classList.contains('is-hidden-item')).toBe(false);
   });

@@ -97,9 +97,14 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const openTag = active ? <span className="pc-open-tag">Open</span> : null;
   const meta = <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{mode}<span aria-hidden="true">·</span>{when}{openTag}</span>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
-  const inRow = view === 'list';
+  // List and Grid show Hide and Archive on the item, so their menu keeps only Rename and Delete.
+  const inRow = view !== 'tile';
   const hide = () => setUserHidden('session', [session.id], !session.userHidden);
   const archive = () => setSessionsArchived([session.id], !session.archived);
+  const shelfButtons = <>
+    <IconButton icon={session.userHidden ? Eye : EyeOff} label={session.userHidden ? 'Unhide' : 'Hide'} size="sm" onClick={(e) => { e.stopPropagation(); hide(); }} />
+    <IconButton icon={session.archived ? ArchiveRestore : Archive} label={session.archived ? 'Restore session' : 'Archive session'} size="sm" onClick={(e) => { e.stopPropagation(); archive(); }} />
+  </>;
   const menu = <CardMenu label="Session actions" className="pc-hover">{(close) => confirming
     ? <MenuConfirm text={`Delete “${session.title}” with its conversation, nodes, designs and assets?`} extra={<RunningNote ids={[session.id]} />} action="Delete" onCancel={() => setConfirming(false)} onConfirm={() => { close(); deleteSession(session.id); }} />
     : <>
@@ -139,9 +144,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
         <span className="pc-col pc-col-spend num">{stats?.spend ? formatUsd(stats.spend) : '—'}</span>
         {when}
         <span className="pc-tools">
-          <IconButton icon={session.userHidden ? Eye : EyeOff} label={session.userHidden ? 'Unhide' : 'Hide'} size="sm" onClick={(e) => { e.stopPropagation(); hide(); }} />
-          <IconButton icon={session.archived ? ArchiveRestore : Archive} label={session.archived ? 'Restore session' : 'Archive session'} size="sm" onClick={(e) => { e.stopPropagation(); archive(); }} />
-          {pin}{menu}
+          {shelfButtons}{pin}{menu}
         </span>
       </div>
     );
@@ -164,14 +167,14 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
       </div>
     );
   }
-  // Grid: the cover on top, the title and details always visible beneath it; checkbox and tools over the cover.
+  // Grid: the cover on top with the checkbox on its corner; title and details beneath; the actions in a footer.
   return (
     <div className={`sess-card pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
       <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>
       <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
-      <span className="pc-tools">{pin}{menu}</span>
       {hiddenMark}
       <div className="pc-info">{title}{meta}</div>
+      <div className="sess-card-foot"><span className="pc-tools">{shelfButtons}{pin}{menu}</span></div>
     </div>
   );
 }

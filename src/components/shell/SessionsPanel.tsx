@@ -236,7 +236,8 @@ export function SessionsPanel() {
                 {g.label} <span className="faint num">{g.items.length}</span>
               </h4>
             ) : null}
-            <div className={`session-list${layout === 'list' ? ' pc-cols' : ''}`} style={{ ['--cols' as string]: cols }}>
+            {/* Grid cards are vertical, so they take one column more than the slider says: the same area, narrower and taller. */}
+            <div className={`session-list${layout === 'list' ? ' pc-cols' : ''}`} style={{ ['--cols' as string]: layout === 'card' ? cols + 1 : cols }}>
               {g.items.map((s) => (
                 <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} view={layout} basis={basis} selecting={selecting} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} />
               ))}
