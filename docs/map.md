@@ -51,7 +51,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 13 | 12 |
 | `src/components/designer` | 54 | 24 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 8 | 8 |
+| `src/components/node` | 8 | 9 |
 | `src/components/shell` | 35 | 23 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 33 | 288 |
 | `src/store` | 15 | 209 |
 
-178 de 505 módulos no tienen ningún test que los importe directamente.
+177 de 505 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

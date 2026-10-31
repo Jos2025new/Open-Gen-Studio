@@ -70,7 +70,13 @@
 .canvas-zoom:hover { color: var(--text); background: var(--surface-3); }
 .react-flow__minimap.canvas-map { top: 12px; bottom: auto; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .canvas-nav-pop .search-input { margin: 6px; }.canvas-history-list, .canvas-search-results { max-height: 280px; overflow: auto; }
-.canvas-zoom-controls { display: flex; align-items: center; justify-content: space-between; padding: 6px; }
+.canvas-zoom-controls { display: flex; flex-direction: column; gap: 8px; padding: 6px 6px 10px; }
+.canvas-zoom-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.canvas-zoom-value { display: flex; flex: 1; align-items: center; justify-content: center; gap: 2px; height: var(--control-h); border-radius: var(--radius-s); background: var(--field-bg); color: var(--text); font-size: 13px; }
+.canvas-zoom-value:focus-within { outline: 1px solid var(--panel-line-focus); }
+.canvas-zoom-value input { width: 5ch; border: 0; background: none; color: inherit; font: inherit; text-align: right; outline: none; }
+.canvas-zoom-value span { color: var(--text-3); }
+.canvas-zoom-slider { width: auto; margin: 0 6px; }
 .canvas-search-result { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 8px; text-align: left; font-size: 12px; border-radius: 6px; overflow-wrap: anywhere; }
 .canvas-search-result:hover { background: var(--surface-3); }.canvas-search-result .faint { font-size: var(--fs-xs); }.canvas-search-result mark { color: var(--accent); background: var(--accent-soft); border-radius: 2px; }
 

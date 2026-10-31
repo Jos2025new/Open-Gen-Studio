@@ -7,7 +7,38 @@ import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } fro
 import { nodeOutputAsset } from '../../engine/flow/graph';
 import { generationTitle } from '../assets/GenerationInfo';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { IconButton, MenuItem } from '../ui/primitives';
+import { IconButton, MenuItem, Range } from '../ui/primitives';
+import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
+
+/** Nodes zooms as far as the Designer: 5% to its MAX_ZOOM (3200%). */
+export const NODE_MIN_ZOOM = 0.05;
+export const NODE_MAX_ZOOM = MAX_ZOOM;
+/** The zoom slider runs on a log scale, so each stretch of it doubles or halves the view, from 5% to 3200%. */
+const zoomToSlider = (z: number) => Math.log2(z);
+const sliderToZoom = (v: number) => Math.min(NODE_MAX_ZOOM, Math.max(NODE_MIN_ZOOM, 2 ** v));
+
+/** The zoom popover: −, the percent as a field (type a value, Enter applies, Escape restores), +, and a slider. */
+export function ZoomControls({ zoom, onZoom }: { zoom: number; onZoom: (z: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const apply = (raw: string) => {
+    const percent = Number(raw.trim().replace(',', '.').replace('%', ''));
+    setDraft(null);
+    if (raw.trim() && Number.isFinite(percent)) onZoom(Math.min(NODE_MAX_ZOOM, Math.max(NODE_MIN_ZOOM, percent / 100)));
+  };
+  return <div className="canvas-zoom-controls">
+    <div className="canvas-zoom-row">
+      <IconButton icon={Minus} label="Zoom out" onClick={() => onZoom(sliderToZoom(zoomToSlider(zoom) - 0.5))} />
+      <label className="canvas-zoom-value num">
+        <input aria-label="Zoom percent" inputMode="decimal" value={draft ?? Math.round(zoom * 100)} onFocus={(e) => { setDraft(String(Math.round(zoom * 100))); e.currentTarget.select(); }} onChange={(e) => setDraft(e.target.value)} onBlur={(e) => apply(e.target.value)} onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') { e.stopPropagation(); setDraft(String(Math.round(zoom * 100))); e.currentTarget.value = String(Math.round(zoom * 100)); e.currentTarget.blur(); }
+        }} /><span>%</span>
+      </label>
+      <IconButton icon={Plus} label="Zoom in" onClick={() => onZoom(sliderToZoom(zoomToSlider(zoom) + 0.5))} />
+    </div>
+    <Range className="canvas-zoom-slider" aria-label="Zoom slider" min={zoomToSlider(NODE_MIN_ZOOM)} max={zoomToSlider(NODE_MAX_ZOOM)} step={0.01} value={zoomToSlider(zoom)} onChange={(e) => onZoom(sliderToZoom(+e.target.value))} />
+  </div>;
+}
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const parts = [];
@@ -22,7 +53,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 /** The canvas toolbox (2026-10-31): one vertical bar on the left, in the Designer's toolbar style, with every canvas
- *  tool: Add node (`add`), Select and Pan, Delete, Auto layout, Fit view and Map, Undo and Redo, zoom, Search. Its
+ *  tool: Add node (`add`), Select, Pan and Auto layout, Fit view and Map, Undo, Redo and Delete, zoom, Search. Its
  *  popovers open to the right. `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
 export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: 'select' | 'pan'; onTool: (t: 'select' | 'pan') => void; selectedCount: number; onDelete: () => void }) {
   const graph = useStore(s => s.sessions[sessionId].graph);
@@ -81,14 +112,14 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
         {add ? <>{add}<span className="canvas-nav-sep" /></> : null}
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
-        <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />
-        <span className="canvas-nav-sep" />
         {onAutoLayout ? <IconButton icon={LayoutGrid} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
+        <span className="canvas-nav-sep" />
         <IconButton icon={Maximize} label="Fit view" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
         <span className="canvas-nav-sep" />
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />
         <IconButton ref={redoPop.ref} icon={Redo2} label="Redo · right-click for history" disabled={blocked || !future.length} onClick={() => travel('redo')} onContextMenu={e => showHistory(e, 'redo')} />
+        <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />
         <span className="canvas-nav-sep" />
         <IconButton icon={Plus} label="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })} />
         <button ref={zoomPop.ref} type="button" className="canvas-zoom num" aria-label="Zoom" aria-expanded={zoomPop.open} onClick={zoomPop.toggle}>{Math.round(zoom * 100)}%</button>
@@ -100,13 +131,8 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
         <PopoverHeader title={direction === 'undo' ? 'Undo history' : 'Redo history'} />
         <div className="canvas-history-list">{(direction === 'undo' ? past : future).map((entry, i) => <MenuItem key={i} label={entry.label} detail={`${direction === 'undo' ? 'Undo' : 'Redo'} ${i + 1} action${i ? 's' : ''}`} disabled={blocked} onClick={() => travel(direction, i + 1)} />)}</div>
       </Popover>
-      <Popover open={zoomPop.open} anchor={zoomPop.ref} onClose={zoomPop.close} placement="right-start" width={200} label="Zoom canvas" className="canvas-nav-pop">
-        <div className="canvas-zoom-controls">
-          <IconButton icon={Minus} label="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })} />
-          <span className="num">{Math.round(zoom * 100)}%</span>
-          <IconButton icon={Plus} label="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })} />
-          <IconButton icon={Maximize} label="Fit view" onClick={() => void rf.fitView({ padding: 0.2, duration: 150 })} />
-        </div>
+      <Popover open={zoomPop.open} anchor={zoomPop.ref} onClose={zoomPop.close} placement="right-start" width={220} label="Zoom canvas" className="canvas-nav-pop">
+        <ZoomControls zoom={zoom} onZoom={z => void rf.zoomTo(z, { duration: 0 })} />
       </Popover>
       <Popover open={searchPop.open} anchor={searchPop.ref} onClose={searchPop.close} placement="right-start" width={340} label="Search canvas" className="canvas-nav-pop">
         <PopoverHeader title="Search canvas" right={<IconButton icon={X} label="Close search" size="sm" onClick={searchPop.close} />} />

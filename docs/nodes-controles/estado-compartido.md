@@ -22,7 +22,7 @@ related: [dependencias, ejecucion, deshacer-bloqueos]
 | `useNodeFocus` | `flow/selection.ts:24` | No | `tick: 0` | Encuadre tras el plan del agente |
 | `tool` (select / pan) | `NodeWorkspace.tsx:108` | `localStorage` del navegador, clave `ogs.nodeTool.v2` | `pan` | Panel de navegación, caja de selección |
 | Aviso «Import from Chat» cerrado | `ImportFromChat.tsx:34` | `localStorage` `ogs.fromChat.node.<sesión>` | 0 | Aviso del lienzo |
-| `mapOpen`, popovers, `query`, `submitted` | `CanvasNavigation.tsx:32` | No | Cerrado | Panel de navegación |
+| `mapOpen`, popovers, `query`, `submitted` | `CanvasNavigation.tsx:63` | No | Cerrado | Panel de navegación |
 | Historial de deshacer | `flow/history.ts:5` | No (memoria del módulo) | Vacío | Undo/Redo |
 | Bloqueos de ejecución | `locks.ts:10` | No (memoria) | Vacío | Run, Undo, borrado |
 | Portapapeles de nodos | `arrange.ts:126` | No | `null` | Pegar |

@@ -12,8 +12,8 @@ El listado oficial (Ajustes › Shortcuts) tiene un grupo «Nodes» con 6 línea
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
-| Ctrl/⌘+Z | `CanvasNavigation.tsx:83` | Lienzo completo; no actúa dentro de campos de texto | `blocked` | Deshacer | Grafo | Listado: «Mod + Z — Undo». No hace nada ni avisa si hay una ejecución |
-| Ctrl/⌘+Y y Ctrl/⌘+Mayús+Z | `CanvasNavigation.tsx:87` | Igual | Igual | Rehacer | Grafo | Listado: «Mod + Y — Redo (also Mod + Shift + Z)» |
+| Ctrl/⌘+Z | `CanvasNavigation.tsx:114` | Lienzo completo; no actúa dentro de campos de texto | `blocked` | Deshacer | Grafo | Listado: «Mod + Z — Undo». No hace nada ni avisa si hay una ejecución |
+| Ctrl/⌘+Y y Ctrl/⌘+Mayús+Z | `CanvasNavigation.tsx:117` | Igual | Igual | Rehacer | Grafo | Listado: «Mod + Y — Redo (also Mod + Shift + Z)» |
 | Ctrl/⌘+C | `NodeWorkspace.tsx:371` | Foco en el lienzo, nodos seleccionados, nada de texto seleccionado en la página, fuera de campos de texto | `selected`, `insideRef` | `copyNodes` y toast | Portapapeles interno | Listado: «Mod + C / X / V» |
 | Ctrl/⌘+X | `NodeWorkspace.tsx:372` | Igual | Igual | `cutNodes` y vacía la selección | Grafo | Borra sin confirmar |
 | Ctrl/⌘+V | `NodeWorkspace.tsx:360` | Foco en el lienzo, fuera de campos de texto | Portapapeles del sistema y del app | Imágenes del sistema: nodos Asset; si no hay imágenes y hay nodos copiados: `pasteNodes` | Grafo | Las imágenes tienen prioridad sobre los nodos copiados |

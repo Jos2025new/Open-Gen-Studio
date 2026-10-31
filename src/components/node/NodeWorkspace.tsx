@@ -27,7 +27,7 @@ import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems, NodeLibrary } from './AddNodeItems';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
-import { CanvasNavigation } from './CanvasNavigation';
+import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM } from './CanvasNavigation';
 import { GroupNode, Operations, type GroupFlowNode } from './Operations';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
@@ -458,8 +458,8 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         colorMode="dark"
         fitView
         fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
-        minZoom={0.15}
-        maxZoom={2}
+        minZoom={NODE_MIN_ZOOM}
+        maxZoom={NODE_MAX_ZOOM}
         deleteKeyCode={insideRef.current ? ['Backspace', 'Delete'] : null}
         selectionOnDrag={tool === 'select'}
         panOnDrag={tool === 'select' ? [1, 2] : true}
