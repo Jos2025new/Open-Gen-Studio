@@ -86,3 +86,10 @@ it('the brightness hierarchy dims and shrinks the frame icons, steps the compose
   expect(css).toMatch(/\.composer-input \{ color: var\(--text-content\); \}/);
   expect(readFileSync('src/styles/soft-contrast.css', 'utf8')).toMatch(/--soft-anchor: var\(--bg-canvas\)/);
 });
+
+it('the top bar follows the same hierarchy: a brighter, larger title, one icon size, dimmed icons', () => {
+  const css = readFileSync('src/styles/hierarchy.css', 'utf8');
+  expect(css).toMatch(/\.session-title-btn \{ color: var\(--text\); font-size: 14px/);
+  expect(css).toMatch(/\.topbar-right > \.icon-btn \{ width: 30px; height: 30px; color: var\(--text-3\); \}/);
+  expect(css).toMatch(/\.topbar-menu \{ height: 30px; padding: 0 10px; font-size: 13px/);
+});

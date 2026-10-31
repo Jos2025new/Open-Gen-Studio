@@ -10,3 +10,23 @@
 
 :root .composer, :root .bubble { background: var(--surface-2); }
 :root .bubble, :root .agent-text, :root .composer-input { color: var(--text-content); }
+
+/* Top bar, same hierarchy (2026-10-31, from three app top bars): the session title is the one bright thing, a little
+   larger and wider; the bar's own icons share one size (16px in a 30px target) and recede to --text-3 until hover;
+   the text menus (Connected, Generations) read at the title's scale but in the secondary colour. Workspace tools in
+   the right slot keep their own styles. */
+:root .topbar { --session-title-width: 260px; }
+:root .topbar .session-title-btn { color: var(--text); font-size: 14px; font-weight: 550; padding: 4px 8px; }
+:root .topbar .session-title-btn > svg { color: var(--text-3); }
+:root .topbar .session-title-btn:hover > svg, :root .topbar .session-title-btn.is-open > svg { color: var(--text); }
+:root .topbar .title-input { font-size: 14px; font-weight: 550; }
+:root .topbar-home, :root .topbar-left .icon-btn, :root .topbar-right > .icon-btn { width: 30px; height: 30px; color: var(--text-3); }
+:root .topbar-home svg, :root .topbar-left .icon-btn svg, :root .topbar-right > .icon-btn svg { width: 16px; height: 16px; }
+:root .topbar-left .icon-btn:hover, :root .topbar-right > .icon-btn:hover, :root .topbar-right > .icon-btn.is-active { color: var(--text); }
+:root .topbar-left { gap: 4px; }
+:root .topbar-right { gap: 6px; }
+:root .topbar-menu { height: 30px; padding: 0 10px; font-size: 13px; color: var(--text-2); }
+@media (max-width: 767px) {
+  :root .topbar { --session-title-width: 160px; }
+  :root .topbar-menu { padding: 0 6px; font-size: 12px; }
+}
