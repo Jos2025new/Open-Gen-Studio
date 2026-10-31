@@ -13,10 +13,11 @@ import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type Place
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 import { JustifiedGrid } from '../ui/JustifiedGrid';
 import { rowHeightFor } from '../../lib/justifiedRows';
-import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, ToggleRow, type ItemView, type SortState } from '../ui/PanelControls';
+import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, ToggleRow, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
+import { ListHeader, columnValues, compareColumn, type ColumnValues, type ListSort } from './ListColumns';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
@@ -32,7 +33,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
   const [place, setPlace] = useState<PlaceFilter>('all');
   const [mode, setMode] = useState<ModeFilter>('all');
   const [favOnly, setFavOnly] = useState(false);
-  const [sort, setSort] = useState<SortState>({ by: 'date', asc: false });
+  const [sort, setSort] = useState<ListSort>({ by: 'date', asc: false });
   const [group, setGroup] = useState<'date' | 'session'>('date');
   const [showHidden, setShowHidden] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -46,7 +47,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
   const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
   const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (showHidden || !a.userHidden) && (showArchived || !sessions[a.sessionId]?.archived)), [assets, showHidden, showArchived, sessions]);
   const dir = sort.asc ? 1 : -1;
-  const order = <T extends { title: string; createdAt: number }>(a: T, b: T) => sort.by === 'name' ? dir * a.title.localeCompare(b.title) : dir * (a.createdAt - b.createdAt);
+  const order = <T extends { title: string; createdAt: number; cols: ColumnValues }>(a: T, b: T) => sort.by === 'name' ? dir * a.title.localeCompare(b.title) : sort.by === 'date' ? dir * (a.createdAt - b.createdAt) : compareColumn(sort.by, sort.asc, a.cols, b.cols);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return inScope
@@ -59,7 +60,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
         const g = a.generationId ? generations[a.generationId] : undefined;
         return (g?.prompt ?? '').toLowerCase().includes(needle) || (g?.modelName ?? '').toLowerCase().includes(needle) || a.origin.includes(needle);
       })
-      .map((a) => ({ a, title: assetTitle(a, a.generationId ? generations[a.generationId] : undefined), createdAt: a.createdAt }))
+      .map((a) => { const g = a.generationId ? generations[a.generationId] : undefined; return { a, title: assetTitle(a, g), createdAt: a.createdAt, cols: columnValues(a, g) }; })
       .sort(order).map((x) => x.a);
   }, [inScope, canvas, where, generations, q, kind, favOnly, sort, place, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const texts = useMemo(() => Object.values(generations).filter((g) => g.kind === 'text' && g.status === 'done' && !g.discard
@@ -71,10 +72,10 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
     return c;
   }, [inScope, texts, where]);
   const textBase = texts.filter((g) => canvas === 'all' || where.generation(g) === canvas);
-  const results = [...list.map((a) => ({ type: 'asset' as const, id: a.id, title: assetTitle(a, a.generationId ? generations[a.generationId] : undefined), createdAt: a.createdAt, asset: a })),
+  const results = [...list.map((a) => ({ type: 'asset' as const, id: a.id, title: assetTitle(a, a.generationId ? generations[a.generationId] : undefined), createdAt: a.createdAt, cols: columnValues(a, a.generationId ? generations[a.generationId] : undefined), asset: a })),
     ...textBase.filter((g) => !favOnly && (kind === 'all' || kind === 'text') && matchesPlace(g.place, place) && matchesMode(g.mode, mode)
       && `${g.prompt} ${g.modelName} ${g.text ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
-      .map((g) => ({ type: 'text' as const, id: g.id, title: generationTitle(g), createdAt: g.createdAt, generation: g }))]
+      .map((g) => ({ type: 'text' as const, id: g.id, title: generationTitle(g), createdAt: g.createdAt, cols: columnValues(undefined, g), generation: g }))]
     .sort(order);
   const facets = useMemo(() => {
     const base = [...inScope.filter((a) => canvas === 'all' || where.asset(a) === canvas), ...texts.filter((g) => canvas === 'all' || where.generation(g) === canvas)];
@@ -93,7 +94,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
     map.set(id, [...(map.get(id) ?? []), item]);
     return map;
   }, new Map<string, typeof results>())).map(([id, items]) => ({ label: sessions[id]?.title ?? 'Unknown session', id, items }))
-    : sort.by === 'name' ? [{ label: '', id: 'name', items: results }] : groupByDate(results, (a) => a.createdAt).map((g) => ({ ...g, id: g.label }));
+    : sort.by !== 'date' ? [{ label: '', id: 'name', items: results }] : groupByDate(results, (a) => a.createdAt).map((g) => ({ ...g, id: g.label }));
 
   const hiddenCount = useMemo(() => Object.values(assets).filter((a) => a.userHidden).length, [assets]);
   const archivedCount = useMemo(() => Object.values(assets).filter((a) => sessions[a.sessionId]?.archived).length, [assets, sessions]);
@@ -182,6 +183,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
         ) : null}
       </div>
       <div className="gallery-scroll">
+        {results.length && view === 'list' ? <ListHeader sort={sort} onSort={setSort} /> : null}
         {results.length ? (
           groups.map((g) => {
             const gids = g.items.flatMap((x) => (x.type === 'asset' ? [x.id] : []));

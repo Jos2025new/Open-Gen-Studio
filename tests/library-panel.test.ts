@@ -422,3 +422,34 @@ describe('Library cards', () => {
     expect(row.querySelector('time')).not.toBeNull();
   });
 });
+
+describe('Library list columns', () => {
+  const rows = () => [...host.querySelectorAll('.library-layout-list .pc-info-title')].map((t) => t.textContent);
+  const head = (label: string) => q(`.pc-list-head [aria-label^="Sort by ${label}"]`);
+  const toList = () => { click(bar('View')); click(radio('List')); };
+
+  it('shows model and parameters in their own columns', () => {
+    toList();
+    const cherry = [...host.querySelectorAll('.library-layout-list .pc-row')].find((r) => r.textContent?.includes('Cherry'))!;
+    expect([...cherry.querySelectorAll('.pc-col')].map((c) => c.textContent)).toEqual(['Seedance', '16:9', '720p', '5s']);
+    expect(cherry.querySelector('.pc-info-sub')?.classList.contains('pc-cols-alt')).toBe(true); // shown only when the narrow panel hides the columns
+  });
+
+  it('sorts from the header, flips on a second press and keeps empty values last', () => {
+    toList();
+    click(head('Duration'));
+    expect(rows()[0]).toBe('Cherry');
+    expect(head('Duration').getAttribute('aria-pressed')).toBe('true');
+    click(head('Duration'));
+    expect(rows()[0]).toBe('Cherry'); // only Cherry has a duration: it stays first either way
+    click(head('Aspect'));
+    expect(rows()[2]).toBe('Cherry');
+    click(head('Aspect'));
+    expect(rows()[0]).toBe('Cherry');
+    // The View popover is still open from switching to List.
+    expect(['Newest', 'Oldest', 'A–Z', 'Z–A'].map((t) => radio(t)?.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'false']);
+    click(radio('A–Z'));
+    expect(rows()).toEqual(['Apple', 'Cherry', 'Mango']);
+    expect(head('Name').getAttribute('aria-pressed')).toBe('true');
+  });
+});

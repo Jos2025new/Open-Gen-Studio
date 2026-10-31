@@ -30,12 +30,13 @@ export type SortKey = 'name' | 'date';
 export interface SortState { by: SortKey; asc: boolean }
 type SortChoice = 'newest' | 'oldest' | 'az' | 'za';
 const SORT_STATE: Record<SortChoice, SortState> = { newest: { by: 'date', asc: false }, oldest: { by: 'date', asc: true }, az: { by: 'name', asc: true }, za: { by: 'name', asc: false } };
-const sortChoice = (s: SortState): SortChoice => (s.by === 'date' ? (s.asc ? 'oldest' : 'newest') : s.asc ? 'az' : 'za');
+/** None of the four when the list is sorted by another column (model, aspect…) from its header. */
+const sortChoice = (s: { by: string; asc: boolean }): SortChoice | undefined => (s.by === 'date' ? (s.asc ? 'oldest' : 'newest') : s.by === 'name' ? (s.asc ? 'az' : 'za') : undefined);
 
 /** Sort choices of the View popover: Newest / Oldest / A–Z / Z–A over the same SortState; `nameOnly` drops the two date choices. */
-export function SortSegmented({ sort, onChange, nameOnly }: { sort: SortState; onChange: (s: SortState) => void; nameOnly?: boolean }) {
+export function SortSegmented({ sort, onChange, nameOnly }: { sort: { by: string; asc: boolean }; onChange: (s: SortState) => void; nameOnly?: boolean }) {
   const options: Array<{ value: SortChoice; label: string }> = [...(nameOnly ? [] : [{ value: 'newest' as const, label: 'Newest' }, { value: 'oldest' as const, label: 'Oldest' }]), { value: 'az', label: 'A–Z' }, { value: 'za', label: 'Z–A' }];
-  return <Segmented value={sortChoice(sort)} size="sm" onChange={(v) => onChange(SORT_STATE[v])} options={options} />;
+  return <Segmented value={sortChoice(sort) as SortChoice} size="sm" onChange={(v) => onChange(SORT_STATE[v])} options={options} />;
 }
 
 export type ItemView = 'list' | 'card';

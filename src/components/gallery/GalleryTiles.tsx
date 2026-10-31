@@ -12,6 +12,7 @@ import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView
 import { generationTitle } from '../assets/GenerationInfo';
 import { TextResult } from '../assets/TextResult';
 import type { Asset, Generation } from '../../engine/types';
+import { ColumnCells, columnValues } from './ListColumns';
 import '../assets/text-result.css';
 
 /** "Seedance · 1:1 · 1k": the model and the parameters the generation recorded (aspect, resolution, duration). */
@@ -64,8 +65,8 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
     return <div className={`g-tile pc-row${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}`}>
       <CardCheck checked={selected} label={`Select ${title}`} onToggle={onToggle} />
       <button type="button" className="g-open pc-thumb" onClick={onOpen} aria-label="Open"><AssetMedia assetId={asset.id} hoverPlay={false} /></button>
-      <span className="pc-text"><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub">{details}</span></span>
-      {remote}{hiddenMark}{when}{tools}
+      <span className="pc-text"><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub pc-cols-alt">{details}</span></span>
+      {remote}{hiddenMark}<ColumnCells v={columnValues(asset, g)} />{when}{tools}
     </div>;
   }
   return <div className={`g-tile pc-card${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}`}>
@@ -99,8 +100,8 @@ export function LibraryTextTile({ g, view }: { g: Generation; view: ItemView }) 
   if (view === 'list') {
     return <article className="space-card text-result-tile pc-row">
       <span className="pc-thumb" aria-hidden="true"><FileText size={16} /></span>
-      <button type="button" className="pc-text" aria-label="Open text" onClick={open}><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub">{[g.modelName, g.text].filter(Boolean).join(' · ')}</span></button>
-      {when}{menu}
+      <button type="button" className="pc-text" aria-label="Open text" onClick={open}><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub">{g.modelName ? <span className="pc-cols-alt">{g.modelName}{g.text ? ' · ' : ''}</span> : null}{g.text}</span></button>
+      <ColumnCells v={columnValues(undefined, g)} />{when}{menu}
     </article>;
   }
   return <article className={`space-card text-result-tile pc-card pc-text-card${tap.armed ? ' is-armed' : ''}`} onPointerDown={tap.onPointerDown} onClick={(e) => { if (!(e.target as Element).closest('button')) tap.onClick(); }}>
