@@ -30,7 +30,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [index.ts](../src/engine/params/index.ts) | 42 | 21 |
 | [ops.ts](../src/engine/ops.ts) | 41 | 16 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 46 |
-| [format.ts](../src/lib/format.ts) | 35 | 1 |
+| [format.ts](../src/lib/format.ts) | 34 | 1 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
 | [actions.ts](../src/engine/actions.ts) | 32 | 24 |
 | [id.ts](../src/lib/id.ts) | 30 | 0 |

@@ -28,15 +28,16 @@
 .pc-menu-sep { width: calc(100% - 12px); margin: 4px 6px; border: 0; border-top: 1px solid var(--border); }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
-.pc-card {
+.pc-card, .pc-inked {
   /* The card's own ink (fade, overlay buttons, text on it), tied to the theme: its page colour (--bg-canvas) taken
      --pc-ink-shade toward black (0: the theme's own darkest colour, not a separate black). Light bases keep it light
-     and write in the theme's text colour. Scoped to cards (Sessions and Library), so nothing outside them changes. */
+     and write in the theme's text colour. Scoped to cards (Sessions and Library) and to .pc-inked (Home's covered
+     cards), so nothing outside them changes. */
   --pc-ink-shade: 0%;
   --pc-ink: color-mix(in oklab, var(--bg-canvas), #000 var(--pc-ink-shade));
   --pc-on-ink: #fff;
 }
-[data-base="claro"] .pc-card, [data-base="blanco"] .pc-card { --pc-on-ink: var(--text); }
+[data-base="claro"] :is(.pc-card, .pc-inked), [data-base="blanco"] :is(.pc-card, .pc-inked) { --pc-on-ink: var(--text); }
 .pc-card { --pc-btn-bg: color-mix(in srgb, var(--pc-ink) 40%, transparent); --pc-btn-bg-hover: color-mix(in srgb, var(--pc-ink) 60%, transparent); --pc-btn-fg: var(--pc-on-ink); position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
 .pc-card.is-selected { box-shadow: 0 0 0 2px var(--accent); }
 .pc-card.is-active { box-shadow: 0 0 0 1px var(--border-strong); }

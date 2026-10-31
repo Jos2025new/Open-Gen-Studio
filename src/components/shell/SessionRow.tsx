@@ -9,7 +9,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
-import type { Session, Workspace } from '../../engine/types';
+import type { Asset, Generation, Session, Workspace } from '../../engine/types';
 import type { HeadDef } from '../gallery/ListColumns';
 
 export type QuickMode = 'all' | 'agent' | 'image' | 'video' | 'audio' | 'model3d';
@@ -41,6 +41,33 @@ export interface Stats {
   latestModeAt?: number;
 }
 
+/** Per session: its assets (newest first), generation count, spend, cover (newest image or video) and the modes used. Shared by Sessions and Home. */
+export function sessionStats(assets: Record<string, Asset>, generations: Record<string, Generation>): Map<string, Stats> {
+  const m = new Map<string, Stats>();
+  const entry = (id: string) => {
+    const e: Stats = m.get(id) ?? { assets: [], gens: 0, spend: 0, modes: new Set() };
+    m.set(id, e);
+    return e;
+  };
+  for (const a of Object.values(assets).sort((x, y) => y.createdAt - x.createdAt)) {
+    const e = entry(a.sessionId);
+    e.assets.push(a.id);
+    e.modes.add(a.kind);
+    if (!e.cover && (a.kind === 'image' || a.kind === 'video')) e.cover = a.id;
+  }
+  for (const g of Object.values(generations)) {
+    const e = entry(g.sessionId);
+    e.gens++;
+    if (g.kind !== 'text') e.modes.add(g.kind);
+    if (g.mode) e.modes.add(g.mode);
+    if (g.origin === 'agent') e.modes.add('agent');
+    const mode = g.mode ?? (g.origin === 'agent' ? 'agent' : g.kind === 'text' ? undefined : g.kind);
+    if (mode && (!e.latestModeAt || g.createdAt > e.latestModeAt)) { e.latestMode = mode; e.latestModeAt = g.createdAt; }
+    if (g.status === 'done') e.spend += g.actualUsd ?? g.estimate.usd ?? 0;
+  }
+  return m;
+}
+
 export function RunningNote({ ids }: { ids: string[] }) {
   const n = useStore((st) => Object.values(st.generations).filter((g) => ids.includes(g.sessionId) && isRunning(g.id)).length);
   if (!n) return null;
@@ -69,7 +96,7 @@ export type SessionSortKey = 'name' | 'mode' | 'gens' | 'nodes' | 'designs' | 's
 
 
 /** A session as an image-first card (cover fills it; details on hover, focus or first tap) or as a compact row. */
-export function SessionRow({ session, active, stats, selecting, selected, view, basis, onToggle }: { session: Session; active: boolean; stats?: Stats; selecting: boolean; selected: boolean; view: ItemView; basis: 'updated' | 'created'; onToggle: () => void }) {
+export function SessionRow({ session, active, stats, selecting, selected, view, basis, onToggle }: { session: Session; active: boolean; stats?: Stats; selecting: boolean; selected: boolean; view: ItemView; basis: 'updated' | 'created'; onToggle?: () => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
   const [confirming, setConfirming] = useState(false);
@@ -81,7 +108,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const stamp = basis === 'created' ? session.createdAt : session.updatedAt;
   const details = [stats?.gens ? `${stats.gens} gen` : null, nodes ? `${nodes} nodes` : null, docs ? `${docs} design${docs === 1 ? '' : 's'}` : null, stats?.spend ? formatUsd(stats.spend) : null].filter(Boolean);
   const open = () => {
-    if (selecting) return onToggle();
+    if (selecting) return onToggle?.();
     if (editing) return;
     if (session.archived) setSessionsArchived([session.id], false);
     selectSession(session.id);
@@ -130,7 +157,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   if (view === 'list') {
     return (
       <div className={`sess-row pc-row${flags}`}>
-        <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
+        {onToggle ? <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} /> : null}
         <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
         <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onDoubleClick={rename} onKeyDown={keys}>
           <span className="pc-title-line">{title}{openTag}</span>
@@ -159,7 +186,8 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
     <span className="pc-tools">{pin}{menu}</span>
   </div>;
   const coverButton = <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>;
-  const check = <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />;
+  // Without onToggle (Home's Continue row) the card has no selection box.
+  const check = onToggle ? <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} /> : null;
 
   if (view === 'tile') {
     // Cards: the cover fills the left side and fades into the dark right side, which holds the same details.

@@ -15,7 +15,10 @@ it('the card ink is the theme’s own page colour (no extra black), kept light o
   const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
   expect(css).toMatch(/--pc-ink: color-mix\(in oklab, var\(--bg-canvas\), #000 var\(--pc-ink-shade\)\)/);
   expect(css).toMatch(/--pc-ink-shade: 0%/);
-  expect(css).toMatch(/\[data-base="claro"\] \.pc-card, \[data-base="blanco"\] \.pc-card \{ --pc-on-ink: var\(--text\); \}/);
+  expect(css).toMatch(/\[data-base="claro"\] :is\(\.pc-card, \.pc-inked\), \[data-base="blanco"\] :is\(\.pc-card, \.pc-inked\) \{ --pc-on-ink: var\(--text\); \}/);
+  // Home's covered cards (apps, spaces) share the same ink through .pc-inked.
+  expect(css).toMatch(/\.pc-card, \.pc-inked \{\n  \/\*/);
+  expect(readFileSync('src/styles/home.css', 'utf8')).toMatch(/\.home-app\.has-cover::after \{[^}]*var\(--pc-ink\)/);
   expect(readFileSync('src/styles/tokens.css', 'utf8')).not.toMatch(/--pc-ink/);
 });
 

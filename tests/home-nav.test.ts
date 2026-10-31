@@ -55,22 +55,25 @@ describe('navigation model', () => {
 });
 
 describe('rendering', () => {
-  it('Home has the hero, then Apps, Tools, For deeper work and Latest', () => {
+  it('Home has the hero, then Latest, Apps, Tools and For deeper work, each with one title and a quiet hint', () => {
     const html = renderToStaticMarkup(createElement(HomeView));
-    for (const label of ['Apps', 'Tools', 'For deeper work', 'Latest']) expect(html).toContain(`aria-label="${label}"`);
+    const order = ['Latest', 'Apps', 'Tools', 'For deeper work'].map((label) => html.indexOf(`aria-label="${label}"`));
+    expect(order.every((i) => i > html.indexOf('class="home-hero"'))).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(html).toContain('class="home-hero"');
     for (const t of ['Image', 'Video', 'Audio', '3D']) expect(html).toMatch(new RegExp(`<span class="home-app-title">${t}</span>`));
-    expect(html).toMatch(/<button type="button" class="home-app t-model3d" aria-label="3D"/);
+    expect(html).toMatch(/<button type="button" class="home-app pc-inked t-model3d" aria-label="3D"/);
     expect(html).toMatch(/<span class="home-app-icon">/);
     for (const t of ['Canvas', 'Designer']) expect(html).toContain(`<span class="home-space-title">${t}</span>`);
-    expect(html).toMatch(/<button type="button" class="home-space" disabled="" aria-label="Projects — soon">/);
+    expect(html).toMatch(/<button type="button" class="home-space pc-inked" disabled="" aria-label="Projects — soon">/);
     expect(html).not.toContain('grid-area');
     expect(html).toContain('Make more with AI tools');
-    expect(html).toContain('class="home-kicker">Tools</div>');
+    expect(html).not.toContain('home-kicker');
+    expect(html).toContain('<span class="home-hint">Edit what you already have</span>');
     expect(html).not.toContain('plan-kicker');
     expect(html).not.toContain('>Apps</div>');
   });
-  it('Tools show 58 px circles with a last "More"; expanded, the same row ends in "Less"', () => {
+  it('Tools show tiles with a last "More"; expanded, the same grid ends in "Less"', () => {
     const collapsed = renderToStaticMarkup(createElement(ToolsRow));
     expect(collapsed.match(/class="home-tool[ "]/g)).toHaveLength(TOOLS_MAIN.length + 1);
     expect(collapsed).toMatch(/aria-expanded="false"[^>]*>.*>More</);

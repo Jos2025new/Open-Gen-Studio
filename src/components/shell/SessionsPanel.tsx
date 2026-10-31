@@ -13,7 +13,7 @@ import { setUserHidden } from '../../store/userHidden';
 import { usePref } from '../ui/hooks';
 import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, SourceSelect, asItemView, type RailItem } from '../ui/PanelControls';
 import { ListHeader, widthVars, type ColumnWidths } from '../gallery/ListColumns';
-import { CANVAS, QUICK_MODES, RunningNote, SESSION_HEADS, SessionRow, sessionCanvases, sessionMode, type QuickMode, type SessionSortKey, type Stats } from './SessionRow';
+import { CANVAS, QUICK_MODES, RunningNote, SESSION_HEADS, SessionRow, sessionCanvases, sessionStats, sessionMode, type QuickMode, type SessionSortKey } from './SessionRow';
 import './SessionsLayout.css';
 
 export { sessionCanvases };
@@ -61,31 +61,7 @@ export function SessionsPanel() {
   const { expanded, embedded } = usePanelExpanded();
   useEffect(() => setCols((c) => (expanded ? Math.max(c, 5) : Math.min(c, 4))), [expanded]);
 
-  const stats = useMemo(() => {
-    const m = new Map<string, Stats>();
-    const entry = (id: string) => {
-      const e: Stats = m.get(id) ?? { assets: [], gens: 0, spend: 0, modes: new Set() };
-      m.set(id, e);
-      return e;
-    };
-    for (const a of Object.values(assets).sort((x, y) => y.createdAt - x.createdAt)) {
-      const e = entry(a.sessionId);
-      e.assets.push(a.id);
-      e.modes.add(a.kind);
-      if (!e.cover && (a.kind === 'image' || a.kind === 'video')) e.cover = a.id;
-    }
-    for (const g of Object.values(generations)) {
-      const e = entry(g.sessionId);
-      e.gens++;
-      if (g.kind !== 'text') e.modes.add(g.kind);
-      if (g.mode) e.modes.add(g.mode);
-      if (g.origin === 'agent') e.modes.add('agent');
-      const mode = g.mode ?? (g.origin === 'agent' ? 'agent' : g.kind === 'text' ? undefined : g.kind);
-      if (mode && (!e.latestModeAt || g.createdAt > e.latestModeAt)) { e.latestMode = mode; e.latestModeAt = g.createdAt; }
-      if (g.status === 'done') e.spend += g.actualUsd ?? g.estimate.usd ?? 0;
-    }
-    return m;
-  }, [assets, generations]);
+  const stats = useMemo(() => sessionStats(assets, generations), [assets, generations]);
   const matches = useSessionMatcher(q);
 
   const list = useMemo(() => {
