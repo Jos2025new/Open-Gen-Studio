@@ -45,3 +45,8 @@ it('the left edge also peeks, and clicking the icon pins the bar', () => {
   expect(nav().className).not.toMatch(/is-peek|is-folded/);
   expect(localStorage.getItem('ogs:sidebar-folded')).toBe('false');
 });
+
+it('the peeking frame reaches the top, covering the top bar beside the logo', async () => {
+  const { readFileSync } = await import('node:fs');
+  expect(readFileSync('src/styles/sidebar-peek.css', 'utf8')).toMatch(/\.sidebar\.is-peek::before \{ top: 6px;/);
+});

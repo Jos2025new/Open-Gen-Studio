@@ -4,6 +4,7 @@
 .side-peek-edge { position: fixed; z-index: 29; top: var(--topbar-h); bottom: 0; left: 0; width: 8px; }
 :root .sidebar.is-peek { position: absolute; z-index: 60; top: 0; left: 0; width: 54px; height: calc(100dvh - 6px); margin: 0; padding-left: 11px; animation: side-peek-in .16s ease-out; }
 :root.sidebar-wide .sidebar.is-peek { width: 214px; padding-left: 16px; }
-.sidebar.is-peek::before { left: 6px; right: 0; box-shadow: var(--shadow-pop); }
+/* The frame reaches the top, so the logo row sits inside it and nothing in the top bar shows through beside it. */
+.sidebar.is-peek::before { top: 6px; left: 6px; right: 0; box-shadow: var(--shadow-pop); }
 @keyframes side-peek-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { :root .sidebar.is-peek { animation: none; } }
