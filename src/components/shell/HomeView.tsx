@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRight, Folder, Minus, Plus, type LucideIcon } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind } from '../../engine/types';
@@ -12,6 +13,7 @@ import { GalleryPanel } from '../gallery/GalleryPanel';
 import { HomeHero } from './HomeHero';
 import { visibleSessions } from '../../store/spaceSession';
 import { SessionRow, sessionStats } from './SessionRow';
+import { getHomeTabsSlot, subscribeHomeTabsSlot } from './topbarSlot';
 
 /** A section head: one title size for every section, a quiet line beside it, and its link on the right. */
 function Head({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
@@ -106,10 +108,14 @@ export function HomeView() {
   // Families, as the model picker groups its variants: one entry per model the user's keys reach.
   const families = useMemo(() => Object.fromEntries(CREATE.map((c) => [c.kind as AssetKind, groupVariants(modelsOf(c.kind), connectedProviders()).length])) as Record<AssetKind, number>, [catalog, keys]);
 
+  // The tabs live in the top bar when there is one (same row as the back pill); inline otherwise.
+  const tabsSlot = useSyncExternalStore(subscribeHomeTabsSlot, getHomeTabsSlot, () => null);
+  const tabs = <nav className="home-tabs" aria-label="Home sections">
+    {TABS.map(([id, label]) => <button key={id} type="button" className={`home-tab ${tab === id ? 'is-active' : ''}`} aria-current={tab === id ? 'page' : undefined} disabled={id === 'projects'} title={id === 'projects' ? 'Coming soon' : undefined} onClick={() => setTab(id)}>{label}</button>)}
+  </nav>;
+
   return <div className="home" role="region" aria-label="Home"><div className="home-inner">
-    <nav className="home-tabs" aria-label="Home sections">
-      {TABS.map(([id, label]) => <button key={id} type="button" className={`home-tab ${tab === id ? 'is-active' : ''}`} aria-current={tab === id ? 'page' : undefined} disabled={id === 'projects'} title={id === 'projects' ? 'Coming soon' : undefined} onClick={() => setTab(id)}>{label}</button>)}
-    </nav>
+    {tabsSlot ? createPortal(tabs, tabsSlot) : tabs}
     {tab === 'sessions' || tab === 'gallery' ? <PanelEmbed.Provider value><div className={`side-panel is-expanded home-embed panel-${tab}`}>{tab === 'sessions' ? <SessionsPanel /> : <GalleryPanel />}</div></PanelEmbed.Provider> : <>
     <HomeHero />
 

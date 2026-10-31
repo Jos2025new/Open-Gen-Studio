@@ -46,6 +46,14 @@ describe('top bar on Home', () => {
     expect(host.textContent).not.toMatch(/Saved|Saving/);
     act(() => root!.unmount()); root = undefined; setUi({ workspace: 'chat' });
   });
+  it('on Home the bar holds a slot for Home\'s tabs, next to the back pill; outside Home it does not', () => {
+    expect(mount(true).querySelector('.topbar-left .topbar-home-tabs')).not.toBeNull();
+    act(() => root!.unmount()); root = undefined;
+    expect(mount(false).querySelector('.topbar-home-tabs')).toBeNull();
+  });
+  it('Sessions and Library under Home are flat: no frame, corner or shadow', () => {
+    expect(readFileSync('src/styles/home.css', 'utf8')).toMatch(/:root \.side-panel\.home-embed \{[^}]*border: 0; border-radius: 0; background: var\(--bg-canvas\); box-shadow: none;/);
+  });
   it('the pill opens the Connected popover as before', () => {
     const host = mount(true);
     act(() => (host.querySelector('.topbar-pill') as HTMLButtonElement).click());

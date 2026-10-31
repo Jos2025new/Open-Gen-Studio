@@ -16,7 +16,7 @@ import { HomeIcon } from './Sidebar';
 import { openHome } from './navModel';
 import { SessionInfo, SessionMenu } from './SessionTools';
 import { StudioReopen } from '../studio/StudioReopen';
-import { getLeftSlot, subscribeLeftSlot } from './topbarSlot';
+import { getLeftSlot, subscribeLeftSlot, setHomeTabsSlot } from './topbarSlot';
 import '../../styles/topbar-home.css';
 import '../../styles/compact-popovers.css';
 
@@ -95,6 +95,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
     <header className={`topbar ${home ? 'is-home' : ''}`}>
       <div className="topbar-left">
         {home && hasSession && <BackToWorkspace workspace={workspace} title={title} />}
+        {home && <div className="topbar-home-tabs" ref={setHomeTabsSlot} />}
         {!home && <>
         <button type="button" className="topbar-home" aria-label="Home" title="Home" onClick={openHome}><HomeIcon size={16} /></button>
           {editing ? (

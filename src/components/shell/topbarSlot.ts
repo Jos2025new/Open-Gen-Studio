@@ -9,3 +9,15 @@ export function setLeftSlot(el: HTMLDivElement | null) {
 }
 export const subscribeLeftSlot = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 export const getLeftSlot = () => leftSlot;
+
+/** Home's tabs (Home, Projects, Sessions, Library) sit in the top bar while Home is open: the bar hands its slot here
+ *  and HomeView portals the tabs into it (inline when there is no bar, as in tests). */
+let homeTabsSlot: HTMLDivElement | null = null;
+const homeTabsListeners = new Set<() => void>();
+export function setHomeTabsSlot(el: HTMLDivElement | null) {
+  if (homeTabsSlot === el) return;
+  homeTabsSlot = el;
+  homeTabsListeners.forEach((l) => l());
+}
+export const subscribeHomeTabsSlot = (l: () => void) => { homeTabsListeners.add(l); return () => { homeTabsListeners.delete(l); }; };
+export const getHomeTabsSlot = () => homeTabsSlot;

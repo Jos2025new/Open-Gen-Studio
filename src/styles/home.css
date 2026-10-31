@@ -78,7 +78,8 @@
 .home-tab:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .home-tab.is-active { background: var(--active-bg); border-color: var(--active-line); color: var(--active-text); }
 .home-tab:disabled { opacity: .45; cursor: default; }
-.side-panel.home-embed { position: static; width: auto; min-height: 60vh; border: 1px solid var(--border); border-radius: var(--r-m); box-shadow: none; overflow: hidden; z-index: auto; }
+/* Sessions and Library under Home's tabs: flat on the page (no frame, corner or shadow), so they read as part of Home. */
+:root .side-panel.home-embed { position: static; width: auto; min-height: 60vh; border: 0; border-radius: 0; background: var(--bg-canvas); box-shadow: none; overflow: hidden; z-index: auto; }
 /* Hero carousel: three stacked slides, 68 px Outfit word, the Home prompt bar on Studio. */
 .home-hero { position: relative; width: 100%; max-width: 760px; margin: var(--sp-2) 0 0; }
 .home-hero-dots { display: flex; gap: 7px; align-items: center; height: 8px; margin-bottom: var(--sp-5); }
