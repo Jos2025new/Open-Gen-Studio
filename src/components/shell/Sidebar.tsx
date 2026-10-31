@@ -1,23 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen, Wallet, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, Plus } from 'lucide-react';
+import { FolderClock, Images, Wallet, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, Plus } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { ProviderPool } from './ProviderPool';
 import { usePref } from '../ui/hooks';
 import { SidebarNav } from './SidebarNav';
 import { openHome } from './navModel';
-
-/**
- * Library: a drawer (a rounded box, the line of its top, a handle below it), drawn here: lucide's archive box has a
- * lid wider than its body and reads as a bin.
- */
-function LibraryIcon() {
-  return <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <rect x="3.5" y="4" width="17" height="16" rx="3" />
-    <path d="M3.5 9h17" />
-    <path d="M9.5 13.5h5" />
-  </svg>;
-}
 
 /** The house icon, shared by the sidebar's Home item and the top bar's Home button. */
 export function HomeIcon({ size = 18 }: { size?: number }) {
@@ -134,7 +122,7 @@ export function Sidebar() {
           aria-expanded={panel === 'sessions'}
           onClick={() => togglePanel('sessions')}
         >
-          <FolderOpen size={18} strokeWidth={1.7} />
+          <FolderClock size={18} strokeWidth={1.7} />
           <span className="side-label">Sessions</span>
         </button>
         <button
@@ -146,7 +134,7 @@ export function Sidebar() {
           aria-expanded={panel === 'gallery'}
           onClick={() => togglePanel('gallery')}
         >
-          <LibraryIcon />
+          <Images size={18} strokeWidth={1.7} />
           <span className="side-label">Library</span>
           {running ? <span className="side-badge num">{running}</span> : null}
         </button>

@@ -126,7 +126,7 @@
 .set-warn-actions { display: flex; gap: 6px; }
 
 /* New session: accented so it is found at a glance. */
-.side-btn.side-new { height: 40px; margin-bottom: 6px; color: var(--new-text); background: var(--new-bg); border: 1px solid var(--new-line); }
+.side-btn.side-new { height: 36px; margin-bottom: 6px; color: var(--new-text); background: var(--new-bg); border: 1px solid var(--new-line); }
 .side-btn.side-new:hover { background: var(--new-hover); }
 /* Money left with the providers, in green so it is noticed. */
 .side-budget, .pool-total { color: var(--money); }

@@ -1,7 +1,9 @@
 /* Sidebar destinations (SidebarNav.tsx) and the narrow bar's icon-only rule. Tokens only. */
 .side-scroll { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: var(--sp-1); scrollbar-width: thin; }
 .sidebar:not(.is-wide) .side-label { display: none; }
-.sidebar:not(.is-wide) .side-btn { height: 40px; }
+.sidebar:not(.is-wide) .side-btn { height: 36px; }
+/* Narrow bar: a hairline between the spaces and the Create and Tools flyouts. */
+.sidebar:not(.is-wide) .side-scroll .side-sep { width: 20px; margin: var(--sp-1) auto; }
 .nav-section { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-2); }
 .nav-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-1) var(--sp-2); color: var(--text-3); font-size: var(--fs-s); }
 .nav-head:hover { color: var(--text-2); }
@@ -24,3 +26,5 @@
 .nav-flyout .nav-item.is-tile:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
 .nav-flyout .nav-item.is-tile svg { width: 20px; height: 20px; }
 .popover:has(.nav-flyout) { padding: 0; border-radius: var(--r-m); }
+/* The narrow bar is 48px (the theme token keeps 56px; this layout rule wins over it). */
+html:root:not(.sidebar-wide), html:root.sidebar-folded { --sidebar-w: 48px; }

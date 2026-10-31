@@ -47,17 +47,19 @@ it('View offers Grid, Cards and List; Cards shows horizontal tiles with details,
   expect(tiles).toHaveLength(2);
   const cherry = tiles.find((t) => t.querySelector('.pc-info-title')?.textContent === 'Cherry')!;
   expect([...cherry.querySelectorAll('.pc-stat')].map((s) => s.textContent)).toEqual(['16:9Aspect', '720pResolution', '5sDuration']);
-  expect(cherry.querySelector('.pc-card-actions .btn')?.textContent).toBe('Use as reference');
-  click(cherry.querySelector('.pc-card-actions .btn'));
+  expect(cherry.querySelector('[aria-label="Use as reference"]')).toBeNull();
+  click(cherry.querySelector('.pc-card-actions .attach-toggle'));
   expect(useStore.getState().composer.attachments).toContain('c');
   click(cherry.querySelector('[aria-label="More actions"]'));
   expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Download', 'Hide', 'Delete']);
 });
 
-it('list rows offer Use as reference as a pill before their actions', () => {
+it('list rows keep one reference control, the paperclip; Reusar is the pill only when the generation can run again', () => {
   layout('List');
   const row = q('.g-tile.pc-row');
-  expect(row.querySelector('.pc-tools > .pc-go')?.textContent).toBe('Use as reference');
+  expect(row.querySelector('.attach-toggle')).not.toBeNull();
+  expect(row.querySelector('[aria-label="Use as reference"]')).toBeNull();
+  expect(row.querySelector('.pc-go')).toBeNull(); // the demo generation cannot be reused
 });
 
 it('saved items follow the same views: Open is the main action and the menu keeps Hide and Remove', () => {

@@ -306,11 +306,11 @@ describe('Library cards', () => {
     expect(host.querySelector('.gallery-bulk')).toBeNull();
   });
 
-  it('the star toggles favorite; Use as reference and agent context are on the card; the menu keeps download, hide and delete', () => {
+  it('the star toggles favorite; the paperclip is the one reference control; the menu keeps download, hide and delete', () => {
     const tile = [...host.querySelectorAll('.g-tile')][1]; // Cherry (video)
     click(tile.querySelector('[aria-label="Add to favorites"]'));
     expect(useStore.getState().assets.c.favorite).toBe(true);
-    expect(tile.querySelector('.pc-card-actions .btn')?.textContent).toBe('Use as reference');
+    expect(tile.querySelector('[aria-label="Use as reference"]')).toBeNull(); // the paperclip already does it
     click(tile.querySelector('.pc-card-actions .attach-toggle'));
     expect(useStore.getState().composer.attachments).toEqual(['c']);
     click([...host.querySelectorAll('.g-tile')][1].querySelector('[aria-label="More actions"]'));

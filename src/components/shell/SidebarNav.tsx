@@ -1,13 +1,13 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, LayoutDashboard, Sparkles, Wrench, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Sparkles, Wrench, type LucideIcon } from 'lucide-react';
 import { useStore } from '../../store/store';
 import { usePref } from '../ui/hooks';
 import { Popover, usePopover } from '../ui/Popover';
 import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, openCreate, openSpace, openTool } from './navModel';
 
 /*
- * Sidebar destinations: Spaces, Create, Tools. Wide: collapsible sections with icon + text. Narrow: one icon per
- * section (no text); pressing it opens a flyout beside the bar with the section's items in a grid.
+ * Sidebar destinations: Spaces, Create, Tools. Wide: collapsible sections with icon + text. Narrow: the three spaces
+ * as their own icons, then one icon each for Create and Tools that opens a flyout with their items in a grid.
  */
 
 const TOOLS_FIRST = 8;
@@ -80,10 +80,18 @@ function Flyout({ label, icon: Icon, active, items, cols }: { label: string; ico
   </>;
 }
 
+/** A destination as its own icon in the narrow bar, so the three spaces read at a glance. */
+function Direct({ e }: { e: Entry }) {
+  return <button type="button" className={`side-btn nav-icon ${e.active ? 'is-active' : ''}`} aria-label={e.label} aria-current={e.active ? 'page' : undefined} data-tip={e.hint ? `${e.label} — ${e.hint}` : e.label} data-tip-side="right" onClick={e.run}>
+    <e.icon size={18} strokeWidth={1.7} />
+  </button>;
+}
+
 function NarrowNav() {
   const { spaces, create, tools, moreTools } = useEntries();
   return <>
-    <Flyout label="Spaces" icon={LayoutDashboard} active={spaces.some((e) => e.active)} items={spaces} cols={3} />
+    {spaces.map((e) => <Direct key={e.key} e={e} />)}
+    <span className="side-sep" aria-hidden="true" />
     <Flyout label="Create" icon={Sparkles} items={create} cols={2} />
     <Flyout label="Tools" icon={Wrench} items={[...tools, ...moreTools]} cols={3} />
   </>;

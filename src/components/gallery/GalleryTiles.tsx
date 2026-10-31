@@ -1,7 +1,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
-import { AudioLines, Box, ImagePlus, Clock, Copy, Download, Eye, EyeOff, FileText, Film, MessageSquare, Paperclip, RotateCcw, Star, Trash } from 'lucide-react';
+import { AudioLines, Box, Clock, Copy, Download, Eye, EyeOff, FileText, Film, MessageSquare, Paperclip, RotateCcw, Star, Trash } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
-import { copyText, deleteAssets, downloadAsset, toggleFavorite, useAsReference } from '../../engine/actions';
+import { copyText, deleteAssets, downloadAsset, toggleFavorite } from '../../engine/actions';
 import { canReuse, reuseGeneration } from '../../store/reuse';
 import { setUserHidden } from '../../store/userHidden';
 import { formatDuration, formatRelative } from '../../lib/format';
@@ -23,16 +23,15 @@ export function tileDetails(asset: Asset | undefined, g: Generation | undefined)
 }
 export const assetTitle = (asset: Asset, g?: Generation) => g?.prompt || asset.name || asset.kind;
 
-/** Use as reference and the agent context sit on every view; in the list Download and Hide sit on the row too, so the
- *  menu keeps only what is not visible. */
-function AssetMenuItems({ asset, g, close, inRow }: { asset: Asset; g?: Generation; close: () => void; inRow: boolean }) {
+/** Reusar is each view's main action and the paperclip (the composer's references) sits on every view; in the list
+ *  Download and Hide sit on the row too, so the menu keeps only what is not visible. */
+function AssetMenuItems({ asset, close, inRow }: { asset: Asset; close: () => void; inRow: boolean }) {
   useStore((s) => s.assets);
   useStore((s) => s.catalog.models);
   const [confirming, setConfirming] = useState(false);
   if (confirming) return <MenuConfirm text="Delete this asset? The file is removed from this browser." action="Delete" onCancel={() => setConfirming(false)} onConfirm={() => { deleteAssets([asset.id]); close(); }} />;
   const run = (f: () => void) => () => { f(); close(); };
   return <>
-    {g && canReuse(g) ? <MenuItem icon={RotateCcw} onClick={run(() => void reuseGeneration(g))}>Reusar</MenuItem> : null}
     {inRow ? null : <>
       <MenuItem icon={Download} onClick={run(() => void downloadAsset(asset.id))}>Download</MenuItem>
       <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
@@ -46,7 +45,7 @@ const KIND_LABEL: Record<Asset['kind'], string> = { image: 'Image', video: 'Vide
 /** Three figures, value over label, as on the Sessions cards. */
 export const Figures = ({ items }: { items: Array<[string, string]> }) => <div className="pc-stats">{items.map(([value, label]) => <span key={label} className="pc-stat"><b className="num">{value || '—'}</b><small>{label}</small></span>)}</div>;
 /** The cards' action row: the main action stretches; the icon buttons follow. */
-export const CardActions = ({ main, children }: { main: ReactNode; children: ReactNode }) => <div className="pc-card-actions">{main}<span className="pc-tools">{children}</span></div>;
+export const CardActions = ({ main, children }: { main: ReactNode; children: ReactNode }) => <div className="pc-card-actions">{main}<span className="pc-tools" style={main ? undefined : { marginLeft: 'auto' }}>{children}</span></div>;
 const stop = (f: () => void) => (e: MouseEvent) => { e.stopPropagation(); f(); };
 
 /** A generated asset as a Grid card (the image fills it; details, figures and actions on hover, focus or first tap),
@@ -58,9 +57,12 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
   const details = tileDetails(asset, g);
   const v = columnValues(asset, g);
   const timed = asset.kind === 'video' || asset.kind === 'audio';
-  const use = (className?: string) => <Button size="sm" variant="secondary" icon={ImagePlus} className={className} aria-label="Use as reference" data-tip="Use as reference" onClick={stop(() => useAsReference(asset.id))}><span className="btn-label">Use as reference</span></Button>;
+  // The paperclip already adds the asset to the composer's references, so the main action is the other thing one does
+  // with a result: run its generation again with the same settings.
+  const reusable = useStore((s) => { void s.assets; void s.catalog.models; return Boolean(g && canReuse(g)); });
+  const use = (className?: string) => reusable && g ? <Button size="sm" variant="secondary" icon={RotateCcw} className={className} aria-label="Reusar" data-tip="Run again with the same settings" onClick={stop(() => void reuseGeneration(g))}><span className="btn-label">Reusar</span></Button> : null;
   const fav = <IconButton icon={Star} label={asset.favorite ? 'Remove from favorites' : 'Add to favorites'} size="sm" aria-pressed={Boolean(asset.favorite)} className={`pc-fav pc-hover${asset.favorite ? ' is-on' : ''}`} onClick={stop(() => toggleFavorite(asset.id))} />;
-  const menu = <CardMenu label="More actions" className="pc-hover">{(close) => <AssetMenuItems asset={asset} g={g} close={close} inRow={view === 'list'} />}</CardMenu>;
+  const menu = <CardMenu label="More actions" className="pc-hover">{(close) => <AssetMenuItems asset={asset} close={close} inRow={view === 'list'} />}</CardMenu>;
   const hiddenMark = asset.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
   const remote = !asset.stored ? <span className="g-remote" data-tip="Stored at the provider only; it may expire"><Clock size={11} /></span> : null;
   const when = <time className="pc-when" dateTime={new Date(asset.createdAt).toISOString()}>{formatRelative(asset.createdAt)}</time>;

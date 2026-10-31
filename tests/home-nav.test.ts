@@ -84,10 +84,10 @@ describe('rendering', () => {
     expect(html).toContain('nav-grid');
     expect(html).toContain('Studio');
   });
-  it('the narrow bar has one icon per section and no text of its own', () => {
+  it('the narrow bar shows the three spaces as icons, then Create and Tools flyouts, with no text of its own', () => {
     const html = renderToStaticMarkup(createElement(SidebarNav, { wide: false }));
-    for (const s of ['Spaces', 'Create', 'Tools']) expect(html).toContain(`aria-label="${s}"`);
-    expect(html.match(/<button/g)).toHaveLength(3);
+    for (const s of ['Studio', 'Canvas', 'Designer', 'Create', 'Tools']) expect(html).toContain(`aria-label="${s}"`);
+    expect(html.match(/<button/g)).toHaveLength(5);
     expect(html.replace(/<[^>]+>/g, '')).toBe('');
   });
 });
