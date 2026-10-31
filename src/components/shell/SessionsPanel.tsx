@@ -362,7 +362,7 @@ function SessionRow({ session, active, stats, expanded, compact, selecting, sele
   const open = () => {
     if (selecting) return onToggle();
     if (editing) return;
-    if (session.archived) return setSessionsArchived([session.id], false);
+    if (session.archived) setSessionsArchived([session.id], false);
     selectSession(session.id);
     setUi({ panel: null, home: false, space: undefined });
   };

@@ -73,3 +73,21 @@ it('selects a date group, archives and restores it, and switches layouts', () =>
   expect(view.getAttribute('aria-expanded')).toBe('false');
   act(() => root.unmount()); host.remove();
 });
+
+it('restores and opens an archived session when its row is pressed', () => {
+  const state = useStore.getState();
+  const first = createSession('First');
+  const second = createSession('Second');
+  second.archived = true;
+  useStore.setState({ sessions: { [first.id]: first, [second.id]: second }, activeSessionId: first.id, assets: {}, generations: {}, ui: { ...state.ui, panelExpanded: true } });
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(createElement(SessionsPanel)));
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter by"]')!.click());
+  act(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Archived'))!.click());
+  expect(host.querySelectorAll('.session-row')).toHaveLength(1);
+  act(() => host.querySelector<HTMLElement>('.session-main')!.click());
+  expect(useStore.getState().sessions[second.id].archived).toBeUndefined();
+  expect(useStore.getState().activeSessionId).toBe(second.id);
+  act(() => root.unmount()); host.remove();
+});
