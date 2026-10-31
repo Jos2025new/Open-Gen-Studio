@@ -55,7 +55,8 @@ it('selects a date group, archives and restores it, and switches layouts', () =>
   expect(useStore.getState().sessions[second.id].archived).toBe(true);
   act(() => host.querySelector<HTMLButtonElement>('.pc-strip-end [aria-label^="Show archived"]')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(2);
-  act(() => host.querySelector<HTMLButtonElement>('.sess-card [aria-label="Restore session"]')!.click());
+  act(() => host.querySelector<HTMLButtonElement>('.sess-card [aria-label="Session actions"]')!.click());
+  act(() => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === 'Restore session')!.click());
   expect(Object.values(useStore.getState().sessions).filter((session) => session.archived)).toHaveLength(1);
   act(() => useStore.setState({ ui: { ...useStore.getState().ui, panelExpanded: false } }));
   expect(host.querySelector('.session-cover-icon')).not.toBeNull();
