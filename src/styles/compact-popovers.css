@@ -8,9 +8,6 @@
 .generations-popover .gen-row-error { white-space: normal; overflow-wrap: anywhere; }
 .settings-popover .settings { max-height: min(620px, calc(100dvh - var(--topbar-h) - 32px)); overflow-y: auto; }
 .settings-popover .pop-head { padding: 8px 10px; }
-.settings-popover .set-tabs { padding-top: 5px; }
-.settings-popover .set-tabs .segmented { overflow-x: auto; }
-.settings-popover .set-tabs .segmented > button { flex: 0 0 auto; padding: 5px 6px; }
 .settings-popover .set-section { padding: 10px; }
 .settings-popover .settings .set-row { margin: 7px 0; }
 .settings-popover .settings .prov-row { padding: 6px 0; }

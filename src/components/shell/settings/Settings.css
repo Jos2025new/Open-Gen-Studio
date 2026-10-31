@@ -1,0 +1,63 @@
+/* Settings: side rail of sections, then titled groups of rows (icon · label · control). Compact on purpose:
+   the rows keep the popover's density; only the grouping and the leading icons add hierarchy. */
+.settings-popover .settings.set-shell { display: flex; flex-direction: column; overflow: hidden; container: settings / inline-size; }
+.set-body { display: grid; grid-template-columns: 128px minmax(0, 1fr); flex: 1; min-height: 0; border-top: 1px solid var(--border); }
+
+.set-nav { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; border-right: 1px solid var(--border); overflow-y: auto; }
+.set-nav > button { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 7px; color: var(--text-2); font-size: 12px; text-align: left; white-space: nowrap; }
+.set-nav > button svg { flex-shrink: 0; color: var(--text-3); }
+.set-nav > button:hover { background: var(--surface-hover); color: var(--text); }
+.set-nav > button.is-on { background: var(--surface-3); color: var(--text); font-weight: 550; }
+.set-nav > button.is-on svg { color: var(--text); }
+.set-nav-label { overflow: hidden; text-overflow: ellipsis; }
+
+.set-pane { overflow-y: auto; padding: 10px 10px 12px; min-width: 0; }
+.set-pane > .set-note { margin: 2px 4px 0; }
+
+.set-group + .set-group { margin-top: 12px; }
+.set-group-head { display: flex; align-items: center; gap: 6px; margin: 0 4px 5px; font-size: 11px; font-weight: 550; color: var(--text-3); }
+.set-group-body { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.set-group-body > * { margin: 0 !important; padding: 7px 10px; }
+.set-group-body > * + * { border-top: 1px solid var(--border); }
+.set-group-body > .set-warn { margin: 8px !important; border-top: 1px solid var(--warn); }
+.set-group-body > .set-note { padding: 7px 10px; }
+
+.settings.set-shell .set-row { min-height: 34px; }
+.settings.set-shell .set-row:not(.col):not(.set-row-3) { grid-template-columns: 150px minmax(0, 1fr); }
+.settings.set-shell .set-row-3 { grid-template-columns: 150px 1fr auto; }
+.settings.set-shell .set-row.col { display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+.settings.set-shell .set-label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+.settings.set-shell .set-row-icon { flex-shrink: 0; color: var(--text-3); }
+.settings.set-shell .check-row { gap: 8px; color: var(--text-2); }
+.settings.set-shell .check-row input { order: 3; margin-left: auto; }
+.settings.set-shell .prov-row { border-bottom: 0 !important; padding: 8px 10px; }
+.settings.set-shell .data-summary { padding: 8px 10px; }
+.settings.set-shell .set-keys { margin: 0; padding: 8px 10px; gap: 4px; }
+.settings.set-shell .accent-swatches { gap: 7px; padding: 2px; justify-content: flex-end; }
+.settings.set-shell .accent-swatch { width: 22px; height: 22px; }
+
+/* Base: a small picture per theme, drawn with that theme's own tokens. Atlas is the :root, so its values are set here. */
+.theme-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.theme-thumb { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 4px 4px 5px; border-radius: 9px; font-size: 11px; color: var(--text-2); text-align: center; }
+.theme-thumb:hover { background: var(--surface-hover); color: var(--text); }
+.theme-thumb.is-on { color: var(--text); font-weight: 550; }
+.theme-thumb.is-on .theme-mini, .theme-thumb.is-on .theme-split { outline: 2px solid var(--accent); outline-offset: 1px; }
+.theme-split { display: flex; height: 38px; border-radius: 7px; overflow: hidden; }
+.theme-split .theme-mini { flex: 1; border-radius: 0; border: 0; }
+.theme-mini[data-base="atlas"] { --bg-canvas: #131314; --surface: #1e1f20; --surface-2: #282a2c; --border: #333537; --text-3: #8d908e; }
+.theme-mini { position: relative; display: flex; gap: 4px; height: 38px; padding: 5px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-canvas); overflow: hidden; }
+.theme-mini i { display: block; }
+.tm-side { width: 8px; border-radius: 3px; background: var(--surface); }
+.tm-panel { position: relative; flex: 1; border-radius: 4px; background: var(--surface-2); }
+.tm-line { position: absolute; left: 6px; top: 7px; width: 55%; height: 3px; border-radius: 2px; background: var(--text-3); }
+.tm-dot { position: absolute; right: 6px; bottom: 6px; width: 10px; height: 6px; border-radius: 3px; background: var(--accent); }
+
+/* Narrow popover (phone): the rail keeps only its icons. */
+@container settings (max-width: 440px) {
+  .set-body { grid-template-columns: 44px minmax(0, 1fr); }
+  .set-nav { padding: 8px 5px; }
+  .set-nav > button { justify-content: center; padding: 0; }
+  .set-nav-label { display: none; }
+  .settings.set-shell .set-row:not(.col):not(.set-row-3), .settings.set-shell .set-row-3 { grid-template-columns: 112px minmax(0, 1fr); }
+  .settings.set-shell .set-row-3 { grid-template-columns: 112px 1fr auto; }
+}

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { setSettings, useStore } from '../../store/store';
 import { DEFAULT_PEOPLE_LOOK } from '../../engine/peopleLook';
+import { UserRound } from 'lucide-react';
+import { SetRow } from './settings/SettingsRows';
 
 /** Settings → Agent: the look of people the user does not describe (empty = the default, shown as placeholder). */
 export function PeopleLookRow() {
@@ -11,10 +13,7 @@ export function PeopleLookRow() {
     if (next !== saved) setSettings({ peopleLook: next || undefined });
   };
   return (
-    <div className="set-row col">
-      <span className="set-label" data-tip="Used when you ask for a person without describing them. A reference image of the person always wins.">
-        Default look for people
-      </span>
+    <SetRow col icon={UserRound} label="Default look for people" tip="Used when you ask for a person without describing them. A reference image of the person always wins.">
       <input
         className="text-input"
         value={value}
@@ -25,6 +24,6 @@ export function PeopleLookRow() {
         onKeyDown={(e) => e.key === 'Enter' && commit()}
         aria-label="Default look for people"
       />
-    </div>
+    </SetRow>
   );
 }

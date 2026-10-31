@@ -6,11 +6,11 @@ export default [
     sides: [
       ['src/engine/shortcuts.ts', "{ keys: 'Mod + S'"],
       ['src/components/designer/designerKeys.ts', 'void saveNow().catch'],
-      ['src/components/shell/SettingsPanel.tsx', 'Save (Mod+S) also works while typing'],
+      ['src/components/shell/settings/DataTab.tsx', 'Save (Mod+S) also works while typing'],
       ['src/engine/shortcuts.ts', 'export function shortcutGroups'],
       ['src/components/designer/designerKeys.ts', 'DESIGN_TOOL_KEYS[e.key.toLowerCase()]'],
       ['src/components/designer/PathNodes.tsx', 'marqueeNodeSelection'],
-      ['src/components/shell/SettingsPanel.tsx', 'shortcutGroups()'],
+      ['src/components/shell/settings/DataTab.tsx', 'shortcutGroups()'],
       ['README.md', '<!-- shortcuts:start -->'],
     ],
     tests: ['tests/readme-shortcuts.test.ts'],

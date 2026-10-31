@@ -278,9 +278,6 @@ button.info-thumb { padding: 0; cursor: pointer; }
 
 /* Settings: one tab at a time, label and control on one line, nothing wider than the panel. */
 .settings { overflow-x: hidden; }
-.set-tabs { padding: 8px 10px 0; }
-.set-tabs .segmented { width: 100%; display: flex; }
-.set-tabs .segmented > button { flex: 1; padding-left: 0; padding-right: 0; font-size: 11px; }
 .settings .set-section { border-bottom: 0; }
 .settings .set-row:not(.col):not(.set-row-3) { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
 .settings .set-row:not(.col):not(.set-row-3) > :last-child { justify-self: end; max-width: 100%; min-width: 0; }

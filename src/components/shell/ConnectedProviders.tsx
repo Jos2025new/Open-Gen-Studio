@@ -4,7 +4,7 @@ import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { Button, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
-import { ProviderRow } from './SettingsPanel';
+import { ProviderRow } from './settings/ProvidersTab';
 import './ConnectedProviders.css';
 
 /** Connect one provider here using the same key field and save path as Settings. */

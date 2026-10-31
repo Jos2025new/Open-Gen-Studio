@@ -11,7 +11,7 @@ export default [
       ['src/engine/agent/sessionModel.ts', 'export function rememberSessionModel'],
       ['src/engine/catalog.ts', 'rememberSessionModel('],
       ['src/components/composer/AgentModelControls.tsx', 'Set as default'],
-      ['src/components/shell/SettingsPanel.tsx', 'updateComposerDefaults'],
+      ['src/components/shell/settings/AgentTab.tsx', 'updateComposerDefaults'],
     ],
     tests: ['tests/model-priority.test.ts', 'tests/session-model-flow.test.ts', 'tests/session-model-defaults.test.ts', 'tests/session-model-controls.test.ts'],
   },
