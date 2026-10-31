@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CornerDownRight, Image as ImageIcon, Search, SlidersHorizontal, X } from 'lucide-react';
+import { CornerDownRight, Image as ImageIcon, Search, ListFilter, ArrowUpDown, Eye, EyeOff, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { generationTitle } from '../assets/GenerationInfo';
@@ -8,12 +8,13 @@ import type { Generation } from '../../engine/types';
 import { KINDS, KIND_ICON, STATUSES, STATUS_LABEL, filterGenerations, statusOf, type Kind, type Sort, type Status } from './generationsView';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
-import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
+import { Button, IconButton, Segmented } from '../ui/primitives';
 import { generationPlace, goToGeneration, openGeneration, placeLabel } from '../../engine/goTo';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
 import { canvasLookup } from '../../engine/canvas';
+import { ResultsMenu } from '../ui/ResultsMenu';
 
 const CANVAS = { chat: 'Chat', node: 'Nodes', designer: 'Designer' } as const;
 
@@ -32,7 +33,6 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('newest');
   const [view, setView] = useState<'thumbs' | 'list'>('thumbs');
-  const filters = usePopover();
   const sessions = useStore((s) => s.sessions);
   const [canvas, setCanvas] = useState<CanvasFilterValue>('all');
   const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
@@ -71,13 +71,9 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
               <X size={13} />
             </button>
           ) : null}
-          <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
-            <SlidersHorizontal size={14} />
-            {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || place !== 'all' || mode !== 'all' || sort !== 'newest' || view !== 'thumbs' ? <span className="dot" /> : null}
-          </button>
         </div>
-        <Popover open={filters.open} anchor={filters.ref} onClose={filters.close} width={300} label="Filter, sort and view">
-          <div className="sessions-view">
+        <div className="results-controls">
+        <ResultsMenu label="Filter by" icon={ListFilter} width={280} active={scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || place !== 'all' || mode !== 'all'}>
             <div className="sv-row">
               <span className="sv-label">Show</span>
               <Segmented size="sm" value={scope} onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
@@ -106,13 +102,13 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
               <span className="sv-label">Status</span>
               <Segmented size="sm" value={status} onChange={setStatus} options={STATUSES.map((x) => ({ value: x.id, label: x.id === 'all' ? 'Any' : x.label }))} />
             </div>
-            <div className="sv-row">
-              <span className="sv-label">Sort</span>
-              <Segmented size="sm" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }, { value: 'cost', label: 'Cost' }]} />
-            </div>
-            <label className="sv-switch"><span>Thumbnails</span><Toggle checked={view === 'thumbs'} onChange={(v) => setView(v ? 'thumbs' : 'list')} label="Thumbnails" /></label>
-          </div>
-        </Popover>
+        </ResultsMenu>
+        <ResultsMenu label="Order by" icon={ArrowUpDown} active={sort !== 'newest'}>
+          <Segmented size="sm" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }, { value: 'cost', label: 'Cost' }]} />
+        </ResultsMenu>
+        <span className="results-controls-spacer" />
+        <IconButton icon={view === 'thumbs' ? Eye : EyeOff} label={view === 'thumbs' ? 'Hide thumbnails' : 'Show thumbnails'} size="sm" aria-pressed={view === 'thumbs'} onClick={() => setView(view === 'thumbs' ? 'list' : 'thumbs')} />
+        </div>
         {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || place !== 'all' || mode !== 'all' ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}

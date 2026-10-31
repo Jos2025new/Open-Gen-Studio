@@ -2,7 +2,7 @@ import { ReuseButton } from '../assets/ReuseButton';
 import { TextTile } from '../assets/TextTile';
 import { useEta } from '../ui/useEta';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
+import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, ListFilter, Eye, EyeOff, Star } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind, Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
@@ -84,14 +84,14 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
       <div className="space-board-tools">
         <IconButton icon={RefreshCw} label="Reset view" size="sm" onClick={reset} />
         <h2 className="space-board-title">Generations</h2>
-        <IconButton ref={filter.ref} icon={SlidersHorizontal} label="Filter" size="sm" active={filter.open || filtered} onClick={filter.toggle} />
+        <IconButton ref={filter.ref} icon={ListFilter} label="Filter by" size="sm" active={filter.open || filtered} onClick={filter.toggle} />
         <IconButton ref={order.ref} icon={ArrowUpDown} label="Sort" size="sm" active={order.open || sort !== 'newest'} onClick={order.toggle} />
         <IconButton ref={view.ref} icon={LayoutGrid} label="View" size="sm" active={view.open || tile !== TILE_DEFAULT || layout !== 'grid'} onClick={view.toggle} />
       </div>
       <div className="space-board-tools">
         <IconButton icon={Star} label="Favorites only" size="sm" active={starred} aria-pressed={starred} onClick={() => setStarred(!starred)} />
         <IconButton icon={MousePointerClick} label="Select" size="sm" active={selecting} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected([]); }} />
-        <IconButton icon={CircleAlert} label="Show failed" size="sm" active={showFailed} aria-pressed={showFailed} onClick={() => setShowFailed(!showFailed)} />
+        <IconButton icon={showFailed ? Eye : EyeOff} label={showFailed ? "Hide failed" : "Show failed"} size="sm" active={showFailed} aria-pressed={showFailed} onClick={() => setShowFailed(!showFailed)} />
         {onClose ? <IconButton icon={X} label="Close board" size="sm" onClick={onClose} /> : null}
       </div>
     </header>

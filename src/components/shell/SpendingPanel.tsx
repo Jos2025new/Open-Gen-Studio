@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Calendar, DollarSign, ArrowDownAZ, Maximize2, Minimize2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, DollarSign, ArrowDownAZ, ArrowUpDown, Layers3, Maximize2, Minimize2, X } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
 import { CATEGORY_LABELS, periodStart, summarizeSpend, type SpendPeriod, type SpendRow } from '../../engine/spending';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
@@ -8,6 +8,7 @@ import type { SpendCategory } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { IconButton, Segmented } from '../ui/primitives';
 import { usePref } from '../ui/hooks';
+import { ResultsMenu } from '../ui/ResultsMenu';
 
 const PERIODS: Array<{ value: SpendPeriod; label: string }> = [
   { value: 'today', label: 'Today' },
@@ -24,7 +25,7 @@ function SortControls({ value, onChange, grouped = false }: { value: Sort; onCha
       const active = value.by === by;
       const description = `${label}${active ? ` · ${value.asc ? 'ascending' : 'descending'} · click to reverse` : ''}`;
       return <button key={by} type="button" title={description} aria-label={description} aria-pressed={active} onClick={() => onChange({ by, asc: active ? !value.asc : by === 'name' })}>
-        <Icon size={14} />{active && (value.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+        <Icon size={14} /><span>{label}</span>{active && (value.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
       </button>;
     })}
   </div>;
@@ -104,11 +105,11 @@ export function SpendingPanel() {
             <Group title="By type" rows={sum.byCategory} name={(k) => CATEGORY_LABELS[k as SpendCategory] ?? k} />
             <Group title="By provider" rows={sum.byProvider} name={providerName} />
           </div>
-          <Segmented value={detail} options={[{ value: 'models', label: 'Models' }, { value: 'sessions', label: 'Sessions' }, { value: 'charges', label: 'Charges' }]} onChange={setDetail} size="sm" />
+          <div className="results-controls"><ResultsMenu label={`Group by · ${detail === 'models' ? 'Models' : detail === 'sessions' ? 'Sessions' : 'Charges'}`} icon={Layers3}><Segmented value={detail} options={[{ value: 'models', label: 'Models' }, { value: 'sessions', label: 'Sessions' }, { value: 'charges', label: 'Charges' }]} onChange={setDetail} size="sm" /></ResultsMenu></div>
           <div hidden={detail !== 'models'}><Group title="By model" rows={sum.byModel} name={modelName} limit={5} /></div>
           <div hidden={detail !== 'sessions'}><Group title="By session" rows={sum.bySession} name={(id) => sessions[id]?.title ?? `Deleted session · ${id.slice(-8)}`} limit={5} /></div>
           {detail === 'charges' && <section className="spend-group">
-              <div className="spend-group-head"><h4>Latest {sum.recent.length} charges</h4><SortControls value={chargeSort} onChange={setChargeSort} /></div>
+              <div className="spend-group-head"><h4>Latest {sum.recent.length} charges</h4><ResultsMenu label="Order by" icon={ArrowUpDown}><SortControls value={chargeSort} onChange={setChargeSort} /></ResultsMenu></div>
               <div className="spend-table-wrap" tabIndex={0} role="region" aria-label="Latest charges">
               <table className="spend-table">
                 <thead><tr><th scope="col">Date</th><th scope="col">Model</th><th scope="col">Type</th><th scope="col">Amount</th></tr></thead>
@@ -157,7 +158,7 @@ function Group({ title, rows, name, limit = Infinity }: { title: string; rows: S
   const max = rows[0]?.usd || 1;
   return (
     <section className="spend-group">
-      <div className="spend-group-head"><h4>{title}</h4><SortControls value={sort} onChange={setSort} grouped /></div>
+      <div className="spend-group-head"><h4>{title}</h4><ResultsMenu label="Order by" icon={ArrowUpDown}><SortControls value={sort} onChange={setSort} grouped /></ResultsMenu></div>
       <ul>
         {sorted.slice(0, showAll ? rows.length : limit).map((r) => (
           <li key={r.key}>

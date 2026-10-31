@@ -102,8 +102,8 @@
 .spend-group { min-width: 0; }
 .spend-group-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .spend-group .spend-group-head h4 { margin: 0; }
-.spend-sort { display: flex; gap: 2px; }
-.spend-sort button { display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 28px; min-height: 28px; padding: 4px; border-radius: var(--radius-s); color: var(--text-2); }
+.spend-sort { display: flex; flex-direction: column; gap: 2px; }
+.spend-sort button { display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 28px; min-height: 28px; padding: 4px 8px; border-radius: var(--radius-s); color: var(--text-2); }
 .spend-sort button:hover { background: var(--surface-3); }
 .spend-sort button[aria-pressed="true"] { color: var(--active-text); background: var(--active-bg); }
 .spending .spend-group .bar > span { background: var(--text-3); }
