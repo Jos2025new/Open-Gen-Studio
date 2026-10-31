@@ -24,7 +24,7 @@ type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
 
 /** Everything generated or uploaded: the "All" category of the Library. */
-export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
+export function GeneratedAssets({ rail, chrome, view, setView, cols, setCols }: { rail: ReactNode; chrome: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const { expanded } = usePanelExpanded();
@@ -115,7 +115,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
           <div className="pc-grp">
-            <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" />
+            <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" hint={`${results.length} ${results.length === 1 ? 'result' : 'results'}`} />
             <div className="results-controls">
               <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={canvas !== 'all' || place !== 'all' || mode !== 'all' || favOnly}>
                 <div className="sv-row">
@@ -141,6 +141,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
             <ViewToggle value={view} onChange={setView} />
             <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
             <ArchivedToggle showing={showArchived} count={archivedCount} onChange={(v) => { setShowArchived(v); setSelected(new Set()); }} />
+            {chrome}
           </div>
         </div>
       </div>
@@ -148,10 +149,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
       {rail}
       <div className="pc-main">
       <div className="pc-sub">
-        <div className="gallery-count faint num">
-          {results.length} {results.length === 1 ? 'result' : 'results'}
-          {running ? <span className="running-pill num">{running} running</span> : null}
-        </div>
+        {running ? <div className="gallery-count faint num"><span className="running-pill num">{running} running</span></div> : null}
         {kind !== 'all' || filtered || favOnly ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}

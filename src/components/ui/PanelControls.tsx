@@ -8,13 +8,13 @@ import './PanelControls.css';
  * Search as an icon button at the start of a top bar. Pressing it shows the input beside it; Escape or the clear button
  * empties the query and hides it. While a query is set the icon stays active, so the filter is never invisible.
  */
-export function SearchToggle({ value, onChange, placeholder, inputLabel }: { value: string; onChange: (v: string) => void; placeholder: string; inputLabel: string }) {
+export function SearchToggle({ value, onChange, placeholder, inputLabel, hint }: { value: string; onChange: (v: string) => void; placeholder: string; inputLabel: string; /** Shown in the tooltip, e.g. the result count. */ hint?: string }) {
   const [open, setOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (open) input.current?.focus(); }, [open]);
   const close = () => { onChange(''); setOpen(false); };
   return <>
-    <IconButton icon={Search} label="Search" size="sm" active={open || value !== ''} aria-pressed={open || value !== ''} aria-expanded={open} data-tip={value ? `Search · “${value}”` : 'Search'} onClick={() => setOpen(!open)} />
+    <IconButton icon={Search} label="Search" size="sm" active={open || value !== ''} aria-pressed={open || value !== ''} aria-expanded={open} data-tip={['Search', value ? `“${value}”` : '', hint ?? ''].filter(Boolean).join(' · ')} onClick={() => setOpen(!open)} />
     {open ? (
       <div className="search-input pc-search">
         <Search size={14} />

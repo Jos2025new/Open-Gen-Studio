@@ -6,14 +6,11 @@
 .sessions .date-head .group-check.is-on { border-color: var(--text); }
 
 /* Card view: a grid of image-first cards; list view: compact rows. */
-.sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 8px; padding: 4px 12px 8px; }
-.sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; padding: 4px 12px 8px; }
+.sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .sess-cover { display: grid; place-items: center; overflow: hidden; color: var(--text-3); background: var(--surface-3); cursor: pointer; }
 .sess-cover .media { width: 100%; height: 100%; object-fit: cover; }
 .sess-card .pc-open { background: var(--surface-3); }
-.sess-card.pc-card { border-color: var(--border); }
-.sess-card.is-active, .sess-row.is-active { border-color: var(--border-strong); box-shadow: inset 0 0 0 1px var(--border-strong); }
-.sess-card.is-selected, .sess-row.is-selected { border-color: var(--accent); }
 .sess-open { position: absolute; right: 6px; bottom: 6px; z-index: 2; padding: 1px 6px; border-radius: 8px; background: var(--overlay); color: var(--text); font-size: 10px; pointer-events: none; }
 .sess-card.is-editing .pc-hover { opacity: 1; }
 .sess-card.is-editing .pc-info { pointer-events: auto; }

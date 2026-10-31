@@ -93,7 +93,9 @@ describe('Sessions top bar', () => {
   it('archived is an icon toggle at the end of the right zone, next to the eye; the Filter by menu has no Active/Archived row', () => {
     const zone = q('.pc-bar .pc-right');
     const btns = [...zone.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
-    expect(btns[btns.length - 1]).toBe('Show archived');
+    expect(btns.slice(-3)).toEqual(['Show archived', 'Collapse', 'Close']);
+    expect(host.querySelector('.sessions-toolbar')).toBeNull(); // one chrome row
+    expect(q('.pc-bar .pc-grp').querySelector('button')?.textContent).toContain('New');
     expect(btns).toContain('Show hidden');
     const arch = q<HTMLButtonElement>('[aria-label="Show archived"]');
     expect(arch.getAttribute('aria-pressed')).toBe('false');
@@ -106,6 +108,13 @@ describe('Sessions top bar', () => {
     expect(titles()).toHaveLength(1);
     click(arch);
     expect(titles()).toHaveLength(2);
+  });
+
+  it('the bar icon buttons share one size class and stroke', () => {
+    for (const b of host.querySelectorAll('.pc-bar .icon-btn')) {
+      expect(b.classList.contains('icon-btn-sm')).toBe(true);
+      expect(b.querySelector('svg')?.getAttribute('stroke-width')).toBe('1.75');
+    }
   });
 
   it('three zones: left (search, filter, sorts, archived), centered modes, right (size, view, thumbnails)', () => {

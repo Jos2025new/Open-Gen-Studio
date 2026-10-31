@@ -12,7 +12,7 @@ export interface JGridItem { id: string; ratio: number; node: ReactNode }
  * The container width comes from one ResizeObserver; rows are packed in a memo, so a slider move or a resize only
  * recomputes numbers and updates inline sizes.
  */
-export function JustifiedGrid({ items, rowHeight, gap = 7, className }: { items: JGridItem[]; rowHeight: number; gap?: number; className?: string }) {
+export function JustifiedGrid({ items, rowHeight, gap = 6, className }: { items: JGridItem[]; rowHeight: number; gap?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {

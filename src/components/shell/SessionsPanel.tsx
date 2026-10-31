@@ -133,11 +133,8 @@ export function SessionsPanel() {
   return (
     <div role="region" aria-label="Sessions" className={`sessions layout-${layout}`}>
       <div className="sessions-controls">
-        <div className="sessions-toolbar">
-          {embedded ? null : <>
-            <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-            <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
-          </>}
+        <div className="sessions-filter-bar pc-bar">
+        <div className="pc-grp">
           <Button ref={newPop.ref} size="sm" variant="secondary" icon={Plus} onClick={newPop.toggle}>
             New
           </Button>
@@ -161,10 +158,7 @@ export function SessionsPanel() {
               })}
             </div>
           </Popover>
-        </div>
-        <div className="sessions-filter-bar pc-bar">
-        <div className="pc-grp">
-          <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" />
+          <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" hint={`${list.length} session${list.length === 1 ? '' : 's'}`} />
           <div className="results-controls">
             <button ref={view.ref} type="button" className={`results-menu-trigger${pinnedOnly || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
           <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">
@@ -196,6 +190,10 @@ export function SessionsPanel() {
           <ViewToggle value={layout} onChange={setLayout} />
           <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
           <ArchivedToggle showing={shelf === 'archived'} count={archivedCount} onChange={(v) => { setShelf(v ? 'archived' : 'recent'); setSelected(new Set()); }} />
+          {embedded ? null : <>
+            <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+            <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
+          </>}
         </div>
         </div>
         {pinnedOnly ? (

@@ -29,21 +29,19 @@ export function GalleryPanel() {
   const view = asItemView(stored);
   const [cols, setCols] = useState(3);
   // Each view renders its top bar across the whole panel, then this rail beside its results.
+  const chrome = embedded ? null : <>
+    <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+    <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
+  </>;
   const rail = <CategoryRail items={RAIL} value={category} onChange={setCategory} expanded={expanded} label="Library categories" />;
   return (
     <div className="gallery" role="region" aria-label="Library">
-      {embedded ? null : (
-        <div className="library-toolbar">
-          <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
-        </div>
-      )}
-      {category === 'all' ? <GeneratedAssets rail={rail} view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets rail={rail} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
+      {category === 'all' ? <GeneratedAssets rail={rail} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets rail={rail} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
     </div>
   );
 }
 
-function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
+function LibraryAssets({ rail, chrome, kind, view, setView, cols, setCols }: { rail: ReactNode; chrome: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const library = useStore((s) => s.library);
   const assets = useStore((s) => s.assets);
   const { expanded } = usePanelExpanded();
@@ -57,7 +55,7 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
           <div className="pc-grp">
-            <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" />
+            <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" hint={`${list.length} item${list.length === 1 ? '' : 's'}`} />
             <IconButton icon={asc ? ArrowDownAZ : ArrowUpZA} label="Sort by name" size="sm" active aria-pressed data-tip={`Sort by name · ${asc ? 'A → Z' : 'Z → A'}`} onClick={() => setAsc(!asc)} />
           </div>
           <div className="pc-grp pc-right">
@@ -67,6 +65,7 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
             </> : null}
             <ViewToggle value={view} onChange={setView} />
             <HiddenToggle showing={showHidden} count={library.filter((x) => x.userHidden).length} onChange={setShowHidden} />
+            {chrome}
           </div>
         </div>
       </div>

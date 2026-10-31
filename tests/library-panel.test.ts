@@ -114,6 +114,18 @@ describe('Library top bar', () => {
     expect(host.querySelector('.jg-cell')).toBeNull();
   });
 
+  it('every icon button of the bar is the same size class and stroke, and one CSS rule sets the 18px glyph', () => {
+    const buttons = [...host.querySelectorAll('.pc-bar .icon-btn')];
+    expect(buttons.length).toBeGreaterThan(12);
+    for (const b of buttons) {
+      expect(b.classList.contains('icon-btn-sm')).toBe(true);
+      expect(b.querySelector('svg')?.getAttribute('stroke-width')).toBe('1.75');
+    }
+    const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
+    expect(css).toMatch(/\.pc-bar \.icon-btn svg, \.pc-bar \.results-menu-trigger svg \{[^}]*width: 18px; height: 18px; stroke-width: 1\.75/);
+    expect(css).toMatch(/\.pc-bar \.results-menu-trigger svg:not\(:first-child\) \{ display: none; \}/);
+  });
+
   it('filters by type with icon buttons and All restores everything', () => {
     for (const label of ['Images', 'Videos', 'Audio', '3D', 'Text']) expect(q(`[aria-label="${label}"]`).textContent).toBe('');
     click(q('[aria-label="Videos"]'));
@@ -206,7 +218,8 @@ describe('Library side panel', () => {
       expect(rail.contains(bar.querySelector('[aria-label="Sort by name"]'))).toBe(false);
     };
     check();
-    expect(q('.pc-main').querySelector('.gallery-count')?.textContent).toContain('results');
+    expect(host.querySelector('.gallery-count')).toBeNull(); // no standalone results line
+    expect(q('.pc-bar [aria-label="Search"]').getAttribute('data-tip')).toContain('3 results');
     click(q('.pc-rail [aria-label="Character"]'));
     check();
   });
@@ -345,7 +358,7 @@ describe('Library cards', () => {
     expect(arch.getAttribute('aria-pressed')).toBe('true');
     expect(names()).toContain('Zebra');
     const btns = [...q('.pc-right').querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
-    expect(btns.slice(-2)).toEqual(['Show hidden', 'Show archived']);
+    expect(btns.slice(-4)).toEqual(['Show hidden', 'Show archived', 'Collapse', 'Close']); // close/collapse end the bar
   });
 
   it('list rows keep the actions', () => {
