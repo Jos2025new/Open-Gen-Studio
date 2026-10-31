@@ -61,20 +61,19 @@ describe('Library top bar', () => {
     expect(radio('A–Z')?.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('has two zones: the source selector and Sessions pill on the left; size, types, favorites, View, Filters, Search and chrome on the right', () => {
+  it('has two zones like Generations: the title and View, Filters, Search on the left; types, Sessions, favorites and chrome on the right', () => {
     const kids = [...q('.pc-bar').children];
     expect(kids).toHaveLength(2);
     expect(kids[0].classList.contains('pc-left')).toBe(true);
     const left = [...kids[0].querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
-    expect(left).toEqual(['Library source: All', 'Sessions']);
+    expect(left).toEqual(['Library source: Library', 'View', 'Filters', 'Search']);
     expect(kids[0].querySelector('.pc-source')?.getAttribute('aria-haspopup')).toBe('menu');
     expect(kids[1].querySelector('.pc-center [aria-label="Images"]')).not.toBeNull();
     expect(kids[1].querySelector('input[aria-label="Grid size"]')).toBeNull(); // grid size lives in View, as in Generations
-    const icons = [...kids[1].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
-    expect(icons).toEqual(['Favorites only', 'View', 'Filters', 'Search']);
+    expect([...kids[1].querySelectorAll('.pc-flags button')].map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Sessions', 'Favorites only']);
     expect(bar('View').getAttribute('aria-haspopup')).toBe('dialog');
     expect(bar('View').getAttribute('aria-expanded')).toBe('false');
-    expect(kids[1].querySelector('.pc-icons')?.nextElementSibling?.classList.contains('pc-chrome')).toBe(true); // collapse and close end the bar
+    expect(kids[1].querySelector('.pc-flags')?.nextElementSibling?.classList.contains('pc-chrome')).toBe(true); // collapse and close end the bar
     expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).toMatch(/@container pc-panel \(max-width: 640px\)/);
   });
 

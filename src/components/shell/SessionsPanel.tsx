@@ -156,15 +156,8 @@ export function SessionsPanel() {
               })}
             </div>
           </Popover>
-          <SourceSelect items={SOURCES.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={(v) => { setCanvas(v); setSelected(new Set()); }} label="Session canvas" separatorAfter="all" />
-        </div>
-        <div className="pc-grp pc-right">
-          <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
-            {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
-            <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
-          </div>
+          <SourceSelect items={SOURCES.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={(v) => { setCanvas(v); setSelected(new Set()); }} label="Session canvas" separatorAfter="all" allLabel="Sessions" />
           <div className="pc-icons">
-            <IconButton icon={Pin} label="Pinned only" size="sm" active={pinnedOnly} aria-pressed={pinnedOnly} onClick={() => setPinnedOnly(!pinnedOnly)} />
             <PanelPopover icon={LayoutGrid} label="View">
               <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={layout} onChange={setLayout} /></div>
               <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
@@ -186,6 +179,13 @@ export function SessionsPanel() {
             </>}</PanelPopover>
             <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" hint={`${list.length} session${list.length === 1 ? '' : 's'}`} />
           </div>
+        </div>
+        <div className="pc-grp pc-right">
+          <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
+            {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
+            <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
+          </div>
+          <div className="pc-flags"><IconButton icon={Pin} label="Pinned only" size="sm" active={pinnedOnly} aria-pressed={pinnedOnly} onClick={() => setPinnedOnly(!pinnedOnly)} /></div>
           {embedded ? null : <div className="pc-chrome">
             <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
             <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />

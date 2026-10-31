@@ -71,13 +71,15 @@ export function PanelPopover({ icon, label, dot, width = 280, children }: { icon
 
 export interface RailItem<T extends string> { id: T; label: string; icon: LucideIcon; count?: number }
 /** The source selector at the start of a bar: a pill with the current source (icon, label, chevron) that opens a menu of all of them. */
-export function SourceSelect<T extends string>({ items, value, onChange, label, separatorAfter }: { items: RailItem<T>[]; value: T; onChange: (v: T) => void; label: string; separatorAfter?: T }) {
+/** `allLabel` names the first source on the button (the panel's own name, as Generations titles its board). */
+export function SourceSelect<T extends string>({ items, value, onChange, label, separatorAfter, allLabel }: { items: RailItem<T>[]; value: T; onChange: (v: T) => void; label: string; separatorAfter?: T; allLabel?: string }) {
   const pop = usePopover();
   const cur = items.find((i) => i.id === value) ?? items[0];
   const Icon = cur.icon;
+  const shown = allLabel && cur.id === items[0].id ? allLabel : cur.label;
   return <>
-    <button ref={pop.ref} type="button" className="canvas-tab is-on pc-source" aria-label={`${label}: ${cur.label}`} aria-haspopup="menu" aria-expanded={pop.open} onClick={pop.toggle}>
-      <Icon size={14} strokeWidth={1.75} />{cur.label}<ChevronDown size={12} />
+    <button ref={pop.ref} type="button" className="canvas-tab is-on pc-source" aria-label={`${label}: ${shown}`} aria-haspopup="menu" aria-expanded={pop.open} onClick={pop.toggle}>
+      <Icon size={14} strokeWidth={1.75} />{shown}<ChevronDown size={12} />
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={220} placement="bottom-start" align="start" label={label}>
       <div className="pc-menu" role="menu">

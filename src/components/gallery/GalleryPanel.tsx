@@ -34,7 +34,7 @@ export function GalleryPanel() {
   </div>;
   const library = useStore((st) => st.library);
   const counts = (k: SubjectKind) => library.filter((x) => (x.kind ?? 'character') === k && !x.userHidden).length;
-  const source = <SourceSelect items={SOURCES.map((x) => (x.id === 'all' ? x : { ...x, count: counts(x.id as SubjectKind) }))} value={category} onChange={setCategory} label="Library source" separatorAfter="all" />;
+  const source = <SourceSelect items={SOURCES.map((x) => (x.id === 'all' ? x : { ...x, count: counts(x.id as SubjectKind) }))} value={category} onChange={setCategory} label="Library source" separatorAfter="all" allLabel="Library" />;
   return (
     <div className="gallery" role="region" aria-label="Library">
       {category === 'all' ? <GeneratedAssets source={source} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets source={source} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
@@ -56,8 +56,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <div className="pc-grp pc-left">{source}</div>
-          <div className="pc-grp pc-right">
+          <div className="pc-grp pc-left">{source}
             <div className="pc-icons">
               <PanelPopover icon={LayoutGrid} label="View">
                 <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
@@ -70,6 +69,8 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
               </PanelPopover>
               <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" hint={`${list.length} item${list.length === 1 ? '' : 's'}`} />
             </div>
+          </div>
+          <div className="pc-grp pc-right">
             {chrome}
           </div>
         </div>

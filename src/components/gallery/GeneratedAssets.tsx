@@ -117,15 +117,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
         <div className="pc-bar">
           <div className="pc-grp pc-left">
             {source}
-            <button type="button" className={`canvas-tab${group === 'session' ? ' is-on' : ''}`} aria-pressed={group === 'session'} onClick={() => setGroup(group === 'session' ? 'date' : 'session')}><Folder size={14} strokeWidth={1.75} />Sessions</button>
-          </div>
-          <div className="pc-grp pc-right">
-            <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
-              {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
-              <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
-            </div>
             <div className="pc-icons">
-              <IconButton icon={Star} label="Favorites only" size="sm" active={favOnly} aria-pressed={favOnly} onClick={() => setFavOnly(!favOnly)} />
               <PanelPopover icon={LayoutGrid} label="View">
                 <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
                 <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
@@ -143,6 +135,13 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
               </PanelPopover>
               <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" hint={`${results.length} ${results.length === 1 ? 'result' : 'results'}`} />
             </div>
+          </div>
+          <div className="pc-grp pc-right">
+            <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
+              {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
+              <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
+            </div>
+            <div className="pc-flags"><button type="button" className={`canvas-tab${group === 'session' ? ' is-on' : ''}`} aria-pressed={group === 'session'} onClick={() => setGroup(group === 'session' ? 'date' : 'session')}><Folder size={14} strokeWidth={1.75} />Sessions</button><IconButton icon={Star} label="Favorites only" size="sm" active={favOnly} aria-pressed={favOnly} onClick={() => setFavOnly(!favOnly)} /></div>
             {chrome}
           </div>
         </div>

@@ -24,7 +24,7 @@
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
 .pc-card { --pc-btn-bg: rgba(255, 255, 255, .16); --pc-btn-bg-hover: rgba(255, 255, 255, .28); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
 .pc-card.is-selected { box-shadow: 0 0 0 2px var(--accent); }
-.pc-card.is-active { box-shadow: 0 0 0 2px var(--border-strong); }
+.pc-card.is-active { box-shadow: 0 0 0 1px var(--border-strong); }
 .pc-card.is-hidden-item .pc-open, .pc-card.is-hidden-item .g-open { opacity: .45; }
 .pc-card .g-open, .pc-card .pc-open { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pc-card .g-open .media, .pc-card .pc-open .media { width: 100%; height: 100%; object-fit: cover; }
@@ -104,7 +104,10 @@
 .pc-bar .results-controls { display: contents; }
 .pc-bar .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; }
 .pc-search { flex: 0 1 220px; }
-.pc-icons, .pc-chrome { gap: var(--sp-1); }
+.pc-icons, .pc-chrome, .pc-flags { display: flex; align-items: center; gap: var(--sp-1); }
+/* As in Generations: the tools sit beside the title; the right holds the quick toggles, then the panel chrome after a hairline. */
+.pc-bar > .pc-left { gap: var(--sp-1) var(--sp-2); }
+.pc-bar .pc-chrome { margin-left: var(--sp-1); padding-left: var(--sp-2); border-left: 1px solid var(--border); }
 .pc-bar .pc-source { height: 28px; gap: 6px; padding: 0 8px 0 6px; border: 0; border-radius: var(--radius-s); background: none; color: var(--text); font-size: var(--fs-l); font-weight: 600; }
 .pc-bar .pc-source:hover, .pc-bar .pc-source[aria-expanded="true"] { background: var(--surface-2); }
 .pc-bar .pc-source svg { color: var(--text-2); }
@@ -123,7 +126,8 @@
   .pc-bar .pc-chrome { order: 2; margin-left: auto; }
   .pc-bar::before { content: ''; order: 3; flex-basis: 100%; height: 0; }
   .pc-bar .pc-center { order: 4; margin-right: auto; }
-  .pc-bar .pc-icons { order: 5; margin-left: auto; }
+  .pc-bar .pc-flags { order: 5; margin-left: auto; }
+  .pc-bar .pc-chrome { border-left: 0; padding-left: 0; }
   .pc-bar .pc-search { flex: 1 1 100%; max-width: none; }
 }
 

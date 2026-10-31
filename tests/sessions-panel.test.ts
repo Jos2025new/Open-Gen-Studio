@@ -86,7 +86,7 @@ describe('Sessions top bar', () => {
   it('the canvas selector at the start of the bar lists All, Studio, Nodes, Designer with counts; there is no side rail', () => {
     expect(host.querySelector('.pc-rail')).toBeNull();
     expect(q('.pc-split').contains(q('.pc-bar'))).toBe(false);
-    expect(q('.pc-source').textContent).toBe('All');
+    expect(q('.pc-source').textContent).toBe('Sessions'); // the first source reads as the panel's name
     click(q('.pc-source'));
     expect([...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent?.replace(/\d+$/, ''))).toEqual(['All', 'Studio', 'Nodes', 'Designer']);
     click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith('Nodes')));
@@ -149,15 +149,16 @@ describe('Sessions top bar', () => {
     }
   });
 
-  it('two zones: New and the canvas selector on the left; size, modes, pin, View, Filters, Search and chrome on the right', () => {
+  it('two zones like Generations: New, the title and View, Filters, Search on the left; modes, pin and chrome on the right', () => {
     const zones = [...q('.pc-bar').children];
     expect(zones).toHaveLength(2);
     expect(zones[0].querySelector('button')?.textContent).toContain('New');
     expect(zones[0].querySelector('.pc-source')).not.toBeNull();
     expect(zones[1].querySelector('.pc-center [aria-label="Videos"]')).not.toBeNull();
     expect(zones[1].querySelector('input[aria-label="Grid size"]')).toBeNull(); // in View
-    const icons = [...zones[1].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
-    expect(icons).toEqual(['Pinned only', 'View', 'Filters', 'Search']);
+    const tools = [...zones[0].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
+    expect(tools).toEqual(['View', 'Filters', 'Search']);
+    expect([...zones[1].querySelectorAll('.pc-flags button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pinned only']);
     expect([...zones[1].querySelectorAll(':scope > .pc-chrome button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Collapse', 'Close']);
     expect(host.querySelector('.sessions-toolbar')).toBeNull(); // one chrome row
   });
