@@ -1,17 +1,19 @@
 /* Shared by Library and Sessions: the one-row top bar, the category rail and the image-first cards. */
 .pc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.pc-bar > .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; height: 32px; box-sizing: border-box; border-color: var(--border); }
-.pc-bar .results-menu-trigger { height: 32px; min-height: 32px; color: var(--text-2); }
-.pc-bar .results-menu-trigger svg, .pc-bar .icon-btn svg { stroke-width: 1.75; }
+.pc-bar { --pc-h: 36px; }
+.pc-bar > .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; height: var(--pc-h); box-sizing: border-box; border-color: var(--border); }
+.pc-bar .results-menu-trigger { height: var(--pc-h); min-height: var(--pc-h); min-width: var(--pc-h); color: var(--text-2); }
+.pc-bar .results-menu-trigger svg:first-child, .pc-bar .icon-btn svg { width: 18px; height: 18px; stroke-width: 1.75; }
 .pc-bar > .results-controls { display: contents; }
-.pc-bar .icon-btn { width: 28px; height: 28px; color: var(--text-2); }
+.pc-bar .icon-btn { width: var(--pc-h); height: var(--pc-h); color: var(--text-2); }
 .pc-bar .icon-btn.is-active { background: var(--surface-3); color: var(--text); box-shadow: none; }
 .pc-sep { flex: none; width: 1px; height: 20px; background: var(--border); }
 .pc-group { display: flex; align-items: center; gap: 2px; }
-.pc-group .canvas-tab { height: 26px; border-color: transparent; padding: 0 7px; font-size: 11px; }
+.pc-search { max-width: 260px; }
+.pc-group .canvas-tab { height: var(--pc-h); border-color: transparent; padding: 0 10px; font-size: 12px; }
 .pc-group .canvas-tab.is-on { border-color: transparent; }
-.pc-size { display: flex; align-items: center; width: 120px; height: 32px; flex: 0 0 120px; }
-.pc-size .opt.opt-slider { width: 100%; height: 32px; box-sizing: border-box; }
+.pc-size { display: flex; align-items: center; width: 160px; flex: 0 0 160px; }
+.pc-size .opt.opt-slider { width: 100%; box-sizing: border-box; padding: 0 10px; gap: 6px; flex: 1 1 auto; }
 
 .pc-split { display: flex; flex: 1; min-height: 0; }
 .pc-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }

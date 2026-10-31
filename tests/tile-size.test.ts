@@ -76,6 +76,14 @@ describe('saved tile size', () => {
   });
 });
 
+describe('Library grid size drives the columns', () => {
+  it('card layout uses --cols and the bar controls match the slider height', () => {
+    expect(readFileSync('src/components/gallery/GalleryLayout.css', 'utf8')).toMatch(/\.library-layout-card \{ grid-template-columns: repeat\(var\(--cols, 3\)/);
+    expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).toMatch(/\.pc-bar \.icon-btn \{ width: var\(--pc-h\); height: var\(--pc-h\)/);
+    expect(readFileSync('src/styles/designer-connected.css', 'utf8')).toMatch(/height: 36px; min-width: 0; padding: 0 12px/); // the slider stays at its standard 36px
+  });
+});
+
 describe('Library uses the same slider', () => {
   it('shows the grid size slider in the bar and hides it in list view', () => {
     const sessionId = useStore.getState().activeSessionId;
