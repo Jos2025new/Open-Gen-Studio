@@ -39,7 +39,7 @@
 /* Grid cards keep the justified rows and give the image room: on hover, focus or first tap a short fade holds a one-line
    title, the model and parameters on one line and a compact action row; narrow cards keep only the icon buttons. */
 .jg-cell > .pc-fade { container-type: inline-size; }
-.jg-cell > .pc-fade .pc-info { gap: 3px; padding: 40px 10px 10px; background: linear-gradient(transparent, rgba(10, 10, 12, .55) 40%, rgba(10, 10, 12, .85)); }
+.jg-cell > .pc-fade .pc-info { gap: 3px; padding: 40px 10px 10px; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 55%, transparent) 40%, color-mix(in srgb, var(--pc-ink) 85%, transparent)); }
 .jg-cell > .pc-fade .pc-info .pc-info-title { display: block; font-size: 13px; -webkit-line-clamp: unset; white-space: nowrap; }
 .jg-cell > .pc-fade .pc-info-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jg-cell > .pc-fade .pc-card-actions { gap: 4px; margin-top: 5px; }
@@ -59,4 +59,4 @@
 .pc-card-actions .btn .btn-label { overflow: hidden; text-overflow: ellipsis; }
 /* A text result's tile has no image: its glyph stands in for the cover. */
 .pc-tile .pc-glyph-cover { display: grid; place-items: center; color: var(--text-3); background: var(--surface-3); }
-.pc-tile .pc-excerpt { display: -webkit-box; overflow: hidden; color: rgba(255, 255, 255, .7); font-size: 12px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.pc-tile .pc-excerpt { display: -webkit-box; overflow: hidden; color: color-mix(in srgb, var(--pc-on-ink) 70%, transparent); font-size: 12px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
