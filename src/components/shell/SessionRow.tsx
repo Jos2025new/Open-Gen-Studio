@@ -144,6 +144,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
         <span className="pc-col pc-col-spend num">{stats?.spend ? formatUsd(stats.spend) : '—'}</span>
         {when}
         <span className="pc-tools">
+          {active ? null : <Button size="sm" variant="secondary" className="sess-continue" onClick={(e) => { e.stopPropagation(); open(); }}>Continue</Button>}
           {shelfButtons}{pin}{menu}
         </span>
       </div>

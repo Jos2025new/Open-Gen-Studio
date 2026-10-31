@@ -72,8 +72,8 @@ it('a column width is resized from the keyboard, stored, and restored with a dou
 });
 
 it('rows show Hide and Archive beside the pin; the row menu keeps only what is not on the row', () => {
-  const tools = () => [...row('Alpha').querySelectorAll('.pc-tools > button')].map((b) => b.getAttribute('aria-label'));
-  expect(tools()).toEqual(['Hide', 'Archive session', 'Pin', 'Session actions']);
+  const tools = () => [...row('Alpha').querySelectorAll('.pc-tools > button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
+  expect(tools()).toEqual(['Continue', 'Hide', 'Archive session', 'Pin', 'Session actions']);
   click(row('Alpha').querySelector('[aria-label="Session actions"]'));
   expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Rename', 'Delete']);
   act(() => document.body.click());
@@ -111,4 +111,12 @@ it('Cards is a third view between Grid and List: horizontal cards with the cover
 it('the open session shows an Open tag beside its title in the list', () => {
   expect(row('Bravo').querySelector('.pc-title-line .pc-open-tag')?.textContent).toBe('Open');
   expect(row('Alpha').querySelector('.pc-open-tag')).toBeNull();
+});
+
+it('list rows offer Continue before their actions, except the open session, which keeps its Open tag', () => {
+  expect(row('Bravo').querySelector('.sess-continue')).toBeNull();
+  const go = row('Alpha').querySelector<HTMLButtonElement>('.pc-tools > .sess-continue')!;
+  expect(go.textContent).toBe('Continue');
+  click(go);
+  expect(useStore.getState().activeSessionId).toBe(ids.Alpha);
 });

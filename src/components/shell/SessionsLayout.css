@@ -61,7 +61,17 @@
 .sess-row .pc-text { cursor: pointer; }
 .sess-row .sess-cover { border-radius: 7px; }
 /* List columns: mode, counts and spend beside the name, sortable and resizable from the header. */
-.sessions { --pc-w-mode: 72px; --pc-w-gens: 84px; --pc-w-nodes: 56px; --pc-w-designs: 64px; --pc-w-spend: 64px; --pc-w-date: 64px; --pc-w-tools: 120px; }
+.sessions { --pc-w-mode: 72px; --pc-w-gens: 84px; --pc-w-nodes: 56px; --pc-w-designs: 64px; --pc-w-spend: 64px; --pc-w-date: 64px; --pc-w-tools: 210px; }
+/* The list borrows the cards' hierarchy without their fade: a larger cover, a bolder title, figures that read as
+   figures, and Continue beside the row's actions (shown on hover or focus; the open session keeps its Open tag). */
+.sess-row.pc-row { padding-top: 7px; padding-bottom: 7px; }
+.sess-row .pc-thumb { width: 44px; height: 44px; border-radius: 8px; }
+.sessions .pc-list-head .pc-col-name { padding-left: 86px; }
+.sess-row .pc-info-title { font-weight: 600; }
+.sess-row .pc-col.num { color: var(--text); font-size: 13px; font-weight: 600; }
+.sess-row .sess-continue { height: 26px; margin-right: 4px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-3); font-size: 12px; opacity: 0; transition: opacity .12s; }
+.sess-row:is(:hover, :focus-within) .sess-continue { opacity: 1; }
+.sess-row .sess-continue:hover { background: var(--surface-hover); }
 .pc-col-mode { width: var(--pc-w-mode); }
 .pc-col-gens { width: var(--pc-w-gens); }
 .pc-col-nodes { width: var(--pc-w-nodes); }
