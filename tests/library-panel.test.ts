@@ -72,6 +72,15 @@ describe('Library top bar', () => {
     expect(kids[2].querySelector('[aria-label="List view"]')).not.toBeNull();
   });
 
+  it('the bar spans the full width of the controls even when the panel is expanded', () => {
+    const css = readFileSync('src/components/gallery/GalleryLayout.css', 'utf8');
+    expect(css).toMatch(/\.side-panel\.is-expanded \.generated-controls \{ flex-direction: column;[^}]*align-items: stretch/);
+    expect(css).toMatch(/\.generated-controls > \.pc-bar \{ width: 100%/);
+    expect(q('.generated-controls').firstElementChild?.classList.contains('pc-bar')).toBe(true);
+    click(q('.pc-rail [aria-label="Character"]'));
+    expect(q('.generated-controls').firstElementChild?.classList.contains('pc-bar')).toBe(true);
+  });
+
   it('the scope is a visible control after the date sort (default this session) and no longer in Filter by', () => {
     const seg = q('.pc-bar .pc-grp').querySelector('[role="radiogroup"], .seg')!;
     expect(seg).not.toBeNull();

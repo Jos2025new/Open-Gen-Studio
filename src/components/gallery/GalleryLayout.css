@@ -1,5 +1,6 @@
 .library-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 12px 0; }
-.generated-controls { flex-direction: column; gap: 8px; }
+.generated-controls, .side-panel.is-expanded .generated-controls { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
+.generated-controls > .pc-bar { width: 100%; box-sizing: border-box; }
 .generated-controls + .pc-split .pc-rail { border-top: 0; }
 .pc-sub { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 0; }
 .pc-sub:empty { display: none; }

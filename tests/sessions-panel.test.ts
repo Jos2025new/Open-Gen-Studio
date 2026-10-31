@@ -89,10 +89,11 @@ describe('Sessions top bar', () => {
     expect(labels).toEqual(['Date means', 'Pinned only']);
   });
 
-  it('archived is an icon toggle after the sort icons; the Filter by menu has no Active/Archived row', () => {
-    const grp = q('.pc-bar').firstElementChild!;
-    const btns = [...grp.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
-    expect(btns.indexOf('Show archived')).toBe(btns.indexOf('Sort by date') + 1);
+  it('archived is an icon toggle at the end of the right zone, next to the eye; the Filter by menu has no Active/Archived row', () => {
+    const zone = q('.pc-bar .pc-right');
+    const btns = [...zone.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
+    expect(btns[btns.length - 1]).toBe('Show archived');
+    expect(btns).toContain('Hide thumbnails');
     const arch = q<HTMLButtonElement>('[aria-label="Show archived"]');
     expect(arch.getAttribute('aria-pressed')).toBe('false');
     expect(arch.getAttribute('data-tip')).toContain('0');

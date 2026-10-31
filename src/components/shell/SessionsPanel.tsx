@@ -180,7 +180,6 @@ export function SessionsPanel() {
           </Popover>
           </div>
           <SortToggles sort={sort} onChange={setSort} dateTip={basis === 'created' ? 'Oldest created first' : 'Oldest activity first'} dateTipDesc={basis === 'created' ? 'Newest created first' : 'Latest activity first'} />
-          <IconButton icon={Archive} label="Show archived" size="sm" active={shelf === 'archived'} aria-pressed={shelf === 'archived'} data-tip={`Show archived · ${archivedCount}`} onClick={() => { setShelf(shelf === 'archived' ? 'recent' : 'archived'); setSelected(new Set()); }} />
         </div>
         <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
           {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
@@ -193,6 +192,7 @@ export function SessionsPanel() {
           </> : null}
           <ViewToggle value={layout} onChange={setLayout} />
           <IconButton icon={compact ? EyeOff : Eye} label={compact ? 'Show thumbnails' : 'Hide thumbnails'} size="sm" aria-pressed={!compact} onClick={() => setCompact(!compact)} />
+          <IconButton icon={Archive} label="Show archived" size="sm" active={shelf === 'archived'} aria-pressed={shelf === 'archived'} data-tip={`Show archived · ${archivedCount}`} onClick={() => { setShelf(shelf === 'archived' ? 'recent' : 'archived'); setSelected(new Set()); }} />
         </div>
         </div>
         {pinnedOnly ? (
