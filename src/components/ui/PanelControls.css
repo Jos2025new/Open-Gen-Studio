@@ -1,6 +1,6 @@
 /* Shared by Library and Sessions: the one-row top bar, the category rail and the image-first cards. */
 .pc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.pc-grp { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.pc-grp { display: flex; flex: 1 1 0; min-width: max-content; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
 .pc-grp.pc-center { flex: 0 0 auto; justify-content: center; }
 .pc-grp.pc-right { justify-content: flex-end; }
 .pc-bar { --pc-h: 36px; }
