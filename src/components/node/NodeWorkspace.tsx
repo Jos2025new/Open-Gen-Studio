@@ -11,7 +11,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
+import { Copy, Film, Image as ImageIcon, Play, Plus, Trash, Type } from 'lucide-react';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, resultHandle, runsGeneration, NO_RESULT, GONE_HANDLE } from '../../engine/flow/graph';
@@ -37,14 +37,13 @@ import { useBoardFocus } from '../studio/useBoardFocus';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
+/** Add node: the first tool of the canvas toolbox; its list opens to the right. */
 function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
   const pop = usePopover();
   return (
     <>
-      <Button ref={pop.ref} size="sm" icon={Plus} variant="secondary" onClick={pop.toggle}>
-        Add node
-      </Button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={260} label="Add node">
+      <IconButton ref={pop.ref} icon={Plus} label="Add node" aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={pop.toggle} />
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={260} label="Add node">
         <AddNodeItems
           onPick={(data) => {
             onAdd(data);
@@ -424,12 +423,6 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         void importImages(files, importPosition.current);
       }} />
       {embedded ? null : <TopbarActions>
-        <AddNodeMenu onAdd={addAtCenter} />
-        <IconButton icon={LayoutGrid} label="Auto layout" size="sm" disabled={!graph.nodes.length} onClick={() => {
-          layoutAll(sessionId);
-          window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
-        }} />
-        <IconButton icon={Maximize} label="Fit view" size="sm" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <RunAll sessionId={sessionId} ids={runIds} />
       </TopbarActions>}
       <ReactFlow<FlowNode, Edge>
@@ -471,6 +464,11 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
+          add={<AddNodeMenu onAdd={addAtCenter} />}
+          onAutoLayout={() => {
+            layoutAll(sessionId);
+            window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
+          }}
           onSelect={(id) => setSelected(new Set([id]))}
           tool={tool}
           onTool={pickTool}

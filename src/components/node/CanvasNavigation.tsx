@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
-import { Hand, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
+import { Hand, LayoutGrid, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
 import { setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem, lockedNodes } from '../../engine/flow/locks';
 import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } from '../../engine/flow/history';
@@ -21,8 +21,10 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
-/** `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
-export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; onSelect: (id: string) => void; tool: 'select' | 'pan'; onTool: (t: 'select' | 'pan') => void; selectedCount: number; onDelete: () => void }) {
+/** The canvas toolbox (2026-10-31): one vertical bar on the left, in the Designer's toolbar style, with every canvas
+ *  tool: Add node (`add`), Select and Pan, Delete, Auto layout, Fit view and Map, Undo and Redo, zoom, Search. Its
+ *  popovers open to the right. `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
+export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: 'select' | 'pan'; onTool: (t: 'select' | 'pan') => void; selectedCount: number; onDelete: () => void }) {
   const graph = useStore(s => s.sessions[sessionId].graph);
   const generations = useStore(s => s.generations);
   const assets = useStore(s => s.assets);
@@ -75,27 +77,30 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
   return (
     <>
       {mapOpen ? <MiniMap pannable zoomable position="top-left" className="canvas-map" maskColor="var(--overlay)" nodeColor="var(--text-4)" /> : null}
-      <Panel position="top-left" className="canvas-navigation">
+      <Panel position="top-left" className="canvas-navigation" role="toolbar" aria-label="Canvas tools" aria-orientation="vertical">
+        {add ? <>{add}<span className="canvas-nav-sep" /></> : null}
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
         <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />
         <span className="canvas-nav-sep" />
+        {onAutoLayout ? <IconButton icon={LayoutGrid} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
+        <IconButton icon={Maximize} label="Fit view" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
         <span className="canvas-nav-sep" />
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />
         <IconButton ref={redoPop.ref} icon={Redo2} label="Redo · right-click for history" disabled={blocked || !future.length} onClick={() => travel('redo')} onContextMenu={e => showHistory(e, 'redo')} />
         <span className="canvas-nav-sep" />
-        <IconButton icon={Minus} label="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })} />
-        <button ref={zoomPop.ref} type="button" className="canvas-zoom num" aria-label="Zoom" aria-expanded={zoomPop.open} onClick={zoomPop.toggle}>{Math.round(zoom * 100)}%</button>
         <IconButton icon={Plus} label="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })} />
+        <button ref={zoomPop.ref} type="button" className="canvas-zoom num" aria-label="Zoom" aria-expanded={zoomPop.open} onClick={zoomPop.toggle}>{Math.round(zoom * 100)}%</button>
+        <IconButton icon={Minus} label="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })} />
         <span className="canvas-nav-sep" />
         <IconButton ref={searchPop.ref} icon={Search} label="Search canvas" active={searchPop.open} onClick={searchPop.toggle} />
       </Panel>
-      <Popover open={history.open} anchor={direction === 'undo' ? undoPop.ref : redoPop.ref} onClose={history.close} width={300} label={`${direction} history`} className="canvas-nav-pop">
+      <Popover open={history.open} anchor={direction === 'undo' ? undoPop.ref : redoPop.ref} onClose={history.close} placement="right-start" width={300} label={`${direction} history`} className="canvas-nav-pop">
         <PopoverHeader title={direction === 'undo' ? 'Undo history' : 'Redo history'} />
         <div className="canvas-history-list">{(direction === 'undo' ? past : future).map((entry, i) => <MenuItem key={i} label={entry.label} detail={`${direction === 'undo' ? 'Undo' : 'Redo'} ${i + 1} action${i ? 's' : ''}`} disabled={blocked} onClick={() => travel(direction, i + 1)} />)}</div>
       </Popover>
-      <Popover open={zoomPop.open} anchor={zoomPop.ref} onClose={zoomPop.close} width={200} label="Zoom canvas" className="canvas-nav-pop">
+      <Popover open={zoomPop.open} anchor={zoomPop.ref} onClose={zoomPop.close} placement="right-start" width={200} label="Zoom canvas" className="canvas-nav-pop">
         <div className="canvas-zoom-controls">
           <IconButton icon={Minus} label="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })} />
           <span className="num">{Math.round(zoom * 100)}%</span>
@@ -103,7 +108,7 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
           <IconButton icon={Maximize} label="Fit view" onClick={() => void rf.fitView({ padding: 0.2, duration: 150 })} />
         </div>
       </Popover>
-      <Popover open={searchPop.open} anchor={searchPop.ref} onClose={searchPop.close} width={340} label="Search canvas" className="canvas-nav-pop">
+      <Popover open={searchPop.open} anchor={searchPop.ref} onClose={searchPop.close} placement="right-start" width={340} label="Search canvas" className="canvas-nav-pop">
         <PopoverHeader title="Search canvas" right={<IconButton icon={X} label="Close search" size="sm" onClick={searchPop.close} />} />
         <form className="search-input" onSubmit={e => { e.preventDefault(); setSubmitted(query.trim()); }}>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search prompts and names" aria-label="Search canvas text" />

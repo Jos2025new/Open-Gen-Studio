@@ -8,7 +8,7 @@ related: [lienzo, puertos-enlaces, nodos-generacion, nodos-herramienta]
 ---
 # Biblioteca de nodos y alta de nodos
 
-`AddNodeItems` (`AddNodeItems.tsx:13`) es la única lista de tipos de nodo. Se monta en tres sitios: el menú «Add node» de la barra superior (`NodeWorkspace.tsx:48`), el menú contextual del lienzo (`NodeWorkspace.tsx:505`) y el puerto «+» de cada nodo (`ConnectedNodeMenu.tsx:32`). Con `accepts` (puerto «+» o enlace soltado en el vacío) solo salen los nodos que aceptan ese tipo como entrada. Los consejos de cada fila (`tip`) salen tras 2,5 s con el puntero encima (`AddNodeItems.tsx:10`) y no existen en táctil: solo pasar el puntero.
+`AddNodeItems` (`AddNodeItems.tsx:13`) es la única lista de tipos de nodo. Se monta en tres sitios: el menú «Add node» de la toolbox del lienzo (`NodeWorkspace.tsx:48`; en la barra superior hasta 2026-10-31), el menú contextual del lienzo (`NodeWorkspace.tsx:505`) y el puerto «+» de cada nodo (`ConnectedNodeMenu.tsx:32`). Con `accepts` (puerto «+» o enlace soltado en el vacío) solo salen los nodos que aceptan ese tipo como entrada. Los consejos de cada fila (`tip`) salen tras 2,5 s con el puntero encima (`AddNodeItems.tsx:10`) y no existen en táctil: solo pasar el puntero.
 
 ## Entradas de la lista
 
@@ -29,7 +29,7 @@ related: [lienzo, puertos-enlaces, nodos-generacion, nodos-herramienta]
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add node (botón de la barra superior) | `NodeWorkspace.tsx:40` | Lienzo completo | Centro visible del lienzo | `addAtCenter` y deja el nodo seleccionado | Grafo | Ver [lienzo](lienzo.md) |
+| Add node (primer botón de la toolbox; antes barra superior) | `NodeWorkspace.tsx:45` | Lienzo completo | Centro visible del lienzo | `addAtCenter` y deja el nodo seleccionado | Grafo | Ver [lienzo](lienzo.md) |
 | Duplicate (menú contextual, barra del nodo) | `flow/actions.ts:134` | Nodo seleccionado | Nodo y sus enlaces | Copia con título «(copy N)», sin generación ni sketch y con `outputIndex` 0 (`flow/actions.ts:139`) | Grafo | Los enlaces de entrada conservan puerto y `outputIndex` (91ea576; antes se copiaban sin `sourceHandle` y la copia recibía el resultado elegido en el origen, [rastreo 3.5](../rastreo/nodes.md#3-regresiones-y-contradicciones-con-promesas)). Visto en sandbox con gasto real y por prueba automatizada |
 | Pegar nodos | `arrange.ts:151` | Hay nodos copiados en la app | Portapapeles interno (variable de módulo, no persiste) | Nodos nuevos con enlaces entre sí y desde nodos aún presentes | Grafo | Un nodo de generación pega sin resultado |
 | Ref (miniatura «+») en un nodo de imagen, vídeo o 3D | `nodes.tsx:426` | Panel del nodo, si el nodo tiene entradas de imagen libres | `recent` (las 12 imágenes más recientes) | Añade un nodo Asset «Reference» a la izquierda y lo conecta (`nodes.tsx:398`) | Grafo | Detalle en [nodos-generacion](nodos-generacion.md) |
