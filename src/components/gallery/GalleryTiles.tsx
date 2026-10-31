@@ -22,7 +22,8 @@ export function tileDetails(asset: Asset | undefined, g: Generation | undefined)
 }
 export const assetTitle = (asset: Asset, g?: Generation) => g?.prompt || asset.name || asset.kind;
 
-function AssetMenuItems({ asset, g, close }: { asset: Asset; g?: Generation; close: () => void }) {
+/** In the list, Download, Hide and the agent context already sit on the row, so the menu keeps only what is not visible. */
+function AssetMenuItems({ asset, g, close, inRow }: { asset: Asset; g?: Generation; close: () => void; inRow: boolean }) {
   const inContext = useStore((s) => s.composer.attachments.includes(asset.id));
   useStore((s) => s.assets);
   useStore((s) => s.catalog.models);
@@ -30,11 +31,11 @@ function AssetMenuItems({ asset, g, close }: { asset: Asset; g?: Generation; clo
   if (confirming) return <MenuConfirm text="Delete this asset? The file is removed from this browser." action="Delete" onCancel={() => setConfirming(false)} onConfirm={() => { deleteAssets([asset.id]); close(); }} />;
   const run = (f: () => void) => () => { f(); close(); };
   return <>
-    <MenuItem icon={Download} onClick={run(() => void downloadAsset(asset.id))}>Download</MenuItem>
+    {inRow ? null : <MenuItem icon={Download} onClick={run(() => void downloadAsset(asset.id))}>Download</MenuItem>}
     <MenuItem icon={Paperclip} onClick={run(() => useAsReference(asset.id))}>Use as reference</MenuItem>
-    {AGENT_ATTACHABLE.includes(asset.kind) ? <MenuItem icon={Bot} onClick={run(() => toggleAgentAttachment(asset.id))}>{inContext ? 'Remove from the agent context' : 'Add to the agent context'}</MenuItem> : null}
+    {!inRow && AGENT_ATTACHABLE.includes(asset.kind) ? <MenuItem icon={Bot} onClick={run(() => toggleAgentAttachment(asset.id))}>{inContext ? 'Remove from the agent context' : 'Add to the agent context'}</MenuItem> : null}
     {g && canReuse(g) ? <MenuItem icon={RotateCcw} onClick={run(() => void reuseGeneration(g))}>Reusar</MenuItem> : null}
-    <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
+    {inRow ? null : <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>}
     <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>Delete</MenuItem>
   </>;
 }
@@ -48,18 +49,22 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
   const title = assetTitle(asset, g);
   const details = tileDetails(asset, g);
   const tools = <span className="pc-tools">
+    {view === 'list' ? <>
+      <IconButton icon={Download} label="Download" size="sm" className="pc-hover" onClick={(e) => { e.stopPropagation(); void downloadAsset(asset.id); }} />
+      <IconButton icon={asset.userHidden ? Eye : EyeOff} label={asset.userHidden ? 'Unhide' : 'Hide'} size="sm" className="pc-hover" onClick={(e) => { e.stopPropagation(); setUserHidden('asset', [asset.id], !asset.userHidden); }} />
+      <AgentAttachToggle assetId={asset.id} glyph={Paperclip} />
+    </> : null}
     <IconButton icon={Star} label={asset.favorite ? 'Remove from favorites' : 'Add to favorites'} size="sm" aria-pressed={Boolean(asset.favorite)} className={`pc-fav pc-hover${asset.favorite ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id); }} />
-    <CardMenu label="More actions" className="pc-hover">{(close) => <AssetMenuItems asset={asset} g={g} close={close} />}</CardMenu>
+    <CardMenu label="More actions" className="pc-hover">{(close) => <AssetMenuItems asset={asset} g={g} close={close} inRow={view === 'list'} />}</CardMenu>
   </span>;
   const hiddenMark = asset.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
   const remote = !asset.stored ? <span className="g-remote" data-tip="Stored at the provider only; it may expire"><Clock size={11} /></span> : null;
   const when = <time className="pc-when" dateTime={new Date(asset.createdAt).toISOString()}>{formatRelative(asset.createdAt)}</time>;
   if (view === 'list') {
-    return <div className={`g-tile pc-row${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}`}>
+    return <div className={`g-tile pc-row${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}`}>
       <CardCheck checked={selected} label={`Select ${title}`} onToggle={onToggle} />
       <button type="button" className="g-open pc-thumb" onClick={onOpen} aria-label="Open"><AssetMedia assetId={asset.id} hoverPlay={false} /></button>
       <span className="pc-text"><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub">{details}</span></span>
-      <AgentAttachToggle assetId={asset.id} glyph={Paperclip} />
       {remote}{hiddenMark}{when}{tools}
     </div>;
   }

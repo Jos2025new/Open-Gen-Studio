@@ -95,7 +95,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
 
   if (view === 'list') {
     return (
-      <div className={`sess-row pc-row${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}>
+      <div className={`sess-row pc-row${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}`}>
         <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
         <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
         <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onDoubleClick={rename} onKeyDown={keys}>

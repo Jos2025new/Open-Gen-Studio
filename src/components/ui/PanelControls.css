@@ -83,6 +83,14 @@
 .pc-row .pc-tools .icon-btn { background: none; color: var(--text-3); backdrop-filter: none; }
 .pc-row .pc-tools .icon-btn:hover { color: var(--text); }
 .pc-row .pc-hover { opacity: 1; }
+/* List: light rows like a file list — no filled blocks; the checkbox shows on hover, focus or while selecting. */
+.pc-row { padding: 5px 8px; background: none; }
+.pc-row:hover, .pc-row:focus-within { background: var(--surface-2); }
+.pc-row.is-selected { background: var(--surface-2); }
+.pc-row .pc-check { color: var(--text-3); opacity: 0; }
+.pc-row:hover .pc-check, .pc-row:focus-within .pc-check, .pc-row.is-selecting .pc-check, .pc-row.is-selected .pc-check { opacity: 1; }
+.pc-row .pc-info-title { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.pc-row .pc-info-sub { color: var(--text-3); }
 .sess-card .pc-hidden-badge { right: 52px; }
 .pc-group-check { display: grid; flex: none; place-items: center; width: 16px; height: 16px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--accent-ink); }
 .pc-group-check.is-on { border-color: transparent; background: var(--accent); }
