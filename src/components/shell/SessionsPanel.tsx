@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, Maximize2, MessageSquare, Minimize2, Pencil, PenTool, Pin, PinOff, Plus, Search, SlidersHorizontal, Trash, Workflow, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Box, Check, Image, LayoutGrid, LayoutList, List, Maximize2, MessageSquare, Minimize2, Music, Pencil, PenTool, Pin, PinOff, Plus, Search, ListFilter, ArrowUpDown, ChevronDown, Eye, EyeOff, Trash, Video, Workflow, X } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { isRunning } from '../../engine/jobs';
@@ -10,8 +10,16 @@ import { AssetMedia } from '../ui/AssetMedia';
 import type { Session, Workspace } from '../../engine/types';
 import { usePanelExpanded } from './panelEmbed';
 import { visibleSessions } from '../../store/spaceSession';
+import { ResultsMenu } from '../ui/ResultsMenu';
+import { setSessionsArchived } from '../../store/sessionArchive';
+import { usePref } from '../ui/hooks';
+import './SessionsLayout.css';
 
 type CanvasFilter = 'all' | Workspace;
+type QuickMode = 'all' | 'agent' | 'image' | 'video' | 'audio' | 'model3d';
+type SessionView = 'cards' | 'list' | 'grid';
+const SESSION_VIEWS = [{ id: 'cards', label: 'Cards', hint: 'Title, mode and actions', icon: LayoutList }, { id: 'list', label: 'List', hint: 'One compact row each', icon: List }, { id: 'grid', label: 'Grid', hint: 'Large previews', icon: LayoutGrid }] as const;
+const QUICK_MODES = [{ id: 'agent', label: 'Agent', icon: Workflow }, { id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Video }, { id: 'audio', label: 'Audio', icon: Music }, { id: 'model3d', label: '3D', icon: Box }] as const;
 
 const CANVAS: Record<Workspace, { label: string; icon: typeof MessageSquare }> = {
   chat: { label: 'Chat', icon: MessageSquare },
@@ -61,25 +69,40 @@ export function SessionsPanel() {
   const [reversed, setReversed] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [compact, setCompact] = useState(false);
+  const [shelf, setShelf] = useState<'recent' | 'archived'>('recent');
+  const [quickMode, setQuickMode] = useState<QuickMode>('all');
+  const [layout, setLayout] = usePref<SessionView>('ogs.sessionsView', 'cards');
   const [canvas, setCanvas] = useState<CanvasFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const selecting = selected.size > 0;
   const bulkDel = usePopover();
   const view = usePopover();
+  const layoutMenu = usePopover();
   const newPop = usePopover();
   const { expanded, embedded } = usePanelExpanded();
+  const currentView = SESSION_VIEWS.find((item) => item.id === layout) ?? SESSION_VIEWS[0];
 
   const stats = useMemo(() => {
     const m = new Map<string, Stats>();
     const entry = (id: string) => {
-      const e = m.get(id) ?? { assets: [], gens: 0, spend: 0 };
+      const e: Stats = m.get(id) ?? { assets: [], gens: 0, spend: 0, modes: new Set() };
       m.set(id, e);
       return e;
     };
-    for (const a of Object.values(assets).sort((x, y) => y.createdAt - x.createdAt)) entry(a.sessionId).assets.push(a.id);
+    for (const a of Object.values(assets).sort((x, y) => y.createdAt - x.createdAt)) {
+      const e = entry(a.sessionId);
+      e.assets.push(a.id);
+      e.modes.add(a.kind);
+      if (!e.cover && (a.kind === 'image' || a.kind === 'video')) e.cover = a.id;
+    }
     for (const g of Object.values(generations)) {
       const e = entry(g.sessionId);
       e.gens++;
+      if (g.kind !== 'text') e.modes.add(g.kind);
+      if (g.mode) e.modes.add(g.mode);
+      if (g.origin === 'agent') e.modes.add('agent');
+      const mode = g.mode ?? (g.origin === 'agent' ? 'agent' : g.kind === 'text' ? undefined : g.kind);
+      if (mode && (!e.latestModeAt || g.createdAt > e.latestModeAt)) { e.latestMode = mode; e.latestModeAt = g.createdAt; }
       if (g.status === 'done') e.spend += g.actualUsd ?? g.estimate.usd ?? 0;
     }
     return m;
@@ -87,7 +110,7 @@ export function SessionsPanel() {
   const matches = useSessionMatcher(q);
 
   const list = useMemo(() => {
-    const arr = visibleSessions(sessions).filter((s) => (!pinnedOnly || s.pinned) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && matches(s));
+    const arr = visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived') && (!pinnedOnly || s.pinned) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && (quickMode === 'all' || stats.get(s.id)?.modes.has(quickMode) || s.feed.some((f) => f.type === 'user' && f.mode === quickMode)) && matches(s));
     const dir = reversed ? -1 : 1;
     arr.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -96,16 +119,16 @@ export function SessionsPanel() {
       return dir * (b.updatedAt - a.updatedAt);
     });
     return arr;
-  }, [sessions, matches, sort, reversed, pinnedOnly, canvas]);
+  }, [sessions, matches, sort, reversed, pinnedOnly, canvas, shelf, quickMode, stats]);
 
   const counts = useMemo(() => {
     const c: Record<CanvasFilter, number> = { all: 0, chat: 0, node: 0, designer: 0 };
-    for (const sess of visibleSessions(sessions)) {
+    for (const sess of visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived'))) {
       c.all++;
       for (const w of sessionCanvases(sess)) c[w]++;
     }
     return c;
-  }, [sessions]);
+  }, [sessions, shelf]);
   const toggle = (id: string) => setSelected((cur) => {
     const next = new Set(cur);
     if (next.has(id)) next.delete(id);
@@ -126,12 +149,13 @@ export function SessionsPanel() {
   }, [list, sort]);
 
   return (
-    <div className={`sessions ${compact ? 'is-compact' : ''}`}>
-      <div className="panel-head">
-        <div className="panel-title">
-          Sessions <span className="faint num">{visibleSessions(sessions).length}</span>
-        </div>
-        <div className="panel-head-actions">
+    <div role="region" aria-label="Sessions" className={`sessions layout-${layout} ${compact ? 'is-compact' : ''}`}>
+      <div className="sessions-controls">
+        <div className="sessions-toolbar">
+          {embedded ? null : <>
+            <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
+            <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+          </>}
           <Button ref={newPop.ref} size="sm" variant="secondary" icon={Plus} onClick={newPop.toggle}>
             New
           </Button>
@@ -155,13 +179,8 @@ export function SessionsPanel() {
               })}
             </div>
           </Popover>
-          {embedded ? null : <>
-            <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
-            <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-          </>}
         </div>
-      </div>
-      <div className="sessions-controls">
+        <div className="sessions-filter-bar">
         <div className="search-input">
           <Search size={14} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
@@ -170,13 +189,15 @@ export function SessionsPanel() {
               <X size={13} />
             </button>
           ) : null}
-          <button ref={view.ref} type="button" className={`search-view ${view.open ? 'is-open' : ''}`} onClick={view.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
-            <SlidersHorizontal size={14} />
-            {canvas !== 'all' || pinnedOnly || sort !== 'recent' || reversed ? <span className="dot" /> : null}
-          </button>
         </div>
-        <Popover open={view.open} anchor={view.ref} onClose={view.close} width={300} label="Filter, sort and view">
+        <div className="results-controls">
+          <button ref={view.ref} type="button" className={`results-menu-trigger${canvas !== 'all' || pinnedOnly || shelf === 'archived' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /><ChevronDown size={12} /></button>
+        <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">
           <div className="sessions-view">
+            <div className="sv-row">
+              <span className="sv-label">Sessions</span>
+              <Segmented value={shelf} size="sm" onChange={(value) => { setShelf(value); setSelected(new Set()); }} options={[{ value: 'recent', label: 'Active' }, { value: 'archived', label: `Archived · ${visibleSessions(sessions).filter((s) => s.archived).length}` }]} />
+            </div>
             <div className="sv-row">
               <span className="sv-label">Canvas</span>
               <div className="sv-canvas">
@@ -192,15 +213,7 @@ export function SessionsPanel() {
                 })}
               </div>
             </div>
-            <div className="sv-row">
-              <span className="sv-label">Sort</span>
-              <div className="sv-inline">
-                <Segmented value={sort} size="sm" onChange={setSort} options={[{ value: 'recent', label: 'Recent' }, { value: 'created', label: 'Created' }, { value: 'name', label: 'Name' }]} />
-                <IconButton icon={reversed ? ArrowUp : ArrowDown} label={sortLabel(sort, reversed)} size="sm" onClick={() => setReversed((v) => !v)} />
-              </div>
-            </div>
             <label className="sv-switch"><span>Pinned only</span><Toggle checked={pinnedOnly} onChange={setPinnedOnly} label="Pinned only" /></label>
-            <label className="sv-switch"><span>Thumbnails</span><Toggle checked={!compact} onChange={(v) => setCompact(!v)} label="Thumbnails" /></label>
             {list.some(isEmpty) ? (
               <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); view.close(); }}>
                 Select the {list.filter(isEmpty).length} empty session{list.filter(isEmpty).length === 1 ? '' : 's'}
@@ -208,6 +221,41 @@ export function SessionsPanel() {
             ) : null}
           </div>
         </Popover>
+        <ResultsMenu label="Order by" icon={ArrowUpDown} iconOnly active={sort !== 'recent' || reversed}>
+            <div className="sv-row">
+              <span className="sv-label">Sort</span>
+              <div className="sv-inline">
+                <Segmented value={sort} size="sm" onChange={setSort} options={[{ value: 'recent', label: 'Recent' }, { value: 'created', label: 'Created' }, { value: 'name', label: 'Name' }]} />
+                <IconButton icon={reversed ? ArrowUp : ArrowDown} label={sortLabel(sort, reversed)} size="sm" onClick={() => setReversed((v) => !v)} />
+              </div>
+            </div>
+        </ResultsMenu>
+        <span className="results-controls-spacer" />
+          <>
+            <button ref={layoutMenu.ref} type="button" className="session-view-trigger" aria-label="View" aria-haspopup="dialog" aria-expanded={layoutMenu.open} onClick={layoutMenu.toggle}>
+              <currentView.icon size={14} />{currentView.label}<ChevronDown size={12} />
+            </button>
+            <Popover open={layoutMenu.open} anchor={layoutMenu.ref} onClose={layoutMenu.close} placement="bottom-start" width={220} label="Session view" className="session-view-popover">
+              <div role="radiogroup" aria-label="Session view" className="session-view-options">
+                {SESSION_VIEWS.map(({ id, label, hint, icon: Icon }, index) => <button key={id} type="button" role="radio" aria-checked={layout === id} className="session-view-option" onClick={() => { setLayout(id); layoutMenu.close(); }} onKeyDown={(event) => {
+                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                  event.preventDefault();
+                  const next = (index + (event.key === 'ArrowDown' ? 1 : -1) + SESSION_VIEWS.length) % SESSION_VIEWS.length;
+                  setLayout(SESSION_VIEWS[next].id);
+                  event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
+                }}>
+                  <Icon size={15} /><span className="session-view-option-text"><span>{label}</span><span className="session-view-hint">{hint}</span></span>{layout === id ? <Check size={13} className="session-view-check" /> : null}
+                </button>)}
+              </div>
+            </Popover>
+          </>
+          <div className="sessions-quick-modes" role="group" aria-label="Filter sessions by mode">
+            {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
+            <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
+          </div>
+        <IconButton icon={compact ? EyeOff : Eye} label={compact ? 'Show thumbnails' : 'Hide thumbnails'} size="sm" aria-pressed={!compact} onClick={() => setCompact(!compact)} />
+        </div>
+        </div>
         {canvas !== 'all' || pinnedOnly ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS[canvas].label} <X size={11} /></button> : null}
@@ -220,12 +268,18 @@ export function SessionsPanel() {
           <section key={g.label} className="date-group">
             {g.label ? (
               <h4 className="date-head">
+                <button type="button" className={`session-check group-check${g.items.every((s) => selected.has(s.id)) ? ' is-on' : ''}`} role="checkbox" aria-label={`Select ${g.label}`} aria-checked={g.items.every((s) => selected.has(s.id)) ? true : g.items.some((s) => selected.has(s.id)) ? 'mixed' : false} onClick={() => setSelected((current) => {
+                  const next = new Set(current);
+                  const all = g.items.every((s) => next.has(s.id));
+                  for (const item of g.items) { if (all) next.delete(item.id); else next.add(item.id); }
+                  return next;
+                })}>{g.items.every((s) => selected.has(s.id)) ? <Check size={12} /> : null}</button>
                 {g.label} <span className="faint num">{g.items.length}</span>
               </h4>
             ) : null}
             <div className="session-list">
               {g.items.map((s) => (
-                <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} selecting={selecting} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} />
+                <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} expanded={expanded} compact={compact} selecting={selecting} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} />
               ))}
             </div>
           </section>
@@ -238,6 +292,7 @@ export function SessionsPanel() {
           <button type="button" className="sb-link" onClick={() => setSelected(new Set(list.map((x) => x.id)))}>Select all</button>
           <span className="spacer" />
           <IconButton icon={allPinned ? PinOff : Pin} label={allPinned ? 'Unpin' : 'Pin'} size="sm" onClick={() => picked.forEach((x) => { if (x.pinned === allPinned) togglePinSession(x.id); })} />
+          <IconButton icon={shelf === 'archived' ? ArchiveRestore : Archive} label={shelf === 'archived' ? 'Restore selected' : 'Archive selected'} size="sm" onClick={() => { setSessionsArchived(picked.map((x) => x.id), shelf === 'recent'); stopSelecting(); }} />
           <IconButton ref={bulkDel.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={bulkDel.toggle} />
           <IconButton icon={X} label="Cancel selection" size="sm" onClick={stopSelecting} />
           <Popover open={bulkDel.open} anchor={bulkDel.ref} onClose={bulkDel.close} width={300} label="Delete sessions">
@@ -253,6 +308,10 @@ interface Stats {
   assets: string[];
   gens: number;
   spend: number;
+  cover?: string;
+  modes: Set<Exclude<QuickMode, 'all'>>;
+  latestMode?: Exclude<QuickMode, 'all'>;
+  latestModeAt?: number;
 }
 
 /** Session search shared by the panel and the top-bar switcher: title, conversation text and generation prompts. */
@@ -278,7 +337,7 @@ function sortLabel(sort: Sort, reversed: boolean): string {
   return reversed ? 'Oldest first' : 'Newest first';
 }
 
-function SessionRow({ session, active, stats, selecting, selected, onToggle }: { session: Session; active: boolean; stats?: Stats; selecting: boolean; selected: boolean; onToggle: () => void }) {
+function SessionRow({ session, active, stats, expanded, compact, selecting, selected, onToggle }: { session: Session; active: boolean; stats?: Stats; expanded: boolean; compact: boolean; selecting: boolean; selected: boolean; onToggle: () => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
   const del = usePopover();
@@ -292,9 +351,18 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
     stats?.spend ? formatUsd(stats.spend) : null,
   ].filter(Boolean);
   const canvases = sessionCanvases(session);
+  const CoverIcon = CANVAS[canvases[0] ?? 'chat'].icon;
+  const latestPrompt = session.feed.reduce<(typeof session.feed)[number] | undefined>((latest, item) => item.type === 'user' && (!latest || item.createdAt > latest.createdAt) ? item : latest, undefined);
+  const latestPromptMode = latestPrompt?.type === 'user' ? latestPrompt.mode : undefined;
+  const recentMode = stats?.latestModeAt && stats.latestModeAt > (latestPrompt?.createdAt ?? 0) ? stats.latestMode : latestPromptMode ?? stats?.latestMode;
+  const modeInfo = QUICK_MODES.find((mode) => mode.id === recentMode);
+  const ModeIcon = modeInfo?.icon;
+  const modeLabel = recentMode ? { agent: 'Agent', image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D' }[recentMode] : undefined;
+  const shortDate = (time: number) => new Date(time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const open = () => {
     if (selecting) return onToggle();
     if (editing) return;
+    if (session.archived) return setSessionsArchived([session.id], false);
     selectSession(session.id);
     setUi({ panel: null, home: false, space: undefined });
   };
@@ -304,6 +372,10 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
       <button type="button" className={`session-check ${selected ? 'is-on' : ''}`} onClick={onToggle} aria-pressed={selected} aria-label={`Select ${session.title}`}>
         {selected ? <Check size={12} /> : null}
       </button>
+      <span className={`session-cover${stats?.cover && !compact ? ' has-media' : ''}`} aria-hidden="true">
+        {stats?.cover && !compact ? <span className="session-cover-media"><AssetMedia assetId={stats.cover} hoverPlay={false} draggable={false} /></span> : null}
+        <CoverIcon size={18} className="session-cover-icon" />
+      </span>
       <div
         role="button"
         tabIndex={0}
@@ -341,6 +413,7 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
           <span className="session-title" title={session.title}>
             {session.pinned ? <Pin size={11} className="pin-mark" /> : null}
             <span className="truncate">{session.title}</span>
+            {active ? <span className="session-open">Open</span> : null}
           </span>
         )}
         <span className="session-meta faint num">
@@ -354,8 +427,20 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
           ) : null}
           {meta.length > 1 || session.feed.length || stats?.assets.length ? meta.join(' · ') : `${meta[0]} · empty`}
         </span>
+        <span className="session-card-meta" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...meta.slice(1)].join(' · ')}>
+          {ModeIcon ? <ModeIcon size={11} /> : null}
+          <span>{modeLabel ?? '—'}</span>
+          <span aria-hidden="true">·</span>
+          <time dateTime={new Date(session.updatedAt).toISOString()} title={`Updated: ${new Date(session.updatedAt).toLocaleString()}`}>{shortDate(session.updatedAt)}</time>
+          {active ? <span className="session-card-open">· Open</span> : null}
+        </span>
+        <span className="session-list-meta">
+          <span className="session-list-mode" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...meta.slice(1)].join(' · ')}>{ModeIcon ? <ModeIcon size={11} /> : null}{modeLabel ?? '—'}</span>
+          <time className="session-list-created" dateTime={new Date(session.createdAt).toISOString()} title={`Created: ${new Date(session.createdAt).toLocaleString()}`}>{shortDate(session.createdAt)}</time>
+          <time className="session-list-updated" dateTime={new Date(session.updatedAt).toISOString()} title={`Updated: ${new Date(session.updatedAt).toLocaleString()}`}>{shortDate(session.updatedAt)}</time>
+        </span>
       </div>
-      {stats?.assets.length ? (
+      {!expanded && !compact && stats?.assets.length ? (
         <span className="session-thumbs">
           {stats.assets.slice(0, 3).map((id) => (
             <span key={id} className="session-thumb">
@@ -375,6 +460,7 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
             setEditing(true);
           }}
         />
+        <IconButton icon={session.archived ? ArchiveRestore : Archive} label={session.archived ? 'Restore session' : 'Archive session'} size="sm" onClick={() => setSessionsArchived([session.id], !session.archived)} />
         <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={del.toggle} />
         <Popover open={del.open} anchor={del.ref} onClose={del.close} width={280} label="Delete session">
           <div className="confirm">

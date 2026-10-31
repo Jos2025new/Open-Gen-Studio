@@ -70,9 +70,6 @@
 @media (max-width: 540px) { .lightbox { flex-direction: column-reverse; }.lb-side { display: flex; width: 100%; padding: 0; border-left: 0; border-bottom: 1px solid var(--border); overflow: visible; }.lb-side .lb-body, .lb-dock { display: none; }.lb-head { height: 46px; padding: 8px; }.lb-stage { min-width: 0; padding: 8px 36px; --lb-pad-y: 16px; }.lb-head { margin-bottom: 0; } }
 
 .date-head { display: flex; gap: 6px; align-items: baseline; margin: 0; padding: 12px 12px 4px; font-size: 11px; font-weight: 500; color: var(--text-2); }.gallery-scroll .date-head + .gallery-grid { padding-top: 4px; }
-.side-panel.is-expanded .session-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; padding: 4px 12px 8px; }
-.side-panel.is-expanded .session-row { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
-.side-panel.is-expanded .sessions:not(.is-compact) .session-thumb { width: 40px; height: 40px; }
 .side-panel.is-expanded .gallery-controls, .side-panel.is-expanded .sessions .gallery-controls { flex-direction: row; flex-wrap: wrap; align-items: center; }.side-panel.is-expanded .gallery-controls .search-input { flex: 1 1 320px; max-width: 520px; }
 
 .sketch { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--overlay); backdrop-filter: blur(10px); }
