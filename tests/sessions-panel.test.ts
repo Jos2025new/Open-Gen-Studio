@@ -63,7 +63,7 @@ describe('Sessions top bar', () => {
   });
 
   it('search is an icon button that filters by title and stays marked while a query is set', () => {
-    const icon = q<HTMLButtonElement>('.pc-bar > [aria-label="Search"]');
+    const icon = q<HTMLButtonElement>('.pc-bar [aria-label="Search"]');
     expect(host.querySelector('input[aria-label="Search sessions"]')).toBeNull();
     click(icon);
     const input = q<HTMLInputElement>('input[aria-label="Search sessions"]');

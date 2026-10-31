@@ -51,8 +51,10 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" />
-          <IconButton icon={asc ? ArrowDownAZ : ArrowUpZA} label="Sort by name" size="sm" active aria-pressed data-tip={`Sort by name · ${asc ? 'A → Z' : 'Z → A'}`} onClick={() => setAsc(!asc)} />
+          <div className="pc-grp">
+            <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" />
+            <IconButton icon={asc ? ArrowDownAZ : ArrowUpZA} label="Sort by name" size="sm" active aria-pressed data-tip={`Sort by name · ${asc ? 'A → Z' : 'Z → A'}`} onClick={() => setAsc(!asc)} />
+          </div>
           {view === 'card' ? <>
             <Sep />
             <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>

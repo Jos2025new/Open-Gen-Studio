@@ -109,26 +109,28 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" />
-          <div className="results-controls">
-            <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={filtered || group !== 'date' || favOnly}>
-              <div className="sv-row">
-                <span className="sv-label">Show</span>
-                <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
-              </div>
-              <div className="sv-row">
-                <span className="sv-label">Canvas</span>
-                <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
-              </div>
-              <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
-              <div className="sv-row">
-                <span className="sv-label"><Folder size={12} /> Group by</span>
-                <Segmented value={group} size="sm" onChange={setGroup} options={[{ value: 'date', label: 'Date' }, { value: 'session', label: 'Sessions' }]} />
-              </div>
-              <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
-            </ResultsMenu>
+          <div className="pc-grp">
+            <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" />
+            <div className="results-controls">
+              <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={filtered || group !== 'date' || favOnly}>
+                <div className="sv-row">
+                  <span className="sv-label">Show</span>
+                  <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
+                </div>
+                <div className="sv-row">
+                  <span className="sv-label">Canvas</span>
+                  <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
+                </div>
+                <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
+                <div className="sv-row">
+                  <span className="sv-label"><Folder size={12} /> Group by</span>
+                  <Segmented value={group} size="sm" onChange={setGroup} options={[{ value: 'date', label: 'Date' }, { value: 'session', label: 'Sessions' }]} />
+                </div>
+                <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
+              </ResultsMenu>
+            </div>
+            <SortToggles sort={sort} onChange={setSort} />
           </div>
-          <SortToggles sort={sort} onChange={setSort} />
           <Sep />
           <div className="pc-group" role="group" aria-label="Filter assets by type">
             {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}

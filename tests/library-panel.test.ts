@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined, peekAssetUrl: () => undefined, loadAssetUrl: async () => undefined }));
 vi.mock('../src/components/ui/AssetMedia', () => ({ AssetMedia: ({ assetId }: { assetId: string }) => createElement('span', { 'data-asset': assetId }) }));
+import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { GalleryPanel } from '../src/components/gallery/GalleryPanel';
@@ -58,6 +59,17 @@ describe('Library top bar', () => {
     expect(name.getAttribute('aria-pressed')).toBe('false');
   });
 
+  it('spreads its groups across the bar: [search, filter, sorts] | types | size | view, with separators between', () => {
+    expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).toMatch(/\.pc-bar \{[^}]*justify-content: space-between/);
+    const kids = [...q('.pc-bar').children];
+    expect(kids.map((k) => k.classList.contains('pc-sep') ? '|' : 'g')).toEqual(['g', '|', 'g', '|', 'g', '|', 'g']);
+    const first = kids[0];
+    for (const l of ['Search', 'Filter by', 'Sort by name', 'Sort by date']) expect(first.querySelector(`[aria-label="${l}"]`)).not.toBeNull();
+    expect(kids[2].querySelector('[aria-label="Images"]')).not.toBeNull();
+    expect(kids[4].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
+    expect(kids[6].querySelector('[aria-label="List view"]')).not.toBeNull();
+  });
+
   it('filters by type with icon buttons and All restores everything', () => {
     for (const label of ['Images', 'Videos', 'Audio', '3D', 'Text']) expect(q(`[aria-label="${label}"]`).textContent).toBe('');
     click(q('[aria-label="Videos"]'));
@@ -96,9 +108,9 @@ describe('Library search', () => {
   const type = (el: HTMLInputElement, v: string) => act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); });
   it('is an icon button that reveals the input; the icon stays active while a query is set; Escape clears and closes', () => {
     expect(host.querySelector('input[aria-label="Search assets"]')).toBeNull();
-    const icon = q<HTMLButtonElement>('.pc-bar > [aria-label="Search"]');
+    const icon = q<HTMLButtonElement>('.pc-bar [aria-label="Search"]');
     expect(icon.textContent).toBe('');
-    expect(host.querySelector('.pc-bar')?.firstElementChild).toBe(icon);
+    expect(host.querySelector('.pc-bar')?.firstElementChild?.firstElementChild).toBe(icon);
     click(icon);
     const input = q<HTMLInputElement>('input[aria-label="Search assets"]');
     expect(document.activeElement).toBe(input);
@@ -116,7 +128,7 @@ describe('Library search', () => {
   });
   it('also works in a category view and clears with its button', () => {
     click(q('.pc-rail [aria-label="Character"]'));
-    click(q('.pc-bar > [aria-label="Search"]'));
+    click(q('.pc-bar [aria-label="Search"]'));
     type(q<HTMLInputElement>('input[aria-label="Search saved items"]'), 'zed');
     expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
     click(q('[aria-label="Clear search"]'));

@@ -157,44 +157,46 @@ export function SessionsPanel() {
           </Popover>
         </div>
         <div className="sessions-filter-bar pc-bar">
-        <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" />
-        <div className="results-controls">
-          <button ref={view.ref} type="button" className={`results-menu-trigger${canvas !== 'all' || pinnedOnly || shelf === 'archived' || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
-        <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">
-          <div className="sessions-view">
-            <div className="sv-row">
-              <span className="sv-label">Sessions</span>
-              <Segmented value={shelf} size="sm" onChange={(value) => { setShelf(value); setSelected(new Set()); }} options={[{ value: 'recent', label: 'Active' }, { value: 'archived', label: `Archived · ${visibleSessions(sessions).filter((s) => s.archived).length}` }]} />
-            </div>
-            <div className="sv-row">
-              <span className="sv-label">Canvas</span>
-              <div className="sv-canvas">
-                {(['all', 'chat', 'node', 'designer'] as const).map((w) => {
-                  const Icon = w === 'all' ? null : CANVAS[w].icon;
-                  return (
-                    <button key={w} type="button" className={`canvas-tab ${canvas === w ? 'is-on' : ''}`} onClick={() => setCanvas(w)} disabled={w !== 'all' && !counts[w]}>
-                      {Icon ? <Icon size={12} /> : null}
-                      {w === 'all' ? 'All' : CANVAS[w].label}
-                      <span className="num faint">{counts[w]}</span>
-                    </button>
-                  );
-                })}
+        <div className="pc-grp">
+          <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" />
+          <div className="results-controls">
+            <button ref={view.ref} type="button" className={`results-menu-trigger${canvas !== 'all' || pinnedOnly || shelf === 'archived' || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
+          <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">
+            <div className="sessions-view">
+              <div className="sv-row">
+                <span className="sv-label">Sessions</span>
+                <Segmented value={shelf} size="sm" onChange={(value) => { setShelf(value); setSelected(new Set()); }} options={[{ value: 'recent', label: 'Active' }, { value: 'archived', label: `Archived · ${visibleSessions(sessions).filter((s) => s.archived).length}` }]} />
               </div>
+              <div className="sv-row">
+                <span className="sv-label">Canvas</span>
+                <div className="sv-canvas">
+                  {(['all', 'chat', 'node', 'designer'] as const).map((w) => {
+                    const Icon = w === 'all' ? null : CANVAS[w].icon;
+                    return (
+                      <button key={w} type="button" className={`canvas-tab ${canvas === w ? 'is-on' : ''}`} onClick={() => setCanvas(w)} disabled={w !== 'all' && !counts[w]}>
+                        {Icon ? <Icon size={12} /> : null}
+                        {w === 'all' ? 'All' : CANVAS[w].label}
+                        <span className="num faint">{counts[w]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="sv-row">
+                <span className="sv-label">Date means</span>
+                <Segmented value={basis} size="sm" onChange={setBasis} options={[{ value: 'updated', label: 'Last activity' }, { value: 'created', label: 'Created' }]} />
+              </div>
+              <label className="sv-switch"><span>Pinned only</span><Toggle checked={pinnedOnly} onChange={setPinnedOnly} label="Pinned only" /></label>
+              {list.some(isEmpty) ? (
+                <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); view.close(); }}>
+                  Select the {list.filter(isEmpty).length} empty session{list.filter(isEmpty).length === 1 ? '' : 's'}
+                </button>
+              ) : null}
             </div>
-            <div className="sv-row">
-              <span className="sv-label">Date means</span>
-              <Segmented value={basis} size="sm" onChange={setBasis} options={[{ value: 'updated', label: 'Last activity' }, { value: 'created', label: 'Created' }]} />
-            </div>
-            <label className="sv-switch"><span>Pinned only</span><Toggle checked={pinnedOnly} onChange={setPinnedOnly} label="Pinned only" /></label>
-            {list.some(isEmpty) ? (
-              <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); view.close(); }}>
-                Select the {list.filter(isEmpty).length} empty session{list.filter(isEmpty).length === 1 ? '' : 's'}
-              </button>
-            ) : null}
+          </Popover>
           </div>
-        </Popover>
+          <SortToggles sort={sort} onChange={setSort} dateTip={basis === 'created' ? 'Oldest created first' : 'Oldest activity first'} dateTipDesc={basis === 'created' ? 'Newest created first' : 'Latest activity first'} />
         </div>
-        <SortToggles sort={sort} onChange={setSort} dateTip={basis === 'created' ? 'Oldest created first' : 'Oldest activity first'} dateTipDesc={basis === 'created' ? 'Newest created first' : 'Latest activity first'} />
         <Sep />
         <div className="pc-group" role="group" aria-label="Filter sessions by mode">
           {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
