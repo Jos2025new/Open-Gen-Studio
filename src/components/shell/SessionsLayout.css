@@ -24,9 +24,11 @@
 .sess-card-foot .pc-tools .icon-btn { border: 0; background: none; color: var(--text-3); backdrop-filter: none; box-shadow: none; }
 .sess-card-foot .pc-tools .icon-btn:hover { color: var(--text); }
 .sess-card-foot .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
-/* The checkbox keeps the overlay controls' smoked glass but one step smaller than a button: a 22px tile holding a 12px box. */
-.sess-card .pc-check, .sess-tile .pc-check { top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 6px; }
+/* The checkbox is the quietest control: a light 20px glass tile with a 12px box, shown only on hover or focus, while
+   selecting, or when checked. */
+.sess-card .pc-check, .sess-tile .pc-check { top: 8px; left: 8px; width: 20px; height: 20px; border-radius: 6px; background: rgba(12, 12, 14, .22); opacity: 0; }
 .sess-card .pc-check .pc-box, .sess-tile .pc-check .pc-box { width: 12px; height: 12px; border-width: 1.5px; border-radius: 3px; }
+.sess-card:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-card .pc-check.is-on, .sess-tile .pc-check.is-on { opacity: 1; }
 .sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 12px; }
 .sess-card .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
 /* Cards: the cover fills the whole left side, edge to edge (checkbox on its corner); pin and menu top right; title
