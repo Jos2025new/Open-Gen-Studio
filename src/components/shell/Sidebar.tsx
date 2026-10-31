@@ -6,6 +6,7 @@ import { ProviderPool } from './ProviderPool';
 import { usePref } from '../ui/hooks';
 import { SidebarNav } from './SidebarNav';
 import { openHome } from './navModel';
+import '../../styles/sidebar-peek.css';
 
 /** The house icon, shared by the sidebar's Home item and the top bar's Home button. */
 export function HomeIcon({ size = 18 }: { size?: number }) {
@@ -47,6 +48,22 @@ export function Sidebar() {
   const sidebarRef = useRef<HTMLElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
   const [folded, setFolded] = usePref('ogs:sidebar-folded', false);
+  // Folded, the bar peeks: hovering or focusing its icon (or the left edge) shows it floating over the workspace, in
+  // the chosen width, without moving anything; leaving hides it after a short pause; clicking the icon pins it.
+  const [peek, setPeek] = useState(false);
+  const hideTimer = useRef<number | undefined>(undefined);
+  const showPeek = () => { window.clearTimeout(hideTimer.current); if (folded) setPeek(true); };
+  const hidePeek = () => {
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      // A flyout opened from the bar (Create, Tools) keeps it out until it closes.
+      if (sidebarRef.current?.querySelector('[aria-haspopup][aria-expanded="true"]')) return hidePeek();
+      setPeek(false);
+    }, 280);
+  };
+  useEffect(() => { if (!folded) setPeek(false); }, [folded]);
+  useEffect(() => () => window.clearTimeout(hideTimer.current), []);
+  const peeking = folded && peek;
 
   // --sidebar-w drives the layout (side panels are anchored to it), so both modes live on the root.
   useEffect(() => {
@@ -84,19 +101,26 @@ export function Sidebar() {
   const togglePanel = (p: 'gallery' | 'sessions' | 'spending') => setUi((u) => ({ panel: u.panel === p ? null : p }));
 
   return (
-    <nav ref={sidebarRef} className={`sidebar ${folded ? 'is-folded' : ''} ${wide && !narrow && !folded ? 'is-wide' : ''}`} aria-label="Main">
+    <>
+    {folded && !peeking ? <div className="side-peek-edge" aria-hidden onMouseEnter={showPeek} /> : null}
+    <nav ref={sidebarRef} className={`sidebar ${folded && !peeking ? 'is-folded' : ''} ${peeking ? 'is-peek' : ''} ${wide && !narrow && (!folded || peeking) ? 'is-wide' : ''}`} aria-label="Main"
+      onMouseEnter={peeking ? showPeek : undefined} onMouseLeave={peeking ? hidePeek : undefined}
+      onBlur={peeking ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) hidePeek(); } : undefined}>
       <div className="brand">
         <span className="brand-mark" aria-hidden />
         <span className="brand-name">Open Gen Studio</span>
         <button
           type="button"
           className="side-collapse"
-          aria-label={folded ? 'Expand panel downward' : 'Collapse panel upward'}
+          aria-label={folded ? 'Pin panel' : 'Collapse panel upward'}
           aria-expanded={!folded}
-          data-tip={folded ? 'Expand panel downward' : 'Collapse panel upward'}
+          data-tip={folded ? 'Pin panel' : 'Collapse panel upward'}
           data-tip-side="right"
+          onMouseEnter={folded ? showPeek : undefined}
+          onFocus={folded ? showPeek : undefined}
           onClick={() => {
             if (!folded) setUi({ panel: null });
+            setPeek(false);
             setFolded(!folded);
           }}
         >
@@ -123,7 +147,7 @@ export function Sidebar() {
         </button>
         <HomeButton home={home} />
       </div>
-      <div className="side-scroll"><SidebarNav wide={wide && !narrow && !folded} /></div>
+      <div className="side-scroll"><SidebarNav wide={wide && !narrow && (!folded || peeking)} /></div>
       <div className="side-group side-footer">
         <button
           type="button"
@@ -166,5 +190,6 @@ export function Sidebar() {
         <ProviderPool wide={wide} />
       </div>
     </nav>
+    </>
   );
 }

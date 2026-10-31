@@ -1,0 +1,9 @@
+/* Peek (2026-10-31): with the bar folded, hovering or focusing its icon, or touching the left edge, shows the whole
+   bar floating over the workspace in the chosen width (icons or wide); the layout keeps the folded width, so nothing
+   moves. Leaving hides it after a short pause; clicking the icon pins it. Same frame as the pinned bar, popover shadow. */
+.side-peek-edge { position: fixed; z-index: 29; top: var(--topbar-h); bottom: 0; left: 0; width: 8px; }
+:root .sidebar.is-peek { position: absolute; z-index: 60; top: 0; left: 0; width: 54px; height: calc(100dvh - 6px); margin: 0; padding-left: 11px; animation: side-peek-in .16s ease-out; }
+:root.sidebar-wide .sidebar.is-peek { width: 214px; padding-left: 16px; }
+.sidebar.is-peek::before { left: 6px; right: 0; box-shadow: var(--shadow-pop); }
+@keyframes side-peek-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { :root .sidebar.is-peek { animation: none; } }
