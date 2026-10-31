@@ -62,6 +62,21 @@ describe('Sessions top bar', () => {
     expect(titles()).toHaveLength(3);
   });
 
+  it('search is an icon button that filters by title and stays marked while a query is set', () => {
+    const icon = q<HTMLButtonElement>('.pc-bar > [aria-label="Search"]');
+    expect(host.querySelector('input[aria-label="Search sessions"]')).toBeNull();
+    click(icon);
+    const input = q<HTMLInputElement>('input[aria-label="Search sessions"]');
+    act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'alp'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    expect(titles()).toEqual(['Alpha']);
+    click(icon);
+    expect(icon.classList.contains('is-active')).toBe(true);
+    click(icon);
+    click(q('[aria-label="Clear search"]'));
+    expect(icon.classList.contains('is-active')).toBe(false);
+    expect(titles()).toHaveLength(3);
+  });
+
   it('has no side rail: the canvas filter stays inside Filter by', () => {
     expect(host.querySelector('.pc-rail')).toBeNull();
     click(q('[aria-label="Filter by"]'));

@@ -1,8 +1,29 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowDownAZ, ArrowUpZA, CalendarArrowDown, CalendarArrowUp, Check, EllipsisVertical, LayoutGrid, List, type LucideIcon } from 'lucide-react';
+import { ArrowDownAZ, Search, X, ArrowUpZA, CalendarArrowDown, CalendarArrowUp, Check, EllipsisVertical, LayoutGrid, List, type LucideIcon } from 'lucide-react';
 import { Button, IconButton } from './primitives';
 import { Popover, usePopover } from './Popover';
 import './PanelControls.css';
+
+/**
+ * Search as an icon button at the start of a top bar. Pressing it shows the input beside it; Escape or the clear button
+ * empties the query and hides it. While a query is set the icon stays active, so the filter is never invisible.
+ */
+export function SearchToggle({ value, onChange, placeholder, inputLabel }: { value: string; onChange: (v: string) => void; placeholder: string; inputLabel: string }) {
+  const [open, setOpen] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (open) input.current?.focus(); }, [open]);
+  const close = () => { onChange(''); setOpen(false); };
+  return <>
+    <IconButton icon={Search} label="Search" size="sm" active={open || value !== ''} aria-pressed={open || value !== ''} aria-expanded={open} data-tip={value ? `Search · “${value}”` : 'Search'} onClick={() => setOpen(!open)} />
+    {open ? (
+      <div className="search-input pc-search">
+        <Search size={14} />
+        <input ref={input} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={inputLabel} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }} />
+        <button type="button" aria-label="Clear search" onClick={close}><X size={13} /></button>
+      </div>
+    ) : null}
+  </>;
+}
 
 /** Thin vertical line between groups of controls in a panel's top bar. */
 export function Sep() { return <span className="pc-sep" role="separator" aria-orientation="vertical" />; }

@@ -92,6 +92,39 @@ describe('Library top bar', () => {
   });
 });
 
+describe('Library search', () => {
+  const type = (el: HTMLInputElement, v: string) => act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); });
+  it('is an icon button that reveals the input; the icon stays active while a query is set; Escape clears and closes', () => {
+    expect(host.querySelector('input[aria-label="Search assets"]')).toBeNull();
+    const icon = q<HTMLButtonElement>('.pc-bar > [aria-label="Search"]');
+    expect(icon.textContent).toBe('');
+    expect(host.querySelector('.pc-bar')?.firstElementChild).toBe(icon);
+    click(icon);
+    const input = q<HTMLInputElement>('input[aria-label="Search assets"]');
+    expect(document.activeElement).toBe(input);
+    type(input, 'apple');
+    expect(names()).toEqual(['Apple']);
+    click(icon); // hide the box: the query stays and the icon shows it
+    expect(host.querySelector('input[aria-label="Search assets"]')).toBeNull();
+    expect(icon.classList.contains('is-active')).toBe(true);
+    expect(names()).toEqual(['Apple']);
+    click(icon);
+    act(() => { q('input[aria-label="Search assets"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(host.querySelector('input[aria-label="Search assets"]')).toBeNull();
+    expect(icon.classList.contains('is-active')).toBe(false);
+    expect(names()).toHaveLength(3);
+  });
+  it('also works in a category view and clears with its button', () => {
+    click(q('.pc-rail [aria-label="Character"]'));
+    click(q('.pc-bar > [aria-label="Search"]'));
+    type(q<HTMLInputElement>('input[aria-label="Search saved items"]'), 'zed');
+    expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
+    click(q('[aria-label="Clear search"]'));
+    expect(host.querySelector('input[aria-label="Search saved items"]')).toBeNull();
+    expect(host.querySelectorAll('.lib-tile')).toHaveLength(2);
+  });
+});
+
 describe('Library side panel', () => {
   it('lists All, Character, Location, Product, Object and Style, and switches to saved items', () => {
     const rail = () => q('.pc-rail');

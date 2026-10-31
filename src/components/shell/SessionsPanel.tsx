@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Check, Eye, EyeOff, Maximize2, Minimize2, Pin, PinOff, Plus, Search, ListFilter, Trash, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Eye, EyeOff, Maximize2, Minimize2, Pin, PinOff, Plus, ListFilter, Trash, X } from 'lucide-react';
 import { newSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -11,7 +11,7 @@ import { usePanelExpanded } from './panelEmbed';
 import { visibleSessions } from '../../store/spaceSession';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { usePref } from '../ui/hooks';
-import { Sep, SortToggles, ViewToggle, asItemView, type SortState } from '../ui/PanelControls';
+import { SearchToggle, Sep, SortToggles, ViewToggle, asItemView, type SortState } from '../ui/PanelControls';
 import { CANVAS, QUICK_MODES, RunningNote, SessionRow, sessionCanvases, type QuickMode, type Stats } from './SessionRow';
 import './SessionsLayout.css';
 
@@ -157,15 +157,7 @@ export function SessionsPanel() {
           </Popover>
         </div>
         <div className="sessions-filter-bar pc-bar">
-        <div className="search-input">
-          <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
-          {q ? (
-            <button type="button" aria-label="Clear search" onClick={() => setQ('')}>
-              <X size={13} />
-            </button>
-          ) : null}
-        </div>
+        <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" />
         <div className="results-controls">
           <button ref={view.ref} type="button" className={`results-menu-trigger${canvas !== 'all' || pinnedOnly || shelf === 'archived' || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
         <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">

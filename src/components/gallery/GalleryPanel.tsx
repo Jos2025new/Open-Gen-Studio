@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowDownAZ, ArrowUpZA, Box, ExternalLink, Grid2X2, Maximize2, Minimize2, Palette, Search, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
+import { ArrowDownAZ, ArrowUpZA, Box, ExternalLink, Grid2X2, Maximize2, Minimize2, Palette, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
 import { IconButton } from '../ui/primitives';
@@ -8,7 +8,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import type { Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { usePref } from '../ui/hooks';
-import { CardMenu, CategoryRail, MenuConfirm, MenuItem, Sep, ViewToggle, asItemView, useTapReveal, type ItemView, type RailItem } from '../ui/PanelControls';
+import { SearchToggle, CardMenu, CategoryRail, MenuConfirm, MenuItem, Sep, ViewToggle, asItemView, useTapReveal, type ItemView, type RailItem } from '../ui/PanelControls';
 import { GeneratedAssets } from './GeneratedAssets';
 import './GalleryLayout.css';
 
@@ -51,11 +51,7 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <div className="search-input">
-            <Search size={14} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search saved items" aria-label="Search saved items" />
-            {q ? <button type="button" aria-label="Clear search" onClick={() => setQ('')}><X size={13} /></button> : null}
-          </div>
+          <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" />
           <IconButton icon={asc ? ArrowDownAZ : ArrowUpZA} label="Sort by name" size="sm" active aria-pressed data-tip={`Sort by name · ${asc ? 'A → Z' : 'Z → A'}`} onClick={() => setAsc(!asc)} />
           {view === 'card' ? <>
             <Sep />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AudioLines, Box, Download, Film, Folder, Image, ListFilter, MessageSquare, Paperclip, Search, Trash, X } from 'lucide-react';
+import { AudioLines, Box, Download, Film, Folder, Image, ListFilter, MessageSquare, Paperclip, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -13,7 +13,7 @@ import { usePanelExpanded } from '../shell/panelEmbed';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 import { ResultsMenu } from '../ui/ResultsMenu';
-import { Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
+import { SearchToggle, Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
 import { generationTitle } from '../assets/GenerationInfo';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
 
@@ -109,11 +109,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <div className="search-input">
-            <Search size={14} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search prompts and models" aria-label="Search assets" />
-            {q ? <button type="button" aria-label="Clear search" onClick={() => setQ('')}><X size={13} /></button> : null}
-          </div>
+          <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" />
           <div className="results-controls">
             <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={filtered || group !== 'date' || favOnly}>
               <div className="sv-row">
