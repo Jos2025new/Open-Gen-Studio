@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Check, Eye, EyeOff, Funnel, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Eye, EyeOff, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from 'lucide-react';
 import { newSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -11,8 +11,9 @@ import { visibleSessions } from '../../store/spaceSession';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { setUserHidden } from '../../store/userHidden';
 import { usePref } from '../ui/hooks';
-import { GridSizeSlider, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, SourceSelect, ToggleRow, asItemView, type RailItem, type SortState } from '../ui/PanelControls';
-import { CANVAS, QUICK_MODES, RunningNote, SessionRow, sessionCanvases, type QuickMode, type Stats } from './SessionRow';
+import { GridSizeSlider, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, SourceSelect, asItemView, type RailItem } from '../ui/PanelControls';
+import { ListHeader, widthVars, type ColumnWidths } from '../gallery/ListColumns';
+import { CANVAS, QUICK_MODES, RunningNote, SESSION_HEADS, SessionRow, sessionCanvases, sessionMode, type QuickMode, type SessionSortKey, type Stats } from './SessionRow';
 import './SessionsLayout.css';
 
 export { sessionCanvases };
@@ -42,7 +43,8 @@ export function SessionsPanel() {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState<SortState>({ by: 'date', asc: false });
+  const [sort, setSort] = useState<{ by: SessionSortKey; asc: boolean }>({ by: 'date', asc: false });
+  const [colWidths, setColWidths] = usePref<ColumnWidths>('ogs.sessionsColumns', {});
   const [basis, setBasis] = useState<'updated' | 'created'>('updated');
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -90,10 +92,27 @@ export function SessionsPanel() {
     const arr = visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived') && (!pinnedOnly || s.pinned) && (showHidden || !s.userHidden) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && (quickMode === 'all' || stats.get(s.id)?.modes.has(quickMode) || s.feed.some((f) => f.type === 'user' && f.mode === quickMode)) && matches(s));
     const dir = sort.asc ? 1 : -1;
     const stamp = (x: Session) => (basis === 'created' ? x.createdAt : x.updatedAt);
+    // Columns compare by value; sessions without one (no mode, no spend…) always go last.
+    const value = (x: Session): number | string | undefined => {
+      const st = stats.get(x.id);
+      switch (sort.by) {
+        case 'mode': return sessionMode(x, st);
+        case 'gens': return st?.gens || undefined;
+        case 'nodes': return x.graph.nodes.length || undefined;
+        case 'designs': return x.docs.length || undefined;
+        case 'spend': return st?.spend || undefined;
+        default: return undefined;
+      }
+    };
     arr.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       if (sort.by === 'name') return dir * a.title.localeCompare(b.title);
-      return dir * (stamp(a) - stamp(b));
+      if (sort.by === 'date') return dir * (stamp(a) - stamp(b));
+      const x = value(a);
+      const y = value(b);
+      if ((x === undefined) !== (y === undefined)) return x === undefined ? 1 : -1;
+      if (x === undefined || y === undefined) return dir * (stamp(a) - stamp(b));
+      return dir * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)));
     });
     return arr;
   }, [sessions, matches, sort, basis, showHidden, pinnedOnly, canvas, shelf, quickMode, stats]);
@@ -120,13 +139,20 @@ export function SessionsPanel() {
   const allPinned = picked.length > 0 && picked.every((x) => x.pinned);
   const isEmpty = (x: Session) => !x.feed.length && !x.graph.nodes.length && !x.docs.some((d) => d.layers.length) && !stats.get(x.id)?.gens && !stats.get(x.id)?.assets.length;
 
-  // Pinned sessions stay on top as their own group; the rest are grouped by date unless sorted by name.
+  // Pinned sessions stay on top as their own group; the rest are grouped by date when sorted by date.
   const groups = useMemo(() => {
     const pinned = list.filter((s) => s.pinned);
     const rest = list.filter((s) => !s.pinned);
-    const dated = sort.by === 'name' ? [{ label: '', items: rest }] : groupByDate(rest, (s) => (basis === 'created' ? s.createdAt : s.updatedAt));
+    const dated = sort.by !== 'date' ? [{ label: '', items: rest }] : groupByDate(rest, (s) => (basis === 'created' ? s.createdAt : s.updatedAt));
     return [...(pinned.length ? [{ label: 'Pinned', items: pinned }] : []), ...dated].filter((g) => g.items.length);
   }, [list, sort, basis]);
+
+  const clear = () => setSelected(new Set());
+  const shelfToggles = <>
+    <IconButton icon={showHidden ? Eye : EyeOff} label={`Show hidden · ${hiddenCount}`} size="sm" active={showHidden} aria-pressed={showHidden} onClick={() => { setShowHidden(!showHidden); clear(); }} />
+    <IconButton icon={Archive} label={`Show archived · ${archivedCount}`} size="sm" active={shelf === 'archived'} aria-pressed={shelf === 'archived'} onClick={() => { setShelf(shelf === 'archived' ? 'recent' : 'archived'); clear(); }} />
+  </>;
+  const empties = list.filter(isEmpty);
 
   return (
     <div role="region" aria-label="Sessions" className={`sessions layout-${layout}`}>
@@ -158,7 +184,7 @@ export function SessionsPanel() {
           </Popover>
           <SourceSelect items={SOURCES.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={(v) => { setCanvas(v); setSelected(new Set()); }} label="Session canvas" separatorAfter="all" allLabel="Sessions" />
           <div className="pc-icons">
-            <PanelPopover icon={LayoutGrid} label="View">
+            <PanelPopover icon={LayoutGrid} label="View">{(close) => <>
               <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={layout} onChange={setLayout} /></div>
               <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
               <div className="sv-row">
@@ -166,16 +192,11 @@ export function SessionsPanel() {
                 <Segmented value={basis} size="sm" onChange={setBasis} options={[{ value: 'updated', label: 'Last activity' }, { value: 'created', label: 'Created' }]} />
               </div>
               {layout === 'card' ? <div className="sv-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
-            </PanelPopover>
-            <PanelPopover icon={Funnel} label="Filters" dot={showHidden || shelf === 'archived'}>{(close) => <>
-              <ToggleRow label="Show hidden" count={hiddenCount} checked={showHidden} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
-              <ToggleRow label="Show archived" count={archivedCount} checked={shelf === 'archived'} onChange={(v) => { setShelf(v ? 'archived' : 'recent'); setSelected(new Set()); }} />
-              {list.some(isEmpty) ? (
-                <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); close(); }}>
-                  Select the {list.filter(isEmpty).length} empty session{list.filter(isEmpty).length === 1 ? '' : 's'}
+              {empties.length ? (
+                <button type="button" className="sv-action" onClick={() => { setSelected(new Set(empties.map((x) => x.id))); close(); }}>
+                  Select the {empties.length} empty session{empties.length === 1 ? '' : 's'}
                 </button>
               ) : null}
-              <Button size="sm" variant="ghost" disabled={!showHidden && shelf !== 'archived'} onClick={() => { setShowHidden(false); setShelf('recent'); setSelected(new Set()); }}>Clear filters</Button>
             </>}</PanelPopover>
             <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" hint={`${list.length} session${list.length === 1 ? '' : 's'}`} />
           </div>
@@ -200,7 +221,8 @@ export function SessionsPanel() {
       </div>
       <div className="pc-split">
       <div className="pc-main">
-      <div className="sessions-scroll">
+      <div className="sessions-scroll" data-col-scope style={layout === 'list' ? widthVars(colWidths) : undefined}>
+        {layout === 'list' ? <ListHeader heads={SESSION_HEADS} sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} end={shelfToggles} /> : <ListHeader heads={SESSION_HEADS} sort={sort} onSort={setSort} strip end={shelfToggles} />}
         {groups.map((g) => (
           <section key={g.label} className="date-group">
             {g.label ? (
@@ -214,7 +236,7 @@ export function SessionsPanel() {
                 {g.label} <span className="faint num">{g.items.length}</span>
               </h4>
             ) : null}
-            <div className="session-list" style={{ ['--cols' as string]: cols }}>
+            <div className={`session-list${layout === 'list' ? ' pc-cols' : ''}`} style={{ ['--cols' as string]: cols }}>
               {g.items.map((s) => (
                 <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} view={layout} basis={basis} selecting={selecting} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} />
               ))}

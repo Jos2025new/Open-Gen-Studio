@@ -18,6 +18,13 @@
 .sess-card .pc-info-sub time { color: inherit; }
 .sess-row .pc-text { cursor: pointer; }
 .sess-row .sess-cover { border-radius: 7px; }
+/* List columns: mode, counts and spend beside the name, sortable and resizable from the header. */
+.sessions { --pc-w-mode: 72px; --pc-w-gens: 84px; --pc-w-nodes: 56px; --pc-w-designs: 64px; --pc-w-spend: 64px; --pc-w-date: 64px; --pc-w-tools: 120px; }
+.pc-col-mode { width: var(--pc-w-mode); }
+.pc-col-gens { width: var(--pc-w-gens); }
+.pc-col-nodes { width: var(--pc-w-nodes); }
+.pc-col-designs { width: var(--pc-w-designs); }
+.pc-col-spend { width: var(--pc-w-spend); }
 
 /* Sessions uses one theme border for its frame and dividers. */
 .side-panel.panel-sessions { border-color: var(--border); box-shadow: 0 12px 32px rgba(0, 0, 0, .225), 0 2px 8px rgba(0, 0, 0, .15); }

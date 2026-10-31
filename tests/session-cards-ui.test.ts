@@ -53,9 +53,7 @@ it('selects a date group, archives and restores it, and switches layouts', () =>
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Archive selected"]')!.click());
   expect(useStore.getState().sessions[first.id].archived).toBe(true);
   expect(useStore.getState().sessions[second.id].archived).toBe(true);
-  act(() => host.querySelector<HTMLButtonElement>('.pc-bar [aria-label^="Filters"]')!.click());
-  act(() => document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Show archived"]')!.click());
-  act(() => document.body.click());
+  act(() => host.querySelector<HTMLButtonElement>('.pc-strip-end [aria-label^="Show archived"]')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(2);
   act(() => host.querySelector<HTMLButtonElement>('.sess-card [aria-label="Session actions"]')!.click());
   act(() => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === 'Restore session')!.click());
@@ -84,9 +82,7 @@ it('restores and opens an archived session when its row is pressed', () => {
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
   act(() => root.render(createElement(SessionsPanel)));
-  act(() => host.querySelector<HTMLButtonElement>('.pc-bar [aria-label^="Filters"]')!.click());
-  act(() => document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Show archived"]')!.click());
-  act(() => document.body.click());
+  act(() => host.querySelector<HTMLButtonElement>('.pc-strip-end [aria-label^="Show archived"]')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(1);
   act(() => host.querySelector<HTMLElement>('.session-main')!.click());
   expect(useStore.getState().sessions[second.id].archived).toBeUndefined();

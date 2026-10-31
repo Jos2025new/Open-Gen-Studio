@@ -47,30 +47,32 @@ export const ColumnCells = ({ v }: { v: ColumnValues }) => <>
   <span className="pc-col pc-col-duration num">{v.duration || '—'}</span>
 </>;
 
-/** Columns whose width the user can drag from the header; Name takes whatever is left. */
-export type WidthKey = ColumnKey | 'date';
-export type ColumnWidths = Partial<Record<WidthKey, number>>;
-const WIDTH_VAR: Record<WidthKey, string> = { model: '--pc-w-model', aspect: '--pc-w-aspect', resolution: '--pc-w-res', duration: '--pc-w-dur', date: '--pc-w-date' };
+/** A column of the sort row: `width` columns can be resized from their header edge; the first one (Name) takes what is left. */
+export interface HeadDef<K extends string = string> { by: K; label: string; width?: boolean }
+/** Widths by column key, stored as CSS variables `--pc-w-<key>` on the list's scroll container (`data-col-scope`). */
+export type ColumnWidths = Partial<Record<string, number>>;
 const MIN_W = 44;
 const MAX_W = 420;
 const clampW = (w: number) => Math.round(Math.min(MAX_W, Math.max(MIN_W, w)));
-/** The stored widths as CSS variables for the list container (defaults live in GalleryLayout.css). */
-export const widthVars = (w: ColumnWidths): CSSProperties => Object.fromEntries((Object.keys(w) as WidthKey[]).filter((k) => WIDTH_VAR[k] && w[k]).map((k) => [WIDTH_VAR[k], `${w[k]}px`])) as CSSProperties;
+const widthVar = (k: string) => `--pc-w-${k}`;
+/** The stored widths as CSS variables for the list container (defaults live in the panel's CSS). */
+export const widthVars = (w: ColumnWidths): CSSProperties => Object.fromEntries(Object.keys(w).filter((k) => w[k]).map((k) => [widthVar(k), `${w[k]}px`])) as CSSProperties;
 
-const HEADS: Array<{ by: ListSortKey; label: string; className: string; width?: WidthKey }> = [
-  { by: 'name', label: 'Name', className: 'pc-col-name' },
-  { by: 'model', label: 'Model', className: 'pc-col pc-col-model', width: 'model' },
-  { by: 'aspect', label: 'Aspect', className: 'pc-col pc-col-aspect', width: 'aspect' },
-  { by: 'resolution', label: 'Resolution', className: 'pc-col pc-col-resolution', width: 'resolution' },
-  { by: 'duration', label: 'Duration', className: 'pc-col pc-col-duration', width: 'duration' },
-  { by: 'date', label: 'Date', className: 'pc-col pc-col-date', width: 'date' },
+/** Library's columns. */
+export const LIBRARY_HEADS: HeadDef<ListSortKey>[] = [
+  { by: 'name', label: 'Name' },
+  { by: 'model', label: 'Model', width: true },
+  { by: 'aspect', label: 'Aspect', width: true },
+  { by: 'resolution', label: 'Resolution', width: true },
+  { by: 'duration', label: 'Duration', width: true },
+  { by: 'date', label: 'Date', width: true },
 ];
 
 /** The handle on a column's left edge: drag it (or use ←/→) to resize; double-click restores the default. While
  *  dragging only the CSS variable on the list changes, so rows do not re-render; the width is stored on release. */
-function ResizeHandle({ k, label, widths, onResize }: { k: WidthKey; label: string; widths: ColumnWidths; onResize: (w: ColumnWidths) => void }) {
+function ResizeHandle({ k, label, widths, onResize }: { k: string; label: string; widths: ColumnWidths; onResize: (w: ColumnWidths) => void }) {
   const cellWidth = (el: Element) => el.parentElement?.getBoundingClientRect().width ?? MIN_W;
-  const apply = (el: Element, w: number) => (el.closest('.gallery-scroll') as HTMLElement | null)?.style.setProperty(WIDTH_VAR[k], `${w}px`);
+  const apply = (el: Element, w: number) => (el.closest('[data-col-scope]') as HTMLElement | null)?.style.setProperty(widthVar(k), `${w}px`);
   const down = (e: PointerEvent<HTMLSpanElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -106,13 +108,14 @@ function ResizeHandle({ k, label, widths, onResize }: { k: WidthKey; label: stri
 /** The list header: pressing a column sorts by it; pressing it again flips the direction. Dates start newest first.
  *  `strip` is the same set for the card grid: one compact row of sort labels, without column widths.
  *  `end` sits at the opposite end of the row (the show-hidden and show-archived toggles). */
-export function ListHeader({ sort, onSort, widths, onResize, strip, end }: { sort: ListSort; onSort: (s: ListSort) => void; widths?: ColumnWidths; onResize?: (w: ColumnWidths) => void; strip?: boolean; end?: ReactNode }) {
+export function ListHeader<K extends string>({ heads, sort, onSort, widths, onResize, strip, end }: { heads: HeadDef<K>[]; sort: { by: K; asc: boolean }; onSort: (s: { by: K; asc: boolean }) => void; widths?: ColumnWidths; onResize?: (w: ColumnWidths) => void; strip?: boolean; end?: ReactNode }) {
   return <div className={strip ? 'pc-sort-strip' : 'pc-list-head'} role="group" aria-label="Sort by column">
-    {HEADS.map((h) => {
+    {heads.map((h, i) => {
       const on = sort.by === h.by;
       const Arrow = sort.asc ? ArrowUp : ArrowDown;
-      return <span key={h.by} className={strip ? 'pc-head-cell' : `pc-head-cell ${h.className}`}>
-        {h.width && widths && onResize && !strip ? <ResizeHandle k={h.width} label={h.label} widths={widths} onResize={onResize} /> : null}
+      const cls = i === 0 ? 'pc-col-name' : `pc-col pc-col-${h.by}`;
+      return <span key={h.by} className={strip ? 'pc-head-cell' : `pc-head-cell ${cls}`}>
+        {h.width && widths && onResize && !strip ? <ResizeHandle k={h.by} label={h.label} widths={widths} onResize={onResize} /> : null}
         <button type="button" className={on ? 'is-on' : undefined} aria-pressed={on}
           aria-label={`Sort by ${h.label}${on ? (sort.asc ? ', ascending' : ', descending') : ''}`}
           onClick={() => onSort(on ? { by: h.by, asc: !sort.asc } : { by: h.by, asc: h.by !== 'date' })}>

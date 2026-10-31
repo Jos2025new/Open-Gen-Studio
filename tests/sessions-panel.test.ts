@@ -20,7 +20,7 @@ const q = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T
 const titles = () => [...host.querySelectorAll('.sess-card .pc-info-title, .sess-row .pc-info-title')].map((e) => e.textContent);
 const bar = (label: string) => q(`.pc-bar [aria-label^="${label}"]`);
 const radio = (text: string) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === text) ?? null;
-const sw = (label: string) => document.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`)!;
+const shelf = (label: string) => q(`.pc-strip-end [aria-label^="${label}"]`);
 const canvasIs = (name: string) => { click(q('.pc-source')); click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith(name))); };
 const item = (text: string) => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((e) => e.textContent === text);
 
@@ -96,13 +96,12 @@ describe('Sessions top bar', () => {
     expect(titles()).toHaveLength(3);
   });
 
-  it('View holds Layout, Sort, Date means and Grid size; Filters holds Show hidden, Show archived and Clear filters; Pinned only is a bar pin', () => {
+  it('View holds Layout, Sort, Date means and Grid size; Show hidden and Show archived are icons at the end of the sort row; Pinned only is a bar pin', () => {
     click(bar('View'));
     const labels = () => [...document.querySelectorAll('.sv-label, .sv-switch > span:first-child')].map((e) => e.textContent?.trim());
     expect(labels()).toEqual(['Layout', 'Sort', 'Date means', 'Grid size']);
-    click(bar('Filters'));
-    expect([...document.querySelectorAll('[role="dialog"][aria-label="Filters"] .sv-switch > span')].map((e) => e.textContent?.trim())).toEqual(['Show hidden · 0', 'Show archived · 0']);
-    expect([...document.querySelectorAll('[role="dialog"][aria-label="Filters"] button')].some((b) => b.textContent === 'Clear filters')).toBe(true);
+    expect([...host.querySelectorAll('.pc-sort-strip .pc-strip-end button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Show hidden · 0', 'Show archived · 0']);
+    expect(host.querySelector('.pc-bar [aria-label^="Filters"]')).toBeNull();
     const pin = bar('Pinned only');
     expect(pin.getAttribute('aria-pressed')).toBe('false');
   });
@@ -116,30 +115,27 @@ describe('Sessions top bar', () => {
     expect(host.querySelector('.sessions-active')).toBeNull();
   });
 
-  it('Show archived in Filters switches to the archived sessions and shows the count; Clear filters returns', () => {
+  it('Show archived switches to the archived sessions and shows the count; pressing it again returns', () => {
     click(q('.sess-card [aria-label="Session actions"]'));
     click(item('Archive session'));
-    click(bar('Filters'));
-    const arch = () => sw('Show archived');
-    expect(arch().closest('.sv-switch')?.textContent).toContain('1');
-    expect(arch().getAttribute('aria-checked')).toBe('false');
-    expect(host.querySelector('.pc-dot')).toBeNull();
+    const arch = () => shelf('Show archived');
+    expect(arch().getAttribute('aria-label')).toBe('Show archived · 1');
+    expect(arch().getAttribute('aria-pressed')).toBe('false');
     click(arch());
-    expect(arch().getAttribute('aria-checked')).toBe('true');
-    expect(host.querySelector('.pc-dot')).not.toBeNull();
+    expect(arch().getAttribute('aria-pressed')).toBe('true');
     expect(titles()).toHaveLength(1);
-    click([...document.querySelectorAll('[role="dialog"][aria-label="Filters"] button')].find((b) => b.textContent === 'Clear filters'));
-    expect(arch().getAttribute('aria-checked')).toBe('false');
+    click(arch());
+    expect(arch().getAttribute('aria-pressed')).toBe('false');
     expect(titles()).toHaveLength(2);
   });
 
-  it('the Filters popover offers to select the empty sessions and closes after using it', () => {
-    click(bar('Filters'));
+  it('the View popover offers to select the empty sessions and closes after using it', () => {
+    click(bar('View'));
     const act1 = [...document.querySelectorAll('.sv-action')].find((b) => b.textContent?.startsWith('Select the'));
     expect(act1?.textContent).toMatch(/Select the 1 empty session/);
     click(act1);
     expect(host.querySelector('.session-bar')?.textContent).toContain('1 selected');
-    expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeNull();
+    expect(document.querySelector('[role="dialog"][aria-label="View"]')).toBeNull();
   });
 
   it('the bar icon buttons share one size class and stroke', () => {
@@ -149,7 +145,7 @@ describe('Sessions top bar', () => {
     }
   });
 
-  it('two zones like Generations: New, the title and View, Filters, Search on the left; modes, pin and chrome on the right', () => {
+  it('two zones like Generations: New, the title and View, Search on the left; modes, pin and chrome on the right', () => {
     const zones = [...q('.pc-bar').children];
     expect(zones).toHaveLength(2);
     expect(zones[0].querySelector('button')?.textContent).toContain('New');
@@ -157,7 +153,7 @@ describe('Sessions top bar', () => {
     expect(zones[1].querySelector('.pc-center [aria-label="Videos"]')).not.toBeNull();
     expect(zones[1].querySelector('input[aria-label="Grid size"]')).toBeNull(); // in View
     const tools = [...zones[0].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
-    expect(tools).toEqual(['View', 'Filters', 'Search']);
+    expect(tools).toEqual(['View', 'Search']);
     expect([...zones[1].querySelectorAll('.pc-flags button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pinned only']);
     expect([...zones[1].querySelectorAll(':scope > .pc-chrome button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Collapse', 'Close']);
     expect(host.querySelector('.sessions-toolbar')).toBeNull(); // one chrome row
@@ -248,12 +244,10 @@ describe('Sessions cards', () => {
     expect(useStore.getState().sessions[ids.Alpha].userHidden).toBe(true);
     expect(useStore.getState().sessions[ids.Alpha].hidden).toBeUndefined(); // not the Space-container flag
     expect(titles()).toEqual(['Bravo', 'Charlie']);
-    click(bar('Filters'));
-    const eye = sw('Show hidden');
-    expect(eye.getAttribute('aria-checked')).toBe('false');
-    expect(eye.closest('.sv-switch')?.textContent).toContain('1');
-    click(eye);
-    expect(eye.getAttribute('aria-checked')).toBe('true');
+    expect(shelf('Show hidden').getAttribute('aria-label')).toBe('Show hidden · 1');
+    expect(shelf('Show hidden').getAttribute('aria-pressed')).toBe('false');
+    click(shelf('Show hidden'));
+    expect(shelf('Show hidden').getAttribute('aria-pressed')).toBe('true');
     expect(titles()).toHaveLength(3);
     expect(card('Alpha').classList.contains('is-hidden-item')).toBe(true);
     expect(card('Alpha').querySelector('.pc-hidden-badge')).not.toBeNull();
@@ -273,8 +267,7 @@ describe('Sessions cards', () => {
     expect(titles()).toEqual(['Bravo']);
     act(() => setUserHidden('session', [space.id], true));
     expect(useStore.getState().sessions[space.id].userHidden).toBeUndefined();
-    click(bar('Filters'));
-    click(sw('Show hidden'));
+    click(shelf('Show hidden'));
     click(card('Charlie').querySelector('[role="checkbox"]'));
     expect(q('.session-bar [aria-label="Unhide"]')).not.toBeNull();
     click(q('.session-bar [aria-label="Unhide"]'));

@@ -10,6 +10,7 @@ import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView
 import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import type { Session, Workspace } from '../../engine/types';
+import type { HeadDef } from '../gallery/ListColumns';
 
 export type QuickMode = 'all' | 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 export const QUICK_MODES = [{ id: 'agent', label: 'Agent', icon: Workflow }, { id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Video }, { id: 'audio', label: 'Audio', icon: Music }, { id: 'model3d', label: '3D', icon: Box }] as const;
@@ -45,6 +46,26 @@ export function RunningNote({ ids }: { ids: string[] }) {
   return <p className="muted">{n} generation{n === 1 ? ' is' : 's are'} still running: {n === 1 ? 'it' : 'they'} will finish, any charge is recorded in Spending, and the results are discarded.</p>;
 }
 
+/** The session's most recent mode: its latest generation's, unless a newer prompt asked for another. */
+export function sessionMode(session: Session, stats?: Stats): string | undefined {
+  const latestPrompt = session.feed.reduce<(typeof session.feed)[number] | undefined>((latest, item) => item.type === 'user' && (!latest || item.createdAt > latest.createdAt) ? item : latest, undefined);
+  const latestPromptMode = latestPrompt?.type === 'user' ? latestPrompt.mode : undefined;
+  const recentMode = stats?.latestModeAt && stats.latestModeAt > (latestPrompt?.createdAt ?? 0) ? stats.latestMode : latestPromptMode ?? stats?.latestMode;
+  return recentMode ? MODE_NAME[recentMode as keyof typeof MODE_NAME] : undefined;
+}
+
+/** Sessions' list columns beyond the name; each one sorts from its header. */
+export const SESSION_HEADS: HeadDef<SessionSortKey>[] = [
+  { by: 'name', label: 'Name' },
+  { by: 'mode', label: 'Mode', width: true },
+  { by: 'gens', label: 'Generations', width: true },
+  { by: 'nodes', label: 'Nodes', width: true },
+  { by: 'designs', label: 'Designs', width: true },
+  { by: 'spend', label: 'Spend', width: true },
+  { by: 'date', label: 'Date', width: true },
+];
+export type SessionSortKey = 'name' | 'mode' | 'gens' | 'nodes' | 'designs' | 'spend' | 'date';
+
 const shortDate = (time: number) => new Date(time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 /** A session as an image-first card (cover fills it; details on hover, focus or first tap) or as a compact row. */
@@ -56,10 +77,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const nodes = session.graph.nodes.length;
   const canvases = sessionCanvases(session);
   const CoverIcon = CANVAS[canvases[0] ?? 'chat'].icon;
-  const latestPrompt = session.feed.reduce<(typeof session.feed)[number] | undefined>((latest, item) => item.type === 'user' && (!latest || item.createdAt > latest.createdAt) ? item : latest, undefined);
-  const latestPromptMode = latestPrompt?.type === 'user' ? latestPrompt.mode : undefined;
-  const recentMode = stats?.latestModeAt && stats.latestModeAt > (latestPrompt?.createdAt ?? 0) ? stats.latestMode : latestPromptMode ?? stats?.latestMode;
-  const modeLabel = recentMode ? MODE_NAME[recentMode as keyof typeof MODE_NAME] : undefined;
+  const modeLabel = sessionMode(session, stats);
   const stamp = basis === 'created' ? session.createdAt : session.updatedAt;
   const details = [stats?.gens ? `${stats.gens} gen` : null, nodes ? `${nodes} nodes` : null, docs ? `${docs} design${docs === 1 ? '' : 's'}` : null, stats?.spend ? formatUsd(stats.spend) : null].filter(Boolean);
   const open = () => {
@@ -75,12 +93,17 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const keys = (e: React.KeyboardEvent) => { if (!editing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } };
   const when = <time className="pc-when" dateTime={new Date(stamp).toISOString()} title={`${basis === 'created' ? 'Created' : 'Updated'}: ${new Date(stamp).toLocaleString()}`}>{shortDate(stamp)}</time>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
+  const inRow = view === 'list';
+  const hide = () => setUserHidden('session', [session.id], !session.userHidden);
+  const archive = () => setSessionsArchived([session.id], !session.archived);
   const menu = <CardMenu label="Session actions" className="pc-hover">{(close) => confirming
     ? <MenuConfirm text={`Delete “${session.title}” with its conversation, nodes, designs and assets?`} extra={<RunningNote ids={[session.id]} />} action="Delete" onCancel={() => setConfirming(false)} onConfirm={() => { close(); deleteSession(session.id); }} />
     : <>
       <MenuItem icon={Pencil} onClick={() => { close(); setDraft(session.title); window.setTimeout(() => setEditing(true), 0); }}>Rename</MenuItem>
-      <MenuItem icon={session.archived ? ArchiveRestore : Archive} onClick={() => { close(); setSessionsArchived([session.id], !session.archived); }}>{session.archived ? 'Restore session' : 'Archive session'}</MenuItem>
-      <MenuItem icon={session.userHidden ? Eye : EyeOff} onClick={() => { close(); setUserHidden('session', [session.id], !session.userHidden); }}>{session.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
+      {inRow ? null : <>
+        <MenuItem icon={session.archived ? ArchiveRestore : Archive} onClick={() => { close(); archive(); }}>{session.archived ? 'Restore session' : 'Archive session'}</MenuItem>
+        <MenuItem icon={session.userHidden ? Eye : EyeOff} onClick={() => { close(); hide(); }}>{session.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
+      </>}
       <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>Delete</MenuItem>
     </>}</CardMenu>;
   const title = editing ? (
@@ -100,10 +123,20 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
         <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
         <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onDoubleClick={rename} onKeyDown={keys}>
           {title}
-          <span className="pc-info-sub num">{[modeLabel, ...details].filter(Boolean).join(' · ') || 'empty'}{active ? ' · Open' : ''}</span>
+          <span className={`pc-info-sub num${active ? '' : ' pc-cols-alt'}`}><span className="pc-cols-alt">{[modeLabel, ...details].filter(Boolean).join(' · ') || 'empty'}{active ? ' · ' : ''}</span>{active ? 'Open' : ''}</span>
         </div>
-        {hiddenMark}{when}
-        <span className="pc-tools">{pin}{menu}</span>
+        {hiddenMark}
+        <span className="pc-col pc-col-mode">{modeLabel ?? '—'}</span>
+        <span className="pc-col pc-col-gens num">{stats?.gens || '—'}</span>
+        <span className="pc-col pc-col-nodes num">{nodes || '—'}</span>
+        <span className="pc-col pc-col-designs num">{docs || '—'}</span>
+        <span className="pc-col pc-col-spend num">{stats?.spend ? formatUsd(stats.spend) : '—'}</span>
+        {when}
+        <span className="pc-tools">
+          <IconButton icon={session.userHidden ? Eye : EyeOff} label={session.userHidden ? 'Unhide' : 'Hide'} size="sm" onClick={(e) => { e.stopPropagation(); hide(); }} />
+          <IconButton icon={session.archived ? ArchiveRestore : Archive} label={session.archived ? 'Restore session' : 'Archive session'} size="sm" onClick={(e) => { e.stopPropagation(); archive(); }} />
+          {pin}{menu}
+        </span>
       </div>
     );
   }

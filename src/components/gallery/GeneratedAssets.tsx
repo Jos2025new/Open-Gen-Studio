@@ -18,7 +18,7 @@ import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
 import { usePref } from '../ui/hooks';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
-import { ListHeader, columnValues, compareColumn, widthVars, type ColumnValues, type ColumnWidths, type ListSort } from './ListColumns';
+import { LIBRARY_HEADS, ListHeader, columnValues, compareColumn, widthVars, type ColumnValues, type ColumnWidths, type ListSort } from './ListColumns';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
@@ -185,8 +185,8 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
           </div>
         ) : null}
       </div>
-      <div className="gallery-scroll" style={view === 'list' ? widthVars(colWidths) : undefined}>
-        {results.length || hiddenCount || archivedCount || showHidden || showArchived ? view === 'list' ? <ListHeader sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} end={shelfToggles} /> : <ListHeader sort={sort} onSort={setSort} strip end={shelfToggles} /> : null}
+      <div className="gallery-scroll" data-col-scope style={view === 'list' ? widthVars(colWidths) : undefined}>
+        {results.length || hiddenCount || archivedCount || showHidden || showArchived ? view === 'list' ? <ListHeader heads={LIBRARY_HEADS} sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} end={shelfToggles} /> : <ListHeader heads={LIBRARY_HEADS} sort={sort} onSort={setSort} strip end={shelfToggles} /> : null}
         {results.length ? (
           groups.map((g) => {
             const gids = g.items.flatMap((x) => (x.type === 'asset' ? [x.id] : []));
@@ -206,7 +206,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
                 ) : null}
                 {view === 'card'
                   ? <JustifiedGrid className="gallery-grid library-layout-card" items={tiles} rowHeight={rowHeightFor((expanded ? 10 : 7) - cols)} />
-                  : <div className="gallery-grid library-layout-list">{tiles.map((t) => <Fragment key={t.id}>{t.node}</Fragment>)}</div>}
+                  : <div className="gallery-grid library-layout-list pc-cols">{tiles.map((t) => <Fragment key={t.id}>{t.node}</Fragment>)}</div>}
               </section>
             );
           })
