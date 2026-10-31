@@ -4,7 +4,7 @@ import { renameSession, selectSession, setUi, togglePinSession, useStore } from 
 import { deleteSession } from '../../engine/actions';
 import { isRunning } from '../../engine/jobs';
 import { formatRelative, formatUsd } from '../../lib/format';
-import { IconButton } from '../ui/primitives';
+import { Button, IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
@@ -167,14 +167,22 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
       </div>
     );
   }
-  // Grid: the cover on top with the checkbox on its corner; title and details beneath; the actions in a footer.
+  // Grid: the cover fills a portrait card; over its lower part a dark fade carries the title, mode and date, three
+  // figures (generations, nodes, designs) and the actions: Continue (Current when open), pin and menu.
+  const stat = (value: number, label: string) => <span className="sess-stat"><b className="num">{value}</b><small>{label}</small></span>;
   return (
     <div className={`sess-card pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
       <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>
       <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
       {hiddenMark}
-      <div className="pc-info">{title}{meta}</div>
-      <div className="sess-card-foot">{openTag}<span className="pc-tools">{pin}{menu}</span></div>
+      <div className="pc-info">
+        {title}{meta}
+        <div className="sess-stats">{stat(stats?.gens ?? 0, 'Generations')}{stat(nodes, 'Nodes')}{stat(docs, 'Designs')}</div>
+        <div className="sess-card-actions">
+          <Button size="sm" variant="secondary" disabled={active} onClick={(e) => { e.stopPropagation(); open(); }}>{active ? 'Current' : 'Continue'}</Button>
+          <span className="pc-tools">{pin}{menu}</span>
+        </div>
+      </div>
     </div>
   );
 }
