@@ -16,8 +16,9 @@ import { rowHeightFor } from '../../lib/justifiedRows';
 import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, ToggleRow, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
+import { usePref } from '../ui/hooks';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
-import { ListHeader, columnValues, compareColumn, type ColumnValues, type ListSort } from './ListColumns';
+import { ListHeader, columnValues, compareColumn, widthVars, type ColumnValues, type ColumnWidths, type ListSort } from './ListColumns';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
@@ -34,6 +35,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
   const [mode, setMode] = useState<ModeFilter>('all');
   const [favOnly, setFavOnly] = useState(false);
   const [sort, setSort] = useState<ListSort>({ by: 'date', asc: false });
+  const [colWidths, setColWidths] = usePref<ColumnWidths>('ogs.libraryColumns', {});
   const [group, setGroup] = useState<'date' | 'session'>('date');
   const [showHidden, setShowHidden] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -182,8 +184,8 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
           </div>
         ) : null}
       </div>
-      <div className="gallery-scroll">
-        {results.length && view === 'list' ? <ListHeader sort={sort} onSort={setSort} /> : null}
+      <div className="gallery-scroll" style={view === 'list' ? widthVars(colWidths) : undefined}>
+        {results.length && view === 'list' ? <ListHeader sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} /> : null}
         {results.length ? (
           groups.map((g) => {
             const gids = g.items.flatMap((x) => (x.type === 'asset' ? [x.id] : []));

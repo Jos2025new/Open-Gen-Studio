@@ -452,4 +452,16 @@ describe('Library list columns', () => {
     expect(rows()).toEqual(['Apple', 'Cherry', 'Mango']);
     expect(head('Name').getAttribute('aria-pressed')).toBe('true');
   });
+  it('resizes a column from its header edge with the keyboard and restores it on double-click', () => {
+    toList();
+    const handle = q('[role="separator"][aria-label="Resize Model column"]');
+    const scroll = q<HTMLElement>('.gallery-scroll');
+    act(() => { handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); });
+    const w = JSON.parse(localStorage.getItem('ogs.libraryColumns') ?? '{}').model;
+    expect(w).toBeGreaterThanOrEqual(44);
+    expect(scroll.style.getPropertyValue('--pc-w-model')).toBe(`${w}px`);
+    act(() => { handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+    expect(JSON.parse(localStorage.getItem('ogs.libraryColumns') ?? '{}').model).toBeUndefined();
+    expect(scroll.style.getPropertyValue('--pc-w-model')).toBe('');
+  });
 });
