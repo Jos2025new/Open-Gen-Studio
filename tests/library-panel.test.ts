@@ -352,7 +352,7 @@ describe('Library cards', () => {
 
   it('overlay controls share one style and the agent-context toggle has its own glyph, distinct from the select box', () => {
     const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
-    expect(css).toMatch(/\.pc-card \.pc-check, \.pc-card \.attach-toggle, \.pc-card \.pc-tools \.icon-btn \{[^}]*width: 28px; height: 28px[^}]*border-radius: 50%; background: var\(--pc-btn-bg\)/);
+    expect(css).toMatch(/\.pc-card \.pc-check, \.pc-card \.attach-toggle, \.pc-card \.pc-tools \.icon-btn \{[^}]*width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: var\(--pc-btn-bg\)/);
     const tile = q('.g-tile');
     const attach = tile.querySelector('.attach-toggle')!;
     expect(attach.querySelector('.is-glyph svg')).not.toBeNull(); // off: a paperclip, not a plain box

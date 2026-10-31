@@ -36,9 +36,9 @@
 .pc-card .g-open .media, .pc-card .pc-open .media { width: 100%; height: 100%; object-fit: cover; }
 .pc-hover { opacity: 0; transition: opacity .12s; }
 .pc-card:hover .pc-hover, .pc-card:focus-within .pc-hover, .pc-card.is-armed .pc-hover, .pc-card.is-selecting .pc-check, .pc-card .pc-check.is-on, .pc-card .pc-hover.is-on, .pc-hover[aria-expanded="true"] { opacity: 1; }
-/* Every overlay control on a card shares one look: a 28px smoked-glass circle with a hairline rim, a soft shadow and a
-   white glyph, so it stays readable on light and dark images alike. */
-.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid rgba(255, 255, 255, .16); border-radius: 50%; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: 0 1px 4px rgba(0, 0, 0, .28); }
+/* Every overlay control on a card shares one look: a 26px smoked-glass rounded rectangle, borderless, with a white
+   glyph, so it stays readable on light and dark images alike and matches the app's square-cornered controls. */
+.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: none; }
 .pc-card .pc-check:hover, .pc-card .attach-toggle:hover, .pc-card .pc-tools .icon-btn:hover { background: var(--pc-btn-bg-hover); }
 .pc-card .pc-tools .icon-btn svg { width: 15px; height: 15px; }
 .pc-card .pc-box { width: 14px; height: 14px; border-width: 1.5px; border-radius: 4px; }
