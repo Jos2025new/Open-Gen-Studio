@@ -1038,7 +1038,8 @@ export interface Session {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
-  /** Internal Space container: hidden from every session list, Home and the search. */
+  archived?: boolean;
+  /** Space container, hidden from session lists and search. */
   hidden?: boolean;
   feed: FeedItem[];
   graph: Graph;

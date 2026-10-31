@@ -31,7 +31,7 @@ import {
   addAssets,
   appendFeed,
   autoTitleSession,
-  newSession,
+  createSession,
   patchSession,
   setComposer,
   setComposerMedia,
@@ -779,13 +779,12 @@ export function deleteSession(sessionId: string): void {
     active.forEach((id) => { if (generations[id]) generations[id] = { ...generations[id], discard: true }; });
     let activeSessionId = cur.activeSessionId;
     if (activeSessionId === sessionId || !sessions[activeSessionId]) {
-      const next = Object.values(sessions).filter((x) => !x.hidden).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      const next = Object.values(sessions).filter((x) => !x.hidden && !x.archived).sort((a, b) => b.updatedAt - a.updatedAt)[0];
       if (next) activeSessionId = next.id;
+      else { const fresh = createSession(); sessions[fresh.id] = fresh; activeSessionId = fresh.id; }
     }
     return { sessions, assets, generations, activeSessionId, ui: { ...cur.ui, homeDrafts: keptDrafts(cur.ui.homeDrafts, sessions) } };
   });
-  // Always keep one session.
-  if (!Object.keys(get().sessions).length) newSession();
   void deleteAssetBlobs(assetIds);
   void deleteBuffers(rasterIds);
   s.docs.forEach((d) => dropHistory(d.id));

@@ -22,7 +22,7 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const matches = useSessionMatcher(q);
   const list = useMemo(
-    () => visibleSessions(sessions).filter(matches).sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt)),
+    () => visibleSessions(sessions).filter((s) => !s.archived).filter(matches).sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt)),
     [sessions, matches],
   );
   const picked = [...selected].filter((id) => sessions[id]);
@@ -45,7 +45,7 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
         <span className="truncate" onDoubleClick={() => { pop.close(); onRename(); }}>{title}</span>
         <ChevronDown size={14} />
       </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={() => { pop.close(); stopSelecting(); }} width={320} label="Sessions">
+      <Popover open={pop.open} anchor={pop.ref} onClose={() => { pop.close(); stopSelecting(); }} width={320} align="start" placement="bottom-start" label="Sessions">
         <div className="switch-head">
           <div className="ml-search">
             <Search size={14} />
@@ -70,7 +70,7 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
         </div>
         <div className="ml-foot">
           <button type="button" className="ml-foot-main" onClick={() => go(() => setUi({ panel: 'sessions' }))}>
-            All sessions ({visibleSessions(sessions).length})
+            All sessions ({visibleSessions(sessions).filter((s) => !s.archived).length})
           </button>
           {selecting && picked.length ? <IconButton ref={del.ref} icon={Trash} label={`Delete ${picked.length} selected`} size="sm" tone="danger" active={del.open} onClick={del.toggle} /> : null}
         </div>
