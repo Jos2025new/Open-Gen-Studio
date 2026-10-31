@@ -24,7 +24,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { StudioNode, type FlowNode } from './nodes';
-import { AddNodeItems } from './AddNodeItems';
+import { AddNodeItems, NodeLibrary } from './AddNodeItems';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
 import { CanvasNavigation } from './CanvasNavigation';
@@ -38,13 +38,13 @@ import { useBoardFocus } from '../studio/useBoardFocus';
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
 /** Add node: the first tool of the canvas toolbox; its list opens to the right. */
-function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
+function AddNodeMenu({ onAdd, onImport }: { onAdd: (data: GraphNodeData) => void; onImport: () => void }) {
   const pop = usePopover();
   return (
     <>
       <IconButton ref={pop.ref} icon={Plus} label="Add node" aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={pop.toggle} />
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={260} label="Add node">
-        <AddNodeItems
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={340} label="Add node" className="node-lib-pop">
+        <NodeLibrary
           onPick={(data) => {
             onAdd(data);
             pop.close();
@@ -52,6 +52,10 @@ function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
           onAsset={() => {
             pop.close();
             setUi({ panel: 'gallery' });
+          }}
+          onImport={() => {
+            pop.close();
+            onImport();
           }}
         />
       </Popover>
@@ -319,6 +323,12 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
 
   const fileInput = useRef<HTMLInputElement>(null);
   const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
+  // Import from the toolbox's library: the images land at the visible centre, like Add node.
+  const importAtCenter = () => {
+    const r = canvasRef.current?.getBoundingClientRect();
+    importPosition.current = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : undefined;
+    fileInput.current?.click();
+  };
   const importImages = useCallback(async (files: File[], position?: { x: number; y: number }) => {
     // EPS and HEIC/HEIF become PNG first (the same conversion as the Designer); unreadable files say why.
     const ready: File[] = [];
@@ -464,7 +474,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
-          add={<AddNodeMenu onAdd={addAtCenter} />}
+          add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} />}
           onAutoLayout={() => {
             layoutAll(sessionId);
             window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);

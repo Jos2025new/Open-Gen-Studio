@@ -51,7 +51,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 13 | 12 |
 | `src/components/designer` | 54 | 24 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 8 | 7 |
+| `src/components/node` | 8 | 8 |
 | `src/components/shell` | 35 | 23 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
@@ -65,7 +65,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 287 |
+| `src/lib` | 33 | 288 |
 | `src/store` | 15 | 209 |
 
 178 de 505 módulos no tienen ningún test que los importe directamente.

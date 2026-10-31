@@ -179,3 +179,29 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .nc-result.react-flow__handle { right: -30px; width: 15px; height: 15px; transform: translateY(-50%); display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-2); font-size: 9px; line-height: 1; opacity: 0; transition: opacity .12s; }
 .react-flow__node:hover .nc-result, .react-flow__node.selected .nc-result, .nc-result.is-linked { opacity: 1; }
 .nc-result:hover { color: var(--accent); border-color: var(--accent-line); }
+
+/* Node library (Add node in the canvas toolbox, 2026-10-31): search, kind chips, Media / Nodes / Tools with each
+   kind's colour on its icon, keyboard hints. Our popover plane and tokens; the type colours are the app's own. */
+.node-lib-pop { padding: 0; }
+.node-lib { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 120px)); }
+.node-lib-search { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; color: var(--text-3); }
+.node-lib .node-lib-search input:not([type="checkbox"]) { flex: 1; min-width: 0; height: 28px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--text); font-size: 15px; outline: none; }
+.node-lib-chips { display: flex; gap: 6px; padding: 0 12px 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+.node-lib-chip { flex-shrink: 0; height: 26px; padding: 0 11px; border: 1px solid var(--border); border-radius: var(--r-full); color: var(--text-2); font-size: 12px; }
+.node-lib-chip:hover { background: var(--surface-hover); color: var(--text); }
+.node-lib-chip.is-on { border-color: var(--active-line); background: var(--active-bg); color: var(--active-text); }
+.node-lib-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px 6px; }
+.node-lib-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 4px; color: var(--text-3); font-size: 11px; }
+.node-lib-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border-radius: 10px; text-align: left; color: var(--text); }
+.node-lib-item.is-at { background: var(--surface-hover); }
+.node-lib-icon { display: grid; flex-shrink: 0; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: color-mix(in srgb, var(--k, var(--text-2)) 16%, transparent); color: var(--k, var(--text-2)); }
+.node-lib-item.k-image { --k: var(--type-image); }
+.node-lib-item.k-video { --k: var(--type-video); }
+.node-lib-item.k-audio { --k: var(--type-audio); }
+.node-lib-item.k-text { --k: var(--type-text); }
+.node-lib-item.k-model3d { --k: var(--warn); }
+.node-lib-text { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.node-lib-text small { overflow: hidden; color: var(--text-3); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
+.node-lib-empty { margin: 0; padding: 16px 10px; color: var(--text-3); font-size: 12px; }
+.node-lib-keys { display: flex; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 11px; }
+.node-lib-keys kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-right: 3px; padding: 0 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-2); font: inherit; font-size: 10.5px; }

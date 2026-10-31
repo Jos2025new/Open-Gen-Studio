@@ -12,7 +12,7 @@ related: [lienzo, deshacer-bloqueos, atajos-gestos]
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add node (+) | `CanvasNavigation.tsx:81`, `NodeWorkspace.tsx:45` | Primer botón de la toolbox, lienzo completo (antes, botón con texto en la barra superior) | `graph`, centro del lienzo | `addAtCenter`; la lista (`AddNodeItems`) se abre a la derecha | Grafo | |
+| Add node (+) | `CanvasNavigation.tsx:81`, `NodeWorkspace.tsx:41` | Primer botón de la toolbox, lienzo completo (antes, botón con texto en la barra superior) | `graph`, centro del lienzo | `addAtCenter`; abre a la derecha el panel `NodeLibrary` (buscador, chips de tipo, Media / Nodes / Tools, teclado); ver [biblioteca-nodos](biblioteca-nodos.md#panel-add-node) | Grafo | |
 | Select (flecha) | `CanvasNavigation.tsx:82` | Panel, lienzo completo | `tool` | `pickTool('select')`: guarda `ogs.nodeTool.v2` en `localStorage` (`NodeWorkspace.tsx:109`) | Arrastre en el fondo = caja de selección; pan con botón medio o derecho | La preferencia persiste solo en este navegador |
 | Pan (mano) | `CanvasNavigation.tsx:83` | Igual | `tool` | `pickTool('pan')` | Arrastre = mover el lienzo; doble pulsación mantenida = caja | Por defecto desde la clave `v2` |
 | Delete selected (papelera) | `CanvasNavigation.tsx:84` | Igual; desactivada sin selección | `selectedCount` (nodos y marcos seleccionados) | `deleteNodes(sessionId, [...selected])` (`NodeWorkspace.tsx:478`) | Grafo; deja un aviso con Undo en el hilo (`flow/actions.ts:90`) | Sin confirmación; el consejo muestra «(Del)» |
