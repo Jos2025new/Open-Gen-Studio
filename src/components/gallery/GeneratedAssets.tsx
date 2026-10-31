@@ -124,7 +124,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
             {source}
             <div className="pc-icons">
               <PanelPopover icon={LayoutGrid} label="View">
-                <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
+                <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} tiles /></div>
                 <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
                 {view === 'card' ? <div className="sv-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
               </PanelPopover>
@@ -206,7 +206,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
                 ) : null}
                 {view === 'card'
                   ? <JustifiedGrid className="gallery-grid library-layout-card" items={tiles} rowHeight={rowHeightFor((expanded ? 10 : 7) - cols)} />
-                  : <div className="gallery-grid library-layout-list pc-cols">{tiles.map((t) => <Fragment key={t.id}>{t.node}</Fragment>)}</div>}
+                  : <div className={`gallery-grid library-layout-${view}${view === 'list' ? ' pc-cols' : ''}`}>{tiles.map((t) => <Fragment key={t.id}>{t.node}</Fragment>)}</div>}
               </section>
             );
           })

@@ -169,7 +169,7 @@
 .pc-col-resize::after { content: ''; position: absolute; top: 4px; bottom: 4px; left: 3px; width: 2px; border-radius: 1px; background: transparent; }
 .pc-col-resize:hover::after, .pc-col-resize:focus-visible::after, .pc-col-resize.is-dragging::after { background: var(--border-strong); }
 .pc-col-resize:focus-visible { outline: none; }
-.pc-list-head .pc-col-name { flex: 1; min-width: 0; padding-left: 78px; }
+.pc-list-head .pc-col-name { flex: 1; min-width: 0; padding-left: 86px; }
 .pc-list-head .pc-col-date { flex: none; }
 @container pc-panel (max-width: 640px) {
   .pc-cols .pc-row .pc-col { display: none; }
@@ -182,3 +182,57 @@
   .pc-cols .pc-cols-alt { display: inline; }
   .pc-cols .pc-row .pc-when, .pc-cols .pc-row .pc-tools { width: auto; }
 }
+
+/* Card views shared by Library and Sessions: the profile-card hierarchy (title, details, figures, actions). */
+/* Fade card (Sessions Grid; Library Grid on hover): the cover fills it; a dark fade over the lower part carries the title, details, figures and
+   actions, as on a profile card. */
+.pc-card.pc-fade, .pc-card.pc-tile { border-radius: 14px; border: 1px solid var(--border); }
+.pc-card.pc-fade { background: var(--surface-3); }
+/* One frame only: the open and selected states recolour the border instead of adding a ring around it. */
+.pc-card.pc-fade.is-active, .pc-card.pc-tile.is-active { border-color: var(--border-strong); box-shadow: none; }
+.pc-card.pc-fade.is-selected, .pc-card.pc-tile.is-selected { border-color: var(--accent); box-shadow: none; }
+.pc-fade .pc-info { gap: 6px; padding: 72px 14px 14px; background: linear-gradient(transparent, rgba(10, 10, 12, .62) 34%, rgba(10, 10, 12, .9) 70%); pointer-events: none; }
+.pc-fade .pc-info::before { mask-image: linear-gradient(transparent, #000 40%); -webkit-mask-image: linear-gradient(transparent, #000 40%); }
+.pc-fade .pc-info > * { pointer-events: auto; }
+.pc-fade .pc-info .pc-info-title { display: -webkit-box; font-size: 16px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.pc-fade .pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); }
+/* Three figures, value over label, split by hairlines. */
+.pc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 4px 0 2px; }
+.pc-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+.pc-stat + .pc-stat { border-left: 1px solid rgba(255, 255, 255, .18); }
+.pc-stat b { font-size: 15px; font-weight: 600; }
+.pc-stat small { overflow: hidden; color: rgba(255, 255, 255, .72); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+/* Actions: the main one stretches; pin and menu keep the cards' glass buttons. */
+.pc-card-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.pc-card-actions .btn { flex: 1; justify-content: center; border: 0; background: rgba(255, 255, 255, .14); color: #fff; backdrop-filter: blur(10px); }
+.pc-card-actions .btn:not(:disabled):hover { background: rgba(255, 255, 255, .22); }
+.pc-card-actions .btn:disabled { background: rgba(255, 255, 255, .06); color: rgba(255, 255, 255, .6); opacity: 1; }
+.pc-card-actions .pc-tools { position: static; gap: 6px; }
+.pc-card-actions .pc-tools .icon-btn { width: 30px; height: 30px; }
+/* The checkbox is the quietest control: a bare 14px outline with the same 1.5px stroke as the group checkbox, no glass
+   behind it (a faint shadow keeps it legible on light covers), shown only on hover or focus, while selecting, or when checked. */
+.pc-fade .pc-check, .pc-tile .pc-check { top: 8px; left: 8px; width: 20px; height: 20px; border-radius: 0; background: none; backdrop-filter: none; opacity: 0; }
+.pc-fade .pc-check .pc-box, .pc-tile .pc-check .pc-box { width: 14px; height: 14px; border: 1.5px solid rgba(255, 255, 255, .9); border-radius: 4px; background: none; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .35)); }
+.pc-fade .pc-check.is-on .pc-box, .pc-tile .pc-check.is-on .pc-box { border-color: transparent; background: var(--accent); }
+.pc-fade:is(:hover, :focus-within, .is-selecting) .pc-check, .pc-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .pc-fade .pc-check.is-on, .pc-tile .pc-check.is-on { opacity: 1; }
+.pc-fade .pc-info-sub, .pc-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.pc-fade .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
+/* Tile (the Cards view): the cover fills the left side and fades into the dark right side, which carries the same details. */
+.pc-card.pc-tile { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--surface-3); }
+.pc-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 46%; height: 100%; }
+.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 20%, rgba(10, 10, 12, .78) 40%, rgba(10, 10, 12, .94) 52%); pointer-events: none; }
+.pc-tile .pc-info::before { display: none; }
+.pc-tile .pc-info > * { pointer-events: auto; }
+.pc-tile .pc-info .pc-info-title { display: -webkit-box; font-size: 15px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.pc-tile .pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); }
+.pc-tile .pc-hover { opacity: 1; }
+.pc-tile .pc-stat b { font-size: 14px; }
+.pc-tile .pc-stat small { font-size: 10.5px; }
+.pc-fade.is-hidden-item .pc-info, .pc-tile.is-hidden-item .pc-info { opacity: .55; }
+.pc-row .pc-go { height: 26px; margin-right: 4px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-3); font-size: 12px; opacity: 0; transition: opacity .12s; }
+.pc-row:is(:hover, :focus-within) .pc-go { opacity: 1; }
+.pc-row .pc-go:hover { background: var(--surface-hover); }
+/* Rows borrow the cards' hierarchy without their fade: a larger cover, a bolder title and the main action as a pill on hover. */
+.pc-cols .pc-row { padding-top: 7px; padding-bottom: 7px; }
+.pc-cols .pc-row .pc-thumb { width: 44px; height: 44px; border-radius: 8px; }
+.pc-cols .pc-row .pc-info-title { font-weight: 600; }

@@ -100,11 +100,11 @@ it('Cards is a third view between Grid and List: horizontal cards with the cover
   expect(host.querySelectorAll('.sess-tile')).toHaveLength(3);
   expect(localStorage.getItem('ogs.sessionsView')).toBe('"tile"');
   const bravo = [...host.querySelectorAll('.sess-tile')].find((c) => c.querySelector('.pc-info-title')?.textContent === 'Bravo')!;
-  expect(bravo.querySelector('.sess-card-actions .btn')?.textContent).toBe('Current');
+  expect(bravo.querySelector('.pc-card-actions .btn')?.textContent).toBe('Current');
   expect(bravo.querySelector('time')).not.toBeNull();
   expect(bravo.querySelector('[role="checkbox"]')).not.toBeNull();
-  expect(bravo.querySelectorAll('.sess-stat')).toHaveLength(3);
-  expect([...bravo.querySelectorAll('.sess-card-actions .pc-tools button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin', 'Session actions']);
+  expect(bravo.querySelectorAll('.pc-stat')).toHaveLength(3);
+  expect([...bravo.querySelectorAll('.pc-card-actions .pc-tools button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin', 'Session actions']);
   expect(host.querySelector('.pc-sort-strip')).not.toBeNull();
 });
 
@@ -114,8 +114,8 @@ it('the open session shows an Open tag beside its title in the list', () => {
 });
 
 it('list rows offer Continue before their actions, except the open session, which keeps its Open tag', () => {
-  expect(row('Bravo').querySelector('.sess-continue')).toBeNull();
-  const go = row('Alpha').querySelector<HTMLButtonElement>('.pc-tools > .sess-continue')!;
+  expect(row('Bravo').querySelector('.pc-go')).toBeNull();
+  const go = row('Alpha').querySelector<HTMLButtonElement>('.pc-tools > .pc-go')!;
   expect(go.textContent).toBe('Continue');
   click(go);
   expect(useStore.getState().activeSessionId).toBe(ids.Alpha);

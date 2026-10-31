@@ -278,12 +278,13 @@ describe('Library source selector', () => {
 });
 
 describe('Library cards', () => {
-  it('shows no text by default; the overlay has checkbox, favorite, menu and model · params', () => {
+  it('shows no text by default; the overlay has checkbox, favorite, menu and model · params on one line', () => {
     const tile = q('.g-tile');
     expect(tile.querySelector('[role="checkbox"]')).not.toBeNull();
     expect(tile.querySelector('[aria-label="Add to favorites"], [aria-label="Remove from favorites"]')).not.toBeNull();
     expect(tile.querySelector('[aria-label="More actions"]')).not.toBeNull();
-    expect(tile.querySelector('.pc-info')?.textContent).toContain('Seedance · 1:1 · 1k');
+    expect(tile.querySelector('.pc-info-sub')?.textContent).toMatch(/^Seedance · 1:1 · 1k · /);
+    expect(tile.querySelector('.pc-stat')).toBeNull(); // figures are for the Cards tile
     expect(tile.querySelector('.pc-info')?.classList.contains('pc-hover')).toBe(true);
     expect(tile.querySelector('.library-item-meta')).toBeNull();
   });
@@ -305,16 +306,15 @@ describe('Library cards', () => {
     expect(host.querySelector('.gallery-bulk')).toBeNull();
   });
 
-  it('the star toggles favorite and the menu keeps download, reference, agent context and delete with confirmation', () => {
+  it('the star toggles favorite; Use as reference and agent context are on the card; the menu keeps download, hide and delete', () => {
     const tile = [...host.querySelectorAll('.g-tile')][1]; // Cherry (video)
     click(tile.querySelector('[aria-label="Add to favorites"]'));
     expect(useStore.getState().assets.c.favorite).toBe(true);
-    click(tile.querySelector('[aria-label="More actions"]'));
-    const items = [...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent);
-    expect(items).toEqual(expect.arrayContaining(['Download', 'Use as reference', 'Add to the agent context', 'Delete']));
-    click([...document.querySelectorAll('[role="menuitem"]')].find((e) => e.textContent === 'Add to the agent context') ?? null);
+    expect(tile.querySelector('.pc-card-actions .btn')?.textContent).toBe('Use as reference');
+    click(tile.querySelector('.pc-card-actions .attach-toggle'));
     expect(useStore.getState().composer.attachments).toEqual(['c']);
-    click(tile.querySelector('[aria-label="More actions"]'));
+    click([...host.querySelectorAll('.g-tile')][1].querySelector('[aria-label="More actions"]'));
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Download', 'Hide', 'Delete']);
     click([...document.querySelectorAll('[role="menuitem"]')].find((e) => e.textContent === 'Delete') ?? null);
     expect(document.querySelector('.confirm')?.textContent).toContain('Delete this asset?');
     click([...document.querySelectorAll('.confirm button')].find((b) => b.textContent === 'Cancel') ?? null);

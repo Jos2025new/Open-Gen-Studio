@@ -32,3 +32,31 @@
 .pc-col-aspect { width: var(--pc-w-aspect); }
 .pc-col-resolution { width: var(--pc-w-resolution); }
 .pc-col-duration { width: var(--pc-w-duration); }
+
+/* Cards view: horizontal tiles in automatic columns, as in Sessions. */
+.gallery-grid.library-layout-tile { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
+.library-layout-tile > .g-tile, .library-layout-tile > .text-result-tile { aspect-ratio: auto; }
+/* Grid cards keep the justified rows and give the image room: on hover, focus or first tap a short fade holds a one-line
+   title, the model and parameters on one line and a compact action row; narrow cards keep only the icon buttons. */
+.jg-cell > .pc-fade { container-type: inline-size; }
+.jg-cell > .pc-fade .pc-info { gap: 3px; padding: 40px 10px 10px; background: linear-gradient(transparent, rgba(10, 10, 12, .55) 40%, rgba(10, 10, 12, .85)); }
+.jg-cell > .pc-fade .pc-info .pc-info-title { display: block; font-size: 13px; -webkit-line-clamp: unset; white-space: nowrap; }
+.jg-cell > .pc-fade .pc-info-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jg-cell > .pc-fade .pc-card-actions { gap: 4px; margin-top: 5px; }
+.jg-cell > .pc-fade .pc-card-actions .btn { height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+.jg-cell > .pc-fade .pc-card-actions .pc-tools { gap: 4px; }
+.jg-cell > .pc-fade .pc-card-actions .icon-btn, .jg-cell > .pc-fade .pc-card-actions .attach-toggle { width: 26px; height: 26px; }
+/* Narrow cards keep every action: Use as reference shrinks to its icon. */
+@container (max-width: 230px) {
+  .pc-card-actions .btn { flex: none; width: 26px; padding: 0; }
+  .pc-card-actions .btn .btn-label { display: none; }
+  .pc-card-actions .pc-tools { margin-left: auto; }
+}
+/* The agent-context toggle in a card's action row shows its paperclip like the other icons, not a box. */
+.pc-card-actions .attach-toggle-box.is-glyph { width: auto; height: auto; border: 0; color: var(--pc-btn-fg); }
+.pc-card-actions .attach-toggle-box.is-glyph svg { width: 15px; height: 15px; stroke-width: 1.75; }
+.pc-card-actions .attach-toggle { position: static; display: grid; place-items: center; width: 30px; height: 30px; opacity: 1; }
+.pc-card-actions .btn .btn-label { overflow: hidden; text-overflow: ellipsis; }
+/* A text result's tile has no image: its glyph stands in for the cover. */
+.pc-tile .pc-glyph-cover { display: grid; place-items: center; color: var(--text-3); background: var(--surface-3); }
+.pc-tile .pc-excerpt { display: -webkit-box; overflow: hidden; color: rgba(255, 255, 255, .7); font-size: 12px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

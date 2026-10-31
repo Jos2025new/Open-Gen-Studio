@@ -5,52 +5,8 @@
 .sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; padding: 4px 12px 8px; }
 .sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
-/* Grid: a portrait card whose cover fills it; a dark fade over the lower part carries the title, details, figures and
-   actions, as on a profile card. */
-.sess-card.pc-card, .sess-tile.pc-card { border-radius: 14px; }
-.sess-card.pc-card { aspect-ratio: 3 / 4; border: 1px solid var(--border); background: var(--surface-3); }
-/* One frame only: the open and selected states recolour the border instead of adding a ring around it. */
-.sess-card.pc-card.is-active, .sess-tile.pc-card.is-active { border-color: var(--border-strong); box-shadow: none; }
-.sess-card.pc-card.is-selected, .sess-tile.pc-card.is-selected { border-color: var(--accent); box-shadow: none; }
-.sess-card .pc-info { gap: 6px; padding: 72px 14px 14px; background: linear-gradient(transparent, rgba(10, 10, 12, .62) 34%, rgba(10, 10, 12, .9) 70%); pointer-events: none; }
-.sess-card .pc-info::before { mask-image: linear-gradient(transparent, #000 40%); -webkit-mask-image: linear-gradient(transparent, #000 40%); }
-.sess-card .pc-info > * { pointer-events: auto; }
-.sess-card .pc-info .pc-info-title { display: -webkit-box; font-size: 16px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.sess-card .pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); }
+.sess-card.pc-card { aspect-ratio: 3 / 4; }
 .sess-card .pc-hover { opacity: 1; }
-/* Three figures, value over label, split by hairlines. */
-.sess-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 4px 0 2px; }
-.sess-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
-.sess-stat + .sess-stat { border-left: 1px solid rgba(255, 255, 255, .18); }
-.sess-stat b { font-size: 15px; font-weight: 600; }
-.sess-stat small { overflow: hidden; color: rgba(255, 255, 255, .72); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-/* Actions: the main one stretches; pin and menu keep the cards' glass buttons. */
-.sess-card-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-.sess-card-actions .btn { flex: 1; justify-content: center; border: 0; background: rgba(255, 255, 255, .14); color: #fff; backdrop-filter: blur(10px); }
-.sess-card-actions .btn:not(:disabled):hover { background: rgba(255, 255, 255, .22); }
-.sess-card-actions .btn:disabled { background: rgba(255, 255, 255, .06); color: rgba(255, 255, 255, .6); opacity: 1; }
-.sess-card-actions .pc-tools { position: static; gap: 6px; }
-.sess-card-actions .pc-tools .icon-btn { width: 30px; height: 30px; }
-/* The checkbox is the quietest control: a bare 14px outline with the same 1.5px stroke as the group checkbox, no glass
-   behind it (a faint shadow keeps it legible on light covers), shown only on hover or focus, while selecting, or when checked. */
-.sess-card .pc-check, .sess-tile .pc-check { top: 8px; left: 8px; width: 20px; height: 20px; border-radius: 0; background: none; backdrop-filter: none; opacity: 0; }
-.sess-card .pc-check .pc-box, .sess-tile .pc-check .pc-box { width: 14px; height: 14px; border: 1.5px solid rgba(255, 255, 255, .9); border-radius: 4px; background: none; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .35)); }
-.sess-card .pc-check.is-on .pc-box, .sess-tile .pc-check.is-on .pc-box { border-color: transparent; background: var(--accent); }
-.sess-card:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-card .pc-check.is-on, .sess-tile .pc-check.is-on { opacity: 1; }
-.sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; font-size: 12px; }
-.sess-card .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
-/* Cards: the cover fills the left side and fades into the dark right side, which carries the same details as Grid. */
-.sess-tile.pc-card { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--surface-3); }
-.sess-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 46%; height: 100%; }
-.sess-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 20%, rgba(10, 10, 12, .78) 40%, rgba(10, 10, 12, .94) 52%); pointer-events: none; }
-.sess-tile .pc-info::before { display: none; }
-.sess-tile .pc-info > * { pointer-events: auto; }
-.sess-tile .pc-info .pc-info-title { display: -webkit-box; font-size: 15px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.sess-tile .pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); }
-.sess-tile .pc-hover { opacity: 1; }
-.sess-tile .sess-stat b { font-size: 14px; }
-.sess-tile .sess-stat small { font-size: 10.5px; }
-.sess-card.is-hidden-item .pc-info, .sess-tile.is-hidden-item .pc-info { opacity: .55; }
 .pc-card .pc-open-tag { color: var(--accent); }
 .sess-cover { display: grid; place-items: center; overflow: hidden; color: var(--text-3); background: var(--surface-3); cursor: pointer; }
 .sess-cover .media { width: 100%; height: 100%; object-fit: cover; }
@@ -62,16 +18,8 @@
 .sess-row .sess-cover { border-radius: 7px; }
 /* List columns: mode, counts and spend beside the name, sortable and resizable from the header. */
 .sessions { --pc-w-mode: 72px; --pc-w-gens: 84px; --pc-w-nodes: 56px; --pc-w-designs: 64px; --pc-w-spend: 64px; --pc-w-date: 64px; --pc-w-tools: 210px; }
-/* The list borrows the cards' hierarchy without their fade: a larger cover, a bolder title, figures that read as
-   figures, and Continue beside the row's actions (shown on hover or focus; the open session keeps its Open tag). */
-.sess-row.pc-row { padding-top: 7px; padding-bottom: 7px; }
-.sess-row .pc-thumb { width: 44px; height: 44px; border-radius: 8px; }
-.sessions .pc-list-head .pc-col-name { padding-left: 86px; }
-.sess-row .pc-info-title { font-weight: 600; }
+/* Sessions rows: figures that read as figures. */(shown on hover or focus; the open session keeps its Open tag). */
 .sess-row .pc-col.num { color: var(--text); font-size: 13px; font-weight: 600; }
-.sess-row .sess-continue { height: 26px; margin-right: 4px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-3); font-size: 12px; opacity: 0; transition: opacity .12s; }
-.sess-row:is(:hover, :focus-within) .sess-continue { opacity: 1; }
-.sess-row .sess-continue:hover { background: var(--surface-hover); }
 .pc-col-mode { width: var(--pc-w-mode); }
 .pc-col-gens { width: var(--pc-w-gens); }
 .pc-col-nodes { width: var(--pc-w-nodes); }

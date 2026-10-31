@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 281 | 222 |
-| [store.ts](../src/store/store.ts) | 189 | 204 |
+| [types.ts](../src/engine/types.ts) | 281 | 223 |
+| [store.ts](../src/store/store.ts) | 189 | 205 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 81 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 51 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
@@ -38,7 +38,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [render.ts](../src/engine/design/render.ts) | 23 | 8 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 20 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
-| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 19 | 5 |
+| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |
 
 ## Por área
@@ -50,13 +50,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/chat` | 22 | 19 |
 | `src/components/composer` | 13 | 12 |
 | `src/components/designer` | 54 | 24 |
-| `src/components/gallery` | 4 | 3 |
+| `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 8 | 7 |
 | `src/components/shell` | 27 | 19 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
-| `src/components/ui` | 20 | 12 |
-| `src/engine` | 60 | 275 |
+| `src/components/ui` | 20 | 13 |
+| `src/engine` | 60 | 276 |
 | `src/engine/agent` | 53 | 109 |
 | `src/engine/design` | 100 | 120 |
 | `src/engine/flow` | 12 | 24 |
@@ -65,8 +65,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 282 |
-| `src/store` | 15 | 206 |
+| `src/lib` | 33 | 283 |
+| `src/store` | 15 | 207 |
 
 173 de 497 módulos no tienen ningún test que los importe directamente.
 

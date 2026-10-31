@@ -189,8 +189,8 @@ describe('Sessions cards', () => {
 
   it('active, pinned and selected states are visible without hover', () => {
     expect(card('Bravo').classList.contains('is-active')).toBe(true);
-    expect(card('Bravo').querySelector<HTMLButtonElement>('.sess-card-actions .btn')?.textContent).toBe('Current');
-    expect(card('Bravo').querySelector<HTMLButtonElement>('.sess-card-actions .btn')?.disabled).toBe(true);
+    expect(card('Bravo').querySelector<HTMLButtonElement>('.pc-card-actions .btn')?.textContent).toBe('Current');
+    expect(card('Bravo').querySelector<HTMLButtonElement>('.pc-card-actions .btn')?.disabled).toBe(true);
     click(card('Alpha').querySelector('[aria-label="Pin"]'));
     expect(useStore.getState().sessions[ids.Alpha].pinned).toBe(true);
     expect(card('Alpha').querySelector('.pc-fav')?.classList.contains('is-on')).toBe(true);
@@ -202,9 +202,9 @@ describe('Sessions cards', () => {
   });
 
   it('the card shows its figures and actions; Continue opens it; the menu renames, archives, hides and deletes with a contextual confirmation', () => {
-    expect([...card('Charlie').querySelectorAll('.sess-stat')].map((s) => s.textContent)).toEqual(['0Generations', '1Nodes', '0Designs']);
-    expect([...card('Alpha').querySelectorAll('.sess-card-actions .pc-tools button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin', 'Session actions']);
-    click([...card('Charlie').querySelectorAll('.sess-card-actions .btn')].find((b) => b.textContent === 'Continue'));
+    expect([...card('Charlie').querySelectorAll('.pc-stat')].map((s) => s.textContent)).toEqual(['0Generations', '1Nodes', '0Designs']);
+    expect([...card('Alpha').querySelectorAll('.pc-card-actions .pc-tools button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin', 'Session actions']);
+    click([...card('Charlie').querySelectorAll('.pc-card-actions .btn')].find((b) => b.textContent === 'Continue'));
     expect(useStore.getState().activeSessionId).toBe(ids.Charlie);
     click(card('Alpha').querySelector('[aria-label="Session actions"]'));
     expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Rename', 'Archive session', 'Hide', 'Delete']);

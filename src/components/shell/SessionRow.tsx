@@ -144,7 +144,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
         <span className="pc-col pc-col-spend num">{stats?.spend ? formatUsd(stats.spend) : '—'}</span>
         {when}
         <span className="pc-tools">
-          {active ? null : <Button size="sm" variant="secondary" className="sess-continue" onClick={(e) => { e.stopPropagation(); open(); }}>Continue</Button>}
+          {active ? null : <Button size="sm" variant="secondary" className="pc-go" onClick={(e) => { e.stopPropagation(); open(); }}>Continue</Button>}
           {shelfButtons}{pin}{menu}
         </span>
       </div>
@@ -152,9 +152,9 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   }
   // Both card views carry the same details: three figures (generations, nodes, designs) and the actions: Continue
   // (Current when open), pin and menu.
-  const stat = (value: number, label: string) => <span className="sess-stat"><b className="num">{value}</b><small>{label}</small></span>;
-  const figures = <div className="sess-stats">{stat(stats?.gens ?? 0, 'Generations')}{stat(nodes, 'Nodes')}{stat(docs, 'Designs')}</div>;
-  const actions = <div className="sess-card-actions">
+  const stat = (value: number, label: string) => <span className="pc-stat"><b className="num">{value}</b><small>{label}</small></span>;
+  const figures = <div className="pc-stats">{stat(stats?.gens ?? 0, 'Generations')}{stat(nodes, 'Nodes')}{stat(docs, 'Designs')}</div>;
+  const actions = <div className="pc-card-actions">
     <Button size="sm" variant="secondary" disabled={active} onClick={(e) => { e.stopPropagation(); open(); }}>{active ? 'Current' : 'Continue'}</Button>
     <span className="pc-tools">{pin}{menu}</span>
   </div>;
@@ -164,7 +164,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   if (view === 'tile') {
     // Cards: the cover fills the left side and fades into the dark right side, which holds the same details.
     return (
-      <div className={`sess-tile pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
+      <div className={`sess-tile pc-card pc-tile${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
         {coverButton}{check}{hiddenMark}
         <div className="pc-info">{title}{meta}{figures}{actions}</div>
       </div>
@@ -172,7 +172,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   }
   // Grid: the cover fills a portrait card; a dark fade over its lower part carries the details.
   return (
-    <div className={`sess-card pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
+    <div className={`sess-card pc-card pc-fade${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
       {coverButton}{check}{hiddenMark}
       <div className="pc-info">{title}{meta}{figures}{actions}</div>
     </div>
