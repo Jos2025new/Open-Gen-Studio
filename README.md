@@ -161,6 +161,7 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Mod + Z | Undo |
 | Mod + Y | Redo (also Mod + Shift + Z) |
 | Mod + C / X / V | Copy, cut, paste nodes (paste also takes images) |
+| X | Cut connections: drag across links (X or Escape leaves) |
 | Mod + G | Group the selected nodes |
 | Mod + Shift + G | Ungroup |
 | Delete or Backspace | Delete the selection |

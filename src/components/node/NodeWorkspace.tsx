@@ -27,7 +27,8 @@ import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems, NodeLibrary } from './AddNodeItems';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
-import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM } from './CanvasNavigation';
+import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
+import { useCutTool } from './CutTool';
 import { GroupNode, Operations, type GroupFlowNode } from './Operations';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
@@ -109,8 +110,11 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
-  const [tool, setTool] = useState<'select' | 'pan'>(() => { try { return localStorage.getItem('ogs.nodeTool.v2') === 'select' ? 'select' : 'pan'; } catch { return 'pan'; } });
-  const pickTool = (t: 'select' | 'pan') => { setTool(t); try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
+  // Cut (scissors, X) is a passing tool: it is not remembered, and X or Escape returns to the last one.
+  const [tool, setTool] = useState<NodeTool>(() => { try { return localStorage.getItem('ogs.nodeTool.v2') === 'select' ? 'select' : 'pan'; } catch { return 'pan'; } });
+  const lastTool = useRef<'select' | 'pan'>(tool === 'select' ? 'select' : 'pan');
+  const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
+  const cut = useCutTool({ active: tool === 'cut', canvasRef, onCut: (ids) => void disconnectEdges(sessionId, ids) });
   // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
   const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -371,6 +375,19 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
     return () => document.removeEventListener('paste', paste);
   }, [importImages, sessionId]);
 
+  // X (no modifier) takes the scissors and gives them back; Escape also leaves them. Not inside text fields.
+  useEffect(() => {
+    if (embedded) return;
+    const key = (e: KeyboardEvent) => {
+      if (!insideRef.current || e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
+      const k = e.key.toLowerCase();
+      if (k === 'x') { e.preventDefault(); pickTool(tool === 'cut' ? lastTool.current : 'cut'); }
+      else if (k === 'escape' && tool === 'cut') pickTool(lastTool.current);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  });
+
   // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -408,11 +425,11 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
   return (
     <div
       ref={canvasRef}
-      className={`node-canvas ${embedded ? 'is-embedded' : ''}`}
-      onPointerDownCapture={onBoxDown}
-      onMouseDownCapture={(e) => { if (boxing.current) e.stopPropagation(); }}
-      onPointerMoveCapture={onBoxMove}
-      onPointerUpCapture={onBoxUp}
+      className={`node-canvas ${embedded ? 'is-embedded' : ''}${tool === 'cut' ? ' is-cut-tool' : ''}`}
+      onPointerDownCapture={(e) => { cut.down(e); onBoxDown(e); }}
+      onMouseDownCapture={(e) => { if (boxing.current || cut.cutting) e.stopPropagation(); }}
+      onPointerMoveCapture={(e) => { cut.move(e); onBoxMove(e); }}
+      onPointerUpCapture={(e) => { cut.up(e); onBoxUp(e); }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('application/x-ogs-asset')) {
           e.preventDefault();
@@ -462,7 +479,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         maxZoom={NODE_MAX_ZOOM}
         deleteKeyCode={insideRef.current ? ['Backspace', 'Delete'] : null}
         selectionOnDrag={tool === 'select'}
-        panOnDrag={tool === 'select' ? [1, 2] : true}
+        panOnDrag={tool === 'pan' ? true : [1, 2]}
         panOnScroll
         zoomOnDoubleClick={false}
         selectionMode={SelectionMode.Partial}
@@ -470,6 +487,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         proOptions={{ hideAttribution: false }}
       >
         {box ? <div className="node-box-select" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} /> : null}
+        {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation

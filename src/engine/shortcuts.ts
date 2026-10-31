@@ -40,6 +40,7 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Mod + Z', action: 'Undo' },
         { keys: 'Mod + Y', action: 'Redo (also Mod + Shift + Z)' },
         { keys: 'Mod + C / X / V', action: 'Copy, cut, paste nodes (paste also takes images)' },
+        { keys: 'X', action: 'Cut connections: drag across links (X or Escape leaves)' },
         { keys: 'Mod + G', action: 'Group the selected nodes' },
         { keys: 'Mod + Shift + G', action: 'Ungroup' },
         { keys: 'Delete or Backspace', action: 'Delete the selection' },

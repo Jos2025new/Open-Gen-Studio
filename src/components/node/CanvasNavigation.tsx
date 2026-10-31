@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
-import { Hand, LayoutGrid, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
+import { Hand, LayoutGrid, Scissors, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
 import { setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem, lockedNodes } from '../../engine/flow/locks';
 import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } from '../../engine/flow/history';
@@ -9,6 +9,8 @@ import { generationTitle } from '../assets/GenerationInfo';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { IconButton, MenuItem, Range } from '../ui/primitives';
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
+
+export type NodeTool = 'select' | 'pan' | 'cut';
 
 /** Nodes zooms as far as the Designer: 5% to its MAX_ZOOM (3200%). */
 export const NODE_MIN_ZOOM = 0.05;
@@ -53,9 +55,9 @@ function Highlight({ text, query }: { text: string; query: string }) {
 }
 
 /** The canvas toolbox (2026-10-31): one vertical bar on the left, in the Designer's toolbar style, with every canvas
- *  tool: Add node (`add`), Select, Pan and Auto layout, Fit view and Map, Undo, Redo and Delete, zoom, Search. Its
+ *  tool: Add node (`add`), Select, Pan, Cut and Auto layout, Fit view and Map, Undo, Redo and Delete, zoom, Search. Its
  *  popovers open to the right. `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
-export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: 'select' | 'pan'; onTool: (t: 'select' | 'pan') => void; selectedCount: number; onDelete: () => void }) {
+export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: NodeTool; onTool: (t: NodeTool) => void; selectedCount: number; onDelete: () => void }) {
   const graph = useStore(s => s.sessions[sessionId].graph);
   const generations = useStore(s => s.generations);
   const assets = useStore(s => s.assets);
@@ -112,6 +114,7 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
         {add ? <>{add}<span className="canvas-nav-sep" /></> : null}
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
+        <IconButton icon={Scissors} label="Cut connections (X): drag across links to cut them" active={tool === 'cut'} disabled={!graph.edges.length && tool !== 'cut'} onClick={() => onTool('cut')} />
         {onAutoLayout ? <IconButton icon={LayoutGrid} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
         <span className="canvas-nav-sep" />
         <IconButton icon={Maximize} label="Fit view" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />

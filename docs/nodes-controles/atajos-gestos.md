@@ -16,6 +16,7 @@ El listado oficial (Ajustes › Shortcuts) tiene un grupo «Nodes» con 6 línea
 | Ctrl/⌘+Y y Ctrl/⌘+Mayús+Z | `CanvasNavigation.tsx:117` | Igual | Igual | Rehacer | Grafo | Listado: «Mod + Y — Redo (also Mod + Shift + Z)» |
 | Ctrl/⌘+C | `NodeWorkspace.tsx:371` | Foco en el lienzo, nodos seleccionados, nada de texto seleccionado en la página, fuera de campos de texto | `selected`, `insideRef` | `copyNodes` y toast | Portapapeles interno | Listado: «Mod + C / X / V» |
 | Ctrl/⌘+X | `NodeWorkspace.tsx:372` | Igual | Igual | `cutNodes` y vacía la selección | Grafo | Borra sin confirmar |
+| X (sin modificador) | `NodeWorkspace.tsx:384` | Lienzo completo con el foco dentro, fuera de campos de texto | `tool` | Toma o suelta la tijera (Cut connections); Escape también la suelta | Herramienta del lienzo | Desde 2026-10-31; sale en Ajustes → Shortcuts |
 | Ctrl/⌘+V | `NodeWorkspace.tsx:360` | Foco en el lienzo, fuera de campos de texto | Portapapeles del sistema y del app | Imágenes del sistema: nodos Asset; si no hay imágenes y hay nodos copiados: `pasteNodes` | Grafo | Las imágenes tienen prioridad sobre los nodos copiados |
 | Ctrl/⌘+G | `NodeWorkspace.tsx:374` | Igual, con 2+ nodos | `selected` | Agrupar | Grupos | Listado: «Mod + G — Group the selected nodes» |
 | Ctrl/⌘+Mayús+G | `NodeWorkspace.tsx:373` | Igual, la selección es un grupo entero | `wholeGroup` | Desagrupar o reacoplar | Grupos | Listado: «Mod + Shift + G — Ungroup» |
