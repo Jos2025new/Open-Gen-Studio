@@ -2,7 +2,7 @@ import { ModelBrandIcon } from '../ui/ModelBrandIcon';
 import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import { filterLlm, llmMaker, llmMakers, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Search } from 'lucide-react';
 import { useState } from 'react';
 import { modelSummary, pickComposerModel, preferredModel, resetAgentModel, resetComposerModel } from '../../engine/catalog';
 import type { ModelSummary } from '../../engine/types';
@@ -65,7 +65,7 @@ function DirectorList({ done }: { done: () => void }) {
   }
   return (
     <>
-      <div className="ml-search"><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Director models" aria-label="Search Director models" /></div>
+      <div className="ml-search"><Search size={14} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Director models" aria-label="Search Director models" /></div>
       <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} makers={makers} maker={maker} onMaker={setMaker} />
       <div className="ml-scroll agent-director-list">
         <button type="button" className={`ml-row ${agent.modelPinned ? '' : 'is-selected'}`} onClick={() => { void resetAgentModel(); done(); }}>
@@ -150,11 +150,11 @@ export function AgentModelControls() {
 
   return (
     <>
-      <Chip ref={pop.ref} className="models-chip" active={pop.open} onClick={pop.toggle} data-tip="Models used by the agent">
+      <Chip ref={pop.ref} className="models-chip" active={pop.open} aria-expanded={pop.open} aria-haspopup="dialog" onClick={pop.toggle} data-tip="Models used by the agent">
         {manualCount ? `Models · ${manualCount}` : 'Models'}
         {pop.open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
       </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={picker ? 520 : 400} label="Agent models" className="agent-model-pop">
+      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={picker ? 400 : 340} label="Agent models" className="agent-model-pop">
         {picker ? (
           <>
             <button type="button" className="agent-model-back" onClick={() => setPicker(null)}><ArrowLeft size={14} /> Models</button>

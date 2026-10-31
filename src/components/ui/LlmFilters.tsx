@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { Check } from 'lucide-react';
+import { ArrowDownUp, Check, ListFilter } from 'lucide-react';
 import { contextLabel, type LlmCapability, type LlmModel, type LlmSort } from '../../engine/providers/llm';
 import { formatUsd } from '../../lib/format';
 import { FilterMenu } from './FilterMenu';
 import { VisionTag } from './VisionTag';
+import { ResultsMenu } from './ResultsMenu';
 
 const CAPS: Array<{ id: LlmCapability; label: string; tip: string }> = [
   { id: 'vision', label: 'Vision', tip: 'Sees images: attachments, the Designer page, results it looks at' },
@@ -22,6 +23,8 @@ const SORTS: Array<{ id: LlmSort; label: string }> = [
 export function LlmFilterBar({ caps, onCaps, sort, onSort, makers, maker = '', onMaker }: { caps: LlmCapability[]; onCaps: (c: LlmCapability[]) => void; sort: LlmSort; onSort: (s: LlmSort) => void; makers?: Array<[string, number]>; maker?: string; onMaker?: (m: string) => void }) {
   return (
     <div className="ml-filters llm-filters">
+      <ResultsMenu label="Filter by" icon={ListFilter} active={caps.length > 0 || Boolean(maker)} width={260}>
+      <div className="results-controls">
       {CAPS.map((c) => {
         const on = caps.includes(c.id);
         return (
@@ -40,12 +43,9 @@ export function LlmFilterBar({ caps, onCaps, sort, onSort, makers, maker = '', o
           options={[['', 'All makers'], ...makers.map(([name, n]): [string, ReactNode] => [name, <span key={name} className="ml-filter-opt">{name} <span className="faint num">{n}</span></span>])]}
         />
       ) : null}
-      <span className="ml-filters-gap" />
-      <select className="ml-filter llm-sort" aria-label="Order" value={sort} onChange={(e) => onSort(e.target.value as LlmSort)}>
-        {SORTS.map((s) => (
-          <option key={s.id} value={s.id}>{s.label}</option>
-        ))}
-      </select>
+      </div>
+      </ResultsMenu>
+      <FilterMenu label={`Order by · ${SORTS.find((s) => s.id === sort)?.label ?? 'Recommended'}`} icon={<ArrowDownUp size={12} />} value={sort} onChange={onSort} options={SORTS.map((s): [LlmSort, string] => [s.id, s.label])} />
     </div>
   );
 }

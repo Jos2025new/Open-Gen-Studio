@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lucide-react';
+import { ArrowDownUp, Check, ChevronDown, KeyRound, ListFilter, Search, Settings2 } from 'lucide-react';
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
@@ -10,6 +10,7 @@ import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { Spinner } from '../ui/primitives';
 import { FilterMenu } from '../ui/FilterMenu';
+import { ResultsMenu } from '../ui/ResultsMenu';
 import { ModelBrandIcon, vendorOf } from '../ui/ModelBrandIcon';
 import { usePref } from '../ui/hooks';
 
@@ -208,6 +209,8 @@ export function ModelList({
         <input autoFocus placeholder={`Search ${kind} models`} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search models" />
       </div>
       <div className="ml-filters">
+        {remoteConnected || features.length ? <ResultsMenu label="Filter by" icon={ListFilter} active={provider !== 'all' || feature !== 'all'}>
+          <div className="results-controls">
         {remoteConnected ? (
           <FilterMenu
             label={provider === 'all' ? 'All providers' : PROVIDER_LABELS[provider]}
@@ -228,8 +231,10 @@ export function ModelList({
         {features.length ? (
           <FilterMenu label={feature === 'all' ? 'All features' : feature} value={feature} active={feature !== 'all'} onChange={setFeature} options={[['all', 'All features'], ...features.map((f): [string, string] => [f, f])]} />
         ) : null}
+          </div>
+        </ResultsMenu> : null}
         <span className="ml-filters-gap" />
-        <FilterMenu label={SORTS.find(([id]) => id === sort)?.[1] ?? 'Sort'} icon={<ArrowDownUp size={12} />} value={sort} onChange={setSort} options={SORTS} />
+        <FilterMenu label={`Order by · ${SORTS.find(([id]) => id === sort)?.[1] ?? 'Name'}`} icon={<ArrowDownUp size={12} />} value={sort} onChange={setSort} options={SORTS} />
       </div>
       <div className="ml-scroll">
         {autoOption ? (

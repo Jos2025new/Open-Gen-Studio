@@ -1,0 +1,8 @@
+.results-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.results-controls-spacer { flex: 1; }
+.results-menu-trigger { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 7px; border-radius: 6px; color: var(--text-2); font-size: 12px; }
+.results-menu-trigger:hover, .results-menu-trigger[aria-expanded="true"] { background: var(--surface-3); color: var(--text); }
+.results-menu-trigger.is-active { color: var(--text); }
+.results-popover .sessions-view { gap: 8px; padding: 7px; }
+.results-popover .sv-row { gap: 4px; }
+.results-popover .segmented button { padding: 5px; }
