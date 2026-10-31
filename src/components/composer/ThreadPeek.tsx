@@ -35,8 +35,8 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
   }, [open, lastKey]);
 
   if (workspace === 'node' && !hasNodeMessage) {
-    const deletions = feed?.filter((f) => f.workspace === 'node' && f.type === 'notice' && f.undoNodes && !f.undone) ?? [];
-    return deletions.length ? <div className="composer-alerts">{deletions.map((item) => item.type === 'notice' && <NoticeView key={item.id} item={item} sessionId={sessionId} />)}</div> : null;
+    const notices = feed?.filter((f) => f.workspace === 'node' && f.type === 'notice') ?? [];
+    return notices.length ? <div className="composer-alerts">{notices.map((item) => item.type === 'notice' && <NoticeView key={item.id} item={item} sessionId={sessionId} />)}</div> : null;
   }
 
   const toggle = (

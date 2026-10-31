@@ -23,6 +23,9 @@ it('shows the Nodes conversation only after a Nodes agent message in this sessio
   act(() => setFeed([{ id: 'n', createdAt: 0, type: 'notice', workspace: 'node', undoNodes: { nodes: [], edges: [] } }]));
   expect(host.querySelector('.thread-toggle')).toBeNull();
   expect(host.textContent).toContain('Undo');
+  act(() => setFeed([{ id: 'e', createdAt: 0, type: 'notice', workspace: 'node', level: 'error', text: 'Boom' }]));
+  expect(host.querySelector('.thread-toggle')).toBeNull();
+  expect(host.querySelector('.composer-alerts')).not.toBeNull();
   act(() => setFeed([{ ...item, workspace: 'node', mode: 'agent' }]));
   expect(host.querySelector('.thread-toggle')?.textContent).toContain('Conversation');
   act(() => root.unmount());
