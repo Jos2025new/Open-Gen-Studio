@@ -18,6 +18,10 @@ const ids: Record<string, string> = {};
 const click = (el: Element | null | undefined) => act(() => (el as HTMLElement).click());
 const q = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel)!;
 const titles = () => [...host.querySelectorAll('.sess-card .pc-info-title, .sess-row .pc-info-title')].map((e) => e.textContent);
+const bar = (label: string) => q(`.pc-bar [aria-label^="${label}"]`);
+const radio = (text: string) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === text) ?? null;
+const sw = (label: string) => document.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`)!;
+const canvasIs = (name: string) => { click(q('.pc-source')); click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith(name))); };
 const item = (text: string) => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((e) => e.textContent === text);
 
 beforeEach(() => {
@@ -34,24 +38,25 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; });
 
 describe('Sessions top bar', () => {
-  it('orders by last activity newest first; name and date toggles flip and exclude each other', () => {
+  it('orders by last activity newest first; the View popover sorts Newest, Oldest, A–Z and Z–A', () => {
     expect(titles()).toEqual(['Bravo', 'Charlie', 'Alpha']);
-    const name = q('[aria-label="Sort by name"]'), date = q('[aria-label="Sort by date"]');
-    click(name);
+    click(bar('View'));
+    expect(radio('Newest')?.getAttribute('aria-checked')).toBe('true');
+    click(radio('A–Z'));
     expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
-    expect(name.getAttribute('aria-pressed')).toBe('true');
-    expect(date.getAttribute('aria-pressed')).toBe('false');
-    click(name);
+    expect(radio('A–Z')?.getAttribute('aria-checked')).toBe('true');
+    expect(radio('Newest')?.getAttribute('aria-checked')).toBe('false');
+    click(radio('Z–A'));
     expect(titles()).toEqual(['Charlie', 'Bravo', 'Alpha']);
-    click(date);
+    click(radio('Newest'));
     expect(titles()).toEqual(['Bravo', 'Charlie', 'Alpha']);
-    click(date);
+    click(radio('Oldest'));
     expect(titles()).toEqual(['Alpha', 'Charlie', 'Bravo']);
   });
 
-  it('the date can mean created instead of last activity, from the Filter by menu', () => {
-    click(q('[aria-label="Filter by"]'));
-    click([...document.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent === 'Created'));
+  it('the date can mean created instead of last activity, from the View popover', () => {
+    click(bar('View'));
+    click(radio('Created'));
     expect(titles()).toEqual(['Alpha', 'Charlie', 'Bravo']);
   });
 
@@ -78,36 +83,63 @@ describe('Sessions top bar', () => {
     expect(titles()).toHaveLength(3);
   });
 
-  it('the canvas filter is a rail below the bar (All, Studio, Nodes, Designer), not a Filter by row', () => {
-    const rail = q('.pc-rail');
-    expect([...rail.querySelectorAll('button')].map((b) => b.textContent?.replace(/\d+$/, ''))).toEqual(['All', 'Studio', 'Nodes', 'Designer']);
+  it('the canvas selector at the start of the bar lists All, Studio, Nodes, Designer with counts; there is no side rail', () => {
+    expect(host.querySelector('.pc-rail')).toBeNull();
     expect(q('.pc-split').contains(q('.pc-bar'))).toBe(false);
-    expect(q('.pc-bar').compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    click(rail.querySelector('[aria-label="Nodes"]'));
+    expect(q('.pc-source').textContent).toBe('All');
+    click(q('.pc-source'));
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent?.replace(/\d+$/, ''))).toEqual(['All', 'Studio', 'Nodes', 'Designer']);
+    click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith('Nodes')));
+    expect(q('.pc-source').textContent).toBe('Nodes');
     expect(titles()).toEqual(['Charlie']);
-    click(q('[aria-label="Filter by"]'));
-    const labels = [...document.querySelectorAll('.sv-label, .sv-switch > span:first-child')].map((e) => e.textContent);
-    expect(labels).toEqual(['Date means', 'Pinned only']);
+    canvasIs('All');
+    expect(titles()).toHaveLength(3);
   });
 
-  it('archived is an icon toggle at the end of the right zone, next to the eye; the Filter by menu has no Active/Archived row', () => {
-    const zone = q('.pc-bar .pc-right');
-    const btns = [...zone.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
-    expect(btns.slice(-3)).toEqual(['Show archived', 'Collapse', 'Close']);
-    expect(host.querySelector('.sessions-toolbar')).toBeNull(); // one chrome row
-    expect(q('.pc-bar .pc-grp').querySelector('button')?.textContent).toContain('New');
-    expect(btns).toContain('Show hidden');
-    const arch = q<HTMLButtonElement>('[aria-label="Show archived"]');
-    expect(arch.getAttribute('aria-pressed')).toBe('false');
-    expect(arch.getAttribute('data-tip')).toContain('0');
+  it('View holds Layout, Sort, Date means and Grid size; Filters holds Show hidden, Show archived and Clear filters; Pinned only is a bar pin', () => {
+    click(bar('View'));
+    const labels = () => [...document.querySelectorAll('.sv-label, .sv-switch > span:first-child')].map((e) => e.textContent?.trim());
+    expect(labels()).toEqual(['Layout', 'Sort', 'Date means', 'Grid size']);
+    click(bar('Filters'));
+    expect([...document.querySelectorAll('[role="dialog"][aria-label="Filters"] .sv-switch > span')].map((e) => e.textContent?.trim())).toEqual(['Show hidden · 0', 'Show archived · 0']);
+    expect([...document.querySelectorAll('[role="dialog"][aria-label="Filters"] button')].some((b) => b.textContent === 'Clear filters')).toBe(true);
+    const pin = bar('Pinned only');
+    expect(pin.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('Pinned only is a pin in the bar that keeps a chip while on', () => {
+    const pin = bar('Pinned only');
+    click(pin);
+    expect(pin.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('.sessions-active .active-chip')?.textContent).toContain('Pinned');
+    click(pin);
+    expect(host.querySelector('.sessions-active')).toBeNull();
+  });
+
+  it('Show archived in Filters switches to the archived sessions and shows the count; Clear filters returns', () => {
     click(q('.sess-card [aria-label="Session actions"]'));
     click(item('Archive session'));
-    expect(arch.getAttribute('data-tip')).toContain('1');
-    click(arch);
-    expect(arch.getAttribute('aria-pressed')).toBe('true');
+    click(bar('Filters'));
+    const arch = () => sw('Show archived');
+    expect(arch().closest('.sv-switch')?.textContent).toContain('1');
+    expect(arch().getAttribute('aria-checked')).toBe('false');
+    expect(host.querySelector('.pc-dot')).toBeNull();
+    click(arch());
+    expect(arch().getAttribute('aria-checked')).toBe('true');
+    expect(host.querySelector('.pc-dot')).not.toBeNull();
     expect(titles()).toHaveLength(1);
-    click(arch);
+    click([...document.querySelectorAll('[role="dialog"][aria-label="Filters"] button')].find((b) => b.textContent === 'Clear filters'));
+    expect(arch().getAttribute('aria-checked')).toBe('false');
     expect(titles()).toHaveLength(2);
+  });
+
+  it('the Filters popover offers to select the empty sessions and closes after using it', () => {
+    click(bar('Filters'));
+    const act1 = [...document.querySelectorAll('.sv-action')].find((b) => b.textContent?.startsWith('Select the'));
+    expect(act1?.textContent).toMatch(/Select the 1 empty session/);
+    click(act1);
+    expect(host.querySelector('.session-bar')?.textContent).toContain('1 selected');
+    expect(document.querySelector('[role="dialog"][aria-label="Filters"]')).toBeNull();
   });
 
   it('the bar icon buttons share one size class and stroke', () => {
@@ -117,23 +149,30 @@ describe('Sessions top bar', () => {
     }
   });
 
-  it('three zones: left (search, filter, sorts, archived), centered modes, right (size, view, thumbnails)', () => {
+  it('two zones: New and the canvas selector on the left; size, modes, pin, View, Filters, Search and chrome on the right', () => {
     const zones = [...q('.pc-bar').children];
-    expect(zones).toHaveLength(3);
-    expect(zones[1].classList.contains('pc-center')).toBe(true);
-    expect(zones[1].querySelector('[aria-label="Videos"]')).not.toBeNull();
-    for (const l of ['Grid size', 'List view', 'Show hidden']) expect(zones[2].querySelector(`[aria-label="${l}"]`)).not.toBeNull();
+    expect(zones).toHaveLength(2);
+    expect(zones[0].querySelector('button')?.textContent).toContain('New');
+    expect(zones[0].querySelector('.pc-source')).not.toBeNull();
+    expect(zones[1].querySelector('.pc-center [aria-label="Videos"]')).not.toBeNull();
+    expect(zones[1].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
+    const icons = [...zones[1].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
+    expect(icons).toEqual(['Pinned only', 'View', 'Filters', 'Search']);
+    expect([...zones[1].querySelectorAll(':scope > .pc-chrome button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Collapse', 'Close']);
+    expect(host.querySelector('.sessions-toolbar')).toBeNull(); // one chrome row
   });
 
   it('list and card views are remembered; old values mean card', () => {
-    click(q('[aria-label="List view"]'));
+    click(bar('View'));
+    click(radio('List'));
     expect(localStorage.getItem('ogs.sessionsView')).toBe('"list"');
     expect(host.querySelectorAll('.sess-row')).toHaveLength(3);
     act(() => root.unmount());
     localStorage.setItem('ogs.sessionsView', '"cards"');
     root = createRoot(host);
     act(() => root.render(createElement(SessionsPanel)));
-    expect(q('[aria-label="Card view"]').getAttribute('aria-pressed')).toBe('true');
+    click(bar('View'));
+    expect(radio('Grid')?.getAttribute('aria-checked')).toBe('true');
     expect(host.querySelectorAll('.sess-card')).toHaveLength(3);
   });
 });
@@ -190,7 +229,8 @@ describe('Sessions cards', () => {
     });
     act(() => input.blur());
     expect(useStore.getState().sessions[ids.Alpha].title).toBe('Alpha 2');
-    click(q('[aria-label="List view"]'));
+    click(bar('View'));
+    click(radio('List'));
     dbl(q('.sess-row .session-main'));
     expect(host.querySelector('input[aria-label="Session title"]')).not.toBeNull();
     // while selecting, double-click does not rename
@@ -207,11 +247,12 @@ describe('Sessions cards', () => {
     expect(useStore.getState().sessions[ids.Alpha].userHidden).toBe(true);
     expect(useStore.getState().sessions[ids.Alpha].hidden).toBeUndefined(); // not the Space-container flag
     expect(titles()).toEqual(['Bravo', 'Charlie']);
-    const eye = q<HTMLButtonElement>('[aria-label="Show hidden"]');
-    expect(eye.getAttribute('aria-pressed')).toBe('false');
-    expect(eye.getAttribute('data-tip')).toContain('1');
+    click(bar('Filters'));
+    const eye = sw('Show hidden');
+    expect(eye.getAttribute('aria-checked')).toBe('false');
+    expect(eye.closest('.sv-switch')?.textContent).toContain('1');
     click(eye);
-    expect(eye.getAttribute('aria-label')).toBe('Hide hidden');
+    expect(eye.getAttribute('aria-checked')).toBe('true');
     expect(titles()).toHaveLength(3);
     expect(card('Alpha').classList.contains('is-hidden-item')).toBe(true);
     expect(card('Alpha').querySelector('.pc-hidden-badge')).not.toBeNull();
@@ -231,7 +272,8 @@ describe('Sessions cards', () => {
     expect(titles()).toEqual(['Bravo']);
     act(() => setUserHidden('session', [space.id], true));
     expect(useStore.getState().sessions[space.id].userHidden).toBeUndefined();
-    click(q('[aria-label="Show hidden"]'));
+    click(bar('Filters'));
+    click(sw('Show hidden'));
     click(card('Charlie').querySelector('[role="checkbox"]'));
     expect(q('.session-bar [aria-label="Unhide"]')).not.toBeNull();
     click(q('.session-bar [aria-label="Unhide"]'));

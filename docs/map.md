@@ -36,7 +36,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 30 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 27 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 23 | 8 |
-| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 22 | 0 |
+| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 20 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 19 | 4 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |

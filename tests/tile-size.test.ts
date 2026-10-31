@@ -89,7 +89,7 @@ describe('Library uses the same slider', () => {
     const sessionId = useStore.getState().activeSessionId;
     act(() => useStore.setState({ assets: { sample: { ...asset('sample'), sessionId } }, generations: {} }));
     render(createElement(GalleryPanel));
-    const src = readFileSync('src/components/gallery/GalleryPanel.tsx', 'utf8');
+    const src = readFileSync('src/components/ui/PanelControls.tsx', 'utf8');
     expect(src).toMatch(/<InlineSlider label="Grid size"/);
     const size = host.querySelector<HTMLInputElement>('input[aria-label="Grid size"]')!;
     expect(size).not.toBeNull();
@@ -100,11 +100,13 @@ describe('Library uses the same slider', () => {
       setNum(size, before + 1);
       expect(rowHeight()).toBeGreaterThan(before_h); // bigger Grid size = larger tiles
     }
-    act(() => host.querySelector<HTMLButtonElement>('[aria-label="List view"]')!.click());
-    expect(host.querySelector('input[aria-label="Grid size"]')).toBeNull();
-    expect(host.querySelector('[aria-label="List view"]')?.getAttribute('aria-pressed')).toBe('true');
+    const radio = (t: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((b) => b.textContent === t)!;
+    act(() => host.querySelector<HTMLButtonElement>('.pc-bar [aria-label="View"]')!.click());
+    act(() => radio('List').click());
+    expect(document.querySelector('input[aria-label="Grid size"]')).toBeNull(); // neither in the bar nor in the View popover
+    expect(radio('List').getAttribute('aria-checked')).toBe('true');
     expect(host.querySelector('.library-layout-list')).not.toBeNull();
-    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Card view"]')!.click());
+    act(() => radio('Grid').click());
     expect(host.querySelector('input[aria-label="Grid size"]')).not.toBeNull();
   });
 });

@@ -1,15 +1,14 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowDownAZ, ArrowUpZA, Box, ExternalLink, Eye, EyeOff, Grid2X2, Maximize2, Minimize2, Palette, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
+import { Box, ExternalLink, Eye, EyeOff, Funnel, Grid2X2, LayoutGrid, Maximize2, Minimize2, Palette, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
-import { IconButton } from '../ui/primitives';
-import { InlineSlider } from '../designer/InlineControls';
+import { Button, IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { usePref } from '../ui/hooks';
-import { HiddenToggle, SearchToggle, CardMenu, CategoryRail, MenuConfirm, MenuItem, Sep, ViewToggle, asItemView, useTapReveal, type ItemView, type RailItem } from '../ui/PanelControls';
+import { SearchToggle, CardMenu, GridSizeSlider, LayoutSegmented, MenuConfirm, MenuItem, PanelPopover, SortSegmented, SourceSelect, ToggleRow, asItemView, useTapReveal, type ItemView, type RailItem, type SortState } from '../ui/PanelControls';
 import { JustifiedGrid } from '../ui/JustifiedGrid';
 import { rowHeightFor } from '../../lib/justifiedRows';
 import { GeneratedAssets } from './GeneratedAssets';
@@ -19,7 +18,7 @@ type Category = 'all' | SubjectKind;
 const SUBJECT_ICONS = { character: UserRound, object: Shapes, product: Tag, location: Box, style: Palette } as const;
 /** All shows what was generated; each category shows the saved library items of that kind. */
 const ORDER: SubjectKind[] = ['character', 'location', 'product', 'object', 'style'];
-const RAIL: RailItem<Category>[] = [{ id: 'all', label: 'All', icon: Grid2X2 }, ...ORDER.map((k) => ({ id: k, label: SUBJECT_KINDS.find((x) => x.value === k)!.label, icon: SUBJECT_ICONS[k] }))];
+const SOURCES: RailItem<Category>[] = [{ id: 'all', label: 'All', icon: Grid2X2 }, ...ORDER.map((k) => ({ id: k, label: SUBJECT_KINDS.find((x) => x.value === k)!.label, icon: SUBJECT_ICONS[k] }))];
 
 /** Assets: every generation and upload, and the library of saved characters, locations, products, objects and styles. */
 export function GalleryPanel() {
@@ -28,25 +27,28 @@ export function GalleryPanel() {
   const [stored, setStored] = usePref<ItemView>('ogs.libraryView', 'card');
   const view = asItemView(stored);
   const [cols, setCols] = useState(3);
-  // Each view renders its top bar across the whole panel, then this rail beside its results.
+  // Each view renders its top bar across the whole panel; the source selector is the first control of that bar.
   const chrome = embedded ? null : <div className="pc-chrome">
     <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
     <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
   </div>;
-  const rail = <CategoryRail items={RAIL} value={category} onChange={setCategory} expanded={expanded} label="Library categories" />;
+  const library = useStore((st) => st.library);
+  const counts = (k: SubjectKind) => library.filter((x) => (x.kind ?? 'character') === k && !x.userHidden).length;
+  const source = <SourceSelect items={SOURCES.map((x) => (x.id === 'all' ? x : { ...x, count: counts(x.id as SubjectKind) }))} value={category} onChange={setCategory} label="Library source" separatorAfter="all" />;
   return (
     <div className="gallery" role="region" aria-label="Library">
-      {category === 'all' ? <GeneratedAssets rail={rail} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets rail={rail} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
+      {category === 'all' ? <GeneratedAssets source={source} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets source={source} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
     </div>
   );
 }
 
-function LibraryAssets({ rail, chrome, kind, view, setView, cols, setCols }: { rail: ReactNode; chrome: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
+function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: { source: ReactNode; chrome: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const library = useStore((s) => s.library);
   const assets = useStore((s) => s.assets);
   const { expanded } = usePanelExpanded();
   const [q, setQ] = useState('');
-  const [asc, setAsc] = useState(true);
+  const [sort, setSort] = useState<SortState>({ by: 'name', asc: true });
+  const asc = sort.asc;
   const [showHidden, setShowHidden] = useState(false);
   const needle = q.trim().toLowerCase();
   const list = library.filter((x) => (x.kind ?? 'character') === kind && x.name.toLowerCase().includes(needle) && (showHidden || !x.userHidden)).sort((a, b) => (asc ? 1 : -1) * a.name.localeCompare(b.name));
@@ -54,23 +56,26 @@ function LibraryAssets({ rail, chrome, kind, view, setView, cols, setCols }: { r
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <div className="pc-grp">
-            <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" hint={`${list.length} item${list.length === 1 ? '' : 's'}`} />
-            <IconButton icon={asc ? ArrowDownAZ : ArrowUpZA} label="Sort by name" size="sm" active aria-pressed data-tip={`Sort by name · ${asc ? 'A → Z' : 'Z → A'}`} onClick={() => setAsc(!asc)} />
-          </div>
+          <div className="pc-grp pc-left">{source}</div>
           <div className="pc-grp pc-right">
-            {view === 'card' ? <>
-              <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
-              <Sep />
-            </> : null}
-            <ViewToggle value={view} onChange={setView} />
-            <HiddenToggle showing={showHidden} count={library.filter((x) => x.userHidden).length} onChange={setShowHidden} />
+            {view === 'card' ? <div className="pc-size"><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+            <div className="pc-icons">
+              <PanelPopover icon={LayoutGrid} label="View">
+                <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
+                <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} nameOnly /></div>
+                {view === 'card' ? <div className="sv-row pc-size-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+              </PanelPopover>
+              <PanelPopover icon={Funnel} label="Filters" dot={showHidden}>
+                <ToggleRow label="Show hidden" count={library.filter((x) => x.userHidden).length} checked={showHidden} onChange={setShowHidden} />
+                <Button size="sm" variant="ghost" disabled={!showHidden} onClick={() => setShowHidden(false)}>Clear filters</Button>
+              </PanelPopover>
+              <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" hint={`${list.length} item${list.length === 1 ? '' : 's'}`} />
+            </div>
             {chrome}
           </div>
         </div>
       </div>
       <div className="pc-split">
-        {rail}
         <div className="pc-main">
           <div className="gallery-scroll">
             {list.length ? (

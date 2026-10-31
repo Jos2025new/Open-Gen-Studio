@@ -22,6 +22,9 @@ const gen = (id: string, prompt: string, over: Partial<Generation> = {}) => ({ i
 const q = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel)!;
 const click = (el: Element | null) => act(() => (el as HTMLElement).click());
 const names = () => [...host.querySelectorAll('.g-tile .g-open')].map((b) => b.getAttribute('title'));
+const bar = (label: string) => q(`.pc-bar [aria-label^="${label}"]`);
+const radio = (text: string) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === text) ?? null;
+const source = (name: string) => { click(q('.pc-source')); click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith(name)) ?? null); };
 const mount = () => act(() => root.render(createElement(GalleryPanel)));
 
 beforeEach(() => {
@@ -41,36 +44,38 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; });
 
 describe('Library top bar', () => {
-  it('sorts by date newest first, then toggles name and date, flipping on a second press', () => {
+  it('sorts from the View popover: Newest, Oldest, A–Z and Z–A over the same order', () => {
     expect(names()).toEqual(['Apple', 'Cherry', 'Mango']);
-    const name = q<HTMLButtonElement>('[aria-label="Sort by name"]');
-    const date = q<HTMLButtonElement>('[aria-label="Sort by date"]');
-    expect(date.getAttribute('aria-pressed')).toBe('true');
-    expect(name.getAttribute('aria-pressed')).toBe('false');
-    click(name);
+    click(bar('View'));
+    expect(document.querySelector('[role="dialog"][aria-label="View"] .pop-title')?.textContent).toBe('View');
+    expect(radio('Newest')?.getAttribute('aria-checked')).toBe('true');
+    click(radio('A–Z'));
     expect(names()).toEqual(['Apple', 'Cherry', 'Mango']);
-    expect(name.getAttribute('aria-pressed')).toBe('true');
-    expect(date.getAttribute('aria-pressed')).toBe('false');
-    click(name);
+    expect(radio('A–Z')?.getAttribute('aria-checked')).toBe('true');
+    click(radio('Z–A'));
     expect(names()).toEqual(['Mango', 'Cherry', 'Apple']);
-    click(date);
-    expect(names()).toEqual(['Apple', 'Cherry', 'Mango']);
-    click(date);
+    click(radio('Oldest'));
     expect(names()).toEqual(['Mango', 'Cherry', 'Apple']);
-    expect(name.getAttribute('aria-pressed')).toBe('false');
+    click(radio('Newest'));
+    expect(names()).toEqual(['Apple', 'Cherry', 'Mango']);
+    expect(radio('A–Z')?.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('has three zones: left (search, filter, sorts, grouping), centered types, right (size, view)', () => {
-    expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).not.toMatch(/\.pc-bar \{[^}]*space-between/);
+  it('has two zones: the source selector and Sessions pill on the left; size, types, favorites, View, Filters, Search and chrome on the right', () => {
     const kids = [...q('.pc-bar').children];
-    expect(kids).toHaveLength(3);
-    const labels = [...kids[0].querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
-    expect(labels.slice(0, 4)).toEqual(['Search', 'Filter by', 'Sort by name', 'Sort by date']);
-    expect(labels.slice(4)).toEqual(['All', 'Sessions']);
-    expect(kids[1].classList.contains('pc-center')).toBe(true);
-    expect(kids[1].querySelector('[aria-label="Images"]')).not.toBeNull();
-    expect(kids[2].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
-    expect(kids[2].querySelector('[aria-label="List view"]')).not.toBeNull();
+    expect(kids).toHaveLength(2);
+    expect(kids[0].classList.contains('pc-left')).toBe(true);
+    const left = [...kids[0].querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
+    expect(left).toEqual(['Library source: All', 'Sessions']);
+    expect(kids[0].querySelector('.pc-source')?.getAttribute('aria-haspopup')).toBe('menu');
+    expect(kids[1].querySelector('.pc-center [aria-label="Images"]')).not.toBeNull();
+    expect(kids[1].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
+    const icons = [...kids[1].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
+    expect(icons).toEqual(['Favorites only', 'View', 'Filters', 'Search']);
+    expect(bar('View').getAttribute('aria-haspopup')).toBe('dialog');
+    expect(bar('View').getAttribute('aria-expanded')).toBe('false');
+    expect(kids[1].querySelector('.pc-icons')?.nextElementSibling?.classList.contains('pc-chrome')).toBe(true); // collapse and close end the bar
+    expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).toMatch(/@container pc-panel \(max-width: 640px\)/);
   });
 
   it('the bar spans the full width of the controls even when the panel is expanded', () => {
@@ -78,25 +83,28 @@ describe('Library top bar', () => {
     expect(css).toMatch(/\.side-panel\.is-expanded \.generated-controls \{ flex-direction: column;[^}]*align-items: stretch/);
     expect(css).toMatch(/\.generated-controls > \.pc-bar \{ width: 100%/);
     expect(q('.generated-controls').firstElementChild?.classList.contains('pc-bar')).toBe(true);
-    click(q('.pc-rail [aria-label="Character"]'));
+    source('Character');
     expect(q('.generated-controls').firstElementChild?.classList.contains('pc-bar')).toBe(true);
   });
 
-  it('All | Sessions replaces the scope and Group by: All groups by date, Sessions by session with titled, selectable headers', () => {
-    const seg = q('.pc-bar .pc-grp [role="radiogroup"], .pc-bar .pc-grp .seg');
-    expect(seg).not.toBeNull();
+  it('the Sessions pill replaces the scope and Group by: unpressed groups by date, pressed by session with titled, selectable headers', () => {
+    const pill = () => [...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'Sessions')!;
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
     const other = createSession('Other');
     act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [other.id]: other }, assets: { ...st.assets, z: asset('z', { sessionId: other.id, createdAt: 5, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zed', { sessionId: other.id }) } })));
     expect(names()).toContain('Zed'); // every session is covered
     expect([...host.querySelectorAll('.date-head')].map((h) => h.textContent)).not.toContain('Other 1');
-    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'Sessions') ?? null);
+    click(pill());
+    expect(pill().getAttribute('aria-pressed')).toBe('true');
     const heads = [...host.querySelectorAll('.date-head')];
     expect(heads.map((h) => h.textContent)).toContain('Other 1');
     const group = heads.find((h) => h.textContent === 'Other 1')!;
     click(group.querySelector('[role="checkbox"]'));
     expect(q('.gallery-bulk').textContent).toContain('1 selected');
-    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'All') ?? null);
-    click(q('[aria-label="Filter by"]'));
+    click(pill());
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
+    expect([...host.querySelectorAll('.date-head')].map((h) => h.textContent)).not.toContain('Other 1');
+    click(bar('Filters'));
     expect([...document.querySelectorAll('.sv-label')].map((e) => e.textContent?.trim())).not.toEqual(expect.arrayContaining(['Show']));
     expect(document.body.textContent).not.toContain('Group by');
     expect(document.body.textContent).not.toContain('This session');
@@ -110,13 +118,14 @@ describe('Library top bar', () => {
     const byName = Object.fromEntries(cells.map((c) => [c.querySelector('.g-open')?.getAttribute('title'), c]));
     expect(ratio(byName.Mango)).toBeCloseTo(2, 3);
     expect(ratio(byName.Apple)).toBeCloseTo(0.5, 3);
-    click(q('[aria-label="List view"]'));
+    click(bar('View'));
+    click(radio('List'));
     expect(host.querySelector('.jg-cell')).toBeNull();
   });
 
   it('every icon button of the bar is the same size class and stroke, and one CSS rule sets the 18px glyph', () => {
     const buttons = [...host.querySelectorAll('.pc-bar .icon-btn')];
-    expect(buttons.length).toBeGreaterThan(12);
+    expect(buttons.length).toBeGreaterThan(9);
     for (const b of buttons) {
       expect(b.classList.contains('icon-btn-sm')).toBe(true);
       expect(b.querySelector('svg')?.getAttribute('stroke-width')).toBe('1.75');
@@ -139,24 +148,56 @@ describe('Library top bar', () => {
     expect(names()).toHaveLength(3);
   });
 
-  it('keeps Canvas, Place, Mode and Favorites only in the Filter by menu', () => {
-    click(q('[aria-label="Filter by"]'));
-    const labels = [...document.querySelectorAll('.sv-row .sv-label, .sv-switch span')].map((e) => e.textContent?.trim());
-    for (const l of ['Canvas', 'Place', 'Mode', 'Favorites only']) expect(labels).toContain(l);
-    click(document.querySelector('[role="switch"][aria-label="Favorites only"]'));
+  it('Filters holds Canvas, Place, Mode, Show hidden and Show archived; Favorites only is a star in the bar', () => {
+    const star = bar('Favorites only');
+    expect(star.getAttribute('aria-pressed')).toBe('false');
+    click(star);
     expect(names()).toEqual(['Apple']);
+    expect(star.getAttribute('aria-pressed')).toBe('true');
+    click(star);
+    click(bar('Filters'));
+    const labels = [...document.querySelectorAll('.sv-row .sv-label, .sv-switch > span')].map((e) => e.textContent?.trim());
+    for (const l of ['Canvas', 'Place', 'Mode', 'Show hidden · 0', 'Show archived · 0']) expect(labels).toContain(l);
+    expect(labels).not.toContain('Favorites only');
+    expect(bar('Filters').getAttribute('aria-label')).toBe('Filters');
+  });
+
+  it('Filters shows an active dot and Clear filters resets it', () => {
+    click(bar('Filters'));
+    const pop = () => document.querySelector('[role="dialog"][aria-label="Filters"]')!;
+    expect(host.querySelector('.pc-dot')).toBeNull();
+    click(pop().querySelector('[role="switch"][aria-label="Show hidden"]'));
+    expect(host.querySelector('.pc-dot')).not.toBeNull();
+    expect(bar('Filters').getAttribute('aria-label')).toBe('Filters (active)');
+    click([...pop().querySelectorAll('button')].find((b) => b.textContent === 'Clear filters') ?? null);
+    expect(host.querySelector('.pc-dot')).toBeNull();
+    expect(pop().querySelector('[role="switch"][aria-label="Show hidden"]')?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('Show hidden and Show archived in Filters include hidden assets and those of archived sessions', () => {
+    const other = createSession('Old'); other.archived = true;
+    act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [other.id]: other }, assets: { ...st.assets, h: asset('h', { userHidden: true, createdAt: 2 }), z: asset('z', { sessionId: other.id, createdAt: 3, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zed', { sessionId: other.id }) } })));
+    expect(names()).toHaveLength(3);
+    click(bar('Filters'));
+    const pop = () => document.querySelector('[role="dialog"][aria-label="Filters"]')!;
+    click(pop().querySelector('[role="switch"][aria-label="Show hidden"]'));
+    expect(names()).toHaveLength(4);
+    click(pop().querySelector('[role="switch"][aria-label="Show archived"]'));
+    expect(names()).toHaveLength(5);
   });
 
   it('remembers list or card view, and old stored values mean card', () => {
-    expect(q('[aria-label="Card view"]').getAttribute('aria-pressed')).toBe('true');
-    click(q('[aria-label="List view"]'));
+    click(bar('View'));
+    expect(radio('Grid')?.getAttribute('aria-checked')).toBe('true');
+    click(radio('List'));
     expect(localStorage.getItem('ogs.libraryView')).toBe('"list"');
     expect(host.querySelector('.library-layout-list')).not.toBeNull();
     act(() => root.unmount());
     localStorage.setItem('ogs.libraryView', '"grid"');
     root = createRoot(host);
     mount();
-    expect(q('[aria-label="Card view"]').getAttribute('aria-pressed')).toBe('true');
+    click(bar('View'));
+    expect(radio('Grid')?.getAttribute('aria-checked')).toBe('true');
   });
 });
 
@@ -166,7 +207,7 @@ describe('Library search', () => {
     expect(host.querySelector('input[aria-label="Search assets"]')).toBeNull();
     const icon = q<HTMLButtonElement>('.pc-bar [aria-label="Search"]');
     expect(icon.textContent).toBe('');
-    expect(host.querySelector('.pc-bar')?.firstElementChild?.firstElementChild).toBe(icon);
+    expect(host.querySelector('.pc-bar .pc-icons')?.lastElementChild).toBe(icon);
     click(icon);
     const input = q<HTMLInputElement>('input[aria-label="Search assets"]');
     expect(document.activeElement).toBe(input);
@@ -183,7 +224,7 @@ describe('Library search', () => {
     expect(names()).toHaveLength(3);
   });
   it('also works in a category view and clears with its button', () => {
-    click(q('.pc-rail [aria-label="Character"]'));
+    source('Character');
     click(q('.pc-bar [aria-label="Search"]'));
     type(q<HTMLInputElement>('input[aria-label="Search saved items"]'), 'zed');
     expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
@@ -193,41 +234,44 @@ describe('Library search', () => {
   });
 });
 
-describe('Library side panel', () => {
-  it('lists All, Character, Location, Product, Object and Style, and switches to saved items', () => {
-    const rail = () => q('.pc-rail');
-    expect([...rail().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['All', 'Character', 'Location', 'Product', 'Object', 'Style']);
-    click(rail().querySelector('[aria-label="Character"]'));
+describe('Library source selector', () => {
+  it('lists All, Character, Location, Product, Object and Style with counts, and switches to saved items', () => {
+    click(q('.pc-source'));
+    const items = [...document.querySelectorAll('[role="menuitem"]')];
+    expect(items.map((b) => b.textContent)).toEqual(['All', 'Character2', 'Location1', 'Product0', 'Object0', 'Style0']);
+    expect(document.querySelector('.pc-menu-sep')).not.toBeNull();
+    expect(items[0].getAttribute('aria-current')).toBe('true');
+    click(items[1]);
+    expect(q('.pc-source').textContent).toBe('Character');
     expect([...host.querySelectorAll('.lib-tile .pc-info-title')].map((e) => e.textContent)).toEqual(['@Alf', '@Zed']);
-    click(q('[aria-label="Sort by name"]'));
+    click(bar('View'));
+    const sortRow = [...document.querySelectorAll('.sv-row')].find((r) => r.querySelector('.sv-label')?.textContent === 'Sort')!;
+    expect([...sortRow.querySelectorAll('[role="radio"]')].map((b) => b.textContent)).toEqual(['A–Z', 'Z–A']); // categories sort by name only
+    click(radio('Z–A'));
     expect([...host.querySelectorAll('.lib-tile .pc-info-title')].map((e) => e.textContent)).toEqual(['@Zed', '@Alf']);
-    click(rail().querySelector('[aria-label="Location"]'));
+    source('Location');
     expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
-    click(rail().querySelector('[aria-label="All"]'));
+    source('All');
     expect(names()).toHaveLength(3);
   });
 
-  it('the top bar spans the panel and the rail sits below it, beside the results', () => {
-    const check = () => {
-      const bar = q('.pc-bar'), split = q('.pc-split'), rail = q('.pc-rail');
-      expect(split.contains(bar)).toBe(false);
-      expect(split.contains(rail)).toBe(true);
-      expect(bar.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(rail.nextElementSibling?.classList.contains('pc-main')).toBe(true);
-      expect(q('.pc-main').querySelector('.gallery-scroll')).not.toBeNull();
-      expect(rail.contains(bar.querySelector('[aria-label="Sort by name"]'))).toBe(false);
-    };
-    check();
-    expect(host.querySelector('.gallery-count')).toBeNull(); // no standalone results line
-    expect(q('.pc-bar [aria-label="Search"]').getAttribute('data-tip')).toContain('3 results');
-    click(q('.pc-rail [aria-label="Character"]'));
-    check();
+  it('a category keeps only View, Filters (Show hidden) and Search; All-only controls disappear', () => {
+    source('Character');
+    expect(host.querySelector('.pc-center')).toBeNull();
+    expect(host.querySelector('[aria-label="Favorites only"]')).toBeNull();
+    expect([...host.querySelectorAll('.pc-bar button')].some((b) => b.textContent === 'Sessions')).toBe(false);
+    click(bar('Filters'));
+    expect([...document.querySelectorAll('.sv-switch > span')].map((e) => e.textContent?.trim())).toEqual(['Show hidden · 0']);
+    click(document.querySelector('[role="switch"][aria-label="Show hidden"]'));
+    expect(bar('Filters').getAttribute('aria-label')).toBe('Filters (active)');
   });
 
-  it('is an icon-only rail with tooltips when the panel is not expanded', () => {
-    act(() => setUi({ panelExpanded: false }));
-    const items = [...host.querySelectorAll('.pc-rail button')];
-    expect(items.every((b) => b.textContent === '' && b.getAttribute('data-tip') && b.getAttribute('aria-label'))).toBe(true);
+  it('there is no side rail: the bar spans the panel and the results follow it', () => {
+    expect(host.querySelector('.pc-rail')).toBeNull();
+    expect(q('.pc-split').contains(q('.pc-bar'))).toBe(false);
+    expect(q('.pc-main').querySelector('.gallery-scroll')).not.toBeNull();
+    expect(host.querySelector('.gallery-count')).toBeNull(); // no standalone results line
+    expect(q('.pc-bar [aria-label="Search"]').getAttribute('data-tip')).toContain('3 results');
   });
 });
 
@@ -299,7 +343,8 @@ describe('Library cards', () => {
     expect(tiles[2].querySelector('.attach-toggle')?.textContent).toBe('2');
     click(on);
     expect(useStore.getState().composer.attachments).toEqual(['a']);
-    click(q('[aria-label="List view"]'));
+    click(bar('View'));
+    click(radio('List'));
     expect(host.querySelector('.g-tile.pc-row .attach-toggle.is-on')?.textContent).toBe('1');
   });
 
@@ -323,9 +368,12 @@ describe('Library cards', () => {
     expect(useStore.getState().assets.c.userHidden).toBe(true);
     expect(useStore.getState().assets.c).toBeDefined(); // hidden is not deleted
     expect(names()).toEqual(['Apple', 'Mango']);
-    const eye = q<HTMLButtonElement>('[aria-label="Show hidden"]');
-    expect(eye.getAttribute('data-tip')).toContain('1');
-    click(eye);
+    click(bar('Filters'));
+    const eye = () => document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Show hidden"]')!;
+    expect(eye().closest('.sv-switch')?.textContent).toContain('1');
+    expect(eye().getAttribute('aria-checked')).toBe('false');
+    click(eye());
+    expect(eye().getAttribute('aria-checked')).toBe('true');
     expect(names()).toHaveLength(3);
     const dim = host.querySelector('.is-hidden-item')!;
     expect(dim.querySelector('.pc-hidden-badge')).not.toBeNull();
@@ -338,11 +386,12 @@ describe('Library cards', () => {
   });
 
   it('saved items can be hidden too, with the same eye', () => {
-    click(q('.pc-rail [aria-label="Character"]'));
+    source('Character');
     click(q('.lib-tile [aria-label^="More actions"]'));
     click([...document.querySelectorAll('[role="menuitem"]')].find((e) => e.textContent === 'Hide') ?? null);
     expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
-    click(q('[aria-label="Show hidden"]'));
+    click(bar('Filters'));
+    click(document.querySelector('[role="switch"][aria-label="Show hidden"]'));
     expect(host.querySelectorAll('.lib-tile')).toHaveLength(2);
     expect(host.querySelector('.lib-tile.is-hidden-item .pc-hidden-badge')).not.toBeNull();
   });
@@ -351,18 +400,20 @@ describe('Library cards', () => {
     const old = createSession('Old'); old.archived = true;
     act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [old.id]: old }, assets: { ...st.assets, z: asset('z', { sessionId: old.id, createdAt: 99, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zebra', { sessionId: old.id }) } })));
     expect(names()).not.toContain('Zebra');
-    const arch = q<HTMLButtonElement>('.pc-right [aria-label="Show archived"]');
-    expect(arch.getAttribute('data-tip')).toContain('1');
-    expect(arch.getAttribute('aria-pressed')).toBe('false');
+    click(bar('Filters'));
+    const arch = document.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Show archived"]')!;
+    expect(arch.closest('.sv-switch')?.textContent).toContain('1');
+    expect(arch.getAttribute('aria-checked')).toBe('false');
     click(arch);
-    expect(arch.getAttribute('aria-pressed')).toBe('true');
+    expect(arch.getAttribute('aria-checked')).toBe('true');
     expect(names()).toContain('Zebra');
-    const btns = [...q('.pc-right').querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
-    expect(btns.slice(-4)).toEqual(['Show hidden', 'Show archived', 'Collapse', 'Close']); // close/collapse end the bar
+    const btns = [...q('.pc-right').querySelectorAll(':scope > .pc-chrome button')].map((b) => b.getAttribute('aria-label'));
+    expect(btns).toEqual(['Collapse', 'Close']); // close/collapse end the bar
   });
 
   it('list rows keep the actions', () => {
-    click(q('[aria-label="List view"]'));
+    click(bar('View'));
+    click(radio('List'));
     const row = q('.g-tile.pc-row');
     expect(row.textContent).toContain('Apple');
     expect(row.textContent).toContain('Seedance · 1:1 · 1k');

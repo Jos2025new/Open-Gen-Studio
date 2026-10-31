@@ -1,6 +1,5 @@
 .generated-controls, .side-panel.is-expanded .generated-controls { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
 .generated-controls > .pc-bar { width: 100%; box-sizing: border-box; }
-.generated-controls + .pc-split .pc-rail { border-top: 0; }
 .pc-sub { display: flex; flex-direction: column; gap: 6px; padding: 6px 12px 0; }
 .pc-sub:empty { display: none; }
 .pc-sub .gallery-bulk { padding-bottom: 4px; }

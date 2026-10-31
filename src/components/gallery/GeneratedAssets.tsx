@@ -1,10 +1,9 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AudioLines, Box, Download, Eye, EyeOff, Film, Image, ListFilter, MessageSquare, Paperclip, Trash, X } from 'lucide-react';
+import { AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Funnel, Image, LayoutGrid, MessageSquare, Paperclip, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
-import { IconButton, Button, Segmented, Toggle } from '../ui/primitives';
-import { InlineSlider } from '../designer/InlineControls';
+import { IconButton, Button } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
 import { canvasLookup } from '../../engine/canvas';
@@ -12,10 +11,9 @@ import type { Asset } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
-import { ResultsMenu } from '../ui/ResultsMenu';
 import { JustifiedGrid } from '../ui/JustifiedGrid';
 import { rowHeightFor } from '../../lib/justifiedRows';
-import { ArchivedToggle, GroupCheck, HiddenToggle, SearchToggle, Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
+import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, ToggleRow, type ItemView, type SortState } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
@@ -24,7 +22,7 @@ type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
 
 /** Everything generated or uploaded: the "All" category of the Library. */
-export function GeneratedAssets({ rail, chrome, view, setView, cols, setCols }: { rail: ReactNode; chrome: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
+export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }: { source: ReactNode; chrome: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const { expanded } = usePanelExpanded();
@@ -114,39 +112,40 @@ export function GeneratedAssets({ rail, chrome, view, setView, cols, setCols }: 
     <>
       <div className="gallery-controls generated-controls">
         <div className="pc-bar">
-          <div className="pc-grp">
-            <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" hint={`${results.length} ${results.length === 1 ? 'result' : 'results'}`} />
-            <div className="results-controls">
-              <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={canvas !== 'all' || place !== 'all' || mode !== 'all' || favOnly}>
+          <div className="pc-grp pc-left">
+            {source}
+            <button type="button" className={`canvas-tab${group === 'session' ? ' is-on' : ''}`} aria-pressed={group === 'session'} onClick={() => setGroup(group === 'session' ? 'date' : 'session')}><Folder size={14} strokeWidth={1.75} />Sessions</button>
+          </div>
+          <div className="pc-grp pc-right">
+            {view === 'card' ? <div className="pc-size"><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+            <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
+              {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
+              <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
+            </div>
+            <div className="pc-icons">
+              <IconButton icon={Star} label="Favorites only" size="sm" active={favOnly} aria-pressed={favOnly} onClick={() => setFavOnly(!favOnly)} />
+              <PanelPopover icon={LayoutGrid} label="View">
+                <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
+                <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
+                {view === 'card' ? <div className="sv-row pc-size-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+              </PanelPopover>
+              <PanelPopover icon={Funnel} label="Filters" dot={filtered || showHidden || showArchived}>
                 <div className="sv-row">
                   <span className="sv-label">Canvas</span>
                   <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
                 </div>
                 <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
-                <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
-              </ResultsMenu>
+                <ToggleRow label="Show hidden" count={hiddenCount} checked={showHidden} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
+                <ToggleRow label="Show archived" count={archivedCount} checked={showArchived} onChange={(v) => { setShowArchived(v); setSelected(new Set()); }} />
+                <Button size="sm" variant="ghost" disabled={!filtered && !showHidden && !showArchived} onClick={() => { setCanvas('all'); setPlace('all'); setMode('all'); setShowHidden(false); setShowArchived(false); setSelected(new Set()); }}>Clear filters</Button>
+              </PanelPopover>
+              <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" hint={`${results.length} ${results.length === 1 ? 'result' : 'results'}`} />
             </div>
-            <SortToggles sort={sort} onChange={setSort} />
-            <Segmented value={group} size="sm" onChange={setGroup} options={[{ value: 'date', label: 'All' }, { value: 'session', label: 'Sessions' }]} />
-          </div>
-          <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
-            {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
-            <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
-          </div>
-          <div className="pc-grp pc-right">
-            {view === 'card' ? <>
-              <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
-              <Sep />
-            </> : null}
-            <ViewToggle value={view} onChange={setView} />
-            <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
-            <ArchivedToggle showing={showArchived} count={archivedCount} onChange={(v) => { setShowArchived(v); setSelected(new Set()); }} />
             {chrome}
           </div>
         </div>
       </div>
       <div className="pc-split">
-      {rail}
       <div className="pc-main">
       <div className="pc-sub">
         {running ? <div className="gallery-count faint num"><span className="running-pill num">{running} running</span></div> : null}

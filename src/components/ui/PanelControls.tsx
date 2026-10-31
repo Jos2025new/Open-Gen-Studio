@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Archive, ArrowDownAZ, Eye, EyeOff, Search, X, ArrowUpZA, CalendarArrowDown, CalendarArrowUp, Check, EllipsisVertical, LayoutGrid, List, type LucideIcon } from 'lucide-react';
-import { Button, IconButton } from './primitives';
-import { Popover, usePopover } from './Popover';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Check, ChevronDown, EllipsisVertical, Search, X, type LucideIcon } from 'lucide-react';
+import { Button, IconButton, Segmented, Toggle } from './primitives';
+import { InlineSlider } from '../designer/InlineControls';
+import { Popover, PopoverHeader, usePopover } from './Popover';
 import './PanelControls.css';
 
 /**
@@ -25,58 +26,70 @@ export function SearchToggle({ value, onChange, placeholder, inputLabel, hint }:
   </>;
 }
 
-/** Eye toggle: shows items the user hid (dimmed, with a badge) while on. */
-export function HiddenToggle({ showing, count, onChange }: { showing: boolean; count: number; onChange: (v: boolean) => void }) {
-  return <IconButton icon={showing ? Eye : EyeOff} label={showing ? 'Hide hidden' : 'Show hidden'} size="sm" active={showing} aria-pressed={showing} data-tip={`${showing ? 'Hide hidden' : 'Show hidden'} · ${count}`} onClick={() => onChange(!showing)} />;
-}
-
-/** Archive toggle: items of archived sessions (or the archived sessions) show only while on. */
-export function ArchivedToggle({ showing, count, onChange }: { showing: boolean; count: number; onChange: (v: boolean) => void }) {
-  return <IconButton icon={Archive} label="Show archived" size="sm" active={showing} aria-pressed={showing} data-tip={`Show archived · ${count}`} onClick={() => onChange(!showing)} />;
-}
-
-/** Thin vertical line between groups of controls in a panel's top bar. */
-export function Sep() { return <span className="pc-sep" role="separator" aria-orientation="vertical" />; }
-
 export type SortKey = 'name' | 'date';
 export interface SortState { by: SortKey; asc: boolean }
-/** Date starts newest first, name starts A → Z; pressing the active key flips it, pressing the other makes it the only active order. */
-export function nextSort(cur: SortState, key: SortKey): SortState {
-  return cur.by === key ? { by: key, asc: !cur.asc } : { by: key, asc: key === 'name' };
-}
+type SortChoice = 'newest' | 'oldest' | 'az' | 'za';
+const SORT_STATE: Record<SortChoice, SortState> = { newest: { by: 'date', asc: false }, oldest: { by: 'date', asc: true }, az: { by: 'name', asc: true }, za: { by: 'name', asc: false } };
+const sortChoice = (s: SortState): SortChoice => (s.by === 'date' ? (s.asc ? 'oldest' : 'newest') : s.asc ? 'az' : 'za');
 
-/** Two icon-only toggles: sort by name and sort by date. Only one is active at a time. */
-export function SortToggles({ sort, onChange, nameTip = 'A → Z', nameTipDesc = 'Z → A', dateTip = 'Oldest first', dateTipDesc = 'Newest first' }: { sort: SortState; onChange: (s: SortState) => void; nameTip?: string; nameTipDesc?: string; dateTip?: string; dateTipDesc?: string }) {
-  const name = sort.by === 'name';
-  const date = sort.by === 'date';
-  const NameIcon: LucideIcon = name && !sort.asc ? ArrowUpZA : ArrowDownAZ;
-  const DateIcon: LucideIcon = date && sort.asc ? CalendarArrowUp : CalendarArrowDown;
-  return <>
-    <IconButton icon={NameIcon} label="Sort by name" size="sm" active={name} aria-pressed={name} data-tip={`Sort by name · ${name && !sort.asc ? nameTipDesc : nameTip}`} onClick={() => onChange(nextSort(sort, 'name'))} />
-    <IconButton icon={DateIcon} label="Sort by date" size="sm" active={date} aria-pressed={date} data-tip={`Sort by date · ${date && sort.asc ? dateTip : dateTipDesc}`} onClick={() => onChange(nextSort(sort, 'date'))} />
-  </>;
+/** Sort choices of the View popover: Newest / Oldest / A–Z / Z–A over the same SortState; `nameOnly` drops the two date choices. */
+export function SortSegmented({ sort, onChange, nameOnly }: { sort: SortState; onChange: (s: SortState) => void; nameOnly?: boolean }) {
+  const options: Array<{ value: SortChoice; label: string }> = [...(nameOnly ? [] : [{ value: 'newest' as const, label: 'Newest' }, { value: 'oldest' as const, label: 'Oldest' }]), { value: 'az', label: 'A–Z' }, { value: 'za', label: 'Z–A' }];
+  return <Segmented value={sortChoice(sort)} size="sm" onChange={(v) => onChange(SORT_STATE[v])} options={options} />;
 }
 
 export type ItemView = 'list' | 'card';
 /** Stored values from older versions ('cards', 'grid') mean card view. */
 export const asItemView = (v: unknown): ItemView => (v === 'list' ? 'list' : 'card');
-export function ViewToggle({ value, onChange }: { value: ItemView; onChange: (v: ItemView) => void }) {
-  return <div className="pc-group" role="group" aria-label="View">
-    <IconButton icon={List} label="List view" size="sm" active={value === 'list'} aria-pressed={value === 'list'} onClick={() => onChange('list')} />
-    <IconButton icon={LayoutGrid} label="Card view" size="sm" active={value === 'card'} aria-pressed={value === 'card'} onClick={() => onChange('card')} />
-  </div>;
+export function LayoutSegmented({ value, onChange }: { value: ItemView; onChange: (v: ItemView) => void }) {
+  return <Segmented value={value} size="sm" onChange={onChange} options={[{ value: 'card', label: 'Grid' }, { value: 'list', label: 'List' }]} />;
+}
+
+/** The grid-size slider shared by the bar (wide) and the View popover (narrow, where the bar hides it). */
+export function GridSizeSlider({ cols, setCols, expanded }: { cols: number; setCols: (c: number) => void; expanded: boolean }) {
+  return <InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} />;
+}
+
+/** A titled row of the View and Filters popovers: a label and a switch, with an optional count. */
+export function ToggleRow({ label, checked, onChange, count }: { label: string; checked: boolean; onChange: (v: boolean) => void; count?: number }) {
+  return <label className="sv-switch"><span>{label}{count !== undefined ? <span className="faint num"> · {count}</span> : null}</span><Toggle checked={checked} onChange={onChange} label={label} /></label>;
+}
+
+/** One icon per intent (View, Filters): opens a small titled popover under it; `dot` marks that something inside is on. */
+export function PanelPopover({ icon, label, dot, width = 280, children }: { icon: LucideIcon; label: string; dot?: boolean; width?: number; children: ReactNode | ((close: () => void) => ReactNode) }) {
+  const pop = usePopover();
+  // The grid size lives in the bar when it fits; this popover repeats it only when the narrow bar hides it.
+  const barSize = pop.open ? pop.ref.current?.closest('.pc-bar')?.querySelector<HTMLElement>('.pc-size') : null;
+  const barSizeShown = !!barSize && barSize.offsetParent !== null;
+  return <span className="pc-pop">
+    <IconButton ref={pop.ref} icon={icon} label={dot ? `${label} (active)` : label} size="sm" active={pop.open || dot} aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle} />
+    {dot ? <i className="pc-dot" aria-hidden="true" /> : null}
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={width} placement="bottom-start" align="end" className="results-popover" label={label}>
+      <PopoverHeader title={label} />
+      <div className="sessions-view" data-bar-size={barSizeShown ? 'shown' : undefined}>{typeof children === 'function' ? children(pop.close) : children}</div>
+    </Popover>
+  </span>;
 }
 
 export interface RailItem<T extends string> { id: T; label: string; icon: LucideIcon; count?: number }
-/** Vertical list of categories: icon + text when expanded, an icon-only rail (labels as tooltips) when not. */
-export function CategoryRail<T extends string>({ items, value, onChange, expanded, label }: { items: RailItem<T>[]; value: T; onChange: (v: T) => void; expanded: boolean; label: string }) {
-  return <nav className={`pc-rail${expanded ? '' : ' is-icons'}`} aria-label={label}>
-    {items.map(({ id, label: text, icon: Icon, count }) => (
-      <button key={id} type="button" className={`pc-rail-item${value === id ? ' is-on' : ''}`} aria-label={text} aria-current={value === id ? 'true' : undefined} data-tip={expanded ? undefined : text} data-tip-side="right" onClick={() => onChange(id)}>
-        <Icon size={15} strokeWidth={1.75} />{expanded ? <span>{text}</span> : null}{expanded && count !== undefined ? <span className="pc-count num">{count}</span> : null}
-      </button>
-    ))}
-  </nav>;
+/** The source selector at the start of a bar: a pill with the current source (icon, label, chevron) that opens a menu of all of them. */
+export function SourceSelect<T extends string>({ items, value, onChange, label, separatorAfter }: { items: RailItem<T>[]; value: T; onChange: (v: T) => void; label: string; separatorAfter?: T }) {
+  const pop = usePopover();
+  const cur = items.find((i) => i.id === value) ?? items[0];
+  const Icon = cur.icon;
+  return <>
+    <button ref={pop.ref} type="button" className="canvas-tab is-on pc-source" aria-label={`${label}: ${cur.label}`} aria-haspopup="menu" aria-expanded={pop.open} onClick={pop.toggle}>
+      <Icon size={14} strokeWidth={1.75} />{cur.label}<ChevronDown size={12} />
+    </button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={220} placement="bottom-start" align="start" label={label}>
+      <div className="pc-menu" role="menu">
+        {items.map((i) => <Fragment key={i.id}>
+          <MenuItem icon={i.icon} selected={i.id === value} onClick={() => { onChange(i.id); pop.close(); }}>{i.label}{i.count !== undefined ? <span className="pc-count num">{i.count}</span> : null}</MenuItem>
+          {i.id === separatorAfter ? <hr className="pc-menu-sep" /> : null}
+        </Fragment>)}
+      </div>
+    </Popover>
+  </>;
 }
 
 /**
@@ -118,8 +131,8 @@ export function GroupCheck({ label, state, onToggle }: { label: string; state: '
   </button>;
 }
 
-export function MenuItem({ icon: Icon, children, tone, disabled, onClick }: { icon?: LucideIcon; children: ReactNode; tone?: 'danger'; disabled?: boolean; onClick: () => void }) {
-  return <button type="button" role="menuitem" className={`pc-menu-item${tone ? ` tone-${tone}` : ''}`} disabled={disabled} onClick={onClick}>{Icon ? <Icon size={14} strokeWidth={1.75} /> : null}{children}</button>;
+export function MenuItem({ icon: Icon, children, tone, disabled, selected, onClick }: { icon?: LucideIcon; children: ReactNode; tone?: 'danger'; disabled?: boolean; /** Marks the current choice of a menu of sources. */ selected?: boolean; onClick: () => void }) {
+  return <button type="button" role="menuitem" aria-current={selected ? 'true' : undefined} className={`pc-menu-item${tone ? ` tone-${tone}` : ''}${selected ? ' is-on' : ''}`} disabled={disabled} onClick={onClick}>{Icon ? <Icon size={14} strokeWidth={1.75} /> : null}{children}</button>;
 }
 
 /** Evaluates a render function only while the menu is open, so closed cards pay nothing for their menu items. */

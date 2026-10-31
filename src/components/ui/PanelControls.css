@@ -2,7 +2,13 @@
 .pc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .pc-grp { display: flex; flex: 1 1 0; min-width: max-content; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
 .pc-grp.pc-center { flex: 0 0 auto; justify-content: center; }
-.pc-grp.pc-right { justify-content: flex-end; }
+.pc-bar > .pc-left { flex: 0 1 auto; }
+.pc-grp.pc-right { flex: 1 1 auto; justify-content: flex-end; }
+.pc-icons { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 6px; }
+.pc-pop { position: relative; display: inline-flex; }
+.pc-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); pointer-events: none; }
+.pc-source { gap: 6px; }
+.sessions-view[data-bar-size="shown"] .pc-size-row { display: none; }
 .pc-bar { --pc-h: 36px; }
 .pc-bar .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; height: var(--pc-h); box-sizing: border-box; border-color: var(--border); }
 .pc-bar .results-menu-trigger { height: var(--pc-h); min-height: var(--pc-h); min-width: var(--pc-h); color: var(--text-2); }
@@ -10,30 +16,24 @@
 .pc-bar .results-controls { display: contents; }
 .pc-bar .icon-btn { width: var(--pc-h); height: var(--pc-h); color: var(--text-2); }
 .pc-bar .icon-btn.is-active { background: var(--surface-3); color: var(--text); box-shadow: none; }
-.pc-sep { flex: none; width: 1px; height: 20px; background: var(--border); }
-.pc-group { display: flex; align-items: center; gap: 2px; }
 .pc-search { flex: 0 1 220px; }
-.pc-group .canvas-tab, .pc-grp .canvas-tab { height: var(--pc-h); border-color: transparent; padding: 0 10px; font-size: 12px; }
-.pc-group .canvas-tab.is-on, .pc-grp .canvas-tab.is-on { border-color: transparent; }
+.pc-grp .canvas-tab { height: var(--pc-h); border-color: transparent; padding: 0 10px; font-size: 12px; }
+.pc-grp .canvas-tab.is-on { border-color: transparent; }
 .pc-size { display: flex; align-items: center; width: 160px; flex: 0 0 160px; }
 .pc-size .opt-slider::before { border-right-width: 0; } /* no thumb line across the label */
 .pc-size .opt.opt-slider { width: 100%; box-sizing: border-box; padding: 0 10px; gap: 6px; flex: 1 1 auto; }
 
 .pc-split { display: flex; flex: 1; min-height: 0; }
 .pc-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
-.pc-rail { display: flex; flex: none; flex-direction: column; gap: 2px; width: 148px; padding: 10px 6px; overflow-y: auto; }
-.pc-rail.is-icons { width: auto; padding: 10px 4px; }
-.pc-rail-item { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 9px; border-radius: var(--radius-s); color: var(--text-2); font-size: 12px; text-align: left; white-space: nowrap; }
-.pc-rail.is-icons .pc-rail-item { justify-content: center; width: 32px; padding: 0; }
-.pc-rail-item:hover { color: var(--text); background: var(--surface-2); }
-.pc-rail-item .pc-count { margin-left: auto; color: var(--text-3); font-size: 11px; }
-.pc-rail-item.is-on { color: var(--text); background: var(--surface-2); }
 
 .pc-menu { display: flex; flex-direction: column; gap: 1px; }
 .pc-menu-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border-radius: var(--radius-s); color: var(--text-2); font-size: 12px; text-align: left; }
 .pc-menu-item:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
 .pc-menu-item.tone-danger:hover:not(:disabled) { color: var(--danger); }
 .pc-menu-item:disabled { opacity: .45; }
+.pc-menu-item.is-on { color: var(--text); background: var(--surface-2); }
+.pc-menu-item .pc-count { margin-left: auto; color: var(--text-3); font-size: 11px; }
+.pc-menu-sep { width: 100%; margin: 3px 0; border: 0; border-top: 1px solid var(--border); }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
 .pc-card { --pc-btn-bg: rgba(255, 255, 255, .3); --pc-btn-bg-hover: rgba(255, 255, 255, .5); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 6px; background: var(--surface-2); }
@@ -115,21 +115,19 @@
 .pc-bar .results-menu-trigger svg:not(:first-child) { display: none; }
 .pc-center .icon-btn { width: 30px; height: 30px; }
 
-/* Narrow panel: the zones break into ordered rows instead of wrapping at random —
-   1) search, filter, sorts, scope … collapse, close; 2) types … view, hidden, archived; 3) Grid size across the width. */
+/* Wide: one row — source on the left, controls on the right. Narrow: row 1 is the source and the chrome; row 2 the types at the start and the icons at the end. */
 .pc-chrome { display: flex; flex: none; align-items: center; gap: 2px; }
 .gallery, .sessions { container: pc-panel / inline-size; }
 @container pc-panel (max-width: 640px) {
   .gallery-controls { padding: 10px; }
   .pc-bar { row-gap: 3px; column-gap: 4px; }
-  .pc-bar > .pc-grp:not(.pc-center) { display: contents; }
-  .pc-bar > .pc-right > * { order: 4; }
-  .pc-bar .pc-chrome { order: 1; margin-left: auto; }
-  .pc-bar::before { content: ''; order: 2; flex-basis: 100%; height: 0; }
-  .pc-bar > .pc-center { order: 3; margin-right: auto; }
-  .pc-bar::after { content: ''; order: 5; flex-basis: 100%; height: 0; }
-  .pc-bar > .pc-right > .pc-size { order: 6; flex: 1 1 100%; width: auto; }
-  .pc-bar .pc-sep { display: none; }
-  .pc-bar .segmented button { padding: 0 8px; }
+  .pc-bar > .pc-grp { display: contents; }
+  .pc-bar > .pc-left > * { order: 1; }
+  .pc-bar .pc-chrome { order: 2; margin-left: auto; }
+  .pc-bar::before { content: ''; order: 3; flex-basis: 100%; height: 0; }
+  .pc-bar .pc-center { order: 4; margin-right: auto; }
+  .pc-bar .pc-icons { order: 5; margin-left: auto; }
+  .pc-bar .pc-search { flex: 1 1 100%; max-width: none; }
+  .pc-bar .pc-size { display: none; }
   .pc-center .icon-btn { width: 28px; height: 28px; }
 }

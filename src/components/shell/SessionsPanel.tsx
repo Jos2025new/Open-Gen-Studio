@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Check, Eye, EyeOff, Grid2X2, Maximize2, Minimize2, Pin, PinOff, Plus, ListFilter, Trash, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Eye, EyeOff, Funnel, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from 'lucide-react';
 import { newSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
-import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
-import { InlineSlider } from '../designer/InlineControls';
+import { Button, IconButton, Segmented } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import type { Session, Workspace } from '../../engine/types';
 import { usePanelExpanded } from './panelEmbed';
@@ -12,14 +11,14 @@ import { visibleSessions } from '../../store/spaceSession';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { setUserHidden } from '../../store/userHidden';
 import { usePref } from '../ui/hooks';
-import { ArchivedToggle, CategoryRail, HiddenToggle, SearchToggle, Sep, SortToggles, ViewToggle, asItemView, type RailItem, type SortState } from '../ui/PanelControls';
+import { GridSizeSlider, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, SourceSelect, ToggleRow, asItemView, type RailItem, type SortState } from '../ui/PanelControls';
 import { CANVAS, QUICK_MODES, RunningNote, SessionRow, sessionCanvases, type QuickMode, type Stats } from './SessionRow';
 import './SessionsLayout.css';
 
 export { sessionCanvases };
 type CanvasFilter = 'all' | Workspace;
-/** Canvas filter rail; the chat workspace is the Studio. */
-const RAIL: RailItem<CanvasFilter>[] = [{ id: 'all', label: 'All', icon: Grid2X2 }, { id: 'chat', label: 'Studio', icon: CANVAS.chat.icon }, { id: 'node', label: 'Nodes', icon: CANVAS.node.icon }, { id: 'designer', label: 'Designer', icon: CANVAS.designer.icon }];
+/** Canvas sources of the selector; the chat workspace is the Studio. */
+const SOURCES: RailItem<CanvasFilter>[] = [{ id: 'all', label: 'All', icon: Grid2X2 }, { id: 'chat', label: 'Studio', icon: CANVAS.chat.icon }, { id: 'node', label: 'Nodes', icon: CANVAS.node.icon }, { id: 'designer', label: 'Designer', icon: CANVAS.designer.icon }];
 
 /** The confirmation for deleting several sessions at once: shared by the Sessions panel and the top bar's switcher. */
 export function DeleteSessionsConfirm({ ids, onCancel, onDone }: { ids: string[]; onCancel: () => void; onDone: () => void }) {
@@ -56,7 +55,6 @@ export function SessionsPanel() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const selecting = selected.size > 0;
   const bulkDel = usePopover();
-  const view = usePopover();
   const newPop = usePopover();
   const { expanded, embedded } = usePanelExpanded();
   useEffect(() => setCols((c) => (expanded ? Math.max(c, 5) : Math.min(c, 4))), [expanded]);
@@ -134,7 +132,7 @@ export function SessionsPanel() {
     <div role="region" aria-label="Sessions" className={`sessions layout-${layout}`}>
       <div className="sessions-controls">
         <div className="sessions-filter-bar pc-bar">
-        <div className="pc-grp">
+        <div className="pc-grp pc-left">
           <Button ref={newPop.ref} size="sm" variant="secondary" icon={Plus} onClick={newPop.toggle}>
             New
           </Button>
@@ -158,38 +156,37 @@ export function SessionsPanel() {
               })}
             </div>
           </Popover>
-          <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" hint={`${list.length} session${list.length === 1 ? '' : 's'}`} />
-          <div className="results-controls">
-            <button ref={view.ref} type="button" className={`results-menu-trigger${pinnedOnly || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
-          <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">
-            <div className="sessions-view">
+          <SourceSelect items={SOURCES.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={(v) => { setCanvas(v); setSelected(new Set()); }} label="Session canvas" separatorAfter="all" />
+        </div>
+        <div className="pc-grp pc-right">
+          {layout === 'card' ? <div className="pc-size"><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+          <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
+            {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
+            <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
+          </div>
+          <div className="pc-icons">
+            <IconButton icon={Pin} label="Pinned only" size="sm" active={pinnedOnly} aria-pressed={pinnedOnly} onClick={() => setPinnedOnly(!pinnedOnly)} />
+            <PanelPopover icon={LayoutGrid} label="View">
+              <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={layout} onChange={setLayout} /></div>
+              <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
               <div className="sv-row">
                 <span className="sv-label">Date means</span>
                 <Segmented value={basis} size="sm" onChange={setBasis} options={[{ value: 'updated', label: 'Last activity' }, { value: 'created', label: 'Created' }]} />
               </div>
-              <label className="sv-switch"><span>Pinned only</span><Toggle checked={pinnedOnly} onChange={setPinnedOnly} label="Pinned only" /></label>
+              {layout === 'card' ? <div className="sv-row pc-size-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+            </PanelPopover>
+            <PanelPopover icon={Funnel} label="Filters" dot={showHidden || shelf === 'archived'}>{(close) => <>
+              <ToggleRow label="Show hidden" count={hiddenCount} checked={showHidden} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
+              <ToggleRow label="Show archived" count={archivedCount} checked={shelf === 'archived'} onChange={(v) => { setShelf(v ? 'archived' : 'recent'); setSelected(new Set()); }} />
               {list.some(isEmpty) ? (
-                <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); view.close(); }}>
+                <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); close(); }}>
                   Select the {list.filter(isEmpty).length} empty session{list.filter(isEmpty).length === 1 ? '' : 's'}
                 </button>
               ) : null}
-            </div>
-          </Popover>
+              <Button size="sm" variant="ghost" disabled={!showHidden && shelf !== 'archived'} onClick={() => { setShowHidden(false); setShelf('recent'); setSelected(new Set()); }}>Clear filters</Button>
+            </>}</PanelPopover>
+            <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" hint={`${list.length} session${list.length === 1 ? '' : 's'}`} />
           </div>
-          <SortToggles sort={sort} onChange={setSort} dateTip={basis === 'created' ? 'Oldest created first' : 'Oldest activity first'} dateTipDesc={basis === 'created' ? 'Newest created first' : 'Latest activity first'} />
-        </div>
-        <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
-          {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
-          <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
-        </div>
-        <div className="pc-grp pc-right">
-          {layout === 'card' ? <>
-            <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
-            <Sep />
-          </> : null}
-          <ViewToggle value={layout} onChange={setLayout} />
-          <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
-          <ArchivedToggle showing={shelf === 'archived'} count={archivedCount} onChange={(v) => { setShelf(v ? 'archived' : 'recent'); setSelected(new Set()); }} />
           {embedded ? null : <div className="pc-chrome">
             <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
             <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
@@ -203,7 +200,6 @@ export function SessionsPanel() {
         ) : null}
       </div>
       <div className="pc-split">
-      <CategoryRail items={RAIL.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={setCanvas} expanded={expanded} label="Session canvases" />
       <div className="pc-main">
       <div className="sessions-scroll">
         {groups.map((g) => (
