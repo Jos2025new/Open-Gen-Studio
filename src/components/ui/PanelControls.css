@@ -28,7 +28,7 @@
 .pc-menu-sep { width: calc(100% - 12px); margin: 4px 6px; border: 0; border-top: 1px solid var(--border); }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
-.pc-card { --pc-btn-bg: rgba(255, 255, 255, .16); --pc-btn-bg-hover: rgba(255, 255, 255, .28); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
+.pc-card { --pc-btn-bg: rgba(12, 12, 14, .4); --pc-btn-bg-hover: rgba(12, 12, 14, .6); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
 .pc-card.is-selected { box-shadow: 0 0 0 2px var(--accent); }
 .pc-card.is-active { box-shadow: 0 0 0 1px var(--border-strong); }
 .pc-card.is-hidden-item .pc-open, .pc-card.is-hidden-item .g-open { opacity: .45; }
@@ -36,8 +36,9 @@
 .pc-card .g-open .media, .pc-card .pc-open .media { width: 100%; height: 100%; object-fit: cover; }
 .pc-hover { opacity: 0; transition: opacity .12s; }
 .pc-card:hover .pc-hover, .pc-card:focus-within .pc-hover, .pc-card.is-armed .pc-hover, .pc-card.is-selecting .pc-check, .pc-card .pc-check.is-on, .pc-card .pc-hover.is-on, .pc-hover[aria-expanded="true"] { opacity: 1; }
-/* Every overlay control on a card shares one look: a 28px frosted-glass circle with a hairline rim and a white glyph. */
-.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: none; }
+/* Every overlay control on a card shares one look: a 28px smoked-glass circle with a hairline rim, a soft shadow and a
+   white glyph, so it stays readable on light and dark images alike. */
+.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid rgba(255, 255, 255, .16); border-radius: 50%; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: 0 1px 4px rgba(0, 0, 0, .28); }
 .pc-card .pc-check:hover, .pc-card .attach-toggle:hover, .pc-card .pc-tools .icon-btn:hover { background: var(--pc-btn-bg-hover); }
 .pc-card .pc-tools .icon-btn svg { width: 15px; height: 15px; }
 .pc-card .pc-box { width: 14px; height: 14px; border-width: 1.5px; border-radius: 4px; }
@@ -51,11 +52,11 @@
 .pc-tools .icon-btn.pc-fav.is-on { color: #ffd34d; }
 .pc-tools .icon-btn.pc-fav.is-on svg { fill: currentColor; }
 /* Details sit on a soft veil: a gentle tint plus a blur that fades in from the top, like frosted glass rising from the edge. */
-.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 3px; padding: 44px 12px 11px; background: linear-gradient(transparent, rgba(0, 0, 0, .18) 40%, rgba(0, 0, 0, .5)); color: #fff; pointer-events: none; }
+.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 3px; padding: 44px 12px 11px; background: linear-gradient(transparent, rgba(0, 0, 0, .24) 38%, rgba(0, 0, 0, .64)); color: #fff; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
 .pc-info::before { content: ''; position: absolute; inset: 0; z-index: -1; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); mask-image: linear-gradient(transparent, #000 55%); -webkit-mask-image: linear-gradient(transparent, #000 55%); }
 .pc-info .pc-info-title { font-size: 13px; font-weight: 600; }
-.pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); font-size: 11.5px; }
-.pc-info-meta { color: rgba(255, 255, 255, .6); font-size: 11px; }
+.pc-info .pc-info-sub { color: rgba(255, 255, 255, .84); font-size: 11.5px; }
+.pc-info-meta { color: rgba(255, 255, 255, .7); font-size: 11px; }
 .pc-info-title { overflow: hidden; font-size: 13px; font-weight: 650; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .pc-info-sub { overflow: hidden; color: rgba(255, 255, 255, .88); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .pc-badge { position: absolute; left: 6px; bottom: 6px; z-index: 2; }
