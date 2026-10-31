@@ -464,4 +464,11 @@ describe('Library list columns', () => {
     expect(JSON.parse(localStorage.getItem('ogs.libraryColumns') ?? '{}').model).toBeUndefined();
     expect(scroll.style.getPropertyValue('--pc-w-model')).toBe('');
   });
+  it('sorts the card grid from the same labels', () => {
+    click(q('.pc-sort-strip [aria-label^="Sort by Name"]'));
+    expect(names()).toEqual(['Apple', 'Cherry', 'Mango']);
+    click(q('.pc-sort-strip [aria-label^="Sort by Name"]'));
+    expect(names()).toEqual(['Mango', 'Cherry', 'Apple']);
+    expect(host.querySelector('.pc-sort-strip .pc-col-resize')).toBeNull();
+  });
 });

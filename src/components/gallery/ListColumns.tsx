@@ -103,14 +103,15 @@ function ResizeHandle({ k, label, widths, onResize }: { k: WidthKey; label: stri
     aria-valuemin={MIN_W} aria-valuemax={MAX_W} aria-valuenow={widths[k]} onPointerDown={down} onKeyDown={key} onDoubleClick={reset} />;
 }
 
-/** The list header: pressing a column sorts by it; pressing it again flips the direction. Dates start newest first. */
-export function ListHeader({ sort, onSort, widths, onResize }: { sort: ListSort; onSort: (s: ListSort) => void; widths: ColumnWidths; onResize: (w: ColumnWidths) => void }) {
-  return <div className="pc-list-head" role="group" aria-label="Sort by column">
+/** The list header: pressing a column sorts by it; pressing it again flips the direction. Dates start newest first.
+ *  `strip` is the same set for the card grid: one compact row of sort labels, without column widths. */
+export function ListHeader({ sort, onSort, widths, onResize, strip }: { sort: ListSort; onSort: (s: ListSort) => void; widths?: ColumnWidths; onResize?: (w: ColumnWidths) => void; strip?: boolean }) {
+  return <div className={strip ? 'pc-sort-strip' : 'pc-list-head'} role="group" aria-label="Sort by column">
     {HEADS.map((h) => {
       const on = sort.by === h.by;
       const Arrow = sort.asc ? ArrowUp : ArrowDown;
-      return <span key={h.by} className={`pc-head-cell ${h.className}`}>
-        {h.width ? <ResizeHandle k={h.width} label={h.label} widths={widths} onResize={onResize} /> : null}
+      return <span key={h.by} className={strip ? 'pc-head-cell' : `pc-head-cell ${h.className}`}>
+        {h.width && widths && onResize && !strip ? <ResizeHandle k={h.width} label={h.label} widths={widths} onResize={onResize} /> : null}
         <button type="button" className={on ? 'is-on' : undefined} aria-pressed={on}
           aria-label={`Sort by ${h.label}${on ? (sort.asc ? ', ascending' : ', descending') : ''}`}
           onClick={() => onSort(on ? { by: h.by, asc: !sort.asc } : { by: h.by, asc: h.by !== 'date' })}>
@@ -118,6 +119,6 @@ export function ListHeader({ sort, onSort, widths, onResize }: { sort: ListSort;
         </button>
       </span>;
     })}
-    <span className="pc-col-tools" aria-hidden="true" />
+    {strip ? null : <span className="pc-col-tools" aria-hidden="true" />}
   </div>;
 }

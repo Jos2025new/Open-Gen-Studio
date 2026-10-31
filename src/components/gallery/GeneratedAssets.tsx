@@ -185,7 +185,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
         ) : null}
       </div>
       <div className="gallery-scroll" style={view === 'list' ? widthVars(colWidths) : undefined}>
-        {results.length && view === 'list' ? <ListHeader sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} /> : null}
+        {results.length ? view === 'list' ? <ListHeader sort={sort} onSort={setSort} widths={colWidths} onResize={setColWidths} /> : <ListHeader sort={sort} onSort={setSort} strip /> : null}
         {results.length ? (
           groups.map((g) => {
             const gids = g.items.flatMap((x) => (x.type === 'asset' ? [x.id] : []));
