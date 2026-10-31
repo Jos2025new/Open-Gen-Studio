@@ -180,7 +180,7 @@
 - [053-2026-10-W43: Auto con una tarjeta, Studio independiente del tablero, límites del modelo y rechazos del agente (2026-10-24), abierto y frágil](history/053-2026-10-W43.md).
 - [054-2026-10-W44: origen y cierre del toolbox, limpieza de ramas del 2026-10-27 y typecheck en `npm test` (2026-10-27)](history/054-2026-10-W44.md).
 - [055-2026-10-W44: cierre de mapas, integración y limpieza (2026-10-29)](history/055-2026-10-W44.md).
-- [056-2026-10-W44: barra de paneles, selector de origen + Vista y Filtros (2026-10-31)](history/056-2026-10-W44.md).
+- [056-2026-10-W44: barra de paneles, Vista y Filtros, Home, barra lateral y caja de Nodes (2026-10-31)](history/056-2026-10-W44.md).
 - [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
 - [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` (bugs confirmados) en `tests/repro-*.test.ts`; H11 descartado.
 - [Auditoría externa (2026-10-29)](audits/auditoria-externa-2026-10-29.md): 11 de 39 citas no sostenían su frase; la rama compacta de formas es alcanzable; la objeción inicial sobre H3 fue retractada.
