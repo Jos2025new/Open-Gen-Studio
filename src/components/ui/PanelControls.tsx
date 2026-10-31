@@ -57,13 +57,13 @@ export function ViewToggle({ value, onChange }: { value: ItemView; onChange: (v:
   </div>;
 }
 
-export interface RailItem<T extends string> { id: T; label: string; icon: LucideIcon }
+export interface RailItem<T extends string> { id: T; label: string; icon: LucideIcon; count?: number }
 /** Vertical list of categories: icon + text when expanded, an icon-only rail (labels as tooltips) when not. */
 export function CategoryRail<T extends string>({ items, value, onChange, expanded, label }: { items: RailItem<T>[]; value: T; onChange: (v: T) => void; expanded: boolean; label: string }) {
   return <nav className={`pc-rail${expanded ? '' : ' is-icons'}`} aria-label={label}>
-    {items.map(({ id, label: text, icon: Icon }) => (
+    {items.map(({ id, label: text, icon: Icon, count }) => (
       <button key={id} type="button" className={`pc-rail-item${value === id ? ' is-on' : ''}`} aria-label={text} aria-current={value === id ? 'true' : undefined} data-tip={expanded ? undefined : text} data-tip-side="right" onClick={() => onChange(id)}>
-        <Icon size={15} strokeWidth={1.75} />{expanded ? <span>{text}</span> : null}
+        <Icon size={15} strokeWidth={1.75} />{expanded ? <span>{text}</span> : null}{expanded && count !== undefined ? <span className="pc-count num">{count}</span> : null}
       </button>
     ))}
   </nav>;

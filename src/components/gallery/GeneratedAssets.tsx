@@ -112,11 +112,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
           <div className="pc-grp">
             <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" />
             <div className="results-controls">
-              <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={filtered || group !== 'date' || favOnly}>
-                <div className="sv-row">
-                  <span className="sv-label">Show</span>
-                  <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
-                </div>
+              <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={canvas !== 'all' || place !== 'all' || mode !== 'all' || group !== 'date' || favOnly}>
                 <div className="sv-row">
                   <span className="sv-label">Canvas</span>
                   <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
@@ -130,18 +126,19 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
               </ResultsMenu>
             </div>
             <SortToggles sort={sort} onChange={setSort} />
+            <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
           </div>
-          <Sep />
-          <div className="pc-group" role="group" aria-label="Filter assets by type">
+          <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
             {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
             <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
           </div>
-          {view === 'card' ? <>
-            <Sep />
-            <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
-          </> : null}
-          <Sep />
-          <ViewToggle value={view} onChange={setView} />
+          <div className="pc-grp pc-right">
+            {view === 'card' ? <>
+              <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
+              <Sep />
+            </> : null}
+            <ViewToggle value={view} onChange={setView} />
+          </div>
         </div>
       </div>
       <div className="pc-split">

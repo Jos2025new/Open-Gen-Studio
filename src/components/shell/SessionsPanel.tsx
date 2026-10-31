@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Check, Eye, EyeOff, Maximize2, Minimize2, Pin, PinOff, Plus, ListFilter, Trash, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Eye, EyeOff, Grid2X2, Maximize2, Minimize2, Pin, PinOff, Plus, ListFilter, Trash, X } from 'lucide-react';
 import { newSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -11,12 +11,14 @@ import { usePanelExpanded } from './panelEmbed';
 import { visibleSessions } from '../../store/spaceSession';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { usePref } from '../ui/hooks';
-import { SearchToggle, Sep, SortToggles, ViewToggle, asItemView, type SortState } from '../ui/PanelControls';
+import { CategoryRail, SearchToggle, Sep, SortToggles, ViewToggle, asItemView, type RailItem, type SortState } from '../ui/PanelControls';
 import { CANVAS, QUICK_MODES, RunningNote, SessionRow, sessionCanvases, type QuickMode, type Stats } from './SessionRow';
 import './SessionsLayout.css';
 
 export { sessionCanvases };
 type CanvasFilter = 'all' | Workspace;
+/** Canvas filter rail; the chat workspace is the Studio. */
+const RAIL: RailItem<CanvasFilter>[] = [{ id: 'all', label: 'All', icon: Grid2X2 }, { id: 'chat', label: 'Studio', icon: CANVAS.chat.icon }, { id: 'node', label: 'Nodes', icon: CANVAS.node.icon }, { id: 'designer', label: 'Designer', icon: CANVAS.designer.icon }];
 
 /** The confirmation for deleting several sessions at once: shared by the Sessions panel and the top bar's switcher. */
 export function DeleteSessionsConfirm({ ids, onCancel, onDone }: { ids: string[]; onCancel: () => void; onDone: () => void }) {
@@ -97,6 +99,7 @@ export function SessionsPanel() {
     return arr;
   }, [sessions, matches, sort, basis, pinnedOnly, canvas, shelf, quickMode, stats]);
 
+  const archivedCount = useMemo(() => visibleSessions(sessions).filter((s) => s.archived).length, [sessions]);
   const counts = useMemo(() => {
     const c: Record<CanvasFilter, number> = { all: 0, chat: 0, node: 0, designer: 0 };
     for (const sess of visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived'))) {
@@ -160,28 +163,9 @@ export function SessionsPanel() {
         <div className="pc-grp">
           <SearchToggle value={q} onChange={setQ} placeholder="Search sessions" inputLabel="Search sessions" />
           <div className="results-controls">
-            <button ref={view.ref} type="button" className={`results-menu-trigger${canvas !== 'all' || pinnedOnly || shelf === 'archived' || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
+            <button ref={view.ref} type="button" className={`results-menu-trigger${pinnedOnly || basis === 'created' ? ' is-active' : ''}`} onClick={view.toggle} aria-label="Filter by" aria-expanded={view.open}><ListFilter size={14} /></button>
           <Popover open={view.open} anchor={view.ref} onClose={view.close} placement="bottom-start" width={280} className="results-popover" label="Filter by">
             <div className="sessions-view">
-              <div className="sv-row">
-                <span className="sv-label">Sessions</span>
-                <Segmented value={shelf} size="sm" onChange={(value) => { setShelf(value); setSelected(new Set()); }} options={[{ value: 'recent', label: 'Active' }, { value: 'archived', label: `Archived · ${visibleSessions(sessions).filter((s) => s.archived).length}` }]} />
-              </div>
-              <div className="sv-row">
-                <span className="sv-label">Canvas</span>
-                <div className="sv-canvas">
-                  {(['all', 'chat', 'node', 'designer'] as const).map((w) => {
-                    const Icon = w === 'all' ? null : CANVAS[w].icon;
-                    return (
-                      <button key={w} type="button" className={`canvas-tab ${canvas === w ? 'is-on' : ''}`} onClick={() => setCanvas(w)} disabled={w !== 'all' && !counts[w]}>
-                        {Icon ? <Icon size={12} /> : null}
-                        {w === 'all' ? 'All' : CANVAS[w].label}
-                        <span className="num faint">{counts[w]}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
               <div className="sv-row">
                 <span className="sv-label">Date means</span>
                 <Segmented value={basis} size="sm" onChange={setBasis} options={[{ value: 'updated', label: 'Last activity' }, { value: 'created', label: 'Created' }]} />
@@ -196,27 +180,30 @@ export function SessionsPanel() {
           </Popover>
           </div>
           <SortToggles sort={sort} onChange={setSort} dateTip={basis === 'created' ? 'Oldest created first' : 'Oldest activity first'} dateTipDesc={basis === 'created' ? 'Newest created first' : 'Latest activity first'} />
+          <IconButton icon={Archive} label="Show archived" size="sm" active={shelf === 'archived'} aria-pressed={shelf === 'archived'} data-tip={`Show archived · ${archivedCount}`} onClick={() => { setShelf(shelf === 'archived' ? 'recent' : 'archived'); setSelected(new Set()); }} />
         </div>
-        <Sep />
-        <div className="pc-group" role="group" aria-label="Filter sessions by mode">
+        <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
           {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
           <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
         </div>
-        {layout === 'card' ? <>
-          <Sep />
-          <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
-        </> : null}
-        <Sep />
-        <ViewToggle value={layout} onChange={setLayout} />
-        <IconButton icon={compact ? EyeOff : Eye} label={compact ? 'Show thumbnails' : 'Hide thumbnails'} size="sm" aria-pressed={!compact} onClick={() => setCompact(!compact)} />
+        <div className="pc-grp pc-right">
+          {layout === 'card' ? <>
+            <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
+            <Sep />
+          </> : null}
+          <ViewToggle value={layout} onChange={setLayout} />
+          <IconButton icon={compact ? EyeOff : Eye} label={compact ? 'Show thumbnails' : 'Hide thumbnails'} size="sm" aria-pressed={!compact} onClick={() => setCompact(!compact)} />
         </div>
-        {canvas !== 'all' || pinnedOnly ? (
+        </div>
+        {pinnedOnly ? (
           <div className="sessions-active">
-            {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS[canvas].label} <X size={11} /></button> : null}
             {pinnedOnly ? <button type="button" className="active-chip" onClick={() => setPinnedOnly(false)}>Pinned <X size={11} /></button> : null}
           </div>
         ) : null}
       </div>
+      <div className="pc-split">
+      <CategoryRail items={RAIL.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={setCanvas} expanded={expanded} label="Session canvases" />
+      <div className="pc-main">
       <div className="sessions-scroll">
         {groups.map((g) => (
           <section key={g.label} className="date-group">
@@ -254,6 +241,8 @@ export function SessionsPanel() {
           </Popover>
         </div>
       ) : null}
+      </div>
+      </div>
     </div>
   );
 }

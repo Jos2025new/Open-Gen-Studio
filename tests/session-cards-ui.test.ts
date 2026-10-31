@@ -46,7 +46,7 @@ it('selects a date group, archives and restores it, and switches layouts', () =>
   expect(host.querySelector('.sess-card .pc-info')?.textContent).toContain('First');
   expect(host.querySelector('.sess-card .pc-info')?.textContent).toContain('Image');
   expect(host.querySelector('.sess-card time')?.getAttribute('datetime')).toBe(new Date(first.updatedAt).toISOString());
-  act(() => [...host.querySelectorAll<HTMLButtonElement>('.pc-group button')].find((button) => button.textContent === 'All')!.click());
+  act(() => [...host.querySelectorAll<HTMLButtonElement>('.pc-center button')].find((button) => button.textContent === 'All')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(2);
   const group = host.querySelector<HTMLButtonElement>('.group-check')!;
   act(() => group.click());
@@ -54,9 +54,7 @@ it('selects a date group, archives and restores it, and switches layouts', () =>
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Archive selected"]')!.click());
   expect(useStore.getState().sessions[first.id].archived).toBe(true);
   expect(useStore.getState().sessions[second.id].archived).toBe(true);
-  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter by"]')!.click());
-  const archived = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Archived'))!;
-  act(() => archived.click());
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Show archived"]')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(2);
   act(() => host.querySelector<HTMLButtonElement>('.sess-card [aria-label="Session actions"]')!.click());
   act(() => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === 'Restore session')!.click());
@@ -85,8 +83,7 @@ it('restores and opens an archived session when its row is pressed', () => {
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
   act(() => root.render(createElement(SessionsPanel)));
-  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter by"]')!.click());
-  act(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Archived'))!.click());
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Show archived"]')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(1);
   act(() => host.querySelector<HTMLElement>('.session-main')!.click());
   expect(useStore.getState().sessions[second.id].archived).toBeUndefined();

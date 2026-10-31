@@ -55,12 +55,13 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
             <SearchToggle value={q} onChange={setQ} placeholder="Search saved items" inputLabel="Search saved items" />
             <IconButton icon={asc ? ArrowDownAZ : ArrowUpZA} label="Sort by name" size="sm" active aria-pressed data-tip={`Sort by name · ${asc ? 'A → Z' : 'Z → A'}`} onClick={() => setAsc(!asc)} />
           </div>
-          {view === 'card' ? <>
-            <Sep />
-            <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
-          </> : null}
-          <Sep />
-          <ViewToggle value={view} onChange={setView} />
+          <div className="pc-grp pc-right">
+            {view === 'card' ? <>
+              <div className="pc-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div>
+              <Sep />
+            </> : null}
+            <ViewToggle value={view} onChange={setView} />
+          </div>
         </div>
       </div>
       <div className="pc-split">
