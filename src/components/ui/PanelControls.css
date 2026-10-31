@@ -30,13 +30,13 @@
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
 .pc-card {
   /* The card's own ink (fade, overlay buttons, text on it), tied to the theme: its page colour (--bg-canvas) taken
-     --pc-ink-shade toward black. Light bases keep it light and write in the theme's text colour. Scoped to cards
-     (Sessions and Library), so nothing outside them changes. */
-  --pc-ink-shade: 20%;
+     --pc-ink-shade toward black (0: the theme's own darkest colour, not a separate black). Light bases keep it light
+     and write in the theme's text colour. Scoped to cards (Sessions and Library), so nothing outside them changes. */
+  --pc-ink-shade: 0%;
   --pc-ink: color-mix(in oklab, var(--bg-canvas), #000 var(--pc-ink-shade));
   --pc-on-ink: #fff;
 }
-[data-base="claro"] .pc-card, [data-base="blanco"] .pc-card { --pc-ink-shade: 4%; --pc-on-ink: var(--text); }
+[data-base="claro"] .pc-card, [data-base="blanco"] .pc-card { --pc-on-ink: var(--text); }
 .pc-card { --pc-btn-bg: color-mix(in srgb, var(--pc-ink) 40%, transparent); --pc-btn-bg-hover: color-mix(in srgb, var(--pc-ink) 60%, transparent); --pc-btn-fg: var(--pc-on-ink); position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
 .pc-card.is-selected { box-shadow: 0 0 0 2px var(--accent); }
 .pc-card.is-active { box-shadow: 0 0 0 1px var(--border-strong); }
@@ -226,10 +226,11 @@
 .pc-fade:is(:hover, :focus-within, .is-selecting) .pc-check, .pc-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .pc-fade .pc-check.is-on, .pc-tile .pc-check.is-on { opacity: 1; }
 .pc-fade .pc-info-sub, .pc-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; font-size: 12px; }
 .pc-fade .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
-/* Tile (the Cards view): the cover fills the left side and fades into the dark right side, which carries the same details. */
-.pc-card.pc-tile { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--surface-3); }
+/* Tile (the Cards view): the cover fills the left side and fades into the right side, which carries the same details.
+   The fade eases to the card's own ink before the cover ends (46%), and the card is that ink, so no edge or second block shows. */
+.pc-card.pc-tile { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--pc-ink); }
 .pc-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 46%; height: 100%; }
-.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 20%, color-mix(in srgb, var(--pc-ink) 78%, transparent) 40%, color-mix(in srgb, var(--pc-ink) 94%, transparent) 52%); pointer-events: none; }
+.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 12%, color-mix(in srgb, var(--pc-ink) 18%, transparent) 21%, color-mix(in srgb, var(--pc-ink) 48%, transparent) 30%, color-mix(in srgb, var(--pc-ink) 80%, transparent) 38%, var(--pc-ink) 45%); pointer-events: none; }
 .pc-tile .pc-info::before { display: none; }
 .pc-tile .pc-info > * { pointer-events: auto; }
 .pc-tile .pc-info .pc-info-title { display: -webkit-box; font-size: 15px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

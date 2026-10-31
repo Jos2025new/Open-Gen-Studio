@@ -11,10 +11,17 @@ it('cards (Sessions and Library) take their fade and overlay colours from the th
   }
 });
 
-it('the card ink is the page colour taken 20% toward black, kept light on light bases, and scoped to cards', () => {
+it('the card ink is the theme’s own page colour (no extra black), kept light on light bases, and scoped to cards', () => {
   const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
   expect(css).toMatch(/--pc-ink: color-mix\(in oklab, var\(--bg-canvas\), #000 var\(--pc-ink-shade\)\)/);
-  expect(css).toMatch(/--pc-ink-shade: 20%/);
-  expect(css).toMatch(/\[data-base="claro"\] \.pc-card, \[data-base="blanco"\] \.pc-card \{ --pc-ink-shade: 4%; --pc-on-ink: var\(--text\); \}/);
+  expect(css).toMatch(/--pc-ink-shade: 0%/);
+  expect(css).toMatch(/\[data-base="claro"\] \.pc-card, \[data-base="blanco"\] \.pc-card \{ --pc-on-ink: var\(--text\); \}/);
   expect(readFileSync('src/styles/tokens.css', 'utf8')).not.toMatch(/--pc-ink/);
+});
+
+it('the tile fade reaches the full ink before the cover ends, and the card is that ink, so no seam or second block shows', () => {
+  const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
+  expect(css).toMatch(/\.pc-card\.pc-tile \{[^}]*background: var\(--pc-ink\); \}/);
+  expect(css).toMatch(/\.pc-tile \.pc-open \{[^}]*width: 46%/);
+  expect(css).toMatch(/\.pc-tile \.pc-info \{[^}]*var\(--pc-ink\) 45%\)/);
 });
