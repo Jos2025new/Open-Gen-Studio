@@ -143,7 +143,7 @@ export function CardMenu({ label, children, className }: { label: string; classN
   const pop = usePopover();
   return <>
     <IconButton ref={pop.ref} icon={EllipsisVertical} label={label} size="sm" className={`pc-more ${className ?? ''}`} aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={(e) => { e.stopPropagation(); pop.toggle(); }} onDoubleClick={(e) => e.stopPropagation()} />
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={236} placement="bottom-start" align="start" className="pc-menu-pop" label={label}>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={236} placement="bottom-start" align="start" edge="slide" className="pc-menu-pop" label={label}>
       <div className="pc-menu" role="menu"><Lazy render={() => children(pop.close)} /></div>
     </Popover>
   </>;

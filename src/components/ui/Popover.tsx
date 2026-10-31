@@ -23,6 +23,12 @@ export function boundPopoverWidth(requested: number, left: number, right: number
   return Math.min(requested, Math.max(0, right - left));
 }
 
+/** Left limit of a start-aligned popover: the anchor's left edge while the full width fits to its right; otherwise it
+ *  slides left (never past the boundary) instead of shrinking into a sliver beside the edge. */
+export function startAlignedBound(anchorLeft: number, width: number, left: number, right: number): number {
+  return Math.max(left, Math.min(anchorLeft, right - width));
+}
+
 export function boundPopoverLeft(preferred: number, width: number, left: number, right: number): number {
   return Math.max(left, Math.min(preferred, right - width));
 }
@@ -39,13 +45,15 @@ interface PopoverProps {
   /** 'content': the box takes its own width (CSS) and is placed by what it measures. */
   width?: number | 'content';
   align?: 'start' | 'end';
+  /** Start-aligned only: near the boundary, 'slide' keeps the full width by moving left; the default narrows beside the anchor. */
+  edge?: 'narrow' | 'slide';
   boundarySelector?: string;
   className?: string;
   label?: string;
   children: ReactNode;
 }
 
-export function Popover({ open, anchor, onClose, placement = 'top-start', width = 300, align = 'end', boundarySelector, className, label, children }: PopoverProps) {
+export function Popover({ open, anchor, onClose, placement = 'top-start', width = 300, align = 'end', edge = 'narrow', boundarySelector, className, label, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const onCloseRef = useRef(onClose);
@@ -62,7 +70,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
     const box = a.closest(boundarySelector ?? '[data-pop-bound], .side-panel, .results-popover, .model-list, .agent-model-pop')?.getBoundingClientRect();
     const lo = Math.max(MARGIN, box?.left ?? 0);
     const hi = Math.min(vw - MARGIN, box?.right ?? vw);
-    const start = align === 'start' && placement !== 'right-start' && placement !== 'right-end' ? Math.max(lo, Math.min(r.left, hi)) : lo;
+    const start = align === 'start' && placement !== 'right-start' && placement !== 'right-end' ? (edge === 'slide' ? startAlignedBound(r.left, fit ? el.offsetWidth : width, lo, hi) : Math.max(lo, Math.min(r.left, hi))) : lo;
     const w = boundPopoverWidth(fit ? el.offsetWidth : width, start, hi);
     const contentH = el.scrollHeight;
     const next: CSSProperties = { ...(fit ? { maxWidth: Math.max(0, hi - start) } : { width: w }), visibility: 'visible' };
@@ -90,7 +98,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       }
     }
     setStyle(next);
-  }, [anchor, placement, width, align, boundarySelector]);
+  }, [anchor, placement, width, align, edge, boundarySelector]);
 
   useLayoutEffect(() => {
     if (!open) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boundPopoverLeft, boundPopoverWidth, openPopoverAbove } from '../src/components/ui/Popover';
+import { boundPopoverLeft, boundPopoverWidth, openPopoverAbove, startAlignedBound } from '../src/components/ui/Popover';
 
 it('keeps popovers within a narrow panel without enlarging smaller menus', () => {
   expect(boundPopoverWidth(300, 80, 300)).toBe(220);
@@ -33,4 +33,11 @@ describe('popover vertical placement', () => {
     expect(openPopoverAbove('bottom-start', 500, 100, 400)).toBe(true);
     expect(openPopoverAbove('bottom-start', 200, 100, 400)).toBe(true);
   });
+});
+
+it('a start-aligned popover slides left instead of shrinking near the edge', () => {
+  expect(startAlignedBound(100, 236, 0, 600)).toBe(100); // fits: starts at the anchor
+  expect(startAlignedBound(340, 236, 0, 380)).toBe(144); // narrow panel: slides left to keep its width
+  expect(startAlignedBound(40, 500, 20, 380)).toBe(20); // wider than the panel: the boundary wins
+  expect(boundPopoverWidth(236, startAlignedBound(340, 236, 0, 380), 380)).toBe(236);
 });
