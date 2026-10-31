@@ -99,8 +99,8 @@ export function CardMenu({ label, children, className }: { label: string; classN
 }
 
 /** A confirmation shown inside a card menu: it names the consequence and always offers Cancel. */
-export function MenuConfirm({ text, action, onCancel, onConfirm }: { text: string; action: string; onCancel: () => void; onConfirm: () => void }) {
-  return <div className="confirm"><p>{text}</p><div className="spend-actions">
+export function MenuConfirm({ text, action, onCancel, onConfirm, extra }: { text: string; action: string; onCancel: () => void; onConfirm: () => void; extra?: ReactNode }) {
+  return <div className="confirm"><p>{text}</p>{extra}<div className="spend-actions">
     <Button variant="ghost" onClick={onCancel}>Cancel</Button>
     <Button variant="danger" onClick={onConfirm}>{action}</Button>
   </div></div>;
