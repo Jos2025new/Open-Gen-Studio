@@ -147,19 +147,19 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
     );
   }
   if (view === 'tile') {
-    // Cards: a compact horizontal card — cover, title and one line of details above; checkbox and tools in a footer.
+    // Cards: a horizontal card — the cover fills the left side with the checkbox on its corner; pin and menu sit
+    // top right and the title and details settle at the bottom beside the cover.
     return (
       <div className={`sess-tile pc-card${flags}${editing ? ' is-editing' : ''}`}>
-        <div className="sess-tile-main">
+        <span className="sess-tile-cover">
           <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
+          <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
+        </span>
+        <div className="sess-tile-body">
+          <span className="pc-tools">{hiddenMark}{pin}{menu}</span>
           <div role="button" tabIndex={0} className="session-main pc-text" aria-label={session.title} onClick={open} onDoubleClick={rename} onKeyDown={keys}>
             {title}{meta}
           </div>
-        </div>
-        <div className="sess-tile-foot">
-          <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
-          {hiddenMark}
-          <span className="pc-tools">{pin}{menu}</span>
         </div>
       </div>
     );
