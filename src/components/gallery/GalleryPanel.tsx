@@ -29,10 +29,10 @@ export function GalleryPanel() {
   const view = asItemView(stored);
   const [cols, setCols] = useState(3);
   // Each view renders its top bar across the whole panel, then this rail beside its results.
-  const chrome = embedded ? null : <>
+  const chrome = embedded ? null : <div className="pc-chrome">
     <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
     <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-  </>;
+  </div>;
   const rail = <CategoryRail items={RAIL} value={category} onChange={setCategory} expanded={expanded} label="Library categories" />;
   return (
     <div className="gallery" role="region" aria-label="Library">

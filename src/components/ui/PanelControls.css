@@ -114,3 +114,22 @@
 .pc-bar .icon-btn svg, .pc-bar .results-menu-trigger svg { flex: none; width: 18px; height: 18px; stroke-width: 1.75; }
 .pc-bar .results-menu-trigger svg:not(:first-child) { display: none; }
 .pc-center .icon-btn { width: 30px; height: 30px; }
+
+/* Narrow panel: the zones break into ordered rows instead of wrapping at random —
+   1) search, filter, sorts, scope … collapse, close; 2) types … view, hidden, archived; 3) Grid size across the width. */
+.pc-chrome { display: flex; flex: none; align-items: center; gap: 2px; }
+.gallery, .sessions { container: pc-panel / inline-size; }
+@container pc-panel (max-width: 640px) {
+  .gallery-controls { padding: 10px; }
+  .pc-bar { row-gap: 3px; column-gap: 4px; }
+  .pc-bar > .pc-grp:not(.pc-center) { display: contents; }
+  .pc-bar > .pc-right > * { order: 4; }
+  .pc-bar .pc-chrome { order: 1; margin-left: auto; }
+  .pc-bar::before { content: ''; order: 2; flex-basis: 100%; height: 0; }
+  .pc-bar > .pc-center { order: 3; margin-right: auto; }
+  .pc-bar::after { content: ''; order: 5; flex-basis: 100%; height: 0; }
+  .pc-bar > .pc-right > .pc-size { order: 6; flex: 1 1 100%; width: auto; }
+  .pc-bar .pc-sep { display: none; }
+  .pc-bar .segmented button { padding: 0 8px; }
+  .pc-center .icon-btn { width: 28px; height: 28px; }
+}

@@ -190,10 +190,10 @@ export function SessionsPanel() {
           <ViewToggle value={layout} onChange={setLayout} />
           <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
           <ArchivedToggle showing={shelf === 'archived'} count={archivedCount} onChange={(v) => { setShelf(v ? 'archived' : 'recent'); setSelected(new Set()); }} />
-          {embedded ? null : <>
+          {embedded ? null : <div className="pc-chrome">
             <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
             <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-          </>}
+          </div>}
         </div>
         </div>
         {pinnedOnly ? (
