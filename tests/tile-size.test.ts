@@ -77,10 +77,24 @@ describe('saved tile size', () => {
 });
 
 describe('Library uses the same slider', () => {
-  it('Grid size is an InlineSlider (.opt-slider), not a bare range', () => {
+  it('shows the grid size slider in the bar and hides it in list view', () => {
+    const sessionId = useStore.getState().activeSessionId;
+    act(() => useStore.setState({ assets: { sample: { ...asset('sample'), sessionId } }, generations: {} }));
     render(createElement(GalleryPanel));
     const src = readFileSync('src/components/gallery/GalleryPanel.tsx', 'utf8');
     expect(src).toMatch(/<InlineSlider label="Grid size"/);
-    expect(src).not.toMatch(/<Range\b/);
+    const size = host.querySelector<HTMLInputElement>('input[aria-label="Grid size"]')!;
+    expect(size).not.toBeNull();
+    const before = Number(size.value);
+    if (before < Number(size.max)) {
+      const columns = Number(host.querySelector<HTMLElement>('.gallery-grid')!.style.getPropertyValue('--cols'));
+      setNum(size, before + 1);
+      expect(Number(host.querySelector<HTMLElement>('.gallery-grid')!.style.getPropertyValue('--cols'))).toBe(columns - 1);
+    }
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="View"]')!.click());
+    const list = [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((button) => button.textContent === 'List')!;
+    act(() => list.click());
+    expect(host.querySelector('input[aria-label="Grid size"]')).toBeNull();
+    expect(host.querySelector<HTMLButtonElement>('[aria-label="View"]')?.textContent).toContain('List');
   });
 });

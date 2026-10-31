@@ -50,7 +50,7 @@ it('Library counts text in Place/Mode and its Text filter excludes images; viewe
   act(() => root.render(createElement(GalleryPanel)));
   expect(host.querySelectorAll('.gallery-grid > *')).toHaveLength(2);
   expect(host.querySelector('.gallery-grid > :first-child')?.classList.contains('g-tile')).toBe(true);
-  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter, sort and view"]')!.click());
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter by"]')!.click());
   const rows = [...document.querySelectorAll('.sv-row')];
   const place = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Place')!;
   const mode = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Mode')!;

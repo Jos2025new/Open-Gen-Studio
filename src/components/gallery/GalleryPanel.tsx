@@ -2,11 +2,11 @@ import { ReuseButton } from '../assets/ReuseButton';
 import { TextTile } from '../assets/TextTile';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, SlidersHorizontal, Star, Trash, X } from 'lucide-react';
+import { AudioLines, Box, CheckSquare, Clock, Download, Film, Folder, Image, MessageSquare, Maximize2, Minimize2, Paperclip, Search, ListFilter, ArrowUpDown, LayoutGrid, LayoutList, List, ChevronDown, Check, Grid2X2, UserRound, Tag, Shapes, Palette, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, deleteSubject, downloadAsset, SUBJECT_KINDS, useAsReference } from '../../engine/actions';
-import { formatDuration, groupByDate } from '../../lib/format';
-import { IconButton, Button, Segmented, Toggle } from '../ui/primitives';
+import { formatDuration, formatRelative, groupByDate } from '../../lib/format';
+import { IconButton, Button, Segmented } from '../ui/primitives';
 import { InlineSlider } from '../designer/InlineControls';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -16,9 +16,12 @@ import type { Asset, Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
+import { ResultsMenu } from '../ui/ResultsMenu';
+import './GalleryLayout.css';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 type Scope = 'session' | 'all';
+const SUBJECT_ICONS = { character: UserRound, object: Shapes, product: Tag, location: Box, style: Palette } as const;
 
 /** Assets: every generation and upload, and the library of saved characters, objects, products and styles. */
 export function GalleryPanel() {
@@ -26,15 +29,12 @@ export function GalleryPanel() {
   const { expanded, embedded } = usePanelExpanded();
   const libraryCount = useStore((s) => s.library.length);
   return (
-    <div className="gallery">
-      <div className="panel-head">
-        <div className="panel-title">Library</div>
-        {embedded ? null : <div className="panel-head-actions">
-          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+    <div className="gallery" role="region" aria-label="Library">
+      <div className="library-toolbar">
+        {embedded ? null : <>
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-        </div>}
-      </div>
-      <div className="assets-tabs">
+          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+        </>}
         <Segmented
           value={tab}
           size="sm"
@@ -57,7 +57,12 @@ function LibraryAssets() {
   return (
     <>
       <div className="gallery-controls">
-        <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, ...SUBJECT_KINDS.map((k) => ({ value: k.value, label: `${k.label}s` }))]} />
+        <div className="results-controls"><ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={kind !== 'all'}>
+          <div className="sv-row"><span className="sv-label">Category</span><div className="sv-canvas" role="radiogroup" aria-label="Category">
+            <button type="button" role="radio" aria-checked={kind === 'all'} className={`canvas-tab ${kind === 'all' ? 'is-on' : ''}`} onClick={() => setKind('all')}><Grid2X2 size={12} /> All</button>
+            {SUBJECT_KINDS.map((k) => { const Icon = SUBJECT_ICONS[k.value]; return <button key={k.value} type="button" role="radio" aria-checked={kind === k.value} className={`canvas-tab ${kind === k.value ? 'is-on' : ''}`} onClick={() => setKind(k.value)}><Icon size={12} /> {k.label}s</button>; })}
+          </div></div>
+        </ResultsMenu></div>
       </div>
       <div className="gallery-scroll">
         {list.length ? (
@@ -119,9 +124,13 @@ function GeneratedAssets() {
   const [mode, setMode] = useState<ModeFilter>('all');
   const [favOnly, setFavOnly] = useState(false);
   const [newest, setNewest] = useState(true);
+  const [group, setGroup] = useState<'date' | 'session'>('date');
   const [cols, setCols] = useState(3);
+  const [layout, setLayout] = useState<'cards' | 'list' | 'grid'>('grid');
+  const layoutMenu = usePopover();
+  const views = [{ id: 'cards', label: 'Cards', icon: LayoutList }, { id: 'list', label: 'List', icon: List }, { id: 'grid', label: 'Grid', icon: LayoutGrid }] as const;
+  const currentView = views.find((view) => view.id === layout)!;
   const [selecting, setSelecting] = useState(false);
-  const filters = usePopover();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const del = usePopover();
 
@@ -170,6 +179,14 @@ function GeneratedAssets() {
     return { places, modes };
   }, [inScope, texts, canvas, where]);
 
+  const groups = group === 'date' ? groupByDate(results, (a) => a.createdAt).map((g) => ({ ...g, id: g.label })) : Array.from(results.reduce((map, item) => {
+    const id = item.type === 'asset' ? item.asset.sessionId : item.generation.sessionId;
+    const entries = map.get(id) ?? [];
+    entries.push(item);
+    map.set(id, entries);
+    return map;
+  }, new Map<string, typeof results>())).map(([id, items]) => ({ label: sessions[id]?.title ?? 'Unknown session', id, items }));
+
   const open = (a: Asset) => {
     if (selecting) {
       setSelected((s) => {
@@ -187,7 +204,7 @@ function GeneratedAssets() {
 
   return (
     <>
-      <div className="gallery-controls">
+      <div className="gallery-controls generated-controls">
         <div className="gallery-count faint num">
           {results.length} {results.length === 1 ? 'result' : 'results'}
           {running ? <span className="running-pill num">{running} running</span> : null}
@@ -201,24 +218,10 @@ function GeneratedAssets() {
               <X size={13} />
             </button>
           ) : null}
-          <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
-            <SlidersHorizontal size={14} />
-            {kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all' || favOnly || !newest ? <span className="dot" /> : null}
-          </button>
         </div>
-        <IconButton
-          icon={CheckSquare}
-          label={selecting ? 'Done selecting' : 'Select'}
-          size="sm"
-          active={selecting}
-          onClick={() => {
-            setSelecting((v) => !v);
-            setSelected(new Set());
-          }}
-        />
         </div>
-        <Popover open={filters.open} anchor={filters.ref} onClose={filters.close} width={300} label="Filter, sort and view">
-          <div className="sessions-view">
+        <div className="results-controls">
+        <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all'}>
             <div className="sv-row">
               <span className="sv-label">Show</span>
               <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
@@ -232,14 +235,39 @@ function GeneratedAssets() {
               <span className="sv-label">Type</span>
               <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'image', label: 'Images' }, { value: 'video', label: 'Videos' }, { value: 'audio', label: 'Audio' }, { value: 'model3d', label: '3D' }, { value: 'text', label: 'Text' }]} />
             </div>
-            <div className="sv-row">
-              <span className="sv-label">Sort</span>
-              <Segmented value={newest ? 'new' : 'old'} size="sm" onChange={(v) => setNewest(v === 'new')} options={[{ value: 'new', label: 'Newest' }, { value: 'old', label: 'Oldest' }]} />
-            </div>
-            <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
-            <InlineSlider label="Grid size" value={cols} min={2} max={expanded ? 8 : 5} onChange={setCols} />
+        </ResultsMenu>
+        <ResultsMenu label="Group by" icon={Folder} iconOnly active={group !== 'date'}>
+          <Segmented value={group} size="sm" onChange={setGroup} options={[{ value: 'date', label: 'Date' }, { value: 'session', label: 'Sessions' }]} />
+        </ResultsMenu>
+        <ResultsMenu label="Order by" icon={ArrowUpDown} iconOnly active={!newest}>
+          <Segmented value={newest ? 'new' : 'old'} size="sm" onChange={(v) => setNewest(v === 'new')} options={[{ value: 'new', label: 'Newest' }, { value: 'old', label: 'Oldest' }]} />
+        </ResultsMenu>
+        <span className="results-controls-spacer" />
+        {layout !== 'list' ? <div className="library-size"><InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} /></div> : null}
+        <button ref={layoutMenu.ref} type="button" className="session-view-trigger" aria-label="View" aria-haspopup="dialog" aria-expanded={layoutMenu.open} onClick={layoutMenu.toggle}>
+          <currentView.icon size={14} />{currentView.label}<ChevronDown size={12} />
+        </button>
+        <Popover open={layoutMenu.open} anchor={layoutMenu.ref} onClose={layoutMenu.close} placement="bottom-start" width={180} label="Library view">
+          <div className="session-view-options" role="radiogroup" aria-label="Library view">
+            {views.map(({ id, label, icon: Icon }) => <button key={id} type="button" role="radio" aria-checked={layout === id} className="session-view-option" onClick={() => { setLayout(id); layoutMenu.close(); }}><Icon size={15} /><span className="session-view-option-text">{label}</span>{layout === id ? <Check size={13} className="session-view-check" /> : null}</button>)}
           </div>
         </Popover>
+        <div className="library-quick-kinds" role="group" aria-label="Filter assets by type">
+          {([{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const).map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
+          <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
+        </div>
+        <IconButton
+          icon={CheckSquare}
+          label={selecting ? 'Done selecting' : 'Select'}
+          size="sm"
+          active={selecting}
+          onClick={() => {
+            setSelecting((v) => !v);
+            setSelected(new Set());
+          }}
+        />
+        <IconButton icon={Star} label="Favorites only" size="sm" active={favOnly} aria-pressed={favOnly} onClick={() => setFavOnly(!favOnly)} />
+        </div>
         {kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all' || favOnly ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
@@ -288,12 +316,12 @@ function GeneratedAssets() {
       </div>
       <div className="gallery-scroll">
         {results.length ? (
-          groupByDate(results, (a) => a.createdAt).map((g) => (
-            <section key={g.label} className="date-group">
+          groups.map((g) => (
+            <section key={g.id} className="date-group">
               <h4 className="date-head">
                 {g.label} <span className="faint num">{g.items.length}</span>
               </h4>
-              <div className="gallery-grid" style={{ ['--cols' as string]: cols }}>
+              <div className={`gallery-grid library-layout-${layout}`} style={{ ['--cols' as string]: cols }}>
                 {g.items.map((a) => (
                   a.type === 'text' ? <TextTile key={a.id} g={a.generation} /> : <GalleryTile key={a.id} asset={a.asset} selected={selected.has(a.id)} selecting={selecting} onOpen={() => open(a.asset)} />
                 ))}
@@ -318,6 +346,15 @@ function GalleryTile({ asset, selected, selecting, onOpen }: { asset: Asset; sel
       <button ref={ref} type="button" className="g-open" onClick={onOpen} aria-label="Open">
         <AssetMedia assetId={asset.id} />
       </button>
+      <div className="library-item-meta">
+        <span className="library-item-title" title={g?.prompt || asset.name || asset.kind}>{g?.prompt || asset.name || asset.kind}</span>
+        {g?.modelName ? <span className="library-item-subtitle" title={g.modelName}>{g.modelName}</span> : null}
+        <span className="library-item-details">
+          <time dateTime={new Date(asset.createdAt).toISOString()}>{formatRelative(asset.createdAt)}</time>
+          {asset.width > 0 && asset.height > 0 ? <span>{asset.width} × {asset.height}</span> : null}
+          {asset.duration ? <span>{formatDuration(asset.duration * 1000)}</span> : null}
+        </span>
+      </div>
       {asset.kind === 'video' || asset.kind === 'audio' || asset.kind === 'model3d' ? (
         <span className="g-badge num">
           {asset.kind === 'audio' ? <AudioLines size={11} /> : asset.kind === 'model3d' ? <Box size={11} /> : <Film size={11} />}
