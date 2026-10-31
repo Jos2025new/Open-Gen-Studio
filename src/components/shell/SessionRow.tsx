@@ -69,6 +69,7 @@ export function SessionRow({ session, active, stats, compact, selecting, selecte
     setUi({ panel: null, home: false, space: undefined });
   };
   const tap = useTapReveal(open);
+  const rename = () => { if (selecting) return; setDraft(session.title); setEditing(true); };
   const keys = (e: React.KeyboardEvent) => { if (!editing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } };
   const when = <time className="pc-when" dateTime={new Date(stamp).toISOString()} title={`${basis === 'created' ? 'Created' : 'Updated'}: ${new Date(stamp).toLocaleString()}`}>{shortDate(stamp)}</time>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
@@ -94,7 +95,7 @@ export function SessionRow({ session, active, stats, compact, selecting, selecte
       <div className={`sess-row pc-row${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}>
         <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
         <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
-        <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onKeyDown={keys}>
+        <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onDoubleClick={rename} onKeyDown={keys}>
           {title}
           <span className="pc-info-sub num">{[modeLabel, ...details].filter(Boolean).join(' · ') || 'empty'}{active ? ' · Open' : ''}</span>
         </div>
@@ -105,7 +106,7 @@ export function SessionRow({ session, active, stats, compact, selecting, selecte
   }
   return (
     <div className={`sess-card pc-card${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
-      <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onKeyDown={keys}>{cover}</div>
+      <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>
       <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
       <span className="pc-tools">{pin}{menu}</span>
       {active ? <span className="sess-open">Open</span> : null}

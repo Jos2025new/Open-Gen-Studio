@@ -125,6 +125,28 @@ describe('Sessions cards', () => {
     expect(useStore.getState().sessions[ids.Charlie]).toBeUndefined();
   });
 
+  it('double-clicking a card or row starts renaming; Enter saves', () => {
+    const dbl = (el: Element) => act(() => { el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
+    dbl(card('Alpha').querySelector('.session-main')!);
+    const input = q<HTMLInputElement>('input[aria-label="Session title"]');
+    expect(input).not.toBeNull();
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Alpha 2');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => input.blur());
+    expect(useStore.getState().sessions[ids.Alpha].title).toBe('Alpha 2');
+    click(q('[aria-label="List view"]'));
+    dbl(q('.sess-row .session-main'));
+    expect(host.querySelector('input[aria-label="Session title"]')).not.toBeNull();
+    // while selecting, double-click does not rename
+    act(() => root.unmount()); root = createRoot(host);
+    act(() => root.render(createElement(SessionsPanel)));
+    click(q('.sess-row [role="checkbox"]'));
+    dbl(q('.sess-row .session-main'));
+    expect(host.querySelector('input[aria-label="Session title"]')).toBeNull();
+  });
+
   it('a touch tap reveals the overlay first and opens on the second tap; a mouse click opens', () => {
     const open = card('Charlie').querySelector<HTMLElement>('.session-main')!;
     const pointer = (type: string) => act(() => { const e = new MouseEvent('pointerdown', { bubbles: true }); Object.defineProperty(e, 'pointerType', { value: type }); open.dispatchEvent(e); });
