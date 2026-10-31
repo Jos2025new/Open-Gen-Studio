@@ -77,21 +77,23 @@ describe('saved tile size', () => {
 });
 
 describe('Library grid size drives the row height', () => {
-  it('card layout is justified rows and the bar controls match the slider height', () => {
+  it('card layout is justified rows and the bar keeps the app own icon sizes', () => {
     expect(readFileSync('src/components/gallery/GalleryLayout.css', 'utf8')).toMatch(/\.gallery-grid\.jg \{ display: flex; flex-direction: column/);
-    expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).toMatch(/\.pc-bar \.icon-btn \{ width: var\(--pc-h\); height: var\(--pc-h\)/);
+    expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).not.toMatch(/\.pc-bar \.icon-btn \{[^}]*width/); // no forced box size
     expect(readFileSync('src/styles/designer-connected.css', 'utf8')).toMatch(/height: 36px; min-width: 0; padding: 0 12px/); // the slider stays at its standard 36px
   });
 });
 
 describe('Library uses the same slider', () => {
-  it('shows the grid size slider in the bar and hides it in list view', () => {
+  it('shows the grid size slider in View, as in Generations, and hides it in list view', () => {
     const sessionId = useStore.getState().activeSessionId;
     act(() => useStore.setState({ assets: { sample: { ...asset('sample'), sessionId } }, generations: {} }));
     render(createElement(GalleryPanel));
     const src = readFileSync('src/components/ui/PanelControls.tsx', 'utf8');
     expect(src).toMatch(/<InlineSlider label="Grid size"/);
-    const size = host.querySelector<HTMLInputElement>('input[aria-label="Grid size"]')!;
+    expect(host.querySelector('.pc-bar input[aria-label="Grid size"]')).toBeNull();
+    act(() => host.querySelector<HTMLButtonElement>('.pc-bar [aria-label="View"]')!.click());
+    const size = document.querySelector<HTMLInputElement>('input[aria-label="Grid size"]')!;
     expect(size).not.toBeNull();
     const before = Number(size.value);
     if (before < Number(size.max)) {
@@ -101,12 +103,11 @@ describe('Library uses the same slider', () => {
       expect(rowHeight()).toBeGreaterThan(before_h); // bigger Grid size = larger tiles
     }
     const radio = (t: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((b) => b.textContent === t)!;
-    act(() => host.querySelector<HTMLButtonElement>('.pc-bar [aria-label="View"]')!.click());
     act(() => radio('List').click());
     expect(document.querySelector('input[aria-label="Grid size"]')).toBeNull(); // neither in the bar nor in the View popover
     expect(radio('List').getAttribute('aria-checked')).toBe('true');
     expect(host.querySelector('.library-layout-list')).not.toBeNull();
     act(() => radio('Grid').click());
-    expect(host.querySelector('input[aria-label="Grid size"]')).not.toBeNull();
+    expect(document.querySelector('input[aria-label="Grid size"]')).not.toBeNull();
   });
 });

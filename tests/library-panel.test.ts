@@ -21,7 +21,7 @@ const asset = (id: string, over: Partial<Asset> = {}) => ({ id, kind: 'image', o
 const gen = (id: string, prompt: string, over: Partial<Generation> = {}) => ({ id, sessionId: sid(), kind: 'image', prompt, modelName: 'Seedance', provider: 'demo', status: 'done', assetIds: [], settings: { count: 1, advanced: {}, aspect: '1:1', resolution: '1k' }, estimate: { usd: 0 }, createdAt: 1, ...over }) as unknown as Generation;
 const q = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel)!;
 const click = (el: Element | null) => act(() => (el as HTMLElement).click());
-const names = () => [...host.querySelectorAll('.g-tile .g-open')].map((b) => b.getAttribute('title'));
+const names = () => [...host.querySelectorAll('.g-tile .g-open')].map((b) => b.getAttribute('data-title'));
 const bar = (label: string) => q(`.pc-bar [aria-label^="${label}"]`);
 const radio = (text: string) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === text) ?? null;
 const source = (name: string) => { click(q('.pc-source')); click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith(name)) ?? null); };
@@ -69,7 +69,7 @@ describe('Library top bar', () => {
     expect(left).toEqual(['Library source: All', 'Sessions']);
     expect(kids[0].querySelector('.pc-source')?.getAttribute('aria-haspopup')).toBe('menu');
     expect(kids[1].querySelector('.pc-center [aria-label="Images"]')).not.toBeNull();
-    expect(kids[1].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
+    expect(kids[1].querySelector('input[aria-label="Grid size"]')).toBeNull(); // grid size lives in View, as in Generations
     const icons = [...kids[1].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
     expect(icons).toEqual(['Favorites only', 'View', 'Filters', 'Search']);
     expect(bar('View').getAttribute('aria-haspopup')).toBe('dialog');
@@ -115,7 +115,7 @@ describe('Library top bar', () => {
     const cells = [...host.querySelectorAll<HTMLElement>('.jg-cell')];
     expect(cells).toHaveLength(3);
     const ratio = (c: HTMLElement) => parseFloat(c.style.width) / parseFloat(c.style.height);
-    const byName = Object.fromEntries(cells.map((c) => [c.querySelector('.g-open')?.getAttribute('title'), c]));
+    const byName = Object.fromEntries(cells.map((c) => [c.querySelector('.g-open')?.getAttribute('data-title'), c]));
     expect(ratio(byName.Mango)).toBeCloseTo(2, 3);
     expect(ratio(byName.Apple)).toBeCloseTo(0.5, 3);
     click(bar('View'));
@@ -123,7 +123,7 @@ describe('Library top bar', () => {
     expect(host.querySelector('.jg-cell')).toBeNull();
   });
 
-  it('every icon button of the bar is the same size class and stroke, and one CSS rule sets the 18px glyph', () => {
+  it('every icon button of the bar is the app small icon button, with no forced sizes or inverted fills', () => {
     const buttons = [...host.querySelectorAll('.pc-bar .icon-btn')];
     expect(buttons.length).toBeGreaterThan(9);
     for (const b of buttons) {
@@ -131,8 +131,8 @@ describe('Library top bar', () => {
       expect(b.querySelector('svg')?.getAttribute('stroke-width')).toBe('1.75');
     }
     const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
-    expect(css).toMatch(/\.pc-bar \.icon-btn svg, \.pc-bar \.results-menu-trigger svg \{[^}]*width: 18px; height: 18px; stroke-width: 1\.75/);
-    expect(css).toMatch(/\.pc-bar \.results-menu-trigger svg:not\(:first-child\) \{ display: none; \}/);
+    expect(css).not.toMatch(/\.pc-bar \.icon-btn svg \{/);
+    expect(css).not.toMatch(/background: var\(--text\); color: var\(--bg-canvas\)/);
   });
 
   it('filters by type with icon buttons and All restores everything', () => {
@@ -350,7 +350,7 @@ describe('Library cards', () => {
 
   it('overlay controls share one style and the agent-context toggle has its own glyph, distinct from the select box', () => {
     const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
-    expect(css).toMatch(/\.pc-card \.pc-check, \.pc-card \.attach-toggle, \.pc-card \.pc-tools \.icon-btn \{[^}]*width: 30px; height: 30px[^}]*background: var\(--pc-btn-bg\)/);
+    expect(css).toMatch(/\.pc-card \.pc-check, \.pc-card \.attach-toggle, \.pc-card \.pc-tools \.icon-btn \{[^}]*width: 28px; height: 28px[^}]*border-radius: 50%; background: var\(--pc-btn-bg\)/);
     const tile = q('.g-tile');
     const attach = tile.querySelector('.attach-toggle')!;
     expect(attach.querySelector('.is-glyph svg')).not.toBeNull(); // off: a paperclip, not a plain box

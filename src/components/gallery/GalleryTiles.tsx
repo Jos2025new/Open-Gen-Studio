@@ -70,7 +70,7 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
     </div>;
   }
   return <div className={`g-tile pc-card${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}`}>
-    <button type="button" className="g-open" onPointerDown={tap.onPointerDown} onClick={tap.onClick} aria-label="Open" title={title}>
+    <button type="button" className="g-open" onPointerDown={tap.onPointerDown} onClick={tap.onClick} aria-label="Open" data-title={title}>
       <AssetMedia assetId={asset.id} />
     </button>
     <CardCheck checked={selected} label={`Select ${title}`} onToggle={onToggle} />
@@ -80,7 +80,7 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
       <span className="g-badge pc-badge num"><KindIcon kind={asset.kind} />{asset.kind === 'model3d' ? '3D' : asset.duration ? formatDuration(asset.duration * 1000) : ''}</span>
     ) : null}
     {remote}{hiddenMark}
-    <div className="pc-info pc-hover"><span className="pc-info-title">{details || title}</span><span className="pc-info-sub">{when}</span></div>
+    <div className="pc-info pc-hover"><span className="pc-info-title">{title}</span>{details ? <span className="pc-info-sub">{details}</span> : null}<span className="pc-info-meta">{when}</span></div>
   </div>;
 }
 

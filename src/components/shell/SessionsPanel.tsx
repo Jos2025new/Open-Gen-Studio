@@ -159,7 +159,6 @@ export function SessionsPanel() {
           <SourceSelect items={SOURCES.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={(v) => { setCanvas(v); setSelected(new Set()); }} label="Session canvas" separatorAfter="all" />
         </div>
         <div className="pc-grp pc-right">
-          {layout === 'card' ? <div className="pc-size"><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
           <div className="pc-grp pc-center" role="group" aria-label="Filter sessions by mode">
             {QUICK_MODES.map(({ id, label, icon: Icon }) => <IconButton key={id} icon={Icon} label={label} size="sm" active={quickMode === id} aria-pressed={quickMode === id} onClick={() => { setQuickMode(quickMode === id ? 'all' : id); setSelected(new Set()); }} />)}
             <button type="button" className={`canvas-tab${quickMode === 'all' ? ' is-on' : ''}`} aria-pressed={quickMode === 'all'} onClick={() => { setQuickMode('all'); setSelected(new Set()); }}>All</button>
@@ -173,7 +172,7 @@ export function SessionsPanel() {
                 <span className="sv-label">Date means</span>
                 <Segmented value={basis} size="sm" onChange={setBasis} options={[{ value: 'updated', label: 'Last activity' }, { value: 'created', label: 'Created' }]} />
               </div>
-              {layout === 'card' ? <div className="sv-row pc-size-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+              {layout === 'card' ? <div className="sv-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
             </PanelPopover>
             <PanelPopover icon={Funnel} label="Filters" dot={showHidden || shelf === 'archived'}>{(close) => <>
               <ToggleRow label="Show hidden" count={hiddenCount} checked={showHidden} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />

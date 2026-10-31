@@ -58,12 +58,11 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
         <div className="pc-bar">
           <div className="pc-grp pc-left">{source}</div>
           <div className="pc-grp pc-right">
-            {view === 'card' ? <div className="pc-size"><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
             <div className="pc-icons">
               <PanelPopover icon={LayoutGrid} label="View">
                 <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
                 <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} nameOnly /></div>
-                {view === 'card' ? <div className="sv-row pc-size-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+                {view === 'card' ? <div className="sv-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
               </PanelPopover>
               <PanelPopover icon={Funnel} label="Filters" dot={showHidden}>
                 <ToggleRow label="Show hidden" count={library.filter((x) => x.userHidden).length} checked={showHidden} onChange={setShowHidden} />

@@ -120,7 +120,6 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
             <button type="button" className={`canvas-tab${group === 'session' ? ' is-on' : ''}`} aria-pressed={group === 'session'} onClick={() => setGroup(group === 'session' ? 'date' : 'session')}><Folder size={14} strokeWidth={1.75} />Sessions</button>
           </div>
           <div className="pc-grp pc-right">
-            {view === 'card' ? <div className="pc-size"><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
             <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
               {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
               <button type="button" className={`canvas-tab${kind === 'all' ? ' is-on' : ''}`} aria-pressed={kind === 'all'} onClick={() => setKind('all')}>All</button>
@@ -130,7 +129,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
               <PanelPopover icon={LayoutGrid} label="View">
                 <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={view} onChange={setView} /></div>
                 <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
-                {view === 'card' ? <div className="sv-row pc-size-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
+                {view === 'card' ? <div className="sv-row"><span className="sv-label">Grid size</span><GridSizeSlider cols={cols} setCols={setCols} expanded={expanded} /></div> : null}
               </PanelPopover>
               <PanelPopover icon={Funnel} label="Filters" dot={filtered || showHidden || showArchived}>
                 <div className="sv-row">

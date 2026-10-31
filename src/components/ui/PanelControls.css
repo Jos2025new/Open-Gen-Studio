@@ -6,22 +6,8 @@
 .pc-grp.pc-right { flex: 1 1 auto; justify-content: flex-end; }
 .pc-icons { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 6px; }
 .pc-pop { position: relative; display: inline-flex; }
-.pc-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); pointer-events: none; }
+.pc-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); pointer-events: none; }
 .pc-source { gap: 6px; }
-.sessions-view[data-bar-size="shown"] .pc-size-row { display: none; }
-.pc-bar { --pc-h: 36px; }
-.pc-bar .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; height: var(--pc-h); box-sizing: border-box; border-color: var(--border); }
-.pc-bar .results-menu-trigger { height: var(--pc-h); min-height: var(--pc-h); min-width: var(--pc-h); color: var(--text-2); }
-.pc-bar .results-menu-trigger svg:first-child, .pc-bar .icon-btn svg { width: 18px; height: 18px; stroke-width: 1.75; }
-.pc-bar .results-controls { display: contents; }
-.pc-bar .icon-btn { width: var(--pc-h); height: var(--pc-h); color: var(--text-2); }
-.pc-bar .icon-btn.is-active { background: var(--surface-3); color: var(--text); box-shadow: none; }
-.pc-search { flex: 0 1 220px; }
-.pc-grp .canvas-tab { height: var(--pc-h); border-color: transparent; padding: 0 10px; font-size: 12px; }
-.pc-grp .canvas-tab.is-on { border-color: transparent; }
-.pc-size { display: flex; align-items: center; width: 160px; flex: 0 0 160px; }
-.pc-size .opt-slider::before { border-right-width: 0; } /* no thumb line across the label */
-.pc-size .opt.opt-slider { width: 100%; box-sizing: border-box; padding: 0 10px; gap: 6px; flex: 1 1 auto; }
 
 .pc-split { display: flex; flex: 1; min-height: 0; }
 .pc-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
@@ -36,7 +22,7 @@
 .pc-menu-sep { width: 100%; margin: 3px 0; border: 0; border-top: 1px solid var(--border); }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
-.pc-card { --pc-btn-bg: rgba(255, 255, 255, .3); --pc-btn-bg-hover: rgba(255, 255, 255, .5); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 6px; background: var(--surface-2); }
+.pc-card { --pc-btn-bg: rgba(255, 255, 255, .16); --pc-btn-bg-hover: rgba(255, 255, 255, .28); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
 .pc-card.is-selected { box-shadow: 0 0 0 2px var(--accent); }
 .pc-card.is-active { box-shadow: 0 0 0 2px var(--border-strong); }
 .pc-card.is-hidden-item .pc-open, .pc-card.is-hidden-item .g-open { opacity: .45; }
@@ -44,20 +30,26 @@
 .pc-card .g-open .media, .pc-card .pc-open .media { width: 100%; height: 100%; object-fit: cover; }
 .pc-hover { opacity: 0; transition: opacity .12s; }
 .pc-card:hover .pc-hover, .pc-card:focus-within .pc-hover, .pc-card.is-armed .pc-hover, .pc-card.is-selecting .pc-check, .pc-card .pc-check.is-on, .pc-card .pc-hover.is-on, .pc-hover[aria-expanded="true"] { opacity: 1; }
-/* Every overlay control on a card shares one look: 30px light glass button, white 16px glyph. */
-.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(6px); box-shadow: 0 1px 3px rgba(0, 0, 0, .35); }
+/* Every overlay control on a card shares one look: a 28px frosted-glass circle with a hairline rim and a white glyph. */
+.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid rgba(255, 255, 255, .22); border-radius: 50%; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: none; }
 .pc-card .pc-check:hover, .pc-card .attach-toggle:hover, .pc-card .pc-tools .icon-btn:hover { background: var(--pc-btn-bg-hover); }
-.pc-card .pc-tools .icon-btn svg { width: 17px; height: 17px; }
-.pc-check { position: absolute; top: 5px; left: 5px; z-index: 2; padding: 0; }
+.pc-card .pc-tools .icon-btn svg { width: 15px; height: 15px; }
+.pc-card .pc-box { width: 14px; height: 14px; border-width: 1.5px; border-radius: 4px; }
+.pc-check { position: absolute; top: 6px; left: 6px; z-index: 2; padding: 0; }
 .pc-box { display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid currentColor; border-radius: 5px; }
 .pc-check.is-on .pc-box { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
-.pc-card > .attach-toggle { top: 5px; left: 39px; z-index: 2; }
+.pc-card > .attach-toggle { top: 6px; left: 38px; z-index: 2; }
 .pc-card > .attach-toggle .attach-toggle-box { width: 22px; height: 22px; border: 0; background: none; font-size: 12px; color: var(--pc-btn-fg); }
 .pc-card > .attach-toggle.is-on .attach-toggle-box { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); }
-.pc-tools { position: absolute; top: 5px; right: 5px; z-index: 2; display: flex; gap: 4px; }
+.pc-tools { position: absolute; top: 6px; right: 6px; z-index: 2; display: flex; gap: 4px; }
 .pc-tools .icon-btn.pc-fav.is-on { color: #ffd34d; }
 .pc-tools .icon-btn.pc-fav.is-on svg { fill: currentColor; }
-.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 2px; padding: 36px 10px 9px; background: linear-gradient(transparent, rgba(0, 0, 0, .55) 35%, rgba(0, 0, 0, .85)); color: #fff; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+/* Details sit on a soft veil: a gentle tint plus a blur that fades in from the top, like frosted glass rising from the edge. */
+.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 3px; padding: 44px 12px 11px; background: linear-gradient(transparent, rgba(0, 0, 0, .18) 40%, rgba(0, 0, 0, .5)); color: #fff; pointer-events: none; }
+.pc-info::before { content: ''; position: absolute; inset: 0; z-index: -1; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); mask-image: linear-gradient(transparent, #000 55%); -webkit-mask-image: linear-gradient(transparent, #000 55%); }
+.pc-info .pc-info-title { font-size: 13px; font-weight: 600; }
+.pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); font-size: 11.5px; }
+.pc-info-meta { color: rgba(255, 255, 255, .6); font-size: 11px; }
 .pc-info-title { overflow: hidden; font-size: 13px; font-weight: 650; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .pc-info-sub { overflow: hidden; color: rgba(255, 255, 255, .88); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .pc-badge { position: absolute; left: 6px; bottom: 6px; z-index: 2; }
@@ -98,51 +90,34 @@
 .pc-dash { width: 8px; border-top: 2px solid currentColor; }
 .date-head .pc-group-check { margin-right: 2px; align-self: center; }
 
-/* Polish: calm canvas surface, borderless controls, outlined type group, inverted pills for the chosen state. */
-.side-panel.panel-gallery, .side-panel.panel-sessions { background: var(--bg-canvas); }
-.pc-bar .icon-btn, .pc-bar .results-menu-trigger { border: 0; background: none; color: var(--text-2); box-shadow: none; }
-.pc-bar .icon-btn:hover, .pc-bar .results-menu-trigger:hover, .pc-bar .results-menu-trigger[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
-.pc-bar .icon-btn.is-active, .pc-bar .icon-btn[aria-pressed="true"], .pc-bar .results-menu-trigger.is-active { background: var(--surface-3); color: var(--text); }
-.pc-bar .segmented { height: var(--pc-h); box-sizing: border-box; padding: 2px; gap: 2px; background: none; border: 1px solid var(--border); border-radius: var(--radius-s); }
-.pc-bar .segmented button { height: 100%; padding: 0 12px; font-size: 12px; color: var(--text-2); }
-.pc-bar .segmented button.is-active { background: var(--text); color: var(--bg-canvas); box-shadow: none; }
-.pc-grp.pc-center { box-sizing: border-box; height: var(--pc-h); flex-wrap: nowrap; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-s); }
-.pc-center .icon-btn { width: 30px; height: 30px; }
-.pc-center .canvas-tab { height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-xs); background: none; color: var(--text-2); }
-.pc-center .canvas-tab:hover { background: var(--surface-2); color: var(--text); }
-.pc-center .canvas-tab.is-on { background: var(--surface-3); color: var(--text); }
 
-/* Three intensities, as in the reference: the source is the one inverted pill; what you switched on gets a surface;
-   tools sit in quiet outlined boxes; idle type icons and the panel chrome stay faint. */
-.pc-bar .canvas-tab.pc-source { border-color: transparent; background: var(--text); color: var(--bg-canvas); font-weight: 600; }
-.pc-bar .canvas-tab.pc-source:hover { background: var(--text); color: var(--bg-canvas); opacity: .9; }
-.pc-left > .canvas-tab:not(.pc-source) { background: none; color: var(--text-2); }
-.pc-left > .canvas-tab:not(.pc-source):hover { color: var(--text); }
-.pc-left > .canvas-tab.is-on:not(.pc-source) { background: var(--surface-3); color: var(--text); }
-.pc-center .icon-btn { color: var(--text-3); }
-.pc-center .icon-btn:hover, .pc-center .icon-btn.is-active { color: var(--text); }
-.pc-icons .icon-btn { border: 1px solid var(--border); color: var(--text); }
-.pc-icons .icon-btn:hover { background: var(--surface-2); }
-.pc-chrome .icon-btn { color: var(--text-3); }
-.pc-chrome .icon-btn:hover { color: var(--text); }
 .gallery .date-head, .sessions .date-head { padding: 10px 12px 4px; font-size: 11px; font-weight: 500; color: var(--text-2); }
 .gallery .date-head .faint, .sessions .date-head .faint { color: var(--text-3); }
 .date-head .pc-group-check, .sessions .date-head .group-check { width: 14px; height: 14px; opacity: .4; transition: opacity .12s; }
 .date-head:hover .pc-group-check, .date-head:hover .group-check, .date-head .pc-group-check:is(.is-on, .is-mixed), .sessions .date-head .group-check:is(.is-on, [aria-checked="mixed"]) { opacity: 1; }
 
-/* One icon size for every control of the bar: a 36px box, an 18px glyph at stroke 1.75, centered (whatever size prop the button got). */
-.pc-bar .icon-btn, .pc-bar .results-menu-trigger { display: inline-grid; place-items: center; flex: none; padding: 0; }
-.pc-bar .results-menu-trigger { width: var(--pc-h); }
-.pc-bar .icon-btn svg, .pc-bar .results-menu-trigger svg { flex: none; width: 18px; height: 18px; stroke-width: 1.75; }
-.pc-bar .results-menu-trigger svg:not(:first-child) { display: none; }
-.pc-center .icon-btn { width: 30px; height: 30px; }
+
+/* The bar speaks the app's own language (the Generations header): a title-weight source, small borderless icon buttons
+   with the usual active surface, a segmented group for the types, quiet chips. No forced sizes or inverted fills. */
+.side-panel.panel-gallery, .side-panel.panel-sessions { background: var(--bg-canvas); }
+.pc-bar { gap: var(--sp-1) var(--sp-3); }
+.pc-bar .results-controls { display: contents; }
+.pc-bar .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; }
+.pc-search { flex: 0 1 220px; }
+.pc-icons, .pc-chrome { gap: var(--sp-1); }
+.pc-bar .pc-source { height: 28px; gap: 6px; padding: 0 8px 0 6px; border: 0; border-radius: var(--radius-s); background: none; color: var(--text); font-size: var(--fs-l); font-weight: 600; }
+.pc-bar .pc-source:hover, .pc-bar .pc-source[aria-expanded="true"] { background: var(--surface-2); }
+.pc-bar .pc-source svg { color: var(--text-2); }
+.pc-grp.pc-center { flex-wrap: nowrap; gap: 2px; padding: 3px; border-radius: var(--radius); background: var(--surface); }
+.pc-center .canvas-tab { height: 24px; padding: 0 9px; border: 0; border-radius: var(--radius-s); background: none; }
+.pc-center .canvas-tab.is-on { background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.pc-center .icon-btn.is-active { box-shadow: inset 0 0 0 1px var(--border-strong); }
 
 /* Wide: one row — source on the left, controls on the right. Narrow: row 1 is the source and the chrome; row 2 the types at the start and the icons at the end. */
 .pc-chrome { display: flex; flex: none; align-items: center; gap: 2px; }
 .gallery, .sessions { container: pc-panel / inline-size; }
 @container pc-panel (max-width: 640px) {
-  .gallery-controls { padding: 10px; }
-  .pc-bar { row-gap: 3px; column-gap: 4px; }
+  .pc-bar { row-gap: var(--sp-2); }
   .pc-bar > .pc-grp { display: contents; }
   .pc-bar > .pc-left > * { order: 1; }
   .pc-bar .pc-chrome { order: 2; margin-left: auto; }
@@ -150,8 +125,5 @@
   .pc-bar .pc-center { order: 4; margin-right: auto; }
   .pc-bar .pc-icons { order: 5; margin-left: auto; }
   .pc-bar .pc-search { flex: 1 1 100%; max-width: none; }
-  .pc-bar .pc-size { display: none; }
-  .pc-center .icon-btn { width: 28px; height: 28px; }
-  .pc-bar .pc-icons { gap: 4px; }
-  .pc-icons .icon-btn { width: 34px; height: 34px; }
 }
+

@@ -46,7 +46,7 @@ export function LayoutSegmented({ value, onChange }: { value: ItemView; onChange
   return <Segmented value={value} size="sm" onChange={onChange} options={[{ value: 'card', label: 'Grid' }, { value: 'list', label: 'List' }]} />;
 }
 
-/** The grid-size slider shared by the bar (wide) and the View popover (narrow, where the bar hides it). */
+/** The grid-size slider of the View popover, as in Generations. */
 export function GridSizeSlider({ cols, setCols, expanded }: { cols: number; setCols: (c: number) => void; expanded: boolean }) {
   return <InlineSlider label="Grid size" value={(expanded ? 10 : 7) - cols} min={2} max={expanded ? 8 : 5} onChange={(value) => setCols((expanded ? 10 : 7) - value)} />;
 }
@@ -59,15 +59,12 @@ export function ToggleRow({ label, checked, onChange, count }: { label: string; 
 /** One icon per intent (View, Filters): opens a small titled popover under it; `dot` marks that something inside is on. */
 export function PanelPopover({ icon, label, dot, width = 280, children }: { icon: LucideIcon; label: string; dot?: boolean; width?: number; children: ReactNode | ((close: () => void) => ReactNode) }) {
   const pop = usePopover();
-  // The grid size lives in the bar when it fits; this popover repeats it only when the narrow bar hides it.
-  const barSize = pop.open ? pop.ref.current?.closest('.pc-bar')?.querySelector<HTMLElement>('.pc-size') : null;
-  const barSizeShown = !!barSize && barSize.offsetParent !== null;
   return <span className="pc-pop">
     <IconButton ref={pop.ref} icon={icon} label={dot ? `${label} (active)` : label} size="sm" active={pop.open || dot} aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle} />
     {dot ? <i className="pc-dot" aria-hidden="true" /> : null}
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={width} placement="bottom-start" align="end" className="results-popover" label={label}>
       <PopoverHeader title={label} />
-      <div className="sessions-view" data-bar-size={barSizeShown ? 'shown' : undefined}>{typeof children === 'function' ? children(pop.close) : children}</div>
+      <div className="sessions-view">{typeof children === 'function' ? children(pop.close) : children}</div>
     </Popover>
   </span>;
 }

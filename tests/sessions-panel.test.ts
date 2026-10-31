@@ -155,7 +155,7 @@ describe('Sessions top bar', () => {
     expect(zones[0].querySelector('button')?.textContent).toContain('New');
     expect(zones[0].querySelector('.pc-source')).not.toBeNull();
     expect(zones[1].querySelector('.pc-center [aria-label="Videos"]')).not.toBeNull();
-    expect(zones[1].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
+    expect(zones[1].querySelector('input[aria-label="Grid size"]')).toBeNull(); // in View
     const icons = [...zones[1].querySelectorAll('.pc-icons > button, .pc-icons > .pc-pop > button')].map((b) => b.getAttribute('aria-label'));
     expect(icons).toEqual(['Pinned only', 'View', 'Filters', 'Search']);
     expect([...zones[1].querySelectorAll(':scope > .pc-chrome button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Collapse', 'Close']);
