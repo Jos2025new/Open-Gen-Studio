@@ -91,10 +91,11 @@ describe('Library uses the same slider', () => {
       setNum(size, before + 1);
       expect(Number(host.querySelector<HTMLElement>('.gallery-grid')!.style.getPropertyValue('--cols'))).toBe(columns - 1);
     }
-    act(() => host.querySelector<HTMLButtonElement>('[aria-label="View"]')!.click());
-    const list = [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((button) => button.textContent === 'List')!;
-    act(() => list.click());
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="List view"]')!.click());
     expect(host.querySelector('input[aria-label="Grid size"]')).toBeNull();
-    expect(host.querySelector<HTMLButtonElement>('[aria-label="View"]')?.textContent).toContain('List');
+    expect(host.querySelector('[aria-label="List view"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('.library-layout-list')).not.toBeNull();
+    act(() => host.querySelector<HTMLButtonElement>('[aria-label="Card view"]')!.click());
+    expect(host.querySelector('input[aria-label="Grid size"]')).not.toBeNull();
   });
 });

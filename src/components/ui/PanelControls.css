@@ -1,0 +1,63 @@
+/* Shared by Library and Sessions: the one-row top bar, the category rail and the image-first cards. */
+.pc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.pc-bar > .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; height: 32px; box-sizing: border-box; border-color: var(--border); }
+.pc-bar .results-menu-trigger { height: 32px; min-height: 32px; color: var(--text-2); }
+.pc-bar .results-menu-trigger svg, .pc-bar .icon-btn svg { stroke-width: 1.75; }
+.pc-bar > .results-controls { display: contents; }
+.pc-bar .icon-btn { width: 28px; height: 28px; color: var(--text-2); }
+.pc-bar .icon-btn.is-active { background: var(--surface-3); color: var(--text); box-shadow: none; }
+.pc-sep { flex: none; width: 1px; height: 20px; background: var(--border); }
+.pc-group { display: flex; align-items: center; gap: 2px; }
+.pc-group .canvas-tab { height: 26px; border-color: transparent; padding: 0 7px; font-size: 11px; }
+.pc-group .canvas-tab.is-on { border-color: transparent; }
+.pc-size { display: flex; align-items: center; width: 120px; height: 32px; flex: 0 0 120px; }
+.pc-size .opt.opt-slider { width: 100%; height: 32px; box-sizing: border-box; }
+
+.pc-split { display: flex; flex: 1; min-height: 0; }
+.pc-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.pc-rail { display: flex; flex: none; flex-direction: column; gap: 2px; width: 148px; padding: 10px 6px; border-right: 1px solid var(--border); overflow-y: auto; }
+.pc-rail.is-icons { width: auto; padding: 10px 4px; }
+.pc-rail-item { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 9px; border-radius: var(--radius-s); color: var(--text-2); font-size: 12px; text-align: left; white-space: nowrap; }
+.pc-rail.is-icons .pc-rail-item { justify-content: center; width: 32px; padding: 0; }
+.pc-rail-item:hover { color: var(--text); background: var(--surface-2); }
+.pc-rail-item.is-on { color: var(--text); background: var(--surface-3); }
+
+.pc-menu { display: flex; flex-direction: column; gap: 1px; }
+.pc-menu-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border-radius: var(--radius-s); color: var(--text-2); font-size: 12px; text-align: left; }
+.pc-menu-item:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
+.pc-menu-item.tone-danger:hover:not(:disabled) { color: var(--danger); }
+.pc-menu-item:disabled { opacity: .45; }
+
+/* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
+.pc-card { position: relative; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.pc-card.is-selected, .pc-card.is-active { border-color: var(--accent); }
+.pc-card .g-open, .pc-card .pc-open { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pc-card .g-open .media, .pc-card .pc-open .media { width: 100%; height: 100%; object-fit: cover; }
+.pc-hover { opacity: 0; transition: opacity .12s; }
+.pc-card:hover .pc-hover, .pc-card:focus-within .pc-hover, .pc-card.is-armed .pc-hover, .pc-card.is-selecting .pc-check, .pc-card .pc-check.is-on, .pc-card .pc-hover.is-on, .pc-hover[aria-expanded="true"] { opacity: 1; }
+.pc-check { position: absolute; top: 6px; left: 6px; z-index: 2; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 1.5px solid var(--text); border-radius: 5px; background: var(--overlay); color: var(--accent-ink); }
+.pc-check.is-on { background: var(--accent); border-color: transparent; }
+.pc-tools { position: absolute; top: 4px; right: 4px; z-index: 2; display: flex; gap: 2px; }
+.pc-tools .icon-btn { background: var(--overlay); color: var(--text); backdrop-filter: blur(3px); }
+.pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
+.pc-tools .icon-btn.pc-fav.is-on svg { fill: currentColor; }
+.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 1px; padding: 22px 8px 6px; background: linear-gradient(transparent, var(--overlay)); color: var(--text); font-size: 11px; pointer-events: none; }
+.pc-info-title { overflow: hidden; font-size: 12px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.pc-info-sub { overflow: hidden; color: var(--text-2); text-overflow: ellipsis; white-space: nowrap; }
+.pc-badge { position: absolute; left: 6px; bottom: 6px; z-index: 2; }
+.pc-card:hover .pc-badge, .pc-card:focus-within .pc-badge, .pc-card.is-armed .pc-badge { opacity: 0; }
+
+/* Compact row: thumbnail, title, details, date and the same actions. */
+.pc-row { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.pc-row:hover { background: var(--surface-hover); }
+.pc-row.is-selected, .pc-row.is-active { border-color: var(--accent); }
+.pc-row .pc-check { position: static; flex: none; }
+.pc-row .pc-thumb { position: relative; flex: none; width: 36px; height: 36px; overflow: hidden; border-radius: 7px; background: var(--surface-3); }
+.pc-row .pc-thumb .media { width: 100%; height: 100%; object-fit: cover; }
+.pc-row .pc-text { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: left; }
+.pc-row .pc-info-title { font-size: 12px; }
+.pc-row .pc-when { flex: none; color: var(--text-3); font-size: 11px; white-space: nowrap; }
+.pc-row .pc-tools { position: static; }
+.pc-row .pc-tools .icon-btn { background: none; color: var(--text-3); backdrop-filter: none; }
+.pc-row .pc-tools .icon-btn:hover { color: var(--text); }
+.pc-row .pc-hover { opacity: 1; }

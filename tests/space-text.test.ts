@@ -28,7 +28,7 @@ it('Library opens text without changing session; viewer closes with Escape', () 
   act(() => root.render(createElement(GalleryPanel)));
   expect(host.textContent).toContain('Transcription here');
   expect(host.querySelector('.g-check')).toBeNull();
-  act(() => [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Open text'))!.click());
+  act(() => host.querySelector<HTMLElement>('.text-result-tile')!.click());
   expect(useStore.getState().ui.textView).toBe(g.id);
   expect(useStore.getState().activeSessionId).toBe(session);
   act(() => root.render(createElement(TextLightbox)));
@@ -56,8 +56,8 @@ it('Library counts text in Place/Mode and its Text filter excludes images; viewe
   const mode = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Mode')!;
   expect([...place.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Tools'))?.textContent).toBe('Tools1');
   expect([...mode.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Audio'))?.textContent).toBe('Audio1');
-  const type = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Type')!;
-  act(() => [...type.querySelectorAll('button')].find((b) => b.textContent === 'Text')!.click());
+  act(() => document.body.click());
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Text"]')!.click());
   expect(host.querySelectorAll('.gallery-grid > *')).toHaveLength(1);
   expect(host.querySelector('.gallery-scroll')?.textContent).toContain('Transcription here');
   act(() => { setUi({ textView: g.id }); setUi({ lightbox: { assetIds: ['pic'], index: 0 } }); });
