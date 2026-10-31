@@ -102,6 +102,8 @@ it('Cards is a third view between Grid and List: compact cards with the cover, t
   const bravo = [...host.querySelectorAll('.sess-tile')].find((c) => c.querySelector('.pc-info-title')?.textContent === 'Bravo')!;
   expect(bravo.querySelector('.pc-open-tag')?.textContent).toBe('Open');
   expect(bravo.querySelector('time')).not.toBeNull();
+  expect([...bravo.querySelectorAll('.sess-tile-foot button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Select Bravo', 'Pin', 'Session actions']);
+  expect(bravo.querySelector('.sess-tile-main [role="checkbox"]')).toBeNull();
   expect(host.querySelector('.pc-sort-strip')).not.toBeNull();
 });
 

@@ -147,16 +147,20 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
     );
   }
   if (view === 'tile') {
-    // Cards: a compact horizontal card — small cover, title and one line of details; tools on hover.
+    // Cards: a compact horizontal card — cover, title and one line of details above; checkbox and tools in a footer.
     return (
-      <div className={`sess-tile pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
-        <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
-        <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
-        <div role="button" tabIndex={0} className="session-main pc-text" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>
-          {title}{meta}
+      <div className={`sess-tile pc-card${flags}${editing ? ' is-editing' : ''}`}>
+        <div className="sess-tile-main">
+          <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
+          <div role="button" tabIndex={0} className="session-main pc-text" aria-label={session.title} onClick={open} onDoubleClick={rename} onKeyDown={keys}>
+            {title}{meta}
+          </div>
         </div>
-        {hiddenMark}
-        <span className="pc-tools">{pin}{menu}</span>
+        <div className="sess-tile-foot">
+          <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
+          {hiddenMark}
+          <span className="pc-tools">{pin}{menu}</span>
+        </div>
       </div>
     );
   }

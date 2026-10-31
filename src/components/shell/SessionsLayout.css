@@ -4,7 +4,7 @@
 /* Card view: a grid of image-first cards; list view: compact rows. */
 .sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; padding: 4px 12px 8px; }
 .sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 /* Grid: the cover on top and the details always visible beneath it, on the theme's surface instead of a veil. */
 .sess-card.pc-card { display: flex; flex-direction: column; aspect-ratio: auto; border: 1px solid var(--border); background: var(--surface); }
 .sess-card.pc-card .pc-open { position: relative; inset: auto; flex: none; height: auto; aspect-ratio: 4 / 3; }
@@ -13,14 +13,21 @@
 .sess-card .pc-info .pc-info-title { display: -webkit-box; font-weight: 500; line-height: 1.3; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 11.5px; }
 .sess-card .pc-hidden-badge { top: 6px; right: auto; bottom: auto; left: 38px; }
-/* Cards: a compact horizontal card — small cover, title and one line of details; tools show on hover. */
-.sess-tile.pc-card { display: flex; align-items: center; gap: 10px; aspect-ratio: auto; padding: 8px; border: 1px solid var(--border); background: var(--surface); }
-.sess-tile .pc-thumb { flex: none; width: 44px; height: 44px; border-radius: 7px; }
+/* Cards: a compact horizontal card — cover, title and details on top; checkbox and tools in a quiet footer, always in view. */
+.sess-tile.pc-card { display: flex; flex-direction: column; gap: 8px; aspect-ratio: auto; padding: 10px 10px 6px; border: 1px solid var(--border); background: var(--surface); }
+.sess-tile-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.sess-tile .pc-thumb { flex: none; width: 48px; height: 48px; border-radius: 8px; }
 .sess-tile .pc-text { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: 0; text-align: left; cursor: pointer; }
 .sess-tile .pc-info-title { font-weight: 500; }
-.sess-tile .pc-check { top: 4px; left: 4px; }
-.sess-tile .pc-tools { top: 50%; right: 8px; transform: translateY(-50%); }
-.sess-tile .pc-tools .icon-btn { border: 0; background: var(--surface-3); color: var(--text-2); backdrop-filter: none; box-shadow: none; }
+.sess-tile-foot { display: flex; align-items: center; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.sess-tile .pc-check, .sess-tile .pc-tools { position: static; }
+.sess-tile .pc-check { display: grid; place-items: center; width: 22px; height: 22px; border: 0; background: none; color: var(--text-3); opacity: 1; }
+.sess-tile .pc-box { width: 14px; height: 14px; border-width: 1.5px; border-radius: 4px; }
+.sess-tile .pc-tools { margin-left: auto; gap: 2px; }
+.sess-tile .pc-hover { opacity: 1; }
+.sess-tile .pc-tools .icon-btn { border: 0; background: none; color: var(--text-3); backdrop-filter: none; box-shadow: none; }
+.sess-tile .pc-tools .icon-btn:hover { color: var(--text); }
+.sess-tile .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
 .sess-tile .pc-hidden-badge { position: static; flex: none; color: var(--text-3); background: none; }
 .sess-card.is-hidden-item .pc-info, .sess-tile.is-hidden-item .pc-text { opacity: .55; }
 .pc-card .pc-open-tag { color: var(--accent); }
