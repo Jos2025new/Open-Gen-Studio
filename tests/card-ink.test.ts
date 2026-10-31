@@ -25,6 +25,6 @@ it('the card ink is the theme’s own page colour (no extra black), kept light o
 it('the tile fade reaches the full ink before the cover ends, and the card is that ink, so no seam or second block shows', () => {
   const css = readFileSync('src/components/ui/PanelControls.css', 'utf8');
   expect(css).toMatch(/\.pc-card\.pc-tile \{[^}]*background: var\(--pc-ink\); \}/);
-  expect(css).toMatch(/\.pc-tile \.pc-open \{[^}]*width: 46%/);
-  expect(css).toMatch(/\.pc-tile \.pc-info \{[^}]*var\(--pc-ink\) 45%\)/);
+  expect(css).toMatch(/\.pc-tile \.pc-open \{[^}]*width: 60%/);
+  expect(css).toMatch(/\.pc-tile \.pc-info \{[^}]*var\(--pc-ink\) 59%\)/);
 });

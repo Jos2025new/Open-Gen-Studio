@@ -228,10 +228,11 @@
 .pc-fade .pc-info-sub, .pc-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; font-size: 12px; }
 .pc-fade .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
 /* Tile (the Cards view): the cover fills the left side and fades into the right side, which carries the same details.
-   The fade eases to the card's own ink before the cover ends (46%), and the card is that ink, so no edge or second block shows. */
+   Like the Grid fade, the cover runs long (60%) and eases into the card's own ink over a wide stretch, so the details
+   sit on a soft fade rather than a band; it reaches the full ink just before the cover ends, so no edge shows. */
 .pc-card.pc-tile { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--pc-ink); }
-.pc-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 46%; height: 100%; }
-.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 12%, color-mix(in srgb, var(--pc-ink) 18%, transparent) 21%, color-mix(in srgb, var(--pc-ink) 48%, transparent) 30%, color-mix(in srgb, var(--pc-ink) 80%, transparent) 38%, var(--pc-ink) 45%); pointer-events: none; }
+.pc-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 60%; height: 100%; }
+.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 14%, color-mix(in srgb, var(--pc-ink) 8%, transparent) 21%, color-mix(in srgb, var(--pc-ink) 22%, transparent) 28%, color-mix(in srgb, var(--pc-ink) 42%, transparent) 35%, color-mix(in srgb, var(--pc-ink) 64%, transparent) 42%, color-mix(in srgb, var(--pc-ink) 82%, transparent) 49%, color-mix(in srgb, var(--pc-ink) 94%, transparent) 55%, var(--pc-ink) 59%); pointer-events: none; }
 .pc-tile .pc-info::before { display: none; }
 .pc-tile .pc-info > * { pointer-events: auto; }
 .pc-tile .pc-info .pc-info-title { display: -webkit-box; font-size: 15px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
