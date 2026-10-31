@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { openPopoverAbove } from '../src/components/ui/Popover';
+import { boundPopoverLeft, boundPopoverWidth, openPopoverAbove } from '../src/components/ui/Popover';
+
+it('keeps popovers within a narrow panel without enlarging smaller menus', () => {
+  expect(boundPopoverWidth(300, 80, 300)).toBe(220);
+  expect(boundPopoverWidth(180, 80, 380)).toBe(180);
+  expect(boundPopoverWidth(300, 80, 80)).toBe(0);
+  expect(boundPopoverLeft(20, 220, 80, 300)).toBe(80);
+  expect(boundPopoverLeft(250, 180, 80, 380)).toBe(200);
+  expect(boundPopoverLeft(100, 180, 80, 380)).toBe(100);
+});
 
 describe('popover vertical placement', () => {
   it('opens below when an anchor near the top has no room above', () => {

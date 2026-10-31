@@ -18,6 +18,15 @@ export function openPopoverAbove(placement: Placement, above: number, below: num
   return above >= contentH || (below < contentH && above >= below);
 }
 
+/** Keep a popover within its available horizontal bounds, including narrow panels. */
+export function boundPopoverWidth(requested: number, left: number, right: number): number {
+  return Math.min(requested, Math.max(0, right - left));
+}
+
+export function boundPopoverLeft(preferred: number, width: number, left: number, right: number): number {
+  return Math.max(left, Math.min(preferred, right - width));
+}
+
 // Open popovers, oldest first. Lets nested popovers keep their parents open.
 const stack: Array<{ id: number; el: () => HTMLElement | null; anchor: () => HTMLElement | null }> = [];
 let seq = 0;
@@ -29,12 +38,14 @@ interface PopoverProps {
   placement?: Placement;
   /** 'content': the box takes its own width (CSS) and is placed by what it measures. */
   width?: number | 'content';
+  align?: 'start' | 'end';
+  boundarySelector?: string;
   className?: string;
   label?: string;
   children: ReactNode;
 }
 
-export function Popover({ open, anchor, onClose, placement = 'top-start', width = 300, className, label, children }: PopoverProps) {
+export function Popover({ open, anchor, onClose, placement = 'top-start', width = 300, align = 'end', boundarySelector, className, label, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const onCloseRef = useRef(onClose);
@@ -48,9 +59,13 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const fit = width === 'content';
-    const w = Math.min(fit ? el.offsetWidth : width, vw - MARGIN * 2);
+    const box = a.closest(boundarySelector ?? '[data-pop-bound], .side-panel, .results-popover, .model-list, .agent-model-pop')?.getBoundingClientRect();
+    const lo = Math.max(MARGIN, box?.left ?? 0);
+    const hi = Math.min(vw - MARGIN, box?.right ?? vw);
+    const start = align === 'start' && placement !== 'right-start' && placement !== 'right-end' ? Math.max(lo, Math.min(r.left, hi)) : lo;
+    const w = boundPopoverWidth(fit ? el.offsetWidth : width, start, hi);
     const contentH = el.scrollHeight;
-    const next: CSSProperties = { ...(fit ? { maxWidth: vw - MARGIN * 2 } : { width: w }), visibility: 'visible' };
+    const next: CSSProperties = { ...(fit ? { maxWidth: Math.max(0, hi - start) } : { width: w }), visibility: 'visible' };
     if (placement === 'right-start') {
       // Beside the anchor, aligned to its top (a rail's flyout).
       next.left = Math.min(r.right + GAP, vw - w - MARGIN);
@@ -61,12 +76,8 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       next.bottom = Math.max(MARGIN, vh - r.bottom);
       next.maxHeight = r.bottom - MARGIN;
     } else {
-      const left = placement === 'bottom-center' || placement === 'top-center' ? r.left + (r.width - w) / 2 : r.right - w;
-      // Inside a [data-pop-bound] box (a chat card) the popover stays within it, never over the rail beside the chat.
-      const box = a.closest('[data-pop-bound]')?.getBoundingClientRect();
-      const lo = Math.max(MARGIN, box?.left ?? 0);
-      const hi = Math.min(vw - MARGIN, box?.right ?? vw);
-      next.left = Math.max(lo, Math.min(left, hi - w));
+      const left = placement === 'bottom-center' || placement === 'top-center' ? r.left + (r.width - w) / 2 : align === 'start' ? r.left : r.right - w;
+      next.left = boundPopoverLeft(left, w, start, hi);
       const above = r.top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;
       const openAbove = openPopoverAbove(placement, above, below, contentH);
@@ -79,7 +90,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       }
     }
     setStyle(next);
-  }, [anchor, placement, width]);
+  }, [anchor, placement, width, align, boundarySelector]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -98,6 +109,8 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
 
   useEffect(() => {
     if (!open) return;
+    const anchorEl = anchor.current;
+    anchorEl?.setAttribute('data-popover-open', '');
     const id = ++seq;
     stack.push({ id, el: () => ref.current, anchor: () => anchor.current });
     const onPointer = (e: PointerEvent) => {
@@ -120,6 +133,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
     document.addEventListener('pointerdown', onPointer, true);
     document.addEventListener('keydown', onKey, true);
     return () => {
+      anchorEl?.removeAttribute('data-popover-open');
       document.removeEventListener('pointerdown', onPointer, true);
       document.removeEventListener('keydown', onKey, true);
       const i = stack.findIndex((s) => s.id === id);

@@ -22,7 +22,7 @@ export function ComposerWorkspaceMenu() {
     <button type="button" ref={pop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={pop.open} onClick={pop.toggle}>
       {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
     </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={240} label="Canvases">
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={240} align="start" boundarySelector=".composer-dock" label="Canvases">
       <div className="menu" role="menu"><WorkspaceMenuItems workspace={workspace} onClose={pop.close} /></div>
     </Popover>
   </>;

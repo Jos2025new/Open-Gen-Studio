@@ -13,7 +13,7 @@ export function FilterMenu<T extends string>({ label, icon, value, options, onCh
         <span className="ml-filter-label">{label}</span>
         <ChevronDown size={12} />
       </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={200} label={label}>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={200} label={label}>
         <div className="menu">
           {options.map(([id, text]) => (
             <MenuItem key={id} label={text} active={id === value} right={id === value ? <Check size={13} /> : null} onClick={() => { onChange(id); pop.close(); }} />
