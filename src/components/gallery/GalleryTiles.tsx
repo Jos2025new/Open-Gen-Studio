@@ -32,11 +32,14 @@ function AssetMenuItems({ asset, g, close, inRow }: { asset: Asset; g?: Generati
   if (confirming) return <MenuConfirm text="Delete this asset? The file is removed from this browser." action="Delete" onCancel={() => setConfirming(false)} onConfirm={() => { deleteAssets([asset.id]); close(); }} />;
   const run = (f: () => void) => () => { f(); close(); };
   return <>
-    {inRow ? null : <MenuItem icon={Download} onClick={run(() => void downloadAsset(asset.id))}>Download</MenuItem>}
     <MenuItem icon={Paperclip} onClick={run(() => useAsReference(asset.id))}>Use as reference</MenuItem>
     {!inRow && AGENT_ATTACHABLE.includes(asset.kind) ? <MenuItem icon={Bot} onClick={run(() => toggleAgentAttachment(asset.id))}>{inContext ? 'Remove from the agent context' : 'Add to the agent context'}</MenuItem> : null}
     {g && canReuse(g) ? <MenuItem icon={RotateCcw} onClick={run(() => void reuseGeneration(g))}>Reusar</MenuItem> : null}
-    {inRow ? null : <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>}
+    {inRow ? null : <>
+      <hr className="pc-menu-sep" />
+      <MenuItem icon={Download} onClick={run(() => void downloadAsset(asset.id))}>Download</MenuItem>
+      <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
+    </>}
     <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>Delete</MenuItem>
   </>;
 }

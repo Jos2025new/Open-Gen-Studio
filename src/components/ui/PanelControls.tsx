@@ -132,18 +132,18 @@ export function GroupCheck({ label, state, onToggle }: { label: string; state: '
 }
 
 export function MenuItem({ icon: Icon, children, tone, disabled, selected, onClick }: { icon?: LucideIcon; children: ReactNode; tone?: 'danger'; disabled?: boolean; /** Marks the current choice of a menu of sources. */ selected?: boolean; onClick: () => void }) {
-  return <button type="button" role="menuitem" aria-current={selected ? 'true' : undefined} className={`pc-menu-item${tone ? ` tone-${tone}` : ''}${selected ? ' is-on' : ''}`} disabled={disabled} onClick={onClick}>{Icon ? <Icon size={14} strokeWidth={1.75} /> : null}{children}</button>;
+  return <button type="button" role="menuitem" aria-current={selected ? 'true' : undefined} className={`pc-menu-item${tone ? ` tone-${tone}` : ''}${selected ? ' is-on' : ''}`} disabled={disabled} onClick={onClick}>{Icon ? <Icon size={16} strokeWidth={1.75} /> : null}{children}</button>;
 }
 
 /** Evaluates a render function only while the menu is open, so closed cards pay nothing for their menu items. */
 function Lazy({ render }: { render: () => ReactNode }) { return <>{render()}</>; }
 
-/** The ⋮ button of a card or row and the popover with its secondary actions. */
+/** The ⋮ button of a card or row and the popover with its secondary actions; it opens outward from the button, not over the card. */
 export function CardMenu({ label, children, className }: { label: string; className?: string; children: (close: () => void) => ReactNode }) {
   const pop = usePopover();
   return <>
     <IconButton ref={pop.ref} icon={EllipsisVertical} label={label} size="sm" className={`pc-more ${className ?? ''}`} aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={(e) => { e.stopPropagation(); pop.toggle(); }} onDoubleClick={(e) => e.stopPropagation()} />
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={220} placement="bottom-start" label={label}>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={236} placement="bottom-start" align="start" className="pc-menu-pop" label={label}>
       <div className="pc-menu" role="menu"><Lazy render={() => children(pop.close)} /></div>
     </Popover>
   </>;

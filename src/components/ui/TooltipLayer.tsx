@@ -15,7 +15,8 @@ export function TooltipLayer() {
   useEffect(() => {
     const show = (el: HTMLElement) => {
       const text = el.getAttribute('data-tip');
-      if (!text) return;
+      // The anchor of an open popover needs no tooltip: it would cover the popover it opened.
+      if (!text || el.hasAttribute('data-popover-open')) return;
       const r = el.getBoundingClientRect();
       const side = el.getAttribute('data-tip-side') === 'right' ? 'right' : 'top';
       setTip(side === 'right' ? { text, x: r.right + 10, y: r.top + r.height / 2, below: r.bottom + 6, side } : { text, x: r.left, y: r.top - 6, below: r.bottom + 6, side });

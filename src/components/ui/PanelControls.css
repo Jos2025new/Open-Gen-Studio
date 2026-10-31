@@ -12,14 +12,20 @@
 .pc-split { display: flex; flex: 1; min-height: 0; }
 .pc-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
 
+/* Menus read like a native context menu: roomy rows, 16px icons, groups split by hairlines, the destructive action last and red. */
 .pc-menu { display: flex; flex-direction: column; gap: 1px; }
-.pc-menu-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border-radius: var(--radius-s); color: var(--text-2); font-size: 12px; text-align: left; }
-.pc-menu-item:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
-.pc-menu-item.tone-danger:hover:not(:disabled) { color: var(--danger); }
+.popover.pc-menu-pop { padding: 6px; border-radius: 14px; }
+.pc-menu-item { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 11px; border-radius: 8px; color: var(--text); font-size: 13px; text-align: left; }
+.pc-menu-item svg { flex: none; color: var(--text-2); }
+.pc-menu-item:hover:not(:disabled) { background: var(--surface-3); }
+.pc-menu-item:hover:not(:disabled) svg { color: var(--text); }
+.pc-menu-item.tone-danger, .pc-menu-item.tone-danger svg { color: var(--danger); }
+.pc-menu > .pc-menu-item.tone-danger:not(:first-child) { margin-top: 9px; }
+.pc-menu > .pc-menu-item.tone-danger:not(:first-child)::before { content: ''; position: absolute; top: -5px; left: 6px; right: 6px; border-top: 1px solid var(--border); }
 .pc-menu-item:disabled { opacity: .45; }
 .pc-menu-item.is-on { color: var(--text); background: var(--surface-2); }
 .pc-menu-item .pc-count { margin-left: auto; color: var(--text-3); font-size: 11px; }
-.pc-menu-sep { width: 100%; margin: 3px 0; border: 0; border-top: 1px solid var(--border); }
+.pc-menu-sep { width: calc(100% - 12px); margin: 4px 6px; border: 0; border-top: 1px solid var(--border); }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
 .pc-card { --pc-btn-bg: rgba(255, 255, 255, .16); --pc-btn-bg-hover: rgba(255, 255, 255, .28); --pc-btn-fg: #fff; position: relative; aspect-ratio: 1; overflow: hidden; border: 0; border-radius: 10px; background: var(--surface-2); }
