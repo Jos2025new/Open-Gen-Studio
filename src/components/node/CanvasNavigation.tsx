@@ -7,7 +7,8 @@ import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } fro
 import { nodeOutputAsset } from '../../engine/flow/graph';
 import { generationTitle } from '../assets/GenerationInfo';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { IconButton, MenuItem, Range } from '../ui/primitives';
+import { IconButton, MenuItem } from '../ui/primitives';
+import { InlineSlider } from '../designer/InlineControls';
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
 
 export type NodeTool = 'select' | 'pan' | 'cut';
@@ -15,30 +16,13 @@ export type NodeTool = 'select' | 'pan' | 'cut';
 /** Nodes zooms as far as the Designer: 5% to its MAX_ZOOM (3200%). */
 export const NODE_MIN_ZOOM = 0.05;
 export const NODE_MAX_ZOOM = MAX_ZOOM;
-/** The zoom slider runs on a log scale, so each stretch of it doubles or halves the view, from 5% to 3200%. */
-const zoomToSlider = (z: number) => Math.log2(z);
-const sliderToZoom = (v: number) => Math.min(NODE_MAX_ZOOM, Math.max(NODE_MIN_ZOOM, 2 ** v));
-
-/** The zoom popover: −, the percent as a field (type a value, Enter applies, Escape restores), +, and a slider. */
+/** The zoom popover: −, the app's slider on a log scale (drag, scroll or type the percent), +. */
 export function ZoomControls({ zoom, onZoom }: { zoom: number; onZoom: (z: number) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const apply = (raw: string) => {
-    const percent = Number(raw.trim().replace(',', '.').replace('%', ''));
-    setDraft(null);
-    if (raw.trim() && Number.isFinite(percent)) onZoom(Math.min(NODE_MAX_ZOOM, Math.max(NODE_MIN_ZOOM, percent / 100)));
-  };
+  const step = (by: number) => onZoom(Math.min(NODE_MAX_ZOOM, Math.max(NODE_MIN_ZOOM, zoom * by)));
   return <div className="canvas-zoom-controls">
-    <div className="canvas-zoom-row">
-      <IconButton icon={Minus} label="Zoom out" onClick={() => onZoom(sliderToZoom(zoomToSlider(zoom) - 0.5))} />
-      <label className="canvas-zoom-value num">
-        <input aria-label="Zoom percent" inputMode="decimal" value={draft ?? Math.round(zoom * 100)} onFocus={(e) => { setDraft(String(Math.round(zoom * 100))); e.currentTarget.select(); }} onChange={(e) => setDraft(e.target.value)} onBlur={(e) => apply(e.target.value)} onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-          if (e.key === 'Escape') { e.stopPropagation(); setDraft(String(Math.round(zoom * 100))); e.currentTarget.value = String(Math.round(zoom * 100)); e.currentTarget.blur(); }
-        }} /><span>%</span>
-      </label>
-      <IconButton icon={Plus} label="Zoom in" onClick={() => onZoom(sliderToZoom(zoomToSlider(zoom) + 0.5))} />
-    </div>
-    <Range className="canvas-zoom-slider" aria-label="Zoom slider" min={zoomToSlider(NODE_MIN_ZOOM)} max={zoomToSlider(NODE_MAX_ZOOM)} step={0.01} value={zoomToSlider(zoom)} onChange={(e) => onZoom(sliderToZoom(+e.target.value))} />
+    <IconButton icon={Minus} label="Zoom out" onClick={() => step(1 / Math.SQRT2)} />
+    <InlineSlider label="Zoom" value={zoom} min={NODE_MIN_ZOOM} max={NODE_MAX_ZOOM} scale={100} unit="%" log onChange={onZoom} />
+    <IconButton icon={Plus} label="Zoom in" onClick={() => step(Math.SQRT2)} />
   </div>;
 }
 

@@ -52,7 +52,7 @@ Promesas del producto (las mismas que en [Studio](../studio-controles/dependenci
 
 | Origen | Destino | Cómo se propaga | Promesa tocada |
 | --- | --- | --- | --- |
-| Ejecución en curso | Undo/Redo, borrado de nodos, «Delete asset» | `lockNodes`, `lockAssets`, `writingNodes` (`locks.ts:20`); el Undo se bloquea en `CanvasNavigation.tsx:102` | P3: el botón Undo queda desactivado sin motivo visible; el borrado sí avisa (hallazgo H10: viene de la regla de `353628e`, sustituida por `b35a933` para editar; sigue existiendo y no consta si es intencional, requiere decisión) |
+| Ejecución en curso | Undo/Redo, borrado de nodos, «Delete asset» | `lockNodes`, `lockAssets`, `writingNodes` (`locks.ts:20`); el Undo se bloquea en `CanvasNavigation.tsx:86` | P3: el botón Undo queda desactivado sin motivo visible; el borrado sí avisa (hallazgo H10: viene de la regla de `353628e`, sustituida por `b35a933` para editar; sigue existiendo y no consta si es intencional, requiere decisión) |
 | Borrado de nodos (cualquier vía) | Aviso del hilo con Undo | `deleteNodes` añade un aviso con copia de nodos y enlaces (`flow/actions.ts:90`) | P3: «Results remain in the gallery» es verdadero |
 | Resultado nuevo (`generationId`) | Historial | No genera entrada (se ignora en la comparación, `flow/history.ts:18`) | Deshacer no pierde resultados |
 | Selección del lienzo | Contexto del agente | `setNodeSelection` | Solo contexto |

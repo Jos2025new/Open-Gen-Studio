@@ -22,13 +22,13 @@ it('the top bar keeps only Run all; Add node, Auto layout and Fit view live in t
   expect(ws).toMatch(/<IconButton ref=\{pop\.ref\} icon=\{Plus\} label="Add node"/);
 });
 
-it('Nodes zooms as far as the Designer, and the zoom popover has a typed percent and a slider, no Fit view', () => {
+it('Nodes zooms as far as the Designer, and the zoom popover uses the app’s one slider (log scale, typed percent), no Fit view', () => {
   expect(nav).toMatch(/NODE_MIN_ZOOM = 0\.05/);
   expect(nav).toMatch(/NODE_MAX_ZOOM = MAX_ZOOM/);
   expect(ws).toMatch(/minZoom=\{NODE_MIN_ZOOM\}\s*maxZoom=\{NODE_MAX_ZOOM\}/);
   const pop = nav.slice(nav.indexOf('function ZoomControls'), nav.indexOf('function Highlight'));
-  expect(pop).toContain('aria-label="Zoom percent"');
-  expect(pop).toContain('aria-label="Zoom slider"');
+  expect(pop).toMatch(/<InlineSlider label="Zoom"[^>]* log /);
+  expect(pop).not.toMatch(/<Range|type="range"/);
   expect(pop).not.toMatch(/Fit view|Maximize/);
   const popover = nav.slice(nav.indexOf('<Popover open={zoomPop.open}'), nav.indexOf('<Popover open={searchPop.open}'));
   expect(popover).toContain('<ZoomControls');

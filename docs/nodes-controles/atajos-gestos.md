@@ -12,8 +12,8 @@ El listado oficial (Ajustes › Shortcuts) tiene un grupo «Nodes» con 6 línea
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
-| Ctrl/⌘+Z | `CanvasNavigation.tsx:114` | Lienzo completo; no actúa dentro de campos de texto | `blocked` | Deshacer | Grafo | Listado: «Mod + Z — Undo». No hace nada ni avisa si hay una ejecución |
-| Ctrl/⌘+Y y Ctrl/⌘+Mayús+Z | `CanvasNavigation.tsx:117` | Igual | Igual | Rehacer | Grafo | Listado: «Mod + Y — Redo (also Mod + Shift + Z)» |
+| Ctrl/⌘+Z | `CanvasNavigation.tsx:98` | Lienzo completo; no actúa dentro de campos de texto | `blocked` | Deshacer | Grafo | Listado: «Mod + Z — Undo». No hace nada ni avisa si hay una ejecución |
+| Ctrl/⌘+Y y Ctrl/⌘+Mayús+Z | `CanvasNavigation.tsx:101` | Igual | Igual | Rehacer | Grafo | Listado: «Mod + Y — Redo (also Mod + Shift + Z)» |
 | Ctrl/⌘+C | `NodeWorkspace.tsx:371` | Foco en el lienzo, nodos seleccionados, nada de texto seleccionado en la página, fuera de campos de texto | `selected`, `insideRef` | `copyNodes` y toast | Portapapeles interno | Listado: «Mod + C / X / V» |
 | Ctrl/⌘+X | `NodeWorkspace.tsx:372` | Igual | Igual | `cutNodes` y vacía la selección | Grafo | Borra sin confirmar |
 | X (sin modificador) | `NodeWorkspace.tsx:384` | Lienzo completo con el foco dentro, fuera de campos de texto | `tool` | Toma o suelta la tijera (Cut connections); Escape también la suelta | Herramienta del lienzo | Desde 2026-10-31; sale en Ajustes → Shortcuts |
@@ -31,7 +31,7 @@ El listado oficial (Ajustes › Shortcuts) tiene un grupo «Nodes» con 6 línea
 | Doble pulsación mantenida en el fondo | `NodeWorkspace.tsx:121` | Herramienta Pan | 350 ms y 12 px | Caja de selección | Selección | Se descubre solo por el consejo del botón Pan |
 | Botón medio o derecho + arrastre | `NodeWorkspace.tsx:461` | Herramienta Select | — | Pan | Vista | Dicho en el consejo del botón Select |
 | Clic derecho en el fondo / en un nodo | `NodeWorkspace.tsx:441` | Lienzo completo | Posición | Menú Add node / menú de nodo (Duplicate, Delete) | Grafo | Sin menú en el tablero de Studio |
-| Clic derecho en Undo o Redo | `CanvasNavigation.tsx:102` | Panel de navegación | `past`/`future` | Lista de historial | Grafo | Dicho en la etiqueta («right-click for history») |
+| Clic derecho en Undo o Redo | `CanvasNavigation.tsx:86` | Panel de navegación | `past`/`future` | Lista de historial | Grafo | Dicho en la etiqueta («right-click for history») |
 | Doble clic en el título de un nodo / de un grupo | `nodes.tsx:754` | Tarjeta o marco | — | Renombrar | Nombre | Consejo «Double-click to rename» (atributo `title`, aparece al pasar el puntero) |
 | Doble clic en el cuerpo de un nodo | `nodes.tsx:810` | Nodo con resultado | — | Abre el visor | Visor | Sin aviso en pantalla |
 | Arrastrar un asset sobre el lienzo | `NodeWorkspace.tsx:407` | Lienzo completo | — | Crea un nodo Asset (o 3D) donde se suelta | Grafo | Sin pista visual en el lienzo: la pista dice «Drag one from the gallery onto the canvas» en el menú Asset |
