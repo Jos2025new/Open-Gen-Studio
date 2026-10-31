@@ -26,7 +26,8 @@ beforeEach(() => {
   const s = createSession('Night market');
   sid = s.id;
   const asset = { id: 'a1', kind: 'image', origin: 'generated', createdAt: 5, favorite: false, width: 10, height: 10, stored: true, sessionId: sid, generationId: 'g1' } as unknown as Asset;
-  useStore.setState({ sessions: { [sid]: s }, activeSessionId: sid, generations: { g1: gen('g1', 'done', 1), g2: gen('g2', 'running', 2) }, assets: { a1: asset }, spendLog: [{ at: 1, usd: 0.4, estimated: false, category: 'generation', provider: 'demo', model: 'M', sessionId: sid }, { at: 1, usd: 9, estimated: false, category: 'generation', provider: 'demo', model: 'M', sessionId: 'other' }] as never });
+  useStore.setState((st) => ({ settings: { ...st.settings, budgetOn: false } }));
+  useStore.setState({ sessions: { [sid]: s }, activeSessionId: sid, generations: { g1: gen('g1', 'done', 1), g2: gen('g2', 'running', 2) }, assets: { a1: asset }, spendLog: [{ at: 1, usd: 0.4, estimated: false, category: 'image', provider: 'demo', model: 'M', sessionId: sid }, { at: 1, usd: 9, estimated: false, category: 'image', provider: 'demo', model: 'M', sessionId: 'other' }] as never });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; });
@@ -38,13 +39,24 @@ it('session info shows this session only: usage, what is running with its status
   const pop = document.querySelector('.si')!;
   expect(pop.querySelector('.si-title')?.textContent).toBe('Night market');
   expect([...pop.querySelectorAll('section')].map((s) => s.getAttribute('aria-label'))).toEqual(['Usage', 'Running', 'Results']);
-  expect(pop.textContent).toContain('Spent$0.4');
+  expect([...pop.querySelectorAll('.si-tile')].map((t) => t.textContent)).toEqual(['Spent$0.4', 'Agent$0', 'Media$0.4']);
+  expect([...pop.querySelectorAll('.si-bars li')].map((l) => l.textContent)).toEqual(['Images ×1$0.4']);
+  expect(pop.querySelector('.si-budget')).toBeNull();
   expect(pop.querySelector('.si-gen [aria-label="Running"]')?.closest('.si-row')?.textContent).toContain('Prompt g2');
   expect(pop.querySelectorAll('.si-file')).toHaveLength(1);
   expect(pop.querySelector('.si-gen small')?.textContent).toMatch(/^M · 1:1 · /);
   expect(pop.querySelector('.si-file small')?.textContent).toBe('Image · 10×10 · M');
   click([...pop.querySelectorAll('button')].find((b) => b.textContent === 'View all'));
   expect(onGenerations).toHaveBeenCalled();
+});
+
+it('with a spending limit on, session info shows the budget counter, and Spending details opens the Spending panel', () => {
+  useStore.setState((st) => ({ spentUsd: 1.27, settings: { ...st.settings, budgetOn: true, budgetUsd: 25 } }));
+  act(() => root.render(createElement(SessionInfo, { onGenerations: () => undefined })));
+  click(byLabel('Session info'));
+  expect(document.querySelector('.si-budget')?.textContent).toContain('$1.27 of $25 · $23.73 left');
+  click([...document.querySelectorAll('.si-more')].find((b) => b.textContent === 'Spending details'));
+  expect(useStore.getState().ui.panel).toBe('spending');
 });
 
 it('the ⋯ menu groups the session actions with Delete last, behind a confirmation', () => {

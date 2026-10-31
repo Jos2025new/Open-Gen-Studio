@@ -22,3 +22,17 @@
 .si-two { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; padding: 4px 0; }
 .si-two small { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .si-thumb { width: 30px; height: 30px; }
+/* Usage as a mini dashboard: three figures, spend by type with thin bars, the budget counter (all sessions). */
+.si-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 2px 8px 8px; }
+.si-tile { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 8px; background: var(--surface-3); }
+.si-tile span { font-size: 11px; color: var(--text-3); }
+.si-tile b { font-size: 14px; font-weight: 600; color: var(--text); }
+.si-bars { list-style: none; margin: 0 8px 6px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.si-bars li { display: grid; grid-template-columns: 1fr auto; row-gap: 3px; font-size: 12px; color: var(--text-2); }
+.si-bars small { color: var(--text-3); font-size: 11px; }
+.si-bars b { font-weight: 500; color: var(--text); }
+.si-bars i { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: var(--text-3); opacity: .55; }
+.si-budget { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin: 2px 8px 6px; font-size: 11px; color: var(--text-3); }
+.si-budget .num { text-align: right; color: var(--text-2); }
+.si-budget > i { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.si-budget > i > b { display: block; height: 100%; background: var(--accent); }
