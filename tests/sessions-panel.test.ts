@@ -7,6 +7,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { SessionsPanel } from '../src/components/shell/SessionsPanel';
 import { createSession, useStore } from '../src/store/store';
+import { setUserHidden } from '../src/store/userHidden';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -93,7 +94,7 @@ describe('Sessions top bar', () => {
     const zone = q('.pc-bar .pc-right');
     const btns = [...zone.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
     expect(btns[btns.length - 1]).toBe('Show archived');
-    expect(btns).toContain('Hide thumbnails');
+    expect(btns).toContain('Show hidden');
     const arch = q<HTMLButtonElement>('[aria-label="Show archived"]');
     expect(arch.getAttribute('aria-pressed')).toBe('false');
     expect(arch.getAttribute('data-tip')).toContain('0');
@@ -112,7 +113,7 @@ describe('Sessions top bar', () => {
     expect(zones).toHaveLength(3);
     expect(zones[1].classList.contains('pc-center')).toBe(true);
     expect(zones[1].querySelector('[aria-label="Videos"]')).not.toBeNull();
-    for (const l of ['Grid size', 'List view', 'Hide thumbnails']) expect(zones[2].querySelector(`[aria-label="${l}"]`)).not.toBeNull();
+    for (const l of ['Grid size', 'List view', 'Show hidden']) expect(zones[2].querySelector(`[aria-label="${l}"]`)).not.toBeNull();
   });
 
   it('list and card views are remembered; old values mean card', () => {
@@ -156,7 +157,7 @@ describe('Sessions cards', () => {
 
   it('the menu renames, archives and deletes with a contextual confirmation', () => {
     click(card('Alpha').querySelector('[aria-label="Session actions"]'));
-    expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Rename', 'Archive session', 'Delete']);
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(['Rename', 'Archive session', 'Hide', 'Delete']);
     click(item('Archive session'));
     expect(useStore.getState().sessions[ids.Alpha].archived).toBe(true);
     click(card('Charlie').querySelector('[aria-label="Session actions"]'));
@@ -189,6 +190,43 @@ describe('Sessions cards', () => {
     click(q('.sess-row [role="checkbox"]'));
     dbl(q('.sess-row .session-main'));
     expect(host.querySelector('input[aria-label="Session title"]')).toBeNull();
+  });
+
+  it('Hide removes a session from the panel; the eye shows it dimmed with a badge; Unhide restores it', () => {
+    click(card('Alpha').querySelector('[aria-label="Session actions"]'));
+    click(item('Hide'));
+    expect(useStore.getState().sessions[ids.Alpha].userHidden).toBe(true);
+    expect(useStore.getState().sessions[ids.Alpha].hidden).toBeUndefined(); // not the Space-container flag
+    expect(titles()).toEqual(['Bravo', 'Charlie']);
+    const eye = q<HTMLButtonElement>('[aria-label="Show hidden"]');
+    expect(eye.getAttribute('aria-pressed')).toBe('false');
+    expect(eye.getAttribute('data-tip')).toContain('1');
+    click(eye);
+    expect(eye.getAttribute('aria-label')).toBe('Hide hidden');
+    expect(titles()).toHaveLength(3);
+    expect(card('Alpha').classList.contains('is-hidden-item')).toBe(true);
+    expect(card('Alpha').querySelector('.pc-hidden-badge')).not.toBeNull();
+    expect(card('Bravo').querySelector('.pc-hidden-badge')).toBeNull();
+    click(card('Alpha').querySelector('[aria-label="Session actions"]'));
+    click(item('Unhide'));
+    expect(useStore.getState().sessions[ids.Alpha].userHidden).toBeUndefined();
+    expect(card('Alpha').classList.contains('is-hidden-item')).toBe(false);
+  });
+
+  it('the selection bar hides and unhides the selected sessions; Space containers are never touched', () => {
+    const space = createSession('Space container'); space.hidden = true;
+    act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [space.id]: space } })));
+    click(card('Charlie').querySelector('[role="checkbox"]'));
+    click(card('Alpha').querySelector('[role="checkbox"]'));
+    click(q('.session-bar [aria-label="Hide"]'));
+    expect(titles()).toEqual(['Bravo']);
+    act(() => setUserHidden('session', [space.id], true));
+    expect(useStore.getState().sessions[space.id].userHidden).toBeUndefined();
+    click(q('[aria-label="Show hidden"]'));
+    click(card('Charlie').querySelector('[role="checkbox"]'));
+    expect(q('.session-bar [aria-label="Unhide"]')).not.toBeNull();
+    click(q('.session-bar [aria-label="Unhide"]'));
+    expect(useStore.getState().sessions[ids.Charlie].userHidden).toBeUndefined();
   });
 
   it('a touch tap reveals the overlay first and opens on the second tap; a mouse click opens', () => {

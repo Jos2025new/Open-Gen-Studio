@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowDownAZ, ArrowUpZA, Box, ExternalLink, Grid2X2, Maximize2, Minimize2, Palette, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
+import { ArrowDownAZ, ArrowUpZA, Box, ExternalLink, Eye, EyeOff, Grid2X2, Maximize2, Minimize2, Palette, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
+import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
 import { IconButton } from '../ui/primitives';
 import { InlineSlider } from '../designer/InlineControls';
@@ -8,7 +9,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import type { Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { usePref } from '../ui/hooks';
-import { SearchToggle, CardMenu, CategoryRail, MenuConfirm, MenuItem, Sep, ViewToggle, asItemView, useTapReveal, type ItemView, type RailItem } from '../ui/PanelControls';
+import { HiddenToggle, SearchToggle, CardMenu, CategoryRail, MenuConfirm, MenuItem, Sep, ViewToggle, asItemView, useTapReveal, type ItemView, type RailItem } from '../ui/PanelControls';
 import { GeneratedAssets } from './GeneratedAssets';
 import './GalleryLayout.css';
 
@@ -45,8 +46,9 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
   const { expanded } = usePanelExpanded();
   const [q, setQ] = useState('');
   const [asc, setAsc] = useState(true);
+  const [showHidden, setShowHidden] = useState(false);
   const needle = q.trim().toLowerCase();
-  const list = library.filter((x) => (x.kind ?? 'character') === kind && x.name.toLowerCase().includes(needle)).sort((a, b) => (asc ? 1 : -1) * a.name.localeCompare(b.name));
+  const list = library.filter((x) => (x.kind ?? 'character') === kind && x.name.toLowerCase().includes(needle) && (showHidden || !x.userHidden)).sort((a, b) => (asc ? 1 : -1) * a.name.localeCompare(b.name));
   return (
     <>
       <div className="gallery-controls generated-controls">
@@ -61,6 +63,7 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
               <Sep />
             </> : null}
             <ViewToggle value={view} onChange={setView} />
+            <HiddenToggle showing={showHidden} count={library.filter((x) => x.userHidden).length} onChange={setShowHidden} />
           </div>
         </div>
       </div>
@@ -89,25 +92,27 @@ function LibraryTile({ item, view }: { item: Subject; view: ItemView }) {
   const open = () => cover && setUi({ lightbox: { assetIds: [cover, ...item.refAssetIds], index: 0 } });
   const tap = useTapReveal(open);
   const [confirming, setConfirming] = useState(false);
+  const hiddenMark = item.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
   const menu = <span className="pc-tools"><CardMenu label={`More actions for @${item.name}`} className="pc-hover">{(close) => confirming
     ? <MenuConfirm text={`Remove @${item.name} from the library? Its images stay in Generated.`} action="Remove" onCancel={() => setConfirming(false)} onConfirm={() => { deleteSubject(item.id); close(); }} />
     : <>
       <MenuItem icon={ExternalLink} disabled={!cover} onClick={() => { open(); close(); }}>{`Open @${item.name}`}</MenuItem>
+      <MenuItem icon={item.userHidden ? Eye : EyeOff} onClick={() => { setUserHidden('subject', [item.id], !item.userHidden); close(); }}>{item.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
       <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>{`Remove @${item.name} from the library`}</MenuItem>
     </>}</CardMenu></span>;
   if (view === 'list') {
-    return <div className="g-tile lib-tile pc-row">
+    return <div className={`g-tile lib-tile pc-row${item.userHidden ? ' is-hidden-item' : ''}`}>
       <button type="button" className="g-open pc-thumb" aria-label={`Open @${item.name}`} onClick={open}>{cover ? <AssetMedia assetId={cover} hoverPlay={false} /> : null}</button>
       <span className="pc-text"><span className="pc-info-title">@{item.name}</span><span className="pc-info-sub">{item.description || SUBJECT_KINDS.find((k) => k.value === (item.kind ?? 'character'))?.label}</span></span>
-      {menu}
+      {hiddenMark}{menu}
     </div>;
   }
   return (
-    <div className={`g-tile lib-tile pc-card${tap.armed ? ' is-armed' : ''}`}>
+    <div className={`g-tile lib-tile pc-card${item.userHidden ? ' is-hidden-item' : ''}${tap.armed ? ' is-armed' : ''}`}>
       <button type="button" className="g-open" aria-label={`Open @${item.name}`} onPointerDown={tap.onPointerDown} onClick={tap.onClick}>
         {cover ? <AssetMedia assetId={cover} /> : null}
       </button>
-      {menu}
+      {menu}{hiddenMark}
       <div className="pc-info pc-hover"><span className="pc-info-title">@{item.name}</span></div>
     </div>
   );

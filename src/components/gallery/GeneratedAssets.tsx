@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AudioLines, Box, Download, Film, Folder, Image, ListFilter, MessageSquare, Paperclip, Trash, X } from 'lucide-react';
+import { AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Image, ListFilter, MessageSquare, Paperclip, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -13,7 +13,8 @@ import { usePanelExpanded } from '../shell/panelEmbed';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 import { ResultsMenu } from '../ui/ResultsMenu';
-import { SearchToggle, Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
+import { ArchivedToggle, HiddenToggle, SearchToggle, Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
+import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
 
@@ -36,6 +37,8 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
   const [favOnly, setFavOnly] = useState(false);
   const [sort, setSort] = useState<SortState>({ by: 'date', asc: false });
   const [group, setGroup] = useState<'date' | 'session'>('date');
+  const [showHidden, setShowHidden] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const del = usePopover();
 
@@ -44,7 +47,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
   const sessions = useStore((s) => s.sessions);
   const [canvas, setCanvas] = useState<CanvasFilterValue>('all');
   const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
-  const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (scope === 'session' ? a.sessionId === sessionId : true)), [assets, scope, sessionId]);
+  const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (scope === 'session' ? a.sessionId === sessionId : true) && (showHidden || !a.userHidden) && (showArchived || !sessions[a.sessionId]?.archived)), [assets, scope, sessionId, showHidden, showArchived, sessions]);
   const dir = sort.asc ? 1 : -1;
   const order = <T extends { title: string; createdAt: number }>(a: T, b: T) => sort.by === 'name' ? dir * a.title.localeCompare(b.title) : dir * (a.createdAt - b.createdAt);
   const list = useMemo(() => {
@@ -63,7 +66,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
       .sort(order).map((x) => x.a);
   }, [inScope, canvas, where, generations, q, kind, favOnly, sort, place, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const texts = useMemo(() => Object.values(generations).filter((g) => g.kind === 'text' && g.status === 'done' && !g.discard
-    && (scope === 'all' || g.sessionId === sessionId)), [generations, scope, sessionId]);
+    && (scope === 'all' || g.sessionId === sessionId) && (showArchived || !sessions[g.sessionId]?.archived)), [generations, scope, sessionId, showArchived, sessions]);
   const canvasCounts = useMemo(() => {
     const c = { all: inScope.length + texts.length, chat: 0, node: 0, designer: 0 };
     for (const a of inScope) c[where.asset(a)]++;
@@ -95,6 +98,8 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
   }, new Map<string, typeof results>())).map(([id, items]) => ({ label: sessions[id]?.title ?? 'Unknown session', id, items }))
     : sort.by === 'name' ? [{ label: '', id: 'name', items: results }] : groupByDate(results, (a) => a.createdAt).map((g) => ({ ...g, id: g.label }));
 
+  const hiddenCount = useMemo(() => Object.values(assets).filter((a) => a.userHidden).length, [assets]);
+  const archivedCount = useMemo(() => Object.values(assets).filter((a) => sessions[a.sessionId]?.archived).length, [assets, sessions]);
   const ids = [...selected].filter((id) => assets[id]);
   const selecting = ids.length > 0;
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -103,6 +108,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
     setUi({ lightbox: { assetIds: list.map((x) => x.id), index: list.findIndex((x) => x.id === a.id) } });
   };
   const filtered = canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all';
+  const allHidden = ids.length > 0 && ids.every((id) => assets[id]?.userHidden);
   const allPicked = list.length > 0 && list.every((a) => selected.has(a.id));
 
   return (
@@ -138,6 +144,8 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
               <Sep />
             </> : null}
             <ViewToggle value={view} onChange={setView} />
+            <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
+            <ArchivedToggle showing={showArchived} count={archivedCount} onChange={(v) => { setShowArchived(v); setSelected(new Set()); }} />
           </div>
         </div>
       </div>
@@ -165,6 +173,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
             <span className="spacer" />
             {/* All selects everything; pressed again with everything selected, it clears the selection. */}
             <Button size="sm" variant="ghost" onClick={() => setSelected(allPicked ? new Set() : new Set(list.map((a) => a.id)))}>{allPicked ? 'None' : 'All'}</Button>
+            <IconButton icon={allHidden ? Eye : EyeOff} label={allHidden ? 'Unhide' : 'Hide'} size="sm" onClick={() => { setUserHidden('asset', ids, !allHidden); setSelected(new Set()); }} />
             <IconButton icon={Paperclip} label="Use as references" size="sm" onClick={() => ids.forEach((id) => useAsReference(id))} />
             <IconButton icon={Download} label="Download" size="sm" onClick={() => ids.forEach((id) => void downloadAsset(id))} />
             <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={del.toggle} />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowDownAZ, Search, X, ArrowUpZA, CalendarArrowDown, CalendarArrowUp, Check, EllipsisVertical, LayoutGrid, List, type LucideIcon } from 'lucide-react';
+import { Archive, ArrowDownAZ, Eye, EyeOff, Search, X, ArrowUpZA, CalendarArrowDown, CalendarArrowUp, Check, EllipsisVertical, LayoutGrid, List, type LucideIcon } from 'lucide-react';
 import { Button, IconButton } from './primitives';
 import { Popover, usePopover } from './Popover';
 import './PanelControls.css';
@@ -23,6 +23,16 @@ export function SearchToggle({ value, onChange, placeholder, inputLabel }: { val
       </div>
     ) : null}
   </>;
+}
+
+/** Eye toggle: shows items the user hid (dimmed, with a badge) while on. */
+export function HiddenToggle({ showing, count, onChange }: { showing: boolean; count: number; onChange: (v: boolean) => void }) {
+  return <IconButton icon={showing ? Eye : EyeOff} label={showing ? 'Hide hidden' : 'Show hidden'} size="sm" active={showing} aria-pressed={showing} data-tip={`${showing ? 'Hide hidden' : 'Show hidden'} · ${count}`} onClick={() => onChange(!showing)} />;
+}
+
+/** Archive toggle: items of archived sessions (or the archived sessions) show only while on. */
+export function ArchivedToggle({ showing, count, onChange }: { showing: boolean; count: number; onChange: (v: boolean) => void }) {
+  return <IconButton icon={Archive} label="Show archived" size="sm" active={showing} aria-pressed={showing} data-tip={`Show archived · ${count}`} onClick={() => onChange(!showing)} />;
 }
 
 /** Thin vertical line between groups of controls in a panel's top bar. */

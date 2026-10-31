@@ -10,8 +10,9 @@ import type { Session, Workspace } from '../../engine/types';
 import { usePanelExpanded } from './panelEmbed';
 import { visibleSessions } from '../../store/spaceSession';
 import { setSessionsArchived } from '../../store/sessionArchive';
+import { setUserHidden } from '../../store/userHidden';
 import { usePref } from '../ui/hooks';
-import { CategoryRail, SearchToggle, Sep, SortToggles, ViewToggle, asItemView, type RailItem, type SortState } from '../ui/PanelControls';
+import { ArchivedToggle, CategoryRail, HiddenToggle, SearchToggle, Sep, SortToggles, ViewToggle, asItemView, type RailItem, type SortState } from '../ui/PanelControls';
 import { CANVAS, QUICK_MODES, RunningNote, SessionRow, sessionCanvases, type QuickMode, type Stats } from './SessionRow';
 import './SessionsLayout.css';
 
@@ -45,7 +46,7 @@ export function SessionsPanel() {
   const [sort, setSort] = useState<SortState>({ by: 'date', asc: false });
   const [basis, setBasis] = useState<'updated' | 'created'>('updated');
   const [pinnedOnly, setPinnedOnly] = useState(false);
-  const [compact, setCompact] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [shelf, setShelf] = useState<'recent' | 'archived'>('recent');
   const [quickMode, setQuickMode] = useState<QuickMode>('all');
   const [storedView, setLayout] = usePref<string>('ogs.sessionsView', 'card');
@@ -88,7 +89,7 @@ export function SessionsPanel() {
   const matches = useSessionMatcher(q);
 
   const list = useMemo(() => {
-    const arr = visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived') && (!pinnedOnly || s.pinned) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && (quickMode === 'all' || stats.get(s.id)?.modes.has(quickMode) || s.feed.some((f) => f.type === 'user' && f.mode === quickMode)) && matches(s));
+    const arr = visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived') && (!pinnedOnly || s.pinned) && (showHidden || !s.userHidden) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && (quickMode === 'all' || stats.get(s.id)?.modes.has(quickMode) || s.feed.some((f) => f.type === 'user' && f.mode === quickMode)) && matches(s));
     const dir = sort.asc ? 1 : -1;
     const stamp = (x: Session) => (basis === 'created' ? x.createdAt : x.updatedAt);
     arr.sort((a, b) => {
@@ -97,17 +98,18 @@ export function SessionsPanel() {
       return dir * (stamp(a) - stamp(b));
     });
     return arr;
-  }, [sessions, matches, sort, basis, pinnedOnly, canvas, shelf, quickMode, stats]);
+  }, [sessions, matches, sort, basis, showHidden, pinnedOnly, canvas, shelf, quickMode, stats]);
 
+  const hiddenCount = useMemo(() => visibleSessions(sessions).filter((s) => s.userHidden).length, [sessions]);
   const archivedCount = useMemo(() => visibleSessions(sessions).filter((s) => s.archived).length, [sessions]);
   const counts = useMemo(() => {
     const c: Record<CanvasFilter, number> = { all: 0, chat: 0, node: 0, designer: 0 };
-    for (const sess of visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived'))) {
+    for (const sess of visibleSessions(sessions).filter((s) => Boolean(s.archived) === (shelf === 'archived') && (showHidden || !s.userHidden))) {
       c.all++;
       for (const w of sessionCanvases(sess)) c[w]++;
     }
     return c;
-  }, [sessions, shelf]);
+  }, [sessions, shelf, showHidden]);
   const toggle = (id: string) => setSelected((cur) => {
     const next = new Set(cur);
     if (next.has(id)) next.delete(id);
@@ -116,6 +118,7 @@ export function SessionsPanel() {
   });
   const stopSelecting = () => setSelected(new Set());
   const picked = list.filter((x) => selected.has(x.id));
+  const allHidden = picked.length > 0 && picked.every((x) => x.userHidden);
   const allPinned = picked.length > 0 && picked.every((x) => x.pinned);
   const isEmpty = (x: Session) => !x.feed.length && !x.graph.nodes.length && !x.docs.some((d) => d.layers.length) && !stats.get(x.id)?.gens && !stats.get(x.id)?.assets.length;
 
@@ -128,7 +131,7 @@ export function SessionsPanel() {
   }, [list, sort, basis]);
 
   return (
-    <div role="region" aria-label="Sessions" className={`sessions layout-${layout} ${compact ? 'is-compact' : ''}`}>
+    <div role="region" aria-label="Sessions" className={`sessions layout-${layout}`}>
       <div className="sessions-controls">
         <div className="sessions-toolbar">
           {embedded ? null : <>
@@ -191,8 +194,8 @@ export function SessionsPanel() {
             <Sep />
           </> : null}
           <ViewToggle value={layout} onChange={setLayout} />
-          <IconButton icon={compact ? EyeOff : Eye} label={compact ? 'Show thumbnails' : 'Hide thumbnails'} size="sm" aria-pressed={!compact} onClick={() => setCompact(!compact)} />
-          <IconButton icon={Archive} label="Show archived" size="sm" active={shelf === 'archived'} aria-pressed={shelf === 'archived'} data-tip={`Show archived · ${archivedCount}`} onClick={() => { setShelf(shelf === 'archived' ? 'recent' : 'archived'); setSelected(new Set()); }} />
+          <HiddenToggle showing={showHidden} count={hiddenCount} onChange={(v) => { setShowHidden(v); setSelected(new Set()); }} />
+          <ArchivedToggle showing={shelf === 'archived'} count={archivedCount} onChange={(v) => { setShelf(v ? 'archived' : 'recent'); setSelected(new Set()); }} />
         </div>
         </div>
         {pinnedOnly ? (
@@ -220,7 +223,7 @@ export function SessionsPanel() {
             ) : null}
             <div className="session-list" style={{ ['--cols' as string]: cols }}>
               {g.items.map((s) => (
-                <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} compact={compact} view={layout} basis={basis} selecting={selecting} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} />
+                <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} view={layout} basis={basis} selecting={selecting} selected={selected.has(s.id)} onToggle={() => toggle(s.id)} />
               ))}
             </div>
           </section>
@@ -232,6 +235,7 @@ export function SessionsPanel() {
           <span className="num">{selected.size} selected</span>
           <button type="button" className="sb-link" onClick={() => setSelected(new Set(list.map((x) => x.id)))}>Select all</button>
           <span className="spacer" />
+          <IconButton icon={allHidden ? Eye : EyeOff} label={allHidden ? 'Unhide' : 'Hide'} size="sm" onClick={() => { setUserHidden('session', picked.map((x) => x.id), !allHidden); stopSelecting(); }} />
           <IconButton icon={allPinned ? PinOff : Pin} label={allPinned ? 'Unpin' : 'Pin'} size="sm" onClick={() => picked.forEach((x) => { if (x.pinned === allPinned) togglePinSession(x.id); })} />
           <IconButton icon={shelf === 'archived' ? ArchiveRestore : Archive} label={shelf === 'archived' ? 'Restore selected' : 'Archive selected'} size="sm" onClick={() => { setSessionsArchived(picked.map((x) => x.id), shelf === 'recent'); stopSelecting(); }} />
           <IconButton ref={bulkDel.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={bulkDel.toggle} />

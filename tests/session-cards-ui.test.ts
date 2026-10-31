@@ -24,9 +24,8 @@ it('shows the latest visual cover, keeps selection and respects hidden thumbnail
   act(() => root.render(createElement(SessionsPanel)));
   expect(host.querySelector('.sess-cover [data-asset]')?.getAttribute('data-asset')).toBe('latest');
   expect(host.querySelector('.sess-card [aria-label="Session actions"]')).not.toBeNull();
-  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Hide thumbnails"]')!.click());
-  expect(host.querySelector('.sess-cover [data-asset]')).toBeNull();
-  expect(host.querySelector('.session-cover-icon')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Hide thumbnails"]')).toBeNull(); // the eye now shows hidden items; covers always show
+  expect(host.querySelector('.session-cover-icon')).toBeNull();
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Select Test session"]')!.click());
   expect(host.querySelector('.session-bar')?.textContent).toContain('1 selected');
   act(() => root.unmount()); host.remove();

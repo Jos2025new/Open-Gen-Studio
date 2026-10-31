@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, ArchiveRestore, Box, Image, MessageSquare, Music, Pencil, PenTool, Pin, PinOff, Trash, Video, Workflow } from 'lucide-react';
+import { Archive, ArchiveRestore, Box, Eye, EyeOff, Image, MessageSquare, Music, Pencil, PenTool, Pin, PinOff, Trash, Video, Workflow } from 'lucide-react';
 import { renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { isRunning } from '../../engine/jobs';
@@ -7,6 +7,7 @@ import { formatRelative, formatUsd } from '../../lib/format';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView } from '../ui/PanelControls';
+import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import type { Session, Workspace } from '../../engine/types';
 
@@ -47,7 +48,7 @@ export function RunningNote({ ids }: { ids: string[] }) {
 const shortDate = (time: number) => new Date(time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 /** A session as an image-first card (cover fills it; details on hover, focus or first tap) or as a compact row. */
-export function SessionRow({ session, active, stats, compact, selecting, selected, view, basis, onToggle }: { session: Session; active: boolean; stats?: Stats; compact: boolean; selecting: boolean; selected: boolean; view: ItemView; basis: 'updated' | 'created'; onToggle: () => void }) {
+export function SessionRow({ session, active, stats, selecting, selected, view, basis, onToggle }: { session: Session; active: boolean; stats?: Stats; selecting: boolean; selected: boolean; view: ItemView; basis: 'updated' | 'created'; onToggle: () => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
   const [confirming, setConfirming] = useState(false);
@@ -70,6 +71,7 @@ export function SessionRow({ session, active, stats, compact, selecting, selecte
   };
   const tap = useTapReveal(open);
   const rename = () => { if (selecting) return; setDraft(session.title); setEditing(true); };
+  const hiddenMark = session.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
   const keys = (e: React.KeyboardEvent) => { if (!editing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } };
   const when = <time className="pc-when" dateTime={new Date(stamp).toISOString()} title={`${basis === 'created' ? 'Created' : 'Updated'}: ${new Date(stamp).toLocaleString()}`}>{shortDate(stamp)}</time>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
@@ -78,6 +80,7 @@ export function SessionRow({ session, active, stats, compact, selecting, selecte
     : <>
       <MenuItem icon={Pencil} onClick={() => { close(); setDraft(session.title); window.setTimeout(() => setEditing(true), 0); }}>Rename</MenuItem>
       <MenuItem icon={session.archived ? ArchiveRestore : Archive} onClick={() => { close(); setSessionsArchived([session.id], !session.archived); }}>{session.archived ? 'Restore session' : 'Archive session'}</MenuItem>
+      <MenuItem icon={session.userHidden ? Eye : EyeOff} onClick={() => { close(); setUserHidden('session', [session.id], !session.userHidden); }}>{session.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
       <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>Delete</MenuItem>
     </>}</CardMenu>;
   const title = editing ? (
@@ -86,29 +89,30 @@ export function SessionRow({ session, active, stats, compact, selecting, selecte
       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setDraft(session.title); setEditing(false); } }} />
   ) : <span className="pc-info-title" title={session.title}>{session.title}</span>;
   const cover = <>
-    {stats?.cover && !compact ? <AssetMedia assetId={stats.cover} hoverPlay={false} draggable={false} /> : null}
-    {!(stats?.cover && !compact) ? <CoverIcon size={view === 'list' ? 16 : 28} className="session-cover-icon" /> : null}
+    {stats?.cover ? <AssetMedia assetId={stats.cover} hoverPlay={false} draggable={false} /> : null}
+    {!stats?.cover ? <CoverIcon size={view === 'list' ? 16 : 28} className="session-cover-icon" /> : null}
   </>;
 
   if (view === 'list') {
     return (
-      <div className={`sess-row pc-row${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}>
+      <div className={`sess-row pc-row${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}>
         <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
         <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
         <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onDoubleClick={rename} onKeyDown={keys}>
           {title}
           <span className="pc-info-sub num">{[modeLabel, ...details].filter(Boolean).join(' · ') || 'empty'}{active ? ' · Open' : ''}</span>
         </div>
-        {when}
+        {hiddenMark}{when}
         <span className="pc-tools">{pin}{menu}</span>
       </div>
     );
   }
   return (
-    <div className={`sess-card pc-card${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
+    <div className={`sess-card pc-card${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
       <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>
       <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
       <span className="pc-tools">{pin}{menu}</span>
+      {hiddenMark}
       {active ? <span className="sess-open">Open</span> : null}
       <div className="pc-info pc-hover">
         {title}

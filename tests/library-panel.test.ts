@@ -8,6 +8,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { GalleryPanel } from '../src/components/gallery/GalleryPanel';
 import { setUi, useStore } from '../src/store/store';
+import { createSession } from '../src/store/store';
 import type { Asset, Generation, Subject } from '../src/engine/types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -280,6 +281,52 @@ describe('Library cards', () => {
     click(attach);
     expect(tile.querySelector('.attach-toggle.is-on')?.textContent).toBe('1');
     expect(tile.querySelector('.attach-toggle.is-on svg')).toBeNull();
+  });
+
+  it('Hide removes an asset from the views, the eye shows it dimmed with a badge, and the bulk bar hides and unhides', () => {
+    const tile = [...host.querySelectorAll('.g-tile')][1]; // Cherry
+    click(tile.querySelector('[aria-label="More actions"]'));
+    click([...document.querySelectorAll('[role="menuitem"]')].find((e) => e.textContent === 'Hide') ?? null);
+    expect(useStore.getState().assets.c.userHidden).toBe(true);
+    expect(useStore.getState().assets.c).toBeDefined(); // hidden is not deleted
+    expect(names()).toEqual(['Apple', 'Mango']);
+    const eye = q<HTMLButtonElement>('[aria-label="Show hidden"]');
+    expect(eye.getAttribute('data-tip')).toContain('1');
+    click(eye);
+    expect(names()).toHaveLength(3);
+    const dim = host.querySelector('.is-hidden-item')!;
+    expect(dim.querySelector('.pc-hidden-badge')).not.toBeNull();
+    click(dim.querySelector('[role="checkbox"]'));
+    click(q('.gallery-bulk [aria-label="Unhide"]'));
+    expect(useStore.getState().assets.c.userHidden).toBeUndefined();
+    click([...host.querySelectorAll('.g-tile [role="checkbox"]')][0]);
+    click(q('.gallery-bulk [aria-label="Hide"]'));
+    expect(useStore.getState().assets.b.userHidden).toBe(true);
+  });
+
+  it('saved items can be hidden too, with the same eye', () => {
+    click(q('.pc-rail [aria-label="Character"]'));
+    click(q('.lib-tile [aria-label^="More actions"]'));
+    click([...document.querySelectorAll('[role="menuitem"]')].find((e) => e.textContent === 'Hide') ?? null);
+    expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
+    click(q('[aria-label="Show hidden"]'));
+    expect(host.querySelectorAll('.lib-tile')).toHaveLength(2);
+    expect(host.querySelector('.lib-tile.is-hidden-item .pc-hidden-badge')).not.toBeNull();
+  });
+
+  it('items of archived sessions are left out until Show archived is on', () => {
+    const old = createSession('Old'); old.archived = true;
+    act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [old.id]: old }, assets: { ...st.assets, z: asset('z', { sessionId: old.id, createdAt: 99, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zebra', { sessionId: old.id }) } })));
+    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'All sessions') ?? null);
+    expect(names()).not.toContain('Zebra');
+    const arch = q<HTMLButtonElement>('.pc-right [aria-label="Show archived"]');
+    expect(arch.getAttribute('data-tip')).toContain('1');
+    expect(arch.getAttribute('aria-pressed')).toBe('false');
+    click(arch);
+    expect(arch.getAttribute('aria-pressed')).toBe('true');
+    expect(names()).toContain('Zebra');
+    const btns = [...q('.pc-right').querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
+    expect(btns.slice(-2)).toEqual(['Show hidden', 'Show archived']);
   });
 
   it('list rows keep the actions', () => {

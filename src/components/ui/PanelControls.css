@@ -81,3 +81,4 @@
 .pc-row .pc-tools .icon-btn { background: none; color: var(--text-3); backdrop-filter: none; }
 .pc-row .pc-tools .icon-btn:hover { color: var(--text); }
 .pc-row .pc-hover { opacity: 1; }
+.sess-card .pc-hidden-badge { right: 52px; }

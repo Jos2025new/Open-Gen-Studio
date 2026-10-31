@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { AudioLines, Bot, Box, Clock, Copy, Download, FileText, Film, Maximize2, MessageSquare, Paperclip, RotateCcw, Star, Trash } from 'lucide-react';
+import { AudioLines, Bot, Box, Clock, Copy, Download, Eye, EyeOff, FileText, Film, Maximize2, MessageSquare, Paperclip, RotateCcw, Star, Trash } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { AGENT_ATTACHABLE, copyText, deleteAssets, downloadAsset, toggleAgentAttachment, toggleFavorite, useAsReference } from '../../engine/actions';
 import { canReuse, reuseGeneration } from '../../store/reuse';
+import { setUserHidden } from '../../store/userHidden';
 import { formatDuration, formatRelative } from '../../lib/format';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -33,6 +34,7 @@ function AssetMenuItems({ asset, g, close }: { asset: Asset; g?: Generation; clo
     <MenuItem icon={Paperclip} onClick={run(() => useAsReference(asset.id))}>Use as reference</MenuItem>
     {AGENT_ATTACHABLE.includes(asset.kind) ? <MenuItem icon={Bot} onClick={run(() => toggleAgentAttachment(asset.id))}>{inContext ? 'Remove from the agent context' : 'Add to the agent context'}</MenuItem> : null}
     {g && canReuse(g) ? <MenuItem icon={RotateCcw} onClick={run(() => void reuseGeneration(g))}>Reusar</MenuItem> : null}
+    <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
     <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>Delete</MenuItem>
   </>;
 }
@@ -49,18 +51,19 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
     <IconButton icon={Star} label={asset.favorite ? 'Remove from favorites' : 'Add to favorites'} size="sm" aria-pressed={Boolean(asset.favorite)} className={`pc-fav pc-hover${asset.favorite ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.id); }} />
     <CardMenu label="More actions" className="pc-hover">{(close) => <AssetMenuItems asset={asset} g={g} close={close} />}</CardMenu>
   </span>;
+  const hiddenMark = asset.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
   const remote = !asset.stored ? <span className="g-remote" data-tip="Stored at the provider only; it may expire"><Clock size={11} /></span> : null;
   const when = <time className="pc-when" dateTime={new Date(asset.createdAt).toISOString()}>{formatRelative(asset.createdAt)}</time>;
   if (view === 'list') {
-    return <div className={`g-tile pc-row${selected ? ' is-selected' : ''}`}>
+    return <div className={`g-tile pc-row${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}`}>
       <CardCheck checked={selected} label={`Select ${title}`} onToggle={onToggle} />
       <button type="button" className="g-open pc-thumb" onClick={onOpen} aria-label="Open"><AssetMedia assetId={asset.id} hoverPlay={false} /></button>
       <span className="pc-text"><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub">{details}</span></span>
       <AgentAttachToggle assetId={asset.id} glyph={Paperclip} />
-      {remote}{when}{tools}
+      {remote}{hiddenMark}{when}{tools}
     </div>;
   }
-  return <div className={`g-tile pc-card${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}`}>
+  return <div className={`g-tile pc-card${asset.userHidden ? ' is-hidden-item' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}`}>
     <button type="button" className="g-open" onPointerDown={tap.onPointerDown} onClick={tap.onClick} aria-label="Open" title={title}>
       <AssetMedia assetId={asset.id} />
     </button>
@@ -70,7 +73,7 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
     {asset.kind === 'video' || asset.kind === 'audio' || asset.kind === 'model3d' ? (
       <span className="g-badge pc-badge num"><KindIcon kind={asset.kind} />{asset.kind === 'model3d' ? '3D' : asset.duration ? formatDuration(asset.duration * 1000) : ''}</span>
     ) : null}
-    {remote}
+    {remote}{hiddenMark}
     <div className="pc-info pc-hover"><span className="pc-info-title">{details || title}</span><span className="pc-info-sub">{when}</span></div>
   </div>;
 }
