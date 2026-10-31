@@ -1,4 +1,4 @@
-import { Check, GitBranch, Sparkles, X } from 'lucide-react';
+import { Check, ChevronDown, GitBranch, Sparkles, X } from 'lucide-react';
 import { SKILLS, WORKFLOWS, skillById, workflowById } from '../../engine/skills';
 import type { AgentStyle } from '../../engine/types';
 import { setComposer, useStore } from '../../store/store';
@@ -112,11 +112,20 @@ export function AgentOptions({ activeOnly = false, onPicked }: { activeOnly?: bo
 
 export function AgentMode() {
   const style = useStore((s) => s.composer.agentStyle);
-  return <select className="ml-filter agent-mode" aria-label="Agent mode" value={style}
-    title={AGENT_MODES.find((m) => m.value === style)?.tip}
-    onChange={(e) => setComposer({ agentStyle: e.target.value as AgentStyle })}>
-    {AGENT_MODES.map((m) => <option key={m.value} value={m.value} title={m.tip}>{m.label}</option>)}
-  </select>;
+  const pop = usePopover();
+  const selected = AGENT_MODES.find((m) => m.value === style);
+  return <>
+    <button ref={pop.ref} type="button" className="ml-filter agent-mode" aria-label="Agent mode" aria-haspopup="dialog" aria-expanded={pop.open} title={selected?.tip} onClick={pop.toggle}>
+      {selected?.label}<ChevronDown size={12} />
+    </button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={170} label="Agent mode">
+      <div className="menu" role="radiogroup" aria-label="Agent mode">
+        {AGENT_MODES.map((m) => <button key={m.value} type="button" role="radio" aria-checked={m.value === style} className={`menu-item${m.value === style ? ' is-active' : ''}`} title={m.tip} onClick={() => { setComposer({ agentStyle: m.value }); pop.close(); }}>
+          <span className="menu-text">{m.label}</span>{m.value === style ? <Check size={13} /> : null}
+        </button>)}
+      </div>
+    </Popover>
+  </>;
 }
 
 export function AgentControls({ showMode = true }: { showMode?: boolean }) {

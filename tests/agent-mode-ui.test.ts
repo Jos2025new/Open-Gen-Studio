@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
@@ -15,6 +15,8 @@ import { AgentControls } from '../src/components/composer/AgentControls';
 import { useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+afterAll(() => vi.unstubAllGlobals());
 
 let host: HTMLDivElement;
 let root: Root;
@@ -33,25 +35,24 @@ afterEach(() => {
 });
 
 describe('agent mode dropdown', () => {
-  it('is a dropdown with Auto, Guided and Direct, Auto selected by default', () => {
-    const select = host.querySelector<HTMLSelectElement>('select[aria-label="Agent mode"]');
-    expect(select).not.toBeNull();
-    expect(select!.value).toBe('auto');
-    expect([...select!.options].map((o) => o.textContent)).toEqual(['Auto', 'Guided', 'Direct']);
+  const open = () => act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Agent mode"]')!.click());
+  const choose = (label: string) => act(() => [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((button) => button.textContent?.trim() === label)!.click());
+
+  it('shows Auto, Guided and Direct, with Auto selected by default', () => {
+    const trigger = host.querySelector<HTMLButtonElement>('button[aria-label="Agent mode"]')!;
+    expect(trigger.textContent).toContain('Auto');
+    open();
+    const options = [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    expect(options.map((option) => option.textContent?.trim())).toEqual(['Auto', 'Guided', 'Direct']);
+    expect(options[0].getAttribute('aria-checked')).toBe('true');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('choosing an option sets the agent mode in the composer', () => {
-    const select = host.querySelector<HTMLSelectElement>('select[aria-label="Agent mode"]')!;
-    act(() => {
-      select.value = 'direct';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+  it('choosing an option sets the agent mode and closes the menu', () => {
+    open(); choose('Direct');
     expect(useStore.getState().composer.agentStyle).toBe('direct');
-
-    act(() => {
-      select.value = 'guided';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    expect(host.querySelector('[aria-label="Agent mode"]')?.getAttribute('aria-expanded')).toBe('false');
+    open(); choose('Guided');
     expect(useStore.getState().composer.agentStyle).toBe('guided');
   });
 });
