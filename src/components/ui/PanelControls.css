@@ -102,7 +102,21 @@
 .pc-center .icon-btn { width: 30px; height: 30px; }
 .pc-center .canvas-tab { height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-xs); background: none; color: var(--text-2); }
 .pc-center .canvas-tab:hover { background: var(--surface-2); color: var(--text); }
-.pc-center .canvas-tab.is-on { background: var(--text); color: var(--bg-canvas); }
+.pc-center .canvas-tab.is-on { background: var(--surface-3); color: var(--text); }
+
+/* Three intensities, as in the reference: the source is the one inverted pill; what you switched on gets a surface;
+   tools sit in quiet outlined boxes; idle type icons and the panel chrome stay faint. */
+.pc-bar .canvas-tab.pc-source { border-color: transparent; background: var(--text); color: var(--bg-canvas); font-weight: 600; }
+.pc-bar .canvas-tab.pc-source:hover { background: var(--text); color: var(--bg-canvas); opacity: .9; }
+.pc-left > .canvas-tab:not(.pc-source) { background: none; color: var(--text-2); }
+.pc-left > .canvas-tab:not(.pc-source):hover { color: var(--text); }
+.pc-left > .canvas-tab.is-on:not(.pc-source) { background: var(--surface-3); color: var(--text); }
+.pc-center .icon-btn { color: var(--text-3); }
+.pc-center .icon-btn:hover, .pc-center .icon-btn.is-active { color: var(--text); }
+.pc-icons .icon-btn { border: 1px solid var(--border); color: var(--text); }
+.pc-icons .icon-btn:hover { background: var(--surface-2); }
+.pc-chrome .icon-btn { color: var(--text-3); }
+.pc-chrome .icon-btn:hover { color: var(--text); }
 .gallery .date-head, .sessions .date-head { padding: 10px 12px 4px; font-size: 11px; font-weight: 500; color: var(--text-2); }
 .gallery .date-head .faint, .sessions .date-head .faint { color: var(--text-3); }
 .date-head .pc-group-check, .sessions .date-head .group-check { width: 14px; height: 14px; opacity: .4; transition: opacity .12s; }
@@ -130,4 +144,6 @@
   .pc-bar .pc-search { flex: 1 1 100%; max-width: none; }
   .pc-bar .pc-size { display: none; }
   .pc-center .icon-btn { width: 28px; height: 28px; }
+  .pc-bar .pc-icons { gap: 4px; }
+  .pc-icons .icon-btn { width: 34px; height: 34px; }
 }
