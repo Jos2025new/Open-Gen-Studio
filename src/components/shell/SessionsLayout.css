@@ -30,3 +30,6 @@
 .side-panel.panel-sessions { border-color: var(--border); box-shadow: 0 12px 32px rgba(0, 0, 0, .225), 0 2px 8px rgba(0, 0, 0, .15); }
 .side-panel.panel-sessions .sessions-controls { border-color: var(--border); }
 [data-base="claro"] .side-panel.panel-sessions, [data-base="blanco"] .side-panel.panel-sessions { box-shadow: 0 6px 18px rgba(60, 64, 67, .06), 0 2px 6px rgba(60, 64, 67, .0375); }
+
+/* Grid: the size slider sets the most columns; a card never gets narrower than 150px, so a narrow drawer shows fewer. */
+.sessions.layout-card .session-list { grid-template-columns: repeat(auto-fill, minmax(max(150px, calc((100% - (var(--cols, 3) - 1) * 6px) / var(--cols, 3))), 1fr)); }

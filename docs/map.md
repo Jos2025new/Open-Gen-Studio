@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 284 | 224 |
-| [store.ts](../src/store/store.ts) | 194 | 206 |
+| [store.ts](../src/store/store.ts) | 194 | 207 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 86 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 55 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
@@ -37,7 +37,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 27 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 23 | 8 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 20 | 0 |
-| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 20 | 7 |
+| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 20 | 8 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |
 
@@ -52,10 +52,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 54 | 24 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 8 | 7 |
-| `src/components/shell` | 35 | 21 |
+| `src/components/shell` | 35 | 22 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
-| `src/components/ui` | 20 | 14 |
+| `src/components/ui` | 20 | 15 |
 | `src/engine` | 60 | 278 |
 | `src/engine/agent` | 53 | 109 |
 | `src/engine/design` | 100 | 120 |
@@ -65,10 +65,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 285 |
-| `src/store` | 15 | 208 |
+| `src/lib` | 33 | 286 |
+| `src/store` | 15 | 209 |
 
-180 de 505 módulos no tienen ningún test que los importe directamente.
+179 de 505 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -86,8 +86,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
-- [SidePanel.tsx](../src/components/shell/SidePanel.tsx)
-- [SpendingPanel.tsx](../src/components/shell/SpendingPanel.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
