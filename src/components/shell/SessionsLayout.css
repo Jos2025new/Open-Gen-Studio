@@ -19,15 +19,16 @@
 /* As in every Sessions view, the checkbox (top left of the cover) and pin and menu (top right) are always in view. */
 .sess-card .pc-hover { opacity: 1; }
 /* The actions sit in a quiet footer under a hairline, as plain icons; the checkbox stays alone on the cover. */
-.sess-card-foot { display: flex; align-items: center; justify-content: flex-end; padding: 5px 8px 6px 14px; border-top: 1px solid var(--border); }
-.sess-card-foot .pc-tools { position: static; gap: 2px; }
+.sess-card-foot { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px 6px 14px; border-top: 1px solid var(--border); }
+.sess-card-foot .pc-tools { position: static; gap: 2px; margin-left: auto; }
 .sess-card-foot .pc-tools .icon-btn { border: 0; background: none; color: var(--text-3); backdrop-filter: none; box-shadow: none; }
 .sess-card-foot .pc-tools .icon-btn:hover { color: var(--text); }
 .sess-card-foot .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
-/* The checkbox is the quietest control: a light 20px glass tile with a 12px box, shown only on hover or focus, while
-   selecting, or when checked. */
-.sess-card .pc-check, .sess-tile .pc-check { top: 8px; left: 8px; width: 20px; height: 20px; border-radius: 6px; background: rgba(12, 12, 14, .22); opacity: 0; }
-.sess-card .pc-check .pc-box, .sess-tile .pc-check .pc-box { width: 12px; height: 12px; border-width: 1.5px; border-radius: 3px; }
+/* The checkbox is the quietest control: a bare 14px outline with the same 1.5px stroke as the group checkbox, no glass
+   behind it (a faint shadow keeps it legible on light covers), shown only on hover or focus, while selecting, or when checked. */
+.sess-card .pc-check, .sess-tile .pc-check { top: 8px; left: 8px; width: 20px; height: 20px; border-radius: 0; background: none; backdrop-filter: none; opacity: 0; }
+.sess-card .pc-check .pc-box, .sess-tile .pc-check .pc-box { width: 14px; height: 14px; border: 1.5px solid rgba(255, 255, 255, .9); border-radius: 4px; background: none; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .35)); }
+.sess-card .pc-check.is-on .pc-box, .sess-tile .pc-check.is-on .pc-box { border-color: transparent; background: var(--accent); }
 .sess-card:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-card .pc-check.is-on, .sess-tile .pc-check.is-on { opacity: 1; }
 .sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 12px; }
 .sess-card .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }

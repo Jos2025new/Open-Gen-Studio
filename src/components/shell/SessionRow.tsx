@@ -95,7 +95,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const ModeIcon = modeLabel ? MODE_ICON[modeLabel] : undefined;
   const mode = <span className="pc-mode">{ModeIcon ? <ModeIcon size={12} /> : null}{modeLabel ?? '—'}</span>;
   const openTag = active ? <span className="pc-open-tag">Open</span> : null;
-  const meta = <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{mode}<span aria-hidden="true">·</span>{when}{openTag}</span>;
+  const meta = <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{mode}<span aria-hidden="true">·</span>{when}{view === 'tile' ? openTag : null}</span>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
   // List and Grid show Hide and Archive on the item, so their menu keeps only Rename and Delete.
   const inRow = view !== 'tile';
@@ -174,7 +174,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
       <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
       {hiddenMark}
       <div className="pc-info">{title}{meta}</div>
-      <div className="sess-card-foot"><span className="pc-tools">{shelfButtons}{pin}{menu}</span></div>
+      <div className="sess-card-foot">{openTag}<span className="pc-tools">{shelfButtons}{pin}{menu}</span></div>
     </div>
   );
 }
