@@ -104,7 +104,19 @@ export function Sidebar() {
         </button>
       </div>
       <div className="side-group">
-        {/* New session first and accented: the quickest thing to find. */}
+        {/* Expand or collapse the bar sits above New session, at the top of the bar. */}
+        <button
+          type="button"
+          className="side-btn side-width-toggle"
+          aria-label={wide ? 'Collapse panel to the left' : 'Expand panel to the right'}
+          data-tip={wide ? 'Collapse panel to the left' : 'Expand panel to the right'}
+          data-tip-side="right"
+          onClick={() => setWide(!wide)}
+        >
+          {wide ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          <span className="side-label wide-only">Collapse panel</span>
+        </button>
+        {/* New session first among the actions, and accented: the quickest thing to find. */}
         <button type="button" className="side-btn side-new" data-tip="New session" data-tip-side="right" aria-label="New session" onClick={() => newSession()}>
           <Plus size={18} strokeWidth={2} />
           <span className="side-label wide-only">New session</span>
@@ -152,17 +164,6 @@ export function Sidebar() {
           {remaining != null && remaining < 0 ? <span className="side-badge is-warn" aria-label="Over the limit">!</span> : null}
         </button>
         <ProviderPool wide={wide} />
-        <button
-          type="button"
-          className="side-btn side-width-toggle"
-          aria-label={wide ? 'Collapse panel to the left' : 'Expand panel to the right'}
-          data-tip={wide ? 'Collapse panel to the left' : 'Expand panel to the right'}
-          data-tip-side="right"
-          onClick={() => setWide(!wide)}
-        >
-          {wide ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-          <span className="side-label wide-only">Collapse panel</span>
-        </button>
       </div>
     </nav>
   );
