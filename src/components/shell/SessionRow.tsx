@@ -95,7 +95,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const ModeIcon = modeLabel ? MODE_ICON[modeLabel] : undefined;
   const mode = <span className="pc-mode">{ModeIcon ? <ModeIcon size={12} /> : null}{modeLabel ?? '—'}</span>;
   const openTag = active ? <span className="pc-open-tag">Open</span> : null;
-  const meta = <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{mode}<span aria-hidden="true">·</span>{when}{view === 'tile' ? openTag : null}</span>;
+  const meta = <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{mode}<span aria-hidden="true">·</span>{when}</span>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
   // List rows show Hide and Archive on the row, so their menu keeps only Rename and Delete; cards keep them in the menu.
   const inRow = view === 'list';
@@ -149,40 +149,31 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
       </div>
     );
   }
+  // Both card views carry the same details: three figures (generations, nodes, designs) and the actions: Continue
+  // (Current when open), pin and menu.
+  const stat = (value: number, label: string) => <span className="sess-stat"><b className="num">{value}</b><small>{label}</small></span>;
+  const figures = <div className="sess-stats">{stat(stats?.gens ?? 0, 'Generations')}{stat(nodes, 'Nodes')}{stat(docs, 'Designs')}</div>;
+  const actions = <div className="sess-card-actions">
+    <Button size="sm" variant="secondary" disabled={active} onClick={(e) => { e.stopPropagation(); open(); }}>{active ? 'Current' : 'Continue'}</Button>
+    <span className="pc-tools">{pin}{menu}</span>
+  </div>;
+  const coverButton = <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>;
+  const check = <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />;
+
   if (view === 'tile') {
-    // Cards: a horizontal card — the cover fills the left side with the checkbox on its corner; pin and menu sit
-    // top right and the title and details settle at the bottom beside the cover.
+    // Cards: the cover fills the left side and fades into the dark right side, which holds the same details.
     return (
-      <div className={`sess-tile pc-card${flags}${editing ? ' is-editing' : ''}`}>
-        <span className="sess-tile-cover">
-          <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
-          <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
-        </span>
-        <div className="sess-tile-body">
-          <span className="pc-tools">{hiddenMark}{pin}{menu}</span>
-          <div role="button" tabIndex={0} className="session-main pc-text" aria-label={session.title} onClick={open} onDoubleClick={rename} onKeyDown={keys}>
-            {title}{meta}
-          </div>
-        </div>
+      <div className={`sess-tile pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
+        {coverButton}{check}{hiddenMark}
+        <div className="pc-info">{title}{meta}{figures}{actions}</div>
       </div>
     );
   }
-  // Grid: the cover fills a portrait card; over its lower part a dark fade carries the title, mode and date, three
-  // figures (generations, nodes, designs) and the actions: Continue (Current when open), pin and menu.
-  const stat = (value: number, label: string) => <span className="sess-stat"><b className="num">{value}</b><small>{label}</small></span>;
+  // Grid: the cover fills a portrait card; a dark fade over its lower part carries the details.
   return (
     <div className={`sess-card pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
-      <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>
-      <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
-      {hiddenMark}
-      <div className="pc-info">
-        {title}{meta}
-        <div className="sess-stats">{stat(stats?.gens ?? 0, 'Generations')}{stat(nodes, 'Nodes')}{stat(docs, 'Designs')}</div>
-        <div className="sess-card-actions">
-          <Button size="sm" variant="secondary" disabled={active} onClick={(e) => { e.stopPropagation(); open(); }}>{active ? 'Current' : 'Continue'}</Button>
-          <span className="pc-tools">{pin}{menu}</span>
-        </div>
-      </div>
+      {coverButton}{check}{hiddenMark}
+      <div className="pc-info">{title}{meta}{figures}{actions}</div>
     </div>
   );
 }

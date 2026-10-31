@@ -4,7 +4,7 @@
 /* Card view: a grid of image-first cards; list view: compact rows. */
 .sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; padding: 4px 12px 8px; }
 .sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
 /* Grid: a portrait card whose cover fills it; a dark fade over the lower part carries the title, details, figures and
    actions, as on a profile card. */
 .sess-card.pc-card, .sess-tile.pc-card { border-radius: 14px; }
@@ -12,7 +12,6 @@
 /* One frame only: the open and selected states recolour the border instead of adding a ring around it. */
 .sess-card.pc-card.is-active, .sess-tile.pc-card.is-active { border-color: var(--border-strong); box-shadow: none; }
 .sess-card.pc-card.is-selected, .sess-tile.pc-card.is-selected { border-color: var(--accent); box-shadow: none; }
-.sess-tile .pc-text { position: static; gap: 3px; padding: 8px 10px 9px; background: none; color: var(--text); text-shadow: none; pointer-events: auto; }
 .sess-card .pc-info { gap: 6px; padding: 72px 14px 14px; background: linear-gradient(transparent, rgba(10, 10, 12, .62) 34%, rgba(10, 10, 12, .9) 70%); pointer-events: none; }
 .sess-card .pc-info::before { mask-image: linear-gradient(transparent, #000 40%); -webkit-mask-image: linear-gradient(transparent, #000 40%); }
 .sess-card .pc-info > * { pointer-events: auto; }
@@ -38,23 +37,20 @@
 .sess-card .pc-check .pc-box, .sess-tile .pc-check .pc-box { width: 14px; height: 14px; border: 1.5px solid rgba(255, 255, 255, .9); border-radius: 4px; background: none; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .35)); }
 .sess-card .pc-check.is-on .pc-box, .sess-tile .pc-check.is-on .pc-box { border-color: transparent; background: var(--accent); }
 .sess-card:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .sess-card .pc-check.is-on, .sess-tile .pc-check.is-on { opacity: 1; }
-.sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; color: var(--text-3); font-size: 12px; }
+.sess-card .pc-info-sub, .sess-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; font-size: 12px; }
 .sess-card .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
-/* Cards: the cover fills the whole left side, edge to edge (checkbox on its corner); pin and menu top right; title
-   and details at the bottom. */
-.sess-tile.pc-card { display: flex; aspect-ratio: auto; min-height: 92px; padding: 0; border: 1px solid var(--border); background: var(--surface); }
-.sess-tile-cover { position: relative; flex: none; align-self: stretch; width: 104px; }
-.sess-tile .pc-thumb { display: grid; width: 100%; height: 100%; border-radius: 0; }
-.sess-tile-body { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: 6px 6px 10px 12px; }
-.sess-tile .pc-tools { position: static; align-self: flex-end; align-items: center; gap: 2px; }
+/* Cards: the cover fills the left side and fades into the dark right side, which carries the same details as Grid. */
+.sess-tile.pc-card { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--surface-3); }
+.sess-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 46%; height: 100%; }
+.sess-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 20%, rgba(10, 10, 12, .78) 40%, rgba(10, 10, 12, .94) 52%); pointer-events: none; }
+.sess-tile .pc-info::before { display: none; }
+.sess-tile .pc-info > * { pointer-events: auto; }
+.sess-tile .pc-info .pc-info-title { display: -webkit-box; font-size: 15px; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sess-tile .pc-info .pc-info-sub { color: rgba(255, 255, 255, .78); }
 .sess-tile .pc-hover { opacity: 1; }
-.sess-tile .pc-tools .icon-btn { border: 0; background: none; color: var(--text-3); backdrop-filter: none; box-shadow: none; }
-.sess-tile .pc-tools .icon-btn:hover { color: var(--text); }
-.sess-tile .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
-.sess-tile .pc-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; margin-top: auto; padding: 0 6px 0 0; text-align: left; cursor: pointer; }
-.sess-tile .pc-info-title { font-weight: 500; }
-.sess-tile .pc-hidden-badge { position: static; flex: none; margin-right: 4px; color: var(--text-3); background: none; }
-.sess-card.is-hidden-item .pc-info, .sess-tile.is-hidden-item .pc-text { opacity: .55; }
+.sess-tile .sess-stat b { font-size: 14px; }
+.sess-tile .sess-stat small { font-size: 10.5px; }
+.sess-card.is-hidden-item .pc-info, .sess-tile.is-hidden-item .pc-info { opacity: .55; }
 .pc-card .pc-open-tag { color: var(--accent); }
 .sess-cover { display: grid; place-items: center; overflow: hidden; color: var(--text-3); background: var(--surface-3); cursor: pointer; }
 .sess-cover .media { width: 100%; height: 100%; object-fit: cover; }

@@ -92,7 +92,7 @@ it('the card grid shows the same sort labels as a compact row with the toggles a
   expect(host.querySelector('.pc-sort-strip [role="separator"]')).toBeNull();
 });
 
-it('Cards is a third view between Grid and List: compact cards with the cover, title, mode and date, remembered', () => {
+it('Cards is a third view between Grid and List: horizontal cards with the cover, details, figures and actions, remembered', () => {
   click(q('.pc-bar [aria-label="View"]'));
   expect([...document.querySelectorAll('[role="radio"]')].map((b) => b.textContent).slice(0, 3)).toEqual(['Grid', 'Cards', 'List']);
   click([...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === 'Cards'));
@@ -100,10 +100,11 @@ it('Cards is a third view between Grid and List: compact cards with the cover, t
   expect(host.querySelectorAll('.sess-tile')).toHaveLength(3);
   expect(localStorage.getItem('ogs.sessionsView')).toBe('"tile"');
   const bravo = [...host.querySelectorAll('.sess-tile')].find((c) => c.querySelector('.pc-info-title')?.textContent === 'Bravo')!;
-  expect(bravo.querySelector('.pc-open-tag')?.textContent).toBe('Open');
+  expect(bravo.querySelector('.sess-card-actions .btn')?.textContent).toBe('Current');
   expect(bravo.querySelector('time')).not.toBeNull();
-  expect(bravo.querySelector('.sess-tile-cover [role="checkbox"]')).not.toBeNull();
-  expect([...bravo.querySelectorAll('.sess-tile-body .pc-tools button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin', 'Session actions']);
+  expect(bravo.querySelector('[role="checkbox"]')).not.toBeNull();
+  expect(bravo.querySelectorAll('.sess-stat')).toHaveLength(3);
+  expect([...bravo.querySelectorAll('.sess-card-actions .pc-tools button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Pin', 'Session actions']);
   expect(host.querySelector('.pc-sort-strip')).not.toBeNull();
 });
 
