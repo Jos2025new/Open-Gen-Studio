@@ -46,7 +46,7 @@ export function GalleryPanel() {
 function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: { source: ReactNode; chrome: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const library = useStore((s) => s.library);
   const assets = useStore((s) => s.assets);
-  const { expanded } = usePanelExpanded();
+  const { expanded, embedded } = usePanelExpanded();
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<SortState>({ by: 'name', asc: true });
   const asc = sort.asc;
@@ -81,7 +81,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
           <div className="gallery-scroll">
             {list.length ? (
               view === 'card'
-                ? <JustifiedGrid className="gallery-grid library-layout-card" rowHeight={rowHeightFor((expanded ? 10 : 7) - cols)} items={list.map((x) => { const a = assets[x.frontalAssetId ?? x.videoAssetId ?? '']; return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} /> }; })} />
+                ? <JustifiedGrid className="gallery-grid library-layout-card" rowHeight={rowHeightFor((expanded ? 10 : 7) - cols + (embedded ? 1 : 0))} items={list.map((x) => { const a = assets[x.frontalAssetId ?? x.videoAssetId ?? '']; return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} /> }; })} />
                 : <div className={`gallery-grid library-layout-${view}`}>{list.map((x) => <LibraryTile key={x.id} item={x} view={view} />)}</div>
             ) : (
               <div className="empty-block">

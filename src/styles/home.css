@@ -80,6 +80,11 @@
 .home-tab:disabled { opacity: .45; cursor: default; }
 /* Sessions and Library under Home's tabs: flat on the page (no frame, corner or shadow), so they read as part of Home. */
 :root .side-panel.home-embed { position: static; width: auto; min-height: 60vh; border: 0; border-radius: 0; background: var(--bg-canvas); box-shadow: none; overflow: hidden; z-index: auto; }
+/* Same scale as the Home tab: session cards at least 200 px with Home's 12 px gap (Library rows go one Grid size step
+   up when embedded, in GalleryPanel and GeneratedAssets); the panel's own inset is pulled back so its content starts on
+   Home's left edge. */
+:root .side-panel.home-embed { width: auto; margin: 0 -12px; }
+:root .home-embed .sessions.layout-card .session-list { grid-template-columns: repeat(auto-fill, minmax(max(200px, calc((100% - (var(--cols, 3) - 1) * 12px) / var(--cols, 3))), 1fr)); gap: 12px; }
 /* Hero carousel: three stacked slides, 68 px Outfit word, the Home prompt bar on Studio. */
 .home-hero { position: relative; width: 100%; max-width: 760px; margin: var(--sp-2) 0 0; }
 .home-hero-dots { display: flex; gap: 7px; align-items: center; height: 8px; margin-bottom: var(--sp-5); }

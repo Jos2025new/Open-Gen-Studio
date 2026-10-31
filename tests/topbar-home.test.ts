@@ -54,6 +54,12 @@ describe('top bar on Home', () => {
   it('Sessions and Library under Home are flat: no frame, corner or shadow', () => {
     expect(readFileSync('src/styles/home.css', 'utf8')).toMatch(/:root \.side-panel\.home-embed \{[^}]*border: 0; border-radius: 0; background: var\(--bg-canvas\); box-shadow: none;/);
   });
+  it('Sessions and Library under Home use Home\'s scale: cards at least 200 px, Home\'s gap, and its left edge', () => {
+    const css = readFileSync('src/styles/home.css', 'utf8');
+    expect(css).toMatch(/\.home-embed \.sessions\.layout-card \.session-list \{ grid-template-columns: repeat\(auto-fill, minmax\(max\(200px,[^}]*gap: 12px; \}/);
+    expect(css).toMatch(/:root \.side-panel\.home-embed \{ width: auto; margin: 0 -12px; \}/);
+    for (const f of ['src/components/gallery/GalleryPanel.tsx', 'src/components/gallery/GeneratedAssets.tsx']) expect(readFileSync(f, 'utf8')).toContain('rowHeightFor((expanded ? 10 : 7) - cols + (embedded ? 1 : 0))');
+  });
   it('the pill opens the Connected popover as before', () => {
     const host = mount(true);
     act(() => (host.querySelector('.topbar-pill') as HTMLButtonElement).click());

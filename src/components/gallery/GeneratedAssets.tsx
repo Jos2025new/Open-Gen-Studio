@@ -27,7 +27,7 @@ const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', lab
 export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }: { source: ReactNode; chrome: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
-  const { expanded } = usePanelExpanded();
+  const { expanded, embedded } = usePanelExpanded();
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
@@ -205,7 +205,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
                   </h4>
                 ) : null}
                 {view === 'card'
-                  ? <JustifiedGrid className="gallery-grid library-layout-card" items={tiles} rowHeight={rowHeightFor((expanded ? 10 : 7) - cols)} />
+                  ? <JustifiedGrid className="gallery-grid library-layout-card" items={tiles} rowHeight={rowHeightFor((expanded ? 10 : 7) - cols + (embedded ? 1 : 0))} />
                   : <div className={`gallery-grid library-layout-${view}${view === 'list' ? ' pc-cols' : ''}`}>{tiles.map((t) => <Fragment key={t.id}>{t.node}</Fragment>)}</div>}
               </section>
             );
