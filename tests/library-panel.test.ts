@@ -94,16 +94,32 @@ describe('Library top bar', () => {
 
 describe('Library side panel', () => {
   it('lists All, Character, Location, Product, Object and Style, and switches to saved items', () => {
-    const rail = q('.pc-rail');
-    expect([...rail.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['All', 'Character', 'Location', 'Product', 'Object', 'Style']);
-    click(rail.querySelector('[aria-label="Character"]'));
+    const rail = () => q('.pc-rail');
+    expect([...rail().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['All', 'Character', 'Location', 'Product', 'Object', 'Style']);
+    click(rail().querySelector('[aria-label="Character"]'));
     expect([...host.querySelectorAll('.lib-tile .pc-info-title')].map((e) => e.textContent)).toEqual(['@Alf', '@Zed']);
     click(q('[aria-label="Sort by name"]'));
     expect([...host.querySelectorAll('.lib-tile .pc-info-title')].map((e) => e.textContent)).toEqual(['@Zed', '@Alf']);
-    click(rail.querySelector('[aria-label="Location"]'));
+    click(rail().querySelector('[aria-label="Location"]'));
     expect(host.querySelectorAll('.lib-tile')).toHaveLength(1);
-    click(rail.querySelector('[aria-label="All"]'));
+    click(rail().querySelector('[aria-label="All"]'));
     expect(names()).toHaveLength(3);
+  });
+
+  it('the top bar spans the panel and the rail sits below it, beside the results', () => {
+    const check = () => {
+      const bar = q('.pc-bar'), split = q('.pc-split'), rail = q('.pc-rail');
+      expect(split.contains(bar)).toBe(false);
+      expect(split.contains(rail)).toBe(true);
+      expect(bar.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(rail.nextElementSibling?.classList.contains('pc-main')).toBe(true);
+      expect(q('.pc-main').querySelector('.gallery-scroll')).not.toBeNull();
+      expect(rail.contains(bar.querySelector('[aria-label="Sort by name"]'))).toBe(false);
+    };
+    check();
+    expect(q('.pc-main').querySelector('.gallery-count')?.textContent).toContain('results');
+    click(q('.pc-rail [aria-label="Character"]'));
+    check();
   });
 
   it('is an icon-only rail with tooltips when the panel is not expanded', () => {

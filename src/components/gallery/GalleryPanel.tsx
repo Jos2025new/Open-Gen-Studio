@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ArrowDownAZ, ArrowUpZA, Box, ExternalLink, Grid2X2, Maximize2, Minimize2, Palette, Search, Shapes, Tag, Trash, UserRound, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
@@ -25,6 +25,8 @@ export function GalleryPanel() {
   const [stored, setStored] = usePref<ItemView>('ogs.libraryView', 'card');
   const view = asItemView(stored);
   const [cols, setCols] = useState(3);
+  // Each view renders its top bar across the whole panel, then this rail beside its results.
+  const rail = <CategoryRail items={RAIL} value={category} onChange={setCategory} expanded={expanded} label="Library categories" />;
   return (
     <div className="gallery" role="region" aria-label="Library">
       {embedded ? null : (
@@ -33,17 +35,12 @@ export function GalleryPanel() {
           <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
         </div>
       )}
-      <div className="pc-split">
-        <CategoryRail items={RAIL} value={category} onChange={setCategory} expanded={expanded} label="Library categories" />
-        <div className="pc-main">
-          {category === 'all' ? <GeneratedAssets view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
-        </div>
-      </div>
+      {category === 'all' ? <GeneratedAssets rail={rail} view={view} setView={setStored} cols={cols} setCols={setCols} /> : <LibraryAssets rail={rail} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
     </div>
   );
 }
 
-function LibraryAssets({ kind, view, setView, cols, setCols }: { kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
+function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const library = useStore((s) => s.library);
   const { expanded } = usePanelExpanded();
   const [q, setQ] = useState('');
@@ -68,16 +65,21 @@ function LibraryAssets({ kind, view, setView, cols, setCols }: { kind: SubjectKi
           <ViewToggle value={view} onChange={setView} />
         </div>
       </div>
-      <div className="gallery-scroll">
-        {list.length ? (
-          <div className={`gallery-grid library-layout-${view}`} style={{ ['--cols' as string]: cols }}>
-            {list.map((x) => <LibraryTile key={x.id} item={x} view={view} />)}
+      <div className="pc-split">
+        {rail}
+        <div className="pc-main">
+          <div className="gallery-scroll">
+            {list.length ? (
+              <div className={`gallery-grid library-layout-${view}`} style={{ ['--cols' as string]: cols }}>
+                {list.map((x) => <LibraryTile key={x.id} item={x} view={view} />)}
+              </div>
+            ) : (
+              <div className="empty-block">
+                <p>{library.some((x) => (x.kind ?? 'character') === kind) ? 'Nothing matches this search.' : 'Save a result with Send to → Save to library, or let the agent create references. Mention them as @Name in any prompt.'}</p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="empty-block">
-            <p>{library.some((x) => (x.kind ?? 'character') === kind) ? 'Nothing matches this search.' : 'Save a result with Send to → Save to library, or let the agent create references. Mention them as @Name in any prompt.'}</p>
-          </div>
-        )}
+        </div>
       </div>
     </>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AudioLines, Box, Download, Film, Folder, Image, ListFilter, MessageSquare, Paperclip, Search, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
@@ -22,7 +22,7 @@ type Scope = 'session' | 'all';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
 
 /** Everything generated or uploaded: the "All" category of the Library. */
-export function GeneratedAssets({ view, setView, cols, setCols }: { view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
+export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const sessionId = useStore((s) => s.activeSessionId);
@@ -145,6 +145,11 @@ export function GeneratedAssets({ view, setView, cols, setCols }: { view: ItemVi
           <Sep />
           <ViewToggle value={view} onChange={setView} />
         </div>
+      </div>
+      <div className="pc-split">
+      {rail}
+      <div className="pc-main">
+      <div className="pc-sub">
         <div className="gallery-count faint num">
           {results.length} {results.length === 1 ? 'result' : 'results'}
           {running ? <span className="running-pill num">{running} running</span> : null}
@@ -198,6 +203,8 @@ export function GeneratedAssets({ view, setView, cols, setCols }: { view: ItemVi
             <p>{Object.keys(assets).length ? 'Nothing matches these filters.' : 'Your generations will appear here.'}</p>
           </div>
         )}
+      </div>
+      </div>
       </div>
     </>
   );
