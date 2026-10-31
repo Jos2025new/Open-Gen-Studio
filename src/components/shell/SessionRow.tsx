@@ -15,6 +15,7 @@ import type { HeadDef } from '../gallery/ListColumns';
 export type QuickMode = 'all' | 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 export const QUICK_MODES = [{ id: 'agent', label: 'Agent', icon: Workflow }, { id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Video }, { id: 'audio', label: 'Audio', icon: Music }, { id: 'model3d', label: '3D', icon: Box }] as const;
 const MODE_NAME = { agent: 'Agent', image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D' } as const;
+const MODE_ICON: Record<string, typeof Workflow> = Object.fromEntries(QUICK_MODES.map((m) => [MODE_NAME[m.id], m.icon]));
 
 export const CANVAS: Record<Workspace, { label: string; icon: typeof MessageSquare }> = {
   chat: { label: 'Chat', icon: MessageSquare },
@@ -66,7 +67,6 @@ export const SESSION_HEADS: HeadDef<SessionSortKey>[] = [
 ];
 export type SessionSortKey = 'name' | 'mode' | 'gens' | 'nodes' | 'designs' | 'spend' | 'date';
 
-const shortDate = (time: number) => new Date(time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 /** A session as an image-first card (cover fills it; details on hover, focus or first tap) or as a compact row. */
 export function SessionRow({ session, active, stats, selecting, selected, view, basis, onToggle }: { session: Session; active: boolean; stats?: Stats; selecting: boolean; selected: boolean; view: ItemView; basis: 'updated' | 'created'; onToggle: () => void }) {
@@ -91,7 +91,11 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const rename = () => { if (selecting) return; setDraft(session.title); setEditing(true); };
   const hiddenMark = session.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
   const keys = (e: React.KeyboardEvent) => { if (!editing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } };
-  const when = <time className="pc-when" dateTime={new Date(stamp).toISOString()} title={`${basis === 'created' ? 'Created' : 'Updated'}: ${new Date(stamp).toLocaleString()}`}>{shortDate(stamp)}</time>;
+  const when = <time className="pc-when" dateTime={new Date(stamp).toISOString()} title={`${basis === 'created' ? 'Created' : 'Updated'}: ${new Date(stamp).toLocaleString()}`}>{formatRelative(stamp)}</time>;
+  const ModeIcon = modeLabel ? MODE_ICON[modeLabel] : undefined;
+  const mode = <span className="pc-mode">{ModeIcon ? <ModeIcon size={12} /> : null}{modeLabel ?? '—'}</span>;
+  const openTag = active ? <span className="pc-open-tag">Open</span> : null;
+  const meta = <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{mode}<span aria-hidden="true">·</span>{when}{openTag}</span>;
   const pin = <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" aria-pressed={Boolean(session.pinned)} className={`pc-fav pc-hover${session.pinned ? ' is-on' : ''}`} onClick={(e) => { e.stopPropagation(); togglePinSession(session.id); }} />;
   const inRow = view === 'list';
   const hide = () => setUserHidden('session', [session.id], !session.userHidden);
@@ -113,20 +117,22 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   ) : <span className="pc-info-title" title={session.title}>{session.title}</span>;
   const cover = <>
     {stats?.cover ? <AssetMedia assetId={stats.cover} hoverPlay={false} draggable={false} /> : null}
-    {!stats?.cover ? <CoverIcon size={view === 'list' ? 16 : 28} className="session-cover-icon" /> : null}
+    {!stats?.cover ? <CoverIcon size={view === 'card' ? 28 : 16} className="session-cover-icon" /> : null}
   </>;
+
+  const flags = `${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}`;
 
   if (view === 'list') {
     return (
-      <div className={`sess-row pc-row${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}`}>
+      <div className={`sess-row pc-row${flags}`}>
         <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
         <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
         <div role="button" tabIndex={0} className="session-main pc-text" onClick={open} onDoubleClick={rename} onKeyDown={keys}>
-          {title}
-          <span className={`pc-info-sub num${active ? '' : ' pc-cols-alt'}`}><span className="pc-cols-alt">{[modeLabel, ...details].filter(Boolean).join(' · ') || 'empty'}{active ? ' · ' : ''}</span>{active ? 'Open' : ''}</span>
+          <span className="pc-title-line">{title}{openTag}</span>
+          <span className="pc-info-sub num pc-cols-alt">{[modeLabel, ...details].filter(Boolean).join(' · ') || 'empty'}</span>
         </div>
         {hiddenMark}
-        <span className="pc-col pc-col-mode">{modeLabel ?? '—'}</span>
+        <span className="pc-col pc-col-mode">{mode}</span>
         <span className="pc-col pc-col-gens num">{stats?.gens || '—'}</span>
         <span className="pc-col pc-col-nodes num">{nodes || '—'}</span>
         <span className="pc-col pc-col-designs num">{docs || '—'}</span>
@@ -140,17 +146,28 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
       </div>
     );
   }
+  if (view === 'tile') {
+    // Cards: a compact horizontal card — small cover, title and one line of details; tools on hover.
+    return (
+      <div className={`sess-tile pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
+        <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
+        <span className="pc-thumb sess-cover" aria-hidden="true">{cover}</span>
+        <div role="button" tabIndex={0} className="session-main pc-text" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>
+          {title}{meta}
+        </div>
+        {hiddenMark}
+        <span className="pc-tools">{pin}{menu}</span>
+      </div>
+    );
+  }
+  // Grid: the cover on top, the title and details always visible beneath it; checkbox and tools over the cover.
   return (
-    <div className={`sess-card pc-card${session.userHidden ? ' is-hidden-item' : ''}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}${selecting ? ' is-selecting' : ''}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
+    <div className={`sess-card pc-card${flags}${tap.armed ? ' is-armed' : ''}${editing ? ' is-editing' : ''}`}>
       <div role="button" tabIndex={0} className="session-main pc-open sess-cover" aria-label={session.title} onPointerDown={tap.onPointerDown} onClick={tap.onClick} onDoubleClick={rename} onKeyDown={keys}>{cover}</div>
       <CardCheck checked={selected} label={`Select ${session.title}`} onToggle={onToggle} />
       <span className="pc-tools">{pin}{menu}</span>
       {hiddenMark}
-      {active ? <span className="sess-open">Open</span> : null}
-      <div className="pc-info pc-hover">
-        {title}
-        <span className="pc-info-sub num" title={[modeLabel ? `Last mode: ${modeLabel}` : 'No recorded mode', ...details, formatRelative(stamp)].join(' · ')}>{modeLabel ?? '—'} · {when}</span>
-      </div>
+      <div className="pc-info">{title}{meta}</div>
     </div>
   );
 }

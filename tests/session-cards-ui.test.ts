@@ -47,7 +47,7 @@ it('selects a date group, archives and restores it, and switches layouts', () =>
   expect(host.querySelector('.sess-card time')?.getAttribute('datetime')).toBe(new Date(first.updatedAt).toISOString());
   act(() => [...host.querySelectorAll<HTMLButtonElement>('.pc-center button')].find((button) => button.textContent === 'All')!.click());
   expect(host.querySelectorAll('.sess-card')).toHaveLength(2);
-  const group = host.querySelector<HTMLButtonElement>('.group-check')!;
+  const group = host.querySelector<HTMLButtonElement>('.pc-group-check')!;
   act(() => group.click());
   expect(host.querySelector('.session-bar')?.textContent).toContain('2 selected');
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Archive selected"]')!.click());

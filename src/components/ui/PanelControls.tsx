@@ -39,11 +39,12 @@ export function SortSegmented({ sort, onChange, nameOnly }: { sort: { by: string
   return <Segmented value={sortChoice(sort) as SortChoice} size="sm" onChange={(v) => onChange(SORT_STATE[v])} options={options} />;
 }
 
-export type ItemView = 'list' | 'card';
+/** Grid ('card'), compact Cards ('tile', Sessions only) or List. */
+export type ItemView = 'list' | 'card' | 'tile';
 /** Stored values from older versions ('cards', 'grid') mean card view. */
-export const asItemView = (v: unknown): ItemView => (v === 'list' ? 'list' : 'card');
-export function LayoutSegmented({ value, onChange }: { value: ItemView; onChange: (v: ItemView) => void }) {
-  return <Segmented value={value} size="sm" onChange={onChange} options={[{ value: 'card', label: 'Grid' }, { value: 'list', label: 'List' }]} />;
+export const asItemView = (v: unknown): ItemView => (v === 'list' || v === 'tile' ? v : 'card');
+export function LayoutSegmented({ value, onChange, tiles }: { value: ItemView; onChange: (v: ItemView) => void; /** Offers the compact Cards view between Grid and List. */ tiles?: boolean }) {
+  return <Segmented value={value} size="sm" onChange={onChange} options={[{ value: 'card', label: 'Grid' }, ...(tiles ? [{ value: 'tile' as const, label: 'Cards' }] : []), { value: 'list', label: 'List' }]} />;
 }
 
 /** The grid-size slider of the View popover, as in Generations. */

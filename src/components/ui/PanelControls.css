@@ -83,13 +83,20 @@
 .pc-row .pc-tools .icon-btn:hover { color: var(--text); }
 .pc-row .pc-hover { opacity: 1; }
 /* List: light rows like a file list — no filled blocks; the checkbox shows on hover, focus or while selecting. */
-.pc-row { padding: 5px 8px; background: none; }
+/* Each row is a soft framed strip, as in a file manager: the checkbox stays faintly present, the title leads, the
+   first column (model or mode) comes next, and dates and counts stay quiet. Library and Sessions share it. */
+.pc-row { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: none; }
 .pc-row:hover, .pc-row:focus-within { background: var(--surface-2); }
-.pc-row.is-selected { background: var(--surface-2); }
-.pc-row .pc-check { color: var(--text-3); opacity: 0; }
+.pc-row.is-selected { background: var(--surface-2); border-color: var(--accent); box-shadow: none; }
+.pc-row.is-active { border-color: var(--border-strong); box-shadow: none; }
+.pc-row .pc-check { color: var(--text-3); opacity: .45; }
 .pc-row:hover .pc-check, .pc-row:focus-within .pc-check, .pc-row.is-selecting .pc-check, .pc-row.is-selected .pc-check { opacity: 1; }
 .pc-row .pc-info-title { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .pc-row .pc-info-sub { color: var(--text-3); }
+.pc-title-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.pc-open-tag { flex: none; color: var(--accent); font-size: 11.5px; font-weight: 500; }
+.pc-mode { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.pc-mode svg { flex: none; }
 .sess-card .pc-hidden-badge { right: 52px; }
 .pc-group-check { display: grid; flex: none; place-items: center; width: 16px; height: 16px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--accent-ink); }
 .pc-group-check.is-on { border-color: transparent; background: var(--accent); }
@@ -139,11 +146,13 @@
 }
 
 /* List columns shared by Library and Sessions: each panel sets its own `--pc-w-<key>` defaults and column widths. */
-.pc-col { flex: none; overflow: hidden; color: var(--text-2); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.pc-col { flex: none; overflow: hidden; color: var(--text-3); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.pc-col-model, .pc-col-mode { color: var(--text-2); }
+.pc-cols .pc-row .pc-when { font-size: 12px; }
 .pc-cols .pc-row .pc-when, .pc-list-head .pc-col-date { width: var(--pc-w-date); flex: none; }
 .pc-cols .pc-row .pc-tools, .pc-list-head .pc-col-tools { display: flex; flex: none; justify-content: flex-end; width: var(--pc-w-tools); }
 .pc-cols .pc-cols-alt { display: none; }
-.pc-list-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 8px 20px 6px; background: var(--bg-canvas); border-bottom: 1px solid var(--border); }
+.pc-list-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 8px 23px 6px; background: var(--bg-canvas); border-bottom: 1px solid var(--border); }
 .pc-head-cell { position: relative; display: flex; align-items: center; overflow: visible; }
 .pc-head-cell > button { display: inline-flex; align-items: center; gap: 4px; min-width: 0; height: 22px; padding: 0; overflow: hidden; color: var(--text-3); font-size: 11px; font-weight: 500; text-align: left; white-space: nowrap; }
 .pc-head-cell > button:hover, .pc-head-cell > button.is-on { color: var(--text); }

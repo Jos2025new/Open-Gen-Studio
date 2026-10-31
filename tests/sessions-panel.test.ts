@@ -177,19 +177,19 @@ describe('Sessions top bar', () => {
 describe('Sessions cards', () => {
   const card = (title: string) => [...host.querySelectorAll('.sess-card')].find((c) => c.textContent?.includes(title))!;
 
-  it('overlay has checkbox, pin and menu; details show mode and date', () => {
+  it('Grid: checkbox, pin and menu over the cover; title, mode and date always visible beneath it', () => {
     const c = card('Bravo');
     expect(c.querySelector('[role="checkbox"]')).not.toBeNull();
     expect(c.querySelector('[aria-label="Pin"]')).not.toBeNull();
     expect(c.querySelector('[aria-label="Session actions"]')).not.toBeNull();
-    expect(c.querySelector('.pc-info')?.classList.contains('pc-hover')).toBe(true);
-    expect(c.querySelector('.pc-info')?.textContent).toMatch(/Video · /);
+    expect(c.querySelector('.pc-info')?.classList.contains('pc-hover')).toBe(false);
+    expect(c.querySelector('.pc-info')?.textContent).toMatch(/Video·/);
     expect(c.querySelector('.session-cover-icon')).not.toBeNull(); // no cover: the canvas icon
   });
 
   it('active, pinned and selected states are visible without hover', () => {
     expect(card('Bravo').classList.contains('is-active')).toBe(true);
-    expect(card('Bravo').querySelector('.sess-open')).not.toBeNull();
+    expect(card('Bravo').querySelector('.pc-open-tag')?.textContent).toBe('Open');
     click(card('Alpha').querySelector('[aria-label="Pin"]'));
     expect(useStore.getState().sessions[ids.Alpha].pinned).toBe(true);
     expect(card('Alpha').querySelector('.pc-fav')?.classList.contains('is-on')).toBe(true);

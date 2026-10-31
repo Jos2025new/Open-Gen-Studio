@@ -5,8 +5,8 @@
 .pc-sub .gallery-bulk { padding-bottom: 4px; }
 .side-panel.panel-gallery { border-color: var(--border); box-shadow: 0 12px 32px rgba(0, 0, 0, .225), 0 2px 8px rgba(0, 0, 0, .15); }
 [data-base="claro"] .side-panel.panel-gallery, [data-base="blanco"] .side-panel.panel-gallery { box-shadow: 0 6px 18px rgba(60, 64, 67, .06), 0 2px 6px rgba(60, 64, 67, .0375); }
-.gallery-grid.pc-cols { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-.g-tile.pc-row { aspect-ratio: auto; overflow: visible; border: 0; border-radius: 6px; }
+.gallery-grid.pc-cols { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.g-tile.pc-row { aspect-ratio: auto; overflow: visible; }
 .g-tile.pc-row .g-open { position: relative; }
 .g-tile.pc-row .g-remote { position: static; flex: none; }
 .pc-text-card { padding: 10px; }

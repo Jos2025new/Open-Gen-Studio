@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Check, Eye, EyeOff, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Eye, EyeOff, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from 'lucide-react';
 import { newSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -11,7 +11,7 @@ import { visibleSessions } from '../../store/spaceSession';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { setUserHidden } from '../../store/userHidden';
 import { usePref } from '../ui/hooks';
-import { GridSizeSlider, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, SourceSelect, asItemView, type RailItem } from '../ui/PanelControls';
+import { GridSizeSlider, GroupCheck, LayoutSegmented, PanelPopover, SearchToggle, SortSegmented, SourceSelect, asItemView, type RailItem } from '../ui/PanelControls';
 import { ListHeader, widthVars, type ColumnWidths } from '../gallery/ListColumns';
 import { CANVAS, QUICK_MODES, RunningNote, SESSION_HEADS, SessionRow, sessionCanvases, sessionMode, type QuickMode, type SessionSortKey, type Stats } from './SessionRow';
 import './SessionsLayout.css';
@@ -185,7 +185,7 @@ export function SessionsPanel() {
           <SourceSelect items={SOURCES.map((r) => ({ ...r, count: counts[r.id] }))} value={canvas} onChange={(v) => { setCanvas(v); setSelected(new Set()); }} label="Session canvas" separatorAfter="all" allLabel="Sessions" />
           <div className="pc-icons">
             <PanelPopover icon={LayoutGrid} label="View">{(close) => <>
-              <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={layout} onChange={setLayout} /></div>
+              <div className="sv-row"><span className="sv-label">Layout</span><LayoutSegmented value={layout} onChange={setLayout} tiles /></div>
               <div className="sv-row"><span className="sv-label">Sort</span><SortSegmented sort={sort} onChange={setSort} /></div>
               <div className="sv-row">
                 <span className="sv-label">Date means</span>
@@ -227,12 +227,12 @@ export function SessionsPanel() {
           <section key={g.label} className="date-group">
             {g.label ? (
               <h4 className="date-head">
-                <button type="button" className={`session-check group-check${g.items.every((s) => selected.has(s.id)) ? ' is-on' : ''}`} role="checkbox" aria-label={`Select ${g.label}`} aria-checked={g.items.every((s) => selected.has(s.id)) ? true : g.items.some((s) => selected.has(s.id)) ? 'mixed' : false} onClick={() => setSelected((current) => {
+                <GroupCheck label={g.label} state={g.items.every((s) => selected.has(s.id)) ? 'all' : g.items.some((s) => selected.has(s.id)) ? 'some' : 'none'} onToggle={() => setSelected((current) => {
                   const next = new Set(current);
                   const all = g.items.every((s) => next.has(s.id));
                   for (const item of g.items) { if (all) next.delete(item.id); else next.add(item.id); }
                   return next;
-                })}>{g.items.every((s) => selected.has(s.id)) ? <Check size={12} /> : null}</button>
+                })} />
                 {g.label} <span className="faint num">{g.items.length}</span>
               </h4>
             ) : null}

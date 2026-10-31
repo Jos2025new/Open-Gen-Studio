@@ -91,3 +91,21 @@ it('the card grid shows the same sort labels as a compact row with the toggles a
   expect([...host.querySelectorAll('.pc-sort-strip .pc-head-cell > button')].map((b) => b.textContent)).toEqual(['Name', 'Mode', 'Generations', 'Nodes', 'Designs', 'Spend', 'Date']);
   expect(host.querySelector('.pc-sort-strip [role="separator"]')).toBeNull();
 });
+
+it('Cards is a third view between Grid and List: compact cards with the cover, title, mode and date, remembered', () => {
+  click(q('.pc-bar [aria-label="View"]'));
+  expect([...document.querySelectorAll('[role="radio"]')].map((b) => b.textContent).slice(0, 3)).toEqual(['Grid', 'Cards', 'List']);
+  click([...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === 'Cards'));
+  expect(host.querySelector('.sessions.layout-tile')).not.toBeNull();
+  expect(host.querySelectorAll('.sess-tile')).toHaveLength(3);
+  expect(localStorage.getItem('ogs.sessionsView')).toBe('"tile"');
+  const bravo = [...host.querySelectorAll('.sess-tile')].find((c) => c.querySelector('.pc-info-title')?.textContent === 'Bravo')!;
+  expect(bravo.querySelector('.pc-open-tag')?.textContent).toBe('Open');
+  expect(bravo.querySelector('time')).not.toBeNull();
+  expect(host.querySelector('.pc-sort-strip')).not.toBeNull();
+});
+
+it('the open session shows an Open tag beside its title in the list', () => {
+  expect(row('Bravo').querySelector('.pc-title-line .pc-open-tag')?.textContent).toBe('Open');
+  expect(row('Alpha').querySelector('.pc-open-tag')).toBeNull();
+});
