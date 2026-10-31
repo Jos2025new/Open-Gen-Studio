@@ -60,13 +60,13 @@ describe('Library top bar', () => {
     expect(name.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('has three zones: left (search, filter, sorts, scope), centered types, right (size, view)', () => {
+  it('has three zones: left (search, filter, sorts, grouping), centered types, right (size, view)', () => {
     expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).not.toMatch(/\.pc-bar \{[^}]*space-between/);
     const kids = [...q('.pc-bar').children];
     expect(kids).toHaveLength(3);
     const labels = [...kids[0].querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
     expect(labels.slice(0, 4)).toEqual(['Search', 'Filter by', 'Sort by name', 'Sort by date']);
-    expect(labels.slice(4)).toEqual(['This session', 'All sessions']);
+    expect(labels.slice(4)).toEqual(['All', 'Sessions']);
     expect(kids[1].classList.contains('pc-center')).toBe(true);
     expect(kids[1].querySelector('[aria-label="Images"]')).not.toBeNull();
     expect(kids[2].querySelector('input[aria-label="Grid size"]')).not.toBeNull();
@@ -82,16 +82,36 @@ describe('Library top bar', () => {
     expect(q('.generated-controls').firstElementChild?.classList.contains('pc-bar')).toBe(true);
   });
 
-  it('the scope is a visible control after the date sort (default this session) and no longer in Filter by', () => {
-    const seg = q('.pc-bar .pc-grp').querySelector('[role="radiogroup"], .seg')!;
+  it('All | Sessions replaces the scope and Group by: All groups by date, Sessions by session with titled, selectable headers', () => {
+    const seg = q('.pc-bar .pc-grp [role="radiogroup"], .pc-bar .pc-grp .seg');
     expect(seg).not.toBeNull();
-    useStore.setState((s) => ({ assets: { ...s.assets, z: asset('z', { sessionId: 'other', createdAt: 5, generationId: undefined, name: 'Zed' }) } }));
-    act(() => root.unmount()); root = createRoot(host); mount();
-    expect(names()).not.toContain('Zed');
-    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'All sessions') ?? null);
-    expect(names()).toContain('Zed');
+    const other = createSession('Other');
+    act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [other.id]: other }, assets: { ...st.assets, z: asset('z', { sessionId: other.id, createdAt: 5, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zed', { sessionId: other.id }) } })));
+    expect(names()).toContain('Zed'); // every session is covered
+    expect([...host.querySelectorAll('.date-head')].map((h) => h.textContent)).not.toContain('Other 1');
+    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'Sessions') ?? null);
+    const heads = [...host.querySelectorAll('.date-head')];
+    expect(heads.map((h) => h.textContent)).toContain('Other 1');
+    const group = heads.find((h) => h.textContent === 'Other 1')!;
+    click(group.querySelector('[role="checkbox"]'));
+    expect(q('.gallery-bulk').textContent).toContain('1 selected');
+    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'All') ?? null);
     click(q('[aria-label="Filter by"]'));
-    expect([...document.querySelectorAll('.sv-label')].map((e) => e.textContent?.trim())).not.toContain('Show');
+    expect([...document.querySelectorAll('.sv-label')].map((e) => e.textContent?.trim())).not.toEqual(expect.arrayContaining(['Show']));
+    expect(document.body.textContent).not.toContain('Group by');
+    expect(document.body.textContent).not.toContain('This session');
+  });
+
+  it('card view lays tiles out in justified rows that keep each asset ratio', () => {
+    act(() => useStore.setState((st) => ({ assets: { ...st.assets, a: { ...st.assets.a, width: 200, height: 100 }, b: { ...st.assets.b, width: 100, height: 200 } } })));
+    const cells = [...host.querySelectorAll<HTMLElement>('.jg-cell')];
+    expect(cells).toHaveLength(3);
+    const ratio = (c: HTMLElement) => parseFloat(c.style.width) / parseFloat(c.style.height);
+    const byName = Object.fromEntries(cells.map((c) => [c.querySelector('.g-open')?.getAttribute('title'), c]));
+    expect(ratio(byName.Mango)).toBeCloseTo(2, 3);
+    expect(ratio(byName.Apple)).toBeCloseTo(0.5, 3);
+    click(q('[aria-label="List view"]'));
+    expect(host.querySelector('.jg-cell')).toBeNull();
   });
 
   it('filters by type with icon buttons and All restores everything', () => {
@@ -107,10 +127,10 @@ describe('Library top bar', () => {
     expect(names()).toHaveLength(3);
   });
 
-  it('keeps Canvas, Place, Mode, Group by and Favorites only in the Filter by menu', () => {
+  it('keeps Canvas, Place, Mode and Favorites only in the Filter by menu', () => {
     click(q('[aria-label="Filter by"]'));
     const labels = [...document.querySelectorAll('.sv-row .sv-label, .sv-switch span')].map((e) => e.textContent?.trim());
-    for (const l of ['Canvas', 'Place', 'Mode', 'Group by', 'Favorites only']) expect(labels).toContain(l);
+    for (const l of ['Canvas', 'Place', 'Mode', 'Favorites only']) expect(labels).toContain(l);
     click(document.querySelector('[role="switch"][aria-label="Favorites only"]'));
     expect(names()).toEqual(['Apple']);
   });
@@ -317,7 +337,6 @@ describe('Library cards', () => {
   it('items of archived sessions are left out until Show archived is on', () => {
     const old = createSession('Old'); old.archived = true;
     act(() => useStore.setState((st) => ({ sessions: { ...st.sessions, [old.id]: old }, assets: { ...st.assets, z: asset('z', { sessionId: old.id, createdAt: 99, generationId: 'g-z' }) }, generations: { ...st.generations, 'g-z': gen('g-z', 'Zebra', { sessionId: old.id }) } })));
-    click([...q('.pc-bar').querySelectorAll('button')].find((b) => b.textContent === 'All sessions') ?? null);
     expect(names()).not.toContain('Zebra');
     const arch = q<HTMLButtonElement>('.pc-right [aria-label="Show archived"]');
     expect(arch.getAttribute('data-tip')).toContain('1');

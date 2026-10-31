@@ -258,8 +258,6 @@ export interface Asset {
   thumbKey?: string;
   stored: boolean;
   favorite: boolean;
-  /** Hidden by the user from the Library views until "Show hidden" is on; the file is kept. */
-  userHidden?: boolean;
   createdAt: number;
 }
 
@@ -1020,8 +1018,6 @@ export interface Subject {
   videoAssetId?: string;
   /** Provider voice bound to the subject (Kling voice_id). */
   voiceId?: string;
-  /** Hidden by the user from the Library views until "Show hidden" is on. */
-  userHidden?: boolean;
   /** kind 'style' saved from a result: its CTLT, usable as the capture style "Mis estilos". */
   capture?: import('./captureStyles').CaptureCustom;
 }
@@ -1043,8 +1039,6 @@ export interface Session {
   updatedAt: number;
   pinned: boolean;
   archived?: boolean;
-  /** Hidden by the user from the Sessions panel (shown again with the eye toggle). Not `hidden`, which marks a Space container. */
-  userHidden?: boolean;
   /** Space container, hidden from session lists and search. */
   hidden?: boolean;
   feed: FeedItem[];

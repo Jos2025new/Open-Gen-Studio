@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Image, ListFilter, MessageSquare, Paperclip, Trash, X } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AudioLines, Box, Download, Eye, EyeOff, Film, Image, ListFilter, MessageSquare, Paperclip, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
@@ -13,25 +13,24 @@ import { usePanelExpanded } from '../shell/panelEmbed';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 import { ResultsMenu } from '../ui/ResultsMenu';
-import { ArchivedToggle, HiddenToggle, SearchToggle, Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
+import { JustifiedGrid } from '../ui/JustifiedGrid';
+import { rowHeightFor } from '../../lib/justifiedRows';
+import { ArchivedToggle, GroupCheck, HiddenToggle, SearchToggle, Sep, SortToggles, ViewToggle, type ItemView, type SortState } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { generationTitle } from '../assets/GenerationInfo';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
-type Scope = 'session' | 'all';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
 
 /** Everything generated or uploaded: the "All" category of the Library. */
 export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: ReactNode; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
-  const sessionId = useStore((s) => s.activeSessionId);
   const { expanded } = usePanelExpanded();
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
-  const [scope, setScope] = useState<Scope>(() => (useStore.getState().ui.home || useStore.getState().ui.space ? 'all' : 'session'));
   const [place, setPlace] = useState<PlaceFilter>('all');
   const [mode, setMode] = useState<ModeFilter>('all');
   const [favOnly, setFavOnly] = useState(false);
@@ -47,7 +46,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
   const sessions = useStore((s) => s.sessions);
   const [canvas, setCanvas] = useState<CanvasFilterValue>('all');
   const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
-  const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (scope === 'session' ? a.sessionId === sessionId : true) && (showHidden || !a.userHidden) && (showArchived || !sessions[a.sessionId]?.archived)), [assets, scope, sessionId, showHidden, showArchived, sessions]);
+  const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (showHidden || !a.userHidden) && (showArchived || !sessions[a.sessionId]?.archived)), [assets, showHidden, showArchived, sessions]);
   const dir = sort.asc ? 1 : -1;
   const order = <T extends { title: string; createdAt: number }>(a: T, b: T) => sort.by === 'name' ? dir * a.title.localeCompare(b.title) : dir * (a.createdAt - b.createdAt);
   const list = useMemo(() => {
@@ -66,7 +65,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
       .sort(order).map((x) => x.a);
   }, [inScope, canvas, where, generations, q, kind, favOnly, sort, place, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const texts = useMemo(() => Object.values(generations).filter((g) => g.kind === 'text' && g.status === 'done' && !g.discard
-    && (scope === 'all' || g.sessionId === sessionId) && (showArchived || !sessions[g.sessionId]?.archived)), [generations, scope, sessionId, showArchived, sessions]);
+    && (showArchived || !sessions[g.sessionId]?.archived)), [generations, showArchived, sessions]);
   const canvasCounts = useMemo(() => {
     const c = { all: inScope.length + texts.length, chat: 0, node: 0, designer: 0 };
     for (const a of inScope) c[where.asset(a)]++;
@@ -107,7 +106,7 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
     if (selecting) return toggle(a.id);
     setUi({ lightbox: { assetIds: list.map((x) => x.id), index: list.findIndex((x) => x.id === a.id) } });
   };
-  const filtered = canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all';
+  const filtered = canvas !== 'all' || place !== 'all' || mode !== 'all';
   const allHidden = ids.length > 0 && ids.every((id) => assets[id]?.userHidden);
   const allPicked = list.length > 0 && list.every((a) => selected.has(a.id));
 
@@ -118,21 +117,17 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
           <div className="pc-grp">
             <SearchToggle value={q} onChange={setQ} placeholder="Search prompts and models" inputLabel="Search assets" />
             <div className="results-controls">
-              <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={canvas !== 'all' || place !== 'all' || mode !== 'all' || group !== 'date' || favOnly}>
+              <ResultsMenu label="Filter by" icon={ListFilter} iconOnly width={280} active={canvas !== 'all' || place !== 'all' || mode !== 'all' || favOnly}>
                 <div className="sv-row">
                   <span className="sv-label">Canvas</span>
                   <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
                 </div>
                 <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
-                <div className="sv-row">
-                  <span className="sv-label"><Folder size={12} /> Group by</span>
-                  <Segmented value={group} size="sm" onChange={setGroup} options={[{ value: 'date', label: 'Date' }, { value: 'session', label: 'Sessions' }]} />
-                </div>
                 <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
               </ResultsMenu>
             </div>
             <SortToggles sort={sort} onChange={setSort} />
-            <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
+            <Segmented value={group} size="sm" onChange={setGroup} options={[{ value: 'date', label: 'All' }, { value: 'session', label: 'Sessions' }]} />
           </div>
           <div className="pc-grp pc-center" role="group" aria-label="Filter assets by type">
             {KINDS.map(({ id, label, icon }) => <IconButton key={id} icon={icon} label={label} size="sm" active={kind === id} aria-pressed={kind === id} onClick={() => setKind(kind === id ? 'all' : id)} />)}
@@ -160,7 +155,6 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
         {kind !== 'all' || filtered || favOnly ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
-            {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
             {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{KINDS.find((k) => k.id === kind)?.label} <X size={11} /></button> : null}
             {place !== 'all' ? <button type="button" className="active-chip" onClick={() => setPlace('all')}>{place === 'none' ? 'No place' : PLACE_LABEL[place]} <X size={11} /></button> : null}
             {mode !== 'all' ? <button type="button" className="active-chip" onClick={() => setMode('all')}>{mode === 'none' ? 'No mode' : MODE_LABEL[mode]} <X size={11} /></button> : null}
@@ -192,16 +186,28 @@ export function GeneratedAssets({ rail, view, setView, cols, setCols }: { rail: 
       </div>
       <div className="gallery-scroll">
         {results.length ? (
-          groups.map((g) => (
-            <section key={g.id} className="date-group">
-              {g.label ? <h4 className="date-head">{g.label} <span className="faint num">{g.items.length}</span></h4> : null}
-              <div className={`gallery-grid library-layout-${view}`} style={{ ['--cols' as string]: cols }}>
-                {g.items.map((a) => (
-                  a.type === 'text' ? <LibraryTextTile key={a.id} g={a.generation} view={view} /> : <GalleryTile key={a.id} asset={a.asset} view={view} selected={selected.has(a.id)} selecting={selecting} onToggle={() => toggle(a.id)} onOpen={() => open(a.asset)} />
-                ))}
-              </div>
-            </section>
-          ))
+          groups.map((g) => {
+            const gids = g.items.flatMap((x) => (x.type === 'asset' ? [x.id] : []));
+            const picked = gids.filter((id) => selected.has(id)).length;
+            const tiles = g.items.map((a) => ({
+              id: a.id,
+              ratio: a.type === 'asset' && a.asset.width > 0 && a.asset.height > 0 ? a.asset.width / a.asset.height : 1,
+              node: a.type === 'text' ? <LibraryTextTile g={a.generation} view={view} /> : <GalleryTile asset={a.asset} view={view} selected={selected.has(a.id)} selecting={selecting} onToggle={() => toggle(a.id)} onOpen={() => open(a.asset)} />,
+            }));
+            return (
+              <section key={g.id} className="date-group">
+                {g.label ? (
+                  <h4 className="date-head">
+                    {gids.length ? <GroupCheck label={g.label} state={picked === 0 ? 'none' : picked === gids.length ? 'all' : 'some'} onToggle={() => setSelected((cur) => { const n = new Set(cur); for (const id of gids) { if (picked === gids.length) n.delete(id); else n.add(id); } return n; })} /> : null}
+                    {g.label} <span className="faint num">{g.items.length}</span>
+                  </h4>
+                ) : null}
+                {view === 'card'
+                  ? <JustifiedGrid className="gallery-grid library-layout-card" items={tiles} rowHeight={rowHeightFor((expanded ? 10 : 7) - cols)} />
+                  : <div className="gallery-grid library-layout-list">{tiles.map((t) => <Fragment key={t.id}>{t.node}</Fragment>)}</div>}
+              </section>
+            );
+          })
         ) : (
           <div className="empty-block">
             <p>{Object.keys(assets).length ? 'Nothing matches these filters.' : 'Your generations will appear here.'}</p>

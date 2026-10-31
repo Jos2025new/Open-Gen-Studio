@@ -19,4 +19,8 @@
 .pc-row .pc-text { background: none; padding: 0; border: 0; }
 /* The agent-context box sits beside the select checkbox; it is always visible once the asset is in the context. */
 .pc-row > .attach-toggle { position: static; flex: none; width: 18px; height: 18px; }
-.gallery-grid.library-layout-card { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
+/* Card view: justified rows (equal row height, widths follow each tile's ratio). */
+.gallery-grid.jg { display: flex; flex-direction: column; grid-template-columns: none; padding: 12px; }
+.jg-row { display: flex; flex: none; }
+.jg-cell { flex: none; min-width: 0; }
+.jg-cell > .g-tile, .jg-cell > .text-result-tile { width: 100%; height: 100%; aspect-ratio: auto; }

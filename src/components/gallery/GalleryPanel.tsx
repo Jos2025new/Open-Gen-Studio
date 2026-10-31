@@ -10,6 +10,8 @@ import type { Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { usePref } from '../ui/hooks';
 import { HiddenToggle, SearchToggle, CardMenu, CategoryRail, MenuConfirm, MenuItem, Sep, ViewToggle, asItemView, useTapReveal, type ItemView, type RailItem } from '../ui/PanelControls';
+import { JustifiedGrid } from '../ui/JustifiedGrid';
+import { rowHeightFor } from '../../lib/justifiedRows';
 import { GeneratedAssets } from './GeneratedAssets';
 import './GalleryLayout.css';
 
@@ -43,6 +45,7 @@ export function GalleryPanel() {
 
 function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: ReactNode; kind: SubjectKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void }) {
   const library = useStore((s) => s.library);
+  const assets = useStore((s) => s.assets);
   const { expanded } = usePanelExpanded();
   const [q, setQ] = useState('');
   const [asc, setAsc] = useState(true);
@@ -72,9 +75,9 @@ function LibraryAssets({ rail, kind, view, setView, cols, setCols }: { rail: Rea
         <div className="pc-main">
           <div className="gallery-scroll">
             {list.length ? (
-              <div className={`gallery-grid library-layout-${view}`} style={{ ['--cols' as string]: cols }}>
-                {list.map((x) => <LibraryTile key={x.id} item={x} view={view} />)}
-              </div>
+              view === 'card'
+                ? <JustifiedGrid className="gallery-grid library-layout-card" rowHeight={rowHeightFor((expanded ? 10 : 7) - cols)} items={list.map((x) => { const a = assets[x.frontalAssetId ?? x.videoAssetId ?? '']; return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} /> }; })} />
+                : <div className="gallery-grid library-layout-list">{list.map((x) => <LibraryTile key={x.id} item={x} view={view} />)}</div>
             ) : (
               <div className="empty-block">
                 <p>{library.some((x) => (x.kind ?? 'character') === kind) ? 'Nothing matches this search.' : 'Save a result with Send to → Save to library, or let the agent create references. Mention them as @Name in any prompt.'}</p>

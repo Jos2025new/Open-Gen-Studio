@@ -1,5 +1,15 @@
 import { useStore } from './store';
 
+/**
+ * The optional `userHidden` flag, declared here (types.ts is size-capped). It is distinct from `Session.hidden`,
+ * which marks a Space container: a user hides a session, an asset or a saved item from the Library and Sessions views.
+ */
+declare module '../engine/types' {
+  interface Session { userHidden?: boolean }
+  interface Asset { userHidden?: boolean }
+  interface Subject { userHidden?: boolean }
+}
+
 export type HideKind = 'session' | 'asset' | 'subject';
 
 /**

@@ -48,8 +48,8 @@ it('Library counts text in Place/Mode and its Text filter excludes images; viewe
   useStore.setState((s) => ({ generations: { txt: g }, assets: { pic: { id: 'pic', kind: 'image', place: 'space-create', mode: 'image', createdAt: 5, sessionId: 'hidden', origin: 'generated', stored: true } as import('../src/engine/types').Asset }, ui: { ...s.ui, home: true, space: undefined, lightbox: null, textView: null } }));
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   act(() => root.render(createElement(GalleryPanel)));
-  expect(host.querySelectorAll('.gallery-grid > *')).toHaveLength(2);
-  expect(host.querySelector('.gallery-grid > :first-child')?.classList.contains('g-tile')).toBe(true);
+  expect(host.querySelectorAll('.gallery-grid .jg-cell')).toHaveLength(2);
+  expect(host.querySelector('.gallery-grid .jg-cell > :first-child')?.classList.contains('g-tile')).toBe(true);
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter by"]')!.click());
   const rows = [...document.querySelectorAll('.sv-row')];
   const place = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Place')!;
@@ -58,7 +58,7 @@ it('Library counts text in Place/Mode and its Text filter excludes images; viewe
   expect([...mode.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Audio'))?.textContent).toBe('Audio1');
   act(() => document.body.click());
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Text"]')!.click());
-  expect(host.querySelectorAll('.gallery-grid > *')).toHaveLength(1);
+  expect(host.querySelectorAll('.gallery-grid .jg-cell')).toHaveLength(1);
   expect(host.querySelector('.gallery-scroll')?.textContent).toContain('Transcription here');
   act(() => { setUi({ textView: g.id }); setUi({ lightbox: { assetIds: ['pic'], index: 0 } }); });
   expect(useStore.getState().ui.textView).toBeNull();

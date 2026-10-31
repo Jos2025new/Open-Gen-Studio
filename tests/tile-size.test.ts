@@ -76,9 +76,9 @@ describe('saved tile size', () => {
   });
 });
 
-describe('Library grid size drives the columns', () => {
-  it('card layout uses --cols and the bar controls match the slider height', () => {
-    expect(readFileSync('src/components/gallery/GalleryLayout.css', 'utf8')).toMatch(/\.library-layout-card \{ grid-template-columns: repeat\(var\(--cols, 3\)/);
+describe('Library grid size drives the row height', () => {
+  it('card layout is justified rows and the bar controls match the slider height', () => {
+    expect(readFileSync('src/components/gallery/GalleryLayout.css', 'utf8')).toMatch(/\.gallery-grid\.jg \{ display: flex; flex-direction: column/);
     expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).toMatch(/\.pc-bar \.icon-btn \{ width: var\(--pc-h\); height: var\(--pc-h\)/);
     expect(readFileSync('src/styles/designer-connected.css', 'utf8')).toMatch(/height: 36px; min-width: 0; padding: 0 12px/); // the slider stays at its standard 36px
   });
@@ -95,9 +95,10 @@ describe('Library uses the same slider', () => {
     expect(size).not.toBeNull();
     const before = Number(size.value);
     if (before < Number(size.max)) {
-      const columns = Number(host.querySelector<HTMLElement>('.gallery-grid')!.style.getPropertyValue('--cols'));
+      const rowHeight = () => parseFloat(host.querySelector<HTMLElement>('.gallery-grid')!.style.getPropertyValue('--row-h'));
+      const before_h = rowHeight();
       setNum(size, before + 1);
-      expect(Number(host.querySelector<HTMLElement>('.gallery-grid')!.style.getPropertyValue('--cols'))).toBe(columns - 1);
+      expect(rowHeight()).toBeGreaterThan(before_h); // bigger Grid size = larger tiles
     }
     act(() => host.querySelector<HTMLButtonElement>('[aria-label="List view"]')!.click());
     expect(host.querySelector('input[aria-label="Grid size"]')).toBeNull();

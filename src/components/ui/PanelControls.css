@@ -82,3 +82,8 @@
 .pc-row .pc-tools .icon-btn:hover { color: var(--text); }
 .pc-row .pc-hover { opacity: 1; }
 .sess-card .pc-hidden-badge { right: 52px; }
+.pc-group-check { display: grid; flex: none; place-items: center; width: 16px; height: 16px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--accent-ink); }
+.pc-group-check.is-on { border-color: transparent; background: var(--accent); }
+.pc-group-check.is-mixed { color: var(--text); }
+.pc-dash { width: 8px; border-top: 2px solid currentColor; }
+.date-head .pc-group-check { margin-right: 2px; align-self: center; }

@@ -111,6 +111,13 @@ export function CardCheck({ checked, label, onToggle }: { checked: boolean; labe
   </button>;
 }
 
+/** Checkbox in a group header (a date or a session): selects or clears every item of the group; mixed when only some are. */
+export function GroupCheck({ label, state, onToggle }: { label: string; state: 'all' | 'some' | 'none'; onToggle: () => void }) {
+  return <button type="button" role="checkbox" aria-label={`Select ${label}`} aria-checked={state === 'all' ? true : state === 'some' ? 'mixed' : false} className={`pc-group-check${state === 'all' ? ' is-on' : ''}${state === 'some' ? ' is-mixed' : ''}`} onClick={onToggle}>
+    {state === 'all' ? <Check size={12} strokeWidth={2.75} /> : state === 'some' ? <span className="pc-dash" /> : null}
+  </button>;
+}
+
 export function MenuItem({ icon: Icon, children, tone, disabled, onClick }: { icon?: LucideIcon; children: ReactNode; tone?: 'danger'; disabled?: boolean; onClick: () => void }) {
   return <button type="button" role="menuitem" className={`pc-menu-item${tone ? ` tone-${tone}` : ''}`} disabled={disabled} onClick={onClick}>{Icon ? <Icon size={14} strokeWidth={1.75} /> : null}{children}</button>;
 }
