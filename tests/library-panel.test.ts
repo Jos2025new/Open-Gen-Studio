@@ -170,6 +170,21 @@ describe('Library cards', () => {
     expect(useStore.getState().ui.lightbox).not.toBeNull();
   });
 
+  it('an asset in the agent context shows its checked, numbered toggle without hover', () => {
+    act(() => useStore.setState({ composer: { ...useStore.getState().composer, attachments: ['c', 'a'] } }));
+    const tiles = [...host.querySelectorAll('.g-tile')]; // Apple(b), Cherry(c), Mango(a)
+    expect(tiles[0].querySelector('.attach-toggle')?.classList.contains('is-on')).toBe(false);
+    const on = tiles[1].querySelector('.attach-toggle')!;
+    expect(on.classList.contains('is-on')).toBe(true);
+    expect(on.getAttribute('aria-checked')).toBe('true');
+    expect(on.textContent).toBe('1');
+    expect(tiles[2].querySelector('.attach-toggle')?.textContent).toBe('2');
+    click(on);
+    expect(useStore.getState().composer.attachments).toEqual(['a']);
+    click(q('[aria-label="List view"]'));
+    expect(host.querySelector('.g-tile.pc-row .attach-toggle.is-on')?.textContent).toBe('1');
+  });
+
   it('list rows keep the actions', () => {
     click(q('[aria-label="List view"]'));
     const row = q('.g-tile.pc-row');

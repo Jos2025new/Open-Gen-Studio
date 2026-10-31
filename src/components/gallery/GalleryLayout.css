@@ -15,3 +15,6 @@
 .pc-text-card .gen-text-actions { position: relative; z-index: 2; opacity: 0; transition: opacity .12s; }
 .pc-text-card:hover .gen-text-actions, .pc-text-card:focus-within .gen-text-actions, .pc-text-card.is-armed .gen-text-actions { opacity: 1; }
 .pc-row .pc-text { background: none; padding: 0; border: 0; }
+/* The agent-context box sits beside the select checkbox; it is always visible once the asset is in the context. */
+.pc-card > .attach-toggle { top: 6px; left: 30px; width: 18px; height: 18px; z-index: 2; }
+.pc-row > .attach-toggle { position: static; flex: none; width: 18px; height: 18px; }

@@ -6,6 +6,7 @@ import { canReuse, reuseGeneration } from '../../store/reuse';
 import { formatDuration, formatRelative } from '../../lib/format';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
+import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView } from '../ui/PanelControls';
 import { generationTitle } from '../assets/GenerationInfo';
 import { TextResult } from '../assets/TextResult';
@@ -55,6 +56,7 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
       <CardCheck checked={selected} label={`Select ${title}`} onToggle={onToggle} />
       <button type="button" className="g-open pc-thumb" onClick={onOpen} aria-label="Open"><AssetMedia assetId={asset.id} hoverPlay={false} /></button>
       <span className="pc-text"><span className="pc-info-title" title={title}>{title}</span><span className="pc-info-sub">{details}</span></span>
+      <AgentAttachToggle assetId={asset.id} />
       {remote}{when}{tools}
     </div>;
   }
@@ -63,6 +65,7 @@ export function GalleryTile({ asset, selected, selecting, view, onOpen, onToggle
       <AssetMedia assetId={asset.id} />
     </button>
     <CardCheck checked={selected} label={`Select ${title}`} onToggle={onToggle} />
+    <AgentAttachToggle assetId={asset.id} />
     {tools}
     {asset.kind === 'video' || asset.kind === 'audio' || asset.kind === 'model3d' ? (
       <span className="g-badge pc-badge num"><KindIcon kind={asset.kind} />{asset.kind === 'model3d' ? '3D' : asset.duration ? formatDuration(asset.duration * 1000) : ''}</span>
