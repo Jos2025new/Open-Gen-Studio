@@ -41,6 +41,8 @@ it('session info shows this session only: usage, what is running with its status
   expect(pop.textContent).toContain('Spent$0.4');
   expect(pop.querySelector('.si-gen [aria-label="Running"]')?.closest('.si-row')?.textContent).toContain('Prompt g2');
   expect(pop.querySelectorAll('.si-file')).toHaveLength(1);
+  expect(pop.querySelector('.si-gen small')?.textContent).toMatch(/^M · 1:1 · /);
+  expect(pop.querySelector('.si-file small')?.textContent).toBe('Image · 10×10 · M');
   click([...pop.querySelectorAll('button')].find((b) => b.textContent === 'View all'));
   expect(onGenerations).toHaveBeenCalled();
 });

@@ -136,7 +136,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={shownProviders.length ? 340 : 180} label="Connected providers" className="provider-connections-popover">
         <ConnectedProviders providers={shownProviders} onAdd={(p) => setAddedProviders((prev) => prev.includes(p) ? prev : [...prev, p])} />
       </Popover>
-      <Popover open={generationsPop.open} anchor={generationsPop.ref} onClose={generationsPop.close} width={540} label="Generations" className="generations-popover">
+      <Popover open={generationsPop.open} anchor={generationsPop.ref} onClose={generationsPop.close} width={440} label="Generations" className="generations-popover">
         <GenerationsPanel onClose={generationsPop.close} />
       </Popover>
       <Popover open={settingsOpen} anchor={settingsRef} onClose={() => setUi({ settingsOpen: false })} width={520} label="Settings" className="pop-scroll settings-popover">

@@ -11,3 +11,7 @@
 .settings-popover .set-section { padding: 10px; }
 .settings-popover .settings .set-row { margin: 7px 0; }
 .settings-popover .settings .prov-row { padding: 6px 0; }
+/* Generations from the top bar: a narrower list with smaller thumbnails (it shows one line of facts per run). */
+.generations-popover .gen-row { gap: 8px; padding: 5px 8px; }
+.generations-popover .gen-row-thumb { flex-basis: 34px; width: 34px; height: 34px; }
+.generations-popover .panel-head { padding: 8px 12px; }

@@ -40,6 +40,7 @@ export function SessionMenu({ onRename }: { onRename: () => void }) {
   </>;
 }
 
+const KIND: Record<string, string> = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
 const RUNNING: GenerationStatus[] = ['queued', 'running'];
 const statusIcon = (s: GenerationStatus) => (RUNNING.includes(s) ? <Loader size={14} className="spin" aria-label="Running" /> : s === 'done' ? <CircleCheck size={14} className="si-ok" aria-label="Done" /> : <CircleAlert size={14} className="si-warn" aria-label={s === 'review' ? 'Needs review' : 'Did not finish'} />);
 
@@ -75,14 +76,14 @@ export function SessionInfo({ onGenerations }: { onGenerations: () => void }) {
         <section className="si-sec" aria-label={data.running ? 'Running' : 'Latest'}>
           <h4>{data.running ? 'Running' : 'Latest'} <span className="num">{data.running || data.gens.length}</span></h4>
           {data.recent.length ? data.recent.map((g) => (
-            <div key={g.id} className="si-row si-gen" title={g.prompt}><span className="si-gen-text">{g.prompt || g.modelName}</span>{statusIcon(g.status)}</div>
+            <div key={g.id} className="si-row si-gen" title={g.prompt}><span className="si-two"><span className="si-gen-text">{g.prompt || g.modelName}</span><small>{[g.modelName, g.settings.aspect, formatRelative(g.createdAt)].filter(Boolean).join(' · ')}</small></span>{statusIcon(g.status)}</div>
           )) : <p className="si-empty">Nothing generated in this session yet.</p>}
           {data.gens.length ? <button type="button" className="si-more" onClick={() => go(onGenerations)}>View all</button> : null}
         </section>
         <section className="si-sec" aria-label="Results">
           <h4>Results <span className="num">{data.results.length}</span></h4>
           {data.results.slice(0, 3).map((a) => (
-            <div key={a.id} className="si-row si-file"><span className="si-thumb"><AssetMedia assetId={a.id} hoverPlay={false} /></span><span className="si-gen-text">{generations[a.generationId ?? '']?.prompt || a.kind}</span><span className="faint">{formatRelative(a.createdAt)}</span></div>
+            <div key={a.id} className="si-row si-file"><span className="si-thumb"><AssetMedia assetId={a.id} hoverPlay={false} /></span><span className="si-two"><span className="si-gen-text">{generations[a.generationId ?? '']?.prompt || a.kind}</span><small>{[KIND[a.kind] ?? a.kind, a.width > 0 && a.height > 0 ? `${a.width}×${a.height}` : '', generations[a.generationId ?? '']?.modelName].filter(Boolean).join(' · ')}</small></span><span className="faint">{formatRelative(a.createdAt)}</span></div>
           ))}
           {data.results.length ? <button type="button" className="si-more" onClick={() => go(() => setUi({ panel: 'gallery' }))}><Images size={14} />View all in Library</button> : <p className="si-empty">No results yet.</p>}
         </section>
