@@ -1,8 +1,8 @@
 import { SaveIndicator } from './SaveIndicator';
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Plus, Settings } from 'lucide-react';
-import { newSession, renameSession, setUi, useStore } from '../../store/store';
+import { ArrowLeft, History, Settings } from 'lucide-react';
+import { renameSession, setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { SettingsPanel } from './SettingsPanel';
 import { SessionSwitcher } from './SessionSwitcher';
@@ -14,6 +14,9 @@ import { IconButton } from '../ui/primitives';
 import { WORKSPACES } from './WorkspaceMenu';
 import { HomeIcon } from './Sidebar';
 import { openHome } from './navModel';
+import { SessionInfo, SessionMenu } from './SessionTools';
+import { StudioReopen } from '../studio/StudioReopen';
+import { getLeftSlot, subscribeLeftSlot } from './topbarSlot';
 import '../../styles/topbar-home.css';
 import '../../styles/compact-popovers.css';
 
@@ -22,11 +25,12 @@ export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 /** Workspaces render their contextual actions into the top bar through this. */
 export function TopbarActions({ children, side = 'right' }: { children: ReactNode; side?: 'left' | 'right' }) {
   const slot = useContext(TopbarSlotContext);
+  const switcherSlot = useSyncExternalStore(subscribeLeftSlot, getLeftSlot);
   const [destination, setDestination] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     setDestination(document.querySelector<HTMLDivElement>(side === 'left' ? '#workspace-actions-left' : '#workspace-actions'));
-  }, [slot, side]);
-  const target = side === 'right' && slot?.isConnected ? slot : destination;
+  }, [slot, side, switcherSlot]);
+  const target = side === 'right' && slot?.isConnected ? slot : side === 'left' && switcherSlot ? switcherSlot : destination;
   return target ? createPortal(children, target) : null;
 }
 
@@ -113,24 +117,21 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
           ) : (
             <SessionSwitcher activeId={sessionId} title={title} onRename={() => setEditing(true)} />
           )}
-          <div id="workspace-actions-left" className="topbar-slot-left" />
-          <IconButton className="topbar-plain topbar-new-session" icon={Plus} label="New session" size="sm" onClick={() => newSession()} />
         </>}
       </div>
       <div className="topbar-right">
         <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
         {workspace === 'designer' && <SaveIndicator />}
-        {home ? (
-          <button type="button" ref={connectedPop.ref} className={`topbar-menu topbar-pill ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
-            <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${connected.length ? 'is-on' : ''}`} />
-          </button>
-        ) : <>
-          <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
-            <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
-          </button>
-          <button type="button" ref={generationsPop.ref} className={`topbar-menu ${generationsPop.open ? 'is-open' : ''}`} aria-expanded={generationsPop.open} onClick={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }}>Generations</button>
-        </>}
+        <button type="button" ref={connectedPop.ref} className={`topbar-menu topbar-pill ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
+          <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${connected.length ? 'is-on' : ''}`} />
+        </button>
+        {!home && hasSession ? <>
+          <SessionInfo onGenerations={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }} />
+          <IconButton ref={generationsPop.ref} icon={History} label="Generations" aria-expanded={generationsPop.open} active={generationsPop.open} onClick={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }} />
+          <SessionMenu onRename={() => setEditing(true)} />
+        </> : null}
         <IconButton ref={settingsRef} icon={Settings} label="Settings" active={settingsOpen} aria-expanded={settingsOpen} onClick={() => { connectedPop.close(); generationsPop.close(); setUi((u) => ({ settingsOpen: !u.settingsOpen })); }} />
+        {!home && workspace === 'chat' ? <StudioReopen /> : null}
       </div>
       <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={shownProviders.length ? 340 : 180} label="Connected providers" className="provider-connections-popover">
         <ConnectedProviders providers={shownProviders} onAdd={(p) => setAddedProviders((prev) => prev.includes(p) ? prev : [...prev, p])} />

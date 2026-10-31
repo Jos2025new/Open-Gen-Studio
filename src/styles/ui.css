@@ -145,4 +145,3 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 .accent-swatch.is-on { outline: 2px solid var(--text); outline-offset: 2px; }
 .topbar-slot-left:empty { display: none; }
 .topbar-slot-left { gap: 2px; }
-.topbar-slot-left + .topbar-new-session { margin-left: -6px; }

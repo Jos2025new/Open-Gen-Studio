@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Check, CheckSquare, ChevronDown, Pin, Search, Trash } from 'lucide-react';
-import { selectSession, setUi, useStore } from '../../store/store';
+import { Check, CheckSquare, ChevronDown, Pin, Plus, Search, Trash } from 'lucide-react';
+import { newSession, selectSession, setUi, useStore } from '../../store/store';
+import { setLeftSlot } from './topbarSlot';
 import { formatRelative } from '../../lib/format';
 import { Popover, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
@@ -9,7 +10,8 @@ import { visibleSessions } from '../../store/spaceSession';
 import './SessionSwitcher.css';
 
 /**
- * Quick session switcher: search · select several · new session on top, recent first below, "All sessions" at the foot.
+ * Quick session switcher: a short search, then the session's actions (Import from Chat… from the workspace, select several,
+ * new session) on the same row; recent first below, "All sessions" at the foot.
  * With "Select several" on, rows tick instead of switching, and a trash at the foot deletes the ticked ones after the
  * same confirmation as the Sessions panel.
  */
@@ -51,7 +53,9 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
             <Search size={14} />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
           </div>
+          <div className="switch-actions" ref={setLeftSlot} />
           <IconButton icon={CheckSquare} label={selecting ? 'Stop selecting' : 'Select several'} size="sm" active={selecting} aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} />
+          <IconButton icon={Plus} label="New session" size="sm" onClick={() => go(() => newSession())} />
         </div>
         <div className="switch-list">
           {list.slice(0, 50).map((s) => {

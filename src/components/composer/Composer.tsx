@@ -18,7 +18,6 @@ import { Chip, costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AgentControls, AgentMode } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
-import { StudioReopen } from '../studio/StudioReopen';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
@@ -541,7 +540,6 @@ export function Composer() {
           </> : null}
         </div>
         <div className="composer-footer-end">
-          {workspace === 'chat' ? <StudioReopen /> : null}
           {mode === 'agent' && workspace !== 'designer' ? <><AgentMode /><AgentModelControls /></> : null}
         </div>
       </div>

@@ -45,14 +45,16 @@ describe('top bar on Home', () => {
     act(() => (host.querySelector('.topbar-pill') as HTMLButtonElement).click());
     expect(host.querySelector('.topbar-pill')?.getAttribute('aria-expanded')).toBe('true');
   });
-  it('outside Home the session, Generations and the plain Connected button remain available', () => {
+  it('outside Home the right side is one row of icons: Connected (dot pill), session info, Generations, session actions, Settings, the Studio board', () => {
     setUi({ workspace: 'chat' });
     const host = mount(false);
     expect(host.querySelector('.ws-tag')).toBeNull();
     expect(host.querySelector('[aria-label="Switch session"]')).not.toBeNull();
-    expect(host.textContent).toContain('Generations');
-    expect(host.querySelector('.topbar-pill')).toBeNull();
-    expect(host.querySelector('.topbar-menu')?.textContent).toContain('Connected');
+    expect(host.querySelector('.topbar-pill')?.textContent).toBe('Connected');
+    const icons = [...host.querySelectorAll('.topbar-right > .icon-btn')].map((b) => b.getAttribute('aria-label'));
+    expect(icons.slice(0, 4)).toEqual(['Session info', 'Generations', 'Session actions', 'Settings']);
+    expect(host.querySelector('.topbar-right > .studio-reopen-btn')).not.toBeNull();
+    expect(host.querySelector('[aria-label="New session"]')).toBeNull();
   });
   it('outside Home a Home button sits before the session and opens Home', () => {
     setUi({ workspace: 'designer' });

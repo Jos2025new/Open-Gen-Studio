@@ -27,7 +27,7 @@ describe('the top bar session switcher', () => {
     act(() => byLabel('Switch session').click());
 
     const head = q('.switch-head')!;
-    expect([...head.children].map((c) => c.getAttribute('aria-label') ?? c.className)).toEqual(['ml-search', 'Select several']);
+    expect([...head.children].map((c) => c.getAttribute('aria-label') ?? c.className)).toEqual(['ml-search', 'switch-actions', 'Select several', 'New session']);
     expect(q('.ml-foot [aria-label^="Delete"]')).toBeNull();
 
     act(() => byLabel('Select several').click());
