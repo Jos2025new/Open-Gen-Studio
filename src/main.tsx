@@ -11,6 +11,7 @@ import '@xyflow/react/dist/style.css';
 import './styles/tokens.css';
 import './styles/accents.css';
 import './styles/soft-contrast.css';
+import './styles/hierarchy.css';
 import './styles/base.css';
 import './styles/ui.css';
 import './styles/shell.css';

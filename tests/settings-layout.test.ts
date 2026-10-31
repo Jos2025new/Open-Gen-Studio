@@ -77,3 +77,12 @@ it('the soft rule only moves surfaces, borders and what derives from them: never
   expect(set.filter((t) => /^--(text|accent|select|danger|warn|ok)/.test(t))).toEqual([]);
   expect(set).toContain('--surface-2');
 });
+
+it('the brightness hierarchy dims and shrinks the frame icons, steps the composer and bubble up, and lifts conversation text', () => {
+  const css = readFileSync('src/styles/hierarchy.css', 'utf8');
+  expect(css).toMatch(/\.side-btn svg \{ width: 16px; height: 16px; \}/);
+  expect(css).toMatch(/:not\(:hover\)[^{]*svg \{ color: var\(--text-3\); \}/);
+  expect(css).toMatch(/\.composer, :root \.bubble \{ background: var\(--surface-2\); \}/);
+  expect(css).toMatch(/\.composer-input \{ color: var\(--text-content\); \}/);
+  expect(readFileSync('src/styles/soft-contrast.css', 'utf8')).toMatch(/--soft-anchor: var\(--bg-canvas\)/);
+});

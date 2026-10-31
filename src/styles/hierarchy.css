@@ -1,0 +1,12 @@
+/* Brightness hierarchy (2026-10-31): what the user reads is the brightest thing on screen; the frame recedes.
+   - Frame icons (side bar) are smaller and dimmer; hover, open and active bring them back to full text colour.
+   - Planes step up from the page: page, then side bar, then the composer and the user's bubble one step above.
+   - Conversation text (bubbles, agent replies, the prompt) sits a little above --text, toward white (black on light bases). */
+:root { --text-content: color-mix(in srgb, var(--text) 70%, #fff); }
+[data-base="claro"], [data-base="blanco"] { --text-content: color-mix(in srgb, var(--text) 70%, #000); }
+
+:root .sidebar .side-btn svg { width: 16px; height: 16px; }
+:root .sidebar .side-btn:not(.is-active):not(.is-open):not(:hover):not(.side-new) svg { color: var(--text-3); }
+
+:root .composer, :root .bubble { background: var(--surface-2); }
+:root .bubble, :root .agent-text, :root .composer-input { color: var(--text-content); }

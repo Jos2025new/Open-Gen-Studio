@@ -1,23 +1,28 @@
 /* Soft contrast (Look → Soft contrast, html[data-contrast="soft"]): one rule over every base instead of hand-tuned
-   palettes. Each surface and border keeps only part of its distance from the base's --surface (--soft-keep), so
+   palettes. Each surface and border keeps only part of its distance from an anchor (--soft-anchor, --soft-keep), so
    panels, popovers, fields and lines sit closer together. Text, accents and the bases themselves are untouched.
    A custom property cannot read itself, so html captures the base's values (--raw-*) and body redefines the tokens
    from them; everything the app draws lives in body, so it all inherits the softened set. */
 html[data-contrast="soft"] {
   --soft-keep: 50%;
+  /* Dark bases soften toward their page (--bg-canvas), so the whole frame sits darker and steps up from it: page,
+     side bar, composer. Light bases soften toward --surface, as before. */
+  --soft-anchor: var(--bg-canvas);
   --raw-bg: var(--bg); --raw-bg-canvas: var(--bg-canvas);
   --raw-surface: var(--surface); --raw-surface-2: var(--surface-2); --raw-surface-3: var(--surface-3); --raw-surface-hover: var(--surface-hover);
   --raw-border: var(--border); --raw-border-strong: var(--border-strong);
 }
+html[data-contrast="soft"][data-base="claro"], html[data-contrast="soft"][data-base="blanco"] { --soft-anchor: var(--surface); }
 html[data-contrast="soft"] body {
-  --bg: color-mix(in oklab, var(--raw-bg) var(--soft-keep), var(--raw-surface));
-  --bg-canvas: color-mix(in oklab, var(--raw-bg-canvas) var(--soft-keep), var(--raw-surface));
-  --surface-2: color-mix(in oklab, var(--raw-surface-2) var(--soft-keep), var(--raw-surface));
-  --surface-3: color-mix(in oklab, var(--raw-surface-3) var(--soft-keep), var(--raw-surface));
+  --bg: color-mix(in oklab, var(--raw-bg) var(--soft-keep), var(--soft-anchor));
+  --bg-canvas: color-mix(in oklab, var(--raw-bg-canvas) var(--soft-keep), var(--soft-anchor));
+  --surface: color-mix(in oklab, var(--raw-surface) var(--soft-keep), var(--soft-anchor));
+  --surface-2: color-mix(in oklab, var(--raw-surface-2) var(--soft-keep), var(--soft-anchor));
+  --surface-3: color-mix(in oklab, var(--raw-surface-3) var(--soft-keep), var(--soft-anchor));
   /* Hover keeps more of its step than the panels it sits on, so it stays visible on a popover (it equals --surface-2 in Graphite). */
-  --surface-hover: color-mix(in oklab, var(--raw-surface-hover) 75%, var(--raw-surface));
-  --border: color-mix(in oklab, var(--raw-border) var(--soft-keep), var(--raw-surface));
-  --border-strong: color-mix(in oklab, var(--raw-border-strong) 65%, var(--raw-surface));
+  --surface-hover: color-mix(in oklab, var(--raw-surface-hover) 75%, var(--soft-anchor));
+  --border: color-mix(in oklab, var(--raw-border) var(--soft-keep), var(--soft-anchor));
+  --border-strong: color-mix(in oklab, var(--raw-border-strong) 65%, var(--soft-anchor));
   /* Tokens tokens.css derives from the ones above resolve on html; they are restated here so they read the softened set. */
   --pop-bg: var(--surface-3); --field-bg: var(--surface-2); --field-bg-hover: var(--surface-3);
 }
