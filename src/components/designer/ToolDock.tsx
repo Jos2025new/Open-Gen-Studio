@@ -45,7 +45,8 @@ function restrictToolbox(tools?: ReadonlySet<DesignTool>): ToolboxFamily[] {
   return TOOLBOX.map((family) => ({ ...family, variants: family.variants.filter((variant) => variant.tool && tools.has(variant.tool)) })).filter((family) => family.variants.length > 0);
 }
 
-export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool> }) {
+/** `vertical`: the same strip turned upright (the Designer's side toolbox); arrows Up and Down also move along it. */
+export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean }) {
   const currentTool = useStore((state) => state.ui.tool);
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
@@ -85,12 +86,13 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
   };
 
   const moveToolbarFocus = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const step = event.key === 'ArrowRight' || (vertical && event.key === 'ArrowDown') ? 1 : event.key === 'ArrowLeft' || (vertical && event.key === 'ArrowUp') ? -1 : 0;
+    if (!step) return;
     event.stopPropagation();
     const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
     const index = buttons.indexOf(event.target as HTMLButtonElement);
     if (index < 0) return;
-    buttons[(index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+    buttons[(index + step + buttons.length) % buttons.length]?.focus();
     event.preventDefault();
   };
 
@@ -103,7 +105,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
     setHeightFrom(height + (event.key === 'ArrowUp' ? 16 : -16));
   };
 
-  return <div className="tool-dock" style={{ '--tool-dock-card-height': `${height}px` } as CSSProperties} onKeyDown={(event) => {
+  return <div className={vertical ? 'tool-dock is-vertical' : 'tool-dock'} style={{ '--tool-dock-card-height': `${height}px` } as CSSProperties} onKeyDown={(event) => {
     if (event.key !== 'Escape') return;
     if (depth === 'closed') return;
     dispatch({ type: 'escape' });
@@ -137,7 +139,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
         </div>
       </section>}
     </div>
-    <div className="tool-dock-family" role="toolbar" aria-label="Tools" onKeyDown={moveToolbarFocus}>
+    <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family) => {
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
         const soonReason = family.variants.every((variant) => variant.soon) ? family.variants.find((variant) => variant.soon)?.soon : undefined;

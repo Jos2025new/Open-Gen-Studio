@@ -16,7 +16,7 @@ Continuación de [[designer-tecnico]], que tiene el índice, la arquitectura, el
 
 `ToolRail.tsx`: familias en `RAIL` (línea 30): Edit (`move`, `hand`), Select (`select`), Paint (`brush`, `eraser`, `lineart`, grupo Fill and gradient), Shapes and text (grupo Shapes and lines, `text`), Guides and color (`ruler`, `eyedropper`). Los grupos abren un menú de variantes (`ToolGroup`, línea 57 en adelante). Cada botón muestra su atajo entre paréntesis; los bloqueos de `toolBlockReason` aparecen como consejo del botón. `tests/designer-inventory.test.ts` falla si una herramienta no tiene sitio en el carril.
 
-Dónde se dibuja: `ui.designerDock` (`'tools'` por defecto o `'prompt'`) decide si la parte baja del Designer muestra el carril o la caja de prompt. En `tools` el carril lo monta el compositor (`Composer.tsx:444`); `ToolPalette.tsx` solo lo dibuja cuando el dock no es `tools` (`ToolPalette.tsx:8,23`) y siempre dibuja los controles de vista (zoom, Fit canvas, reglas, ayuda). Enviar un prompt desde el Designer cambia el dock a `prompt` (`Composer.tsx:285`, `engine/actions.ts:662`).
+Dónde se dibuja: `ui.designerDock` (`'tools'` por defecto o `'prompt'`) decide si la parte baja del Designer muestra el carril o la caja de prompt. En `tools` el carril lo monta el compositor (`Composer.tsx:444`); `ToolPalette.tsx` solo lo dibuja cuando el dock no es `tools`, girado en vertical a la izquierda con los controles de vista (zoom, Fit canvas, reglas, ayuda) en el mismo marco; con `tools` dibuja solo esos controles. Enviar un prompt desde el Designer cambia el dock a `prompt` (`Composer.tsx:285`, `engine/actions.ts:662`).
 
 ### Barra contextual
 

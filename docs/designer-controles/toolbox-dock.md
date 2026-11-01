@@ -15,7 +15,7 @@ Fuente de verdad: `TOOLBOX` (`toolboxModel.ts:24`) y `ToolDock` (`ToolDock.tsx:4
 ## Dónde vive la caja
 
 - **Composer** (por defecto): barra inferior del Designer cuando `ui.designerDock === 'tools'` (`Composer.tsx:437`, JSX en `Composer.tsx:483`). Se cambia desde el menú «+» del composer (`Design`, `ComposerOptions.tsx:52`).
-- **Paleta del Designer**: si `designerDock === 'prompt'`, `ToolPalette` pinta la caja dentro del Designer (`ToolPalette.tsx:24`); con `'tools'` devuelve `null` (`ToolPalette.tsx:23`).
+- **Toolbox lateral del Designer** (desde 2026-10-31): si `designerDock === 'prompt'`, `ToolPalette` pinta la misma tira girada en vertical a la izquierda (`ToolDock` con `vertical`, contenedor `.designer-side`), con los controles de vista (zoom, Fit canvas, reglas, ayuda) debajo en el mismo marco; variantes y tarjeta salen a su derecha, alineadas arriba, a `--canvas-pop-gap` como los menús de Nodes. Mismos botones y orden que la barra (`designer-side-toolbox.test.ts`); las flechas arriba y abajo también recorren la tira. Con `'tools'` la vista queda sola, como antes. Antes era una tira horizontal arriba; ya no se recoloca la ayuda del lienzo bajo ella (`--stage-hint-top` usa su valor por defecto).
 - **Studio** (tablero embebido): subconjunto sin Edit ni Pan, ver [[estudio-embebido]].
 
 ## Cómo se abre y se cierra

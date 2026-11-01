@@ -132,3 +132,15 @@
 .brush-tip-shape svg { flex: none; color: var(--text-2); touch-action: none; }
 .brush-tip-shape .tip-handle { cursor: grab; }
 .brush-tip-fields { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0; }
+/* Designer, toolbox outside the prompt box (ToolPalette): the same strip turned upright at the left, the canvas view under
+   it in one frame; variants and the settings card open at its right, aligned to its top, like the Nodes toolbox menus. */
+.designer-side { position: absolute; z-index: 10; left: 16px; top: 66px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.designer-side .designer-palette.is-side { position: static; max-width: none; }
+.designer-side .tool-dock.is-vertical { width: auto; align-items: center; }
+.designer-side .tool-dock-family, .designer-side .tool-dock-end { flex-direction: column; width: auto; padding: 0; overflow: visible; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.designer-side .tool-dock-separator { width: 20px; height: 1px; margin: 4px 0; }
+.designer-side .designer-palette.is-side .tool-dock-stack { left: calc(100% + var(--toolbar-padding) + 1px + var(--canvas-pop-gap)); right: auto; top: calc(-1 * var(--toolbar-padding) - 1px); bottom: auto; width: min(560px, calc(100vw - var(--layers-w, 260px) - 120px)); }
+.designer-side .designer-palette .icon-btn.is-active::after { top: 8px; bottom: 8px; left: -5px; right: auto; width: 2px; height: auto; }
+.designer-side .designer-view { position: static; padding: 6px 0 0; border: 0; border-top: 1px solid var(--panel-line); border-radius: 0; background: transparent; box-shadow: none; }
+.designer:has(.designer-side) .document-picker { left: 16px; }
+.ws-designer:has(.designer-side) { --designer-dock-left: max(84px, min(calc(50% - 400px), calc(100% - var(--layers-w, 260px) - 824px))); }

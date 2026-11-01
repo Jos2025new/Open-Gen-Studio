@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 289 | 224 |
-| [store.ts](../src/store/store.ts) | 196 | 208 |
+| [store.ts](../src/store/store.ts) | 196 | 209 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 89 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 55 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
@@ -29,7 +29,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
 | [ops.ts](../src/engine/ops.ts) | 43 | 17 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
-| [doc.ts](../src/engine/design/doc.ts) | 38 | 46 |
+| [doc.ts](../src/engine/design/doc.ts) | 38 | 47 |
 | [actions.ts](../src/engine/actions.ts) | 34 | 24 |
 | [format.ts](../src/lib/format.ts) | 34 | 1 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
@@ -49,7 +49,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
 | `src/components/composer` | 13 | 13 |
-| `src/components/designer` | 54 | 24 |
+| `src/components/designer` | 54 | 25 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
 | `src/components/shell` | 35 | 23 |
@@ -58,15 +58,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 20 | 15 |
 | `src/engine` | 60 | 280 |
 | `src/engine/agent` | 53 | 109 |
-| `src/engine/design` | 100 | 120 |
+| `src/engine/design` | 100 | 121 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 289 |
-| `src/store` | 15 | 210 |
+| `src/lib` | 33 | 290 |
+| `src/store` | 15 | 211 |
 
 179 de 511 módulos no tienen ningún test que los importe directamente.
 
