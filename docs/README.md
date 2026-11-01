@@ -2,7 +2,7 @@
 
 ## Dónde mirar
 
-- [Reglas de trabajo](../AGENTS.md).
+- [Reglas de trabajo](../AGENTS.md) y [método con agentes](metodo-trabajo.md): carriles rápido, estructura y delicado; checks en prueba.
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
 - [Pendientes: índice priorizado](pendientes.md): lo más crítico ahora y la lista abierta por área, con prioridad y fecha de origen.
 - [Pendientes del agente, proveedores y coste](pendientes-agente.md): detalle de las filas A y B.
