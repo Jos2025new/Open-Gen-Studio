@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
-import { Hand, Workflow, Scissors, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
+import { Hand, LayoutDashboard, Scissors, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
 import { setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem, lockedNodes } from '../../engine/flow/locks';
 import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } from '../../engine/flow/history';
@@ -99,7 +99,7 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
         <IconButton icon={Scissors} label="Cut connections (X): drag across links to cut them" active={tool === 'cut'} disabled={!graph.edges.length && tool !== 'cut'} onClick={() => onTool('cut')} />
-        {onAutoLayout ? <IconButton icon={Workflow} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
+        {onAutoLayout ? <IconButton icon={LayoutDashboard} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
         <span className="canvas-nav-sep" />
         <IconButton icon={Maximize} label="Fit view" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
