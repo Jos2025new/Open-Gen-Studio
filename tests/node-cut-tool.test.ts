@@ -23,7 +23,7 @@ describe('Nodes Cut tool (scissors)', () => {
   it('sits in the toolbox after Pan, takes X, is not remembered, and cuts through disconnectEdges (one undo step)', () => {
     const panel = nav.slice(nav.indexOf('<Panel position'), nav.indexOf('</Panel>'));
     expect(panel.indexOf('icon={Scissors}')).toBeGreaterThan(panel.indexOf('icon={Hand}'));
-    expect(panel.indexOf('icon={Scissors}')).toBeLessThan(panel.indexOf('LayoutGrid'));
+    expect(panel.indexOf('icon={Scissors}')).toBeLessThan(panel.indexOf('icon={Workflow}'));
     expect(panel).toMatch(/label="Cut connections \(X\)/);
     expect(ws).toMatch(/if \(k === 'x'\) \{ e\.preventDefault\(\); pickTool\(tool === 'cut' \? lastTool\.current : 'cut'\); \}/);
     expect(ws).toMatch(/if \(t === 'cut'\) return; lastTool\.current = t; try \{ localStorage/);

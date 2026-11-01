@@ -105,3 +105,10 @@ it('the selected result reads like a card: kind, model, prompt, settings chips, 
   expect(src).toMatch(/\{more \? <GenerationInfo/);
   expect(src).toContain('className="cc-mini num"');
 });
+
+it('Create uses the grid icon; Auto layout in the toolbox uses the flow icon, so the two never look alike', () => {
+  expect(readFileSync('src/components/node/NodeSide.tsx', 'utf8')).toMatch(/aria-label="Create"[\s\S]{0,200}<LayoutGrid size=\{15\} \/>/);
+  const nav = readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8');
+  expect(nav).toMatch(/<IconButton icon=\{Workflow\} label="Auto layout"/);
+  expect(nav).not.toContain('LayoutGrid');
+});

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Panel } from '@xyflow/react';
-import { ChevronDown, MessageSquare, Plus, WandSparkles, X } from 'lucide-react';
+import { ChevronDown, LayoutGrid, MessageSquare, Plus, X } from 'lucide-react';
 import type { MediaKind } from '../../engine/types';
 import { nodeAttempt, nodeOutputAsset } from '../../engine/flow/graph';
 import { useNodeSelection } from '../../engine/flow/selection';
@@ -104,7 +104,7 @@ export function NodeSide({ sessionId }: { sessionId: string }) {
           {pending ? <span className="pulse-dot" /> : null}
         </button>
         <button type="button" className={`side-icon ${active('create') ? 'is-active' : ''}`} aria-label="Create" aria-pressed={active('create')} data-tip={named ? undefined : 'Create'} onClick={() => pick('create')}>
-          <WandSparkles size={15} />
+          <LayoutGrid size={15} />
           {named ? <span className="side-label">Create</span> : null}
         </button>
         {shown ? (
