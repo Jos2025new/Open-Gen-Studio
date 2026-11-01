@@ -9,7 +9,7 @@
 .path-tools .cut-rubber { stroke: var(--danger); stroke-width: 1.5; stroke-dasharray: 5 3; fill: none; pointer-events: none; }
 .path-tools .erase-ring { fill: none; stroke: var(--text); stroke-width: 1; pointer-events: none; }
 .path-tools .erase-halo { fill: none; stroke: var(--surface); stroke-width: 3; opacity: 0.8; pointer-events: none; }
-.path-tools .erase-band { fill: color-mix(in srgb, var(--danger) 28%, transparent); stroke: var(--danger); stroke-width: 1; fill-rule: nonzero; pointer-events: none; }
+.path-tools .erase-band { fill: none; stroke: color-mix(in srgb, var(--danger) 30%, transparent); pointer-events: none; }
 .path-tools .lasso-loop { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 /* Bend: the segment under the pointer is outlined in the accent colour; the cursor is a small curve. */
 .path-nodes .bend-hl { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; fill: none; pointer-events: none; }

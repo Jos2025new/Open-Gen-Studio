@@ -9,12 +9,15 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { cutShape } from '../src/components/designer/PathNodeTools';
-import { eraseFilled, isFilledArea } from '../src/components/designer/areaTools';
+import { bandScreenPoints, eraseFilled, isFilledArea } from '../src/components/designer/areaTools';
 import { addDoc, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
 import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from '../src/engine/design/objectSelection';
 import { useNodeEditMode } from '../src/engine/design/nodeEditMode';
 import { pageSegs } from '../src/engine/design/pathNodes';
+import { gradientSvg, elementMatrix } from '../src/engine/design/gradientPaint';
+import { apply } from '../src/engine/design/matrix';
+import { shapeEditHint } from '../src/components/designer/ShapeKnots';
 import { useStore } from '../src/store/store';
 import type { VectorShape } from '../src/engine/types';
 
@@ -114,5 +117,46 @@ describe('area knife and area eraser on filled closed paths', () => {
     expect(cutShape(t.sid, t.id, t.layer, t.shape, { across: [[90, 0], [90, 200]] })).toBe(true);
     expect(pageSegs(t.shapes()[0]).filter((s) => s.c === 'M')).toHaveLength(2);
     expect(closed(t.shapes()[0].d)).toBe(0);
+  });
+
+  it('a miss after a first cut (pieces are subpaths of one shape) records nothing', () => {
+    const t = setup();
+    expect(cutShape(t.sid, t.id, t.layer, t.shape, { across: [[100, 0], [100, 200]] })).toBe(true);
+    const cur = t.shapes()[0], d1 = cur.d;
+    expect(cutShape(t.sid, t.id, t.layer, cur, { across: [[250, 0], [250, 200]] })).toBe(false);
+    expect(eraseFilled(t.sid, t.id, t.layer, cur, [[250, 100], [260, 100]], 5)).toBe(false);
+    expect(t.shapes()[0].d).toBe(d1);
+    undoDoc(t.sid, t.id);
+    expect(t.shapes()[0].d).toBe(d);
+  });
+
+  it('gradients are page-anchored: every piece paints the same colours at the same page positions', () => {
+    const g = { kind: 'linear', x1: 50, y1: 100, x2: 150, y2: 100, stops: [{ offset: 0, color: '#ff0000', alpha: 1 }, { offset: 1, color: '#0000ff', alpha: 1 }] };
+    const t = setup(circle({ fill: null, fillGradient: g }));
+    expect(isFilledArea(t.shape)).toBe(true);
+    expect(cutShape(t.sid, t.id, t.layer, t.shape, { across: [[100, 0], [100, 200]] })).toBe(true);
+    setShapeEdit(t.id, null);
+    expect(t.shapes()).toHaveLength(2);
+    for (const s of t.shapes()) {
+      expect(s.fillGradient).toEqual(g);
+      const m = /x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/.exec(gradientSvg(g as never, s, 'x', (v) => v))!;
+      const [x1, y1] = apply(elementMatrix(s), +m[1], +m[2]), [x2, y2] = apply(elementMatrix(s), +m[3], +m[4]);
+      expect([x1, y1, x2, y2].map(Math.round)).toEqual([50, 100, 150, 100]);
+    }
+  });
+
+  it('hints use isFilledArea: fill none without gradient is edge-only', () => {
+    const t = setup(circle({ fill: 'none' }));
+    useNodeEditMode.setState({ mode: 'cut' });
+    expect(shapeEditHint(getDoc(t.sid, t.id)!).text).toMatch(/click the path to cut it/);
+    useNodeEditMode.setState({ mode: 'erase' });
+    expect(shapeEditHint(getDoc(t.sid, t.id)!).text).toMatch(/over the path/);
+    useNodeEditMode.setState({ mode: 'move' });
+  });
+
+  it('the live erase preview is a plain polyline of the trail (no boolean per event)', () => {
+    const id = (p: [number, number]) => ({ x: p[0] * 2, y: p[1] * 2 });
+    expect(bandScreenPoints([[1, 1], [2, 3]], id)).toBe('2.0,2.0 4.0,6.0');
+    expect(bandScreenPoints([[1, 1]], id)).toBe('2.0,2.0 2.0,2.0');
   });
 });

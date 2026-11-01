@@ -1,4 +1,4 @@
-import { ClipType, EndType, FillRule, JoinType, PolyTree64, area as pathArea, areaPaths, booleanOpWithPolyTree, inflatePaths, union } from 'clipper2-ts';
+import { ClipType, EndType, FillRule, JoinType, PointInPolygonResult, PolyTree64, area as pathArea, areaPaths, booleanOpWithPolyTree, inflatePaths, pointInPolygon, union } from 'clipper2-ts';
 import type { Path64, Paths64 } from 'clipper2-ts';
 import { fitSubpaths } from './curveFit';
 import type { Pt, Seg } from './pathNodes';
@@ -150,12 +150,76 @@ export function booleanOp(op: Op, subjects: Area[], clips: Area[], o?: BooleanOp
   } catch { return []; }
 }
 
-/** Connected filled pieces of a shape (outer contour + the holes inside it). Even-odd by default: holes are holes. Not refitted twice: segs are re-flattened at 0.1 px. */
+// ---------------------------------------------------------------- existing components (no refit)
+
+type Box = [number, number, number, number];
+/** A connected piece as it stands: its polygons for Clipper and, when the shape's own subpaths can be told apart, its original segs (reused as they are, so untouched pieces never drift). */
+interface Part { comp: Comp; box: Box; segs?: Seg[] }
+const boundsOf = (ps: Paths64): Box => {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of ps) for (const q of p) { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; }
+  return [x0, y0, x1, y1];
+};
+const hits = (a: Box, b: Box, m = SCALE) => a[0] <= b[2] + m && b[0] <= a[2] + m && a[1] <= b[3] + m && b[1] <= a[3] + m;
+const inside = (a: Box, b: Box, m = 2) => a[0] >= b[0] - m && a[1] >= b[1] - m && a[2] <= b[2] + m && a[3] <= b[3] + m;
+
+/**
+ * The shape split into its existing components (outer + holes) by containment, keeping each one's original segs.
+ * Pieces that merely touch (the two halves of a cut) stay separate; only if the nesting is not clean (overlapping
+ * subpaths, a same-direction subpath inside a nonzero outer) does it fall back to uniting. Tiny pieces are kept:
+ * only results of an operation are filtered.
+ */
+function partsOf(area: Area, tol: number): Part[] {
+  const groups: Array<{ segs: Seg[]; path: Path64; box: Box; size: number; up: Group[]; parent?: Group }> = [];
+  type Group = (typeof groups)[number];
+  let cur: Seg[] = [];
+  const push = () => { if (cur.length) { const f = flatten(cur, tol).find((x) => x.points.length >= 3); if (f) { const path = toP64(f.points); groups.push({ segs: cur, path, box: boundsOf([path]), size: pathArea(path), up: [] }); } } cur = []; };
+  for (const g of area?.segs ?? []) { if (g.c === 'M') push(); cur.push(g); }
+  push();
+  if (!groups.length) return [];
+  const evenOdd = area.fillRule === 'evenodd';
+  let clean = groups.every((g) => g.size !== 0);
+  for (const g of groups) for (const c of groups) {
+    if (c === g || Math.abs(c.size) <= Math.abs(g.size) || !inside(g.box, c.box)) continue;
+    const probe = g.path.length > 64 ? g.path.filter((_, i) => i % Math.ceil(g.path.length / 64) === 0) : g.path;
+    if (probe.every((q) => pointInPolygon(q, c.path) !== PointInPolygonResult.IsOutside)) g.up.push(c);
+  }
+  for (const g of groups) {
+    g.up.sort((a, b) => Math.abs(a.size) - Math.abs(b.size));
+    g.parent = g.up[0];
+    // under nonzero each nesting level winds against the one around it
+    if (clean && g.parent && !evenOdd && Math.sign(g.size) === Math.sign(g.parent.size)) clean = false;
+    if (clean && g.up.length > 1 && g.parent && g.up.length !== g.parent.up.length + 1) clean = false;
+  }
+  if (!clean) return partsByUnion(groups, area, tol);
+  const outers = groups.filter((g) => g.up.length % 2 === 0);
+  return outers.map((o): Part => {
+    const holes = groups.filter((g) => g.parent === o && g.up.length % 2 === 1);
+    const orient = (g: Group, positive: boolean) => ((g.size > 0) === positive ? g.path : [...g.path].reverse());
+    const comp: Comp = [orient(o, true), ...holes.map((h) => orient(h, false))];
+    return { comp, box: o.box, segs: [o, ...holes].flatMap((g) => g.segs) };
+  });
+}
+/** The union fallback: components of the united area; each subpath goes to the smallest component whose box holds it (no original segs if one is lost). */
+function partsByUnion(groups: Array<{ segs: Seg[]; path: Path64 }>, area: Area, tol: number): Part[] {
+  void tol;
+  const parts: Part[] = pieces('union', union(groups.map((g) => g.path), rule(area)), [], 0).map((comp) => ({ comp, box: boundsOf([comp[0]]) }));
+  const own: Seg[][][] = parts.map(() => []);
+  let lost = false;
+  for (const g of groups) {
+    const gb = boundsOf([g.path]);
+    let best = -1, bestSize = Infinity;
+    parts.forEach((p, i) => { const size = (p.box[2] - p.box[0]) * (p.box[3] - p.box[1]); if (inside(gb, p.box) && size < bestSize) { best = i; bestSize = size; } });
+    if (best < 0) lost = true; else own[best].push(g.segs);
+  }
+  if (!lost) parts.forEach((p, i) => { if (own[i].length) p.segs = own[i].flat(); });
+  return parts;
+}
+const partSegs = (p: Part, fitTol: number): Seg[] => p.segs ?? fitComp(p.comp, fitTol);
+
+/** Connected filled pieces of a shape (outer contour + the holes inside it), each with its own segs as they were (no flatten/refit drift). Even-odd by default: holes are holes. */
 export function splitComponents(segs: Seg[], fillRule: 'nonzero' | 'evenodd' = 'evenodd'): Seg[][] {
-  try {
-    const paths = normalize({ segs, fillRule }, 0.1);
-    return pieces('union', paths, [], minArea(0.1)).map((c) => fitComp(c, 0.25));
-  } catch { return []; }
+  try { return partsOf({ segs, fillRule }, 0.1).map((p) => partSegs(p, 0.25)); } catch { return []; }
 }
 
 // ---------------------------------------------------------------- eraser and knife
@@ -192,33 +256,58 @@ function stripPaths(line: Pt[], width = KNIFE_W): Paths64 {
 
 /**
  * The area minus the brush trail, split into connected pieces (a band across a shape gives 2 pieces; rubbing only
- * inside gives 1 piece with a hole). Nothing touched -> [area.segs] (same reference); everything erased -> [].
+ * inside gives 1 piece with a hole). Only components the band can reach are recomputed; the others keep their original
+ * segs. Nothing touched -> [area.segs] (same reference); everything erased -> [].
  */
 export function eraseArea(area: Area, trail: Pt[], radius: number, o?: BooleanOptions): Seg[][] {
   try {
     const { tol, fitTol } = opts(o);
-    const subj = normalize(area, tol), band = bandPaths(trail, radius);
-    if (!subj.length || !band.length) return [area?.segs ?? []];
-    const comps = pieces('difference', subj, band, minArea(tol));
-    const before = Math.abs(areaPaths(subj)), after = comps.reduce((s, c) => s + Math.abs(areaPaths(c)), 0);
-    if (comps.length && Math.abs(before - after) < 1 && comps.length === 1 && comps[0].length === subj.length) return [area.segs];
-    return comps.map((c) => fitComp(c, fitTol));
+    const band = bandPaths(trail, radius), parts = partsOf(area, tol);
+    if (!parts.length || !band.length) return [area?.segs ?? []];
+    const bb = boundsOf(band), min = minArea(tol);
+    let changed = false;
+    const out = parts.flatMap((p) => {
+      if (!hits(p.box, bb)) return [partSegs(p, fitTol)];
+      const comps = pieces('difference', p.comp, band, min);
+      if (comps.length === 1 && Math.abs(Math.abs(areaPaths(p.comp)) - Math.abs(areaPaths(comps[0]))) < 1) return [partSegs(p, fitTol)];
+      changed = true;
+      return comps.map((c) => fitComp(c, fitTol));
+    });
+    return changed ? out : [area.segs];
   } catch { return [area?.segs ?? []]; }
 }
 
 /**
  * Divide the area along a polyline. Returns the closed filled pieces (>= 2). If the line does not go through the
  * shape (a miss, or only a notch from the edge) it returns [area.segs], the same reference, so callers can detect it.
- * Pieces can be cut again: call it on each piece. The cut leaves a 0.05 px gap, as vectorcraft's knife does.
+ * Pieces can be cut again: call it on each piece. The cut leaves a 0.05 px strip empty; each new piece then grows half
+ * of it back toward the cut, so neighbours touch exactly (no anti-aliasing hairline). Components the line does not
+ * divide keep their original segs.
  */
 export function knifeArea(area: Area, line: Pt[], o?: BooleanOptions): Seg[][] {
   try {
     const { tol, fitTol } = opts(o);
-    const subj = normalize(area, tol), strip = stripPaths(line);
-    if (!subj.length || !strip.length) return [area?.segs ?? []];
-    const comps = pieces('difference', subj, strip, minArea(tol));
-    return comps.length < 2 ? [area.segs] : comps.map((c) => fitComp(c, fitTol));
+    const strip = stripPaths(line), parts = partsOf(area, tol);
+    if (!parts.length || !strip.length) return [area?.segs ?? []];
+    const sb = boundsOf(strip), min = minArea(tol);
+    let cut = false;
+    const out = parts.flatMap((p) => {
+      if (!hits(p.box, sb)) return [partSegs(p, fitTol)];
+      const comps = pieces('difference', p.comp, strip, min);
+      if (comps.length < 2) return [partSegs(p, fitTol)];
+      cut = true;
+      return comps.map((c) => fitComp(seamless(c, strip), fitTol));
+    });
+    return cut ? out : [area.segs];
   } catch { return [area?.segs ?? []]; }
+}
+
+/** The piece plus the half of the knife strip nearest to it: grown by half the strip width, but only inside the strip, so the rest of its outline stays put. */
+function seamless(c: Comp, strip: Paths64): Paths64 {
+  const grown = inflatePaths(c, (KNIFE_W / 2) * SCALE, JoinType.Miter, EndType.Polygon, 4);
+  const add = pieces('intersection', grown, strip, 0).flat();
+  const merged = add.length ? pieces('union', c, add, 0) : [];
+  return merged.length === 1 ? merged[0] : c;
 }
 
 // ---------------------------------------------------------------- faces (Shape Builder)

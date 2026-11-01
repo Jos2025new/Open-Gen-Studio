@@ -56,7 +56,7 @@ export function isFilledArea(shape: VectorShape): boolean {
   const subs = subpathsOf(pageSegs(shape));
   return subs.length > 0 && subs.every((sp) => sp.length > 2 && sp[sp.length - 1].c === 'Z');
 }
-/** The pieces of a filled area: each outer contour with its holes. */
+/** The pieces of a filled area: each outer contour with its holes, with their own segs (separating never re-runs the boolean or the refit). */
 export const areaPieces = (shape: VectorShape): Seg[][] => splitComponents(pageSegs(shape), shape.fillRule ?? 'nonzero');
 
 /** Leaving node editing after a cut or erase: the subpaths become individual shapes (original attributes), all picked, in one undo step. */

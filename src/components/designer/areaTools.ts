@@ -1,6 +1,6 @@
 import type { VectorShape } from '../../engine/types';
 import { pageSegs, type Pt, type Seg } from '../../engine/design/pathNodes';
-import { eraseArea, eraseBand, knifeArea } from '../../engine/design/pathBoolean';
+import { eraseArea, knifeArea } from '../../engine/design/pathBoolean';
 import { areaPieces, layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
 
 /*
@@ -30,8 +30,9 @@ export function eraseFilled(s: string, d: string, l: string, shape: VectorShape,
   return apply(s, d, l, shape, eraseArea({ segs, fillRule: shape.fillRule }, trail, radius), segs);
 }
 
-/** SVG path data of the swept band, mapped to screen by `toScreen` (own point -> screen px). */
-export function bandScreenPath(trail: Pt[], radius: number, toScreen: (p: Pt) => { x: number; y: number }): string {
-  const f = (p: Pt) => { const q = toScreen(p); return `${q.x.toFixed(1)} ${q.y.toFixed(1)}`; };
-  return eraseBand(trail, radius).map((g) => (g.c === 'Z' ? 'Z' : `${g.c} ${g.p.map(f).join(' ')}`)).join(' ');
+/** Points ("x,y x,y") of the brush trail on screen, for a round-capped <polyline> whose stroke-width is 2r: the live preview of the area eraser, O(trail) per event. A single point repeats so the round cap draws a dot. */
+export function bandScreenPoints(trail: Pt[], toScreen: (p: Pt) => { x: number; y: number }): string {
+  const pts = trail.map((p) => { const q = toScreen(p); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; });
+  if (pts.length === 1) pts.push(pts[0]);
+  return pts.join(' ');
 }

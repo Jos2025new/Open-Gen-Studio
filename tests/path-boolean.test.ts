@@ -90,6 +90,47 @@ describe('erase and knife', () => {
   });
 });
 
+describe('knife and eraser on shapes that already have several components', () => {
+  const two = [...rect(0, 0, 100, 100), ...rect(300, 0, 50, 50)];
+  const ser = (segs: Seg[]) => JSON.stringify(segs);
+  it('a miss returns the input even when it has 2+ components', () => {
+    expect(knifeArea({ segs: two }, [[200, -20], [200, 200]])[0]).toBe(two);
+    expect(eraseArea({ segs: two }, [[200, 20], [220, 20]], 5)[0]).toBe(two);
+    expect(knifeArea({ segs: two }, [[200, -20], [200, 200]])).toHaveLength(1);
+    // a band near but not over a component
+    expect(eraseArea({ segs: two }, [[200, 20], [210, 20]], 5)).toHaveLength(1);
+    // a notch from the edge of one of them is not a cut
+    expect(knifeArea({ segs: two }, [[90, 50], [150, 50]])[0]).toBe(two);
+  });
+  it('cutting 10 times far from an island leaves its segs byte-identical (no drift, no minArea drop)', () => {
+    const island = circle(500, 500, 0.3); // tinier than minArea: untouched, so kept
+    const big = circle(500, 700, 30);
+    let pieces: Seg[][] = [[...rect(0, 0, 100, 100), ...island, ...big]];
+    for (let i = 0; i < 10; i++) {
+      const next = knifeArea({ segs: pieces.flat() }, [[5 + i * 8, -10], [5 + i * 8 + 3, 110]]);
+      expect(next.length).toBeGreaterThan(pieces.length);
+      pieces = next;
+    }
+    const all = pieces.map(ser);
+    expect(all).toContain(ser(island));
+    expect(all).toContain(ser(big));
+    const erased = eraseArea({ segs: pieces.flat() }, [[0, 50], [100, 50]], 4);
+    expect(erased.map(ser)).toContain(ser(island));
+    expect(erased.map(ser)).toContain(ser(big));
+    expect(splitComponents(pieces.flat()).map(ser)).toContain(ser(big));
+  });
+  it('knife pieces touch exactly (no hairline) while the outer outline stays put', () => {
+    const [a, b] = knifeArea({ segs: rect(0, 0, 100, 100) }, [[50, -10], [50, 110]]);
+    const xs = (segs: Seg[]) => flatten(segs, 0.05).flatMap((l) => l.points.map((p) => p[0]));
+    const [aMax, bMin] = xs(a)[0] < 50 || Math.max(...xs(a)) <= 50.02 ? [Math.max(...xs(a)), Math.min(...xs(b))] : [Math.max(...xs(b)), Math.min(...xs(a))];
+    expect(Math.abs(bMin - aMax)).toBeLessThan(0.01);
+    expect(Math.abs(aMax - 50)).toBeLessThan(0.01);
+    const all = [...xs(a), ...xs(b)];
+    expect(Math.min(...all)).toBeCloseTo(0, 2);
+    expect(Math.max(...all)).toBeCloseTo(100, 2);
+  });
+});
+
 describe('faces', () => {
   it('two overlapping circles -> 3 faces with sources', () => {
     const f = faces([{ segs: circle(0, 0, 50) }, { segs: circle(60, 0, 50) }])!;
@@ -127,5 +168,16 @@ describe('performance', () => {
     const ms = (performance.now() - t0) / 5;
     console.log(`eraseArea avg ${ms.toFixed(2)} ms`);
     expect(ms).toBeLessThan(40);
+  });
+});
+
+describe('components by containment', () => {
+  it('an island inside a hole is its own piece and keeps its segs; touching halves stay two pieces', () => {
+    const ring = [...rect(0, 0, 100, 100), ...parseSegs('M 20 20 L 20 80 L 80 80 L 80 20 Z')];
+    const isle = parseSegs('M 40 40 L 60 40 L 60 60 L 40 60 Z');
+    const all = splitComponents([...ring, ...isle], 'nonzero');
+    expect(all).toHaveLength(2);
+    expect(JSON.stringify(all[1])).toBe(JSON.stringify(isle));
+    expect(splitComponents([...rect(0, 0, 50, 100), ...rect(50, 0, 50, 100)])).toHaveLength(2);
   });
 });

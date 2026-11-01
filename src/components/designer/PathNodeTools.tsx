@@ -9,7 +9,7 @@ import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection'
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
-import { bandScreenPath, eraseFilled, isFilledArea, knifeFilled } from './areaTools';
+import { bandScreenPoints, eraseFilled, isFilledArea, knifeFilled } from './areaTools';
 import '../../styles/path-tools.css';
 
 const CUT_REACH = 12; // screen px from the path that a hover or click still counts as on it
@@ -69,7 +69,7 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = at(e);
     gesture.current = { start: p, moved: false, shift: e.shiftKey, pts: [p] };
-    if (mode === 'erase' && isFilledArea(shape)) { gesture.current.area = [local(p)]; setBand(bandScreenPath(gesture.current.area, radiusPx / view.zoom, scr)); }
+    if (mode === 'erase' && isFilledArea(shape)) { gesture.current.area = [local(p)]; setBand(bandScreenPoints(gesture.current.area, scr)); }
     else if (mode === 'erase') {
       gesture.current.erase = new EraseSession(sessionId, docId, layerId, shape, layerShapes(sessionId, docId, layerId));
       gesture.current.erase.sample(local(p), radiusPx / view.zoom);
@@ -81,7 +81,7 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
     if (!g) return;
     if (g.area) {
       const lp = local(p), prev = g.area[g.area.length - 1];
-      if (Math.hypot(lp[0] - prev[0], lp[1] - prev[1]) * view.zoom >= 2) { g.area.push(lp); setBand(bandScreenPath(g.area, radiusPx / view.zoom, scr)); }
+      if (Math.hypot(lp[0] - prev[0], lp[1] - prev[1]) * view.zoom >= 2) { g.area.push(lp); setBand(bandScreenPoints(g.area, scr)); }
       return;
     }
     if (mode === 'erase') { g.erase?.sample(local(p), radiusPx / view.zoom); return; }
@@ -122,7 +122,7 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
     <rect className="path-tools-hit" x="0" y="0" width="100%" height="100%" />
     {mark && <><line className="cut-mark" x1={mark.a.x} y1={mark.a.y} x2={mark.b.x} y2={mark.b.y} /><circle className="cut-dot" cx={mark.c.x} cy={mark.c.y} r={3.5} /></>}
     {mode === 'cut' && trail.length === 2 && <line className="cut-rubber" x1={trail[0].x} y1={trail[0].y} x2={trail[1].x} y2={trail[1].y} />}
-    {band && <path className="erase-band" d={band} />}
+    {band && <polyline className="erase-band" points={band} strokeWidth={2 * radiusPx} strokeLinecap="round" strokeLinejoin="round" />}
     {mode === 'erase' && hover && <><circle className="erase-halo" cx={hover.x} cy={hover.y} r={radiusPx} /><circle className="erase-ring" cx={hover.x} cy={hover.y} r={radiusPx} data-erase-radius={radiusPx} /></>}
     {mode === 'lasso' && trail.length > 1 && <polygon className="lasso-loop" points={trail.map((q) => `${q.x},${q.y}`).join(' ')} />}
   </svg>;
