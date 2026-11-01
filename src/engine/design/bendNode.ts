@@ -17,7 +17,7 @@ export function roundNode(segs: Seg[], n: number, dx: number, dy: number): { seg
   const h = nodeHandles(out, n), at = nodePosition(out, n), both = !!(h.in && h.out), sign = both ? -1 : 1;
   if (h.out) out[h.out[0]].p[h.out[1]] = [at[0] + dx, at[1] + dy];
   if (h.in) out[h.in[0]].p[h.in[1]] = [at[0] + sign * dx, at[1] + sign * dy];
-  return { segs: out, type: both ? 'z' : 's' };
+  return { segs: out, type: both ? 'z' : 'c' };
 }
 
 /** Node n retracted to a sharp corner; null when it has no handle sticking out (nothing to do). */

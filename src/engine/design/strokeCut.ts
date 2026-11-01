@@ -68,7 +68,9 @@ export function cutStrokeAcross(s: Stroke, a: [number, number], b: [number, numb
     cur.push(q);
   }
   out.push(cur);
-  const pieces = out.filter((c) => c.length >= 2);
+  // A line through a vertex can cut both its segments (float error): the zero-length sliver between is dropped.
+  const long = (c: P3[]) => c.some((q) => Math.hypot(q[0] - c[0][0], q[1] - c[0][1]) > EPS);
+  const pieces = out.filter((c) => c.length >= 2 && long(c));
   return out.length < 2 || pieces.length < 2 ? [s] : pieces.map((c) => strokePiece(base, c));
 }
 

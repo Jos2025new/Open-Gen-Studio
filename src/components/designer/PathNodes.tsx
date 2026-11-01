@@ -104,7 +104,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     }
     const d = drag.current;
     if (!d) return;
-    if (bend && d.pt?.kind !== 'node') return; // Bend mode: only nodes respond (they round); handles stay put
+    if (bend && d.pt && d.pt.kind !== 'node') return; // Bend mode: only nodes respond (they round); handles stay put
     const q = page(e, d.shape);
     if (d.start) {
       const x = e.clientX - ref.current!.getBoundingClientRect().left, y = e.clientY - ref.current!.getBoundingClientRect().top;
@@ -179,7 +179,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     {box && <rect className="node-marquee" x={box.x} y={box.y} width={box.w} height={box.h} />}
     <path className="path-outline" d={outline} data-tip="Double-click to add a node" onDoubleClick={addAt} />
     {/* A wide invisible band over the outline: grab any point of a segment to bend it (the cursor says so). */}
-    {bend && hoverSeg != null && segs[hoverSeg - 1] && ['L', 'C'].includes(segs[hoverSeg].c) && <path className="bend-hl" d={serializeSegs([{ c: 'M', p: [scrT(segs[hoverSeg - 1].p[segs[hoverSeg - 1].p.length - 1])] }, { c: segs[hoverSeg].c, p: segs[hoverSeg].p.map(scrT) }])} />}
+    {bend && hoverSeg != null && segs[hoverSeg - 1] && segs[hoverSeg] && ['L', 'C'].includes(segs[hoverSeg].c) && <path className="bend-hl" d={serializeSegs([{ c: 'M', p: [scrT(segs[hoverSeg - 1].p[segs[hoverSeg - 1].p.length - 1])] }, { c: segs[hoverSeg].c, p: segs[hoverSeg].p.map(scrT) }])} />}
     <path className="segment-hit" d={outline} fill="none" stroke="transparent" strokeWidth={bend ? 14 : 10} style={bend ? undefined : { cursor: 'move' }} data-tip={bend ? 'Drag so the curve passes through the pointer' : 'Drag to bend this segment · double-click to add a node'}
       onPointerMove={(e) => { if (!bend) return; if (segDrag.current) return setHoverSeg(segDrag.current.i); const q = page(e), r = nearestSegment(segs, [q.x, q.y]); setHoverSeg(r ? r.i : null); }}
       onPointerLeave={() => { if (!segDrag.current) setHoverSeg(null); }}

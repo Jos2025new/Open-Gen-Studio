@@ -92,7 +92,8 @@ export function StrokeTools({ view, sessionId, doc }: { view: View; sessionId: s
     cut.current = null; setTrail(null);
     if (c && e && e.type === 'pointerup') {
       const to = (q: { x: number; y: number }): [number, number] => { const d = screenToDocument({ x: q.x + rect().left, y: q.y + rect().top }, view, rect()); return [d.x, d.y]; };
-      if (c.moved) cutPickedStrokesAcross(sessionId, doc.id, layerId, to(c.start), to({ x: e.clientX - rect().left, y: e.clientY - rect().top }));
+      // A short drag that crosses nothing still cuts where it started, as a click.
+      if (c.moved && cutPickedStrokesAcross(sessionId, doc.id, layerId, to(c.start), to({ x: e.clientX - rect().left, y: e.clientY - rect().top }))) { /* cut across */ }
       else { const p = to(c.start); cutPickedStrokes(sessionId, doc.id, layerId, p[0], p[1], REACH / view.zoom); }
     }
     drag.current = null;
