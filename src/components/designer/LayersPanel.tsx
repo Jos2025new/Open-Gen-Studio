@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { PanelPeekHandle, usePanelPeek } from './LayersPeek';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import type { RelativeTo } from '../../engine/design/transform';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
@@ -99,6 +100,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const morePop = usePopover();
   const split = useRef<{ y: number; h: number } | null>(null);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
+  const peek = usePanelPeek(collapsed);
   // Properties, active-tool settings, and the layer list are separate panel destinations.
   const [savedTab, setTab] = usePref<string>('ogs:layers-tab', 'props');
   const tab = savedTab === 'layers' || savedTab === 'props' || savedTab === 'tool' ? savedTab : 'tool';
@@ -146,17 +148,15 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   // The composer dock centers itself on the free canvas area using this variable.
   useEffect(() => {
     const root = document.documentElement.style;
-    root.setProperty('--layers-w', collapsed ? '40px' : `${width}px`);
+    root.setProperty('--layers-w', collapsed ? '0px' : `${width}px`);
+    root.setProperty('--layers-peek-w', `${width}px`);
     root.setProperty('--layers-list-h', `${listH}px`);
-    return () => { root.removeProperty('--layers-w'); root.removeProperty('--layers-list-h'); };
+    return () => { root.removeProperty('--layers-w'); root.removeProperty('--layers-peek-w'); root.removeProperty('--layers-list-h'); };
   }, [width, collapsed, listH]);
 
-  if (collapsed) return <aside className="layers-panel is-collapsed" aria-label="Layers">
-    <IconButton icon={PanelRightOpen} label="Show layers panel" size="sm" onClick={() => setCollapsed(false)} />
-    {pendingPaintLayer && <IconButton icon={AlertTriangle} label="Open layers panel to confirm painting" size="sm" onClick={() => setCollapsed(false)} />}
-  </aside>;
+  if (collapsed && !peek.on) return <PanelPeekHandle warn={!!pendingPaintLayer} onPin={() => setCollapsed(false)} show={peek.show} hide={peek.hide} />;
 
-  return <aside className={`layers-panel${tab === 'layers' ? ' is-layers-only' : ''}`} aria-label="Layers">
+  return <aside className={`layers-panel${tab === 'layers' ? ' is-layers-only' : ''}${peek.on ? ' is-peek' : ''}`} aria-label="Layers" {...peek.panelProps}>
     <div className="layers-split" role="separator" aria-orientation="horizontal" aria-label="Resize the layer list" data-tip="Drag to give the layers more or less room · double-click resets"
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); split.current = { y: e.clientY, h: listH }; }}
       onPointerMove={(e) => { const r = split.current; if (r) setListH(Math.round(Math.min(window.innerHeight * 0.75, Math.max(96, r.h + r.y - e.clientY)))); }}
@@ -175,7 +175,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </button>
       ))}
       <span className="panel-tabs-gap" />
-      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<RasterLimitApproval layer={pendingPaintLayer} /><IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
+      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<RasterLimitApproval layer={pendingPaintLayer} /><IconButton icon={collapsed ? PanelRightOpen : PanelRightClose} label={collapsed ? 'Pin layers panel' : 'Collapse layers panel'} size="sm" onClick={() => setCollapsed(!collapsed)} /></div>
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
         <legend className="layer-appearance-title">Layer · {layer.name}</legend>
