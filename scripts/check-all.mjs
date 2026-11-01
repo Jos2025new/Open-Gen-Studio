@@ -1,7 +1,7 @@
 // Runs every project check in order and writes one log: .checks/last.log (rule · file:line · problem · fix, as each check prints it).
 import { spawnSync } from 'node:child_process'; import fs from 'node:fs';
 const steps = [['tsc', 'npx', ['tsc', '-b', '--noEmit']], ['safeguards', 'node', ['scripts/check-safeguards.mjs']], ['protected', 'node', ['scripts/check-protected.mjs']],
-  ['docs', 'node', ['scripts/check-docs.mjs']], ['sizes', 'node', ['scripts/check-sizes.mjs']], ['css-units', 'node', ['scripts/px-to-rem.mjs', '--check']], ['map', 'node', ['scripts/map.mjs']]];
+  ['docs', 'node', ['scripts/check-docs.mjs']], ['sizes', 'node', ['scripts/check-sizes.mjs']], ['css-units', 'node', ['scripts/px-to-rem.mjs', '--check']], ['gui', 'node', ['scripts/check-gui.mjs']], ['functions', 'node', ['scripts/check-functions.mjs']], ['map', 'node', ['scripts/map.mjs']]];
 fs.mkdirSync('.checks', { recursive: true });
 let log = `checks ${new Date().toISOString()}\n`, failed = 0;
 for (const [name, cmd, args] of steps) {
