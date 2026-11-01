@@ -1,12 +1,12 @@
 ---
 type: inventario
-title: Edición de nodos: modos Move, Bend, Cut, Erase y Lasso
-description: La barra de modos de la edición de nodos de un path (con palabras), el menú Más y Done; qué hace cada modo, qué estado toca y dónde está en el código. Cambio del 2026-11-01.
+title: Edición de nodos: modos Move, Bend, Cut, Erase y Lasso, selección Node · Segment · Face
+description: La barra de modos de la edición de nodos de un path (con palabras), la selección por nodo, tramo o cara (teclas 1, 2 y 3), el menú Más y Done; qué hace cada uno, qué estado toca y dónde está en el código. Cambio del 2026-11-01.
 tags: [designer, nodos, path, cortar, borrar, lazo, bend]
 updated: 2026-11-01
 related: [tira-contextual, toolbox-dock, lienzo-gestos, formas, atajos, booleanas]
 ---
-# Edición de nodos: modos Move, Bend, Cut, Erase y Lasso
+# Edición de nodos: modos Move, Bend, Cut, Erase y Lasso, selección Node · Segment · Face
 
 Al editar los nodos de un path (Edit con un path elegido, `ShapeKnots.tsx:56`), la tira contextual muestra la barra de modos (`ContextStrip.tsx:82`), el menú Más (`ContextStrip.tsx:88`) y Done (`ContextStrip.tsx:90`). Desde 2026-11-01 los cinco modos están activos, con su palabra visible. Antes, Cut, Erase y Lasso eran marcadores «Soon».
 
@@ -22,13 +22,17 @@ Fuente de verdad: el modo vive en `useNodeEditMode` (`nodeEditMode.ts:13`). No s
 | Erase (Eraser) | Barra de modos (`NodeEditBar.tsx:19`), etiqueta en `NodeEditBar.tsx:15` | Forma rellena y cerrada: `eraseFilled` (`areaTools.ts:28`) → `eraseArea` (`pathBoolean.ts:262`), al soltar. Trazo abierto o sin relleno: `EraseSession` (`PathNodeTools.tsx:28`) → `erasePath` (`vectorErase.ts:35`) | Path en edición | En forma rellena, arrastrar pinta una banda redonda del radio real en vivo; el área se borra al soltar, en un paso de deshacer. En trazo abierto, arrastrar borra un círculo a lo largo del trazo. El cursor es un anillo de radio real |
 | Tamaño del borrador (slider «Eraser», px) | Debajo de la barra, solo con Erase (`NodeEditBar.tsx:19`) | `setEraseRadius` (`nodeEditMode.ts:20`): `eraseRadius`, 1 a 200, por defecto 10 | Modo Erase | Radio en píxeles de pantalla; en unidades de página se divide entre el zoom (`PathNodeTools.tsx:50`) |
 | Lasso (Lasso) | Barra de modos (`NodeEditBar.tsx:19`), etiqueta en `NodeEditBar.tsx:16` | `setShapeEdit` con `nodes` (`PathNodeTools.tsx:50`) | Path en edición | Lazo libre; selecciona los nodos dentro (`nodesInLasso`, `lassoNodes.ts:14`). Shift añade a la selección |
+| Node · Segment · Face (teclas 1, 2, 3) | Segmentado en la barra, `SelectModeButtons.tsx`; solo en Move y Lasso | `chooseSelectMode` (`selectModeActions.ts`): cambia `useNodeEditMode.select` y convierte la selección | Path en edición, modo Move o Lasso | Qué elige un clic, un marco o un lazo. Ver «Selección: Node · Segment · Face» |
+| Gap (Cut) | Campo bajo la barra, solo con Cut (`NodeEditBar.tsx`, `NodeModeButtons`) | `setUi({ cutGap })`: `ui.cutGap`, de 0 a 20 px, paso 0,5 | Modo Cut | Espacio entre las piezas de un corte sobre formas con relleno. 0 (defecto) = tocándose. Recordado |
+| Fix overlaps (Fill, Cut) | Menú Más de la edición de nodos (`NodeEditBar.tsx`) y Más de la tira de selección (`ShapeMoreMenu.tsx`), fila `FixOverlapsRow.tsx` | `fixShapeOverlaps`; `ui.fixMode` (recordado, por defecto Fill) | Path con relleno que no es primitiva | Arregla los trazos que se cruzan: Fill suma las partes plegadas, Cut deja vacío el solape. Ver [booleanas](booleanas.md) |
 | Más (More) | Botón en `NodeEditBar.tsx:30`, popover de 240 px | Abre el menú; cada entrada usa las operaciones de abajo | Path en edición | Sin nodos elegidos muestra «Pick nodes to see their operations.» |
-| Node: cusp / smooth / symmetric | Menú Más (`NodeEditBar.tsx:30`) | `setPathNodeType` | Un nodo elegido | Atajos Shift+C, Shift+S, Shift+Y (ver [[tira-contextual]]) |
+| Node: cusp / smooth / symmetric | Menú Más (`NodeEditBar.tsx:30`) | `setPathNodeType` | Un nodo elegido | Atajos Shift+C, Shift+S, Shift+Y (ver [[tira-contextual]]). En una esquina entre dos tramos rectos, smooth y symmetric sacan las manijas en línea recta (ver «Tipos de nodo en tramos rectos») |
 | Break | Menú Más (`NodeEditBar.tsx:30`) | `setBreakNodes` | ≥1 nodo elegido | Shift+B |
 | Join / Join with segment | Menú Más (`NodeEditBar.tsx:30`) | `setJoinEnds` (`merge` o `segment`) | ≥2 nodos elegidos | Shift+J; Alt+J |
 | Delete segment | Menú Más (`NodeEditBar.tsx:30`) | `setDeleteSegments` | ≥2 nodos elegidos | — |
 | Make line / Make curve | Menú Más (`NodeEditBar.tsx:30`) | `setSegmentsTo` | ≥2 nodos elegidos | Shift+L; Shift+U |
-| Delete node | Menú Más (`NodeEditBar.tsx:30`) | `deletePickedNode` | Un nodo elegido | Delete; Ctrl+Delete une los vecinos en recta |
+| Delete node | Menú Más (`NodeEditBar.tsx:30`) | `deletePickedNode` | Un nodo elegido (modo Node) | Delete; Ctrl+Delete une los vecinos en recta |
+| Delete segment o face | Tecla Delete (`deleteBySelection`, `selectModeActions.ts`) | `deleteFaces` o `setDeleteSegments`; un paso de deshacer | Modo Segment o Face con elementos elegidos | Borra los tramos elegidos, o las caras con sus huecos. Si no queda ningún tramo, la forma sale de la capa |
 | Done | `NodeDoneButton` (`NodeEditBar.tsx:53`) | `setShapeEdit(docId, null)` | Path en edición | Esc también sale. Vuelve a Move |
 | Pista de la barra de estado | `shapeEditHint` (`ShapeKnots.tsx:120`, líneas 124 a 129) | Ninguno | Según el modo | Un texto por modo: Bend, Cut, Erase, Lasso y Move (el de Move dice las teclas de nodos) |
 
@@ -36,10 +40,47 @@ Fuente de verdad: el modo vive en `useNodeEditMode` (`nodeEditMode.ts:13`). No s
 
 Una forma cerrada con relleno se trata por su área, como el cuchillo y el borrador de Inkscape o Illustrator (`isFilledArea`, `pathPieces.ts`). Los trazos abiertos y sin relleno siguen con las herramientas de borde de la tabla.
 
-- **Cut arrastrando (cuchillo):** la línea divide el área en piezas cerradas. Cada pieza es una forma con relleno que se puede volver a cortar o borrar. Desde `7cf8a0c7`, los puntos del borde se pegan a la línea del cuchillo y cada extremo de corte queda en un solo nodo, sin costura. Con el modo Cut activo, el campo **Gap** de la tira (`NodeEditBar.tsx`, `ui.cutGap`, recordado entre sesiones) deja ese espacio en px entre las piezas para verlas y agarrarlas mejor; 0, el valor por defecto, las deja tocándose (test: `tests/path-boolean.test.ts`, «a knife gap…»).
+- **Cut arrastrando (cuchillo):** la línea divide el área en piezas cerradas. Cada pieza es una forma con relleno que se puede volver a cortar o borrar. Desde `7cf8a0c7`, los puntos del borde se pegan a la línea del cuchillo y cada extremo de corte queda en un solo nodo, sin costura. Con el modo Cut activo, el campo **Gap** de la tira (`NodeEditBar.tsx`, `ui.cutGap`, recordado entre sesiones) deja ese espacio en px entre las piezas para verlas y agarrarlas mejor; 0, el valor por defecto, las deja tocándose. Solo afecta al cuchillo sobre formas con relleno (`knifeFilled` → `knifeArea`): el corte de un trazo abierto no lo usa. Con gap, los bordes no se pegan a la línea del cuchillo (test: `tests/path-boolean.test.ts`, «a knife gap leaves that much space…» y «0 keeps them touching»).
 - **Erase:** el área bajo el pincel desaparece al soltar; el resultado puede ser varias piezas. Un gesto, un paso de deshacer.
 - **Un intento que no divide ni borra nada** no cambia la forma y no deja paso de deshacer (función `apply` de `areaTools.ts`).
 - **Mientras se editan los nodos**, las piezas son subtrazados de la misma forma, así que se puede seguir cortando. **Al salir** (Done, Esc o cambio de herramienta) se separan por componente: cada contorno exterior con sus agujeros. Las piezas que no se tocaron conservan sus curvas; separar no repite la operación booleana.
+
+## Selección: Node · Segment · Face
+
+Con Move o Lasso, la barra muestra tres elementos, como los modos vértice, arista y cara de Blender: **Node** (`1`), **Segment** (`2`) y **Face** (`3`). Las teclas solo cambian el elemento con el tablero enfocado; al empezar a editar vuelve a Node (`tests/select-mode.test.ts`). Los tres botones tienen `aria-checked`.
+
+- **Node:** el nodo. La selección es la lista de nodos de siempre (`ShapeEdit.nodes`), así que todas las operaciones de nodo siguen igual. Clic elige; Shift añade o quita.
+- **Segment:** el tramo entre dos nodos consecutivos, incluido el de cierre de un subtrazado cerrado. Clic o arrastre sobre el tramo elige el tramo y sus dos nodos; arrastrarlo mueve esos dos nodos. Shift añade o quita.
+- **Face:** un subtrazado cerrado. Un contorno exterior incluye los huecos que contiene **por completo** (no basta con que toquen un punto). Los contornos que solo se solapan son hermanos, no anidados. Con relleno nonzero, un hueco debe ir en sentido contrario a su padre; con evenodd, la profundidad impar es hueco. Clic dentro elige la cara más pequeña que lo contiene: clic en un hueco elige el hueco. Arrastrar una cara mueve solo sus nodos.
+
+**Conversión al cambiar de elemento** (como Blender: solo sobreviven los elementos enteros, `deriveSel`):
+
+- Node a Segment: quedan los tramos cuyos dos extremos están elegidos. El nodo suelto no forma tramo.
+- Node a Face: quedan las caras cuyos nodos están todos elegidos. El hueco de una cara exterior elegida va con ella.
+- Segment o Face a Node: quedan los nodos de los elementos elegidos.
+
+Ejemplo de la prueba: con los nodos 0, 1, 2 y 9 elegidos, Segment conserva los tramos 0 y 1 (nodos 0, 1 y 2); el 9 se pierde.
+
+**Qué hace cada acción con el elemento elegido:**
+
+- **Mover** (arrastrar): en Node, los nodos elegidos; en Segment, los dos nodos del tramo; en Face, los nodos de la cara. Un paso de deshacer.
+- **Delete** en Segment o Face: borra los tramos o las caras elegidas (con sus huecos) en un paso de deshacer, y limpia la selección. Si no queda ningún tramo, la forma sale de la capa. En Node, Delete borra el nodo como antes.
+- **Delete segment, Make line y Make curve** en Segment actúan solo sobre los tramos elegidos (dos lados opuestos de un cuadrado no arrastran los otros dos). En Node actúan sobre todos los tramos entre nodos elegidos.
+- **Join, Break y los tipos de nodo** actúan sobre los nodos elegidos en cualquier modo.
+
+Pruebas: `tests/select-mode.test.ts` (conversión, clic y Shift en tramos, caras con huecos, arrastre de cara, Delete, teclas y tira, caras con contornos hermanos, reglas evenodd y nonzero, Delete segment y Shift+L solo sobre lo elegido).
+
+**Límite** (D42): en un trazado que se cruza a sí mismo, las regiones de solape no son caras. Conviene arreglar el cruce con Fix overlaps antes ([booleanas](booleanas.md)).
+
+## Tipos de nodo en tramos rectos
+
+Smooth o Symmetric sobre una esquina entre dos tramos rectos (como Inkscape) necesita manijas en los dos lados. Por eso el nodo saca las manijas en línea recta, y los tramos vecinos se vuelven curvas primero (`alignNode`, `nodeTypes.ts`):
+
+- Cada manija que faltaba mide un tercio del tramo vecino, en línea con el nodo.
+- Vale también para el primer y el último nodo de un trazado cerrado (con Z sin nodo de cierre, se añade el segmento de cierre).
+- Una esquina (cusp) no cambia nada.
+
+Prueba: `tests/node-types-straight.test.ts`.
 
 ## Algoritmos
 
@@ -60,11 +101,12 @@ Procedencia: `bendSegment.ts`, `pathCut.ts` y `vectorErase.ts` siguen las operac
 
 ## Evidencia
 
-- Código: commits `59e77856` (barra con palabras, Bend, menú Más, Done), `025cacba` (Cut, Erase, Lasso y radio del borrador), ambos el 2026-11-01. Después, `cf7d47c6` y `de441d6e` (Bend visible, redondeo y esquina por nodo, Lineart: marca de corte, corte arrastrado y anillo de Bend), `f26a5ecd`, `015eb834` y `7cf8a0c7` (corte y borrado por área en formas con relleno; el último, puntos del cuchillo pegados y soldados).
+- Código: commits `59e77856` (barra con palabras, Bend, menú Más, Done), `025cacba` (Cut, Erase, Lasso y radio del borrador), ambos el 2026-11-01. Después, `12fdc6f3` (campo Gap de Cut, `ui.cutGap`), `a4e697ae` y `99ece82e` (selección Node · Segment · Face, teclas 1, 2 y 3, revisión de caras por contención completa y regla de relleno), `6476c6a7` (Smooth y Symmetric en esquinas rectas) y `157985f1` (Fix overlaps con Fill y Cut, en [booleanas](booleanas.md)). Después, `cf7d47c6` y `de441d6e` (Bend visible, redondeo y esquina por nodo, Lineart: marca de corte, corte arrastrado y anillo de Bend), `f26a5ecd`, `015eb834` y `7cf8a0c7` (corte y borrado por área en formas con relleno; el último, puntos del cuchillo pegados y soldados).
 - Tests: `tests/bend-cut-tools.test.ts` (Bend por nodo y gestos de Lineart) y `tests/path-area-tools.test.ts` (corte y borrado por área; los trazos abiertos siguen con sus pruebas de borde).
 - Tests unitarios: `tests/node-edit-mode.test.ts` (modos, reset, pista, math de Bend), `tests/path-cut-erase-lasso.test.ts` (cortes, borrado, lazo) y `tests/path-node-tools.test.ts` (cinco modos, radio 10 px, un solo deshacer al borrar, lazo).
+- Selección y tipos de nodo: `tests/select-mode.test.ts` (elementos, conversión, Segment, Face, Delete, teclas 1/2/3) y `tests/node-types-straight.test.ts` (Smooth y Symmetric en esquinas rectas).
 - E2E: `tests-e2e/path-nodes.spec.ts` abre el menú Más para las operaciones de nodos. No se ha ejecutado contra el sandbox en este cambio.
-- Prueba visual del gesto (puntero, vista previa de corte, cursor de Erase): **no hecha**. Los tests no cubren el gesto real del puntero.
+- Prueba visual del gesto (puntero, vista previa de corte, cursor de Erase, selección por tramo o cara, Gap): **no hecha**. Los tests no cubren el gesto real del puntero. La prueba la hace el usuario en el sandbox.
 
 ## Lineart: trazos elegidos
 

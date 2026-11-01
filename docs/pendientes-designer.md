@@ -38,7 +38,7 @@ El usuario dijo que máscaras, ajustes, PSD y color son el próximo trabajo del 
 
 ## Límites y huecos de la tanda 2026-11-01
 
-Límites conocidos de los cambios de la [caja de herramientas](designer-controles/toolbox-dock.md) y los trazos Lineart ([nodos-modos](designer-controles/nodos-modos.md)). Los huecos D34, D35, D37 y D38 van en el orden de impacto que dio el usuario (el primero, el de más impacto). D36 (constructor de formas y booleanas) se cerró el 2026-11-01 y sus restos son D39 a D41, que son propuesta. La prioridad es propuesta de Astra.
+Límites conocidos de los cambios de la [caja de herramientas](designer-controles/toolbox-dock.md) y los trazos Lineart ([nodos-modos](designer-controles/nodos-modos.md)). Los huecos D34, D35, D37 y D38 van en el orden de impacto que dio el usuario (el primero, el de más impacto). D36 (constructor de formas y booleanas) se cerró el 2026-11-01 y sus restos son D39 a D41, que son propuesta; D42 y D43 vienen de Fix overlaps y de la reconstrucción exacta del mismo día. La prioridad es propuesta de Astra.
 
 - **D32 · bajo · 2026-11-01 · Slider de tamaño del trazo Lineart:** cada tick registra un paso de deshacer, igual que los campos de forma hoy. Agrupar el arrastre en un solo paso si el usuario lo nota.
 - **D33 · bajo · 2026-11-01 · Borrar un trazo entero y deshacer:** el deshacer devuelve el trazo, pero no lo deja elegido (`strokeEdit.ts`, `replace`).
@@ -49,6 +49,8 @@ Límites conocidos de los cambios de la [caja de herramientas](designer-controle
 - **D39 · bajo · 2026-11-01 · Trim, Merge y Crop del pathfinder** (propuesta). Las booleanas actuales son Union, Subtract, Intersect, Exclude y Divide ([booleanas](designer-controles/booleanas.md)); faltan esas tres operaciones de recorte.
 - **D40 · medio · 2026-11-01 · Booleanas entre capas** (propuesta). Hoy solo actúan sobre formas de una misma capa vectorial (`shapeBuilder.ts:18`).
 - **D41 · bajo · 2026-11-01 · Arrastrar las manijas de Bend** (propuesta). En Bend solo responden los nodos y los segmentos; las manijas no se mueven con el arrastre (`PathNodes.tsx:104`). Ver [nodos-modos](designer-controles/nodos-modos.md).
+- **D42 · medio · 2026-11-01 · Caras de un trazado que se cruza a sí mismo** (propuesta). La selección Face de los nodos solo reconoce subtrazados cerrados; las regiones de solape de un trazado que se cruza no son caras (`selectMode.ts`, `facesOf`). Propuesta: tratarlas como caras al elegir, con su relleno. Ver [nodos-modos](designer-controles/nodos-modos.md) y [booleanas](designer-controles/booleanas.md).
+- **D43 · medio · 2026-11-01 · Reconstrucción exacta de curvas (Z tags)** (**en corrección**, revisión independiente en curso). Casos abiertos en `exactRebuild.ts`: un único cúbico que se cierra sobre sí mismo, los T-junctions y la guarda de trazados grandes. Ver [booleanas](designer-controles/booleanas.md).
 
 ## Auditoría del Designer (2026-10-22)
 
