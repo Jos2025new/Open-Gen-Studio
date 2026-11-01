@@ -7,10 +7,10 @@ import { createRoot } from 'react-dom/client';
 vi.mock('@xyflow/react', () => ({ Panel: ({ children, className }: { children: ReactNode; className?: string }) => createElement('div', { className }, children) }));
 vi.mock('../src/components/chat/FeedList', () => ({ FeedList: () => createElement('div', { className: 'feed-mock' }), NoticeView: () => createElement('button', null, 'Undo') }));
 vi.mock('../src/components/node/ResultSummary', () => ({ ResultSummary: () => createElement('div', { className: 'info-mock' }) }));
-vi.mock('../src/components/composer/Composer', () => ({ AttachStrip: () => null, SendDirect: ({ kind }: { kind: string }) => createElement('button', { className: 'send-mock' }, `Generate ${kind}`) }));
+vi.mock('../src/components/composer/Composer', () => ({ AttachStrip: () => null, DesignerTargetChip: () => createElement('span', { className: 'target-mock' }, 'New layer'), SendDirect: ({ kind }: { kind: string }) => createElement('button', { className: 'send-mock' }, `Generate ${kind}`) }));
 vi.mock('../src/components/composer/MediaControls', () => ({ ModelChip: ({ kind }: { kind: string }) => createElement('span', { className: 'model-mock' }, kind), MediaControls: () => null }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined } }));
-import { CornerButtons, NodeSide, useCorner } from '../src/components/node/NodeSide';
+import { CornerButtons, DesignerCorner, NodeSide, useCorner } from '../src/components/node/NodeSide';
 import { setNodeSelection } from '../src/engine/flow/selection';
 import { useStore } from '../src/store/store';
 
@@ -121,4 +121,29 @@ it('Create uses the grid icon; Auto layout in the toolbox uses the tidy-blocks i
   expect(nav).toMatch(/<IconButton icon=\{LayoutDashboard\} label="Auto layout"/);
   expect(nav).not.toContain('Workflow');
   expect(nav).not.toContain('LayoutGrid');
+});
+
+it('the Designer side toolbox opens the same panel: Create offers only Image (with the target layer), Conversation shows its thread', () => {
+  setSession({ feed: [{ ...user, workspace: 'designer' }] });
+  useStore.setState({ composer: { ...initial.composer, mode: 'image', text: '' } });
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  act(() => root.render(createElement('div', null, createElement('nav', { className: 'tools' }, createElement(CornerButtons, { sessionId: id, space: 'designer' })), createElement(DesignerCorner, { sessionId: id }))));
+  expect(host.querySelector('.designer-corner')).toBeNull();
+  expect(host.querySelector('.tools .canvas-nav-badge')?.textContent).toBe('1');
+  act(() => host.querySelector<HTMLElement>('.tools [aria-label="Create"]')?.click());
+  expect([...host.querySelectorAll<HTMLButtonElement>('.designer-corner .side-kind')].map((b) => `${b.textContent?.trim()}${b.disabled ? ' off' : ''}`)).toEqual(['Image', 'Video off', 'Audio off', '3D off']);
+  expect(host.querySelector('.designer-corner .target-mock')).not.toBeNull();
+  act(() => host.querySelector<HTMLElement>('.tools [aria-label="Conversation"]')?.click());
+  expect(host.querySelector('.designer-corner .feed-mock')).not.toBeNull();
+  act(() => root.unmount());
+});
+
+it('in the Designer the panel lives in the side toolbox, gives way to its popups and replaces the Conversation card', () => {
+  const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
+  expect(palette).toMatch(/<DesignsButton [^>]*\/>\s*<CornerButtons sessionId=\{settings\.sessionId\} space="designer" \/>/);
+  expect(palette).toMatch(/\{viewBar\}\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>/);
+  const css = readFileSync('src/styles/node-side.css', 'utf8');
+  expect(css).toMatch(/\.designer-side:has\(\.tool-dock-stack > \*\) \.designer-corner, body:has\(\.designs-pop\) \.designer-corner \{ display: none; \}/);
+  expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) :is\(\.thread-peek, \.thread-peek-folded\) \{ display: none; \}/);
 });

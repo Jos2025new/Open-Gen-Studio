@@ -76,7 +76,7 @@ it('integrated (in the prompt box) or separate (upright at the left, with the de
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
   expect(palette).toMatch(/if \(docked\) return viewBar;/);
   expect(palette).toMatch(/<IconButton icon=\{docked \? PanelLeft : PanelBottom\} label=\{docked \? 'Toolbox at the side' : 'Toolbox in the prompt box'\} size="md" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
-  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical place=\{<DockPlaceButton \/>\} \/>\s*<\/div>\s*\{viewBar\}/);
+  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<CornerButtons [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical place=\{<DockPlaceButton \/>\} \/>\s*<\/div>\s*\{viewBar\}\s*<DesignerCorner /);
   expect(palette).toMatch(/<Popover [^>]*placement="right-start"[^>]*className="designs-pop">\s*<DocumentChoices /);
   expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<div className="designer-palette is-docked"><ToolDock sessionId=\{sessionId\} doc=\{designDoc\} place=\{<DockPlaceButton \/>\} \/><\/div>/);
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');

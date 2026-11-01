@@ -6,6 +6,7 @@ import { DocumentChoices } from './DocumentPicker';
 import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
+import { CornerButtons, DesignerCorner } from '../node/NodeSide';
 
 /** Last button of the toolbox, in both places: moves it between the prompt box and the side. */
 export function DockPlaceButton() {
@@ -26,8 +27,8 @@ function DesignsButton({ sessionId, active }: { sessionId: string; active: Compo
 }
 
 /**
- * The toolbox outside the prompt box: the same strip as in the composer, turned upright at the left, with the designs
- * on top and the canvas view (zoom, fit, view toggles) under it in one frame. With the toolbox in the composer, the view
+ * The toolbox outside the prompt box: the same strip as in the composer, turned upright at the left, with the designs,
+ * Create and Conversation on top (as in Nodes) and the canvas view (zoom, fit, view toggles) under it in one frame. With the toolbox in the composer, the view
  * stays on its own.
  */
 export function ToolPalette({ history, view, ...settings }: ComponentProps<typeof ToolSettings> & { history?: ReactNode; view: ReactNode }) {
@@ -39,10 +40,12 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
   if (docked) return viewBar;
   return <div className="designer-side">
     <DesignsButton sessionId={settings.sessionId} active={settings.doc} />
+    <CornerButtons sessionId={settings.sessionId} space="designer" />
     <span className="tool-dock-separator" aria-hidden="true" />
     <div className="designer-palette is-side">
       <ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} vertical place={<DockPlaceButton />} />
     </div>
     {viewBar}
+    <DesignerCorner sessionId={settings.sessionId} />
   </div>;
 }

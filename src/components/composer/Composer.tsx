@@ -131,7 +131,7 @@ const PLACEHOLDER = {
   model3d: 'Describe the object, material and shape…',
 };
 
-function DesignerTargetChip() {
+export function DesignerTargetChip() {
   const sessionId = useStore((s) => s.activeSessionId);
   const target = useStore((s) => s.composer.designerTarget);
   const doc = useStore(() => activeDoc(sessionId));
