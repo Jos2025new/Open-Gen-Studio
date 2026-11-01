@@ -168,11 +168,14 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .designer-footer-tools .icon-btn { width: 28px; height: 28px; color: var(--text-3); }
 .designer-footer-tools .icon-btn svg { width: 16px; height: 16px; }
 .designer-footer-tools .icon-btn:hover, .designer-footer-tools .icon-btn.is-active { color: var(--text); }
-/* The bar takes its content's width: the dock (and so the footer under it) follows, so the footer icons end at the bar's edge. */
-.composer-dock:has(.composer-tools-bar) { width: max-content; max-width: calc(100% - 48px); }
+/* The bar is as wide as the prompt box in every space (800 px), so nothing changes width when switching spaces or the toolbox's place;
+   its three groups spread across it (Designs and the panels' buttons, tools, view), and the footer ends at its edge. */
+.composer-dock:has(.composer-tools-bar) { width: min(800px, calc(100% - 48px)); }
+.composer-dock .composer:has(.composer-tools-bar) { width: 100%; }
+.composer-tools-bar { justify-content: space-between; }
 /* The prompt box is centered in the room the pinned right panel leaves (the stage), and Fit canvas centers there too (fitView):
    box and canvas share one line in the middle of what the user sees. A peeking (unpinned) panel floats over and moves nothing. */
 @media (min-width: 768px) {
   .ws-designer .dock-designer { left: calc((100% - var(--layers-w, 0px)) / 2); transform: translateX(-50%); width: min(800px, calc(100% - var(--layers-w, 0px) - 192px)); }
-  .ws-designer .dock-designer:has(.composer-tools-bar) { width: max-content; max-width: calc(100% - var(--layers-w, 0px) - 48px); }
+  .ws-designer .dock-designer:has(.composer-tools-bar) { width: min(800px, calc(100% - var(--layers-w, 0px) - 48px)); }
 }
