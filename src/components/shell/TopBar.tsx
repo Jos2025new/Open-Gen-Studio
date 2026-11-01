@@ -19,16 +19,18 @@ import { StudioReopen } from '../studio/StudioReopen';
 import { getLeftSlot, subscribeLeftSlot, setHomeTabsSlot } from './topbarSlot';
 import '../../styles/topbar-home.css';
 import '../../styles/compact-popovers.css';
+import '../../styles/topbar-groups.css';
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 
 /** Workspaces render their contextual actions into the top bar through this. */
-export function TopbarActions({ children, side = 'right' }: { children: ReactNode; side?: 'left' | 'right' }) {
+/** `start`: beside the session title (the document's own actions); `left`: the session switcher; `right`: the workspace slot. */
+export function TopbarActions({ children, side = 'right' }: { children: ReactNode; side?: 'left' | 'right' | 'start' }) {
   const slot = useContext(TopbarSlotContext);
   const switcherSlot = useSyncExternalStore(subscribeLeftSlot, getLeftSlot);
   const [destination, setDestination] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
-    setDestination(document.querySelector<HTMLDivElement>(side === 'left' ? '#workspace-actions-left' : '#workspace-actions'));
+    setDestination(document.querySelector<HTMLDivElement>(side === 'left' ? '#workspace-actions-left' : side === 'start' ? '#workspace-actions-start' : '#workspace-actions'));
   }, [slot, side, switcherSlot]);
   const target = side === 'right' && slot?.isConnected ? slot : side === 'left' && switcherSlot ? switcherSlot : destination;
   return target ? createPortal(children, target) : null;
@@ -119,10 +121,12 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
             <SessionSwitcher activeId={sessionId} title={title} onRename={() => setEditing(true)} />
           )}
         </>}
+        {/* Always mounted (hidden on Home), so the portals into it survive a visit to Home. */}
+        <div id="workspace-actions-start" className="topbar-slot topbar-slot-start" />
+        {workspace === 'designer' && !home && <SaveIndicator />}
       </div>
       <div className="topbar-right">
         <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
-        {workspace === 'designer' && !home && <SaveIndicator />}
         <button type="button" ref={connectedPop.ref} className={`topbar-menu topbar-pill ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
           <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${connected.length ? 'is-on' : ''}`} />
         </button>

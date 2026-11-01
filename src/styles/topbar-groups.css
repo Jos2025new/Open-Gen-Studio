@@ -1,0 +1,15 @@
+/* Top bar groups (Designer first): related actions share one frame, as in the canvas toolbars. */
+.topbar-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); }
+.topbar-group .icon-btn { width: 32px; height: 32px; border-radius: calc(var(--toolbar-radius) - 3px); color: var(--text-2); }
+.topbar-group .icon-btn svg { width: 17px; height: 17px; }
+.topbar-group .icon-btn:not(:disabled):hover, .topbar-group .icon-btn.is-active { color: var(--text); background: var(--surface-3, var(--surface)); }
+.topbar-group .topbar-sep { height: 18px; margin: 0 3px; background: var(--panel-line); }
+/* The turn menu and canvas size bring their own wrappers: they sit flush in the group. */
+.topbar-group > :not(.icon-btn):not(.topbar-sep) { display: inline-flex; align-items: center; gap: 2px; }
+.topbar-slot-start:empty { display: none; }
+.topbar-left:has(.topbar-slot-start:not(:empty)) { max-width: 60%; }
+/* Workspace actions end in Export; a hairline sets the app's own status and menus apart. */
+.topbar-right > .topbar-slot:has(.topbar-group) { padding-right: 10px; margin-right: 2px; border-right: 1px solid var(--panel-line); }
+.topbar-export.btn { height: 32px; padding: 0 14px; border-radius: var(--toolbar-radius); font-weight: 600; }
+.topbar-left .save-indicator { height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 12px; color: var(--text-3); }
+.topbar-left .save-indicator:hover { color: var(--text); }

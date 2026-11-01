@@ -6,7 +6,7 @@ Continuación de [[designer-tecnico]], que tiene el índice, la arquitectura, el
 
 ### Barra superior
 
-`TopbarActions` en `DesignerWorkspace.tsx:84-120`, de izquierda a derecha: `New document` (menú de presets, `DOC_PRESETS`), `Undo`, `Redo` (con el texto "History trimmed" si el historial perdió pasos), `Import image`, `Transform` (versión `turnOnly` de `EditOps`), `Show or hide right panel`, el chip `Selection` (si hay selección de píxeles y otra herramienta activa), `Canvas size` (`CanvasSize.tsx:10`), `Save to gallery` (con confirmación) y `Export` (menú PNG, JPG, SVG, PDF). Guía: [[designer-guia-usuario#La barra superior]].
+`TopbarActions` en `DesignerWorkspace.tsx:85-124`, en dos huecos (2026-10-31). Junto al título (`side="start"`), un grupo con `New document` (menú de presets, `DOC_PRESETS`), `Undo` y `Redo` (con el texto "History trimmed" si el historial perdió pasos), y después el estado de guardado. A la derecha: el chip `Selection` (si hay selección de píxeles y otra herramienta activa), el grupo «Document» con `Import image`, `Transform` (versión `turnOnly` de `EditOps`), `Canvas size` (`CanvasSize.tsx:10`), `Save to gallery` (con confirmación) y `Show or hide right panel`, y `Export` como botón primario (menú PNG, JPG, SVG, PDF). Estilo: `topbar-groups.css`. Guía: [[designer-guia-usuario#La barra superior]].
 
 ### Selector de documentos
 

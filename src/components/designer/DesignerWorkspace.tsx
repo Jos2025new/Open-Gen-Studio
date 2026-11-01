@@ -81,26 +81,32 @@ export function DesignerWorkspace() {
 
   return <div className="designer">
     <input ref={importRef} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
-    <TopbarActions>
-      <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
+    {/* Beside the title: new document and undo/redo, one group. Right: the document's actions, then Export. */}
+    <TopbarActions side="start">
+      <span className="topbar-group" role="toolbar" aria-label="Document history">
+        <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
+        {doc && <>
+          <span className="topbar-sep" aria-hidden />
+          <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
+          <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
+        </>}
+      </span>
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
-      {doc && <>
-        <span className="topbar-sep" aria-hidden />
-        <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
-        <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
-        {trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 11, alignSelf: 'center' }}>History trimmed</span>}
-        <span className="topbar-sep" aria-hidden />
-        <IconButton icon={ImagePlus} label="Import image" size="sm" onClick={() => importRef.current?.click()} />
-        <EditOps sessionId={session.id} doc={doc} turnOnly />
-        <IconButton icon={PanelRight} label="Show or hide right panel" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
-        <span className="topbar-sep" aria-hidden />
-      </>}
+      {doc && trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 11, alignSelf: 'center' }}>History trimmed</span>}
+    </TopbarActions>
+    <TopbarActions>
       {doc && <SelectionChip docId={doc.id} />}
       {doc && <>
-        <CanvasSize key={doc.id} sessionId={session.id} doc={doc} />
-        <IconButton ref={saveConfirm.ref} icon={Images} label="Save to gallery" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />
+        <span className="topbar-group" role="toolbar" aria-label="Document">
+          <IconButton icon={ImagePlus} label="Import image" size="sm" onClick={() => importRef.current?.click()} />
+          <EditOps sessionId={session.id} doc={doc} turnOnly />
+          <CanvasSize key={doc.id} sessionId={session.id} doc={doc} />
+          <IconButton ref={saveConfirm.ref} icon={Images} label="Save to gallery" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />
+          <span className="topbar-sep" aria-hidden />
+          <IconButton icon={PanelRight} label="Show or hide right panel" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
+        </span>
         <Popover open={saveConfirm.open} anchor={saveConfirm.ref} onClose={saveConfirm.close} width={260} label="Save to gallery">
           <div className="confirm-pop">
             <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>
@@ -110,7 +116,7 @@ export function DesignerWorkspace() {
             </div>
           </div>
         </Popover>
-        <Button ref={exportMenu.ref} icon={ArrowUpFromLine} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
+        <Button ref={exportMenu.ref} className="topbar-export" variant="primary" icon={ArrowUpFromLine} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
         <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} label="Export format">
           {EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => { exportMenu.close(); void output(false, f.id); }} />)}
         </Popover>

@@ -110,3 +110,11 @@ it('side toolbox, one popup at a time: another popup closes the tool\'s; a famil
   expect(sources).toMatch(/useSidePopup\('corner', \(\) => useCorner\.setState\(\{ open: false \}\)\)/);
   expect(sources).toMatch(/if \(space === 'designer'\) announceSidePopup\('corner'\)/);
 });
+
+it('top bar: new document and undo/redo beside the title, the document actions in one group, Export the one primary button', () => {
+  const ws = readFileSync('src/components/designer/DesignerWorkspace.tsx', 'utf8');
+  expect(ws).toMatch(/<TopbarActions side="start">\s*<span className="topbar-group" role="toolbar" aria-label="Document history">\s*<IconButton [^>]*label="New document"[\s\S]*?label="Undo"[\s\S]*?label="Redo"/);
+  expect(ws).toMatch(/aria-label="Document">\s*<IconButton [^>]*label="Import image"[^\n]*\/>\s*<EditOps [^>]*turnOnly \/>\s*<CanvasSize [^>]*\/>\s*<IconButton [^>]*label="Save to gallery"[^\n]*\/>\s*<span className="topbar-sep" aria-hidden \/>\s*<IconButton [^>]*label="Show or hide right panel"/);
+  expect(ws).toMatch(/className="topbar-export" variant="primary"/);
+  expect(readFileSync('src/components/shell/TopBar.tsx', 'utf8')).toMatch(/<\/>\}\s*\{\/\*[^*]*\*\/\}\s*<div id="workspace-actions-start" className="topbar-slot topbar-slot-start" \/>/);
+});
