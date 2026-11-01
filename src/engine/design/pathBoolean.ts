@@ -119,8 +119,16 @@ function pieces(op: Op, subject: Paths64, clip: Paths64, min: number): Comp[] {
 }
 
 /** Refit a piece: outer + holes -> a few cubics (lines where it is straight). */
-function fitComp(c: Comp, fitTol: number): Seg[] {
-  return fitSubpaths(c.map((p) => ({ points: fromP64(p), closed: true })), { tolerance: fitTol });
+function fitComp(c: Comp, fitTol: number, snap?: (p: Pt) => Pt): Seg[] {
+  return fitSubpaths(c.map((p) => ({ points: weld(snap ? fromP64(p).map(snap) : fromP64(p), fitTol * 2), closed: true })), { tolerance: fitTol });
+}
+
+/** Welds runs of points closer than `d` into one (the knife strip and its regrowth leave 2–3 points a hair apart at each cut end: one node, not three). */
+function weld(pts: Pt[], d: number): Pt[] {
+  const out: Pt[] = [];
+  for (const p of pts) { const q = out[out.length - 1]; if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > d) out.push(p); }
+  while (out.length > 3 && Math.hypot(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1]) <= d) out.pop();
+  return out.length >= 3 ? out : pts;
 }
 /** The polygons as plain M/L/Z (no refit): exact, for thin strips and faces. */
 function rawSegs(ps: Paths64): Seg[] {
@@ -296,18 +304,25 @@ export function knifeArea(area: Area, line: Pt[], o?: BooleanOptions): Seg[][] {
       const comps = pieces('difference', p.comp, strip, min);
       if (comps.length < 2) return [partSegs(p, fitTol)];
       cut = true;
-      return comps.map((c) => fitComp(seamless(c, strip), fitTol));
+      return comps.map((c) => fitComp(c, fitTol, onLine(line)));
     });
     return cut ? out : [area.segs];
   } catch { return [area?.segs ?? []]; }
 }
 
-/** The piece plus the half of the knife strip nearest to it: grown by half the strip width, but only inside the strip, so the rest of its outline stays put. */
-function seamless(c: Comp, strip: Paths64): Paths64 {
-  const grown = inflatePaths(c, (KNIFE_W / 2) * SCALE, JoinType.Miter, EndType.Polygon, 4);
-  const add = pieces('intersection', grown, strip, 0).flat();
-  const merged = add.length ? pieces('union', c, add, 0) : [];
-  return merged.length === 1 ? merged[0] : c;
+/** Points on the edge of the knife strip move onto the knife line itself: neighbours share that edge exactly (no hairline) and each cut end welds into one node. */
+function onLine(line: Pt[]): (p: Pt) => Pt {
+  const reach = KNIFE_W;
+  return (p) => {
+    let best: Pt = p, bd = reach;
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1], b = line[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+      const q: Pt = [a[0] + t * dx, a[1] + t * dy], d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+      if (d <= bd) { bd = d; best = q; }
+    }
+    return best;
+  };
 }
 
 // ---------------------------------------------------------------- faces (Shape Builder)

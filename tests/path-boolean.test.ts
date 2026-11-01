@@ -181,3 +181,16 @@ describe('components by containment', () => {
     expect(splitComponents([...rect(0, 0, 50, 100), ...rect(50, 0, 50, 100)])).toHaveLength(2);
   });
 });
+
+it('a knife cut leaves one node at each end of the cut, not a cluster of near-duplicates', async () => {
+  const { knifeArea } = await import('../src/engine/design/pathBoolean');
+  const k = 0.5523 * 100;
+  const segs = [{ c: 'M', p: [[300, 200]] }, { c: 'C', p: [[300, 200 + k], [200 + k, 300], [200, 300]] }, { c: 'C', p: [[200 - k, 300], [100, 200 + k], [100, 200]] }, { c: 'C', p: [[100, 200 - k], [200 - k, 100], [200, 100]] }, { c: 'C', p: [[200 + k, 100], [300, 200 - k], [300, 200]] }, { c: 'Z', p: [] }] as never;
+  for (const piece of knifeArea({ segs }, [[120, 60], [280, 340]])) {
+    const ends = piece.filter((s) => s.p.length).map((s) => s.p[s.p.length - 1]);
+    for (let i = 1; i < ends.length; i++) {
+      const d = Math.hypot(ends[i][0] - ends[i - 1][0], ends[i][1] - ends[i - 1][1]);
+      if (d > 1e-9) expect(d).toBeGreaterThan(0.5);
+    }
+  }
+});
