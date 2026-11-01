@@ -5,6 +5,7 @@ import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { PathNodes } from './PathNodes';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
+import { useNodeEditMode } from '../../engine/design/nodeEditMode';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
 import { PrimKnots } from './ShapeHandles';
@@ -119,6 +120,8 @@ function focusField(label: string): void {
 export function shapeEditHint(doc: DesignDoc): { id: string; text: string } {
   const e = useShapeEdit.getState().byDoc[doc.id], l = doc.layers.find((x) => x.id === e?.layerId);
   const s = l?.type === 'vector' ? l.shapes.find((x) => x.id === e?.shapeId) : undefined;
+  const mode = useNodeEditMode.getState().mode;
+  if (s?.type === 'path' && mode === 'bend') return { id: 'edit-nodes-bend', text: 'Bend: drag a segment to curve it · nodes stay put · Esc or Done to finish' };
   return s?.type === 'path'
     ? { id: 'edit-nodes', text: 'Shift-click adds nodes · drag in empty space to select · drag a selected node to move the group · arrows move 2 px (Shift 20, Alt 1 screen px) · Delete removes selected nodes · Esc clears, then exits' }
     : { id: 'edit-shape', text: 'Drag the round handles: corners (Ctrl: both) and blur · double-click a handle for its value · Esc or Done to finish' };

@@ -3,11 +3,13 @@ import { X } from 'lucide-react';
 import type { DesignDoc, Layer } from '../../engine/types';
 import { layerObjects } from '../../engine/design/objectOps';
 import { shapeEditHint } from './ShapeKnots';
+import { useNodeEditMode } from '../../engine/design/nodeEditMode';
 
 export function StageEditHint(props: {
   doc: DesignDoc; shapeEditing: boolean; marquee: boolean; layersEmpty: boolean;
   canShowHandles: boolean; handleMode: 'scale' | 'rotate'; canShowObjects: boolean; active: Layer | null;
 }) {
+  useNodeEditMode((st) => st.mode); // re-render when the node mode changes
   const { doc, shapeEditing, marquee, layersEmpty, canShowHandles, handleMode, canShowObjects, active } = props;
   return shapeEditing ? <StageHint id={shapeEditHint(doc).id} subtle>{shapeEditHint(doc).text}</StageHint>
     : marquee ? <StageHint id="edit-marquee" subtle>Drag selects objects or layers · Shift adds · Alt removes</StageHint>

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { VectorShape } from '../../engine/types';
 import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
 import { alignNode, focusNodes, nodePosition, pullHandle } from '../../engine/design/nodeTypes';
+import { bendSegment } from '../../engine/design/bendSegment';
+import { useNodeEditMode } from '../../engine/design/nodeEditMode';
 import { dragSegment, nearestSegment } from '../../engine/design/segmentDrag';
 import { breakNodes, deleteSegments, joinEnds, segmentsTo, deleteSelectedNodes, insertNode, nearestOnPath } from '../../engine/design/pathNodeOps';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
@@ -29,6 +31,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   // A drag on a segment bends it (segmentDrag.ts); a Shift-drag from a node pulls one of its handles out (nodeTypes.ts).
   const segDrag = useRef<{ i: number; t: number; base: Seg[]; shape: VectorShape; moved: boolean } | null>(null);
   // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
+  const bend = useNodeEditMode((st) => st.mode) === 'bend';
   const segs = pageSegs(shape), types = readTypes(segs, shape.nodeTypes);
   const edit = useShapeEdit((st) => st.byDoc[docId]), selected = edit?.shapeId === shape.id ? (edit.nodes ?? (edit.node == null ? [] : [edit.node])) : [], picked = selected[0];
   // Inkscape's Shift+C / Shift+S / Shift+Y on the picked node; not while typing in a field.
@@ -90,13 +93,14 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   const move = (e: React.PointerEvent) => {
     const sd = segDrag.current;
     if (sd) {
-      const q = page(e, sd.shape), next = withSegs(sd.shape, dragSegment(sd.base, sd.i, sd.t, [q.x, q.y]));
+      const q = page(e, sd.shape), next = withSegs(sd.shape, (bend ? bendSegment : dragSegment)(sd.base, sd.i, sd.t, [q.x, q.y]));
       patchShape(sessionId, docId, layerId, sd.shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h }, { record: !sd.moved });
       sd.moved = true;
       return;
     }
     const d = drag.current;
     if (!d) return;
+    if (bend && d.pt) return; // Bend mode: nodes and handles stay put
     const q = page(e, d.shape);
     if (d.start) {
       const x = e.clientX - ref.current!.getBoundingClientRect().left, y = e.clientY - ref.current!.getBoundingClientRect().top;
@@ -158,7 +162,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     {box && <rect className="node-marquee" x={box.x} y={box.y} width={box.w} height={box.h} />}
     <path className="path-outline" d={outline} data-tip="Double-click to add a node" onDoubleClick={addAt} />
     {/* A wide invisible band over the outline: grab any point of a segment to bend it (the cursor says so). */}
-    <path className="segment-hit" d={outline} fill="none" stroke="transparent" strokeWidth={10} style={{ cursor: 'move' }} data-tip="Drag to bend this segment · double-click to add a node"
+    <path className="segment-hit" d={outline} fill="none" stroke="transparent" strokeWidth={10} style={{ cursor: 'move' }} data-tip={bend ? 'Drag so the curve passes through the pointer' : 'Drag to bend this segment · double-click to add a node'}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         const q = page(e), r = nearestSegment(segs, [q.x, q.y]);

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { resetNodeEditMode } from './nodeEditMode';
 
 /*
  * Objects picked inside one layer with the Edit tool in Objects mode: strokes of a painted layer, shapes and
@@ -28,6 +29,9 @@ export function setObjectPick(docId: string, pick: ObjectPick | null): void {
 export interface ShapeEdit { layerId: string; shapeId: string; /** Path edit: selected node indices; node remains as the primary index for existing controls. */ node?: number; nodes?: number[]; /** Explicit multi-path node selection; legacy fields above remain the single-path contract. */ paths?: Array<{ layerId: string; shapeId: string; nodes: number[] }> }
 export const useShapeEdit = create<{ byDoc: Record<string, ShapeEdit | undefined> }>(() => ({ byDoc: {} }));
 export function setShapeEdit(docId: string, edit: ShapeEdit | null): void {
+  // Node-edit mode returns to Move when editing starts, ends or changes shape.
+  const prev = useShapeEdit.getState().byDoc[docId];
+  if (!prev || !edit || prev.shapeId !== edit.shapeId) resetNodeEditMode();
   useShapeEdit.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: edit ?? undefined } }));
 }
 /** Enter edit mode on one shape: it becomes the only picked object. */

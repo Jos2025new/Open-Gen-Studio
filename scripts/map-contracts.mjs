@@ -113,7 +113,7 @@ export default [
       ['src/engine/design/pathNodeOps.ts', 'export function weldNodes'],
       ['src/components/designer/PathNodes.tsx', 'export function setJoinEnds'],
       ['src/components/designer/PathNodes.tsx', 'export function setDeleteSegments'],
-      ['src/components/designer/ContextStrip.tsx', '>Delete segment</button>'],
+      ['src/components/designer/NodeEditBar.tsx', '>Delete segment</button>'],
     ],
     tests: ['tests/path-nodes.test.ts', 'tests-e2e/path-nodes.spec.ts'],
   },

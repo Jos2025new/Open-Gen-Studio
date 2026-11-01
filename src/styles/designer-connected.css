@@ -318,3 +318,8 @@
 .agent-glow { position: absolute; border: 2px solid var(--accent); border-radius: 3px; box-shadow: 0 0 14px var(--accent-line); pointer-events: none; animation: agent-glow 1.2s ease-out forwards; }
 @keyframes agent-glow { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .agent-glow { animation: none; } }
+.node-modes { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.context-strip .node-mode { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; }
+.context-strip .node-mode:disabled { opacity: 0.5; cursor: not-allowed; }
+.context-strip .node-done { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; }
+.node-more { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; }
