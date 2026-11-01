@@ -154,9 +154,10 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     return () => { root.removeProperty('--layers-w'); root.removeProperty('--layers-peek-w'); root.removeProperty('--layers-list-h'); };
   }, [width, collapsed, listH]);
 
-  if (collapsed && !peek.on) return <PanelPeekHandle warn={!!pendingPaintLayer} onPin={() => setCollapsed(false)} show={peek.show} hide={peek.hide} />;
+  const handle = collapsed && <PanelPeekHandle warn={!!pendingPaintLayer} tab={peek.on ? tab : null} onTab={(id, pin) => { setTab(id); if (pin) setCollapsed(false); }} show={peek.show} hide={peek.hide} />;
+  if (collapsed && !peek.on) return handle;
 
-  return <aside className={`layers-panel${tab === 'layers' ? ' is-layers-only' : ''}${peek.on ? ' is-peek' : ''}`} aria-label="Layers" {...peek.panelProps}>
+  return <>{handle}<aside className={`layers-panel${tab === 'layers' ? ' is-layers-only' : ''}${peek.on ? ' is-peek' : ''}`} aria-label="Layers" {...peek.panelProps}>
     <div className="layers-split" role="separator" aria-orientation="horizontal" aria-label="Resize the layer list" data-tip="Drag to give the layers more or less room · double-click resets"
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); split.current = { y: e.clientY, h: listH }; }}
       onPointerMove={(e) => { const r = split.current; if (r) setListH(Math.round(Math.min(window.innerHeight * 0.75, Math.max(96, r.h + r.y - e.clientY)))); }}
@@ -308,5 +309,5 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     </>}
     {(() => { const f = doc.layers.find((l) => l.id === fxEdit); return f?.type === 'fx' ? <FxEditorPopover sessionId={sessionId} doc={doc} layer={f} anchor={fxRow} onClose={() => setFxEdit(null)} /> : null; })()}
     </div>
-  </aside>;
+  </aside></>;
 }

@@ -9,39 +9,48 @@ import { PanelPeekHandle, usePanelPeek } from '../src/components/designer/Layers
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
-/** The same wiring as LayersPanel: unpinned shows the handle until it peeks; the panel carries the peek props. */
+/** The same wiring as LayersPanel: unpinned shows the bar of tabs; peeking adds the panel; a tab click pins it on that tab. */
 function Harness() {
   const [unpinned, setUnpinned] = useState(true);
+  const [tab, setTab] = useState<'props' | 'tool' | 'layers'>('props');
   const peek = usePanelPeek(unpinned);
-  if (unpinned && !peek.on) return createElement(PanelPeekHandle, { warn: false, onPin: () => setUnpinned(false), show: peek.show, hide: peek.hide });
-  return createElement('aside', { className: `layers-panel${peek.on ? ' is-peek' : ''}`, ...peek.panelProps }, createElement('button', { 'aria-label': unpinned ? 'Pin layers panel' : 'Collapse layers panel', onClick: () => setUnpinned(!unpinned) }));
+  const handle = unpinned && createElement(PanelPeekHandle, { warn: false, tab: peek.on ? tab : null, onTab: (id, pin) => { setTab(id); if (pin) setUnpinned(false); }, show: peek.show, hide: peek.hide });
+  if (unpinned && !peek.on) return handle;
+  return createElement('div', null, handle, createElement('aside', { className: `layers-panel${peek.on ? ' is-peek' : ''}`, 'data-tab': tab, ...peek.panelProps }));
 }
 
-it('unpinned: hovering the corner icon peeks the panel; leaving hides it after a pause; clicking pins it', () => {
+it('unpinned: the tabs stand in a vertical bar; hovering one peeks the panel on it, leaving hides it, clicking pins it there', () => {
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
   act(() => root.render(createElement(Harness)));
-  const icon = () => host.querySelector<HTMLButtonElement>('.layers-peek-handle [aria-label="Pin layers panel"]');
-  expect(icon()).not.toBeNull();
+  const bar = () => host.querySelector('.layers-peek-handle');
+  const tab = (name: string) => host.querySelector<HTMLButtonElement>(`.layers-peek-handle [aria-label="${name} · click to pin"]`)!;
+  expect(bar()?.getAttribute('aria-orientation')).toBe('vertical');
+  expect([...bar()!.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Properties · click to pin', 'Tool · click to pin', 'Layers · click to pin']);
   expect(host.querySelector('.layers-panel')).toBeNull();
-  act(() => { icon()!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); });
-  expect(host.querySelector('.layers-panel.is-peek')).not.toBeNull();
+  act(() => { tab('Tool').dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); });
+  expect(host.querySelector('.layers-panel.is-peek')?.getAttribute('data-tab')).toBe('tool');
+  expect(tab('Tool').getAttribute('aria-pressed')).toBe('true');
+  expect(bar()).not.toBeNull();
   act(() => { host.querySelector('.layers-panel')!.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })); });
-  expect(host.querySelector('.layers-panel.is-peek')).not.toBeNull();
   act(() => { vi.advanceTimersByTime(300); });
   expect(host.querySelector('.layers-panel')).toBeNull();
-  act(() => icon()!.click());
+  expect(tab('Tool').getAttribute('aria-pressed')).toBe('false');
+  act(() => tab('Layers').click());
   expect(host.querySelector('.layers-panel')?.className).toBe('layers-panel');
+  expect(host.querySelector('.layers-panel')?.getAttribute('data-tab')).toBe('layers');
+  expect(bar()).toBeNull();
   act(() => root.unmount()); host.remove();
 });
 
-it('the right panel uses it with no empty strip: unpinned takes no width, peeks in its pinned width, the header pin toggles', () => {
+it('the right panel uses it with no empty strip: unpinned takes no width, peeks beside the bar in its pinned width, the header pin toggles', () => {
   const panel = readFileSync('src/components/designer/LayersPanel.tsx', 'utf8');
   expect(panel).toMatch(/const peek = usePanelPeek\(collapsed\);/);
-  expect(panel).toMatch(/if \(collapsed && !peek\.on\) return <PanelPeekHandle warn=\{!!pendingPaintLayer\} onPin=\{\(\) => setCollapsed\(false\)\} show=\{peek\.show\} hide=\{peek\.hide\} \/>;/);
+  expect(panel).toMatch(/const handle = collapsed && <PanelPeekHandle warn=\{!!pendingPaintLayer\} tab=\{peek\.on \? tab : null\} onTab=\{\(id, pin\) => \{ setTab\(id\); if \(pin\) setCollapsed\(false\); \}\} show=\{peek\.show\} hide=\{peek\.hide\} \/>;\s*if \(collapsed && !peek\.on\) return handle;/);
+  expect(panel).toMatch(/return <>\{handle\}<aside className=\{`layers-panel/);
   expect(panel).toMatch(/root\.setProperty\('--layers-w', collapsed \? '0px' : `\$\{width\}px`\);\s*root\.setProperty\('--layers-peek-w', `\$\{width\}px`\);/);
   expect(panel).toMatch(/\$\{peek\.on \? ' is-peek' : ''\}`\} aria-label="Layers" \{\.\.\.peek\.panelProps\}>/);
   expect(panel).toMatch(/label=\{collapsed \? 'Pin layers panel' : 'Collapse layers panel'\} size="sm" onClick=\{\(\) => setCollapsed\(!collapsed\)\}/);
   expect(panel).not.toContain('is-collapsed');
-  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.layers-panel\.is-peek \{ position: absolute;[^}]*width: var\(--layers-peek-w, 260px\);/);
+  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.layers-panel\.is-peek \{ position: absolute; z-index: 30; top: 12px; right: calc\(12px \+ var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 2px \+ var\(--canvas-pop-gap\)\);[^}]*width: var\(--layers-peek-w, 260px\);/);
 });
