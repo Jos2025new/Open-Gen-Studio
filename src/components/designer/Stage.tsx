@@ -187,14 +187,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const [preview, setPreview] = useState<Drag | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
   // Picked strokes of one raster layer (Ctrl-click adds more of the same layer in Objects mode).
-  // Objects picked inside a layer (Edit, Objects mode): shared, so Align and Transform in the bar act on them.
+  // Objects picked inside a layer (Edit, Objects mode), shared with the bar's Align and Transform.
   const objPick = useObjectSelection((st) => st.byDoc[doc.id]);
   // Shape edit mode (ShapeKnots): the shape's own knots instead of the transform handles.
   const shapeEditing = !!useShapeEdit((st) => st.byDoc[doc.id]);
   const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
   /** Edit acts on whole layers (Layer mode) instead of the objects inside them. */
   const editLayers = selectMode === 'layers';
-  // Transform handles (Inkscape): scale by default; clicking the selection again switches to rotate/skew and back.
+  // Transform handles (Inkscape): scale by default; clicking the selection again toggles rotate/skew.
   const [handleMode, setHandleMode] = useState<'scale' | 'rotate'>('scale');
   const [pivot, setPivot] = useState<{ x: number; y: number } | null>(null);
   const [hoverHandle, setHoverHandle] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
   const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
-  // The stroke being drawn lives here until pointer up: one document change (and one undo step) per gesture.
+  // The stroke being drawn stays here until pointer up: one change and undo step per gesture.
   const [live, setLive] = useState<Stroke | null>(null);
   const shapeStyle = useStore((s) => s.ui.shape);
   const textStyle = useStore((s) => s.ui.text);
@@ -273,14 +273,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     // Thin margin, as Photoshop or Krita; the bottom clears the toolbar.
     const pad = size.w < 500 ? 12 : 24;
     const bottom = board?.bottom ?? (window.innerWidth < 768 ? 12 : 120); // composer is below the canvas on narrow screens
-    const zoom = Math.min((size.w - pad * 2) / doc.width, (size.h - pad - bottom) / doc.height, 4);
-    const z = Math.max(0.05, zoom);
-    setView({ zoom: z, x: (size.w - doc.width * z) / 2, y: Math.max(pad / 2, (size.h - bottom - doc.height * z) / 2) });
+    const z = Math.max(0.05, Math.min((size.w - pad * 2) / doc.width, (size.h - pad - bottom) / doc.height, 4));
+    setView((untouched.current = { zoom: z, x: (size.w - doc.width * z) / 2, y: Math.max(pad / 2, (size.h - bottom - doc.height * z) / 2) }));
   }, [size, doc.width, doc.height, board?.bottom]);
 
+  const untouched = useRef<View | null>(null);
   useEffect(() => {
-    const key = `${doc.id}:${doc.width}x${doc.height}:${size.w}x${size.h}`;
-    if (fitted.current !== key && size.w > 0) {
+    const key = `${doc.id}:${doc.width}x${doc.height}`;
+    if (size.w && (fitted.current !== key || view === untouched.current)) {
       fitted.current = key;
       fit();
     }
