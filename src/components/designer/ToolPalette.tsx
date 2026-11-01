@@ -9,11 +9,17 @@ import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { CornerButtons, DesignerCorner } from '../node/NodeSide';
+import { ViewToggles } from './ToolHelp';
 
-/** Last button of the toolbox, in both places: moves it between the prompt box and the side. */
+/** Under the prompt box: moves the toolbox between the prompt box and the side. */
 export function DockPlaceButton() {
   const docked = (useStore((s) => s.ui.designerDock) ?? 'tools') === 'tools';
-  return <IconButton icon={docked ? PanelLeft : PanelBottom} label={docked ? 'Toolbox at the side' : 'Toolbox in the prompt box'} size="md" onClick={() => setUi({ designerDock: docked ? 'prompt' : 'tools' })} />;
+  return <IconButton icon={docked ? PanelLeft : PanelBottom} label={docked ? 'Toolbox at the side' : 'Toolbox in the prompt box'} size="sm" onClick={() => setUi({ designerDock: docked ? 'prompt' : 'tools' })} />;
+}
+
+/** Under the prompt box, opposite the workspace menu: the tool help switch and where the toolbox sits. */
+export function DesignerFooterTools() {
+  return <span className="designer-footer-tools"><ViewToggles /><DockPlaceButton /></span>;
 }
 
 /**
@@ -64,7 +70,7 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
     <CornerButtons sessionId={settings.sessionId} space="designer" />
     <span className="tool-dock-separator" aria-hidden="true" />
     <div className="designer-palette is-side">
-      <ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} vertical place={<DockPlaceButton />} />
+      <ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} vertical />
     </div>
     {viewBar}
     <DesignerCorner sessionId={settings.sessionId} />

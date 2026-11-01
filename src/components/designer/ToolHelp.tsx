@@ -39,7 +39,7 @@ export function ToolHelpLine() {
   if (!on) return null;
   return <div className="tool-help" role="status" aria-live="polite">
     <strong>{TOOL_NAMES[tool]}</strong><span>{TOOL_HELP[tool]}</span>
-    <button type="button" className="tool-help-close" aria-label="Hide tool help" data-tip="Hide tool help · turn it back on with ? in the view controls" onClick={() => setUi({ toolHelp: false })}><X size={12} /></button>
+    <button type="button" className="tool-help-close" aria-label="Hide tool help" data-tip="Hide tool help · turn it back on with ? under the prompt box" onClick={() => setUi({ toolHelp: false })}><X size={12} /></button>
   </div>;
 }
 

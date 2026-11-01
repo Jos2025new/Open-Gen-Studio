@@ -66,20 +66,22 @@ it('upright, the popups are vertical too: variants in a column, the chevron poin
   await done();
 });
 
-it('the place button sits right after the panel buttons, in both places; Studio passes none', () => {
-  const dock = readFileSync('src/components/designer/ToolDock.tsx', 'utf8');
-  expect(dock).toMatch(/\{button\}\s*\{place\}\s*<\/span> : button;/);
-  expect(readFileSync('src/components/studio/EmbeddedDesignerBar.tsx', 'utf8')).not.toContain('place=');
+it('the place button and the tool help sit under the prompt box, opposite the workspace menu; the toolbox no longer carries them', () => {
+  expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).not.toContain('{place}');
+  expect(readFileSync('src/components/designer/ToolPalette.tsx', 'utf8')).toMatch(/<span className="designer-footer-tools"><ViewToggles \/><DockPlaceButton \/><\/span>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<div className="composer-footer-end">\s*\{workspace === 'designer' \? <DesignerFooterTools \/> : null\}/);
+  expect(readFileSync('src/components/designer/DesignerWorkspace.tsx', 'utf8')).not.toContain('<ViewToggles');
+  expect(readFileSync('src/components/studio/EmbeddedDesignerBar.tsx', 'utf8')).not.toMatch(/<ToolDock[^>]* designer[ />]/);
 });
 
 it('integrated (in the prompt box) or separate (upright at the left, with the designs and the canvas view in its frame): both modes stay', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
   // In the prompt box the same pieces go in the bar's two slots: Designs (popup above), Create and Conversation and their panel before the tools, the view after.
   expect(palette).toMatch(/if \(docked\) return slot\.start && slot\.end \? <>\s*\{createPortal\(<>\s*<DesignsButton [^>]*up \/>\s*<CornerButtons sessionId=\{settings\.sessionId\} space="designer" \/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>\s*<\/>, slot\.start\)\}\s*\{createPortal\(<><span className="tool-dock-separator" aria-hidden="true" \/>\{viewBar\}<\/>, slot\.end\)\}\s*<\/> : viewBar;/);
-  expect(palette).toMatch(/<IconButton icon=\{docked \? PanelLeft : PanelBottom\} label=\{docked \? 'Toolbox at the side' : 'Toolbox in the prompt box'\} size="md" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
-  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<CornerButtons [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical place=\{<DockPlaceButton \/>\} \/>\s*<\/div>\s*\{viewBar\}\s*<DesignerCorner /);
+  expect(palette).toMatch(/<IconButton icon=\{docked \? PanelLeft : PanelBottom\} label=\{docked \? 'Toolbox at the side' : 'Toolbox in the prompt box'\} size="sm" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
+  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<CornerButtons [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical \/>\s*<\/div>\s*\{viewBar\}\s*<DesignerCorner /);
   expect(palette).toMatch(/<Popover [^>]*placement=\{up \? 'top-start' : 'right-start'\} align="start"[^>]*className=\{up \? 'designs-pop is-up' : 'designs-pop'\}>\s*<DocumentChoices /);
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="start" \/><div className="designer-palette is-docked"><ToolDock sessionId=\{sessionId\} doc=\{designDoc\} place=\{<DockPlaceButton \/>\} \/><\/div><DockSlot at="end" \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="start" \/><div className="designer-palette is-docked"><ToolDock sessionId=\{sessionId\} doc=\{designDoc\} designer \/><\/div><DockSlot at="end" \/>/);
   expect(readFileSync('src/styles/tool-dock.css', 'utf8')).toMatch(/\.ws-designer:has\(\.designer-dock-start\) \.document-picker \{ display: none; \}/);
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
   expect(css).toMatch(/\.designer-side \.designer-palette\.is-side \.tool-dock-stack \{ left: calc\(100% \+ var\(--toolbar-padding\) \+ 1px \+ var\(--canvas-pop-gap\)\);[^}]*flex-direction: row;/);
@@ -106,7 +108,7 @@ it('side toolbox, one popup at a time: another popup closes the tool\'s; a famil
   window.removeEventListener('ogs:side-popup', spy);
   const sources = ['src/components/designer/ToolPalette.tsx', 'src/components/node/NodeSide.tsx'].map((f) => readFileSync(f, 'utf8')).join('\n');
   expect(sources).toMatch(/useSidePopup\('designs', pop\.close\)/);
-  expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/const designer = vertical \|\| place !== undefined;\s*useSidePopup\('tools', [^\n]*, designer\);/);
+  expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/const designer = vertical \|\| inDesigner;\s*useSidePopup\('tools', [^\n]*, designer\);/);
   expect(sources).toMatch(/useSidePopup\('corner', \(\) => useCorner\.setState\(\{ open: false \}\)\)/);
   expect(sources).toMatch(/if \(space === 'designer'\) announceSidePopup\('corner'\)/);
 });

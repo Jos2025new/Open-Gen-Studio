@@ -1,5 +1,5 @@
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
-import { ToolHelpLine, ViewToggles } from './ToolHelp';
+import { ToolHelpLine } from './ToolHelp';
 import { DrawingChoicePrompt } from './DrawingChoice';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -149,7 +149,6 @@ export function DesignerWorkspace() {
           </label>
           <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
           <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
-          <ViewToggles />
         </>} />
       <ToolHelpLine />
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />

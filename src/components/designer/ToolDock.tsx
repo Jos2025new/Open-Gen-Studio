@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
 import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
@@ -61,9 +61,9 @@ function restrictToolbox(tools?: ReadonlySet<DesignTool>): ToolboxFamily[] {
 
 /**
  * `vertical`: the same strip turned upright (the Designer's side toolbox): variants in a column and the card at their right,
- * the grip under the card; arrows Up and Down also move along it. `place`: a button after the panel buttons (where the toolbox sits).
+ * the grip under the card; arrows Up and Down also move along it. `designer`: the Designer's own toolbox (vertical implies it).
  */
-export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false, place }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean; place?: ReactNode }) {
+export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false, designer: inDesigner = false }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean; designer?: boolean }) {
   const currentTool = useStore((state) => state.ui.tool);
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
@@ -78,8 +78,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
   const disabledReason = (variant: ToolboxVariant) => variant.tool ? toolBlockReason(variant.tool, activeLayerValue) : undefined;
-  // The Designer's toolbox (either place; Studio passes no `place`) shares one popup at a time with Designs and Create/Conversation.
-  const designer = vertical || place !== undefined;
+  // The Designer's toolbox (either place; Studio's is not) shares one popup at a time with Designs and Create/Conversation.
+  const designer = vertical || inDesigner;
   useSidePopup('tools', () => { dispatch({ type: 'escape' }); dispatch({ type: 'escape' }); }, designer);
 
   useEffect(() => {
@@ -178,7 +178,6 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           <span className="tool-dock-separator" aria-hidden="true" />
           <IconButton icon={Layers} label="Show or hide right panel" size="md" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
           {button}
-          {place}
         </span> : button;
       })}
     </div>

@@ -163,3 +163,10 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .composer-tools-bar .designer-view .zoom-value { height: 34px; min-height: 0; }
 .popover.designs-pop.is-up { margin: 0; translate: 0 calc(-1 * var(--toolbar-padding)); }
 .ws-designer:has(.designer-dock-start) .document-picker { display: none; }
+/* Under the prompt box, opposite the workspace menu: tool help and where the toolbox sits. */
+.designer-footer-tools { display: inline-flex; align-items: center; gap: 2px; }
+.designer-footer-tools .icon-btn { width: 28px; height: 28px; color: var(--text-3); }
+.designer-footer-tools .icon-btn svg { width: 16px; height: 16px; }
+.designer-footer-tools .icon-btn:hover, .designer-footer-tools .icon-btn.is-active { color: var(--text); }
+/* The bar takes its content's width: the dock (and so the footer under it) follows, so the footer icons end at the bar's edge. */
+.composer-dock:has(.composer-tools-bar) { width: max-content; max-width: calc(100% - 48px); }

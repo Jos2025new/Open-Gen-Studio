@@ -25,7 +25,7 @@ related: [documentos, tamanos, navegacion-zoom, alinear-editar, capas]
 | Export (botón + menú de 4 formatos) | Barra superior, botón primario (`DesignerWorkspace.tsx:119`) | Abre el menú de formatos | Hay documento; deshabilitado mientras exporta | Detalle en [[documentos]] | Igual que hoy | se conserva | no dibujado |
 | Import from chat (botón + popover) | Barra superior izquierda (`DesignerWorkspace.tsx:125`) | `chatToDesigner` | Hay imágenes del chat que aún no están en un diseño | Detalle en [[documentos]] | Igual que hoy | se conserva | no dibujado |
 | Choose canvas (selector de documentos) | Encima del lienzo (`DocumentPicker.tsx:42`) | Preferencia `ogs:canvas-picker-open` | Hay documento | Detalle en [[documentos]] | Igual que hoy | se conserva | no dibujado |
-| Zoom in / Zoom percent / Zoom out / Fit canvas / tool help | Barra vertical «Canvas view» (`DesignerWorkspace.tsx:129`) | Eventos de zoom y `ui.toolHelp` | Hay documento | Detalle en [[navegacion-zoom]] | Igual que hoy | se conserva | no dibujado |
+| Zoom in / Zoom percent / Zoom out / Fit canvas (la ayuda «?» pasó bajo la caja de prompt) | Barra «Canvas view» (`DesignerWorkspace.tsx:129`) | Eventos de zoom y `ui.toolHelp` | Hay documento | Detalle en [[navegacion-zoom]] | Igual que hoy | se conserva | no dibujado |
 | Línea de ayuda de la herramienta | Encima del lienzo (`ToolHelp.tsx:36`) | `ui.toolHelp` (la X lo apaga) | `ui.toolHelp` no es false | Texto distinto por herramienta | Igual que hoy | se conserva | no dibujado |
 
 ## Enlaces
