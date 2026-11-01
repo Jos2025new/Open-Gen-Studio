@@ -15,6 +15,7 @@ import { Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
+import { usePropsOnPick } from './usePropsOnPick';
 import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { LayerUnreadable } from './LayerUnreadable';
@@ -126,6 +127,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   // Several layers picked with Ctrl/Shift-click (Edit's Align and Transform act on all of them).
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  usePropsOnPick(tab, setTab, picked);
   const objPick = useObjectSelection((st) => st.byDoc[doc.id]);
   const groups = liveGroups(doc);
   // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.

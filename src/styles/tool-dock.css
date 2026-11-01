@@ -48,6 +48,7 @@
   border-radius: var(--toolbar-radius);
   box-shadow: var(--shadow-card);
 }
+.tool-dock-strip { padding: 6px; overflow: visible; }
 .tool-dock-grip {
   display: flex;
   flex: 0 0 18px;

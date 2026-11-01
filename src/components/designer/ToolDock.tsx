@@ -9,9 +9,11 @@ import { IconButton } from '../ui/primitives';
 import { ToolSettings } from './ToolSettings';
 import { CanvasSize } from './CanvasSize';
 import { GuidesCard } from './GuidesCard';
-import { EditCard } from './EditCard';
+import { EditCard, useEditCount } from './EditCard';
+import { ContextStrip } from './ContextStrip';
+import { useObjectSelection } from '../../engine/design/objectSelection';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
-import { initialToolboxState, reduceToolboxState, TOOLBOX, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
+import { initialToolboxState, reduceToolboxState, TOOLBOX, variantKey, withKey, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
 import '../../styles/tool-dock.css';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -39,9 +41,9 @@ export function useSidePopup(which: SidePopup, close: () => void, active = true)
   }, [which, active]);
 }
 
-function iconButton(name: string, label: string, active: boolean, onClick: () => void, disabled = false, ref?: Ref<HTMLButtonElement>) {
+function iconButton(name: string, label: string, active: boolean, onClick: () => void, disabled = false, ref?: Ref<HTMLButtonElement>, key?: string) {
   const Icon = iconFor(name);
-  return <button ref={ref} type="button" className={`icon-btn icon-btn-md tone-default ${active ? 'is-active' : ''}`} aria-label={label} aria-pressed={active} aria-disabled={label.includes('Soon:') || undefined} title={label.includes('Soon:') ? label : undefined} disabled={disabled} data-tip={label} onClick={onClick}><Icon size={16} strokeWidth={1.75} /></button>;
+  return <button ref={ref} type="button" className={`icon-btn icon-btn-md tone-default ${active ? 'is-active' : ''}`} aria-label={label} aria-pressed={active} aria-disabled={label.includes('Soon:') || undefined} title={label.includes('Soon:') ? label : undefined} disabled={disabled} data-tip={withKey(label, key)} onClick={onClick}><Icon size={16} strokeWidth={1.75} /></button>;
 }
 
 function toolFor(family: ToolboxFamily, current: DesignTool, shape: string, rulerKind: string, hardness: number): ToolboxVariant | undefined {
@@ -77,6 +79,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? currentFamily;
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
+  // A real pick (objects, or several layers): the active layer alone is always set, so it does not count.
+  const editCount = useEditCount(doc), picked = useObjectSelection((st) => !!st.byDoc[doc.id]?.ids.length) || editCount > 1;
   const disabledReason = (variant: ToolboxVariant) => variant.tool ? toolBlockReason(variant.tool, activeLayerValue) : undefined;
   // The Designer's toolbox (either place; Studio's is not) shares one popup at a time with Designs and Create/Conversation.
   const designer = vertical || inDesigner;
@@ -136,13 +140,15 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
       {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
-          return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant))}</span>;
+          return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
         })}
         {!selectedVariant?.soon && <><span className="tool-dock-grow" />
         <button type="button" className="icon-btn icon-btn-md tone-default" aria-label={depth === 'open' ? 'Hide tool settings' : 'Show tool settings'} aria-expanded={depth === 'open'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily.id })}>
           {depth === 'open' ? (vertical ? <ChevronLeft size={16} /> : <ChevronDown size={16} />) : (vertical ? <ChevronRight size={16} /> : <ChevronUp size={16} />)}
         </button></>}
       </div>}
+      {/* Edit with a selection and its card not open: the contextual strip alone, where the card would open. */}
+      {currentTool === 'move' && picked && !(depth === 'open' && selectedVariant?.id === 'edit') && <section className="tool-dock-card tool-dock-strip" aria-label="Selection controls"><ContextStrip sessionId={sessionId} doc={doc} /></section>}
       {depth === 'open' && selectedVariant && !selectedVariant.soon && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
         <button type="button" className="tool-dock-grip" role="separator" aria-orientation="horizontal" aria-label="Resize tool settings" tabIndex={0} onKeyDown={onGripKey} onPointerDown={(event) => {
           const startY = event.clientY; const startHeight = height; const el = event.currentTarget;
@@ -172,7 +178,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
               if (initial) chooseVariant(initial);
             }
             dispatch({ type: 'family', familyId: family.id });
-          }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); })}
+          }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); }, variantKey(family.variants.find((variant) => variant.tool) ?? family.variants[0]))}
         </span>;
         return family.id === 'settings' ? <span key="panels" className="tool-dock-end">
           <span className="tool-dock-separator" aria-hidden="true" />

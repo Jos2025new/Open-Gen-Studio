@@ -1,4 +1,5 @@
 import type { DesignTool } from '../../engine/design/rules';
+import { toolKey } from '../../engine/shortcuts';
 
 /** Icon keys are names only so this table stays data-only and easy to inspect. */
 export type ToolboxVariant = {
@@ -34,6 +35,14 @@ export const TOOLBOX: ToolboxFamily[] = [
 
 /** Edit with two or more objects selected: these join Align and Distribute, disabled and explained until they exist. */
 export const MULTI_SOON: ToolboxVariant[] = [soon('boolean', 'Boolean', 'combine', 'Boolean operations (union, subtract, intersect) are planned.'), soon('form-builder', 'Form builder', 'shapes', 'A form builder is planned.')];
+
+/** The key of a variant's tool; none for variants that are only one flavour of a shared key (Pencil, Airbrush, Lasso, Wand, ellipse and perspective rulers). */
+export function variantKey(variant: ToolboxVariant): string | undefined {
+  if (variant.preset || (variant.selectShape && variant.selectShape !== 'rect') || (variant.rulerKind && variant.rulerKind !== 'line')) return undefined;
+  return toolKey(variant.tool);
+}
+/** A tooltip: the name, then the key when there is one ("Brush  B"). */
+export const withKey = (label: string, key?: string) => key ? `${label}  ${key}` : label;
 
 /** Every implemented drawing tool has a home, including tools without shortcuts. */
 export function toolboxTools(): DesignTool[] {
