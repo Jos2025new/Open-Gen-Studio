@@ -2,6 +2,7 @@ import { MoreHorizontal } from 'lucide-react';
 import type { VectorShape } from '../../engine/types';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { canOutlineStroke, outlineStrokeShapes } from '../../engine/design/outlineStroke';
+import { FixOverlapsRow } from './FixOverlapsRow';
 import { Popover, usePopover } from '../ui/Popover';
 import { convertToPath } from './ShapeLookFields';
 
@@ -16,11 +17,12 @@ export function ShapeMoreMenu({ sessionId, docId, layerId, shape }: { sessionId:
     pop.close();
   };
   return <>
-    <button type="button" ref={pop.ref} className="opt context-more" aria-haspopup="menu" aria-expanded={pop.open} aria-label="More shape operations" data-tip="More: outline stroke, flatten" onClick={pop.toggle}><MoreHorizontal size={14} /></button>
+    <button type="button" ref={pop.ref} className="opt context-more" aria-haspopup="menu" aria-expanded={pop.open} aria-label="More shape operations" data-tip="More: outline stroke, flatten, fix overlaps" onClick={pop.toggle}><MoreHorizontal size={14} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="top-start" width={220} label="Shape operations">
       <div className="node-more">
         <button type="button" className="opt" disabled={!canOutline} data-tip={outlineTip} onClick={outline}>Outline stroke</button>
         <button type="button" className="opt" disabled={!canFlatten} data-tip={canFlatten ? 'Turn the shape into an editable path' : 'Already a plain path'} onClick={() => { convertToPath(sessionId, docId, layerId, shape); pop.close(); }}>Flatten</button>
+        <FixOverlapsRow sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} done={() => pop.close()} />
       </div>
     </Popover>
   </>;

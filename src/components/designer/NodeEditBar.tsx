@@ -6,6 +6,7 @@ import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { activeSelectMode, segOnly } from './selectModeActions';
 import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { InlineChoice, InlineSlider } from './InlineControls';
+import { FixOverlapsRow } from './FixOverlapsRow';
 import { Popover, usePopover } from '../ui/Popover';
 import { convertToPath } from './ShapeLookFields';
 import { setUi, useStore } from '../../store/store';
@@ -60,6 +61,7 @@ export function NodeMoreMenu({ sessionId, docId, layerId, shape }: { sessionId: 
           <button type="button" className="opt" data-tip="Straight segments between the selected nodes become curves (Shift+U)" onClick={() => setSegmentsTo(sessionId, docId, layerId, shape, nodes, 'curve', segOnly(shape, activeSelectMode(), edit))}>Make curve</button>
         </>}
         {one != null && <button type="button" className="opt" data-tip="Remove the picked node keeping the shape (Delete; Ctrl+Delete joins its neighbours straight)" onClick={() => deletePickedNode(sessionId, docId)}>Delete node</button>}
+        <FixOverlapsRow sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} done={(changed) => { if (changed && edit) setShapeEdit(docId, { ...edit, node: undefined, nodes: [] }); pop.close(); }} />
         {nodes.length === 0 && one == null && <span className="context-help">Pick nodes to see their operations.</span>}
       </div>
     </Popover>

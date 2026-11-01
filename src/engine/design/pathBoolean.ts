@@ -1,6 +1,7 @@
 import { ClipType, EndType, FillRule, JoinType, PointInPolygonResult, PolyTree64, area as pathArea, areaPaths, booleanOpWithPolyTree, inflatePaths, pointInPolygon, union } from 'clipper2-ts';
 import type { Path64, Paths64 } from 'clipper2-ts';
 import { fitSubpaths } from './curveFit';
+import { Tagger, runPaths, runTree } from './exactRebuild';
 import type { Pt, Seg } from './pathNodes';
 
 /*
@@ -79,13 +80,13 @@ const rule = (a: Area) => (a.fillRule === 'evenodd' ? FillRule.EvenOdd : NZ);
 const minArea = (tol: number) => SLIVER * tol * tol * SCALE * SCALE;
 
 /** An Area as clean non-overlapping polygons (its own fill rule resolved). */
-function normalize(a: Area, tol: number): Paths64 {
-  const paths = flatten(a?.segs ?? [], tol).filter((s) => s.points.length >= 3).map((s) => toP64(s.points));
-  return paths.length ? union(paths, rule(a)) : [];
+function normalize(a: Area, tol: number, tg?: Tagger): Paths64 {
+  const paths = tg ? tg.tag(a?.segs ?? [], tol) : flatten(a?.segs ?? [], tol).filter((s) => s.points.length >= 3).map((s) => toP64(s.points));
+  return paths.length ? (tg ? runPaths(tg, ClipType.Union, paths, [], rule(a)) : union(paths, rule(a))) : [];
 }
-const normalizeAll = (areas: Area[], tol: number): Paths64 => {
-  const ps = (areas ?? []).flatMap((a) => normalize(a, tol));
-  return ps.length > 1 ? union(ps, NZ) : ps;
+const normalizeAll = (areas: Area[], tol: number, tg?: Tagger): Paths64 => {
+  const ps = (areas ?? []).flatMap((a) => normalize(a, tol, tg));
+  return ps.length > 1 ? (tg ? runPaths(tg, ClipType.Union, ps, [], NZ) : union(ps, NZ)) : ps;
 };
 
 /** Connected pieces of a PolyTree: each outer with its holes; islands inside holes are pieces of their own. */
@@ -111,15 +112,17 @@ function components(tree: PolyTree64, min: number): Comp[] {
   return out;
 }
 
-function pieces(op: Op, subject: Paths64, clip: Paths64, min: number): Comp[] {
+function pieces(op: Op, subject: Paths64, clip: Paths64, min: number, tg?: Tagger): Comp[] {
   if (!subject.length && !clip.length) return [];
+  if (tg) return components(runTree(tg, CT[op], subject, clip, NZ), min);
   const tree = new PolyTree64();
   booleanOpWithPolyTree(CT[op], subject.length ? subject : null, clip.length ? clip : null, tree, NZ);
   return components(tree, min);
 }
 
 /** Refit a piece: outer + holes -> a few cubics (lines where it is straight). */
-function fitComp(c: Comp, fitTol: number, snap?: (p: Pt) => Pt): Seg[] {
+function fitComp(c: Comp, fitTol: number, snap?: (p: Pt) => Pt, tg?: Tagger): Seg[] {
+  if (tg) return c.flatMap((loop) => tg.rebuild(loop, fitTol));
   return fitSubpaths(c.map((p) => ({ points: weld(snap ? fromP64(p).map(snap) : fromP64(p), fitTol * 2), closed: true })), { tolerance: fitTol });
 }
 
@@ -152,9 +155,9 @@ const opts = (o?: BooleanOptions) => ({ tol: o?.tol && o.tol > 0 ? o.tol : 0.1, 
  */
 export function booleanOp(op: Op, subjects: Area[], clips: Area[], o?: BooleanOptions): Seg[] {
   try {
-    const { tol, fitTol } = opts(o);
-    const comps = pieces(op, normalizeAll(subjects, tol), normalizeAll(clips, tol), minArea(tol));
-    return comps.flatMap((c) => fitComp(c, fitTol));
+    const { tol, fitTol } = opts(o), tg = new Tagger(SCALE);
+    const comps = pieces(op, normalizeAll(subjects, tol, tg), normalizeAll(clips, tol, tg), minArea(tol), tg);
+    return comps.flatMap((c) => fitComp(c, fitTol, undefined, tg));
   } catch { return []; }
 }
 
@@ -228,6 +231,57 @@ const partSegs = (p: Part, fitTol: number): Seg[] => p.segs ?? fitComp(p.comp, f
 /** Connected filled pieces of a shape (outer contour + the holes inside it), each with its own segs as they were (no flatten/refit drift). Even-odd by default: holes are holes. */
 export function splitComponents(segs: Seg[], fillRule: 'nonzero' | 'evenodd' = 'evenodd'): Seg[][] {
   try { return partsOf({ segs, fillRule }, 0.1).map((p) => partSegs(p, 0.25)); } catch { return []; }
+}
+
+// ---------------------------------------------------------------- fix overlaps
+
+/** True when two edges of the polylines properly cross (shared endpoints and touching do not count). Bounded: too big counts as "yes". */
+function hasCrossing(paths: Path64[]): boolean {
+  type E = { ax: number; ay: number; bx: number; by: number };
+  const es: E[] = [];
+  for (const p of paths) for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; es.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y }); }
+  if (es.length > 6000) return true;
+  const o = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
+  es.sort((u, v) => Math.min(u.ax, u.bx) - Math.min(v.ax, v.bx));
+  for (let i = 0; i < es.length; i++) {
+    const u = es[i], ux1 = Math.max(u.ax, u.bx), uy0 = Math.min(u.ay, u.by), uy1 = Math.max(u.ay, u.by);
+    for (let j = i + 1; j < es.length; j++) {
+      const v = es[j];
+      if (Math.min(v.ax, v.bx) > ux1) break;
+      if (Math.max(v.ay, v.by) < uy0 || Math.min(v.ay, v.by) > uy1) continue;
+      const d1 = o(u.ax, u.ay, u.bx, u.by, v.ax, v.ay), d2 = o(u.ax, u.ay, u.bx, u.by, v.bx, v.by);
+      const d3 = o(v.ax, v.ay, v.bx, v.by, u.ax, u.ay), d4 = o(v.ax, v.ay, v.bx, v.by, u.bx, u.by);
+      if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Resolves self-crossings. 'fill' (default): each contour fills everything it encloses, so a part folded back over the
+ * original is straightened, it adds instead of cancelling. 'cut': nonzero winding, the folded lobes fill but where the
+ * fold overlaps the original (+1 and -1) the overlap stays empty. In both, a hole made by a separate contour drawn the
+ * other way (a ring) stays a hole. Curves are kept exactly (exactRebuild.ts): the only new nodes are the crossings.
+ * Returns `area.segs` itself when nothing crosses (callers skip the undo step) and on any failure.
+ */
+export function fixOverlaps(area: Area, o?: BooleanOptions, mode: 'fill' | 'cut' = 'fill'): Seg[] {
+  try {
+    const { tol, fitTol } = opts(o), tg = new Tagger(SCALE);
+    const paths = tg.tag(area?.segs ?? [], tol);
+    if (!paths.length || !hasCrossing(paths)) return area.segs;
+    let filled = paths;
+    if (mode === 'fill') {
+      // Each contour is cut at its crossings into the faces it encloses (the cancelled overlap among them); every face adds,
+      // oriented as the contour was drawn (a flipped lobe stops cancelling). The contours then combine nonzero, so a ring drawn as two opposite contours keeps its hole.
+      filled = paths.flatMap((p) => {
+        const parts = tg.faces(p), whole = pathArea(p), sign = whole < 0 ? -1 : 1;
+        return parts.filter((q) => Math.abs(pathArea(q)) >= minArea(tol)).map((q) => (Math.sign(pathArea(q)) === sign ? q : [...q].reverse()));
+      });
+    }
+    const comps = pieces('union', filled, [], minArea(tol), tg);
+    if (!comps.length) return area.segs;
+    return comps.flatMap((c) => fitComp(c, fitTol, undefined, tg));
+  } catch { return area?.segs ?? []; }
 }
 
 // ---------------------------------------------------------------- eraser and knife

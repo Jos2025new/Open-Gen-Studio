@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { booleanOp, eraseArea, eraseBand, faces, flatten, knifeArea, knifeStrip, mergeFaces, splitComponents } from '../src/engine/design/pathBoolean';
+import { booleanOp, eraseArea, fixOverlaps, eraseBand, faces, flatten, knifeArea, knifeStrip, mergeFaces, splitComponents } from '../src/engine/design/pathBoolean';
 import { parseSegs, type Pt, type Seg } from '../src/engine/design/pathNodes';
 import { shapeToPath } from '../src/engine/design/affine';
 import type { ShapeSpec } from '../src/engine/types';
@@ -206,4 +206,38 @@ it('a knife gap leaves that much space between the pieces; 0 keeps them touching
   };
   expect(spread(0)).toBeLessThan(0.01);
   expect(spread(4)).toBeCloseTo(4, 1);
+});
+
+describe('fixOverlaps', () => {
+  const rev = (x: number, y: number, w: number, h: number): Seg[] => parseSegs(`M ${x} ${y} L ${x} ${y + h} L ${x + w} ${y + h} L ${x + w} ${y} Z`);
+  const area = (segs: Seg[]) => Math.abs(filled(segs));
+  it('a folded-back edge (opposite winding) is filled, not left as a pinch, and leaves no crossings', () => {
+    const segs = parseSegs('M 0 0 L 100 0 L 20 100 L 80 100 Z');
+    const fixed = fixOverlaps({ segs, fillRule: 'nonzero' });
+    expect(fixed).not.toBe(segs);
+    expect(area(fixed)).toBeGreaterThan(1000);
+    expect(fixOverlaps({ segs: fixed })).toBe(fixed);
+  });
+  it('a bow-tie becomes two filled triangles joined at the crossing', () => {
+    const segs = parseSegs('M 0 0 L 100 100 L 100 0 L 0 100 Z');
+    const fixed = fixOverlaps({ segs });
+    expect(fixed).not.toBe(segs);
+    near(area(fixed), 5000);
+    expect(fixOverlaps({ segs: fixed })).toBe(fixed);
+  });
+  it('a ring drawn as two opposite contours stays a ring, same reference', () => {
+    const segs = [...rect(0, 0, 100, 100), ...rev(25, 25, 50, 50)];
+    expect(fixOverlaps({ segs })).toBe(segs);
+  });
+  it('a ring beside a fold keeps its hole', () => {
+    const segs = [...rect(0, 0, 100, 100), ...rev(25, 25, 50, 50), ...parseSegs('M 200 0 L 300 100 L 300 0 L 200 100 Z')];
+    near(area(fixOverlaps({ segs })), 7500 + 5000);
+  });
+  it('never throws and returns the same reference when there is nothing to do', () => {
+    const empty: Seg[] = [];
+    expect(fixOverlaps({ segs: empty })).toBe(empty);
+    const sq = rect(0, 0, 10, 10);
+    expect(fixOverlaps({ segs: sq })).toBe(sq);
+    expect(() => fixOverlaps(undefined as never)).not.toThrow();
+  });
 });

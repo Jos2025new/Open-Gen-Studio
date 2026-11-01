@@ -145,21 +145,21 @@ export interface UiState extends PageUiPrefs {
   tool: DesignTool;
   /** Brush and eraser; the tip fields (hardness, pressure, texture, blend, Keep Opacity) are design/brushEngine.ts. */
   brush: Omit<import('../engine/design/brushEngine').BrushOptions, 'size'> & { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
-  /** Designer colors: recent (newest first) and saved. */
+  /** Designer colors: recent and saved. */
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */
   selectShape?: 'rect' | 'lasso' | 'wand';
-  /** Toolbox: last variant used per family (ids). */
+  /** Toolbox: last variant per family. */
   lastVariant?: Record<string, string>;
-  /** Knife gap, px (0 = touching). */
-  cutGap?: number;
+  /** Knife gap px; Fix overlaps mode. */
+  cutGap?: number; fixMode?: 'fill' | 'cut';
   /** Magic wand, like the bucket: color tolerance, grow, soft edge; how it combines; what it samples. */
   wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
   rulers?: boolean; showGuides?: boolean; lockGuides?: boolean;
   /** Stroke ruler (SAI 2): the guide the brush follows, and the kind the Ruler tool places next (strokeRuler.ts). */
   strokeRuler?: import('../engine/design/strokeRuler').StrokeRuler | null;
   strokeRulerKind?: import('../engine/design/strokeRuler').RulerKind;
-  /** Shape edit mode: Rx and Ry move together, as with Ctrl held (ShapeKnots). */
+  /** Shape edit: Rx and Ry move together, as with Ctrl (ShapeKnots). */
   shapeLockRadii?: boolean;
   /** The help line above the Designer canvas (ToolHelp.tsx); on unless turned off. */
   toolHelp?: boolean;
