@@ -20,6 +20,7 @@ import { AgentControls, AgentMode } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
+import { NodeSide } from './NodeSide';
 import { ComposerOptions } from './ComposerOptions';
 import { ToolDock } from '../designer/ToolDock';
 import { ComposerWorkspaceMenu } from '../shell/WorkspaceMenu';
@@ -440,8 +441,8 @@ export function Composer() {
   }, [text, mode, showTools]);
 
   return (
-    <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
-      {workspace !== 'chat' ? <ThreadPeek workspace={workspace} /> : null}
+    <div ref={dockRef} className={`composer-dock dock-${workspace} ${mode === 'agent' ? 'is-agent' : ''}`}>
+      {workspace === 'node' ? <NodeSide /> : workspace !== 'chat' ? <ThreadPeek workspace={workspace} /> : null}
       <ComposerAlerts />
       <div
         className={`composer ${dragOver ? 'is-drop' : ''}`}
