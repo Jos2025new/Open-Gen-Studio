@@ -118,7 +118,7 @@ test('node types: pick a node, make it smooth or symmetric (bar or Shift+S / Shi
   const n0 = (await page.locator('rect.path-node').first().boundingBox())!;
   await page.mouse.click(n0.x + n0.width / 2, n0.y + n0.height / 2);
   await expect(page.locator('rect.path-node.is-picked')).toHaveCount(1);
-  await expect(strip(page).getByRole('radiogroup', { name: 'Node' })).toBeVisible();
+  await expect((await nodeOps(page)).getByRole('radiogroup', { name: 'Node' })).toBeVisible();
   await page.keyboard.press('Shift+Y');
   let s = await shape(page);
   expect(s.nodeTypes?.[0]).toBe('z');
@@ -144,7 +144,7 @@ test('node types: pick a node, make it smooth or symmetric (bar or Shift+S / Shi
   await page.keyboard.press('Control+z');
   expect((await shape(page)).d).toBe(before);
   // The bar's choice works too.
-  await strip(page).getByRole('radio', { name: /Cusp node/ }).click();
+  await (await nodeOps(page)).getByRole('radio', { name: /Cusp node/ }).click();
   expect((await shape(page)).nodeTypes?.[0]).toBe('c');
   expect(errors).toEqual([]);
 });
@@ -178,7 +178,7 @@ test('add a node by double-clicking the outline, delete it with Delete (never th
   // Pick a corner and delete it from the bar: three nodes left; Ctrl+Z brings it back in one step.
   const n = (await page.locator('rect.path-node').nth(2).boundingBox())!;
   await page.mouse.click(n.x + n.width / 2, n.y + n.height / 2);
-  await strip(page).getByRole('button', { name: 'Delete node' }).click();
+  await (await nodeOps(page)).getByRole('button', { name: 'Delete node' }).click();
   await expect(page.locator('rect.path-node')).toHaveCount(3);
   await page.keyboard.press('Control+z');
   await expect(page.locator('rect.path-node')).toHaveCount(4);
@@ -243,7 +243,7 @@ test('Shift+U / Shift+L turn segments between selected nodes into curves / lines
   expect((await shape(page)).d).toBe(s0.d);
   // The bar's buttons do the same with two or more nodes selected.
   await page.keyboard.press('Control+a');
-  await strip(page).getByRole('button', { name: 'Make curve' }).click();
+  await (await nodeOps(page)).getByRole('button', { name: 'Make curve' }).click();
   expect((await shape(page)).d).toContain('C');
   expect(errors).toEqual([]);
 });
@@ -311,6 +311,14 @@ test('Shift+B opens a closed path at the selected node (two coincident ends); Sh
 });
 
 
+/* The node operations sit in the strip's «More» popover ("Node operations"). A pointer press outside it (a canvas
+   drag or click) closes it, so open it again unless it is already showing; its action buttons keep it open. */
+async function nodeOps(page: Page) {
+  const dlg = page.getByRole('dialog', { name: 'Node operations' });
+  if (!(await dlg.isVisible())) await strip(page).getByRole('button', { name: 'More', exact: true }).click();
+  return dlg;
+}
+
 async function convertedSquare(page: Page) {
   const errors = await setup(page), c = (await page.locator('canvas.stage-canvas').boundingBox())!;
   await page.keyboard.press('r');
@@ -339,7 +347,7 @@ const pickedNodeIndices = (page: Page) => page.evaluate(async () => {
 test('Delete segment opens the closed path, removes its isolated middle node and selects both surviving ends; one undo', async ({ page }) => {
   const { errors, before } = await convertedSquare(page);
   await selectNodes(page, [0, 1, 2]);
-  await strip(page).getByRole('button', { name: 'Delete segment', exact: true }).click();
+  await (await nodeOps(page)).getByRole('button', { name: 'Delete segment', exact: true }).click();
   await expect(page.locator('rect.path-node')).toHaveCount(3);
   expect((await shape(page)).d).not.toContain('Z');
   expect(await pickedNodeIndices(page)).toEqual([0, 2]);

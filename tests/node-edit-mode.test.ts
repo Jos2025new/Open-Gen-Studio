@@ -28,21 +28,21 @@ describe('bend math', () => {
 
 describe('node edit mode', () => {
   beforeEach(() => setShapeEdit('d', null));
-  it('placeholders cannot be selected; bend resets when editing starts or ends', () => {
-    setNodeEditMode('cut');
-    expect(useNodeEditMode.getState().mode).toBe('move');
+  it('every mode can be selected; the mode resets when editing starts or ends', () => {
+    for (const m of ['cut', 'erase', 'lasso'] as const) { setNodeEditMode(m); expect(useNodeEditMode.getState().mode).toBe(m); }
     setShapeEdit('d', { layerId: 'l', shapeId: 's' });
+    expect(useNodeEditMode.getState().mode).toBe('move');
     setNodeEditMode('bend');
     setShapeEdit('d', { layerId: 'l', shapeId: 's', node: 1, nodes: [1] });
     expect(useNodeEditMode.getState().mode).toBe('bend');
     setShapeEdit('d', null);
     expect(useNodeEditMode.getState().mode).toBe('move');
   });
-  it('shows the five modes with words, soon ones disabled, and Done', () => {
+  it('shows the five modes with words, none disabled, and Done', () => {
     const html = renderToStaticMarkup(createElement('div', null, createElement(NodeModeButtons), createElement(NodeDoneButton, { docId: 'd' })));
     for (const w of ['Move', 'Bend', 'Cut', 'Erase', 'Lasso', 'Done']) expect(html).toContain(w);
-    expect(html.match(/disabled/g)?.length).toBe(3);
-    expect(html).toContain('Soon: cut');
+    expect(html).not.toContain('disabled');
+    expect(html).not.toContain('Soon');
   });
   it('bend has its own hint', () => {
     setNodeEditMode('bend');

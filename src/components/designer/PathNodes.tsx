@@ -16,6 +16,7 @@ import { pathNodeTargets, PathNodeSnapSession } from '../../engine/design/snapNo
 import { useStore } from '../../store/store';
 import { snapIdleFeed, snapIdleStart, snapIdleStop } from './snapIdle';
 import { boardKey } from './boardKey';
+import { PathNodeTools } from './PathNodeTools';
 
 /*
  * Inkscape's Node tool on a path shape in edit mode (docs/plan-edicion-formas.md): square nodes, round handles on
@@ -31,7 +32,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   // A drag on a segment bends it (segmentDrag.ts); a Shift-drag from a node pulls one of its handles out (nodeTypes.ts).
   const segDrag = useRef<{ i: number; t: number; base: Seg[]; shape: VectorShape; moved: boolean } | null>(null);
   // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
-  const bend = useNodeEditMode((st) => st.mode) === 'bend';
+  const mode = useNodeEditMode((st) => st.mode), bend = mode === 'bend';
   const segs = pageSegs(shape), types = readTypes(segs, shape.nodeTypes);
   const edit = useShapeEdit((st) => st.byDoc[docId]), selected = edit?.shapeId === shape.id ? (edit.nodes ?? (edit.node == null ? [] : [edit.node])) : [], picked = selected[0];
   // Inkscape's Shift+C / Shift+S / Shift+Y on the picked node; not while typing in a field.
@@ -152,7 +153,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
     if (edit) setShapeEdit(docId, { ...edit, node: r.node, nodes: [r.node] });
   };
-  return <svg ref={ref} className="stroke-ruler shape-knots path-nodes" aria-label="Path nodes" onPointerDown={(e) => {
+  return <><svg ref={ref} className="stroke-ruler shape-knots path-nodes" aria-label="Path nodes" onPointerDown={(e) => {
     if (e.button !== 0 || !(e.target instanceof SVGRectElement && e.target.classList.contains('node-marquee-hit'))) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -204,7 +205,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
         ? <rect key={`n${p.seg}`} className={`stroke-ruler-handle shape-knot path-node${selected.includes(nodeSegs(segs).seg.indexOf(p.seg)) ? ' is-picked' : ''}`} data-node={p.seg} data-tip="Node · Shift-click to add or remove · drag selected nodes together" x={c.x - 4.5} y={c.y - 4.5} width={9} height={9} {...handlers} />
         : <circle key={`h${p.seg}-${p.k}`} className="stroke-ruler-handle shape-knot path-handle" data-handle={`${p.seg}-${p.k}`} data-tip="Curve handle · drag to shape the curve" cx={c.x} cy={c.y} r={4} {...handlers} />;
     })}
-  </svg>;
+  </svg>{(mode === 'cut' || mode === 'erase' || mode === 'lasso') && <PathNodeTools mode={mode} view={view} sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} selected={selected} />}</>;
 }
 
 /** Make node `n` cusp, smooth or symmetric (handles realigned as Inkscape does), one undo step. */

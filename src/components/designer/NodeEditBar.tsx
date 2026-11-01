@@ -1,29 +1,30 @@
 import { Hand, Spline, Scissors, Eraser, Lasso, MoreHorizontal, X } from 'lucide-react';
 import type { VectorShape } from '../../engine/types';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
-import { NODE_EDIT_MODES, NODE_EDIT_MODES_READY, setNodeEditMode, useNodeEditMode, type NodeEditMode } from '../../engine/design/nodeEditMode';
+import { NODE_EDIT_MODES, NODE_EDIT_MODES_READY, setEraseRadius, setNodeEditMode, useNodeEditMode, type NodeEditMode } from '../../engine/design/nodeEditMode';
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
-import { InlineChoice } from './InlineControls';
+import { InlineChoice, InlineSlider } from './InlineControls';
 import { Popover, usePopover } from '../ui/Popover';
 
 /* Labelled mode bar of the node editor: icon + word, one mode active, then «More» (the node operations) and Done. */
 const MODES: Record<NodeEditMode, { label: string; icon: typeof Hand; tip: string }> = {
   move: { label: 'Move', icon: Hand, tip: 'Move: drag nodes and handles, drag a segment to bend it, double-click to add a node' },
   bend: { label: 'Bend', icon: Spline, tip: 'Bend: drag a segment so the curve passes through the pointer; nodes stay put' },
-  cut: { label: 'Cut', icon: Scissors, tip: 'Soon: cut the path along a line' },
-  erase: { label: 'Erase', icon: Eraser, tip: 'Soon: erase part of the path' },
-  lasso: { label: 'Lasso', icon: Lasso, tip: 'Soon: select nodes with a free-form loop' },
+  cut: { label: 'Cut', icon: Scissors, tip: 'Cut: click the path to cut it there, or drag a line across it' },
+  erase: { label: 'Erase', icon: Eraser, tip: 'Erase: drag over the path to rub part of it out' },
+  lasso: { label: 'Lasso', icon: Lasso, tip: 'Lasso: drag a free-form loop to select the nodes inside (Shift adds)' },
 };
 
 export function NodeModeButtons() {
   const mode = useNodeEditMode((s) => s.mode);
-  return <div className="node-modes" role="radiogroup" aria-label="Node editing mode">
+  const radius = useNodeEditMode((s) => s.eraseRadius);
+  return <><div className="node-modes" role="radiogroup" aria-label="Node editing mode">
     {NODE_EDIT_MODES.map((m) => {
       const { label, icon: Icon, tip } = MODES[m], ready = NODE_EDIT_MODES_READY.includes(m);
       return <button key={m} type="button" role="radio" aria-checked={mode === m} disabled={!ready} className={`opt node-mode${mode === m ? ' is-on' : ''}`} data-tip={tip} onClick={() => setNodeEditMode(m)}><Icon size={13} />{label}</button>;
     })}
-  </div>;
+  </div>{mode === 'erase' && <InlineSlider label="Eraser" unit="px" min={2} max={100} allowManualOverflow value={radius} onChange={setEraseRadius} />}</>;
 }
 
 export function NodeMoreMenu({ sessionId, docId, layerId, shape }: { sessionId: string; docId: string; layerId: string; shape: VectorShape }) {

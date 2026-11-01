@@ -122,6 +122,9 @@ export function shapeEditHint(doc: DesignDoc): { id: string; text: string } {
   const s = l?.type === 'vector' ? l.shapes.find((x) => x.id === e?.shapeId) : undefined;
   const mode = useNodeEditMode.getState().mode;
   if (s?.type === 'path' && mode === 'bend') return { id: 'edit-nodes-bend', text: 'Bend: drag a segment to curve it · nodes stay put · Esc or Done to finish' };
+  if (s?.type === 'path' && mode === 'cut') return { id: 'edit-nodes-cut', text: 'Cut: click the path to cut it, or drag a line across it · Esc or Done to finish' };
+  if (s?.type === 'path' && mode === 'erase') return { id: 'edit-nodes-erase', text: 'Erase: drag over the path to rub part of it out · set the size in the bar · Esc or Done to finish' };
+  if (s?.type === 'path' && mode === 'lasso') return { id: 'edit-nodes-lasso', text: 'Lasso: drag a loop around nodes to select them · Shift adds to the selection · Esc or Done to finish' };
   return s?.type === 'path'
     ? { id: 'edit-nodes', text: 'Shift-click adds nodes · drag in empty space to select · drag a selected node to move the group · arrows move 2 px (Shift 20, Alt 1 screen px) · Delete removes selected nodes · Esc clears, then exits' }
     : { id: 'edit-shape', text: 'Drag the round handles: corners (Ctrl: both) and blur · double-click a handle for its value · Esc or Done to finish' };
