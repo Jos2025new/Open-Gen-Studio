@@ -22,7 +22,7 @@ import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
 import { ToolDock } from '../designer/ToolDock';
-import { DockPlaceButton } from '../designer/ToolPalette';
+import { DockPlaceButton, DockSlot } from '../designer/ToolPalette';
 import { ComposerWorkspaceMenu } from '../shell/WorkspaceMenu';
 import { AgentSend } from './AgentSend';
 
@@ -489,7 +489,7 @@ export function Composer() {
         />
         {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={false} onAdd={() => fileRef.current?.click()} />
-          <div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} place={<DockPlaceButton />} /></div>
+          <DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} place={<DockPlaceButton />} /></div><DockSlot at="end" />
         </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row is-compact">

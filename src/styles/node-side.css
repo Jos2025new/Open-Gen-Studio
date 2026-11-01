@@ -41,6 +41,8 @@ body:has(.canvas-nav-pop, .node-lib-pop) .react-flow__panel.node-side, .react-fl
 /* Designer: the panel at the right of the side toolbox (ToolPalette), lined up with its top; one popup at a time, and the
    Conversation card by the prompt box gives way to it. */
 .node-side.designer-corner { position: absolute; left: calc(100% + var(--canvas-pop-gap)); top: -1px; width: min(340px, calc(100vw - var(--layers-w, 260px) - 120px)); max-height: calc(100vh - var(--composer-height, 120px) - 140px); display: flex; flex-direction: column; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
-.designer-side:has(.tool-dock-stack > *) .designer-corner, body:has(.designs-pop) .designer-corner { display: none; }
-.ws-designer:has(.designer-side) :is(.thread-peek, .thread-peek-folded) { display: none; }
+:is(.designer-side, .composer-tools-bar):has(.tool-dock-stack > *) .designer-corner, body:has(.designs-pop) .designer-corner { display: none; }
+/* In the prompt box the panel opens above the bar, at its left, a popup gap away (as the tool cards do). */
+.composer-tools-bar .node-side.designer-corner { left: 0; top: auto; bottom: calc(100% + var(--canvas-pop-gap)); }
+.ws-designer:has(.designer-side, .designer-dock-start) :is(.thread-peek, .thread-peek-folded) { display: none; }
 .designer-side .canvas-nav-badged .icon-btn { width: var(--control-h); height: var(--control-h); }

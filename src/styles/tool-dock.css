@@ -152,3 +152,14 @@
 body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .designs-pop .document-picker-panel { width: 100%; max-height: min(70vh, 560px); margin: 0; padding: 6px; }
 .ws-designer:has(.designer-side) { --designer-dock-left: max(84px, min(calc(50% - 400px), calc(100% - var(--layers-w, 260px) - 824px))); }
+/* Designer, toolbox in the prompt box: Designs, Create and Conversation before the tools and the canvas view after them,
+   in the bar's own size, as the side toolbox has them (ToolPalette's slots). */
+.designer-dock-start, .designer-dock-end { display: flex; align-items: center; gap: 3px; flex: none; }
+.designer-dock-start:empty, .designer-dock-end:empty { display: none; }
+.composer-tools-bar :is(.designer-dock-start, .designer-dock-end) .tool-dock-separator { height: 24px; }
+.composer-tools-bar :is(.designer-dock-start, .designer-dock-end, .tool-dock-family) .icon-btn { width: 34px; height: 34px; }
+.composer-tools-bar :is(.designer-dock-start, .designer-dock-end, .tool-dock-family) .icon-btn svg { width: 19px; height: 19px; }
+.composer-tools-bar .designer-view { position: static; flex-direction: row; gap: 3px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.composer-tools-bar .designer-view .zoom-value { height: 34px; min-height: 0; }
+.popover.designs-pop.is-up { margin: 0; translate: 0 calc(-1 * var(--toolbar-padding)); }
+.ws-designer:has(.designer-dock-start) .document-picker { display: none; }

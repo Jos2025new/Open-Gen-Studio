@@ -25,7 +25,7 @@ const ICONS: Record<string, LucideIcon> = {
 };
 const iconFor = (name: string): LucideIcon => ICONS[name] ?? CircleHelp;
 
-/** Designer side toolbox: one popup at a time. Opening one (a tool's variants, Create or Conversation, Designs) closes the others. */
+/** Designer toolbox (side or in the prompt box): one popup at a time. Opening one (a tool's variants, Create or Conversation, Designs) closes the others. */
 export type SidePopup = 'tools' | 'corner' | 'designs';
 export const announceSidePopup = (which: SidePopup) => window.dispatchEvent(new CustomEvent<SidePopup>('ogs:side-popup', { detail: which }));
 export function useSidePopup(which: SidePopup, close: () => void, active = true) {
@@ -78,7 +78,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
   const disabledReason = (variant: ToolboxVariant) => variant.tool ? toolBlockReason(variant.tool, activeLayerValue) : undefined;
-  useSidePopup('tools', () => { dispatch({ type: 'escape' }); dispatch({ type: 'escape' }); }, vertical);
+  // The Designer's toolbox (either place; Studio passes no `place`) shares one popup at a time with Designs and Create/Conversation.
+  const designer = vertical || place !== undefined;
+  useSidePopup('tools', () => { dispatch({ type: 'escape' }); dispatch({ type: 'escape' }); }, designer);
 
   useEffect(() => {
     const desiredId = currentFamily?.id;
@@ -164,7 +166,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
         const button = <span key={family.id}>
           {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
             if (soonReason) return;
-            if (vertical) announceSidePopup('tools');
+            if (designer) announceSidePopup('tools');
             if (family.id !== familyId) {
               const initial = family.variants.find((variant) => variant.tool);
               if (initial) chooseVariant(initial);
