@@ -8,6 +8,7 @@ import { groupLayers } from '../../engine/design/groups';
 import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
 import { deletePickedNode } from './PathNodes';
+import { boardKey } from './boardKey';
 import { deleteLayers, mergeDown, redoDoc, undoDoc } from '../../engine/design/actions';
 import { activeLayer } from '../../engine/design/doc';
 import { record } from '../../engine/design/history';
@@ -30,7 +31,7 @@ function pickedHere(doc: DesignDoc): boolean {
  */
 export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc | undefined, tools?: ReadonlySet<DesignTool>): void {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); void saveNow().catch(() => undefined); return; }
-  if (!doc || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.popover:not(.designer-context), .lightbox')) return;
+  if (!doc || !boardKey(e)) return;
   const layer = activeLayer(doc);
   const k = e.key.toLowerCase();
   const mod = e.ctrlKey || e.metaKey;

@@ -6,13 +6,14 @@ import { uploadFiles } from '../../engine/actions';
 import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
 import { cloneCanvas, getBuffer } from '../../engine/design/raster';
 import { canvasToBlob } from '../../lib/media';
+import { offBoard } from './boardKey';
 
 /**
  * Paste, copy and cut of images for a design, on the document. The full Designer registers it always; Studio's embedded
  * one passes `allowed` (focus inside the board), so the chat composer's clipboard is never taken. Returns the cleanup.
  */
 export function designerClipboard(sessionId: string, doc: DesignDoc | undefined, allowed: () => boolean = () => true): () => void {
-  const inField = (e: Event) => e.target instanceof Element && !!e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+  const inField = (e: Event) => offBoard(e) || (e.target instanceof Element && !!e.target.closest('[contenteditable]:not([contenteditable="false"])'));
   const paste = (e: ClipboardEvent) => {
     if (e.defaultPrevented || !allowed() || inField(e)) return;
     const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));

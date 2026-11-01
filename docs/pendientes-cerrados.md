@@ -4,6 +4,10 @@ Lo que salió de las listas abiertas ([índice](pendientes.md)). Una línea por 
 
 Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se movieron tal cual estaban marcados `[x]`.
 
+## Cerrado el 2026-10-31 (rama `task/gui-compact`)
+
+- **Atajos del tablero con el foco en el chat** (antes en [pendientes-gui](pendientes-gui.md)): edición de nodos, nudos de forma, teclas del Designer y su portapapeles pasan por un único filtro, `src/components/designer/boardKey.ts`; con el foco en el panel de conversación, el hilo o la columna del chat no actúan sobre el lienzo. Evidencia: `tests/board-key.test.ts` (código y jsdom; sin prueba visual).
+
 ## Cierre de la sesión del 2026-10-29 (detalle en [055](history/055-2026-10-W44.md))
 
 - **Mapas y regla de consulta:** actualizados e integrados en `task/workflow-ask-first` (`d8b3869`); consultar los `huecos.md` para lo que sigue abierto. El comprobador de enlaces no demuestra accesibilidad ni comportamiento.

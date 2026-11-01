@@ -13,6 +13,7 @@ import { snapOptsFor } from '../../engine/design/snap';
 import { pathNodeTargets, PathNodeSnapSession } from '../../engine/design/snapNodes';
 import { useStore } from '../../store/store';
 import { snapIdleFeed, snapIdleStart, snapIdleStop } from './snapIdle';
+import { boardKey } from './boardKey';
 
 /*
  * Inkscape's Node tool on a path shape in edit mode (docs/plan-edicion-formas.md): square nodes, round handles on
@@ -34,8 +35,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   useEffect(() => {
     if (!edit || edit.shapeId !== shape.id) return;
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-      if (document.querySelector('.popover:not(.designer-context), .lightbox')) return;
+      if (!boardKey(e)) return;
       const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
       if (e.key === 'Escape') {
         stop();

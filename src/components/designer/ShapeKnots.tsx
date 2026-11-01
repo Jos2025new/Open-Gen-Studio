@@ -13,6 +13,7 @@ import { multiPathTargets } from '../../engine/design/multiPathEdit';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { useLayerSelection, layerSelection } from '../../engine/design/selection';
 import { useStore } from '../../store/store';
+import { boardKey } from './boardKey';
 
 /*
  * Shape edit mode (docs/plan-edicion-formas.md): after a double-click or «Edit shape», the edited shape shows its own
@@ -36,7 +37,7 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   const editing = !!picked && edit?.shapeId === picked.shape.id && (picked.shape.type === 'rect' || picked.shape.type === 'ellipse' || picked.shape.type === 'path');
   useEffect(() => {
     if (!editing || picked?.shape.type === 'path') return;
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) setShapeEdit(doc.id, null); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && boardKey(e)) setShapeEdit(doc.id, null); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [editing, doc.id, picked?.shape.type]);

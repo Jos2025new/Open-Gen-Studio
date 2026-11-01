@@ -4,6 +4,7 @@ import { editablePageSegs, movePathNodeSelections, type MultiPathTarget, type Pa
 import { mutateDoc } from '../../engine/design/actions';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
+import { boardKey } from './boardKey';
 
 type Drag = { kind: 'node'; start: { x: number; y: number }; screen: { x: number; y: number }; shapeId: string; node: number; paths: PathNodeSelection[]; base: MultiPathTarget[]; moved: boolean; shift: boolean }
   | { kind: 'marquee'; start: { x: number; y: number }; screen: { x: number; y: number }; paths: PathNodeSelection[]; base: MultiPathTarget[]; moved: boolean; shift: boolean; ctrl: boolean };
@@ -20,7 +21,7 @@ export function MultiPathNodes({ view, sessionId, docId, targets }: { view: View
   const setSelection = (next: PathNodeSelection[]) => setShapeEdit(docId, { ...edit!, node: undefined, nodes: [], paths: next });
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (!boardKey(e)) return;
       if (e.key === 'Escape') {
         e.preventDefault(); e.stopImmediatePropagation();
         if (paths.some((p) => p.nodes.length)) setSelection(paths.map((p) => ({ ...p, nodes: [] })));
