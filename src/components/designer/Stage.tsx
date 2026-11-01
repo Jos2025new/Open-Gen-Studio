@@ -240,7 +240,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const pk = objectPick(d0.id);
       const pl = pk ? d0.layers.find((l) => l.id === pk.layerId) : null;
       if (ok(pl) && pk!.ids.length) return [{ layer: pl, ids: pk!.ids }];
-      // Several layers picked in the panel (Ctrl/Shift-click) and no objects picked: transform them together.
+      // Several layers picked (Ctrl/Shift-click), no objects: transform them all.
       const picked = layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id));
       if (picked.length > 1) return picked.map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
       const a = activeLayer(d0);
@@ -1314,7 +1314,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       />
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
-      {tool === 'move' && (!editLayers || shapeEditing) && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
+      {(tool === 'move' ? !editLayers || shapeEditing : tool === 'shapeBuilder') && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
       <SnapIndicator view={view} measures={guideLines.m} alignments={guideLines.a} />
       <AgentGlow view={view} doc={doc} />

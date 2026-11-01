@@ -1,0 +1,14 @@
+/* Combine shapes (BooleanOps.tsx) and the Shape Builder overlay (ShapeBuilder.tsx). Cards and themes are untouched: only existing tokens. */
+.boolean-ops { display: inline-flex; align-items: center; gap: 2px; }
+.boolean-ops .boolean-more { padding: 0 4px; min-width: 0; }
+.boolean-ops .icon-btn:disabled { opacity: .45; }
+.edit-card .boolean-ops { margin-top: 4px; }
+.shape-builder { pointer-events: auto; cursor: crosshair; touch-action: none; }
+.shape-builder .sb-face { fill: url(#sb-hatch); stroke: var(--accent); stroke-width: 1.5; pointer-events: none; }
+.shape-builder .sb-face.is-touched { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
+.shape-builder .sb-face.is-delete { fill: url(#sb-hatch-del); stroke: var(--danger); }
+.shape-builder .sb-face.is-delete.is-touched { fill: color-mix(in srgb, var(--danger) 24%, transparent); }
+.shape-builder line.sb-hatch { stroke: var(--accent); stroke-width: 1; opacity: .75; }
+.shape-builder line.sb-hatch-del { stroke: var(--danger); stroke-width: 1; opacity: .75; }
+.shape-builder .sb-trail { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.shape-builder .sb-trail.is-delete { stroke: var(--danger); }

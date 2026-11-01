@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
-import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
+import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
@@ -23,7 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   'mouse-pointer-2': MousePointer2, 'move-up-right': MoveUpRight, 'paint-bucket': PaintBucket, 'pen-tool': PenTool,
   pencil: Pencil, pentagon: Pentagon, pipette: Pipette, scissors: Scissors, 'settings-2': Settings2, shapes: Shapes, square: Square,
   'square-dashed': SquareDashed, star: Star, spline: Spline, type: Type, 'wand-sparkles': WandSparkles,
-  'ruler-dimension-line': Ruler,
+  'ruler-dimension-line': Ruler, 'squares-unite': SquaresUnite,
 };
 const iconFor = (name: string): LucideIcon => ICONS[name] ?? CircleHelp;
 

@@ -14,6 +14,10 @@ import { activeLayer } from '../../engine/design/doc';
 import { record } from '../../engine/design/history';
 import { toolBlockReason } from '../../engine/design/rules';
 import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
+import { applyBoolean } from '../../engine/design/shapeBuilder';
+import type { BoolOp } from '../../engine/design/shapeBoolean';
+
+const BOOLEAN_KEYS: Record<string, BoolOp> = { u: 'union', s: 'subtract', i: 'intersect', e: 'exclude' };
 
 const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
@@ -39,6 +43,13 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
     // Ctrl+Z undo; Ctrl+Shift+Z and Ctrl+Y redo.
     e.preventDefault();
     (e.shiftKey || k === 'y' ? redoDoc : undoDoc)(sessionId, doc.id);
+  } else if (mod && e.altKey && !e.shiftKey && BOOLEAN_KEYS[e.code?.startsWith('Key') ? e.code.slice(3).toLowerCase() : k]) {
+    // Ctrl+Alt+U / S / I / E: Union, Subtract, Intersect, Exclude on the picked shapes (Ctrl+E, merge down, has no Alt).
+    e.preventDefault();
+    applyBoolean(sessionId, doc.id, BOOLEAN_KEYS[e.code?.startsWith('Key') ? e.code.slice(3).toLowerCase() : k]);
+  } else if (!mod && !e.altKey && e.shiftKey && k === 'm' && (!tools || tools.has('shapeBuilder'))) {
+    e.preventDefault();
+    setUi({ tool: 'shapeBuilder' });
   } else if (!tools && !mod && !e.altKey && e.shiftKey && k === 'r') {
     e.preventDefault();
     setUi({ rulers: !useStore.getState().ui.rulers });

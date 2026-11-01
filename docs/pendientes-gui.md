@@ -6,7 +6,7 @@ Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W
 
 ## Código sin arreglar (hallados, no introducidos)
 
-- [ ] **Borrar capas con el teclado y teclas de herramienta (V, H, B, E…) nunca se ejecutan.** El bloque de `deleteLayers` y la búsqueda en `DESIGN_TOOL_KEYS` están anidados dentro de la rama de las flechas. Pasa también en el Designer completo; el código se movió tal cual. Decisión del usuario: no arreglar todavía. `src/components/designer/designerKeys.ts:88` (borrar) y `:95` (teclas de herramienta). **2026-10-15**, código; **revisado 2026-10-16**, sigue igual.
+- [ ] **Borrar capas con el teclado y teclas de herramienta (V, H, B, E…) nunca se ejecutan.** El bloque de `deleteLayers` y la búsqueda en `DESIGN_TOOL_KEYS` están anidados dentro de la rama de las flechas. Pasa también en el Designer completo; el código se movió tal cual. Decisión del usuario: no arreglar todavía. `src/components/designer/designerKeys.ts:99` (borrar) y `:95` (teclas de herramienta). **2026-10-15**, código; **revisado 2026-10-16**, sigue igual.
 - [ ] **Textos de operación escritos para el agente.** El tooltip de los menús de operación (`867c426`) muestra `description` de `ops.ts`, que también lee el agente. Hay descripciones con nombres de parámetros internos: `join_clips` (`params.music`, `params.loudness`), la operación de filtros/efectos (`params.effect`, `params.amount`), y `reference_sheet` y `contact_sheet` con nombres internos. Hace falta un texto de usuario aparte, sin tocar el que lee el agente. `src/engine/ops.ts` (`join_clips` ~331, fx ~430, `reference_sheet` ~209, `contact_sheet` ~302). **2026-10-16**, hallazgo del usuario.
 
 ## Diseño sin decidir o sin hacer

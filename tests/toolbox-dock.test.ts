@@ -140,7 +140,7 @@ describe('ToolDock real interaction', () => {
     expect([...host.querySelectorAll('[aria-label="Edit variants"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Pan', 'Rectangle']);
   });
 
-  it('Edit card follows the selection: one shows Transform and Align, two or more add Distribute and disabled Soon Boolean and Form builder', async () => {
+  it('Edit card follows the selection: one shows Transform and Align, two or more add Distribute; the combine group appears only for picked vector shapes', async () => {
     const rect = { x: 0, y: 0, width: 10, height: 10 }, px = { width: 10, height: 10 };
     const a = newRasterLayer('A', rect, px), b = newRasterLayer('B', rect, px);
     const withLayers = { ...doc, layers: [a, b], activeLayerId: a.id };
@@ -158,9 +158,8 @@ describe('ToolDock real interaction', () => {
     expect(card().getAttribute('data-selection')).toBe('many');
     expect(card().querySelector('[aria-label="Align selection"]')).toBeTruthy();
     expect(card().querySelector('[aria-label="Distribute selection"]')).toBeTruthy();
-    const soon = [...card().querySelectorAll<HTMLButtonElement>('.edit-card-soon button')];
-    expect(soon.map((x) => x.textContent)).toEqual(['Boolean', 'Form builder']);
-    for (const x of soon) { expect(x.disabled).toBe(true); expect(x.title).toContain('Soon:'); }
+    expect(card().querySelector('.edit-card-soon')).toBeNull();
+    expect(card().querySelector('.boolean-ops')).toBeNull();
   });
 
   it('size preset dots grow at every step, small sizes included, and none is capped', async () => {

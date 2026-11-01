@@ -8,7 +8,7 @@ import { useStore } from '../../store/store';
 import { ContextStrip } from './ContextStrip';
 import { EditOps } from './ToolSettings';
 import { usePickedShape } from './ShapeLookFields';
-import { MULTI_SOON } from './toolboxModel';
+import { BooleanOps } from './BooleanOps';
 
 /** How many objects (or layers, in Layer mode) the Edit tool would act on, read the way EditOps reads them. */
 export function useEditCount(doc: DesignDoc): number {
@@ -38,9 +38,7 @@ export function EditCard({ sessionId, doc }: { sessionId: string; doc: DesignDoc
     {count === 1 && !stripHasTransform && <EditOps sessionId={sessionId} doc={doc} turnOnly />}
     {count >= 1 && <section className="edit-card-align" aria-label="Align and distribute">
       <EditOps sessionId={sessionId} doc={doc} panelOnly alignPanel={alignPanel} />
-      {count > 1 && <div className="edit-card-soon" role="group" aria-label="Combine">
-        {MULTI_SOON.map((item) => <button key={item.id} type="button" className="opt" disabled aria-disabled="true" title={`Soon: ${item.soon}`} data-tip={`Soon: ${item.soon}`}>{item.label}</button>)}
-      </div>}
+      {count > 1 && <BooleanOps sessionId={sessionId} doc={doc} />}
     </section>}
   </div>;
 }

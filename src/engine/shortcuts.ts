@@ -4,11 +4,11 @@ import type { DesignTool } from './design/rules';
 export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', m: 'select', i: 'eyedropper', b: 'brush', g: 'fill', u: 'gradient', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text', k: 'ruler' };
 
 /** The key that picks a tool (shown in toolbox tooltips), or undefined when it has none. */
-export const toolKey = (tool: DesignTool | undefined): string | undefined => tool ? Object.entries(DESIGN_TOOL_KEYS).find(([, t]) => t === tool)?.[0].toUpperCase() : undefined;
+export const toolKey = (tool: DesignTool | undefined): string | undefined => tool === 'shapeBuilder' ? 'Shift+M' : tool ? Object.entries(DESIGN_TOOL_KEYS).find(([, t]) => t === tool)?.[0].toUpperCase() : undefined;
 
 /** One name per tool; typed as a complete record, so a new tool cannot be left out (the inventory test reads it). */
 export const TOOL_NAMES: Record<DesignTool, string> = {
-  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text', ruler: 'Ruler',
+  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text', ruler: 'Ruler', shapeBuilder: 'Shape Builder',
 };
 
 export interface ShortcutGroup {
@@ -61,6 +61,8 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Ctrl+J', action: 'Selected pixels to a new layer' },
         { keys: 'Ctrl+G', action: 'Group the selected layers' },
         { keys: 'Shift+R', action: 'Show or hide rulers' },
+        { keys: 'Shift+M', action: 'Shape Builder: drag across regions of the picked shapes to merge them (Alt deletes, Esc cancels)' },
+        { keys: 'Ctrl+Alt+U / S / I / E', action: 'Union, Subtract, Intersect, Exclude the picked shapes' },
         { keys: 'Delete (with a selection)', action: 'Erase the selected pixels' },
         { keys: 'Mod + Z', action: 'Undo' },
         { keys: 'Mod + Shift + Z', action: 'Redo' },

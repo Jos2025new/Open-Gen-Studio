@@ -37,4 +37,23 @@ export default [{
     ['src/components/designer/EditCard.tsx', 'export function EditCard'],
   ],
   tests: ['tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-keys.test.ts'],
+},
+{
+  id: 'designer-shape-booleans',
+  what: 'Union, Subtract, Intersect, Exclude y Divide visibles con 2+ formas elegidas (atajos Ctrl+Alt+U/S/I/E); Shape Builder (Shift+M) fusiona o borra caras con Alt.',
+  sides: [
+    ['src/engine/design/shapeBoolean.ts', 'export function booleanShapes'],
+    ['src/engine/design/shapeBuilder.ts', 'export function applyBoolean'],
+    ['src/engine/design/shapeBuilder.ts', 'export function applyBuilder'],
+    ['src/components/designer/BooleanOps.tsx', 'export function BooleanOps'],
+    ['src/components/designer/ContextStrip.tsx', '<BooleanOps '],
+    ['src/components/designer/EditCard.tsx', '<BooleanOps '],
+    ['src/components/designer/ShapeBuilder.tsx', 'export function ShapeBuilder'],
+    ['src/components/designer/ShapeKnots.tsx', '<ShapeBuilder '],
+    ['src/components/designer/Stage.tsx', "tool === 'shapeBuilder'"],
+    ['src/components/designer/designerKeys.ts', 'BOOLEAN_KEYS'],
+    ['src/engine/shortcuts.ts', 'Ctrl+Alt+U / S / I / E'],
+    ['src/components/designer/toolboxModel.ts', "'shape-builder'"],
+  ],
+  tests: ['tests/shape-boolean.test.ts', 'tests/path-boolean.test.ts', 'tests/designer-keys.test.ts', 'tests/shape-kinds.test.ts'],
 }];

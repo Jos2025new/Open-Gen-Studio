@@ -4,6 +4,7 @@ import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, 
 import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { PathNodes } from './PathNodes';
+import { isFilledArea } from './pathPieces';
 import { StrokeTools } from './StrokeTools';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { useNodeEditMode } from '../../engine/design/nodeEditMode';
@@ -16,6 +17,7 @@ import { useObjectSelection } from '../../engine/design/objectSelection';
 import { useLayerSelection, layerSelection } from '../../engine/design/selection';
 import { useStore } from '../../store/store';
 import { boardKey } from './boardKey';
+import { ShapeBuilder } from './ShapeBuilder';
 
 /*
  * Shape edit mode (docs/plan-edicion-formas.md): after a double-click or «Edit shape», the edited shape shows its own
@@ -28,7 +30,12 @@ type Knot = 'rx' | 'ry' | 'top' | 'right';
 const NUDGE = 10; // screen px: a zero radius knot sits beside the corner, so Rx and Ry never share one spot
 const BLUR_GAP = 20; // screen px from the edge, so the blur knots stay apart from the corner knots
 
-export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
+/** The Edit tool's knots, or the Shape Builder's regions while that tool is active (mounted here so the Stage stays as it is). */
+export function ShapeKnots(props: { view: View; sessionId: string; doc: DesignDoc }) {
+  return useStore((st) => st.ui.tool) === 'shapeBuilder' ? <ShapeBuilder {...props} /> : <EditKnots {...props} />;
+}
+
+function EditKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
   const picked = usePickedShape(doc);
   const edit = useShapeEdit((st) => st.byDoc[doc.id]);
   const objectPick = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
@@ -124,8 +131,8 @@ export function shapeEditHint(doc: DesignDoc): { id: string; text: string } {
   const s = l?.type === 'vector' ? l.shapes.find((x) => x.id === e?.shapeId) : undefined;
   const mode = useNodeEditMode.getState().mode;
   if (s?.type === 'path' && mode === 'bend') return { id: 'edit-nodes-bend', text: 'Bend: drag a segment to curve it · drag a node to round it · click a node to make it sharp' };
-  if (s?.type === 'path' && mode === 'cut') return { id: 'edit-nodes-cut', text: s.fill || s.fillGradient ? 'Cut: drag a line to slice the shape · click the outline to open it · Esc or Done to finish' : 'Cut: click the path to cut it, or drag a line across it · Esc or Done to finish' };
-  if (s?.type === 'path' && mode === 'erase') return { id: 'edit-nodes-erase', text: s.fill || s.fillGradient ? 'Erase: drag to rub away area of the shape · set the size in the bar · Esc or Done to finish' : 'Erase: drag over the path to rub part of it out · set the size in the bar · Esc or Done to finish' };
+  if (s?.type === 'path' && mode === 'cut') return { id: 'edit-nodes-cut', text: isFilledArea(s) ? 'Cut: drag a line to slice the shape · click the outline to open it · Esc or Done to finish' : 'Cut: click the path to cut it, or drag a line across it · Esc or Done to finish' };
+  if (s?.type === 'path' && mode === 'erase') return { id: 'edit-nodes-erase', text: isFilledArea(s) ? 'Erase: drag to rub away area of the shape · set the size in the bar · Esc or Done to finish' : 'Erase: drag over the path to rub part of it out · set the size in the bar · Esc or Done to finish' };
   if (s?.type === 'path' && mode === 'lasso') return { id: 'edit-nodes-lasso', text: 'Lasso: drag a loop around nodes to select them · Shift adds to the selection · Esc or Done to finish' };
   return s?.type === 'path'
     ? { id: 'edit-nodes', text: 'Shift-click adds nodes · drag in empty space to select · drag a selected node to move the group · arrows move 2 px (Shift 20, Alt 1 screen px) · Delete removes selected nodes · Esc clears, then exits' }

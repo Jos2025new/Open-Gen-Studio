@@ -30,6 +30,7 @@ export const TOOL_HELP: Record<DesignTool, string> = {
   curve: 'Drag to draw a curve · Bend sets how far it bows',
   arrow: 'Drag to draw an arrow',
   text: 'Click on the page to add a text · font, size and colour are in the strip',
+  shapeBuilder: 'Shape Builder: drag across regions to merge · Alt to delete · Esc cancels',
   ruler: 'Drag to place a straight, ellipse or perspective guide · drag its round handles to adjust it · the Brush follows it while on',
 };
 
