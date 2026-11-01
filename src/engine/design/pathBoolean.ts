@@ -263,8 +263,9 @@ export function fixOverlaps(area: Area, o?: BooleanOptions, mode: 'fill' | 'cut'
       // oriented as the contour was drawn (a flipped lobe stops cancelling). The contours then combine nonzero, so a ring drawn as two opposite contours keeps its hole.
       filled = paths.flatMap((p) => {
         if (!hasCrossing([p])) return [p]; // no crossing of its own: nothing to cut
-        const parts = tg.faces(p), sign = orientation(p);
+        const parts = tg.faces(p);
         if (!parts) return [p];
+        const sign = orientation(p, parts, paths.filter((o) => o !== p));
         return parts.filter((q) => Math.abs(pathArea(q)) >= minArea(tol)).map((q) => (sign > 0 ? q : [...q].reverse()));
       });
     }

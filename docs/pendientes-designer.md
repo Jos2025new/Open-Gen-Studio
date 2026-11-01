@@ -50,7 +50,7 @@ Límites conocidos de los cambios de la [caja de herramientas](designer-controle
 - **D40 · medio · 2026-11-01 · Booleanas entre capas** (propuesta). Hoy solo actúan sobre formas de una misma capa vectorial (`shapeBuilder.ts:18`).
 - **D41 · bajo · 2026-11-01 · Arrastrar las manijas de Bend** (propuesta). En Bend solo responden los nodos y los segmentos; las manijas no se mueven con el arrastre (`PathNodes.tsx:104`). Ver [nodos-modos](designer-controles/nodos-modos.md).
 - **D42 · medio · 2026-11-01 · Caras de un trazado que se cruza a sí mismo** (propuesta). La selección Face de los nodos solo reconoce subtrazados cerrados; las regiones de solape de un trazado que se cruza no son caras (`selectMode.ts`, `facesOf`). Propuesta: tratarlas como caras al elegir, con su relleno. Ver [nodos-modos](designer-controles/nodos-modos.md) y [booleanas](designer-controles/booleanas.md).
-- **D43 · medio · 2026-11-01 · Reconstrucción exacta de curvas (Z tags)** (**corregido** en código y tests, `tests/fix-overlaps.test.ts`; falta prueba visual del usuario). Casos cubiertos en `exactRebuild.ts`: cúbico que se cierra sobre sí mismo, T-junctions, orientación y guarda de trazados grandes. Sin test propio: la proyección antes de reajustar. Ver [booleanas](designer-controles/booleanas.md).
+- **D43 · medio · 2026-11-01 · Reconstrucción exacta de curvas (Z tags)** (**corregido** en código y tests, `tests/fix-overlaps.test.ts`; falta prueba visual del usuario). Casos cubiertos en `exactRebuild.ts`: cúbico que se cierra sobre sí mismo, T-junctions, orientación y guarda de trazados grandes. Ver [booleanas](designer-controles/booleanas.md).
 
 ## Auditoría del Designer (2026-10-22)
 

@@ -140,7 +140,8 @@ export class Tagger {
     const split = (ei: number, a: Point64, b: Point64, other: [Point64, Point64], v: Point64) => {
       const s = dot(a, b, v);
       if (s <= 0 || s >= dot(a, b, b)) return;
-      const q = at.get(key(v))!;
+      const q = at.get(key(v));
+      if (!q) return;
       this.mergeTag(q, this.cross([[a, b], other], { x: v.x, y: v.y }));
       on[ei].push({ s, q });
     };
@@ -348,17 +349,42 @@ export function edgeRelation(u: EdgeRef, v: EdgeRef): 'cross' | 'touch' | 'none'
   return d1 * d2 <= 0 && d3 * d4 <= 0 ? 'touch' : 'none';
 }
 
+const area2 = (f: Path64) => { let a2 = 0; for (let i = 0; i < f.length; i++) { const q = f[i], r = f[(i + 1) % f.length]; a2 += q.x * r.y - r.x * q.y; } return a2; };
+/** Winding number of the closed polygon `p` around (x, y). */
+function windAt(p: Path64, x: number, y: number): number {
+  let w = 0;
+  for (let i = 0; i < p.length; i++) {
+    const a = p[i], b = p[(i + 1) % p.length], c = (b.x - a.x) * (y - a.y) - (x - a.x) * (b.y - a.y);
+    if (a.y <= y) { if (b.y > y && c > 0) w++; } else if (b.y <= y && c < 0) w--;
+  }
+  return w;
+}
+/** A point inside the (simple, counter-clockwise) face: the middle of its widest span on a line between two vertex heights (no vertex on it). */
+function innerPoint(f: Path64): { x: number; y: number } | null {
+  const ys = [...new Set(f.map((q) => q.y))].sort((a, b) => a - b);
+  let best: { x: number; y: number; w: number } | null = null;
+  for (let k = 0; k + 1 < ys.length; k++) {
+    const y = (ys[k] + ys[k + 1]) / 2, xs: number[] = [];
+    for (let i = 0; i < f.length; i++) {
+      const a = f[i], b = f[(i + 1) % f.length];
+      if ((a.y <= y) !== (b.y <= y)) xs.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x));
+    }
+    xs.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < xs.length; i += 2) if (!best || xs[i + 1] - xs[i] > best.w) best = { x: (xs[i] + xs[i + 1]) / 2, y, w: xs[i + 1] - xs[i] };
+  }
+  return best && best.w > 0 ? best : null;
+}
 /**
- * Which way a contour was drawn, read where it cannot be wrong: at its lowest (then leftmost) vertex, always on the
- * outer boundary. +1 = positive shoelace sign (the faces' sign), -1 the other. A flat vertex falls back to the net area.
+ * Which way a contour was drawn, read from a face of its own, not from one vertex (a folded lobe can hold the lowest
+ * vertex and turn the other way): the sign of the contour's winding inside the face that holds another contour of the
+ * path (a ring is two opposite contours, so the hole says which face it was drawn against), else inside the largest
+ * face (the body). +1 = the faces' sign (positive shoelace), -1 the other. No usable face: the net area.
  */
-export function orientation(p: Path64): number {
-  const n = p.length;
-  let m = 0;
-  for (let i = 1; i < n; i++) if (p[i].y < p[m].y || (p[i].y === p[m].y && p[i].x < p[m].x)) m = i;
-  const a = p[(m + n - 1) % n], b = p[m], c = p[(m + 1) % n], turn = orient(a.x, a.y, b.x, b.y, c.x, c.y);
-  if (turn) return turn;
-  let a2 = 0;
-  for (let i = 0; i < n; i++) { const q = p[i], r = p[(i + 1) % n]; a2 += q.x * r.y - r.x * q.y; }
-  return a2 < 0 ? -1 : 1;
+export function orientation(p: Path64, faces: Paths64, others: Path64[] = []): number {
+  const inside = (f: Path64, q: { x: number; y: number }) => windAt(f, q.x, q.y) > 0;
+  let face: Path64 | null = null;
+  for (const o of others) for (const f of faces) if (o.length && inside(f, o[0]) && (!face || area2(f) > area2(face))) face = f;
+  face ??= faces.reduce<Path64 | null>((m, f) => (!m || area2(f) > area2(m) ? f : m), null);
+  const at = face && innerPoint(face), w = at ? windAt(p, at.x, at.y) : 0;
+  return w ? Math.sign(w) : area2(p) < 0 ? -1 : 1;
 }

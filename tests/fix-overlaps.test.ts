@@ -113,6 +113,7 @@ it('a segment dragged back across its own contour: the flipped lobe is filled, n
 
 // ---- Fill / Cut and exact curves
 import { fixOverlaps, flatten, booleanOp } from '../src/engine/design/pathBoolean';
+import { Tagger } from '../src/engine/design/exactRebuild';
 import { parseSegs, type Pt, type Seg } from '../src/engine/design/pathNodes';
 const poly = (pts: number[][]): Seg[] => [{ c: 'M', p: [pts[0] as Pt] }, ...pts.slice(1).map((p): Seg => ({ c: 'L', p: [p as Pt] })), { c: 'Z', p: [] }];
 /** Sum of the winding numbers of the closed loops around (x, y): nonzero fill = this is not 0. */
@@ -270,6 +271,56 @@ it('a huge polyline does not freeze: Fill falls back to winding semantics', () =
   const t0 = Date.now();
   expect(() => fixOverlaps({ segs: poly(pts) })).not.toThrow();
   expect(Date.now() - t0).toBeLessThan(8000);
+});
+it('Fill orientation: a bow whose folded lobe holds the lowest vertex still follows the body, so a ring keeps its hole', () => {
+  const bow = poly([[-50, -200], [-40, 0], [100, 0], [100, 100], [0, 100], [0, 0], [40, 0]]); // net area positive, lowest vertex in the folded lobe
+  const hole = poly([[40, 30], [40, 70], [70, 70], [70, 30]]); // drawn against the body
+  for (const m of ['fill', 'cut'] as const) {
+    const out = fixOverlaps({ segs: [...bow, ...hole] }, undefined, m);
+    expect(winding(out, 55, 50)).toBe(0);
+    expect(winding(out, 20, 50)).not.toBe(0);
+    expect(winding(out, 90, 50)).not.toBe(0);
+  }
+});
+it('collinear edges that overlap with interleaved ends (a<c<b<d on one line) are split at the overlap ends', () => {
+  // (0,0)->(100,0) and later (60,0)->(160,0) share the stretch 60..100
+  const c = poly([[0, 0], [100, 0], [100, 80], [160, 80], [160, 0], [60, 0], [60, -80], [0, -80]]);
+  const out = fixOverlaps({ segs: c }, undefined, 'fill');
+  expect(winding(out, 130, 40)).not.toBe(0);
+  expect(winding(out, 30, -40)).not.toBe(0);
+  expect(winding(out, 80, 40)).toBe(0); // the stretch 60..100 on y=0 has no area of its own: nothing bounded above x 60..100
+});
+it('a big path: Fill gives exactly the Cut result (the guard counts flattened points)', () => {
+  const n = 9000, pts: number[][] = [];
+  for (let i = 0; i < n; i++) { const a = (2 * Math.PI * i) / n, r = 1000 + (i % 2) * 5; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+  pts.push([-2000, 0], [2000, 10]);
+  const big = poly(pts);
+  expect(JSON.stringify(fixOverlaps({ segs: big }, undefined, 'fill'))).toBe(JSON.stringify(fixOverlaps({ segs: big }, undefined, 'cut')));
+});
+/** Rebuild of a loop of the first path with `extra` (a point of the second path, no shared segment) inserted after point `at`. */
+function rebuiltWith(segs: Seg[], other: Seg[], at: number, extra: Pt, near?: Pt) {
+  const tg = new Tagger(1000), paths = tg.tag([...segs, ...other], 0.1);
+  const pt = paths[1].find((q) => q.x === extra[0] * 1000 && q.y === extra[1] * 1000)!;
+  const body = paths[0].filter((q) => q.x !== pt.x || q.y !== pt.y); // the same place on the body is replaced by the other shape's point
+  let k = at;
+  if (near) { let bd = Infinity; body.forEach((q, i) => { const d = Math.hypot(q.x - near[0] * 1000, q.y - near[1] * 1000); if (d < bd && q.x < near[0] * 1000) { bd = d; k = i; } }); }
+  const loop = [...body.slice(0, k + 1), pt, ...body.slice(k + 1)];
+  return { out: tg.rebuild(loop, 0.25) };
+}
+it('projection before the refit: ends with no shared segment are projected onto the original line, no spurious node', () => {
+  const rect = poly([[0, 0], [200, 0], [200, 100], [0, 100]]), tri = poly([[50, 0], [150, 0], [100, -50]]);
+  const { out } = rebuiltWith(rect, tri, 0, [50, 0]);
+  expect(nodesOf(out)).toBe(4);
+  expect(out.some((s) => s.c !== 'Z' && s.p[s.p.length - 1][0] === 50)).toBe(false);
+  expect(out.filter((s) => s.c === 'L')).toHaveLength(4); // 200,0 / 200,100 / 0,100 / back to 0,0
+});
+it('projection before the refit, curved: a touching point of another shape stays on the original cubic', () => {
+  const arc = parseSegs('M 0 0 C 0 -60 100 -60 100 0 L 100 60 L 0 60 Z'), tri = poly([[50, -45], [30, -100], [70, -100]]);
+  const { out } = rebuiltWith(arc, tri, 0, [50, -45], [50, -45]);
+  const cubics = out.map((s, i) => (s.c === 'C' ? [out[i - 1].p[out[i - 1].p.length - 1], ...s.p] : null)).filter(Boolean) as Pt[][];
+  expect(cubics).toHaveLength(1);
+  expect(maxGapToCubic(cubics[0], [[0, 0], [0, -60], [100, -60], [100, 0]])).toBeLessThan(1e-6);
+  expect(nodesOf(out)).toBe(4);
 });
 
 // ---- UI: Fill / Cut inside the one entry

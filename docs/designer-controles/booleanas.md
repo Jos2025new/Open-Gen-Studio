@@ -50,7 +50,7 @@ Union, Subtract, Intersect y Exclude (`booleanOp`, `pathBoolean.ts`) y Fix overl
 
 Pruebas: `tests/fix-overlaps.test.ts` («curved segments stay the original curves…», «booleanOp cuts a curve exactly…», «booleanOp keeps untouched curves exactly…») y `tests/path-boolean.test.ts`.
 
-**Corregido** tras revisión independiente: un único cúbico que se cierra sobre sí mismo (t por arista), T-junctions y solapes colineales, orientación por el vértice extremo y guarda de trazados grandes (más de 8000 aristas: Fill pasa a Cut). Test: `tests/fix-overlaps.test.ts`. Ver [pendientes-designer](../pendientes-designer.md), D43.
+**Corregido** tras revisión independiente: un único cúbico que se cierra sobre sí mismo (t por arista), T-junctions y solapes colineales, orientación leída en una cara propia (la que contiene otro contorno del trazado, si no la mayor; no en un vértice) y guarda de trazados grandes (más de 8000 puntos aplanados, no aristas originales: Fill pasa a Cut). Test: `tests/fix-overlaps.test.ts`. Ver [pendientes-designer](../pendientes-designer.md), D43.
 
 ## Shape Builder (`ShapeBuilder.tsx`, `shapeBuilder.ts`)
 
