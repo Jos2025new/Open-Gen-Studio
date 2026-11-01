@@ -133,13 +133,51 @@ function crossings(e: Edge, a: Pt, b: Pt): number[] {
   return out;
 }
 
-/** Cut the path wherever the segment a→b crosses it (crossings within 0.01..0.99 of an edge). */
-export function cutPathAcross(path: Seg[], a: Pt, b: Pt): Seg[][] {
+/** From t on edge `e`, go `d` along the curve (dir +1 forward, -1 back): where it ends, and what is left past the edge's end. */
+function walk(e: Edge, t: number, d: number, dir: 1 | -1): { t: number; left: number } {
+  const N = 64;
+  let prev = edgePoint(e, t), at = t;
+  while (dir > 0 ? at < 1 : at > 0) {
+    const next = dir > 0 ? Math.min(1, at + 1 / N) : Math.max(0, at - 1 / N), p = edgePoint(e, next), step = Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+    if (step >= d) return { t: step > 0 ? at + ((next - at) * d) / step : next, left: 0 };
+    d -= step; at = next; prev = p;
+  }
+  return { t: at, left: d };
+}
+
+/** Ranges per edge that take `half` of curve length out on each side of every cut (they may run into the next edges). */
+function gapRanges(c: Contour, cuts: Array<{ edge: number; t: number }>, half: number): Map<number, Array<[number, number]>> {
+  const out = new Map<number, Array<[number, number]>>(), add = (i: number, r: [number, number]) => out.set(i, [...(out.get(i) ?? []), r]);
+  const n = c.edges.length;
+  for (const k of cuts) {
+    for (const dir of [-1, 1] as const) {
+      let i = k.edge, t = k.t, d = half;
+      for (let guard = 0; guard <= n; guard++) {
+        const r = walk(c.edges[i], t, d, dir);
+        add(i, dir > 0 ? [t, r.t] : [r.t, t]);
+        if (r.left <= 0) break;
+        const j = i + dir;
+        if (j < 0 || j >= n) { if (!c.closed) break; i = (j + n) % n; } else i = j;
+        t = dir > 0 ? 0 : 1; d = r.left;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Cut the path wherever the segment a→b crosses it (crossings within 0.01..0.99 of an edge). `gap` (curve length) is
+ * taken out around each cut, half on each side, so the pieces stand apart like the knife's gap on filled areas.
+ */
+export function cutPathAcross(path: Seg[], a: Pt, b: Pt, gap = 0): Seg[][] {
   // A line that misses returns the path itself: nothing is rewritten, so no undo step and no lost node types.
   if (!contoursOf(path).some((c) => c.edges.some((e) => crossings(e, a, b).length))) return [path];
   return contoursOf(path).flatMap((c) => {
     const cuts = c.edges.flatMap((e, edge) => crossings(e, a, b).map((t) => ({ edge, t })));
-    return cuts.length ? cutContour(c, cuts) : [contourSegs(c.edges, c.closed)];
+    if (!cuts.length) return [contourSegs(c.edges, c.closed)];
+    if (!(gap > 0)) return cutContour(c, cuts);
+    const ranges = gapRanges(c, cuts, gap / 2);
+    return assemble(c.edges.flatMap((e, i) => (ranges.has(i) ? carve(e, ranges.get(i)!) : [e])), c.closed);
   });
 }
 

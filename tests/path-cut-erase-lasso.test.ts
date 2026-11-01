@@ -60,6 +60,29 @@ describe('cutPathAcross', () => {
   it('ignores crossings outside the cutting segment', () => {
     expect(cutPathAcross(line, [50, 5], [50, 10])).toHaveLength(1);
   });
+  it('a gap takes half of it out on each side of the cut', () => {
+    const r = cutPathAcross(line, [50, -10], [50, 10], 10);
+    expect(r).toHaveLength(2);
+    expect(Math.abs(last(r[0])[0] - 45)).toBeLessThan(1e-3);
+    expect(Math.abs(first(r[1])[0] - 55)).toBeLessThan(1e-3);
+  });
+  it('a gap runs past a corner into the next edge, and opens a closed path at both cuts', () => {
+    const r = cutPathAcross(parseSegs('M 0 0 L 4 0 L 4 100'), [-1, 2], [10, 2], 0);
+    expect(r).toHaveLength(2);
+    const g = cutPathAcross(parseSegs('M 0 0 L 4 0 L 4 100'), [0, 10], [10, 10], 20);
+    expect(near(last(g[0]), [4, 0])).toBe(true); // 10 back from (4,10): 10 along the vertical edge, ends at the corner
+    expect(Math.abs(first(g[1])[1] - 20)).toBeLessThan(1e-3);
+    const sq = cutPathAcross(square, [50, -10], [50, 110], 10);
+    expect(sq).toHaveLength(2);
+    for (const p of sq) for (const q of [first(p), last(p)]) expect(Math.abs(Math.abs(q[0] - 50) - 5)).toBeLessThan(1e-3);
+  });
+  it('a gap on a curve is measured along the curve', () => {
+    const arc = parseSegs('M 0 0 C 0 50 100 50 100 0');
+    const [a, b] = cutPathAcross(arc, [50, -10], [50, 100], 20);
+    const gapStraight = Math.hypot(first(b)[0] - last(a)[0], first(b)[1] - last(a)[1]);
+    expect(gapStraight).toBeGreaterThan(19);
+    expect(gapStraight).toBeLessThan(20.01);
+  });
 });
 
 describe('nearestOnPath', () => {

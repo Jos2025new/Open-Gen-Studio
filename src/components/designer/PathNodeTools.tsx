@@ -10,6 +10,7 @@ import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
 import { bandScreenPoints, eraseFilled, isFilledArea, knifeFilled } from './areaTools';
+import { useStore } from '../../store/store';
 import '../../styles/path-tools.css';
 
 const CUT_REACH = 12; // screen px from the path that a hover or click still counts as on it
@@ -18,7 +19,9 @@ export const MARK = 9; // half length of the cut mark, screen px
 /** Cut a path at one point, or along a line: the pieces replace it in one undo step. False when nothing was cut. */
 export function cutShape(sessionId: string, docId: string, layerId: string, shape: VectorShape, how: { at: PathHit } | { across: [Pt, Pt] }): boolean {
   if ('across' in how && isFilledArea(shape)) return knifeFilled(sessionId, docId, layerId, shape, how.across);
-  const segs = pageSegs(shape), out = 'at' in how ? cutPathAt(segs, how.at.segmentIndex, how.at.t) : cutPathAcross(segs, how.across[0], how.across[1]);
+  // The knife's gap on an outline is the space you see: round and square caps reach past each end, so they come out too.
+  const gap = useStore.getState().ui.cutGap ?? 0, caps = gap > 0 && shape.stroke && (shape.cap ?? 'round') !== 'butt' ? shape.strokeWidth : 0;
+  const segs = pageSegs(shape), out = 'at' in how ? cutPathAt(segs, how.at.segmentIndex, how.at.t) : cutPathAcross(segs, how.across[0], how.across[1], gap > 0 ? gap + caps : 0);
   const pieces = usablePieces(out);
   if (pieces.length === 1 && out.length === 1 && serializeSegs(pieces[0]) === serializeSegs(segs)) return false;
   if (!pieces.length) return false;

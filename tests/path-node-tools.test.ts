@@ -75,6 +75,18 @@ describe('node tools', () => {
     expect(t.shapes()[0].d).toBe('M 0 0 L 100 0');
   });
 
+  it('the knife gap also opens an outline: the space you see is the gap, round caps included', () => {
+    const ui = useStore.getState().ui;
+    useStore.setState({ ui: { ...ui, cutGap: 10 } });
+    try {
+      const { sid, id, layer, shape, shapes } = setup(); // stroke 4, round caps (default)
+      expect(cutShape(sid, id, layer, shape, { across: [[50, -10], [50, 10]] })).toBe(true);
+      const xs = [...(shapes()[0].d ?? '').matchAll(/-?\d+(\.\d+)?/g)].map((m) => Number(m[0]));
+      expect(xs.some((x) => Math.abs(x - 43) < 0.01)).toBe(true); // 50 - 10/2 - 4/2
+      expect(xs.some((x) => Math.abs(x - 57) < 0.01)).toBe(true);
+    } finally { useStore.setState({ ui }); }
+  });
+
   it('erasing over many samples commits one history entry and keeps the pieces as subpaths', () => {
     const { sid, id, layer, shape, shapes } = setup();
     const e = new EraseSession(sid, id, layer, shape, shapes());
