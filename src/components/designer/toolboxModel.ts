@@ -41,6 +41,11 @@ export function variantKey(variant: ToolboxVariant): string | undefined {
   if (variant.preset || (variant.selectShape && variant.selectShape !== 'rect') || (variant.rulerKind && variant.rulerKind !== 'line')) return undefined;
   return toolKey(variant.tool);
 }
+/** The variant a family button goes to: the remembered one when it still exists and is usable, else the first with a tool. */
+export function entryVariant(family: ToolboxFamily, last?: Record<string, string>): ToolboxVariant | undefined {
+  const remembered = family.variants.find((variant) => variant.id === last?.[family.id]);
+  return remembered?.tool && !remembered.soon ? remembered : family.variants.find((variant) => variant.tool);
+}
 /** A tooltip: the name, then the key when there is one ("Brush  B"). */
 export const withKey = (label: string, key?: string) => key ? `${label}  ${key}` : label;
 

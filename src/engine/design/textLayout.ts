@@ -18,6 +18,38 @@ export function applyLetterSpacing(ctx: CanvasRenderingContext2D, px: number): v
   if ('letterSpacing' in c) c.letterSpacing = `${px}px`;
 }
 
+/** The text as shown: UPPER, lower or Title Case (first letter of each word; the rest as typed). */
+export function applyTextCase(text: string, textCase?: TextLayer['textCase']): string {
+  if (textCase === 'upper') return text.toUpperCase();
+  if (textCase === 'lower') return text.toLowerCase();
+  if (textCase === 'title') return text.replace(/(^|\s)(\p{L})/gu, (_m, sp: string, c: string) => sp + c.toUpperCase());
+  return text;
+}
+
+/** Underline and strikethrough bars of a laid-out text, in page px: the one geometry for canvas and SVG. */
+export function decorationRects(l: TextLayer, t: { lines: string[]; width: number; lineHeightPx: number }, ascent: number): Array<{ x: number; y: number; w: number; h: number }> {
+  if (!l.underline && !l.strike) return [];
+  const ctx = measurer();
+  ctx.font = fontFor(l);
+  applyLetterSpacing(ctx, l.letterSpacing);
+  const thick = Math.max(1, l.fontSize / 16), pad = (t.lineHeightPx - l.fontSize) / 2, out: Array<{ x: number; y: number; w: number; h: number }> = [];
+  t.lines.forEach((line, i) => {
+    const w = ctx.measureText(line).width;
+    if (!line.trim() || w <= 0) return;
+    const ax = l.align === 'center' ? l.x + t.width / 2 : l.align === 'right' ? l.x + t.width : l.x;
+    const x = l.align === 'center' ? ax - w / 2 : l.align === 'right' ? ax - w : ax;
+    const base = l.y + i * t.lineHeightPx + pad + ascent;
+    if (l.underline) out.push({ x, y: base + l.fontSize * 0.1, w, h: thick });
+    if (l.strike) out.push({ x, y: base - l.fontSize * 0.3 - thick / 2, w, h: thick });
+  });
+  return out;
+}
+
+/** Draw the bars on the canvas, in the text's color (fillStyle is already it). */
+export function drawTextDecoration(ctx: CanvasRenderingContext2D, l: TextLayer, t: { lines: string[]; width: number; lineHeightPx: number }): void {
+  if (l.underline || l.strike) for (const r of decorationRects(l, t, textAscent(l))) ctx.fillRect(r.x, r.y, r.w, r.h);
+}
+
 export interface TextLayout {
   lines: string[];
   width: number;
@@ -32,7 +64,7 @@ export function layoutText(l: TextLayer): TextLayout {
   applyLetterSpacing(ctx, l.letterSpacing);
   const maxW = l.width > 0 ? l.width : Infinity;
   const lines: string[] = [];
-  for (const para of l.text.split('\n')) {
+  for (const para of applyTextCase(l.text, l.textCase).split('\n')) {
     const words = para.split(/(\s+)/);
     let line = '';
     for (const w of words) {

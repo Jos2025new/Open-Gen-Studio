@@ -20,12 +20,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 295 | 227 |
+| [types.ts](../src/engine/types.ts) | 297 | 231 |
 | [store.ts](../src/store/store.ts) | 198 | 214 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 91 | 0 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 57 | 4 |
-| [actions.ts](../src/engine/design/actions.ts) | 54 | 29 |
-| [media.ts](../src/lib/media.ts) | 48 | 40 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 58 | 4 |
+| [actions.ts](../src/engine/design/actions.ts) | 55 | 29 |
+| [media.ts](../src/lib/media.ts) | 48 | 41 |
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
 | [ops.ts](../src/engine/ops.ts) | 43 | 17 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
@@ -33,7 +33,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 34 | 24 |
 | [format.ts](../src/lib/format.ts) | 34 | 1 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
-| [id.ts](../src/lib/id.ts) | 32 | 0 |
+| [id.ts](../src/lib/id.ts) | 33 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 28 | 9 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 27 | 12 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 23 | 0 |
@@ -49,26 +49,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
 | `src/components/composer` | 13 | 13 |
-| `src/components/designer` | 63 | 34 |
+| `src/components/designer` | 64 | 34 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
 | `src/components/shell` | 35 | 23 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 20 | 15 |
-| `src/engine` | 60 | 284 |
+| `src/engine` | 60 | 288 |
 | `src/engine/agent` | 53 | 109 |
-| `src/engine/design` | 107 | 129 |
+| `src/engine/design` | 108 | 133 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 295 |
+| `src/lib` | 33 | 296 |
 | `src/store` | 15 | 216 |
 
-181 de 527 módulos no tienen ningún test que los importe directamente.
+181 de 529 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

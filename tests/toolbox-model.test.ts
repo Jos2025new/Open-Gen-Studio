@@ -30,3 +30,15 @@ describe('toolbox model', () => {
     expect(reduceToolboxState(folded, { type: 'family', familyId: 'brush' }).depth).toBe('folded');
   });
 });
+
+describe('toolbox family memory', () => {
+  it('returns to the last variant used, falling back to the first usable one', async () => {
+    const { entryVariant } = await import('../src/components/designer/toolboxModel');
+    const brush = TOOLBOX.find((family) => family.id === 'brush')!;
+    expect(entryVariant(brush)?.id).toBe('brush');
+    expect(entryVariant(brush, { brush: 'lasso' })?.id).toBe('lasso');
+    expect(entryVariant(brush, { brush: 'sculpt' })?.id, 'a soon variant is never remembered').toBe('brush');
+    expect(entryVariant(brush, { brush: 'gone' })?.id).toBe('brush');
+    expect(entryVariant(TOOLBOX.find((family) => family.id === 'layout')!)?.id, 'Sizes has no tool').toBeUndefined();
+  });
+});

@@ -69,7 +69,7 @@ export interface InputSlots {
   refVideos?: { key: string; max: number; min: number; format: ImageInputFormat };
   /** Typed references; replaces `images` and `refVideos`. */
   mixedRefs?: { key: string; max: number; min: number };
-  /** Images pinned to frame positions (FLUX 3: `{ image_url, frame_index }`, 24 fps). Takes every input image. */
+  /** Images pinned to frame positions (FLUX 3, 24 fps). Takes every input image. */
   keyframes?: { key: string; max: number; min: number; imageKey: string; indexKey: string; fps: number };
   /** One audio track: lip-sync / avatar speech (required there) or a soundtrack. */
   audio?: { key: string; required: boolean; format: ImageInputFormat };
@@ -368,7 +368,7 @@ export interface AgentQuestion {
 
 export type StepRef = string; // "s1", "s1#2", "asset:<id>", "layer:<id>"
 
-export interface TextStyle {
+export interface TextStyle extends TextExtras {
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
@@ -378,7 +378,7 @@ export interface TextStyle {
   letterSpacing: number;
 }
 
-import type { ShapeSpec } from './shapeSpec';
+import type { ShapeSpec, TextExtras } from './shapeSpec';
 export type { ShapeSpec };
 
 interface StepBase {

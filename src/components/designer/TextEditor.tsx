@@ -63,6 +63,8 @@ export function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: Vi
         font: `${layer.fontWeight} ${layer.fontSize * z}px ${fontStack(layer.fontFamily)}`,
         lineHeight: `${layer.lineHeight}`,
         letterSpacing: `${layer.letterSpacing * z}px`,
+        textTransform: layer.textCase === 'upper' ? 'uppercase' : layer.textCase === 'lower' ? 'lowercase' : layer.textCase === 'title' ? 'capitalize' : undefined,
+        textDecoration: [layer.underline && 'underline', layer.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
         color: layer.color,
         textAlign: layer.align,
         paddingTop: ((layer.fontSize * layer.lineHeight - layer.fontSize) / 2) * z,

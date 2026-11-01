@@ -13,7 +13,7 @@ import { EditCard, useEditCount } from './EditCard';
 import { ContextStrip } from './ContextStrip';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
-import { initialToolboxState, reduceToolboxState, TOOLBOX, variantKey, withKey, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
+import { entryVariant, initialToolboxState, reduceToolboxState, TOOLBOX, variantKey, withKey, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
 import '../../styles/tool-dock.css';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -70,6 +70,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
   const brushHardness = useStore((state) => state.ui.brush.hardness ?? TIP_PRESETS[0]);
+  const lastVariant = useStore((state) => state.ui.lastVariant);
   const shownFamilies = useMemo(() => restrictToolbox(tools), [tools]);
   const currentFamily = familyFor(shownFamilies, currentTool, currentShape, rulerKind, brushHardness);
   const [dockState, dispatch] = useReducer(reduceToolboxState, initialToolboxState);
@@ -96,7 +97,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     if (desiredId && desiredId !== familyId) dispatch({ type: 'family', familyId: desiredId });
   }, [currentTool, doc.id]);
 
-  const chooseVariant = (variant: ToolboxVariant) => {
+  const chooseVariant = (variant: ToolboxVariant, ownerId = selectedFamily?.id ?? '') => {
     if (variant.soon) return;
     if (!variant.tool) {
       if (variant.action) dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id, open: true });
@@ -111,6 +112,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     if (!variant.also?.includes(useStore.getState().ui.tool)) setUi({ tool: variant.tool });
     if (variant.preset === 'pencil') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[0] } });
     if (variant.preset === 'airbrush') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[3] } });
+    if (ownerId && useStore.getState().ui.lastVariant?.[ownerId] !== variant.id) setUi({ lastVariant: { ...useStore.getState().ui.lastVariant, [ownerId]: variant.id } });
     dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id });
   };
 
@@ -180,11 +182,11 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
             if (designer) announceSidePopup('tools');
             if (stripShown && family.id === currentFamily?.id) { setVariantsAsked(true); if (depth === 'closed') dispatch({ type: 'family', familyId: family.id }); return; }
             if (family.id !== familyId) {
-              const initial = family.variants.find((variant) => variant.tool);
-              if (initial) chooseVariant(initial);
+              const initial = entryVariant(family, lastVariant);
+              if (initial) chooseVariant(initial, family.id);
             }
             dispatch({ type: 'family', familyId: family.id });
-          }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); }, variantKey(family.variants.find((variant) => variant.tool) ?? family.variants[0]))}
+          }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); }, variantKey(entryVariant(family, lastVariant) ?? family.variants[0]))}
         </span>;
         return family.id === 'settings' ? <span key="panels" className="tool-dock-end">
           <span className="tool-dock-separator" aria-hidden="true" />

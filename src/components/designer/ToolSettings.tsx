@@ -205,6 +205,9 @@ export function TextStyleFields({ value, onChange, compact = false }: { value: T
     {!compact && <>
       <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={value.lineHeight} onChange={(v) => onChange({ lineHeight: v })} />
       <InlineSlider label="Spacing" unit="px" min={-10} max={40} step={0.5} value={value.letterSpacing} onChange={(v) => onChange({ letterSpacing: v })} />
+      <InlineSelect label="Case" value={value.textCase ?? 'none'} options={[{ value: 'none', label: 'As typed' }, { value: 'upper', label: 'UPPER' }, { value: 'lower', label: 'lower' }, { value: 'title', label: 'Title Case' }]} onChange={(v) => onChange({ textCase: v === 'none' ? undefined : v as TextStyle['textCase'] })} />
+      <InlineToggle label="Underline" checked={!!value.underline} onChange={(on) => onChange({ underline: on || undefined })} />
+      <InlineToggle label="Strikethrough" checked={!!value.strike} onChange={(on) => onChange({ strike: on || undefined })} />
     </>}
   </>;
 }

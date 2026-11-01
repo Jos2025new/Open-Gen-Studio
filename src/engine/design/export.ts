@@ -6,7 +6,8 @@ const gradId = (s: VectorShape, side: 'f' | 's') => `g-${xmlEscape(s.id)}-${side
 import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
 import { inkscapePrimAttrs } from './inkscapeShape';
-import { blurFilterSvg, cornerRadii, roundRectPath, strokeLookSvg } from './shapeLook';
+import { decorationRects } from './textLayout';
+import { blurFilterSvg, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
 import { strokeSvg } from './brushTextures';
@@ -57,13 +58,31 @@ function paint(s: VectorShape, strokeWidth: number, fill: string | null | undefi
 export function shapeSvg(s: VectorShape): string {
   // Arrowheads: <marker> definitions beside the shape, attached to its line or path (markers.ts).
   const mk = s.stroke && s.strokeWidth > 0 ? markerSvg(s, `mk-${xmlEscape(s.id)}`, s.stroke, xmlEscape) : { defs: '', attrs: '' };
-  const body = mk.attrs ? shapeBody(s).replace(/\/>$/, ` ${mk.attrs}/>`) : shapeBody(s);
+  const aligned = strokeAlignOf(s) !== 'center' && !!(s.stroke || s.strokeGradient) && s.strokeWidth > 0;
+  const body = aligned ? alignedBody(s) : mk.attrs ? shapeBody(s).replace(/\/>$/, ` ${mk.attrs}/>`) : shapeBody(s);
   // Editable gradients: their <linearGradient>/<radialGradient> definitions sit beside the shape, like its markers.
   const grads = (s.fillGradient ? gradientSvg(s.fillGradient, s, gradId(s, 'f'), xmlEscape) : '') + (s.strokeGradient && s.strokeWidth > 0 ? gradientSvg(s.strokeGradient, s, gradId(s, 's'), xmlEscape) : '');
   const marked = mk.defs || grads ? `<g><defs>${mk.defs}${grads}</defs>${body}</g>` : body;
   if (!s.blur || s.blur <= 0) return marked;
   const id = `blur-${xmlEscape(s.id)}`;
   return `<g filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${marked}</g>`;
+}
+
+/**
+ * Inside / outside stroke: the fill as usual, then a stroke twice as wide cut to the shape (a clipPath) or to everything
+ * else (a mask: white page, black shape). Dashes are halved so they keep their size at the doubled width.
+ */
+function alignedBody(s: VectorShape): string {
+  const id = `sa-${xmlEscape(s.id)}`, big = 1e7;
+  const plain: VectorShape = { ...s, strokeAlign: undefined, };
+  const fillEl = shapeBody({ ...plain, stroke: null, strokeGradient: undefined, dash: undefined });
+  const strokeEl = shapeBody({ ...plain, fill: null, fillGradient: undefined, strokeWidth: s.strokeWidth * 2, dash: s.dash?.map((d) => d / 2), dashOffset: s.dashOffset ? s.dashOffset / 2 : s.dashOffset });
+  let geo = shapeBody({ ...plain, fill: '#000', fillGradient: undefined, fillOpacity: undefined, stroke: null, strokeGradient: undefined, strokeWidth: 0, dash: undefined, paintOrder: undefined });
+  const inside = strokeAlignOf(s) === 'inside';
+  if (inside && s.fillRule === 'evenodd') geo = geo.replace(/^<(\w+) /, '<$1 clip-rule="evenodd" ');
+  const def = inside ? `<clipPath id="${id}">${geo}</clipPath>` : `<mask id="${id}" maskUnits="userSpaceOnUse" x="${-big}" y="${-big}" width="${2 * big}" height="${2 * big}"><rect x="${-big}" y="${-big}" width="${2 * big}" height="${2 * big}" fill="#fff"/>${geo}</mask>`;
+  const stroked = `<g ${inside ? 'clip-path' : 'mask'}="url(#${id})">${strokeEl}</g>`;
+  return `<g><defs>${def}</defs>${s.paintOrder === 'stroke' ? stroked + fillEl : fillEl + stroked}</g>`;
 }
 
 function shapeBody(s: VectorShape): string {
@@ -86,7 +105,8 @@ function shapeBody(s: VectorShape): string {
     if (!w || !h) return `<path d="${roundRectPath({ x, y, w, h }, 0, 0)}" ${paint(s, s.strokeWidth, null)}/>`;
     const r = cornerRadii(s);
     // Dashed: a path from mid top edge, the same the canvas traces (shapeLook.traceRoundRect).
-    if (s.dash?.length && s.stroke && s.strokeWidth > 0) return `<path d="${roundRectPath({ x, y, w, h }, r.rx, r.ry, true)}" ${paint(s, s.strokeWidth)}/>`;
+    if (s.dash?.length && s.stroke && s.strokeWidth > 0) return `<path d="${roundRectPath({ x, y, w, h }, r.rx, r.ry, true, s.smooth)}" ${paint(s, s.strokeWidth)}/>`;
+    if (s.smooth && r.rx > 0 && r.ry > 0) return `<path d="${roundRectPath({ x, y, w, h }, r.rx, r.ry, false, s.smooth)}" ${paint(s, s.strokeWidth)}/>`;
     return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${r.rx > 0 && r.ry > 0 ? ` rx="${n(r.rx)}"${r.ry !== r.rx ? ` ry="${n(r.ry)}"` : ''}` : ''} ${paint(s, s.strokeWidth)}/>`;
   }
   if (s.type === 'ellipse') {
@@ -102,7 +122,9 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
   const pad = (t.lineHeightPx - l.fontSize) / 2;
   const spans = t.lines.map((line, i) => `<tspan x="${n(ax)}" y="${n(l.y + i * t.lineHeightPx + pad + ascent)}">${xmlEscape(line)}</tspan>`).join('');
   const spacing = l.letterSpacing ? ` letter-spacing="${n(l.letterSpacing)}"` : '';
-  return `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}" fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
+  const bars = decorationRects(l, t, ascent).map((r) => `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" fill="${xmlEscape(l.color)}"/>`).join('');
+  const el = `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}" fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
+  return bars ? `<g>${el}${bars}</g>` : el;
 }
 
 export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {

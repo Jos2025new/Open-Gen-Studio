@@ -37,6 +37,8 @@ export interface ShapeSpec {
   radius: number;
   rx?: number;
   ry?: number;
+  /** Corner smoothing of a rectangle, 0–1 (the iOS squircle; design/shapeLook.ts). Absent = round corners as before. */
+  smooth?: number;
   join?: 'miter' | 'round' | 'bevel';
   cap?: 'butt' | 'round' | 'square';
   miter?: number;
@@ -45,6 +47,8 @@ export interface ShapeSpec {
   dashOffset?: number;
   /** Even-odd fill rule (SVG fill-rule); absent = nonzero. */
   fillRule?: 'evenodd';
+  /** Stroke alignment on closed shapes (rect, ellipse, closed path); absent = centered on the edge, as before. */
+  strokeAlign?: 'inside' | 'outside';
   /** 'stroke': stroke painted under the fill. */
   paintOrder?: 'stroke';
   /** Gaussian blur σ in page px (Inkscape's stdDeviation); the panel shows it as Inkscape's blur %. */
@@ -63,4 +67,11 @@ export interface ShapeSpec {
   markerEnd?: MarkerKind;
   /** Stroke width follows the shape's scale (paths); absent = the stroke keeps its width when scaled. */
   scaleStroke?: boolean;
+}
+
+/** Optional text-style fields (absent = off / as typed, so older text is unchanged); see design/textLayout.ts. */
+export interface TextExtras {
+  underline?: boolean;
+  strike?: boolean;
+  textCase?: 'upper' | 'lower' | 'title';
 }

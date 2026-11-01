@@ -13,6 +13,7 @@ import { InlineToggle } from './InlineControls';
 import { NodeDoneButton, NodeModeButtons, NodeMoreMenu } from './NodeEditBar';
 import { patchShape, ShapeLookFields, usePickedShape } from './ShapeLookFields';
 import { PaintSwatch, ShapeParams } from './ShapePaint';
+import { ShapeMoreMenu } from './ShapeMoreMenu';
 import { editShape, setShapeEdit, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { useLayerSelection } from '../../engine/design/selection';
 import { multiLayerRectangles } from '../../engine/design/multiRectEdit';
@@ -97,6 +98,7 @@ export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: 
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="fill" />
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="stroke" />
         {editShapeButton}
+        <ShapeMoreMenu sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape as VectorShape} />
       </> : <>
         <ShapeParams sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="fill" />

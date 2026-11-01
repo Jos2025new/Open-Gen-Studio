@@ -6,7 +6,7 @@ import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape } from '../types';
 import { shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
-import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
+import { BLUR_MARGIN, blurRegion, cornerRadii, rectBox, strokeAlignOf, strokeShape, traceRoundRect } from './shapeLook';
 import { drawShapeMarkers } from './markers';
 import { gradientStyle } from './gradientPaint';
 import { bufferVersion, cloneCanvas, getBuffer, getRasterSurface, paintingLive, rasterBufferIds, redrawSoon } from './raster';
@@ -54,7 +54,7 @@ export const BLEND_MODES = Object.keys(GCO) as BlendMode[];
 export const PIXEL_VIEW_FROM = 4;
 
 export { layoutText, textAscent, type TextLayout } from './textLayout';
-import { applyLetterSpacing, fontFor, layoutText } from './textLayout';
+import { applyLetterSpacing, drawTextDecoration, fontFor, layoutText } from './textLayout';
 
 export { alphaBounds, pixelBox } from './rasterBounds';
 
@@ -113,18 +113,20 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
     // A turned or skewed rectangle or ellipse: drawn in its own coordinates (shapeTransform.ts).
     if (s.rot) { const m = shapeMatrix(s); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); }
     ctx.beginPath();
+    // Inside / outside strokes clip to the shape: it needs a path of its own.
+    const t: Path2D | CanvasRenderingContext2D = strokeAlignOf(s) === 'center' ? ctx : (p = new Path2D());
     if (s.type === 'rect') {
       const r = cornerRadii(s), b = rectBox(s);
       // A shape from before Rx/Ry keeps the native round rect it was always drawn with, pixel for pixel.
       const dashed = !!s.dash?.length && !!s.stroke && s.strokeWidth > 0;
-      if (s.rx == null && s.ry == null && !dashed) ctx.roundRect(b.x, b.y, b.w, b.h, r.rx);
-      else traceRoundRect(ctx, b, r.rx, r.ry, dashed);
-    } else if (s.type === 'ellipse') ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
+      if (s.rx == null && s.ry == null && !dashed && !s.smooth) t.roundRect(b.x, b.y, b.w, b.h, r.rx);
+      else traceRoundRect(t, b, r.rx, r.ry, dashed, s.smooth);
+    } else if (s.type === 'ellipse') t.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
     else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h); }
   }
   const a0 = ctx.globalAlpha;
   const fill = () => { if ((s.fill || s.fillGradient) && s.type !== 'line') { ctx.fillStyle = s.fillGradient ? gradientStyle(ctx, s.fillGradient, s) : s.fill!; ctx.globalAlpha *= s.fillOpacity ?? 1; if (p) ctx.fill(p, s.fillRule); else ctx.fill(s.fillRule); ctx.globalAlpha = a0; } };
-  const stroke = () => { if ((s.stroke || s.strokeGradient) && s.strokeWidth > 0) { ctx.strokeStyle = s.strokeGradient ? gradientStyle(ctx, s.strokeGradient, s) : s.stroke!; ctx.globalAlpha *= s.strokeOpacity ?? 1; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); ctx.globalAlpha = a0; } };
+  const stroke = () => { if ((s.stroke || s.strokeGradient) && s.strokeWidth > 0) { ctx.strokeStyle = s.strokeGradient ? gradientStyle(ctx, s.strokeGradient, s) : s.stroke!; ctx.globalAlpha *= s.strokeOpacity ?? 1; strokeShape(ctx, s, p, sw); ctx.globalAlpha = a0; } };
   if (s.paintOrder === 'stroke') { stroke(); fill(); } else { fill(); stroke(); }
   if (s.stroke && s.strokeWidth > 0 && (s.type === 'line' || s.type === 'path')) drawShapeMarkers(ctx, s, sw, s.stroke, s.strokeOpacity ?? 1);
 }
@@ -175,6 +177,7 @@ function drawText(ctx: CanvasRenderingContext2D, l: TextLayer): void {
   // Center glyphs vertically inside each line box.
   const pad = (t.lineHeightPx - l.fontSize) / 2;
   t.lines.forEach((line, i) => ctx.fillText(line, ax, l.y + i * t.lineHeightPx + pad));
+  drawTextDecoration(ctx, l, t);
   applyLetterSpacing(ctx, 0);
 }
 

@@ -6,8 +6,9 @@ import { defaultGradient } from '../../engine/design/gradientPaint';
 import { MARKER_KINDS, type MarkerKind } from '../../engine/design/markers';
 import { Popover } from '../ui/Popover';
 import { usePopover } from '../ui/Popover';
-import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
+import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { PrimFields } from './PrimFields';
+import { isClosedShape, strokeAlignOf } from '../../engine/design/shapeLook';
 import { patchShape } from './ShapeLookFields';
 
 /*
@@ -84,6 +85,9 @@ function StrokeOptions({ sessionId, docId, layerId, shape }: { sessionId: string
   const lined = shape.type === 'line' || shape.type === 'path';
   return <>
     <InlineSlider label="Width" unit="px" min={0} max={40} value={shape.strokeWidth} onChange={(v) => set({ strokeWidth: v })} />
+    {isClosedShape(shape)
+      ? <InlineChoice label="Align" value={strokeAlignOf(shape)} options={[{ value: 'inside' as const, label: 'Inside stroke', render: 'Inside' }, { value: 'center' as const, label: 'Center stroke', render: 'Center' }, { value: 'outside' as const, label: 'Outside stroke', render: 'Outside' }]} onChange={(a) => set({ strokeAlign: a === 'center' ? undefined : a })} />
+      : <button type="button" className="opt is-disabled" disabled data-tip="Open paths and lines keep the stroke centered: only closed shapes have an inside">Align · Center</button>}
     {lined && <>
       <InlineSelect label="Start arrow" value={shape.markerStart ?? 'none'} options={MARKER_KINDS} onChange={(v) => set({ markerStart: v as MarkerKind })} />
       <InlineSelect label="End arrow" value={shape.markerEnd ?? 'none'} options={MARKER_KINDS} onChange={(v) => set({ markerEnd: v as MarkerKind })} />

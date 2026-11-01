@@ -139,7 +139,6 @@ export interface UiState extends PageUiPrefs {
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
   lightbox: { assetIds: string[]; index: number; back?: { assetIds: string[]; index: number } } | null;
-  /** Sketch editor over a node's image; saving sets that node's painted-over copy. */
   /** Sketch editor: paint over a node's image (saved to the node), or draw a mask for Edit region / Remove object. */
   sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;
   toasts: Toast[];
@@ -150,6 +149,8 @@ export interface UiState extends PageUiPrefs {
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */
   selectShape?: 'rect' | 'lasso' | 'wand';
+  /** Toolbox: last variant used per family (ids). */
+  lastVariant?: Record<string, string>;
   /** Magic wand, like the bucket: color tolerance, grow, soft edge; how it combines; what it samples. */
   wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
   rulers?: boolean; showGuides?: boolean; lockGuides?: boolean;

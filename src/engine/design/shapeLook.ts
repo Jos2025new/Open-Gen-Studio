@@ -33,13 +33,17 @@ export function cornerRadii(s: Pick<ShapeSpec, 'w' | 'h' | 'radius' | 'rx' | 'ry
 type PathSink = { moveTo(x: number, y: number): void; lineTo(x: number, y: number): void; bezierCurveTo(a: number, b: number, c: number, d: number, x: number, y: number): void; closePath(): void };
 
 /** Trace a rectangle with elliptical corners (cubic Béziers) on a canvas or path; the one geometry for all uses. */
-export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number, fromMid = false): void {
+export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number, fromMid = false, smooth = 0): void {
+  // Corner smoothing (the iOS «squircle»): each corner starts further along the edges, (1 + smooth) times the radius
+  // (never past the middle of the side), and its Bézier handles are longer, so the curve eases in and out of the edge.
+  let k = K;
+  if (smooth > 0 && rx > 0 && ry > 0) { const t = clamp(smooth, 0, 1); rx = Math.min(rx * (1 + t), b.w / 2); ry = Math.min(ry * (1 + t), b.h / 2); k = K + 0.2 * t; }
   const x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
   // Dashed: start and close in the middle of the top edge, never at a corner, where engines differ in how the
   // dash meets the closing join (review: Inkscape squared a corner Chromium rounded).
   if (fromMid) {
     const xm = (x0 + x1) / 2, r = rx > 0 && ry > 0;
-    const kx = rx * K, ky = ry * K;
+    const kx = rx * k, ky = ry * k;
     p.moveTo(xm, y0);
     if (!r) { p.lineTo(x1, y0); p.lineTo(x1, y1); p.lineTo(x0, y1); p.lineTo(x0, y0); p.lineTo(xm, y0); p.closePath(); return; }
     p.lineTo(x1 - rx, y0); p.bezierCurveTo(x1 - rx + kx, y0, x1, y0 + ry - ky, x1, y0 + ry);
@@ -49,7 +53,7 @@ export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number, from
     p.lineTo(xm, y0); p.closePath(); return;
   }
   if (rx <= 0 || ry <= 0) { p.moveTo(x0, y0); p.lineTo(x1, y0); p.lineTo(x1, y1); p.lineTo(x0, y1); p.closePath(); return; }
-  const kx = rx * K, ky = ry * K;
+  const kx = rx * k, ky = ry * k;
   p.moveTo(x0 + rx, y0);
   p.lineTo(x1 - rx, y0); p.bezierCurveTo(x1 - rx + kx, y0, x1, y0 + ry - ky, x1, y0 + ry);
   p.lineTo(x1, y1 - ry); p.bezierCurveTo(x1, y1 - ry + ky, x1 - rx + kx, y1, x1 - rx, y1);
@@ -59,9 +63,9 @@ export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number, from
 }
 
 /** The same rectangle as SVG path data (so it also survives rotation and skew). */
-export function roundRectPath(b: Box, rx: number, ry: number, fromMid = false): string {
+export function roundRectPath(b: Box, rx: number, ry: number, fromMid = false, smooth = 0): string {
   const d: string[] = [];
-  traceRoundRect({ moveTo: (x, y) => d.push(`M ${x} ${y}`), lineTo: (x, y) => d.push(`L ${x} ${y}`), bezierCurveTo: (...c) => d.push(`C ${c.join(' ')}`), closePath: () => d.push('Z') }, b, rx, ry, fromMid);
+  traceRoundRect({ moveTo: (x, y) => d.push(`M ${x} ${y}`), lineTo: (x, y) => d.push(`L ${x} ${y}`), bezierCurveTo: (...c) => d.push(`C ${c.join(' ')}`), closePath: () => d.push('Z') }, b, rx, ry, fromMid, smooth);
   return d.join(' ');
 }
 
@@ -145,14 +149,44 @@ export function scaleLook(s: ShapeSpec, sx: number, sy: number): Partial<ShapeSp
 }
 
 /** Canvas stroke settings. Old shapes (no join/cap) keep the round look they always had. */
-export function applyStrokeLook(ctx: CanvasRenderingContext2D, s: ShapeSpec, width: number): void {
-  ctx.lineWidth = width;
+export function applyStrokeLook(ctx: CanvasRenderingContext2D, s: ShapeSpec, width: number, drawWidth = width): void {
+  ctx.lineWidth = drawWidth;
   ctx.lineJoin = s.join ?? 'round';
   ctx.lineCap = s.cap ?? 'round';
   ctx.miterLimit = s.miter ?? MITER_DEFAULT;
   // Dashes are in stroke widths (Inkscape's default), so they keep their rhythm when the width changes.
   ctx.setLineDash(s.dash?.length ? s.dash.map((d) => Math.max(0, d) * width) : []);
   ctx.lineDashOffset = (s.dashOffset ?? 0) * width;
+}
+
+/** A shape whose outline closes: rectangle, ellipse, or a path ending in Z. Lines and open paths have no inside. */
+export function isClosedShape(s: Pick<ShapeSpec, 'type' | 'd'>): boolean {
+  return s.type === 'rect' || s.type === 'ellipse' || (s.type === 'path' && /z\s*$/i.test(s.d ?? ''));
+}
+/** Stroke alignment as drawn: only closed shapes can leave the center. */
+export function strokeAlignOf(s: Pick<ShapeSpec, 'type' | 'd' | 'strokeAlign'>): 'center' | 'inside' | 'outside' {
+  return s.strokeAlign && isClosedShape(s) ? s.strokeAlign : 'center';
+}
+
+/**
+ * Inside / outside stroke (Figma): the stroke is drawn twice as wide and cut to the shape (inside) or to everything
+ * but the shape (outside; a rectangle larger than any canvas plus the shape, even-odd), so the visible band is one width.
+ */
+function strokeAligned(ctx: CanvasRenderingContext2D, s: ShapeSpec, p: Path2D, sw: number, align: 'inside' | 'outside'): void {
+  ctx.save();
+  if (align === 'inside') ctx.clip(p, s.fillRule);
+  else { const o = new Path2D(); o.addPath(p); o.rect(-1e7, -1e7, 2e7, 2e7); ctx.clip(o, 'evenodd'); }
+  applyStrokeLook(ctx, s, sw, sw * 2);
+  ctx.stroke(p);
+  ctx.restore();
+}
+
+/** Stroke the shape's path (or the current path when `p` is absent) with its look and alignment; `sw` is the width in the path's own units. */
+export function strokeShape(ctx: CanvasRenderingContext2D, s: ShapeSpec, p: Path2D | undefined, sw: number): void {
+  const align = strokeAlignOf(s);
+  if (align !== 'center') { strokeAligned(ctx, s, p!, sw, align); return; }
+  applyStrokeLook(ctx, s, sw);
+  if (p) ctx.stroke(p); else ctx.stroke();
 }
 
 /** SVG stroke attributes beyond colour and width. */
@@ -166,7 +200,10 @@ export function strokeLookSvg(s: ShapeSpec, width: number): string {
 export function strokeReach(s: ShapeSpec): number {
   if (!s.stroke || s.strokeWidth <= 0) return 0;
   const join = (s.join ?? 'round') === 'miter' ? Math.max(1, s.miter ?? MITER_DEFAULT) : 1, cap = (s.cap ?? 'round') === 'square' ? Math.SQRT2 : 1;
-  return (s.strokeWidth / 2) * Math.max(join, cap);
+  // Inside: nothing past the edge. Outside: the whole width (the drawn stroke is twice as wide, half of it hidden).
+  const align = strokeAlignOf(s);
+  if (align === 'inside') return 0;
+  return (align === 'outside' ? s.strokeWidth : s.strokeWidth / 2) * Math.max(join, cap);
 }
 
 /** The page area a blurred shape paints: its box, the stroke's reach and Inkscape's 2.4σ margin (never empty). */

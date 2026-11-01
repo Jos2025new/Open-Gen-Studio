@@ -301,7 +301,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
             <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => set(s.id, { fill })} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
             <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => set(s.id, { stroke })} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
             <InlineSlider label="Stroke width" unit="px" min={0} max={40} allowManualOverflow value={s.strokeWidth} onChange={(strokeWidth) => set(s.id, { strokeWidth })} />
-            <ShapeLookFields value={s} corners={s.type === 'rect'} blur onChange={(p) => set(s.id, p)} /></div>)}</>;
+            <ShapeLookFields value={s} corners={s.type === 'rect'} smoothing blur onChange={(p) => set(s.id, p)} /></div>)}</>;
         })()}
       </fieldset>
       </details>}

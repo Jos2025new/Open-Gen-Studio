@@ -18,8 +18,8 @@ const DASHES: Array<{ value: string; label: string }> = [
 ];
 
 type Look = Partial<ShapeSpec>;
-export function ShapeLookFields({ value, onChange, corners, stroke = true, blur, compact }: {
-  value: Look; onChange: (patch: Look) => void; corners?: boolean; stroke?: boolean; /** Needs w/h (blur % is relative to the size). */ blur?: boolean; compact?: boolean;
+export function ShapeLookFields({ value, onChange, corners, smoothing, stroke = true, blur, compact }: {
+  value: Look; onChange: (patch: Look) => void; corners?: boolean; /** Corner smoothing (a rectangle already drawn: the next one does not carry it). */ smoothing?: boolean; stroke?: boolean; /** Needs w/h (blur % is relative to the size). */ blur?: boolean; compact?: boolean;
 }) {
   const r = cornerRadii({ w: value.w ?? 1e9, h: value.h ?? 1e9, radius: value.radius ?? 0, rx: value.rx, ry: value.ry });
   const join = value.join ?? 'round', dash = value.dash?.join(' ') ?? '';
@@ -28,6 +28,7 @@ export function ShapeLookFields({ value, onChange, corners, stroke = true, blur,
     {corners && <>
       <InlineSlider label="Rx" unit="px" min={0} max={Math.max(1, Math.round(Math.abs(w) / 2) || 200)} allowManualOverflow value={Math.round(r.rx * 10) / 10} step={0.5} onChange={(rx) => onChange({ rx, ry: value.ry ?? r.ry })} />
       <InlineSlider label="Ry" unit="px" min={0} max={Math.max(1, Math.round(Math.abs(h) / 2) || 200)} allowManualOverflow value={Math.round(r.ry * 10) / 10} step={0.5} onChange={(ry) => onChange({ ry, rx: value.rx ?? r.rx })} />
+      {smoothing && <InlineSlider label="Smoothing" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!r.rx || !r.ry} value={value.smooth ?? 0} onChange={(smooth) => onChange({ smooth: smooth || undefined })} />}
       <button type="button" className="opt" disabled={!r.rx && !r.ry} onClick={() => onChange(SHARP)} data-tip="Make corners sharp (Shift-click a corner handle does the same)">Sharp corners</button>
     </>}
     {blur && <span data-tip="Inkscape's blur: σ = (blur/100)² · (width + height) / 4"><InlineSlider label="Blur" unit="%" min={0} max={100} step={0.1} value={Math.round(blurPercent(value.blur ?? 0, w, h) * 10) / 10} onChange={(p) => onChange({ blur: blurSigma(p, w, h) })} /></span>}

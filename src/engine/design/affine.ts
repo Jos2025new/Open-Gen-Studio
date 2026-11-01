@@ -30,11 +30,11 @@ export function shapeToPath<T extends ShapeSpec>(s: T): T {
     // Rounded corners keep their look (elliptical when Rx ≠ Ry).
     const r = cornerRadii(s);
     // Dashed: from mid top edge, as the rectangle is painted, so the dashes stay where they were.
-    d = roundRectPath({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, r.rx, r.ry, !!s.dash?.length && !!s.stroke && s.strokeWidth > 0);
+    d = roundRectPath({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, r.rx, r.ry, !!s.dash?.length && !!s.stroke && s.strokeWidth > 0, s.smooth);
   }
   const box = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) || 1, h: Math.abs(y1 - y0) || 1 };
   // A turn or skew stays as rot (Inkscape keeps the transform): outline, stroke, dashes and blur are unchanged.
-  return { ...s, type: 'path' as const, d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined } as T;
+  return { ...s, type: 'path' as const, d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined, smooth: undefined } as T;
 }
 
 export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
