@@ -53,8 +53,8 @@ Edit es la herramienta `move`. Su barra (`ToolSettings`, `ToolSettings.tsx:250`)
 | Even vertical gaps | Panel de alinear (`AlignControls.tsx:67`) | Distribuir `v` | Edit card con ≥3 objetos | — | Fila «Distribute» con etiqueta | se mueve | [c11-alinear](../mockups/designer-ajustes/c11-alinear.html) |
 | Fit inside page | Panel de alinear (`AlignControls.tsx:70`) | `fitLayer(…, 'contain')` | Una sola capa raster en modo Layer | Texto del botón visible | Fila «Page» con etiqueta | se mueve | [c11-alinear](../mockups/designer-ajustes/c11-alinear.html) |
 | Fill page | Panel de alinear (`AlignControls.tsx:71`) | `fitLayer(…, 'cover')` | Una sola capa raster en modo Layer | — | Fila «Page» con etiqueta | se mueve | [c11-alinear](../mockups/designer-ajustes/c11-alinear.html) |
-| Boolean (soon) | Edit card › Combine (`toolboxModel.ts:36`) | Ninguno (deshabilitado) | ≥2 objetos | Aviso «Soon» (tooltip); mismo `MULTI_SOON` que el dock | Igual que hoy | se conserva | no dibujado |
-| Form builder (soon) | Edit card › Combine (`toolboxModel.ts:36`) | Ninguno (deshabilitado) | ≥2 objetos | Idem | Igual que hoy | se conserva | no dibujado |
+| Boolean (soon) | Edit card › Combine (`toolboxModel.ts:36`) | Ninguno (deshabilitado) | ≥2 objetos | Estado anterior: aviso «Soon» con `MULTI_SOON`. Superado el 2026-11-01 (`d2ba3496`): ya es el grupo de [booleanas](booleanas.md) | Igual que hoy | se conserva | no dibujado |
+| Form builder (soon) | Edit card › Combine (`toolboxModel.ts:36`) | Ninguno (deshabilitado) | ≥2 objetos | Estado anterior: «Soon». Superado el 2026-11-01: el Shape Builder (Shift+M) está en [booleanas](booleanas.md) | Igual que hoy | se conserva | no dibujado |
 | Encabezado «On N objects/layers» | Panel de alinear y menú Transform (`ToolSettings.tsx:111`) | Ninguno | Con selección | Dice sobre qué actúan | Igual que hoy | se conserva | no dibujado |
 
 ## Enlaces

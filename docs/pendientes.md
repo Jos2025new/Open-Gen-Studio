@@ -158,9 +158,11 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | D33 | Borrar un trazo entero y deshacer no restaura la elección | bajo | 2026-11-01 |
 | D34 | Edición de nodos dentro de Pen (figcraft) | medio | 2026-11-01 |
 | D35 | Bote de pintura por región (figcraft) | medio | 2026-11-01 |
-| D36 | Constructor de formas y booleanas (figcraft) | medio | 2026-11-01 |
 | D37 | Herramienta Width (figcraft) | bajo | 2026-11-01 |
 | D38 | Espaciado de párrafo en el texto | bajo | 2026-11-01 |
+| D39 | Trim, Merge y Crop del pathfinder | bajo | 2026-11-01 |
+| D40 | Booleanas entre capas | medio | 2026-11-01 |
+| D41 | Arrastrar las manijas de Bend | bajo | 2026-11-01 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 

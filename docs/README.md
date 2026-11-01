@@ -47,6 +47,7 @@
 - Toolbox del Designer (un solo dock: familias → variantes → tarjeta de ajustes; Edit sigue la selección): código `src/components/designer/ToolDock.tsx`, `toolboxModel.ts`, `EditCard.tsx`; test `tests/toolbox-dock.test.ts`, `tests/toolbox-model.test.ts`; contrato `designer-toolbox-dock`; ver [propuesta](propuesta-toolbox-dock.md) y [plan](plan-toolbox-dock.md).
 - Toolbox y pestañas (2026-11-01): tecla en tooltip, franja con selección, Properties al elegir: código `ToolDock.tsx`, `usePropsOnPick.ts`; test `tests/tool-dock-strip-and-keys.test.ts`, `tests/designer-props-on-pick.test.ts`; ver [toolbox-dock](designer-controles/toolbox-dock.md).
 - Edición de nodos: Move, Bend, Cut, Erase, Lasso y Más (2026-11-01): código `NodeEditBar.tsx`, `PathNodeTools.tsx`, `nodeEditMode.ts`; test `tests/node-edit-mode.test.ts`, `tests/path-cut-erase-lasso.test.ts`, `tests/path-node-tools.test.ts`; sin prueba visual; ver [nodos-modos](designer-controles/nodos-modos.md).
+- [Booleanas y Shape Builder](designer-controles/booleanas.md) (2026-11-01).
 - [cuota provisional de trazos raster](raster-limit.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
@@ -83,6 +84,7 @@
 - [0023 — Spaces separados de los Workspaces (etapa 1)](decisions/0023-spaces-separados-etapa-1.md).
 - [0024 — Identidad visual: sistema de tarjetas, bases y resaltado (aceptado 2026-10-20; pasos 1 y 2 en `task/workflow-ask-first`)](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md).
 - [0025 — Revisión de la sesión «house party»: número confirmado, revisiones del plan, crédito, cambio de modelo o proveedor y aspecto por entregable (aceptado 2026-10-20)](decisions/0025-revision-sesion-house-party.md).
+- [0026 — Motor de booleanas: Clipper2 (BSL-1.0) y ajuste de curvas (aceptado 2026-11-01)](decisions/0026-motor-booleano.md).
 
 ## Propuestas de interfaz
 

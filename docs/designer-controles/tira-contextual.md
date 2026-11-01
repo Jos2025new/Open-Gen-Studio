@@ -4,7 +4,7 @@ title: Tira contextual (ContextStrip)
 description: La tira de la Edit card y de las tarjetas: qué rama muestra según herramienta y selección, y cada control de esas ramas.
 tags: [designer, contextstrip, nodos, formas]
 updated: 2026-11-01
-related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades, nodos-modos]
+related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades, nodos-modos, booleanas]
 ---
 # Tira contextual (ContextStrip)
 
@@ -51,6 +51,7 @@ related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades
 - **Aparición sola.** Con Edit y una selección real, la tira aparece sin la tarjeta (`ToolDock.tsx:151`); ver [[toolbox-dock]].
 - **Trazos Lineart.** Con trazos Lineart elegidos (de una sola capa vector visible y desbloqueada), la tira muestra el nombre de la capa, Color, Size y Edit nodes (`StrokeEditBar.tsx`); en edición, la fila Move / Bend / Cut / Erase y Done (`StrokeTools.tsx`). Detalle y pruebas en [[nodos-modos]], sección «Lineart: trazos elegidos».
 - **Forma elegida: More.** Junto a Fill y Stroke, el botón «More» (`ShapeMoreMenu.tsx`) abre Outline stroke y Flatten, cada una con un paso de deshacer. Outline stroke convierte el trazo en un relleno (la capa conserva el relleno como forma aparte; ver [[propiedades]]); está disponible solo con trazo centrado (Align = Center) y no con trazo Inside u Outside, que muestra el aviso «set Align to Center first». Flatten convierte la forma en trazado editable, salvo los trazados ya planos. Prueba: `tests/outline-stroke.test.ts`.
+- **Grupo booleano.** Con dos o más formas elegidas en una capa vectorial, la tira (variante `strip`) muestra Union, Subtract, Intersect y Exclude (`BooleanOps.tsx`, montado en `ContextStrip.tsx:113`); la tarjeta de Edit lo monta también con más de una forma (`EditCard.tsx:41`). Divide y Shape Builder están en el chevron. Atajos Ctrl+Alt+U, S, I y E; Shift+M activa el Shape Builder. No aparece con varios paths en edición de nodos (`!multiNodeEdit`). Detalle, reglas y límites en [[booleanas]] · [booleanas.md](booleanas.md). Prueba: `tests/shape-boolean.test.ts`; sin prueba visual.
 
 ## Enlaces
 
@@ -61,4 +62,5 @@ related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades
 - [[toolbox-dock]] · [toolbox-dock.md](toolbox-dock.md)
 - [[capas]] · [capas.md](capas.md)
 - [[propiedades]] · [propiedades.md](propiedades.md)
+- [[booleanas]] · [booleanas.md](booleanas.md)
 - [[README]] · [Índice](README.md)
