@@ -3,8 +3,8 @@ type: inventario
 title: Panel de capas (Layers)
 description: El panel derecho: pestañas, lista de capas, filas, carpetas, barra de acciones, menús, arrastre, selección múltiple y avisos del límite raster.
 tags: [designer, capas, layers, panel]
-updated: 2026-10-28
-related: [propiedades, fx, alinear-editar, documentos, atajos, lienzo-gestos]
+updated: 2026-11-01
+related: [propiedades, fx, alinear-editar, documentos, atajos, lienzo-gestos, toolbox-dock]
 ---
 # Panel de capas (Layers)
 
@@ -61,6 +61,12 @@ related: [propiedades, fx, alinear-editar, documentos, atajos, lienzo-gestos]
 | Límite de trazos: «N/M strokes · P/Q segments» | Bajo una capa raster (`RasterLimitControls.tsx:18`) | Ninguno | Raster en modo Design, con trazos editables o aplanada | Informativo | Igual que hoy | se conserva | no dibujado |
 | Pixels · strokes flattened | Bajo la capa (`RasterLimitControls.tsx:31`) | Ninguno | Capa con `paintFlattened` | Deshacer restaura los trazos | Igual que hoy | se conserva | no dibujado |
 | Disable limit / Enable limit (+ confirmación Cancel / Disable) | Bajo la capa (`RasterLimitControls.tsx:37`) | `patchLayer` {paintLimitDisabled} | Raster no aplanada; deshabilitado si bloqueada | Confirma en popover contextual | Igual que hoy | se conserva | no dibujado |
+
+## Cambio del 2026-11-01: pestaña al elegir capas
+
+- `LayersPanel.tsx:130` llama a `usePropsOnPick(tab, setTab, picked, doc.id)`. Con Edit (`ui.tool === 'move'`) y la pestaña Tool, una selección real nueva abre Properties: objetos elegidos, o varias capas. La capa activa sola no cuenta (cambia al deshacer o al crear una capa). Con otras herramientas, elegir dónde pintar no cambia de pestaña.
+- Layers no cambia: el usuario está gestionando capas. Otras herramientas tampoco cambian la pestaña, porque elegir dónde pintar no es editar un objeto. Vaciar la selección o cambiar solo la pestaña no conmuta.
+- Prueba: `tests/designer-props-on-pick.test.ts` (nueva selección en Tool abre Properties; la primera carga no; Layers y Properties no se mueven; otras herramientas no).
 
 ## Enlaces
 

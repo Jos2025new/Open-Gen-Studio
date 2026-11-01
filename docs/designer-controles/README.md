@@ -35,6 +35,7 @@ Columnas del estado actual: **Control**, **Dónde está hoy** (superficie y cont
 | Tamaño de página | [[tamanos]] · [tamanos.md](tamanos.md) | 13 | 13 | 0 | 0 | Formulario Sizes y su popover |
 | Edit, alinear y transformar | [[alinear-editar]] · [alinear-editar.md](alinear-editar.md) | 44 | 30 | 14 | 0 | Modo Object/Layer, snap, Transform, Align, Distribute |
 | Tira contextual | [[tira-contextual]] · [tira-contextual.md](tira-contextual.md) | 31 | 31 | 0 | 0 | ContextStrip: nodos, forma seleccionada, texto |
+| Edición de nodos: modos y menú Más | [[nodos-modos]] · [nodos-modos.md](nodos-modos.md) | 15 | 15 | 0 | 0 | Move, Bend, Cut, Erase, Lasso, tamaño del borrador, Más, Done y pista |
 | Panel de capas | [[capas]] · [capas.md](capas.md) | 49 | 43 | 6 | 0 | Pestañas, lista, filas, carpetas, acciones, menús |
 | Propiedades de la capa | [[propiedades]] · [propiedades.md](propiedades.md) | 28 | 28 | 0 | 0 | Apariencia, geometría, texto, trazos, formas, avisos de pintura |
 | FX | [[fx]] · [fx.md](fx.md) | 44 | 42 | 2 | 0 | Menú FX y editor de filtros y efectos |
@@ -44,7 +45,7 @@ Columnas del estado actual: **Control**, **Dónde está hoy** (superficie y cont
 | Menús contextuales y popovers | [[menus-contextuales]] · [menus-contextuales.md](menus-contextuales.md) | 19 | 19 | 0 | 0 | Los dos clics derechos y todos los popovers |
 | Gestos del lienzo | [[lienzo-gestos]] · [lienzo-gestos.md](lienzo-gestos.md) | 29 | 29 | 0 | 0 | Stage: gestos, modificadores, asas, cursores |
 | Designer embebido en Studio | [[estudio-embebido]] · [estudio-embebido.md](estudio-embebido.md) | 15 | 15 | 0 | 0 | Barra y menú reducidos del tablero |
-| **Total** | | **601** | **542** | **58** | **1** | |
+| **Total** | | **616** | **557** | **58** | **1** | |
 
 El único `se elimina` es el interruptor «Advanced settings» del panel del pincel, que sustituye el bloque plegable Advanced (misma función). Los controles `nuevo` no son filas de estas matrices (no existen hoy): están en la sección 2 de [[huecos]].
 

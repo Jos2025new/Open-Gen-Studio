@@ -3,8 +3,8 @@ type: inventario
 title: Propiedades de la capa (pestaña Properties)
 description: Apariencia, geometría, texto, trazos y formas de la capa activa, y los avisos de pintura sobre capas con trazos editables.
 tags: [designer, propiedades, capas, geometria]
-updated: 2026-10-28
-related: [capas, fx, texto, formas, tira-contextual, lienzo-gestos]
+updated: 2026-11-01
+related: [capas, fx, texto, formas, tira-contextual, lienzo-gestos, toolbox-dock]
 ---
 # Propiedades de la capa (pestaña Properties)
 
@@ -40,6 +40,11 @@ Todo esto vive en `LayersPanel` (`LayersPanel.tsx:271`) y se deshabilita con la 
 | New layer (aviso) | Aviso (`DrawingChoice.tsx:38`) | `applyDrawingChoice('newLayer')` | Idem | — | Igual que hoy | se conserva | no dibujado |
 | Don't show again | Aviso (`DrawingChoice.tsx:40`) | `setDrawingPreference` (guarda la elección) | Idem | Estado local `remember` hasta elegir | Igual que hoy | se conserva | no dibujado |
 | Close (aviso) | Aviso (`DrawingChoice.tsx:41`>Close}) | `cancelDrawingChoice` (no pinta) | Idem | Esc o clic fuera hacen lo mismo | Igual que hoy | se conserva | no dibujado |
+
+## Cambio del 2026-11-01: entrada automática
+
+- Con Edit, una selección real nueva (objetos o varias capas) abre esta pestaña desde Tool. La lógica está en `usePropsOnPick.ts:9` y se llama desde `LayersPanel.tsx:130`; detalle en [[capas]].
+- Otras herramientas no la abren solas. Prueba: `tests/designer-props-on-pick.test.ts`.
 
 ## Enlaces
 

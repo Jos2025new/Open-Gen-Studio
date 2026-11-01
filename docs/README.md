@@ -45,6 +45,8 @@
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
 - [selección y marquee de Edit por modo](features/designer-selection.md).
 - Toolbox del Designer (un solo dock: familias → variantes → tarjeta de ajustes; Edit sigue la selección): código `src/components/designer/ToolDock.tsx`, `toolboxModel.ts`, `EditCard.tsx`; test `tests/toolbox-dock.test.ts`, `tests/toolbox-model.test.ts`; contrato `designer-toolbox-dock`; ver [propuesta](propuesta-toolbox-dock.md) y [plan](plan-toolbox-dock.md).
+- Toolbox y pestañas (2026-11-01): tecla en tooltip, franja con selección, Properties al elegir: código `ToolDock.tsx`, `usePropsOnPick.ts`; test `tests/tool-dock-strip-and-keys.test.ts`, `tests/designer-props-on-pick.test.ts`; ver [toolbox-dock](designer-controles/toolbox-dock.md).
+- Edición de nodos: Move, Bend, Cut, Erase, Lasso y Más (2026-11-01): código `NodeEditBar.tsx`, `PathNodeTools.tsx`, `nodeEditMode.ts`; test `tests/node-edit-mode.test.ts`, `tests/path-cut-erase-lasso.test.ts`, `tests/path-node-tools.test.ts`; sin prueba visual; ver [nodos-modos](designer-controles/nodos-modos.md).
 - [cuota provisional de trazos raster](raster-limit.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).

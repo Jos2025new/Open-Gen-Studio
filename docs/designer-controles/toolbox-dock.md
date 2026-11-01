@@ -3,8 +3,8 @@ type: inventario
 title: Toolbox dock (familias, variantes, chevron)
 description: La caja de herramientas del Designer: 8 familias, 31 variantes (7 «soon»), chevron, tirador y botón de panel, con su estado y condiciones.
 tags: [designer, toolbox, dock]
-updated: 2026-10-28
-related: [estado-compartido, pincel, seleccion, alinear-editar, guias, tamanos, atajos, estudio-embebido]
+updated: 2026-11-01
+related: [estado-compartido, pincel, seleccion, alinear-editar, guias, tamanos, atajos, estudio-embebido, nodos-modos]
 ---
 # Toolbox dock (familias, variantes, chevron)
 
@@ -73,6 +73,12 @@ Estado local `dockState` (`useReducer`, `toolboxModel.ts:48`): `depth` = `closed
 | Tarjeta: Edit | Tarjeta abierta de la variante Edit (`ToolDock.tsx:133`) | Ver [[alinear-editar]] y [[tira-contextual]] | Variante Edit abierta | Es la única que lleva `ContextStrip`: por eso las ramas de la tira de texto, pincel, borrador y similares son código muerto por lectura, y las de formas del grupo Edit y Select requieren prueba (ver [[tira-contextual]]) | Igual que hoy | se conserva | no dibujado |
 | Tarjeta: ajustes de herramienta | Tarjeta abierta de cualquier variante con herramienta (`ToolDock.tsx:134`) | `ToolSettings` con `card` | Variante abierta | `card` solo cambia Brush/Eraser (tabs); el resto se ve completo, no compacto | Igual que hoy | se conserva | no dibujado |
 | Tarjeta: Sizes / Guides | Tarjeta abierta (`ToolDock.tsx:135`, `ToolDock.tsx:136`) | Ver [[tamanos]], [[guias]] | Variantes Sizes/Guides | Sin `ToolSettings` | Igual que hoy | se conserva | no dibujado |
+
+## Cambios del 2026-11-01
+
+- **Tecla en el tooltip.** Cada icono de variante con herramienta muestra su tecla tras el nombre («Brush  B», dos espacios). La tecla sale de `DESIGN_TOOL_KEYS` por `toolKey` (`engine/shortcuts.ts:7`) y de `variantKey` (`toolboxModel.ts:40`); `withKey` (`toolboxModel.ts:45`) compone el texto (`ToolDock.tsx:46`). El `aria-label` sigue siendo el nombre sin tecla (`ToolDock.tsx:44`). Sin tecla: Pencil, Airbrush, Lasso, Wand, las reglas elíptica y de perspectiva (`variantKey` las deja fuera porque comparten tecla con su herramienta base) y las variantes «soon». Las familias muestran la tecla de su primera variante con herramienta (`ToolDock.tsx:173`). Prueba: `tests/tool-dock-strip-and-keys.test.ts`.
+- **Franja contextual con selección real.** Con Edit y una selección real (objetos elegidos, o más de una capa; `ToolDock.tsx:83`), la tira contextual se muestra sola donde se abriría la tarjeta (`ToolDock.tsx:151`, clase `tool-dock-strip`), con la tarjeta cerrada. Con la tarjeta de Edit abierta no se repite. Sin selección no aparece nada. Prueba: `tests/tool-dock-strip-and-keys.test.ts`.
+- **Modos de nodos.** Con un path en edición, la tira muestra la barra Move / Bend / Cut / Erase / Lasso y Done; detalle en [[nodos-modos]] · [nodos-modos.md](nodos-modos.md).
 
 ## Enlaces
 

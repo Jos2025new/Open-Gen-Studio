@@ -3,8 +3,8 @@ type: inventario
 title: Tira contextual (ContextStrip)
 description: La tira de la Edit card y de las tarjetas: qué rama muestra según herramienta y selección, y cada control de esas ramas.
 tags: [designer, contextstrip, nodos, formas]
-updated: 2026-10-28
-related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades]
+updated: 2026-11-01
+related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades, nodos-modos]
 ---
 # Tira contextual (ContextStrip)
 
@@ -43,6 +43,12 @@ related: [alinear-editar, formas, texto, curva, toolbox-dock, capas, propiedades
 | Follow stroke ruler (interruptor) | Tira (`ContextStrip.tsx:109`) | `ui.strokeRuler.on` (`setRuler`) | Brush o Eraser y hay una guía en este documento — Solo en la tira: «código muerto por lectura (`f11a0dd`; [rastreo 2.6](../rastreo/designer.md)) — requiere decisión y prueba en sandbox» | DUPLICADO con «Snap brush to ruler» ([[regla]]) | Igual que hoy | se conserva | no dibujado |
 | Settings… (botón) | Tira (`ContextStrip.tsx:110`) | Solo evento `ogs:designer-panel`: «props» con texto o forma seleccionados, «tool» en el resto | Siempre salvo hand | Abre el panel derecho, no cambia ajustes | Igual que hoy | se conserva | no dibujado |
 | Rama compact de ToolSettings | Tira (`ContextStrip.tsx:107` compact}) | Según herramienta ([[toolbox-dock]]) | Ninguna de las tres ramas anteriores — Solo en la tira: para Fill, Gradient, Brush, Eraser, Curve, Lineart y Ruler «código muerto por lectura (`f11a0dd`; [rastreo 2.6](../rastreo/designer.md)) — requiere decisión y prueba en sandbox»; para formas del grupo Edit (Rectangle, Ellipse, Line, Polygon) y Select «requiere prueba en sandbox: con la variante Edit abierta, las teclas R, O, L o M cambian la herramienta dentro de la familia Edit sin cambiar de variante (`ToolDock.tsx:60,64-67`), así que `EditCard` puede seguir montado; sin confirmar en ejecución» | Por lectura, solo podrían verla las formas del grupo Edit y Select (requiere prueba); las demás herramientas no llegan | Igual que hoy | se conserva | no dibujado |
+
+## Cambios del 2026-11-01
+
+- **Barra de modos y menú Más.** Con un path en edición, la tira monta `NodeModeButtons` (`ContextStrip.tsx:82`), `NodeMoreMenu` (`ContextStrip.tsx:88`) y `NodeDoneButton` (`ContextStrip.tsx:90`), definidos en `NodeEditBar.tsx` (`:19`, `:30`, `:53`). Las filas de nodo de la tabla (Node, Break, Join, Join with segment, Delete segment, Make line, Make curve, Delete node) ya están dentro del popover Más (`NodeEditBar.tsx:30`); sus líneas `ContextStrip.tsx:88` a `:97` son del estado anterior.
+- **Modos.** Move, Bend, Cut, Erase y Lasso son activos (antes Cut, Erase y Lasso eran «Soon»). El slider del borrador aparece solo en Erase. Detalle y evidencia en [[nodos-modos]] · [nodos-modos.md](nodos-modos.md).
+- **Aparición sola.** Con Edit y una selección real, la tira aparece sin la tarjeta (`ToolDock.tsx:151`); ver [[toolbox-dock]].
 
 ## Enlaces
 

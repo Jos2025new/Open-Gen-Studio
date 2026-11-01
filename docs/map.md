@@ -35,7 +35,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
 | [id.ts](../src/lib/id.ts) | 31 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 28 | 9 |
-| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 24 | 9 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 25 | 10 |
 | [render.ts](../src/engine/design/render.ts) | 23 | 8 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 22 | 0 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 21 | 8 |
@@ -58,7 +58,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 20 | 15 |
 | `src/engine` | 60 | 282 |
 | `src/engine/agent` | 53 | 109 |
-| `src/engine/design` | 105 | 125 |
+| `src/engine/design` | 105 | 126 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |

@@ -4,6 +4,11 @@ Lo que salió de las listas abiertas ([índice](pendientes.md)). Una línea por 
 
 Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se movieron tal cual estaban marcados `[x]`.
 
+## Cerrado el 2026-11-01 (rama `task/gui-compact`)
+
+- **Tecla en el tooltip de la caja, franja con selección y Properties al elegir** (commit `ce97e87c`): los tooltips de variantes leen la tecla de `DESIGN_TOOL_KEYS` («Brush  B»); con Edit y selección real la tira aparece sin tarjeta; con Edit, una selección real nueva (objetos o varias capas) abre Properties y Layers se queda; cortar o borrar sin efecto no deja paso de deshacer (`6e054662`). Evidencia: código `ToolDock.tsx`, `usePropsOnPick.ts`; tests `tests/tool-dock-strip-and-keys.test.ts`, `tests/designer-props-on-pick.test.ts`. Prueba visual: no hecha. Detalle en [toolbox-dock](designer-controles/toolbox-dock.md) y [capas](designer-controles/capas.md).
+- **Modos de edición de nodos** (commits `59e77856` y `025cacba`): barra con palabras Move, Bend, Cut, Erase y Lasso; menú Más con las operaciones de nodos; Done. Cut corta en un punto o a lo largo de una línea, Erase borra con un radio ajustable en un solo deshacer, y Lasso selecciona nodos. Los algoritmos siguen a figcraft (MIT OR Apache-2.0), portados. Evidencia: tests `tests/node-edit-mode.test.ts`, `tests/path-cut-erase-lasso.test.ts`, `tests/path-node-tools.test.ts`; E2E `tests-e2e/path-nodes.spec.ts` sin ejecutar contra el sandbox. Prueba visual del gesto: no hecha. Detalle en [nodos-modos](designer-controles/nodos-modos.md).
+
 ## Cerrado el 2026-10-31 (rama `task/gui-compact`)
 
 - **Atajos del tablero con el foco en el chat** (antes en [pendientes-gui](pendientes-gui.md)): edición de nodos, nudos de forma, teclas del Designer y su portapapeles pasan por un único filtro, `src/components/designer/boardKey.ts`; con el foco en el panel de conversación, el hilo o la columna del chat no actúan sobre el lienzo. Evidencia: `tests/board-key.test.ts` (código y jsdom; sin prueba visual).
