@@ -2,7 +2,7 @@ import { getDoc, patchLayer } from './actions';
 import { objectPick, setObjectPick, setShapeEdit, useObjectSelection } from './objectSelection';
 import type { DesignDoc, Layer } from '../types';
 import type { Stroke } from '../strokeTypes';
-import { cutStroke, eraseStroke, nearestOnStroke } from './strokeCut';
+import { cutStroke, cutStrokeAcross, eraseStroke, nearestOnStroke } from './strokeCut';
 import { bakeStroke } from './strokes';
 
 /* Stroke edit (Lineart strokes picked with Edit → «Edit nodes»): shares ShapeEdit with `strokes: true`, so the transform handles hide and Done / Esc / a tool change leave it. */
@@ -56,6 +56,11 @@ export function cutPickedStrokes(sessionId: string, docId: string, layerId: stri
   }
   const hit = target;
   return !!hit && replace(sessionId, docId, layerId, (s) => (s === hit ? cutStroke(s, x, y, reach + bakeStroke(s).size / 2) : [s]), {});
+}
+
+/** Cut every picked stroke at each crossing of the line a→b (page px); false when it crosses none (no undo step). */
+export function cutPickedStrokesAcross(sessionId: string, docId: string, layerId: string, a: [number, number], b: [number, number]): boolean {
+  return replace(sessionId, docId, layerId, (s) => cutStrokeAcross(s, a, b), {});
 }
 
 /** Rub a circle out of the picked strokes (page px). The first change records the undo step; pass `record: false` afterwards. */

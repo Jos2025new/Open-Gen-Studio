@@ -10,3 +10,9 @@
 .path-tools .erase-ring { fill: none; stroke: var(--text); stroke-width: 1; pointer-events: none; }
 .path-tools .erase-halo { fill: none; stroke: var(--surface); stroke-width: 3; opacity: 0.8; pointer-events: none; }
 .path-tools .lasso-loop { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+/* Bend: the segment under the pointer is outlined in the accent colour; the cursor is a small curve. */
+.path-nodes .bend-hl { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; fill: none; pointer-events: none; }
+.path-nodes.is-bend .segment-hit { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 19C8 4 16 4 21 19' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M3 19C8 4 16 4 21 19' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair; }
+.path-nodes.is-bend .path-node { cursor: crosshair; }
+.path-tools .influence-ring { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 3; pointer-events: none; }
+.path-tools .influence-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; pointer-events: none; }

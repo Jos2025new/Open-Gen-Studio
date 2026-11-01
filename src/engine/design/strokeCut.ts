@@ -44,6 +44,34 @@ export function cutStroke(s: Stroke, x: number, y: number, reach: number): Strok
   return [strokePiece(b, head), strokePiece(b, tail)];
 }
 
+/**
+ * Cut a stroke at every place where it crosses the line a→b (page coordinates): the pieces keep the style, the new
+ * points are interpolated (x, y, pressure), the new ends are blunt. No crossing, or nothing usable left, returns `[s]`.
+ */
+export function cutStrokeAcross(s: Stroke, a: [number, number], b: [number, number]): Stroke[] {
+  const base = bakeStroke(s), pts = base.points, rx = b[0] - a[0], ry = b[1] - a[1], out: P3[][] = [];
+  if (pts.length < 2 || Math.hypot(rx, ry) < EPS) return [s];
+  let cur: P3[] = [pts[0]];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const p = pts[i], q = pts[i + 1], dx = q[0] - p[0], dy = q[1] - p[1], den = dx * ry - dy * rx;
+    const cuts: number[] = [];
+    if (Math.abs(den) > EPS) {
+      // p + t·d = a + u·r, t in [0, 1) so a crossing on a shared vertex counts once.
+      const t = ((a[0] - p[0]) * ry - (a[1] - p[1]) * rx) / den, u = ((a[0] - p[0]) * dy - (a[1] - p[1]) * dx) / den;
+      if (t >= 0 && t < 1 && u >= 0 && u <= 1) cuts.push(t);
+    }
+    for (const t of cuts) {
+      const at = t === 0 ? p : lerp(p, q, t);
+      if (at !== cur[cur.length - 1]) cur.push(at);
+      out.push(cur); cur = [at];
+    }
+    cur.push(q);
+  }
+  out.push(cur);
+  const pieces = out.filter((c) => c.length >= 2);
+  return out.length < 2 || pieces.length < 2 ? [s] : pieces.map((c) => strokePiece(base, c));
+}
+
 /** Parameter interval of segment a→b inside the circle (open), or null. */
 function inside(a: P3, b: P3, c: [number, number], r: number): [number, number] | null {
   const dx = b[0] - a[0], dy = b[1] - a[1], fx = a[0] - c[0], fy = a[1] - c[1];

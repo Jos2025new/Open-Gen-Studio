@@ -12,7 +12,7 @@ import { layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
 import '../../styles/path-tools.css';
 
 const CUT_REACH = 12; // screen px from the path that a hover or click still counts as on it
-const MARK = 9; // half length of the cut mark, screen px
+export const MARK = 9; // half length of the cut mark, screen px
 
 /** Cut a path at one point, or along a line: the pieces replace it in one undo step. False when nothing was cut. */
 export function cutShape(sessionId: string, docId: string, layerId: string, shape: VectorShape, how: { at: PathHit } | { across: [Pt, Pt] }): boolean {
