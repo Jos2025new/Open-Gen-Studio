@@ -81,7 +81,7 @@
 .edit-card > .tool-setting { align-self: flex-start; }
 .tool-dock-end { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 /* In the composer the bar itself is the toolbox (mockup): one box, the row and card as wide as it, icons spread along it. */
-.composer:has(.composer-tools-bar) { position: relative; padding: 6px 8px; }
+.composer:has(.composer-tools-bar) { position: relative; padding: 9px 8px 8px; } /* the same insets around the + as the prompt box in Studio and Nodes */
 .composer-tools-bar { position: static; }
 .composer-tools-bar .tool-dock { position: static; flex: 1 1 auto; width: auto; }
 .composer-tools-bar .designer-palette.is-docked { display: flex; flex: 1 1 auto; min-width: 0; }
