@@ -101,7 +101,7 @@ it('Nodes keeps the floating prompt box; Create attaches through its picker; the
   expect(css).toMatch(/body:has\(\.canvas-nav-pop, \.node-lib-pop\) \.react-flow__panel\.node-side, \.react-flow:has\(\.canvas-map\) \.react-flow__panel\.node-side \{ display: none; \}/);
   const node = readFileSync('src/styles/node.css', 'utf8');
   expect(node).toMatch(/:root \{ --canvas-pop-gap: 6px; \}/);
-  expect(node).toMatch(/\.popover\.node-lib-pop, \.popover\.canvas-nav-pop \{ margin-left: calc\(var\(--canvas-pop-gap\) - 1px\); border-color: var\(--panel-line\); border-radius: var\(--toolbar-radius\); \}/);
+  expect(node).toMatch(/\.popover\.node-lib-pop, \.popover\.canvas-nav-pop, \.popover\.designs-pop \{ margin-left: calc\(var\(--canvas-pop-gap\) - 1px\); border-color: var\(--panel-line\); border-radius: var\(--toolbar-radius\); \}/);
   expect(css).toMatch(/\.react-flow__panel\.node-side \{ left: calc\(var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 2px \+ var\(--canvas-pop-gap\)\);/);
   expect(css).toMatch(/\.react-flow__panel\.node-side \{[^}]*max-height: calc\(100% - var\(--composer-height, 120px\) - 60px\);[^}]*border: 1px solid var\(--panel-line\); border-radius: var\(--toolbar-radius\)/);
 });

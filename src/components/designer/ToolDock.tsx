@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
-import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
@@ -45,8 +45,11 @@ function restrictToolbox(tools?: ReadonlySet<DesignTool>): ToolboxFamily[] {
   return TOOLBOX.map((family) => ({ ...family, variants: family.variants.filter((variant) => variant.tool && tools.has(variant.tool)) })).filter((family) => family.variants.length > 0);
 }
 
-/** `vertical`: the same strip turned upright (the Designer's side toolbox); arrows Up and Down also move along it. */
-export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean }) {
+/**
+ * `vertical`: the same strip turned upright (the Designer's side toolbox): variants in a column and the card at their right,
+ * the grip under the card; arrows Up and Down also move along it. `place`: a button after the panel buttons (where the toolbox sits).
+ */
+export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false, place }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean; place?: ReactNode }) {
   const currentTool = useStore((state) => state.ui.tool);
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
@@ -102,7 +105,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     event.stopPropagation();
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); return; }
     event.preventDefault();
-    setHeightFrom(height + (event.key === 'ArrowUp' ? 16 : -16));
+    setHeightFrom(height + (event.key === (vertical ? 'ArrowDown' : 'ArrowUp') ? 16 : -16));
   };
 
   return <div className={vertical ? 'tool-dock is-vertical' : 'tool-dock'} style={{ '--tool-dock-card-height': `${height}px` } as CSSProperties} onKeyDown={(event) => {
@@ -113,21 +116,21 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     if (familyId) familyButtons.current.get(familyId)?.focus();
   }}>
     <div className="tool-dock-stack">
-      {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
+      {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
           return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant))}</span>;
         })}
         {!selectedVariant?.soon && <><span className="tool-dock-grow" />
         <button type="button" className="icon-btn icon-btn-md tone-default" aria-label={depth === 'open' ? 'Hide tool settings' : 'Show tool settings'} aria-expanded={depth === 'open'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily.id })}>
-          {depth === 'open' ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          {depth === 'open' ? (vertical ? <ChevronLeft size={16} /> : <ChevronDown size={16} />) : (vertical ? <ChevronRight size={16} /> : <ChevronUp size={16} />)}
         </button></>}
       </div>}
       {depth === 'open' && selectedVariant && !selectedVariant.soon && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
         <button type="button" className="tool-dock-grip" role="separator" aria-orientation="horizontal" aria-label="Resize tool settings" tabIndex={0} onKeyDown={onGripKey} onPointerDown={(event) => {
           const startY = event.clientY; const startHeight = height; const el = event.currentTarget;
           el.setPointerCapture(event.pointerId);
-          const move = (next: PointerEvent) => setHeightFrom(startHeight + startY - next.clientY);
+          const move = (next: PointerEvent) => setHeightFrom(startHeight + (vertical ? next.clientY - startY : startY - next.clientY));
           const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); };
           el.addEventListener('pointermove', move); el.addEventListener('pointerup', up, { once: true });
         }}><GripHorizontal size={14} /></button>
@@ -157,6 +160,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           <span className="tool-dock-separator" aria-hidden="true" />
           <IconButton icon={Layers} label="Show or hide right panel" size="md" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
           {button}
+          {place}
         </span> : button;
       })}
     </div>

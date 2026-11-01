@@ -134,13 +134,21 @@
 .brush-tip-fields { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0; }
 /* Designer, toolbox outside the prompt box (ToolPalette): the same strip turned upright at the left, the canvas view under
    it in one frame; variants and the settings card open at its right, aligned to its top, like the Nodes toolbox menus. */
-.designer-side { position: absolute; z-index: 10; left: 16px; top: 66px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.designer-side { position: absolute; z-index: 10; left: 16px; top: 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
 .designer-side .designer-palette.is-side { position: static; max-width: none; }
 .designer-side .tool-dock.is-vertical { width: auto; align-items: center; }
 .designer-side .tool-dock-family, .designer-side .tool-dock-end { flex-direction: column; width: auto; padding: 0; overflow: visible; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .designer-side .tool-dock-separator { width: 20px; height: 1px; margin: 4px 0; }
-.designer-side .designer-palette.is-side .tool-dock-stack { left: calc(100% + var(--toolbar-padding) + 1px + var(--canvas-pop-gap)); right: auto; top: calc(-1 * var(--toolbar-padding) - 1px); bottom: auto; width: min(560px, calc(100vw - var(--layers-w, 260px) - 120px)); }
+.designer-side .designer-palette.is-side .tool-dock-stack { left: calc(100% + var(--toolbar-padding) + 1px + var(--canvas-pop-gap)); right: auto; top: calc(-1 * var(--toolbar-padding) - 1px); bottom: auto; width: auto; flex-direction: row; align-items: flex-start; gap: var(--canvas-pop-gap); }
+/* Vertical popups: the variants as a column (Settings chevron at its foot), the card at their right with the grip at its foot. */
+.designer-side .tool-dock-variants { flex-direction: column; width: auto; overflow: visible; }
+.designer-side .tool-dock-card { width: min(520px, calc(100vw - var(--layers-w, 260px) - 170px)); }
+.designer-side .tool-dock-grip { order: 2; position: sticky; bottom: 0; background: var(--surface); }
 .designer-side .designer-palette .icon-btn.is-active::after { top: 8px; bottom: 8px; left: -5px; right: auto; width: 2px; height: auto; }
 .designer-side .designer-view { position: static; padding: 6px 0 0; border: 0; border-top: 1px solid var(--panel-line); border-radius: 0; background: transparent; box-shadow: none; }
-.designer:has(.designer-side) .document-picker { left: 16px; }
+/* Side toolbox: the design picker is its first button, a popup at its right (ToolPalette). */
+.designer:has(.designer-side) .document-picker { display: none; }
+.popover.designs-pop { width: 212px; }
+body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
+.designs-pop .document-picker-panel { width: 100%; max-height: min(70vh, 560px); margin: 0; padding: 6px; }
 .ws-designer:has(.designer-side) { --designer-dock-left: max(84px, min(calc(50% - 400px), calc(100% - var(--layers-w, 260px) - 824px))); }

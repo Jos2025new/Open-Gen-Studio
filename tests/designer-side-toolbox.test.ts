@@ -52,13 +52,36 @@ it('arrows Up and Down move along the upright strip; Left and Right still work',
   await done();
 });
 
-it('integrated (in the prompt box) or separate (upright at the left, with the canvas view in its frame): both modes stay', () => {
+it('upright, the popups are vertical too: variants in a column, the chevron points right, the grip resizes downward', async () => {
+  const { host, done } = await render(true, 'Brush');
+  expect(host.querySelector('[aria-label="Brush variants"]')?.getAttribute('aria-orientation')).toBe('vertical');
+  expect(host.querySelector('.lucide-chevron-right')).not.toBeNull();
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Show tool settings"]')?.click());
+  expect(host.querySelector('.lucide-chevron-left')).not.toBeNull();
+  const grip = host.querySelector<HTMLButtonElement>('[aria-label="Resize tool settings"]')!;
+  const card = () => host.querySelector<HTMLElement>('.tool-dock')!.style.getPropertyValue('--tool-dock-card-height');
+  const before = card();
+  act(() => { grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); });
+  expect(parseInt(card())).toBe(parseInt(before) + 16);
+  await done();
+});
+
+it('the place button sits right after the panel buttons, in both places; Studio passes none', () => {
+  const dock = readFileSync('src/components/designer/ToolDock.tsx', 'utf8');
+  expect(dock).toMatch(/\{button\}\s*\{place\}\s*<\/span> : button;/);
+  expect(readFileSync('src/components/studio/EmbeddedDesignerBar.tsx', 'utf8')).not.toContain('place=');
+});
+
+it('integrated (in the prompt box) or separate (upright at the left, with the designs and the canvas view in its frame): both modes stay', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
   expect(palette).toMatch(/if \(docked\) return viewBar;/);
-  expect(palette).toMatch(/\{view\}\s*<IconButton icon=\{docked \? PanelLeft : PanelBottom\} label=\{docked \? 'Toolbox at the side' : 'Toolbox in the prompt box'\} size="sm" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
-  expect(palette).toMatch(/<div className="designer-side">\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical \/>\s*<\/div>\s*\{viewBar\}/);
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<div className="designer-palette is-docked"><ToolDock sessionId=\{sessionId\} doc=\{designDoc\} \/><\/div>/);
+  expect(palette).toMatch(/<IconButton icon=\{docked \? PanelLeft : PanelBottom\} label=\{docked \? 'Toolbox at the side' : 'Toolbox in the prompt box'\} size="md" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
+  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical place=\{<DockPlaceButton \/>\} \/>\s*<\/div>\s*\{viewBar\}/);
+  expect(palette).toMatch(/<Popover [^>]*placement="right-start"[^>]*className="designs-pop">\s*<DocumentChoices /);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<div className="designer-palette is-docked"><ToolDock sessionId=\{sessionId\} doc=\{designDoc\} place=\{<DockPlaceButton \/>\} \/><\/div>/);
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
-  expect(css).toMatch(/\.designer-side \.designer-palette\.is-side \.tool-dock-stack \{ left: calc\(100% \+ var\(--toolbar-padding\) \+ 1px \+ var\(--canvas-pop-gap\)\);[^}]*top: calc\(-1 \* var\(--toolbar-padding\) - 1px\);/);
+  expect(css).toMatch(/\.designer-side \.designer-palette\.is-side \.tool-dock-stack \{ left: calc\(100% \+ var\(--toolbar-padding\) \+ 1px \+ var\(--canvas-pop-gap\)\);[^}]*flex-direction: row;/);
+  expect(css).toMatch(/\.designer:has\(\.designer-side\) \.document-picker \{ display: none; \}/);
+  expect(css).toMatch(/body:has\(\.designs-pop\) \.designer-side \.tool-dock-stack \{ display: none; \}/);
   expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) \{ --designer-dock-left: max\(84px/);
 });

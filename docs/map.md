@@ -23,7 +23,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/types.ts) | 289 | 224 |
 | [store.ts](../src/store/store.ts) | 196 | 209 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 90 | 0 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 55 | 4 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 56 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
@@ -85,7 +85,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [LayerUnreadable.tsx](../src/components/designer/LayerUnreadable.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
-- [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
