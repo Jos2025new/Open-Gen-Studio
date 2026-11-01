@@ -55,6 +55,7 @@ it('arrows Up and Down move along the upright strip; Left and Right still work',
 it('integrated (in the prompt box) or separate (upright at the left, with the canvas view in its frame): both modes stay', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
   expect(palette).toMatch(/if \(docked\) return viewBar;/);
+  expect(palette).toMatch(/\{view\}\s*<IconButton icon=\{docked \? PanelLeft : PanelBottom\} label=\{docked \? 'Toolbox at the side' : 'Toolbox in the prompt box'\} size="sm" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
   expect(palette).toMatch(/<div className="designer-side">\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical \/>\s*<\/div>\s*\{viewBar\}/);
   expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<div className="designer-palette is-docked"><ToolDock sessionId=\{sessionId\} doc=\{designDoc\} \/><\/div>/);
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
