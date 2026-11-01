@@ -1,4 +1,4 @@
-import { nodeHandles, nodeSegs, type NodeType, type Seg } from './pathNodes';
+import { closesOnStart, nodeHandles, nodeSegs, type NodeType, type Seg } from './pathNodes';
 
 /*
  * Node types as Inkscape applies them (path-manipulator / node.cpp): corner (independent handles), smooth (the two
@@ -25,10 +25,12 @@ export function focusNodes(segs: Seg[], selected: number[]): number[] {
 
 /** Make node n corner, smooth or symmetric, rewriting its handles now. */
 export function alignNode(segs: Seg[], n: number, type: NodeType): Seg[] {
-  const out = clone(segs);
-  if (type === 'c') return out;
-  const h = nodeHandles(out, n), at = nodePosition(out, n), count = nodeCount(out);
-  const prev = nodePosition(out, (n - 1 + count) % count), next = nodePosition(out, (n + 1) % count);
+  if (type === 'c') return clone(segs);
+  // Straight neighbours become curves first (Inkscape: a smooth node needs handles on both sides), so a node between two lines turns smooth.
+  const out = curveAround(clone(segs), n);
+  const h = nodeHandles(out, n), at = nodePosition(out, n), { subpaths } = nodeSegs(out);
+  const sp = subpaths.find((x) => n >= x.from && n < x.to) ?? { from: 0, to: nodeCount(out), closed: false };
+  const prev = nodePosition(out, n > sp.from ? n - 1 : sp.closed ? sp.to - 1 : n), next = nodePosition(out, n < sp.to - 1 ? n + 1 : sp.closed ? sp.from : n);
   // A handle that is missing (zero length) takes a third of the neighbouring segment, as Inkscape places it.
   const third = (to: P): P => [at[0] + (to[0] - at[0]) / 3, at[1] + (to[1] - at[1]) / 3];
   if (h.out && isAt(out[h.out[0]].p[h.out[1]], at)) out[h.out[0]].p[h.out[1]] = third(next);
@@ -65,6 +67,33 @@ export function pullHandle(segs: Seg[], n: number, side: 'in' | 'out', dx: numbe
   const q = out[j].p[k];
   q[0] += dx;
   q[1] += dy;
+  return out;
+}
+
+/** Segment j as a cubic with both handles on its ends (same shape), so a handle can then be pulled out of it. */
+function toCurve(out: Seg[], j: number): void {
+  const s = out[j];
+  if (s?.c !== 'L') return;
+  const p0 = endOf(out[j - 1]), p3 = s.p[0];
+  out[j] = { c: 'C', p: [[p0[0], p0[1]], [p3[0], p3[1]], p3] };
+}
+
+/** The segments on both sides of node n as curves. A closed subpath that closes with a bare Z gets an explicit closing segment (same node count). */
+function curveAround(out: Seg[], n: number): Seg[] {
+  const { seg, subpaths } = nodeSegs(out), i = seg[n], sp = subpaths.find((x) => n >= x.from && n < x.to);
+  if (i == null || !sp) return out;
+  const zAt = (() => { for (let j = i + 1; j < out.length && out[j].c !== 'M'; j++) if (out[j].c === 'Z') return j; return -1; })();
+  const closeSeg = (): number => {
+    for (let j = i + 1; j < out.length && out[j].c !== 'M'; j++) if (closesOnStart(out, j)) return j;
+    if (zAt < 0) return -1;
+    const start = out[i].c === 'M' ? out[i].p[0] : out[seg[sp.from]].p[0];
+    out.splice(zAt, 0, { c: 'L', p: [[start[0], start[1]]] });
+    return zAt;
+  };
+  if (out[i].c === 'L') toCurve(out, i);
+  else if (out[i].c === 'M' && sp.closed) { const j = closeSeg(); if (j > 0) toCurve(out, j); }
+  if (out[i + 1]?.c === 'L') toCurve(out, i + 1);
+  else if (sp.closed && n === sp.to - 1 && out[i + 1]?.c === 'Z') { const j = closeSeg(); if (j > 0) toCurve(out, j); }
   return out;
 }
 
