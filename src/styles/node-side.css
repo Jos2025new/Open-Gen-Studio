@@ -1,13 +1,13 @@
 /* Nodes: the panel the toolbox's Create and Conversation open (NodeSide.tsx), at the toolbox's right. As tall as its content, always clear of the floating prompt box. */
-.react-flow__panel.node-side { left: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px + 25px); width: min(340px, calc(100% - var(--control-h) - 80px)); max-height: calc(100% - var(--composer-height, 120px) - 60px); display: flex; flex-direction: column; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.react-flow__panel.node-side { left: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px + var(--canvas-pop-gap)); width: min(340px, calc(100% - var(--control-h) - 80px)); max-height: calc(100% - var(--composer-height, 120px) - 60px); display: flex; flex-direction: column; padding: 0; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
 .node-side:focus-within { border-color: var(--panel-line-focus); }
 /* One toolbox surface at a time: the panel steps aside while a toolbox menu or the map is open. */
 body:has(.canvas-nav-pop, .node-lib-pop) .react-flow__panel.node-side, .react-flow:has(.canvas-map) .react-flow__panel.node-side { display: none; }
-.node-side .side-head { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: var(--control-h); padding: 0 2px 0 8px; color: var(--text-2); }
+.node-side .side-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; height: 48px; padding: 0 8px 0 16px; color: var(--text-2); }
 .node-side .side-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); font-weight: 600; color: var(--text); }
 .node-side .side-icon { width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-s); color: var(--text-3); }
 .node-side .side-icon:hover { color: var(--text); background: var(--surface-3); }
-.node-side .side-body { min-height: 0; overflow: auto; margin-top: var(--toolbar-padding); padding: 8px 6px 6px; border-top: 1px solid var(--panel-line); }
+.node-side .side-body { min-height: 0; overflow: auto; padding: 12px; border-top: 1px solid var(--panel-line); }
 /* Toolbox: Conversation carries the number of items and the agent's pulse. */
 .canvas-nav-badged { position: relative; display: inline-flex; }
 .canvas-nav-badge { position: absolute; right: -2px; top: -2px; min-width: 15px; height: 15px; padding: 0 3px; display: grid; place-items: center; border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-size: 9px; pointer-events: none; }

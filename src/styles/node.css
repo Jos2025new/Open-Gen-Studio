@@ -59,6 +59,7 @@
 
 /* Canvas toolbox: one vertical bar on the left, in the Designer's toolbar style (same padding, radius, line, plane and
    control size); separators run across it, the zoom value sits between + and −. */
+:root { --canvas-pop-gap: 6px; }
 .canvas-navigation { max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
 .canvas-navigation .icon-btn { flex-shrink: 0; width: var(--control-h); height: var(--control-h); border-radius: var(--radius-s); }
 .canvas-navigation .icon-btn svg { width: var(--control-icon); height: var(--control-icon); }
@@ -182,7 +183,9 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 
 /* Node library (Add node in the canvas toolbox, 2026-10-31): search, kind chips, Media / Nodes / Tools with each
    kind's colour on its icon, keyboard hints. Our popover plane and tokens; the type colours are the app's own. */
-.node-lib-pop { padding: 0; }
+/* Toolbox menus and the Create / Conversation panel (node-side.css): same surface, corners and gap from the toolbox. */
+.popover.node-lib-pop, .popover.canvas-nav-pop { margin-left: calc(var(--canvas-pop-gap) - 1px); border-color: var(--panel-line); border-radius: var(--toolbar-radius); }
+.node-lib-pop { padding: 0; margin-top: calc(-1 * var(--toolbar-padding) - 1px); }
 .node-lib { display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 120px)); }
 .node-lib-search { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; color: var(--text-3); }
 .node-lib .node-lib-search input:not([type="checkbox"]) { flex: 1; min-width: 0; height: 28px; padding: 0; border: 0; background: transparent; box-shadow: none; color: var(--text); font-size: 15px; outline: none; }
