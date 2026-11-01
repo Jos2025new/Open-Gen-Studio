@@ -284,6 +284,13 @@ export function Composer() {
     return () => { observer.disconnect(); parent.style.removeProperty('--composer-height'); parent.style.removeProperty('--conversation-side-width'); };
   }, [workspace]);
 
+  // Other panels (Nodes' Create) attach through this same picker, so the model's input rules apply once.
+  useEffect(() => {
+    const pick = () => fileRef.current?.click();
+    window.addEventListener('ogs:attach', pick);
+    return () => window.removeEventListener('ogs:attach', pick);
+  }, []);
+
   useEffect(() => {
     if (!focusTick) return;
     if (workspace === 'designer') setUi({ designerDock: 'prompt' });

@@ -20,24 +20,24 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 286 | 224 |
+| [types.ts](../src/engine/types.ts) | 288 | 224 |
 | [store.ts](../src/store/store.ts) | 196 | 208 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 87 | 0 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 88 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 55 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 50 | 26 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
+| [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [ops.ts](../src/engine/ops.ts) | 42 | 17 |
-| [index.ts](../src/engine/params/index.ts) | 42 | 21 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 46 |
+| [actions.ts](../src/engine/actions.ts) | 34 | 24 |
 | [format.ts](../src/lib/format.ts) | 34 | 1 |
-| [actions.ts](../src/engine/actions.ts) | 33 | 24 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
 | [id.ts](../src/lib/id.ts) | 30 | 0 |
-| [types.ts](../src/engine/providers/types.ts) | 27 | 9 |
+| [types.ts](../src/engine/providers/types.ts) | 28 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 23 | 8 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 21 | 0 |
-| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 20 | 8 |
+| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 21 | 8 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |
 
@@ -46,12 +46,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Área | Archivos | Tests que la importan directamente |
 | --- | --- | --- |
 | `src` | 2 | 0 |
-| `src/components/assets` | 17 | 7 |
+| `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
-| `src/components/composer` | 13 | 12 |
+| `src/components/composer` | 13 | 13 |
 | `src/components/designer` | 54 | 24 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 11 | 11 |
+| `src/components/node` | 12 | 11 |
 | `src/components/shell` | 35 | 23 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 33 | 289 |
 | `src/store` | 15 | 210 |
 
-178 de 509 módulos no tienen ningún test que los importe directamente.
+178 de 510 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
