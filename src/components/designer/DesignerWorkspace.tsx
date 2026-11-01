@@ -5,9 +5,8 @@ import { DrawingChoicePrompt } from './DrawingChoice';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
-import { CanvasSize } from './CanvasSize';
 import { AspectGlyph } from '../composer/MediaControls';
-import { ArrowUpFromLine, Images, ImagePlus, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
+import { ArrowUpFromLine, Images, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
 import { useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
@@ -22,7 +21,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { Stage } from './Stage';
 import { ToolPalette } from './ToolPalette';
 import { DocumentPicker } from './DocumentPicker';
-import { EditOps, SelectionChip } from './ToolSettings';
+import { SelectionChip } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 
 export function DesignerWorkspace() {
@@ -81,7 +80,8 @@ export function DesignerWorkspace() {
 
   return <div className="designer">
     <input ref={importRef} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
-    {/* Beside the title: new document and undo/redo, one group. Right: the document's actions, then Export. */}
+    {/* Beside the title: new document and undo/redo, one group. Right: Save to gallery and the panel, then Export. Import (the
+        prompt box's +), Transform (Edit) and Canvas size (toolbox) live where they are used. */}
     <TopbarActions side="start">
       <span className="topbar-group" role="toolbar" aria-label="Document history">
         <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
@@ -100,9 +100,6 @@ export function DesignerWorkspace() {
       {doc && <SelectionChip docId={doc.id} />}
       {doc && <>
         <span className="topbar-group" role="toolbar" aria-label="Document">
-          <IconButton icon={ImagePlus} label="Import image" size="sm" onClick={() => importRef.current?.click()} />
-          <EditOps sessionId={session.id} doc={doc} turnOnly />
-          <CanvasSize key={doc.id} sessionId={session.id} doc={doc} />
           <IconButton ref={saveConfirm.ref} icon={Images} label="Save to gallery" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />
           <span className="topbar-sep" aria-hidden />
           <IconButton icon={PanelRight} label="Show or hide right panel" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
