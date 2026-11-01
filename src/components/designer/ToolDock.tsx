@@ -81,6 +81,11 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const activeLayerValue = activeLayer(doc);
   // A real pick (objects, or several layers): the active layer alone is always set, so it does not count.
   const editCount = useEditCount(doc), picked = useObjectSelection((st) => !!st.byDoc[doc.id]?.ids.length) || editCount > 1;
+  // Edit with a selection: one compact strip takes the variant row's place. The Edit button brings the variants back (and hides the strip); opening the Edit card, or picking something else, returns to the strip.
+  const [variantsAsked, setVariantsAsked] = useState(false);
+  useEffect(() => { setVariantsAsked(false); }, [picked, currentTool, doc.id]);
+  useEffect(() => { if (depth === 'open') setVariantsAsked(false); }, [depth]);
+  const stripShown = currentTool === 'move' && picked && !(depth === 'open' && selectedVariant?.id === 'edit') && !(variantsAsked && depth !== 'closed');
   const disabledReason = (variant: ToolboxVariant) => variant.tool ? toolBlockReason(variant.tool, activeLayerValue) : undefined;
   // The Designer's toolbox (either place; Studio's is not) shares one popup at a time with Designs and Create/Conversation.
   const designer = vertical || inDesigner;
@@ -137,7 +142,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     if (familyId) familyButtons.current.get(familyId)?.focus();
   }}>
     <div className="tool-dock-stack">
-      {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
+      {depth !== 'closed' && selectedFamily && !stripShown && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
           return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
@@ -148,7 +153,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
         </button></>}
       </div>}
       {/* Edit with a selection and its card not open: the contextual strip alone, where the card would open. */}
-      {currentTool === 'move' && picked && !(depth === 'open' && selectedVariant?.id === 'edit') && <section className="tool-dock-card tool-dock-strip" aria-label="Selection controls"><ContextStrip sessionId={sessionId} doc={doc} /></section>}
+      {stripShown && <section className="tool-dock-card tool-dock-strip" aria-label="Selection controls"><ContextStrip sessionId={sessionId} doc={doc} variant="strip" /></section>}
       {depth === 'open' && selectedVariant && !selectedVariant.soon && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
         <button type="button" className="tool-dock-grip" role="separator" aria-orientation="horizontal" aria-label="Resize tool settings" tabIndex={0} onKeyDown={onGripKey} onPointerDown={(event) => {
           const startY = event.clientY; const startHeight = height; const el = event.currentTarget;
@@ -173,6 +178,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
             if (soonReason) return;
             if (designer) announceSidePopup('tools');
+            if (stripShown && family.id === currentFamily?.id) { setVariantsAsked(true); if (depth === 'closed') dispatch({ type: 'family', familyId: family.id }); return; }
             if (family.id !== familyId) {
               const initial = family.variants.find((variant) => variant.tool);
               if (initial) chooseVariant(initial);

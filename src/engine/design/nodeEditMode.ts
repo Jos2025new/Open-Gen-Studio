@@ -10,12 +10,17 @@ export const NODE_EDIT_MODES: NodeEditMode[] = ['move', 'bend', 'cut', 'erase', 
 /** Modes that do something; a mode not listed shows disabled. */
 export const NODE_EDIT_MODES_READY: NodeEditMode[] = ['move', 'bend', 'cut', 'erase', 'lasso'];
 
-export const useNodeEditMode = create<{ mode: NodeEditMode; /** Erase radius in screen px (page units = px / zoom). */ eraseRadius: number }>(() => ({ mode: 'move', eraseRadius: 10 }));
+export const useNodeEditMode = create<{ mode: NodeEditMode; /** Erase radius in screen px (page units = px / zoom). */ eraseRadius: number; /** Set when a cut or erase left several pieces as subpaths of the one edited shape; leaving node editing then separates them (pathPieces.ts). */ split: { sessionId: string; before: number } | null }>(() => ({ mode: 'move', eraseRadius: 10, split: null }));
+/** `before`: the shape's subpath count before the first cut, so an undone cut (same count again) separates nothing on exit. */
+export function markNodeEditSplit(sessionId: string, before = 1): void {
+  if (useNodeEditMode.getState().split?.sessionId !== sessionId) useNodeEditMode.setState({ split: { sessionId, before } });
+}
 export function setNodeEditMode(mode: NodeEditMode): void {
   if (NODE_EDIT_MODES_READY.includes(mode)) useNodeEditMode.setState({ mode });
 }
 export function resetNodeEditMode(): void {
-  if (useNodeEditMode.getState().mode !== 'move') useNodeEditMode.setState({ mode: 'move' });
+  const st = useNodeEditMode.getState();
+  if (st.mode !== 'move' || st.split) useNodeEditMode.setState({ mode: 'move', split: null });
 }
 export function setEraseRadius(px: number): void {
   useNodeEditMode.setState({ eraseRadius: Math.min(200, Math.max(1, Math.round(px))) });

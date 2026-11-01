@@ -63,3 +63,14 @@ Procedencia: `bendSegment.ts`, `pathCut.ts` y `vectorErase.ts` siguen las operac
 - [[atajos]] · [atajos.md](atajos.md)
 - [Plan de edición de formas](../plan-edicion-formas.md)
 - [Índice de controles](README.md)
+
+## Ajuste tras la prueba del 2026-11-01
+
+La prueba en el sandbox encontró la barra apilada, el modo activo invisible, Bend sin efecto en una elipse y Cut confuso. Cambios:
+
+- **Una sola tira sobre la barra.** Con Edit y una selección, la tira ocupa el sitio de la fila de variantes (pulsar la familia Edit vuelve a mostrar las variantes). Sin selección de nodos lleva solo acciones del objeto: nombre, Fill, Stroke, Edit nodes y alinear con varios; los ajustes de la herramienta (Auto-select, Influence, Settings…) siguen en la tarjeta de Edit. Editando nodos: nombre | Move Bend Cut Erase Lasso | More | Done, en una fila que se desplaza en horizontal; W, H y Blur quedan en Properties (`ContextStrip.tsx`, prop `variant`; `ToolDock.tsx`; `tool-dock.css`).
+- **Modo activo y Done visibles:** fondo `--accent` con texto `--accent-ink`; Done es la acción principal al final de la fila (`NodeEditBar.tsx`).
+- **Formas primitivas:** elegir Bend, Cut, Erase o Lasso en una elipse, rectángulo o polígono la convierte antes en trazado, en un solo paso de deshacer (`chooseNodeMode`).
+- **Cut sigue con el mismo objetivo:** mientras se editan nodos, las piezas de un corte o borrado son subtrazados de la misma forma, así que se puede seguir cortando sin Done. Al salir (Done, Esc o cambio de herramienta) se separan en formas con los atributos originales, todas seleccionadas, en un paso de deshacer; un trazado compuesto que no se cortó, o un corte deshecho antes de salir, no se separa (`pathPieces.ts`, `split.before` en `nodeEditMode.ts`).
+- Evidencia: `tests/node-edit-strip.test.ts`, `tests/path-node-tools.test.ts`; `tests-e2e/path-nodes.spec.ts` busca «Done» en vez de «Editing nodes» (no ejecutado). Sin prueba visual tras el ajuste.
+- Queda: el doble clic en un nudo ya no enfoca Rx/Ry/Blur en la tira (están en Properties).

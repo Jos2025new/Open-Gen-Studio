@@ -20,7 +20,7 @@ test('Convert to path, then edit its nodes (Inkscape Node tool): one undo per dr
   await strip(page).getByRole('button', { name: 'Convert to path' }).click();
   const s0 = await shape(page);
   expect(s0.type).toBe('path');
-  await expect(strip(page)).toContainText('Editing nodes');
+  await expect(strip(page)).toContainText('Done');
   await expect(page.locator('rect.path-node')).toHaveCount(4);
   // Drag the second node (top right) out: the outline follows, as one undo step.
   const n = (await page.locator('rect.path-node').nth(1).boundingBox())!;
@@ -233,7 +233,7 @@ test('Shift+U / Shift+L turn segments between selected nodes into curves / lines
   const s1 = await shape(page);
   expect((s1.d.match(/C/g) ?? []).length).toBe(4);
   // The U tool key (gradient) did not fire: still editing nodes with Edit.
-  await expect(strip(page)).toContainText('Editing nodes');
+  await expect(strip(page)).toContainText('Done');
   await expect(page.locator('circle.path-handle')).toHaveCount(8);
   await page.keyboard.press('Shift+L');
   expect((await shape(page)).d).not.toContain('C');
@@ -296,7 +296,7 @@ test('Shift+B opens a closed path at the selected node (two coincident ends); Sh
   const s1 = await shape(page);
   expect(s1.d).not.toContain('Z');
   await expect(page.locator('rect.path-node')).toHaveCount(5);
-  await expect(strip(page)).toContainText('Editing nodes');
+  await expect(strip(page)).toContainText('Done');
   // Select both ends again and join: closed, four nodes, same outline box.
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Shift+J');
@@ -369,7 +369,7 @@ test('Shift+J welds adjacent nodes without end pairs, selects the new cusp and k
   expect((await shape(page)).d).toContain('Z');
   expect(await pickedNodeIndices(page)).toEqual([1]);
   await expect(page.locator('rect.path-node.is-picked')).toHaveCount(1);
-  await expect(strip(page)).toContainText('Editing nodes');
+  await expect(strip(page)).toContainText('Done');
   const middle = await page.evaluate(async () => {
     const st = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), P = await import('/src/engine/design/pathNodes.ts' as string);
     const d = A.activeDoc(st.useStore.getState().activeSessionId), s = d.layers.find((l: any) => l.type === 'vector').shapes[0];

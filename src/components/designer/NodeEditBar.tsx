@@ -6,6 +6,7 @@ import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { InlineChoice, InlineSlider } from './InlineControls';
 import { Popover, usePopover } from '../ui/Popover';
+import { convertToPath } from './ShapeLookFields';
 
 /* Labelled mode bar of the node editor: icon + word, one mode active, then «More» (the node operations) and Done. */
 const MODES: Record<NodeEditMode, { label: string; icon: typeof Hand; tip: string }> = {
@@ -16,13 +17,22 @@ const MODES: Record<NodeEditMode, { label: string; icon: typeof Hand; tip: strin
   lasso: { label: 'Lasso', icon: Lasso, tip: 'Lasso: drag a free-form loop to select the nodes inside (Shift adds)' },
 };
 
-export function NodeModeButtons() {
+/** What a mode needs to act on the edited shape: Bend, Cut, Erase and Lasso work on path nodes, so a primitive becomes a path first. */
+export interface NodeModeTarget { sessionId: string; docId: string; layerId: string; shape: VectorShape }
+
+/** Choose a mode. On a primitive (rectangle, ellipse, polygon…) every mode but Move first runs «Convert to path» (one undo step) and goes on in that mode. */
+export function chooseNodeMode(mode: NodeEditMode, target?: NodeModeTarget): void {
+  if (mode !== 'move' && target && (target.shape.type !== 'path' || target.shape.prim)) convertToPath(target.sessionId, target.docId, target.layerId, target.shape);
+  setNodeEditMode(mode);
+}
+
+export function NodeModeButtons({ target }: { target?: NodeModeTarget }) {
   const mode = useNodeEditMode((s) => s.mode);
   const radius = useNodeEditMode((s) => s.eraseRadius);
   return <><div className="node-modes" role="radiogroup" aria-label="Node editing mode">
     {NODE_EDIT_MODES.map((m) => {
-      const { label, icon: Icon, tip } = MODES[m], ready = NODE_EDIT_MODES_READY.includes(m);
-      return <button key={m} type="button" role="radio" aria-checked={mode === m} disabled={!ready} className={`opt node-mode${mode === m ? ' is-on' : ''}`} data-tip={tip} onClick={() => setNodeEditMode(m)}><Icon size={13} />{label}</button>;
+      const { label, icon: Icon, tip } = MODES[m], ready = NODE_EDIT_MODES_READY.includes(m), on = mode === m;
+      return <button key={m} type="button" role="radio" aria-checked={on} disabled={!ready} className={`opt node-mode${on ? ' is-on is-active' : ''}`} data-tip={tip} onClick={() => chooseNodeMode(m, target)}><Icon size={13} />{label}</button>;
     })}
   </div>{mode === 'erase' && <InlineSlider label="Eraser" unit="px" min={2} max={100} allowManualOverflow value={radius} onChange={setEraseRadius} />}</>;
 }
@@ -51,7 +61,7 @@ export function NodeMoreMenu({ sessionId, docId, layerId, shape }: { sessionId: 
 }
 
 export function NodeDoneButton({ docId }: { docId: string }) {
-  return <button type="button" className="opt node-done" data-tip="Leave node editing (Esc)" onClick={() => setShapeEdit(docId, null)}><X size={13} />Done</button>;
+  return <button type="button" className="opt node-done is-primary" data-tip="Leave node editing (Esc)" onClick={() => setShapeEdit(docId, null)}><X size={13} />Done</button>;
 }
 
 /* Node types as Inkscape draws them: a node with its two handles. Cusp: the handles bend apart; smooth: in line,

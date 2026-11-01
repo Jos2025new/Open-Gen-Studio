@@ -180,3 +180,17 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
   .ws-designer .dock-designer { left: calc((100% - var(--layers-w, 0px)) / 2); transform: translateX(-50%); width: min(800px, calc(100% - var(--layers-w, 0px) - 192px)); }
   .ws-designer .dock-designer:has(.composer-tools-bar) { width: min(800px, calc(100% - var(--layers-w, 0px) - 48px)); }
 }
+/* Selection strip and node-edit bar: one compact row directly above the toolbox, scrolling sideways when short (never wrapping). */
+.tool-dock .tool-dock-strip { padding: 4px 6px; }
+.tool-dock .tool-dock-strip .context-strip { position: static; width: 100%; max-width: 100%; box-shadow: none; border: 0; padding: 0; background: transparent; }
+.context-strip.context-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.context-strip.context-row > *, .context-strip.context-row .tool-settings > * { flex: none; }
+.context-strip.context-row .node-modes { flex-wrap: nowrap; }
+.context-strip.context-row .context-target { white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+/* The active mode is unmistakable: the accent fill with its contrasting ink (the primary state of the app). */
+.context-strip .node-mode:not(.is-active):is(:hover, :focus-visible) { background: var(--field-bg-hover); color: var(--text); }
+.context-strip .node-mode.is-active, .context-strip .node-mode[aria-checked="true"], .context-strip .node-done.is-primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+.context-strip .node-mode.is-active:is(:hover, :focus-visible), .context-strip .node-done.is-primary:is(:hover, :focus-visible) { background: var(--accent); color: var(--accent-ink); filter: brightness(1.1); }
+.context-strip .node-mode:focus-visible, .context-strip .node-done:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: 1px; }
+/* Done closes the row on the right and stays reachable while the row scrolls. */
+.context-strip .node-done { margin-left: auto; position: sticky; right: 0; }

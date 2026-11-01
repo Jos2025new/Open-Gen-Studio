@@ -8,7 +8,7 @@ import { useNodeEditMode } from '../../engine/design/nodeEditMode';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
-import { layerShapes, replaceWithPieces, usablePieces } from './pathPieces';
+import { layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
 import '../../styles/path-tools.css';
 
 const CUT_REACH = 12; // screen px from the path that a hover or click still counts as on it
@@ -20,17 +20,17 @@ export function cutShape(sessionId: string, docId: string, layerId: string, shap
   const pieces = usablePieces(out);
   if (pieces.length === 1 && out.length === 1 && serializeSegs(pieces[0]) === serializeSegs(segs)) return false;
   if (!pieces.length) return false;
-  replaceWithPieces(sessionId, docId, layerId, layerShapes(sessionId, docId, layerId), shape, pieces);
+  replaceWithSubpaths(sessionId, docId, layerId, layerShapes(sessionId, docId, layerId), shape, pieces, { split: pieces.length > contoursOf(segs).length });
   return true;
 }
 
 /** Live erase: each sample rubs a circle out of the current pieces; the first change records the undo step. */
 export class EraseSession {
   private pieces: Seg[][];
-  private ids: string[] = [];
+  private contours: number;
   private moved = false;
   private last: Pt | null = null;
-  constructor(private s: string, private d: string, private l: string, private shape: VectorShape, private base: VectorShape[]) { this.pieces = [pageSegs(shape)]; }
+  constructor(private s: string, private d: string, private l: string, private shape: VectorShape, private base: VectorShape[]) { const segs = pageSegs(shape); this.pieces = [segs]; this.contours = contoursOf(segs).length; }
   /** Rub at `at` (own coordinates), filling the gap from the previous sample so a fast drag leaves no holes. */
   sample(at: Pt, radius: number): void {
     if (!this.pieces.length) return;
@@ -40,7 +40,7 @@ export class EraseSession {
     for (let i = 1; i <= n; i++) next = usablePieces(next.flatMap((p) => erasePath(p, [from[0] + ((at[0] - from[0]) * i) / n, from[1] + ((at[1] - from[1]) * i) / n], radius)));
     if (next.length === this.pieces.length && next.every((p, i) => serializeSegs(p) === serializeSegs(this.pieces[i]))) return;
     this.pieces = next;
-    this.ids = replaceWithPieces(this.s, this.d, this.l, this.base, this.shape, next, { record: !this.moved, ids: this.ids });
+    replaceWithSubpaths(this.s, this.d, this.l, this.base, this.shape, next, { record: !this.moved, split: next.length > this.contours });
     this.moved = true;
   }
   get changed(): boolean { return this.moved; }

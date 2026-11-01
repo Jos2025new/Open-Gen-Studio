@@ -1,16 +1,17 @@
 import { Settings2 } from 'lucide-react';
-import { setUi, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { isProtectedImage } from '../../engine/design/rules';
 import { TOOL_NAMES } from '../../engine/shortcuts';
 import { setRuler } from '../../engine/design/strokeRuler';
-import { TextStyleFields, ToolSettings } from './ToolSettings';
+import { EditOps, TextStyleFields, ToolSettings } from './ToolSettings';
+import { useEditCount } from './EditCard';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer, VectorShape } from '../../engine/types';
 import { InlineToggle } from './InlineControls';
 import { NodeDoneButton, NodeModeButtons, NodeMoreMenu } from './NodeEditBar';
-import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
+import { patchShape, ShapeLookFields, usePickedShape } from './ShapeLookFields';
 import { PaintSwatch, ShapeParams } from './ShapePaint';
 import { editShape, setShapeEdit, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { useLayerSelection } from '../../engine/design/selection';
@@ -38,12 +39,17 @@ export function editTarget(doc: DesignDoc, tool: string): string | null {
   return null;
 }
 
-export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+/**
+ * `variant="strip"`: the selection strip above the toolbox, one compact row of object actions (name, Fill, Stroke, Edit
+ * nodes, Align when several); the tool's own settings stay in the Edit card. `variant="card"` (default): the Edit card's
+ * bar. In node editing both show the same single row: name, the five modes, More, Done.
+ */
+export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: string; doc: DesignDoc; variant?: 'strip' | 'card' }) {
   const tool = useStore((s) => s.ui.tool);
   const ruler = useStore((s) => s.ui.strokeRuler);
   const mode = useStore((s) => s.ui.selectMode ?? 'objects');
-  const lockRadii = useStore((s) => !!s.ui.shapeLockRadii);
   const picked = usePickedShape(doc), edit = useShapeEdit((st) => st.byDoc[doc.id]);
+  const editCount = useEditCount(doc);
   const objectSelection = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
   const layerPicks = useLayerSelection((st) => st.byDoc[doc.id]);
   const layerGroup = mode === 'layers' || (!objectSelection && (layerPicks?.filter((id) => doc.layers.some((l) => l.id === id)).length ?? 0) > 1);
@@ -63,41 +69,41 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
   const selectedShape = tool === 'move' && mode === 'objects' && !selectedText ? picked : null;
   const editing = !!selectedShape && edit?.shapeId === selectedShape.shape.id;
   const isPath = selectedShape?.shape.type === 'path';
-  return <div className="context-strip" role="toolbar" aria-label={`${TOOL_NAMES[tool]} quick settings`}>
-    <span className="context-target" data-tip="What the next action changes">
-      <strong>{TOOL_NAMES[tool]}</strong>{target && <> → <span>{target}</span></>}
-    </span>
+  const editShapeButton = selectedShape && (selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse' || isPath) ? <button type="button" className="opt" data-tip={isPath ? 'Its nodes and curve handles (or double-click the path)' : 'Corner radius and blur handles (or double-click the shape)'} onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>{isPath ? 'Edit nodes' : 'Edit shape'}</button> : null;
+  const row = variant === 'strip' || (editing && !multiNodeEdit);
+  const objectName = (selectedShape && doc.layers.find((l) => l.id === selectedShape.layerId)?.name) || target || 'Selection';
+  return <div className={`context-strip${row ? ' context-row' : ''}`} role="toolbar" aria-label={editing ? 'Node editing' : variant === 'strip' ? 'Selection controls' : `${TOOL_NAMES[tool]} quick settings`}>
+    {row
+      ? <span className="context-target" data-tip="The selected object"><strong>{objectName}</strong></span>
+      : <span className="context-target" data-tip="What the next action changes"><strong>{TOOL_NAMES[tool]}</strong>{target && <> → <span>{target}</span></>}</span>}
     {/* With a text layer selected, the fields change that text, not the settings for the next one. */}
     {tool === 'move' && (multiNodeEdit || (!picked && nodeTargets.length > 1)) ? <div className="tool-settings" role="group" aria-label="Multiple path nodes">
-      <span className="context-mode">{multiNodeEdit ? `Editing nodes · ${edit!.paths!.length} paths` : `${nodeTargets.length} paths selected`}</span>
+      <span className="context-mode" data-tip="Click nodes; Shift-click adds or removes. Drag a selected node to move the group; drag empty space to select nodes. Multi-path topology edits remain per path.">{multiNodeEdit ? `Editing nodes · ${edit!.paths!.length} paths` : `${nodeTargets.length} paths selected`}</span>
       {multiNodeEdit
-        ? <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
+        ? <button type="button" className="opt node-done is-primary" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
         : <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, { layerId: nodeTargets[0].layerId, shapeId: nodeTargets[0].shapeId, paths: nodeTargets.map((t) => ({ layerId: t.layerId, shapeId: t.shapeId, nodes: [] })) })}>Edit nodes</button>}
-      <span className="context-help">Click nodes; Shift-click adds or removes. Drag a selected node to move the group; drag empty space to select nodes. Multi-path topology edits remain per path.</span>
     </div> : selectedText ? <div className="tool-settings" role="group" aria-label="Selected text">
       <TextStyleFields value={selectedText} compact onChange={(p) => { if (!selectedText.locked) patchLayer(sessionId, doc.id, selectedText.id, p as Partial<Layer>); }} />
     </div> : selectedShape ? <div className="tool-settings" role="group" aria-label={editing ? 'Editing shape' : 'Selected shape'}>
       {/* One click transforms; double-click or «Edit shape» edits (docs/plan-edicion-formas.md). */}
       {editing ? <>
-        {isPath && <NodeModeButtons />}
-        <span className="context-mode" data-tip={isPath ? 'Shift-click to toggle nodes, drag a selected node to move the group; Esc clears selection, then exits' : 'Drag the round handles; Esc or Done to leave'}>{isPath ? 'Editing nodes' : 'Editing shape'}</span>
-        <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
-        <ShapeParams sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
-        <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
-        {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
-        {isPath && <NodeMoreMenu sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape as VectorShape} />}
-        {(!isPath || selectedShape.shape.prim) && <button type="button" className="opt" data-tip="Inkscape's Object to Path: the same outline as editable nodes; the corner and size handles are gone (Ctrl+Z undoes it)" onClick={() => convertToPath(sessionId, doc.id, selectedShape.layerId, selectedShape.shape)}>Convert to path</button>}
+        <NodeModeButtons target={{ sessionId, docId: doc.id, layerId: selectedShape.layerId, shape: selectedShape.shape }} />
+        {isPath && !selectedShape.shape.prim && <NodeMoreMenu sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape as VectorShape} />}
         <NodeDoneButton docId={doc.id} />
+      </> : variant === 'strip' ? <>
+        <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="fill" />
+        <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="stroke" />
+        {editShapeButton}
       </> : <>
         <ShapeParams sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="fill" />
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="stroke" />
         <ShapeLookFields value={selectedShape.shape} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
-        {(selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse' || isPath) && <button type="button" className="opt" data-tip={isPath ? 'Its nodes and curve handles (or double-click the path)' : 'Corner radius and blur handles (or double-click the shape)'} onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>{isPath ? 'Edit nodes' : 'Edit shape'}</button>}
+        {editShapeButton}
       </>}
-    </div> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
+    </div> : variant === 'strip' ? (editCount > 1 ? <EditOps sessionId={sessionId} doc={doc} alignOnly /> : null) : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
     {tool === 'move' && roundTargets.length > 1 && <MultiRectangleRadii sessionId={sessionId} doc={doc} targets={roundTargets} />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
-    <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>
+    {variant === 'card' && !editing && <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>}
   </div>;
 }

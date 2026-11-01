@@ -28,9 +28,13 @@ export function setObjectPick(docId: string, pick: ObjectPick | null): void {
 /** The shape being edited (double-click or «Edit shape»): its own knots show, the transform handles hide. */
 export interface ShapeEdit { layerId: string; shapeId: string; /** Path edit: selected node indices; node remains as the primary index for existing controls. */ node?: number; nodes?: number[]; /** Explicit multi-path node selection; legacy fields above remain the single-path contract. */ paths?: Array<{ layerId: string; shapeId: string; nodes: number[] }> }
 export const useShapeEdit = create<{ byDoc: Record<string, ShapeEdit | undefined> }>(() => ({ byDoc: {} }));
+/** Called when node editing of a shape ends or moves to another shape, before the mode resets (pathPieces.ts separates cut pieces here). */
+let leaveHook: ((docId: string, prev: ShapeEdit) => void) | null = null;
+export function onShapeEditLeave(fn: (docId: string, prev: ShapeEdit) => void): void { leaveHook = fn; }
 export function setShapeEdit(docId: string, edit: ShapeEdit | null): void {
   // Node-edit mode returns to Move when editing starts, ends or changes shape.
   const prev = useShapeEdit.getState().byDoc[docId];
+  if (prev && (!edit || prev.shapeId !== edit.shapeId)) leaveHook?.(docId, prev);
   if (!prev || !edit || prev.shapeId !== edit.shapeId) resetNodeEditMode();
   useShapeEdit.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: edit ?? undefined } }));
 }
