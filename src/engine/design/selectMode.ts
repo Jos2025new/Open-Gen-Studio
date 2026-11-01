@@ -14,7 +14,7 @@ export type SelectMode = 'node' | 'segment' | 'face';
 export const SELECT_MODES: SelectMode[] = ['node', 'segment', 'face'];
 
 export interface SelEdge { id: number; a: number; b: number; /** the segment's start point and the L/C command that ends it */ from: Pt; seg: Seg }
-export interface SelFace { id: number; /** its own nodes, and (outer contours) the nodes of its holes */ nodes: number[]; hole: boolean; holes: number[]; poly: Pt[]; area: number; /** own contour + holes, as drawn */ segs: Seg[] }
+export interface SelFace { id: number; /** its own nodes, and (outer contours) the nodes of its holes */ nodes: number[]; hole: boolean; holes: number[]; poly: Pt[]; box: { x0: number; y0: number; x1: number; y1: number }; area: number; /** own contour + holes, as drawn */ segs: Seg[] }
 export interface Sel { nodes: number[]; segs: number[]; faces: number[] }
 
 const sorted = (a: Iterable<number>): number[] => [...new Set(a)].sort((x, y) => x - y);
@@ -57,7 +57,11 @@ export function edgeDistance(e: SelEdge, map: (p: Pt) => Pt, pt: Pt): number {
 /** The segment nearest to `pt` within `tol`, or null. */
 export function pickEdge(edges: SelEdge[], map: (p: Pt) => Pt, pt: Pt, tol: number): SelEdge | null {
   let best: SelEdge | null = null, bd = tol;
-  for (const e of edges) { const d = edgeDistance(e, map, pt); if (d <= bd) { bd = d; best = e; } }
+  for (const e of edges) {
+    const pts = [e.from, ...e.seg.p].map(map); // the curve stays in its control hull: skip what the pointer is clearly away from
+    if (pt[0] < Math.min(...pts.map((q) => q[0])) - bd || pt[0] > Math.max(...pts.map((q) => q[0])) + bd || pt[1] < Math.min(...pts.map((q) => q[1])) - bd || pt[1] > Math.max(...pts.map((q) => q[1])) + bd) continue;
+    const d = edgeDistance(e, map, pt); if (d <= bd) { bd = d; best = e; }
+  }
   return best;
 }
 
@@ -69,29 +73,44 @@ const inside = (poly: Pt[], [x, y]: Pt): boolean => {
   }
   return c;
 };
-const areaOf = (poly: Pt[]): number => Math.abs(poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2);
+const signedArea = (poly: Pt[]): number => poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+const boxOf = (poly: Pt[]) => poly.reduce((b, [x, y]) => ({ x0: Math.min(b.x0, x), y0: Math.min(b.y0, y), x1: Math.max(b.x1, x), y1: Math.max(b.y1, y) }), { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
+type Box = ReturnType<typeof boxOf>;
+/** `a` lies wholly in `g`: its box is within g's and every sampled vertex is inside; overlapping contours are siblings. */
+const within = (a: { poly: Pt[]; box: Box }, g: { poly: Pt[]; box: Box }): boolean =>
+  a.box.x0 >= g.box.x0 && a.box.y0 >= g.box.y0 && a.box.x1 <= g.box.x1 && a.box.y1 <= g.box.y1 && a.poly.every((p) => inside(g.poly, p));
 
-/** The closed subpaths as faces: an outer contour (even depth) owns the holes (odd depth) whose smallest container it is. */
-export function facesOf(segs: Seg[]): SelFace[] {
+/**
+ * The closed subpaths as faces. Containment needs the whole contour inside. Evenodd: an odd depth is a hole. Nonzero (the
+ * default): a nested contour is a hole only if it winds against its parent (a hole itself never makes a hole); one that winds
+ * the same way is a filled face of its own. An outer contour owns the holes whose smallest container it is.
+ */
+export function facesOf(segs: Seg[], fillRule?: 'evenodd' | 'nonzero'): SelFace[] {
   const ns = nodeSegs(segs), groups: Seg[][] = [];
   segs.forEach((g) => { if (g.c === 'M') groups.push([]); groups[groups.length - 1]?.push(g); });
   const all = ns.subpaths.map((sp, id) => {
     const poly = sp.closed && sp.to - sp.from >= 2 ? flatten(groups[id] ?? [], 0.5)[0]?.points : undefined;
-    return poly && poly.length >= 3 ? { id, poly, area: areaOf(poly), nodes: Array.from({ length: sp.to - sp.from }, (_, k) => sp.from + k), parent: -1, depth: 0 } : null;
+    if (!poly || poly.length < 3) return null;
+    const sa = signedArea(poly);
+    return { id, poly, box: boxOf(poly), sa, area: Math.abs(sa), nodes: Array.from({ length: sp.to - sp.from }, (_, k) => sp.from + k), parent: -1, depth: 0, hole: false };
   }).filter((f): f is NonNullable<typeof f> => !!f);
   for (const f of all) {
-    const boxes = all.filter((g) => g !== f && g.area > f.area && inside(g.poly, f.poly[0])).sort((x, y) => x.area - y.area);
+    const boxes = all.filter((g) => g !== f && g.area >= f.area && within(f, g) && !(g.area === f.area && g.id > f.id)).sort((x, y) => x.area - y.area);
     f.depth = boxes.length; f.parent = boxes[0]?.id ?? -1;
   }
+  for (const f of [...all].sort((x, y) => x.depth - y.depth)) {
+    const par = all.find((g) => g.id === f.parent);
+    f.hole = !par ? false : fillRule === 'evenodd' ? f.depth % 2 === 1 : !par.hole && Math.sign(par.sa) !== Math.sign(f.sa);
+  }
   return all.map((f) => {
-    const hole = f.depth % 2 === 1, holes = hole ? [] : all.filter((g) => g.depth % 2 === 1 && g.parent === f.id);
-    return { id: f.id, hole, holes: holes.map((h) => h.id), poly: f.poly, area: f.area, nodes: sorted([...f.nodes, ...holes.flatMap((h) => h.nodes)]), segs: [f.id, ...holes.map((h) => h.id)].flatMap((i) => groups[i]) };
+    const holes = f.hole ? [] : all.filter((g) => g.hole && g.parent === f.id);
+    return { id: f.id, hole: f.hole, holes: holes.map((h) => h.id), poly: f.poly, box: f.box, area: f.area, nodes: sorted([...f.nodes, ...holes.flatMap((h) => h.nodes)]), segs: [f.id, ...holes.map((h) => h.id)].flatMap((i) => groups[i]) };
   });
 }
 
 /** The face under `pt` (own coordinates): the smallest contour containing it, so a click in a hole picks the hole itself. */
 export function pickFace(faces: SelFace[], pt: Pt): SelFace | null {
-  return faces.filter((f) => inside(f.poly, pt)).sort((a, b) => a.area - b.area)[0] ?? null;
+  return faces.filter((f) => pt[0] >= f.box.x0 && pt[0] <= f.box.x1 && pt[1] >= f.box.y0 && pt[1] <= f.box.y1 && inside(f.poly, pt)).sort((a, b) => a.area - b.area)[0] ?? null;
 }
 
 const nodesOfSegs = (edges: SelEdge[], ids: number[]) => sorted(edges.filter((e) => ids.includes(e.id)).flatMap((e) => [e.a, e.b]));

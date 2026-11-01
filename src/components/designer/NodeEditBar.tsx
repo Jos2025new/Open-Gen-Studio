@@ -3,6 +3,7 @@ import type { VectorShape } from '../../engine/types';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { NODE_EDIT_MODES, NODE_EDIT_MODES_READY, setEraseRadius, setNodeEditMode, useNodeEditMode, type NodeEditMode } from '../../engine/design/nodeEditMode';
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
+import { activeSelectMode, segOnly } from './selectModeActions';
 import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { InlineChoice, InlineSlider } from './InlineControls';
 import { Popover, usePopover } from '../ui/Popover';
@@ -54,9 +55,9 @@ export function NodeMoreMenu({ sessionId, docId, layerId, shape }: { sessionId: 
         {nodes.length >= 2 && <>
           <button type="button" className="opt" data-tip="Merge selected ends, or weld adjacent selected nodes if there are no end pairs (Shift+J)" onClick={() => setJoinEnds(sessionId, docId, layerId, shape, nodes, 'merge')}>Join</button>
           <button type="button" className="opt" data-tip="Join the selected end nodes with a straight segment (Alt+J)" onClick={() => setJoinEnds(sessionId, docId, layerId, shape, nodes, 'segment')}>Join with segment</button>
-          <button type="button" className="opt" data-tip="Delete the segments between adjacent selected nodes; open or split the path" onClick={() => setDeleteSegments(sessionId, docId, layerId, shape, nodes)}>Delete segment</button>
-          <button type="button" className="opt" data-tip="Segments between the selected nodes become straight (Shift+L)" onClick={() => setSegmentsTo(sessionId, docId, layerId, shape, nodes, 'line')}>Make line</button>
-          <button type="button" className="opt" data-tip="Straight segments between the selected nodes become curves (Shift+U)" onClick={() => setSegmentsTo(sessionId, docId, layerId, shape, nodes, 'curve')}>Make curve</button>
+          <button type="button" className="opt" data-tip="Delete the segments between adjacent selected nodes; open or split the path" onClick={() => setDeleteSegments(sessionId, docId, layerId, shape, nodes, segOnly(shape, activeSelectMode(), edit))}>Delete segment</button>
+          <button type="button" className="opt" data-tip="Segments between the selected nodes become straight (Shift+L)" onClick={() => setSegmentsTo(sessionId, docId, layerId, shape, nodes, 'line', segOnly(shape, activeSelectMode(), edit))}>Make line</button>
+          <button type="button" className="opt" data-tip="Straight segments between the selected nodes become curves (Shift+U)" onClick={() => setSegmentsTo(sessionId, docId, layerId, shape, nodes, 'curve', segOnly(shape, activeSelectMode(), edit))}>Make curve</button>
         </>}
         {one != null && <button type="button" className="opt" data-tip="Remove the picked node keeping the shape (Delete; Ctrl+Delete joins its neighbours straight)" onClick={() => deletePickedNode(sessionId, docId)}>Delete node</button>}
         {nodes.length === 0 && one == null && <span className="context-help">Pick nodes to see their operations.</span>}

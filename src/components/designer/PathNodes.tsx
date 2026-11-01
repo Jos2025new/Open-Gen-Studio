@@ -19,7 +19,7 @@ import { snapIdleFeed, snapIdleStart, snapIdleStop } from './snapIdle';
 import { boardKey } from './boardKey';
 import { PathNodeTools } from './PathNodeTools';
 import { SelectLayer, useSelectKeys } from './SelectLayer';
-import { deleteBySelection } from './selectModeActions';
+import { deleteBySelection, segOnly } from './selectModeActions';
 
 /*
  * Inkscape's Node tool on a path shape in edit mode (docs/plan-edicion-formas.md): square nodes, round handles on
@@ -77,7 +77,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
       if (e.key.toLowerCase() === 'b') { stop(); setBreakNodes(sessionId, docId, layerId, shape, selected); return; }
       // Shift+L / Shift+U: segments to line / curve; taken here so the L and U tool keys never fire.
       const seg = ({ l: 'line', u: 'curve' } as Record<string, 'line' | 'curve'>)[e.key.toLowerCase()];
-      if (seg) { stop(); setSegmentsTo(sessionId, docId, layerId, shape, selected, seg); return; }
+      if (seg) { stop(); setSegmentsTo(sessionId, docId, layerId, shape, selected, seg, segOnly(shape, selMode, edit)); return; }
       const t = ({ c: 'c', s: 's', y: 'z' } as Record<string, NodeType>)[e.key.toLowerCase()];
       if (t && picked != null) { stop(); setPathNodeType(sessionId, docId, layerId, shape, picked, t); }
     };
@@ -225,7 +225,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
         onPointerCancel: () => { drag.current = null; snapIdleStop(); setBox(null); },
       };
       return p.kind === 'node'
-        ? <rect key={`n${p.seg}`} className={`stroke-ruler-handle shape-knot path-node${selected.includes(nodeSegs(segs).seg.indexOf(p.seg)) ? ' is-picked' : ''}${selMode !== 'node' ? ' is-dim' : ''}`} data-node={p.seg} data-tip="Node · Shift-click to add or remove · drag selected nodes together" x={c.x - (selMode === 'node' ? 4.5 : 3)} y={c.y - (selMode === 'node' ? 4.5 : 3)} width={selMode === 'node' ? 9 : 6} height={selMode === 'node' ? 9 : 6} {...handlers} />
+        ? <rect key={`n${p.seg}`} className={`stroke-ruler-handle shape-knot path-node${selected.includes(nodeSegs(segs).seg.indexOf(p.seg)) ? ' is-picked' : ''}${selMode !== 'node' ? ' is-dim' : ''}`} data-node={p.seg} style={picking ? { pointerEvents: 'none' } : undefined} data-tip="Node · Shift-click to add or remove · drag selected nodes together" x={c.x - (selMode === 'node' ? 4.5 : 3)} y={c.y - (selMode === 'node' ? 4.5 : 3)} width={selMode === 'node' ? 9 : 6} height={selMode === 'node' ? 9 : 6} {...handlers} />
         : <circle key={`h${p.seg}-${p.k}`} className="stroke-ruler-handle shape-knot path-handle" data-handle={`${p.seg}-${p.k}`} data-tip="Curve handle · drag to shape the curve" cx={c.x} cy={c.y} r={4} {...handlers} />;
     })}
   </svg>{(mode === 'cut' || mode === 'erase' || mode === 'lasso') && <PathNodeTools mode={mode} view={view} sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} selected={selected} />}</>;
@@ -268,8 +268,8 @@ function patchNodeGroup(sessionId: string, docId: string, layerId: string, shape
 }
 
 /** Segments between selected neighbouring nodes to line or curve (Shift+L / Shift+U), one undo step. */
-export function setSegmentsTo(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], to: 'line' | 'curve'): void {
-  const segs = pageSegs(shape), r = segmentsTo(segs, readTypes(segs, shape.nodeTypes), selected, to);
+export function setSegmentsTo(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], to: 'line' | 'curve', only?: number[]): void {
+  const segs = pageSegs(shape), r = segmentsTo(segs, readTypes(segs, shape.nodeTypes), selected, to, only);
   if (!r) return;
   const next = withSegs(shape, r.segs);
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
@@ -308,5 +308,6 @@ export function setDeleteSegments(sessionId: string, docId: string, layerId: str
   const next = withSegs(shape, r.segs);
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
   const edit = useShapeEdit.getState().byDoc[docId];
-  if (edit) setShapeEdit(docId, { ...edit, node: r.nodes[0], nodes: r.nodes });
+  // Picked segments (`only`): clear the selection like Blender, or the surviving ends would re-select another edge joining them.
+  if (edit) setShapeEdit(docId, only ? { ...edit, node: undefined, nodes: [], segs: undefined, faces: undefined } : { ...edit, node: r.nodes[0], nodes: r.nodes });
 }

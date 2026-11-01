@@ -229,14 +229,14 @@ export function fitCubic(pts: Pt[], h1: Pt, h2: Pt, u0?: number[]): [Pt, Pt] | n
  * symmetric (node.cpp L203–239 changes the type when a handle retracts): here it becomes a cusp. Null if no segment
  * has both ends selected.
  */
-export function segmentsTo(segs: Seg[], types: NodeType[], selected: number[], to: 'line' | 'curve'): { segs: Seg[]; types: NodeType[] } | null {
+export function segmentsTo(segs: Seg[], types: NodeType[], selected: number[], to: 'line' | 'curve', only?: number[]): { segs: Seg[]; types: NodeType[] } | null {
   const subs = toSubs(segs), sel = new Set(selected), out = [...types];
   let changed = false;
   subs.forEach((s, si) => {
     const base = globalIndex(subs, si, 0), m = s.nodes.length;
     s.edges.forEach((e, k) => {
       const a = base + k, b = base + ((k + 1) % m);
-      if (!sel.has(a) || !sel.has(b)) return;
+      if (!sel.has(a) || !sel.has(b) || (only && !only.includes(a))) return;
       if (to === 'line' && e.c === 'C') {
         s.edges[k] = { c: 'L' };
         for (const n of [a, b]) if (out[n] !== 'c') out[n] = 'c';

@@ -172,3 +172,41 @@ it('the strip shows Node · Segment · Face with aria-checked, only in Move or L
   expect(host.querySelector('.node-select')).toBeNull();
   await act(async () => root.unmount()); host.remove();
 });
+
+const SQ = (x: number, y: number, s: number, cw = true) => (cw ? `M ${x} ${y} L ${x + s} ${y} L ${x + s} ${y + s} L ${x} ${y + s} Z` : `M ${x} ${y} L ${x} ${y + s} L ${x + s} ${y + s} L ${x + s} ${y} Z`);
+
+it('faces: overlapping contours are siblings, only a wholly contained one is nested', () => {
+  const faces = facesOf(parseSegs(`${SQ(0, 0, 100)} ${SQ(50, 50, 100)}`));
+  expect(faces.map((f) => [f.hole, f.holes])).toEqual([[false, []], [false, []]]);
+  expect(facesOf(parseSegs(`${SQ(0, 0, 100)} ${SQ(30, 30, 40, false)}`)).map((f) => f.hole)).toEqual([false, true]);
+});
+
+it('faces: nonzero holes need the opposite winding, evenodd uses depth parity', () => {
+  const same = `${SQ(0, 0, 100)} ${SQ(30, 30, 40)}`, opp = `${SQ(0, 0, 100)} ${SQ(30, 30, 40, false)}`;
+  expect(facesOf(parseSegs(same)).map((f) => [f.hole, f.holes])).toEqual([[false, []], [false, []]]); // nonzero: an island
+  expect(facesOf(parseSegs(same), 'evenodd').map((f) => f.hole)).toEqual([false, true]);
+  expect(facesOf(parseSegs(opp), 'nonzero').map((f) => [f.hole, f.holes])).toEqual([[false, [1]], [true, []]]);
+  const three = `${SQ(0, 0, 100)} ${SQ(20, 20, 60, false)} ${SQ(40, 40, 20)}`; // CW, CCW hole, CW island in the hole
+  expect(facesOf(parseSegs(three)).map((f) => f.hole)).toEqual([false, true, false]);
+});
+
+it('segment mode: More > Delete segment and Shift+L act only on the picked segments', async () => {
+  const t = fresh();
+  const sq = 'M 0 0 L 100 0 L 100 100 L 0 100 Z';
+  const put = () => { const sh = t.shapes()[0]; return { ...sh, d: sq } as VectorShape; };
+  const { setDeleteSegments, setSegmentsTo } = await import('../src/components/designer/PathNodes');
+  const { segOnly } = await import('../src/components/designer/selectModeActions');
+  useNodeEditMode.setState({ select: 'segment' });
+  const shape = put(); const edit = { layerId: t.layer.id, shapeId: shape.id, node: 0, nodes: [0, 1, 2, 3], segs: [0, 2] };
+  expect(segOnly(shape, 'segment', edit as never)).toEqual([0, 2]);
+  expect(segOnly(shape, 'node', edit as never)).toBeUndefined();
+  const { patchShape } = await import('../src/components/designer/ShapeLookFields');
+  patchShape(t.sid, t.doc.id, t.layer.id, shape.id, { d: sq, box0: { x: 0, y: 0, w: 100, h: 100 }, x: 0, y: 0, w: 100, h: 100 });
+  setShapeEdit(t.doc.id, edit as never);
+  setDeleteSegments(t.sid, t.doc.id, t.layer.id, t.shapes()[0], [0, 1, 2, 3], [0, 2]);
+  expect(t.shapes()[0].d!.match(/[LC]/g)).toHaveLength(2); // sides 1 and 3 survive as two pieces (all four would leave nothing)
+  expect(t.edit().nodes).toEqual([]); expect(t.edit().segs).toBeUndefined(); // selection cleared
+  undoDoc(t.sid, t.doc.id);
+  setSegmentsTo(t.sid, t.doc.id, t.layer.id, t.shapes()[0], [0, 1, 2, 3], 'curve', [0]);
+  expect(t.shapes()[0].d!.match(/C/g)).toHaveLength(1);
+});

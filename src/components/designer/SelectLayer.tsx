@@ -20,12 +20,14 @@ interface Props {
 const PICK_PX = 8;
 
 export function SelectLayer({ svg, sessionId, docId, layerId, shape, segs, types, edit, mode, interactive, scr, page }: Props) {
-  const key = serializeSegs(segs);
+  const key = mode === 'node' ? '' : serializeSegs(segs); // only the pick modes depend on the path
   const edges = useMemo(() => (mode === 'segment' ? edgesOf(segs) : []), [key, mode]); // eslint-disable-line react-hooks/exhaustive-deps
-  const faces = useMemo(() => (mode === 'face' ? facesOf(segs) : []), [key, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const faces = useMemo(() => (mode === 'face' ? facesOf(segs, shape.fillRule) : []), [key, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const mine = edit?.shapeId === shape.id ? edit : undefined;
   const sel = useMemo(() => currentSel(shape, mine, mode), [key, mine, mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const [hover, setHover] = useState<number | null>(null);
+  const rect = useRef<DOMRect | null>(null), raf = useRef(0); // the svg's rect, read once per gesture; hover picks at most once a frame
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
   const drag = useRef<{ base: Seg[]; shape: VectorShape; nodes: number[]; from: { x: number; y: number }; client: { x: number; y: number }; moved: boolean } | null>(null);
   // Keep ShapeEdit whole: nodes are exactly the selected elements' nodes, and the elements are stored only in their own mode.
   useEffect(() => {
@@ -34,7 +36,7 @@ export function SelectLayer({ svg, sessionId, docId, layerId, shape, segs, types
     const same = (a: number[] | undefined, b: number[]) => [...(a ?? [])].sort((x, y) => x - y).join() === [...b].sort((x, y) => x - y).join();
     if (!same(mine.nodes ?? (mine.node == null ? [] : [mine.node]), sel.nodes) || !same(mine.segs, sel.segs) || !same(mine.faces, sel.faces)) writeSel(docId, mine, sel);
   }, [mine, sel, mode, docId]);
-  const pt = (e: { clientX: number; clientY: number }): Pt => { const r = svg.current!.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const pt = (e: { clientX: number; clientY: number }): Pt => { const r = (rect.current ??= svg.current!.getBoundingClientRect()); return [e.clientX - r.left, e.clientY - r.top]; };
   const toScr = (p: Pt): Pt => { const c = scr(p); return [c.x, c.y]; };
   const pickAt = (e: { clientX: number; clientY: number }): number | null => {
     if (mode === 'segment') return pickEdge(edges, toScr, pt(e), PICK_PX)?.id ?? null;
@@ -43,6 +45,7 @@ export function SelectLayer({ svg, sessionId, docId, layerId, shape, segs, types
   };
   const onDown = (e: React.PointerEvent<SVGRectElement>) => {
     if (e.button !== 0 || !interactive) return;
+    rect.current = null;
     const id = pickAt(e);
     if (id == null) return; // empty space: the marquee takes it
     e.stopPropagation();
@@ -54,17 +57,22 @@ export function SelectLayer({ svg, sessionId, docId, layerId, shape, segs, types
   };
   const onMove = (e: React.PointerEvent<SVGRectElement>) => {
     const d = drag.current;
-    if (!d) { if (interactive) setHover(pickAt(e)); return; }
+    if (!d) {
+      if (!interactive || raf.current) return;
+      const at = { clientX: e.clientX, clientY: e.clientY };
+      raf.current = requestAnimationFrame(() => { raf.current = 0; rect.current = null; setHover(pickAt(at)); });
+      return;
+    }
     if (!d.moved && Math.hypot(e.clientX - d.client.x, e.clientY - d.client.y) <= 2) return;
     const q = page(e, d.shape), next = withSegs(d.shape, moveSelectedNodes(d.base, d.nodes, q.x - d.from.x, q.y - d.from.y, types));
     patchShape(sessionId, docId, layerId, d.shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h }, { record: !d.moved });
     d.moved = true;
   };
-  const end = () => { drag.current = null; };
+  const end = () => { drag.current = null; rect.current = null; };
   const edgePath = (id: number) => { const e = edges.find((x) => x.id === id); return e ? serializeSegs([{ c: 'M', p: [toScr(e.from)] }, { c: e.seg.c, p: e.seg.p.map(toScr) }]) : ''; };
   const facePath = (id: number) => { const f = faces.find((x) => x.id === id); return f ? serializeSegs(f.segs.map((g) => ({ c: g.c, p: g.p.map(toScr) }))) : ''; };
   return <g className="sel-layer">
-    {interactive && mode !== 'node' && <rect className="node-marquee-hit sel-hit" x="0" y="0" width="100%" height="100%" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end} onPointerLeave={() => setHover(null)} />}
+    {interactive && mode !== 'node' && <rect className="node-marquee-hit sel-hit" x="0" y="0" width="100%" height="100%" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end} onPointerLeave={() => { rect.current = null; cancelAnimationFrame(raf.current); raf.current = 0; setHover(null); }} />}
     {mode === 'segment' && hover != null && !sel.segs.includes(hover) && <path className="sel-seg is-hover" d={edgePath(hover)} />}
     {mode === 'segment' && sel.segs.map((id) => <path key={id} className="sel-seg" data-seg={id} d={edgePath(id)} />)}
     {mode === 'face' && hover != null && !sel.faces.includes(hover) && <path className="sel-face is-hover" d={facePath(hover)} />}

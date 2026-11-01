@@ -19,8 +19,15 @@ export const nodesOf = (edit?: ShapeEdit): number[] => edit?.nodes ?? (edit?.nod
 /** What the edited shape has selected in `mode`. */
 export function currentSel(shape: VectorShape, edit: ShapeEdit | undefined, mode: SelectMode): Sel {
   const segs = pageSegs(shape);
-  return effectiveSel(mode === 'segment' ? edgesOf(segs) : [], mode === 'face' ? facesOf(segs) : [], mode, nodesOf(edit), edit);
+  return effectiveSel(mode === 'segment' ? edgesOf(segs) : [], mode === 'face' ? facesOf(segs, shape.fillRule) : [], mode, nodesOf(edit), edit);
 }
+
+/**
+ * The segments a per-segment action (Delete segment, Make line / curve) is limited to: the picked ones in Segment mode, so two
+ * opposite sides of a square do not drag in the other two; undefined otherwise (Node mode: every segment between selected
+ * nodes; Face mode: the faces' own segments). Join, Break and the node types act on the selected nodes in every mode.
+ */
+export const segOnly = (shape: VectorShape, mode: SelectMode, edit?: ShapeEdit): number[] | undefined => (mode === 'segment' ? currentSel(shape, edit, mode).segs : undefined);
 
 /** Write a selection (nodes plus the segments or faces they stand for) to the shape's edit state. */
 export function writeSel(docId: string, edit: ShapeEdit, sel: Sel): void {
@@ -35,7 +42,7 @@ export function chooseSelectMode(docId: string, shape: VectorShape, mode: Select
   useNodeEditMode.setState({ select: mode });
   if (!mine || !cur) return;
   const segs = pageSegs(shape);
-  writeSel(docId, edit, deriveSel(mode === 'segment' ? edgesOf(segs) : [], mode === 'face' ? facesOf(segs) : [], mode, cur.nodes));
+  writeSel(docId, edit, deriveSel(mode === 'segment' ? edgesOf(segs) : [], mode === 'face' ? facesOf(segs, shape.fillRule) : [], mode, cur.nodes));
 }
 
 /**
@@ -46,7 +53,7 @@ export function deleteBySelection(sessionId: string, docId: string, layerId: str
   if (mode === 'node') return false;
   const edit = useShapeEdit.getState().byDoc[docId], sel = currentSel(shape, edit, mode);
   if (mode === 'segment') { if (sel.segs.length) setDeleteSegments(sel.segs); return true; }
-  const segs = pageSegs(shape), r = deleteFaces(segs, readTypes(segs, shape.nodeTypes), facesOf(segs), sel.faces);
+  const segs = pageSegs(shape), r = deleteFaces(segs, readTypes(segs, shape.nodeTypes), facesOf(segs, shape.fillRule), sel.faces);
   if (!r) return true;
   if (!nodeSegs(r.segs).seg.length) {
     const layer = getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId);
