@@ -1,21 +1,14 @@
-/* Nodes: the composer as a panel at the left, beside the canvas toolbox (NodeSide.tsx). Create: as tall as its content; Agent: full height. */
-.composer-dock.dock-node { --node-side-left: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px + 15px + 10px); left: var(--node-side-left); top: 15px; bottom: auto; transform: none; width: min(340px, calc(100% - var(--node-side-left) - 15px)); max-height: calc(100% - 30px); display: flex; flex-direction: column; padding: 4px; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); overflow: hidden; }
-.composer-dock.dock-node.is-agent { bottom: 15px; }
-.composer-dock.dock-node:focus-within { border-color: var(--panel-line-focus); }
-.composer-dock.dock-node::before { content: none; }
-.dock-node .side-head { display: flex; align-items: center; gap: 4px; padding: 2px 2px 6px; flex-shrink: 0; }
-.dock-node .side-tabs { display: flex; gap: 2px; flex: 1; }
-.dock-node .side-tab { display: inline-flex; align-items: center; gap: 6px; height: var(--control-h); padding: 0 10px; border-radius: var(--radius-s); font-size: var(--fs-m); font-weight: 600; color: var(--text-3); }
-.dock-node .side-tab:hover { color: var(--text-2); }
-.dock-node .side-tab.is-active { color: var(--active-text); background: var(--active-bg); }
-.dock-node .side-fold { width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-s); color: var(--text-3); }
-.dock-node .side-fold:hover { color: var(--text); background: var(--surface-3); }
-.dock-node .side-thread { flex: 1; min-height: 0; overflow: auto; padding: 8px 8px 12px; }
-.dock-node .side-info { flex: 1 1 auto; min-height: 0; overflow: auto; margin-bottom: 6px; border-top: 1px solid var(--panel-line); }
-.dock-node .side-info-head { display: flex; align-items: center; gap: 6px; padding: 8px 4px 4px 8px; }
-.dock-node .side-info-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); font-weight: 600; }
-.dock-node .composer-alerts { flex-shrink: 0; margin: 0 2px 6px; }
-.dock-node .composer { flex-shrink: 0; }
-.dock-node .composer-footer { flex-shrink: 0; flex-wrap: wrap; padding: 6px 4px 2px; }
-.dock-node .composer-footer-start, .dock-node .composer-footer-end { flex-wrap: wrap; }
-@media (max-width: 767px) { .composer-dock.dock-node { left: 10px; top: auto; bottom: 10px; width: calc(100% - 20px); max-height: 70vh; } }
+/* Nodes: the agent's corner (NodeSide.tsx), beside the canvas toolbox, in its frame. As tall as its content, always clear of the floating prompt box; folded, a pill as tall as a toolbox row. */
+.react-flow__panel.node-side { left: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px + 25px); width: min(340px, calc(100% - var(--control-h) - 80px)); max-height: calc(100% - var(--composer-height, 120px) - 60px); display: flex; flex-direction: column; padding: 4px; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.node-side:focus-within { border-color: var(--panel-line-focus); }
+.react-flow__panel.node-side.is-folded { width: auto; min-width: 200px; }
+.node-side .side-head { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.node-side .side-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: var(--control-h); padding: 0 8px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-s); }
+.node-side .side-toggle:hover { color: var(--text); background: var(--surface-3); }
+.node-side .side-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text); }
+.node-side .side-chevron { margin-left: auto; flex-shrink: 0; }
+.node-side .side-icon { width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-s); color: var(--text-3); }
+.node-side .side-icon:hover { color: var(--text); background: var(--surface-3); }
+.node-side .side-body { min-height: 0; overflow: auto; margin-top: 4px; padding: 8px 6px 6px; border-top: 1px solid var(--panel-line); }
+.node-side .composer-alerts { margin: 0; }
+@media (max-width: 767px) { .react-flow__panel.node-side { width: calc(100% - var(--control-h) - 60px); } }

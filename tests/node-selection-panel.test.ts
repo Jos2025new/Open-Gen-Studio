@@ -18,7 +18,7 @@ it('every op with one input has its own section, in Explore · Edit · Reuse · 
 
 it('the full canvas shows the Selection panel at the top right for exactly one selected node; Studio’s board does not', () => {
   expect(panel).toMatch(/<Panel position="top-right" className="selection-panel/);
-  expect(ws).toMatch(/\{embedded \? null : <SoloSelection sessionId=\{sessionId\}/);
+  expect(ws).toMatch(/\{embedded \? null : <CanvasPanels sessionId=\{sessionId\}/);
   expect(panel).toMatch(/nodes\.length === 1 \? <SelectionPanel/);
   expect(ws).toMatch(/data: \{ node: n, solo, panel: !embedded \}/);
 });

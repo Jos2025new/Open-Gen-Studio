@@ -10,6 +10,7 @@ import { MenuItem } from '../ui/primitives';
 import { OP_ICONS } from '../assets/AssetActions';
 import { OP_GROUP_LABEL, OP_GROUP_ORDER, opGroup, type OpGroupId } from '../assets/opGroups';
 import { KIND_ICON, useNodeOutput } from './nodes';
+import { NodeSide } from './NodeSide';
 
 type Item = { key: string; icon: LucideIcon; label: string; tip?: string; detail?: string; onClick: () => void };
 
@@ -57,7 +58,12 @@ export function SelectionPanel({ sessionId, node }: { sessionId: string; node: G
   );
 }
 
-/** The Selection panel shows for exactly one selected node (with a result). */
-export function SoloSelection({ sessionId, nodes }: { sessionId: string; nodes: GraphNode[] }) {
-  return nodes.length === 1 ? <SelectionPanel key={nodes[0].id} sessionId={sessionId} node={nodes[0]} /> : null;
+/** The full canvas's side panels: the conversation and details at the left, the Selection panel (exactly one selected node with a result) at the right. */
+export function CanvasPanels({ sessionId, nodes }: { sessionId: string; nodes: GraphNode[] }) {
+  return (
+    <>
+      <NodeSide sessionId={sessionId} />
+      {nodes.length === 1 ? <SelectionPanel key={nodes[0].id} sessionId={sessionId} node={nodes[0]} /> : null}
+    </>
+  );
 }

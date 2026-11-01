@@ -27,7 +27,7 @@ import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems, NodeLibrary } from './AddNodeItems';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
-import { SoloSelection } from './SelectionPanel';
+import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations, type GroupFlowNode } from './Operations';
@@ -490,7 +490,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         {box ? <div className="node-box-select" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} /> : null}
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
-        {embedded ? null : <SoloSelection sessionId={sessionId} nodes={graph.nodes.filter((n) => selected.has(n.id))} />}
+        {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={graph.nodes.filter((n) => selected.has(n.id))} />}
         {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
