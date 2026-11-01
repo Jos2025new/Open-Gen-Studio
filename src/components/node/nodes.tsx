@@ -24,11 +24,11 @@ import { OP_ICONS } from '../assets/AssetActions';
 import { AddNext, ResultPorts } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 
-/** `solo`: this node is the only selected one, so its toolbar and settings panel show. */
-export type FlowNodeData = { node: GraphNode; solo: boolean };
+/** `solo`: this node is the only selected one, so its toolbar and settings panel show. `panel`: the canvas shows the Selection panel, which holds the result's tools. */
+export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean };
 export type FlowNode = Node<FlowNodeData>;
 
-const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage } as const;
+export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage } as const;
 
 /** `quiet`: a secondary input, shown only while a connection is being dragged (or once something is connected to it). */
 function PortHandle({ id, type, side, top, label, portType, quiet }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null; quiet?: boolean }) {
@@ -191,7 +191,7 @@ function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
   return { g, assetId: sketch ?? (all[Math.min(index, all.length - 1)] as string | undefined), all, sketch };
 }
 
-function useNodeOutput(node: GraphNode) {
+export function useNodeOutput(node: GraphNode) {
   const d = node.data;
   const genId = runsGeneration(d) ? d.generationId : undefined;
   const g = useStore((s) => (genId ? s.generations[genId] : undefined));
@@ -289,13 +289,13 @@ function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: 
   );
 }
 
-/** Floating actions above the selected node: run, quick tools on its result, open, download, duplicate, delete. */
-function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
+/** Floating actions above the selected node: run, open, duplicate, delete. Without the Selection panel (Studio's board) also the quick tools, sketch, attach and download. */
+function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | null; panel?: boolean }) {
   const sessionId = useSessionId();
   const { assetId, all, sketch } = useNodeOutput(node);
   const runnable = runsGeneration(node.data);
   const detached = useStore(s => detachedOutputGroup(s.sessions[sessionId]?.graph, node.id));
-  const quick = assetId && out ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
+  const quick = assetId && out && !panel ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
   return (
     <div className="nt-bar">
       {runnable ? <RunButton node={node} /> : null}
@@ -309,14 +309,14 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
           </button>
         );
       })}
-      {assetId && out ? <MoreTools node={node} out={out} skip={quick} /> : null}
+      {assetId && out && !panel ? <MoreTools node={node} out={out} skip={quick} /> : null}
       {runnable || quick.length ? <span className="nt-sep" /> : null}
       {assetId ? (
         <>
           <button type="button" className="nt-btn nt-icon nodrag" aria-label="Open" data-tip="Open" onClick={() => setUi({ lightbox: { assetIds: all, index: Math.max(0, all.indexOf(assetId)) } })}>
             <Maximize2 size={14} />
           </button>
-          {out === 'image' ? (
+          {out === 'image' && !panel ? (
             <button type="button" className="nt-btn nodrag" data-tip="Paint over the image; the edited version is what goes downstream" onClick={() => setUi({ sketch: { assetId, nodeId: node.id } })}>
               <Brush size={13} /> Sketch
             </button>
@@ -326,12 +326,16 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
               <RotateCcw size={13} /> Reset image
             </button>
           ) : null}
-          <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => useAsReference(assetId)}>
-            <Paperclip size={14} />
-          </button>
-          <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
-            <Download size={14} />
-          </button>
+          {panel ? null : (
+            <>
+              <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => useAsReference(assetId)}>
+                <Paperclip size={14} />
+              </button>
+              <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
+                <Download size={14} />
+              </button>
+            </>
+          )}
         </>
       ) : null}
       <button type="button" className="nt-btn nt-icon nodrag" aria-label="Duplicate" data-tip="Duplicate" onClick={() => duplicateNode(sessionId, node)}>
@@ -762,7 +766,7 @@ function NodeTitle({ sessionId, node }: { sessionId: string; node: GraphNode }) 
 }
 
 export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps<FlowNode>) {
-  const { node, solo } = data;
+  const { node, solo, panel: inPanel } = data;
   const assets = useStore((s) => s.assets);
   const sessionId = useSessionId();
   const inputs = inputPorts(node.data);
@@ -781,7 +785,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
   return (
     <>
       <NodeToolbar isVisible={showTools} position={Position.Top} offset={34}>
-        <NodeActions node={node} out={out} />
+        <NodeActions node={node} out={out} panel={inPanel} />
       </NodeToolbar>
       {panel ? (
         <NodeToolbar isVisible={showTools} position={Position.Bottom} offset={12}>

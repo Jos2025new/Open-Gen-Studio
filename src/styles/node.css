@@ -211,3 +211,11 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .cut-trail { position: absolute; inset: 0; z-index: 6; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .cut-trail polyline { fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; stroke-linejoin: round; }
 .react-flow__edge.is-cut-hit .react-flow__edge-path { stroke: var(--danger) !important; stroke-width: 3; }
+/* Selection panel: the selected node's result tools, by section, at the top right (same frame as the canvas toolbox). */
+.selection-panel { width: 240px; max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; padding: 4px; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.selection-panel .sp-head { display: flex; align-items: center; gap: 8px; padding: 9px 9px 7px; color: var(--text); font-size: var(--fs-s); }
+.selection-panel .sp-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.selection-panel .sp-size { flex-shrink: 0; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.selection-panel .sp-group + .sp-group { border-top: 1px solid var(--panel-line); margin-top: 4px; padding-top: 2px; }
+.selection-panel .menu-sep-label { padding: 8px 9px 3px; }
+.selection-panel .menu-item { padding: 6px 9px; font-size: var(--fs-s); }

@@ -3,7 +3,7 @@ type: inventario
 title: Tarjeta de nodo: título, resultado, historial y barra de acciones
 description: Piezas comunes a todos los nodos (título, estado, vista previa, tira de resultados, historial de generaciones, barra flotante de acciones) con sus condiciones de montaje.
 tags: [nodes, tarjeta, resultados]
-updated: 2026-10-28
+updated: 2026-10-31
 related: [nodos-generacion, nodos-herramienta, nodos-texto-asset, ejecucion, puertos-enlaces]
 ---
 # Tarjeta de nodo
@@ -36,12 +36,24 @@ related: [nodos-generacion, nodos-herramienta, nodos-texto-asset, ejecucion, pue
 | --- | --- | --- | --- | --- | --- | --- |
 | Run (o `$` estimado en el panel) | `nodes.tsx:59` | Nodos que ejecutan (imagen, vídeo, audio, 3D, herramienta) | `previewRun` | Abre la revisión de gasto | [ejecucion](ejecucion.md) | La barra muestra solo «Run»; el botón grande del panel lleva el coste |
 | Detach outputs / Reattach outputs | `nodes.tsx:302` | Nodo con generación terminada de 2+ resultados y sin sketch; «Reattach» si ya está desacoplado | `useNodeOutput`, grupos | `detachOutputs` / `reattachOutputs` (`arrange.ts:196`) | Grafo | Una tarjeta por resultado; el original conserva su id en el resultado elegido |
-| Acción rápida (Relight, Change angle, Upscale, Remove background…) | `nodes.tsx:306` | Nodo con resultado; hasta 4 operaciones `quick` cuya entrada coincide con la salida del nodo | `OPS[id].quick` | `addConnected` con un nodo de herramienta | Grafo | Para imagen salen las 4 primeras (Relight, Change angle, Upscale, Remove background); «Animate» (también `quick`) queda en More tools por el corte `slice(0, 4)` (`nodes.tsx:297`) |
-| More tools (…) | `nodes.tsx:276` | Nodo con resultado | Operaciones sin varias entradas con esa entrada y no mostradas arriba | `addConnected` | Grafo | Incluye «Panorama» (Reframe a 21:9) para imágenes (`nodes.tsx:281`) y también las operaciones de máscara y voz; ver [hallazgos](hallazgos.md) |
+| Acción rápida (Relight, Change angle, Upscale, Remove background…) | `nodes.tsx:306` | Solo en el tablero de Studio (sin panel Selección); nodo con resultado; hasta 4 operaciones `quick` cuya entrada coincide con la salida del nodo | `OPS[id].quick`, `panel` | `addConnected` con un nodo de herramienta | Grafo | En el lienzo completo pasa al [panel Selección](#panel-selección-arriba-a-la-derecha) (2026-10-31). Para imagen salen las 4 primeras; «Animate» queda en More tools por el corte `slice(0, 4)` |
+| More tools (…) | `nodes.tsx:276` | Solo en el tablero de Studio; nodo con resultado | Operaciones sin varias entradas con esa entrada y no mostradas arriba | `addConnected` | Grafo | Incluye «Panorama» (Reframe a 21:9) y las operaciones de máscara y voz; en el lienzo completo, todo está en el panel Selección; ver [hallazgos](hallazgos.md) |
 | Open | `nodes.tsx:315` | Nodo con resultado | `all`, `assetId` | `setUi({ lightbox })` | Visor | |
-| Sketch | `nodes.tsx:7` | Nodo con resultado de tipo imagen | `assetId` | `setUi({ sketch: { assetId, nodeId } })` | Editor Sketch | Guardar deja una copia pintada que sustituye al resultado aguas abajo (`SketchEditor.tsx:192`) |
+| Sketch | `nodes.tsx:7` | Solo en el tablero de Studio; nodo con resultado de tipo imagen | `assetId` | `setUi({ sketch: { assetId, nodeId } })` | Editor Sketch | En el lienzo completo, en el panel Selección (Edit). Guardar deja una copia pintada que sustituye al resultado aguas abajo (`SketchEditor.tsx:192`) |
 | Reset image | `nodes.tsx:247` | Nodo con sketch | `sketch` | `setSketch(undefined)`: descarta el sketch y borra su copia (`flow/actions.ts:125`) | Resultado aguas abajo | La copia pintada se elimina sin confirmar |
-| Attach to prompt | `nodes.tsx:328` | Nodo con resultado | `assetId` | `useAsReference`: añade el asset a los adjuntos del Composer y le da foco (`engine/actions.ts:581`) | Composer | Un 3D entra como su imagen de vista; si aún no la tiene avisa |
-| Download | `nodes.tsx:331` | Nodo con resultado | `assetId` | `downloadAsset` | Archivo local | |
+| Attach to prompt | `nodes.tsx:328` | Solo en el tablero de Studio; nodo con resultado | `assetId` | `useAsReference`: añade el asset a los adjuntos del Composer y le da foco (`engine/actions.ts:581`) | Composer | En el lienzo completo, en el panel Selección (Reuse). Un 3D entra como su imagen de vista; si aún no la tiene avisa |
+| Download | `nodes.tsx:331` | Solo en el tablero de Studio; nodo con resultado | `assetId` | `downloadAsset` | Archivo local | En el lienzo completo, en el panel Selección (Finalize) |
 | Duplicate | `nodes.tsx:336` | Siempre en la barra | Nodo | `duplicateNode` | Grafo | |
 | Delete (papelera con confirmación) | `nodes.tsx:86` | Siempre en la barra | Nodo | Abre «Delete “título”? Its results stay in the gallery.»; Delete lo borra (`nodes.tsx:100`) | Grafo | Es la única vía de borrado de nodos con confirmación; el resto (Supr, panel, menú) no la pide |
+
+## Panel Selección (arriba a la derecha)
+
+Desde 2026-10-31, en el lienzo completo (no en el tablero de Studio), un único nodo seleccionado **con resultado** muestra el panel `SelectionPanel` (`SelectionPanel.tsx:20`, montado por `SoloSelection` desde `NodeWorkspace.tsx`), con el marco de la toolbox. Las herramientas sobre el resultado salen de la barra del nodo y se agrupan aquí; la barra conserva Run, Detach/Reattach outputs, Open, Reset image, Duplicate y Delete. Sin resultado, el panel no se dibuja.
+
+| Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cabecera | `SelectionPanel.tsx` | Siempre que hay panel | Asset elegido | — | — | Icono del tipo, título del nodo, tamaño en píxeles y `n/N` si hay varios resultados |
+| Operación (Explore, Edit, Reuse, Finalize) | `SelectionPanel.tsx` | Todas las operaciones de una entrada cuya entrada coincide con la salida del nodo | `OPS`, `opGroup` (`assets/opGroups.ts`) | `addConnected` con un nodo de herramienta (igual que la barra antes) | Grafo | La sección de cada operación está en `OP_GROUPS`; un test exige que toda operación de una entrada tenga sección. El nodo nuevo queda a la derecha del origen y puede quedar bajo el panel; la selección no cambia |
+| Panorama | `SelectionPanel.tsx` | Imagen, en Edit tras Reframe | — | `addConnected` con Reframe a 21:9 | Grafo | |
+| Sketch, Attach to prompt, Download | `SelectionPanel.tsx` | Sketch solo para imagen; los otros con cualquier resultado | `assetId` | Lo mismo que en la barra (filas de arriba) | | Secciones Edit, Reuse y Finalize |
+
