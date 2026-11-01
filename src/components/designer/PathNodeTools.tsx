@@ -9,6 +9,7 @@ import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection'
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
+import { bandScreenPath, eraseFilled, isFilledArea, knifeFilled } from './areaTools';
 import '../../styles/path-tools.css';
 
 const CUT_REACH = 12; // screen px from the path that a hover or click still counts as on it
@@ -16,6 +17,7 @@ export const MARK = 9; // half length of the cut mark, screen px
 
 /** Cut a path at one point, or along a line: the pieces replace it in one undo step. False when nothing was cut. */
 export function cutShape(sessionId: string, docId: string, layerId: string, shape: VectorShape, how: { at: PathHit } | { across: [Pt, Pt] }): boolean {
+  if ('across' in how && isFilledArea(shape)) return knifeFilled(sessionId, docId, layerId, shape, how.across);
   const segs = pageSegs(shape), out = 'at' in how ? cutPathAt(segs, how.at.segmentIndex, how.at.t) : cutPathAcross(segs, how.across[0], how.across[1]);
   const pieces = usablePieces(out);
   if (pieces.length === 1 && out.length === 1 && serializeSegs(pieces[0]) === serializeSegs(segs)) return false;
@@ -52,8 +54,9 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
   const radiusPx = useNodeEditMode((s) => s.eraseRadius);
   const edit = useShapeEdit((s) => s.byDoc[docId]);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  const [band, setBand] = useState('');
   const [trail, setTrail] = useState<Array<{ x: number; y: number }>>([]);
-  const gesture = useRef<{ start: { x: number; y: number }; moved: boolean; erase?: EraseSession; shift: boolean; pts: Array<{ x: number; y: number }> } | null>(null);
+  const gesture = useRef<{ start: { x: number; y: number }; moved: boolean; erase?: EraseSession; area?: Pt[]; shift: boolean; pts: Array<{ x: number; y: number }> } | null>(null);
   const rect = () => ref.current!.getBoundingClientRect();
   const local = (p: { x: number; y: number }): Pt => { const q = screenToDocument({ x: p.x + rect().left, y: p.y + rect().top }, view, rect()); return toLocal(shape, q.x, q.y); };
   const scr = (p: Pt) => { const [x, y] = toPage(shape, p[0], p[1]); return documentToScreen({ x, y }, view, { left: 0, top: 0 }); };
@@ -66,7 +69,8 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = at(e);
     gesture.current = { start: p, moved: false, shift: e.shiftKey, pts: [p] };
-    if (mode === 'erase') {
+    if (mode === 'erase' && isFilledArea(shape)) { gesture.current.area = [local(p)]; setBand(bandScreenPath(gesture.current.area, radiusPx / view.zoom, scr)); }
+    else if (mode === 'erase') {
       gesture.current.erase = new EraseSession(sessionId, docId, layerId, shape, layerShapes(sessionId, docId, layerId));
       gesture.current.erase.sample(local(p), radiusPx / view.zoom);
     }
@@ -75,6 +79,11 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
     const p = at(e), g = gesture.current;
     setHover(p);
     if (!g) return;
+    if (g.area) {
+      const lp = local(p), prev = g.area[g.area.length - 1];
+      if (Math.hypot(lp[0] - prev[0], lp[1] - prev[1]) * view.zoom >= 2) { g.area.push(lp); setBand(bandScreenPath(g.area, radiusPx / view.zoom, scr)); }
+      return;
+    }
     if (mode === 'erase') { g.erase?.sample(local(p), radiusPx / view.zoom); return; }
     if (!g.moved && Math.hypot(p.x - g.start.x, p.y - g.start.y) <= 3) return;
     g.moved = true;
@@ -86,8 +95,9 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
   };
   const up = (e: React.PointerEvent) => {
     const g = gesture.current, p = at(e);
-    gesture.current = null; setTrail([]);
+    gesture.current = null; setTrail([]); setBand('');
     if (!g) return;
+    if (g.area) { const lp = local(p), last = g.area[g.area.length - 1]; if (Math.hypot(lp[0] - last[0], lp[1] - last[1]) > 0) g.area.push(lp); eraseFilled(sessionId, docId, layerId, shape, g.area, radiusPx / view.zoom); return; }
     if (mode === 'cut') {
       if (g.moved) cutShape(sessionId, docId, layerId, shape, { across: [local(g.start), local(p)] });
       else { const h = near(p); if (h) cutShape(sessionId, docId, layerId, shape, { at: h }); }
@@ -108,10 +118,11 @@ export function PathNodeTools({ mode, view, sessionId, docId, layerId, shape, se
       mark = { a: { x: c.x + ty * MARK, y: c.y - tx * MARK }, b: { x: c.x - ty * MARK, y: c.y + tx * MARK }, c };
     }
   }
-  return <svg ref={ref} className={`stroke-ruler shape-knots path-tools is-${mode}`} aria-label={`Path ${mode} tool`} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { gesture.current = null; setTrail([]); }} onPointerLeave={() => setHover(null)}>
+  return <svg ref={ref} className={`stroke-ruler shape-knots path-tools is-${mode}`} aria-label={`Path ${mode} tool`} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { gesture.current = null; setTrail([]); setBand(''); }} onPointerLeave={() => setHover(null)}>
     <rect className="path-tools-hit" x="0" y="0" width="100%" height="100%" />
     {mark && <><line className="cut-mark" x1={mark.a.x} y1={mark.a.y} x2={mark.b.x} y2={mark.b.y} /><circle className="cut-dot" cx={mark.c.x} cy={mark.c.y} r={3.5} /></>}
     {mode === 'cut' && trail.length === 2 && <line className="cut-rubber" x1={trail[0].x} y1={trail[0].y} x2={trail[1].x} y2={trail[1].y} />}
+    {band && <path className="erase-band" d={band} />}
     {mode === 'erase' && hover && <><circle className="erase-halo" cx={hover.x} cy={hover.y} r={radiusPx} /><circle className="erase-ring" cx={hover.x} cy={hover.y} r={radiusPx} data-erase-radius={radiusPx} /></>}
     {mode === 'lasso' && trail.length > 1 && <polygon className="lasso-loop" points={trail.map((q) => `${q.x},${q.y}`).join(' ')} />}
   </svg>;

@@ -4,6 +4,7 @@ import { getDoc, patchLayer } from '../../engine/design/actions';
 import { objectPick, onShapeEditLeave, setObjectPick, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { markNodeEditSplit, useNodeEditMode } from '../../engine/design/nodeEditMode';
 import { pageSegs } from '../../engine/design/pathNodes';
+import { splitComponents } from '../../engine/design/pathBoolean';
 import { uid } from '../../lib/id';
 
 /** Pieces worth a shape: a lone moveto draws nothing. */
@@ -29,7 +30,7 @@ export function replaceWithPieces(sessionId: string, docId: string, layerId: str
  * piece stays editable and the mode continues (Figma). `split` marks the session: leaving node editing then separates
  * them. Fewer than one piece removes the shape. One patchLayer = one undo step (`record: false` continues it).
  */
-export function replaceWithSubpaths(sessionId: string, docId: string, layerId: string, base: VectorShape[], shape: VectorShape, pieces: Seg[][], opts: { record?: boolean; split?: boolean } = {}): void {
+export function replaceWithSubpaths(sessionId: string, docId: string, layerId: string, base: VectorShape[], shape: VectorShape, pieces: Seg[][], opts: { record?: boolean; split?: boolean; /** Pieces counted before the first cut (components for filled areas); default: subpaths. */ before?: number } = {}): void {
   if (!pieces.length) {
     patchLayer(sessionId, docId, layerId, { shapes: base.filter((s) => s.id !== shape.id) }, { record: opts.record });
     setShapeEdit(docId, null);
@@ -37,7 +38,7 @@ export function replaceWithSubpaths(sessionId: string, docId: string, layerId: s
   }
   const made = { ...withSegs(shape, pieces.flat()), id: shape.id, nodeTypes: undefined } as VectorShape;
   patchLayer(sessionId, docId, layerId, { shapes: base.map((s) => (s.id === shape.id ? made : s)) }, { record: opts.record });
-  if (opts.split) markNodeEditSplit(sessionId, subpathsOf(pageSegs(shape)).length);
+  if (opts.split) markNodeEditSplit(sessionId, opts.before ?? subpathsOf(pageSegs(shape)).length);
   const edit = useShapeEdit.getState().byDoc[docId];
   if (edit) setShapeEdit(docId, { ...edit, node: undefined, nodes: [] });
 }
@@ -49,6 +50,15 @@ export function subpathsOf(segs: Seg[]): Seg[][] {
   return out;
 }
 
+/** A filled closed path: it has a fill or fill gradient and every subpath ends in Z. Cut and Erase work on its area (knife, area eraser); anything else is edge-only. */
+export function isFilledArea(shape: VectorShape): boolean {
+  if (shape.type !== 'path' || !(shape.fillGradient || (shape.fill && shape.fill !== 'none' && shape.fill !== 'transparent'))) return false;
+  const subs = subpathsOf(pageSegs(shape));
+  return subs.length > 0 && subs.every((sp) => sp.length > 2 && sp[sp.length - 1].c === 'Z');
+}
+/** The pieces of a filled area: each outer contour with its holes. */
+export const areaPieces = (shape: VectorShape): Seg[][] => splitComponents(pageSegs(shape), shape.fillRule ?? 'nonzero');
+
 /** Leaving node editing after a cut or erase: the subpaths become individual shapes (original attributes), all picked, in one undo step. */
 onShapeEditLeave((docId, prev) => {
   const split = useNodeEditMode.getState().split;
@@ -57,7 +67,7 @@ onShapeEditLeave((docId, prev) => {
   const layer = getDoc(split.sessionId, docId)?.layers.find((l) => l.id === prev.layerId);
   const shape = layer?.type === 'vector' ? layer.shapes.find((s) => s.id === prev.shapeId) : undefined;
   if (!layer || layer.type !== 'vector' || !shape || shape.type !== 'path') return;
-  const pieces = usablePieces(subpathsOf(pageSegs(shape)));
+  const pieces = usablePieces(isFilledArea(shape) ? areaPieces(shape) : subpathsOf(pageSegs(shape)));
   if (pieces.length < 2 || pieces.length <= split.before) return;
   const ids = replaceWithPieces(split.sessionId, docId, layer.id, layer.shapes, shape, pieces, { edit: false });
   // Done, Esc or a tool change keep the pick on the shape: it becomes all its pieces. A click elsewhere keeps its own pick.
