@@ -10,7 +10,7 @@
   min-width: 0;
   color: var(--text);
 }
-.tool-dock-stack { position: absolute; z-index: 7; left: -1px; right: -1px; width: auto; bottom: calc(100% + 8px); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.tool-dock-stack { position: absolute; z-index: 7; left: -1px; right: -1px; width: auto; bottom: calc(100% + 8px); display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 /* Every panel above the bar is as wide as its content (up to the bar), never a wide row with empty gaps. */
 .tool-dock .tool-dock-stack > * { width: fit-content; max-width: 100%; }
 .designer-palette:not(.is-docked) .tool-dock-stack { top: calc(100% + 8px); bottom: auto; }
