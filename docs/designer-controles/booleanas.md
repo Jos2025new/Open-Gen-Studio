@@ -50,7 +50,7 @@ Union, Subtract, Intersect y Exclude (`booleanOp`, `pathBoolean.ts`) y Fix overl
 
 Pruebas: `tests/fix-overlaps.test.ts` («curved segments stay the original curves…», «booleanOp cuts a curve exactly…», «booleanOp keeps untouched curves exactly…») y `tests/path-boolean.test.ts`.
 
-**En corrección** (revisión independiente en curso): un único cúbico que se cierra sobre sí mismo, los T-junctions y la guarda de trazados grandes. Ver [pendientes-designer](../pendientes-designer.md), D43.
+**Corregido** tras revisión independiente: un único cúbico que se cierra sobre sí mismo (t por arista), T-junctions y solapes colineales, orientación por el vértice extremo y guarda de trazados grandes (más de 8000 aristas: Fill pasa a Cut). Test: `tests/fix-overlaps.test.ts`. Ver [pendientes-designer](../pendientes-designer.md), D43.
 
 ## Shape Builder (`ShapeBuilder.tsx`, `shapeBuilder.ts`)
 
@@ -87,7 +87,7 @@ Pruebas: `tests/fix-overlaps.test.ts` (id y estilo, un paso de deshacer, sin cru
 - Solo una capa vectorial a la vez; no hay booleanas entre capas (pendiente en [pendientes-designer](../pendientes-designer.md), D40).
 - No hay Trim, Merge ni Crop del pathfinder (pendiente D39).
 - Las operaciones se aplican a formas, no a trazos Lineart (esos tienen sus herramientas en [nodos-modos](nodos-modos.md)).
-- Reconstrucción exacta: en corrección (D43). Cuchillo y borrado por área siguen aproximados.
+- Reconstrucción exacta: corregida (D43); falta prueba visual. Cuchillo y borrado por área siguen aproximados.
 
 ## Evidencia
 

@@ -191,6 +191,87 @@ it('booleanOp keeps untouched curves exactly (a union that only adds to straight
   expect(arch.p.flat()).toEqual([100, 50, 0, 50, 0, 0]);
 });
 
+// ---- one cubic that loops over itself, touching vertices, orientation, size
+const orig = [[0, 0], [150, 150], [-50, 150], [100, 0]] as Pt[];
+/** Largest distance from the piece's samples to the original cubic (a piece may start and end at the same point: no parameter lookup of its ends). */
+function maxDistToCurve(piece: Pt[], c: Pt[]): number {
+  const at = (t: number): Pt => { const m = 1 - t; return [m * m * m * c[0][0] + 3 * m * m * t * c[1][0] + 3 * m * t * t * c[2][0] + t * t * t * c[3][0], m * m * m * c[0][1] + 3 * m * m * t * c[1][1] + 3 * m * t * t * c[2][1] + t * t * t * c[3][1]]; };
+  const dist = (p: Pt) => { let best = 0, bd = Infinity; for (let i = 0; i <= 4000; i++) { const q = at(i / 4000); const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = i / 4000; } } let lo = Math.max(0, best - 1 / 4000), hi = Math.min(1, best + 1 / 4000); for (let i = 0; i < 60; i++) { const a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3; if (Math.hypot(at(a)[0] - p[0], at(a)[1] - p[1]) < Math.hypot(at(b)[0] - p[0], at(b)[1] - p[1])) hi = b; else lo = a; } return Math.hypot(at((lo + hi) / 2)[0] - p[0], at((lo + hi) / 2)[1] - p[1]); };
+  let worst = 0;
+  for (let i = 0; i <= 10; i++) { const u = i / 10, m = 1 - u; worst = Math.max(worst, dist([0, 1].map((k) => m * m * m * piece[0][k] + 3 * m * m * u * piece[1][k] + 3 * m * u * u * piece[2][k] + u * u * u * piece[3][k]) as Pt)); }
+  return worst;
+}
+const loopCubic = parseSegs('M 0 0 C 150 150 -50 150 100 0 Z');
+it('a single cubic that loops over itself: Fill fills the loop, Cut follows the winding, one new node, curves exact', () => {
+  for (const m of ['fill', 'cut'] as const) {
+    const out = fixOverlaps({ segs: loopCubic }, undefined, m);
+    expect(out).not.toBe(loopCubic);
+    expect(winding(out, 50, 100)).not.toBe(0); // the loop
+    expect(winding(out, 50, 20)).not.toBe(0); // the body under the crossing
+    expect(nodesOf(out)).toBe(2 + 1);
+    const cubics = out.map((s, i) => (s.c === 'C' ? [out[i - 1].p[out[i - 1].p.length - 1], ...s.p] : null)).filter(Boolean) as Pt[][];
+    expect(cubics.length).toBeGreaterThanOrEqual(2);
+    for (const c of cubics) expect(maxDistToCurve(c, orig)).toBeLessThan(1e-6);
+    expect(out.some((s) => s.c === 'L' && s.p[0][0] === 50 && Math.abs(s.p[0][1] - 64.2857) < 1e-3)).toBe(false); // no zero-length line at the crossing
+  }
+  const fill = fixOverlaps({ segs: loopCubic }, undefined, 'fill');
+  expect(winding(fill, 50, 100) * winding(fill, 50, 20)).toBeGreaterThan(0); // Fill: the flipped loop winds like the rest
+});
+it('a closed cubic whose node is both its start (t 0) and its end (t 1) keeps its curve when another contour crosses it', () => {
+  const drop = parseSegs('M 0 0 C 200 200 -200 200 0 0 Z'), dropC = [[0, 0], [200, 200], [-200, 200], [0, 0]] as Pt[];
+  const segs = [...drop, ...poly([[-100, 40], [100, 40], [100, 60], [-100, 60]])];
+  for (const m of ['fill', 'cut'] as const) {
+    const out = fixOverlaps({ segs }, undefined, m);
+    expect(out).not.toBe(segs);
+    const cubics = out.map((s, i) => (s.c === 'C' ? [out[i - 1].p[out[i - 1].p.length - 1], ...s.p] : null)).filter(Boolean) as Pt[][];
+    expect(cubics.length).toBeGreaterThan(0);
+    for (const c of cubics) expect(maxDistToCurve(c, dropC)).toBeLessThan(1e-6);
+    expect(winding(out, 0, 30)).not.toBe(0); expect(winding(out, 0, 100)).not.toBe(0);
+  }
+});
+it('a figure 8 pinched exactly at a vertex is detected and both lobes wind the same way after Fill', () => {
+  const pinch = poly([[0, 50], [50, 50], [100, 0], [100, 100], [50, 50], [0, 0]]);
+  expect(Math.sign(winding(pinch, 20, 40))).toBe(-Math.sign(winding(pinch, 85, 50)));
+  const out = fixOverlaps({ segs: pinch }, undefined, 'fill');
+  expect(out).not.toBe(pinch);
+  expect(winding(out, 85, 50)).not.toBe(0); expect(winding(out, 15, 40)).not.toBe(0);
+  expect(Math.sign(winding(out, 85, 50))).toBe(Math.sign(winding(out, 15, 40)));
+});
+it('a vertex on another edge (T-junction) splits that edge: the enclosed lobe becomes a face', () => {
+  // the contour goes up the middle of the square's bottom edge's line: vertex (50,0) lies on the edge (0,0)-(100,0)
+  const t = poly([[0, 0], [100, 0], [100, 100], [50, 0], [50, -60], [0, -60]]);
+  const out = fixOverlaps({ segs: t }, undefined, 'fill');
+  expect(out).not.toBe(t);
+  expect(winding(out, 80, 20)).not.toBe(0);
+  expect(winding(out, 20, -30)).not.toBe(0);
+});
+it('collinear overlapping edges merge instead of breaking the graph', () => {
+  const c = poly([[0, 0], [100, 0], [100, 100], [0, 100], [0, 50], [60, 50], [60, 70], [150, 70], [150, 30], [60, 30], [60, 50], [0, 50]]);
+  const out = fixOverlaps({ segs: c }, undefined, 'fill');
+  expect(out).not.toBe(c);
+  expect(winding(out, 20, 20)).not.toBe(0); expect(winding(out, 125, 50)).not.toBe(0);
+});
+it('Fill orientation comes from the outer boundary: a ring whose outer has a big inverted lobe keeps its hole', () => {
+  const bow = poly([[800, 0], [1200, 0], [0, 4000], [2000, 4000]]); // small lobe below (CCW), big one above (CW, bigger)
+  const hole = poly([[970, 100], [1000, 250], [1030, 100]]); // drawn against the small lobe
+  const ring = [...bow, ...hole];
+  for (const m of ['fill', 'cut'] as const) {
+    const out = fixOverlaps({ segs: ring }, undefined, m);
+    expect(out).not.toBe(ring);
+    expect(winding(out, 1000, 150)).toBe(0);
+    expect(winding(out, 1000, 40)).not.toBe(0);
+    expect(winding(out, 1000, 3000)).not.toBe(0);
+  }
+});
+it('a huge polyline does not freeze: Fill falls back to winding semantics', () => {
+  const n = 9000, pts: number[][] = [];
+  for (let i = 0; i < n; i++) { const a = (2 * Math.PI * i) / n, r = 1000 + (i % 2) * 5; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+  pts.push([-2000, 0], [2000, 10]);
+  const t0 = Date.now();
+  expect(() => fixOverlaps({ segs: poly(pts) })).not.toThrow();
+  expect(Date.now() - t0).toBeLessThan(8000);
+});
+
 // ---- UI: Fill / Cut inside the one entry
 async function menuEntries(host: HTMLElement, selector: string) {
   await act(async () => host.querySelector<HTMLButtonElement>(selector)!.click());

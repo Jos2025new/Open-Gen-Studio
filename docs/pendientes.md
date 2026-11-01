@@ -164,7 +164,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | D40 | Booleanas entre capas | medio | 2026-11-01 |
 | D41 | Arrastrar las manijas de Bend | bajo | 2026-11-01 |
 | D42 | Caras de un trazado que se cruza a sí mismo (selección Face) | medio | 2026-11-01 |
-| D43 | Reconstrucción exacta de curvas: en corrección (cúbico que se cierra, T-junctions, trazados grandes) | medio | 2026-11-01 |
+| D43 | Reconstrucción exacta de curvas: corregida en código y tests; falta prueba visual | medio | 2026-11-01 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 

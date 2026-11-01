@@ -116,29 +116,53 @@ export class Tagger {
     if (z) ip.z = z;
   };
 
+  /** Adds the entries of tag `z` to the point's own tag (a vertex reached twice, a vertex touching an edge). */
+  private mergeTag(q: Point64, z: number): void {
+    if (!z || q.z === z) return;
+    if (!q.z) { q.z = z; return; }
+    const dst = this.recs[q.z - 1];
+    for (const e of this.recs[z - 1]) if (!dst.some((f) => f.seg === e.seg && Math.abs(f.t - e.t) < 1e-6)) dst.push(e);
+  }
+
   /**
    * The bounded faces of one closed polygon drawn on its own crossings (the planar arrangement of its edges), each a
    * counter-clockwise (positive area) polygon with tagged corners. A part folded back over the rest gives its own
-   * faces and the cancelled overlap (winding 0) is a face too; the unbounded face is left out.
+   * faces and the cancelled overlap (winding 0) is a face too; the unbounded face is left out. Crossings, vertices that
+   * touch another edge (T-junctions) and collinear overlaps all split the edges; null when the polygon is too big to search.
    */
-  faces(p: Path64): Paths64 {
+  faces(p: Path64): Paths64 | null {
     const n = p.length, key = (q: { x: number; y: number }) => q.x + ',' + q.y;
     const on: Array<Array<{ s: number; q: Point64 }>> = Array.from({ length: n }, () => []);
     const at = new Map<string, Point64>();
-    for (const q of p) if (!at.has(key(q))) at.set(key(q), q);
-    const sg = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
-    for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
-      if (i === 0 && j === n - 1) continue;
-      const a = p[i], b = p[(i + 1) % n], c = p[j], d = p[(j + 1) % n];
-      if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x) || Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) continue;
-      if (sg(a.x, a.y, b.x, b.y, c.x, c.y) * sg(a.x, a.y, b.x, b.y, d.x, d.y) >= 0 || sg(c.x, c.y, d.x, d.y, a.x, a.y) * sg(c.x, c.y, d.x, d.y, b.x, b.y) >= 0) continue;
-      const den = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x), u = ((c.x - a.x) * (d.y - c.y) - (c.y - a.y) * (d.x - c.x)) / den;
-      const ip = { x: Math.round(a.x + u * (b.x - a.x)), y: Math.round(a.y + u * (b.y - a.y)) }, k = key(ip), old = at.get(k), z = this.cross([[a, b], [c, d]], ip);
-      if (old?.z && z) this.recs[old.z - 1].push(...this.recs[z - 1]); // the same point reached twice (a vertex, a triple crossing): one tag
-      const q: Point64 = old ?? { ...ip, z }; at.set(k, q);
-      on[i].push({ s: (ip.x - a.x) * (b.x - a.x) + (ip.y - a.y) * (b.y - a.y), q }); on[j].push({ s: (ip.x - c.x) * (d.x - c.x) + (ip.y - c.y) * (d.y - c.y), q });
-    }
-    // the graph: one node per point, one edge per distinct pair of consecutive points
+    for (const q of p) { const old = at.get(key(q)); if (old) this.mergeTag(old, q.z ?? 0); else at.set(key(q), q); } // a repeated vertex keeps both tags
+    const dot = (a: Point64, b: Point64, q: { x: number; y: number }) => (q.x - a.x) * (b.x - a.x) + (q.y - a.y) * (b.y - a.y);
+    /** `v` (a vertex of the other edge) lies strictly inside edge a-b: it splits it. */
+    const split = (ei: number, a: Point64, b: Point64, other: [Point64, Point64], v: Point64) => {
+      const s = dot(a, b, v);
+      if (s <= 0 || s >= dot(a, b, b)) return;
+      const q = at.get(key(v))!;
+      this.mergeTag(q, this.cross([[a, b], other], { x: v.x, y: v.y }));
+      on[ei].push({ s, q });
+    };
+    const status = edgePairs([p], (u, v) => {
+      const [i, j] = u.k < v.k ? [u.k, v.k] : [v.k, u.k], a = p[i], b = p[(i + 1) % n], c = p[j], d = p[(j + 1) % n];
+      const s1 = orient(a.x, a.y, b.x, b.y, c.x, c.y), s2 = orient(a.x, a.y, b.x, b.y, d.x, d.y), s3 = orient(c.x, c.y, d.x, d.y, a.x, a.y), s4 = orient(c.x, c.y, d.x, d.y, b.x, b.y);
+      if (s1 * s2 > 0 || s3 * s4 > 0) return;
+      if (s1 * s2 < 0 && s3 * s4 < 0) {
+        const den = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x), t = ((c.x - a.x) * (d.y - c.y) - (c.y - a.y) * (d.x - c.x)) / den;
+        const ip = { x: Math.round(a.x + t * (b.x - a.x)), y: Math.round(a.y + t * (b.y - a.y)) }, k = key(ip), old = at.get(k), z = this.cross([[a, b], [c, d]], ip);
+        if (old) this.mergeTag(old, z); // the same point reached twice (a vertex, a triple crossing): one tag
+        const q: Point64 = old ?? { ...ip, z }; at.set(k, q);
+        on[i].push({ s: dot(a, b, ip), q }); on[j].push({ s: dot(c, d, ip), q });
+        return;
+      }
+      if (s1 === 0) split(i, a, b, [c, d], c);
+      if (s2 === 0) split(i, a, b, [c, d], d);
+      if (s3 === 0) split(j, c, d, [a, b], a);
+      if (s4 === 0) split(j, c, d, [a, b], b);
+    });
+    if (status === 'budget') return null;
+    // the graph: one node per point, one edge per distinct pair of consecutive points (overlapping edges merge into one)
     const nb = new Map<string, Point64[]>(), seen = new Set<string>(), seq: Point64[] = [];
     for (let i = 0; i < n; i++) { seq.push(at.get(key(p[i])) ?? p[i]); for (const e of on[i].sort((x, y) => x.s - y.s)) seq.push(e.q); }
     for (let i = 0; i < seq.length; i++) {
@@ -173,7 +197,7 @@ export class Tagger {
     let p: Pt = raw;
     const node = es.find((e) => e.t < EPS || e.t > 1 - EPS);
     if (node) p = evalAt(this.geoms[node.seg], node.t < 0.5 ? 0 : 1);
-    else if (es.length >= 2 && es[0].seg !== es[1].seg) {
+    else if (es.length >= 2 && (es[0].seg !== es[1].seg || Math.abs(es[0].t - es[1].t) > 1e-3)) {
       let a = es[0].t, b = es[1].t;
       const g1 = this.geoms[es[0].seg], g2 = this.geoms[es[1].seg];
       for (let i = 0; i < 12; i++) {
@@ -184,21 +208,53 @@ export class Tagger {
       }
       const q1 = evalAt(g1, a), q2 = evalAt(g2, b);
       if (a > 0 && a < 1 && b > 0 && b < 1 && Math.hypot(q1[0] - q2[0], q1[1] - q2[1]) < 1e-7 && Math.hypot(q1[0] - raw[0], q1[1] - raw[1]) < 3 * this.tol + 0.01) { es[0].t = a; es[1].t = b; p = q1; }
-    }
+      else p = this.onCurve(es[0], raw);
+    } else p = this.onCurve(es[0], raw);
     memo.set(v.z!, p);
     return p;
   }
 
-  /** The original segment an output edge runs along: of the segments both ends carry, the one whose curve passes the edge's midpoint (a node shared by two segments that both cross the edge is ambiguous otherwise). */
-  private edge(a: Point64, b: Point64): { seg: number; t0: number; t1: number } | null {
+  /** The original curve at the entry's t when that is near the raw point (never farther than the flattening could be), else the raw point. */
+  private onCurve(e: Entry, raw: Pt): Pt {
+    const q = evalAt(this.geoms[e.seg], e.t);
+    return Math.hypot(q[0] - raw[0], q[1] - raw[1]) <= 3 * this.tol + 0.01 ? q : raw;
+  }
+  /** The parameter of the point of the segment nearest to `p`. */
+  private project(g: Geom, p: Pt): number {
+    if (g.c.length === 2) {
+      const [a, b] = g.c, dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+      return l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+    }
+    const d = (t: number) => { const q = evalAt(g, t); return Math.hypot(q[0] - p[0], q[1] - p[1]); };
+    let best = 0, bd = Infinity;
+    for (let i = 0; i <= 32; i++) { const x = d(i / 32); if (x < bd) { bd = x; best = i / 32; } }
+    let lo = Math.max(0, best - 1 / 32), hi = Math.min(1, best + 1 / 32);
+    for (let i = 0; i < 30; i++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (d(m1) < d(m2)) hi = m2; else lo = m1; }
+    return (lo + hi) / 2;
+  }
+
+  /**
+   * The original segment an output edge runs along: of the segments both ends carry, the one whose curve passes the edge's midpoint (a node shared by two segments that both cross the edge is ambiguous otherwise).
+   * `x` and `y` are the tags of its two ends for that segment (the entries themselves: refining a crossing updates them). When the ends share no
+   * segment (Clipper dropped a collinear point between them) the ends are projected onto the segments they carry.
+   */
+  private edge(a: Point64, b: Point64): { seg: number; x: Entry; y: Entry } | null {
     const ea = this.entries(a), eb = this.entries(b);
     if (!ea || !eb) return null;
     const mx = (a.x + b.x) / 2 / this.scale, my = (a.y + b.y) / 2 / this.scale;
-    let best: { seg: number; t0: number; t1: number } | null = null, bd = 3 * this.tol + 0.01;
+    let best: { seg: number; x: Entry; y: Entry } | null = null, bd = 3 * this.tol + 0.01;
     for (const x of ea) for (const y of eb) {
       if (x.seg !== y.seg) continue;
       const q = evalAt(this.geoms[x.seg], (x.t + y.t) / 2), d = Math.hypot(q[0] - mx, q[1] - my);
-      if (d <= bd) { bd = d; best = { seg: x.seg, t0: x.t, t1: y.t }; }
+      if (d <= bd) { bd = d; best = { seg: x.seg, x, y }; }
+    }
+    if (best) return best;
+    const A: Pt = [a.x / this.scale, a.y / this.scale], B: Pt = [b.x / this.scale, b.y / this.scale], dist = (p: Pt, q: Pt) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+    for (const seg of new Set([...ea, ...eb].map((e) => e.seg))) {
+      const g = this.geoms[seg], ta = this.project(g, A), tb = this.project(g, B);
+      if (Math.abs(ta - tb) < EPS) continue;
+      const worst = Math.max(dist(evalAt(g, ta), A), dist(evalAt(g, tb), B), dist(evalAt(g, (ta + tb) / 2), [mx, my]));
+      if (worst <= bd) { bd = worst; best = { seg, x: { seg, t: ta }, y: { seg, t: tb } }; }
     }
     return best;
   }
@@ -210,18 +266,15 @@ export class Tagger {
     try {
       if (n < 3) return [];
       // each edge: its original segment (or -1) and the direction of t along it
-      const seg: number[] = [], dir: number[] = [];
-      for (let i = 0; i < n; i++) {
-        const e = this.edge(loop[i], loop[(i + 1) % n]);
-        seg.push(e ? e.seg : -1); dir.push(e ? Math.sign(e.t1 - e.t0) : 0);
-      }
-      const cut = (i: number) => { const j = (i + n - 1) % n; return seg[j] !== seg[i] || (dir[j] !== 0 && dir[i] !== 0 && dir[j] !== dir[i]); };
+      const ed = Array.from({ length: n }, (_, i) => this.edge(loop[i], loop[(i + 1) % n]));
+      const seg = ed.map((e) => (e ? e.seg : -1)), dir = ed.map((e) => (e ? Math.sign(e.y.t - e.x.t) : 0));
+      // a new run where the segment changes, turns back, or jumps in t (a curve crossing itself: same segment, other branch)
+      const cut = (i: number) => { const j = (i + n - 1) % n; return seg[j] !== seg[i] || (dir[j] !== 0 && dir[i] !== 0 && dir[j] !== dir[i]) || (seg[i] >= 0 && Math.abs(ed[j]!.y.t - ed[i]!.x.t) > 1e-4); };
       let k = -1;
       for (let i = 0; i < n && k < 0; i++) if (cut(i)) k = i;
       if (k < 0) return refit(loop.map((q) => [q.x / this.scale, q.y / this.scale]), true);
       const idx = (i: number) => (k + i) % n;
       const pos = (i: number) => this.posOf(loop[idx(i)], memo);
-      const tOf = (i: number, s: number): number => this.entries(loop[idx(i)])?.find((e) => e.seg === s)?.t ?? 0;
       const start = pos(0), out: Seg[] = [{ c: 'M', p: [start] }];
       let i = 0;
       while (i < n) {
@@ -230,7 +283,7 @@ export class Tagger {
         const s = seg[idx(i)], end = pos(j % n);
         if (s < 0) out.push(...refit(Array.from({ length: j - i + 1 }, (_, m) => pos((i + m) % n)), false).filter((g) => g.c !== 'M'));
         else {
-          const g = this.geoms[s], t0 = tOf(i, s), t1 = tOf(j % n, s);
+          const g = this.geoms[s], t0 = ed[idx(i)]!.x.t, t1 = ed[idx(j - 1)]!.y.t; // per edge: a loop crossing has two tags of one segment
           if (g.c.length === 2 || Math.abs(t1 - t0) < EPS) out.push({ c: 'L', p: [end] });
           else { const c = sub(g.c, t0, t1); out.push({ c: 'C', p: [c[1], c[2], end] }); }
         }
@@ -259,4 +312,53 @@ export function runPaths(tg: Tagger, ct: ClipType, subject: Paths64, clip: Paths
   if (clip.length) c.addPaths(clip, PathType.Clip);
   c.execute(ct, rule, out);
   return out;
+}
+
+const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
+export interface EdgeRef { ci: number; k: number; ax: number; ay: number; bx: number; by: number }
+
+/**
+ * Visits every pair of non-adjacent edges whose boxes overlap (sweep over x), in the polylines `paths` (closed).
+ * `visit` returns true to stop. 'stop' = stopped, 'done' = all visited, 'budget' = too many candidates (not finished).
+ */
+export function edgePairs(paths: Path64[], visit: (u: EdgeRef, v: EdgeRef) => boolean | void, budget = 3e6): 'stop' | 'done' | 'budget' {
+  const es: EdgeRef[] = [];
+  paths.forEach((p, ci) => p.forEach((a, k) => { const b = p[(k + 1) % p.length]; es.push({ ci, k, ax: a.x, ay: a.y, bx: b.x, by: b.y }); }));
+  es.sort((u, v) => Math.min(u.ax, u.bx) - Math.min(v.ax, v.bx));
+  let work = 0;
+  for (let i = 0; i < es.length; i++) {
+    const u = es[i], ux1 = Math.max(u.ax, u.bx), uy0 = Math.min(u.ay, u.by), uy1 = Math.max(u.ay, u.by);
+    for (let j = i + 1; j < es.length; j++) {
+      const v = es[j];
+      if (Math.min(v.ax, v.bx) > ux1) break;
+      if (++work > budget) return 'budget';
+      if (Math.max(v.ay, v.by) < uy0 || Math.min(v.ay, v.by) > uy1) continue;
+      if (u.ci === v.ci) { const m = paths[u.ci].length, dk = Math.abs(u.k - v.k); if (dk < 2 || dk === m - 1) continue; }
+      if (visit(u, v) === true) return 'stop';
+    }
+  }
+  return 'done';
+}
+
+/** Two edges of the same polyline or of different ones: 'cross' = they properly cross; 'touch' = they meet otherwise (a vertex on the other edge, shared vertex, collinear overlap). */
+export function edgeRelation(u: EdgeRef, v: EdgeRef): 'cross' | 'touch' | 'none' {
+  const d1 = orient(u.ax, u.ay, u.bx, u.by, v.ax, v.ay), d2 = orient(u.ax, u.ay, u.bx, u.by, v.bx, v.by);
+  const d3 = orient(v.ax, v.ay, v.bx, v.by, u.ax, u.ay), d4 = orient(v.ax, v.ay, v.bx, v.by, u.bx, u.by);
+  if (d1 * d2 < 0 && d3 * d4 < 0) return 'cross';
+  return d1 * d2 <= 0 && d3 * d4 <= 0 ? 'touch' : 'none';
+}
+
+/**
+ * Which way a contour was drawn, read where it cannot be wrong: at its lowest (then leftmost) vertex, always on the
+ * outer boundary. +1 = positive shoelace sign (the faces' sign), -1 the other. A flat vertex falls back to the net area.
+ */
+export function orientation(p: Path64): number {
+  const n = p.length;
+  let m = 0;
+  for (let i = 1; i < n; i++) if (p[i].y < p[m].y || (p[i].y === p[m].y && p[i].x < p[m].x)) m = i;
+  const a = p[(m + n - 1) % n], b = p[m], c = p[(m + 1) % n], turn = orient(a.x, a.y, b.x, b.y, c.x, c.y);
+  if (turn) return turn;
+  let a2 = 0;
+  for (let i = 0; i < n; i++) { const q = p[i], r = p[(i + 1) % n]; a2 += q.x * r.y - r.x * q.y; }
+  return a2 < 0 ? -1 : 1;
 }

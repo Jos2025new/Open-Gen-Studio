@@ -1,7 +1,7 @@
 import { ClipType, EndType, FillRule, JoinType, PointInPolygonResult, PolyTree64, area as pathArea, areaPaths, booleanOpWithPolyTree, inflatePaths, pointInPolygon, union } from 'clipper2-ts';
 import type { Path64, Paths64 } from 'clipper2-ts';
 import { fitSubpaths } from './curveFit';
-import { Tagger, runPaths, runTree } from './exactRebuild';
+import { Tagger, edgePairs, edgeRelation, orientation, runPaths, runTree } from './exactRebuild';
 import type { Pt, Seg } from './pathNodes';
 
 /*
@@ -235,27 +235,14 @@ export function splitComponents(segs: Seg[], fillRule: 'nonzero' | 'evenodd' = '
 
 // ---------------------------------------------------------------- fix overlaps
 
-/** True when two edges of the polylines properly cross (shared endpoints and touching do not count). Bounded: too big counts as "yes". */
+/**
+ * True when two edges of the polylines properly cross, or when a contour touches itself (a vertex on one of its own
+ * edges, a pinch, a collinear overlap). Bounded: too big counts as "yes".
+ */
 function hasCrossing(paths: Path64[]): boolean {
-  type E = { ax: number; ay: number; bx: number; by: number };
-  const es: E[] = [];
-  for (const p of paths) for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; es.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y }); }
-  if (es.length > 6000) return true;
-  const o = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
-  es.sort((u, v) => Math.min(u.ax, u.bx) - Math.min(v.ax, v.bx));
-  for (let i = 0; i < es.length; i++) {
-    const u = es[i], ux1 = Math.max(u.ax, u.bx), uy0 = Math.min(u.ay, u.by), uy1 = Math.max(u.ay, u.by);
-    for (let j = i + 1; j < es.length; j++) {
-      const v = es[j];
-      if (Math.min(v.ax, v.bx) > ux1) break;
-      if (Math.max(v.ay, v.by) < uy0 || Math.min(v.ay, v.by) > uy1) continue;
-      const d1 = o(u.ax, u.ay, u.bx, u.by, v.ax, v.ay), d2 = o(u.ax, u.ay, u.bx, u.by, v.bx, v.by);
-      const d3 = o(v.ax, v.ay, v.bx, v.by, u.ax, u.ay), d4 = o(v.ax, v.ay, v.bx, v.by, u.bx, u.by);
-      if (d1 * d2 < 0 && d3 * d4 < 0) return true;
-    }
-  }
-  return false;
+  return edgePairs(paths, (u, v) => { const r = edgeRelation(u, v); return r === 'cross' || (r === 'touch' && u.ci === v.ci); }) !== 'done';
 }
+const FILL_MAX_EDGES = 8000;
 
 /**
  * Resolves self-crossings. 'fill' (default): each contour fills everything it encloses, so a part folded back over the
@@ -270,12 +257,15 @@ export function fixOverlaps(area: Area, o?: BooleanOptions, mode: 'fill' | 'cut'
     const paths = tg.tag(area?.segs ?? [], tol);
     if (!paths.length || !hasCrossing(paths)) return area.segs;
     let filled = paths;
+    if (mode === 'fill' && paths.reduce((n, p) => n + p.length, 0) > FILL_MAX_EDGES) mode = 'cut'; // too big to search every face: winding semantics
     if (mode === 'fill') {
       // Each contour is cut at its crossings into the faces it encloses (the cancelled overlap among them); every face adds,
       // oriented as the contour was drawn (a flipped lobe stops cancelling). The contours then combine nonzero, so a ring drawn as two opposite contours keeps its hole.
       filled = paths.flatMap((p) => {
-        const parts = tg.faces(p), whole = pathArea(p), sign = whole < 0 ? -1 : 1;
-        return parts.filter((q) => Math.abs(pathArea(q)) >= minArea(tol)).map((q) => (Math.sign(pathArea(q)) === sign ? q : [...q].reverse()));
+        if (!hasCrossing([p])) return [p]; // no crossing of its own: nothing to cut
+        const parts = tg.faces(p), sign = orientation(p);
+        if (!parts) return [p];
+        return parts.filter((q) => Math.abs(pathArea(q)) >= minArea(tol)).map((q) => (sign > 0 ? q : [...q].reverse()));
       });
     }
     const comps = pieces('union', filled, [], minArea(tol), tg);
