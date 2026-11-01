@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { flushSync } from 'react-dom';
 import { useBoardFocus } from '../studio/useBoardFocus';
 import { canDragGuides, drawGuides } from './drawGuides';
 import { sameGuides, type GuideLines } from './guideLines';
@@ -264,16 +265,17 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    // Synchronous, with the refit and the redraw in layout effects: a folded or pinned panel never paints a stretched frame.
+    const ro = new ResizeObserver(() => flushSync(() => setSize({ w: el.clientWidth, h: el.clientHeight })));
     ro.observe(el);
     setSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
   }, []);
 
-  const fit = useCallback(() => setView((untouched.current = fitView(wrapRef.current, size, doc, board))), [size, doc.width, doc.height, board?.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fit = useCallback(() => setView((untouched.current = fitView(size, doc, board))), [size, doc.width, doc.height, board?.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const untouched = useRef<View | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const key = `${doc.id}:${doc.width}x${doc.height}`;
     if (size.w && (fitted.current !== key || view === untouched.current)) {
       fitted.current = key;
@@ -308,7 +310,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   // ---------------------------------------------------------------------------
   // Rendering
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
