@@ -1,15 +1,17 @@
-/* Nodes: the corner beside the canvas toolbox (NodeSide.tsx), in its frame. Folded: a row of two icons. Open: as tall as its content, always clear of the floating prompt box. */
-.react-flow__panel.node-side { left: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px + 25px); max-height: calc(100% - var(--composer-height, 120px) - 60px); display: flex; flex-direction: column; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
-.react-flow__panel.node-side.is-open { width: min(340px, calc(100% - var(--control-h) - 80px)); }
+/* Nodes: the panel the toolbox's Create and Conversation open (NodeSide.tsx), at the toolbox's right. As tall as its content, always clear of the floating prompt box. */
+.react-flow__panel.node-side { left: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px + 25px); width: min(340px, calc(100% - var(--control-h) - 80px)); max-height: calc(100% - var(--composer-height, 120px) - 60px); display: flex; flex-direction: column; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
 .node-side:focus-within { border-color: var(--panel-line-focus); }
-.node-side .side-head { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
-.node-side .side-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: var(--control-h); height: var(--control-h); padding: 0 6px; flex-shrink: 0; border-radius: var(--radius-s); color: var(--text-2); }
+/* One toolbox surface at a time: the panel steps aside while a toolbox menu or the map is open. */
+body:has(.canvas-nav-pop, .node-lib-pop) .react-flow__panel.node-side, .react-flow:has(.canvas-map) .react-flow__panel.node-side { display: none; }
+.node-side .side-head { display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: var(--control-h); padding: 0 2px 0 8px; color: var(--text-2); }
+.node-side .side-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); font-weight: 600; color: var(--text); }
+.node-side .side-icon { width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-s); color: var(--text-3); }
 .node-side .side-icon:hover { color: var(--text); background: var(--surface-3); }
-.node-side .side-icon.is-active { color: var(--active-text); background: var(--active-bg); }
-.node-side .side-count { font-size: var(--fs-xs); color: var(--text-3); }
-.node-side .side-icon .pulse-dot { position: absolute; top: 5px; right: 5px; }
-.node-side .side-title { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); font-weight: 600; color: var(--text); }
 .node-side .side-body { min-height: 0; overflow: auto; margin-top: var(--toolbar-padding); padding: 8px 6px 6px; border-top: 1px solid var(--panel-line); }
+/* Toolbox: Conversation carries the number of items and the agent's pulse. */
+.canvas-nav-badged { position: relative; display: inline-flex; }
+.canvas-nav-badge { position: absolute; right: -2px; top: -2px; min-width: 15px; height: 15px; padding: 0 3px; display: grid; place-items: center; border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-size: 9px; pointer-events: none; }
+.canvas-nav-badged .pulse-dot { position: absolute; left: 3px; top: 3px; pointer-events: none; }
 .node-side .composer-alerts { margin: 0; }
 /* Create: kind, model, prompt, references, settings, Generate — the prompt box's own controls, stacked. */
 .node-side .side-create { display: flex; flex-direction: column; gap: 10px; }
@@ -23,12 +25,9 @@
 .node-side .side-add { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--radius-s); font-size: var(--fs-s); color: var(--text-2); }
 .node-side .side-add:hover { color: var(--text); background: var(--surface-3); }
 .node-side .side-generate .send-btn { width: 100%; height: 38px; border-radius: var(--btn-radius); }
-@media (max-width: 767px) { .react-flow__panel.node-side.is-open { width: calc(100% - var(--control-h) - 60px); } }
-.node-side .side-label { font-size: var(--fs-s); font-weight: 600; }
-.node-side .side-fold { margin-left: auto; color: var(--text-3); }
-.react-flow__panel.node-side.is-folded .side-fold { margin-left: 2px; }
+@media (max-width: 767px) { .react-flow__panel.node-side { width: calc(100% - var(--control-h) - 60px); } }
 /* The selected result, compact: model, prompt, inputs, settings chips, then Reusar · Copy · All details on one line. */
-.react-flow__panel.node-side.is-open.has-result { width: min(280px, calc(100% - var(--control-h) - 80px)); }
+.react-flow__panel.node-side.has-result { width: min(280px, calc(100% - var(--control-h) - 80px)); }
 .node-side .result-summary { display: flex; flex-direction: column; gap: 8px; }
 .node-side .rs-line { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: var(--fs-xs); }
 .node-side .rs-prompt { margin: 0; color: var(--text); font-size: var(--fs-m); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8lh; overflow: auto; }

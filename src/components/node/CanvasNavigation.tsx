@@ -9,6 +9,7 @@ import { generationTitle } from '../assets/GenerationInfo';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { InlineSlider } from '../designer/InlineControls';
+import { CornerButtons } from './NodeSide';
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
 
 export type NodeTool = 'select' | 'pan' | 'cut';
@@ -95,7 +96,9 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
     <>
       {mapOpen ? <MiniMap pannable zoomable position="top-left" className="canvas-map" maskColor="var(--overlay)" nodeColor="var(--text-4)" /> : null}
       <Panel position="top-left" className="canvas-navigation" role="toolbar" aria-label="Canvas tools" aria-orientation="vertical">
-        {add ? <>{add}<span className="canvas-nav-sep" /></> : null}
+        {add}
+        <CornerButtons sessionId={sessionId} />
+        <span className="canvas-nav-sep" />
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
         <IconButton icon={Scissors} label="Cut connections (X): drag across links to cut them" active={tool === 'cut'} disabled={!graph.edges.length && tool !== 'cut'} onClick={() => onTool('cut')} />

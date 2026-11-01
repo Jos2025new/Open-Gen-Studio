@@ -8,7 +8,7 @@ related: [lienzo, deshacer-bloqueos, atajos-gestos]
 ---
 # Panel de navegación de Nodes
 
-`CanvasNavigation` se monta dentro de `ReactFlow` solo cuando el lienzo no es embebido (`NodeWorkspace.tsx:466`). En el tablero de Studio se monta `EmbeddedControls` (3 botones). Desde 2026-10-31 es una toolbox vertical arriba a la izquierda (`role="toolbar"`, «Canvas tools»), con el estilo de la barra de vista del Designer; reúne Add node, Select, Pan, Cut y Auto layout; Fit view y Map; Undo, Redo y Delete; zoom (+, %, −) y Search (orden desde 2026-10-31: Auto layout bajo Pan, Delete junto a Undo y Redo), y sus popovers se abren a la derecha. La barra superior de Nodes conserva solo Run all. El minimapa se abre a su derecha. Los botones de icono llevan su nombre como `label`; el texto largo del botón Pan sale como consejo.
+`CanvasNavigation` se monta dentro de `ReactFlow` solo cuando el lienzo no es embebido (`NodeWorkspace.tsx:466`). En el tablero de Studio se monta `EmbeddedControls` (3 botones). Desde 2026-10-31 es una toolbox vertical arriba a la izquierda (`role="toolbar"`, «Canvas tools»), con el estilo de la barra de vista del Designer; reúne Add node, Create y Conversation (abren el panel de [agente-nodes](agente-nodes.md)), Select, Pan, Cut y Auto layout; Fit view y Map; Undo, Redo y Delete; zoom (+, %, −) y Search (orden desde 2026-10-31: Auto layout bajo Pan, Delete junto a Undo y Redo), y sus popovers se abren a la derecha. La barra superior de Nodes conserva solo Run all. El minimapa se abre a su derecha. Los botones de icono llevan su nombre como `label`; el texto largo del botón Pan sale como consejo.
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |
