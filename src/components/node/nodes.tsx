@@ -23,6 +23,7 @@ import { GenerationInfo } from '../assets/GenerationInfo';
 import { OP_ICONS } from '../assets/AssetActions';
 import { AddNext, ResultPorts } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
+import { KeyTools, PanelToggle } from './NodeBarExtras';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. `panel`: the canvas shows the Selection panel, which holds the result's tools. */
 export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean };
@@ -289,7 +290,7 @@ function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: 
   );
 }
 
-/** Floating actions above the selected node: run, open, duplicate, delete. Without the Selection panel (Studio's board) also the quick tools, sketch, attach and download. */
+/** Floating actions above the selected node: key tools, run, open, download, duplicate, delete and "…" (the Selection panel). Studio's board has no panel: quick tools, sketch and attach stay here instead. */
 function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | null; panel?: boolean }) {
   const sessionId = useSessionId();
   const { assetId, all, sketch } = useNodeOutput(node);
@@ -298,6 +299,7 @@ function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | nu
   const quick = assetId && out && !panel ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
   return (
     <div className="nt-bar">
+      {panel && assetId && out ? <KeyTools sessionId={sessionId} node={node} out={out} /> : null}
       {runnable ? <RunButton node={node} /> : null}
       {detached ? <button type="button" className="nt-btn nodrag" onClick={() => reattachOutputs(sessionId, detached.id)}>Reattach outputs</button>
         : runnable && all.length > 1 && !sketch ? <button type="button" className="nt-btn nodrag" onClick={() => detachOutputs(sessionId, node.id)}>Detach outputs</button> : null}
@@ -327,21 +329,20 @@ function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | nu
             </button>
           ) : null}
           {panel ? null : (
-            <>
-              <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => useAsReference(assetId)}>
-                <Paperclip size={14} />
-              </button>
-              <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
-                <Download size={14} />
-              </button>
-            </>
+            <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => useAsReference(assetId)}>
+              <Paperclip size={14} />
+            </button>
           )}
+          <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
+            <Download size={14} />
+          </button>
         </>
       ) : null}
       <button type="button" className="nt-btn nt-icon nodrag" aria-label="Duplicate" data-tip="Duplicate" onClick={() => duplicateNode(sessionId, node)}>
         <Copy size={14} />
       </button>
       <DeleteButton node={node} />
+      {panel && assetId ? <><span className="nt-sep" /><PanelToggle /></> : null}
     </div>
   );
 }

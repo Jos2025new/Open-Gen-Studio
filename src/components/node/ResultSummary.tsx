@@ -8,17 +8,13 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Button } from '../ui/primitives';
 import { GenerationInfo, generationInputs, generationTitle, openInputs } from '../assets/GenerationInfo';
 import { ReuseButton } from '../assets/ReuseButton';
-import { KIND_ICON } from './nodes';
-
-const KIND_LABEL = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D model' } as const;
 
 /**
- * The selected result in the corner: what it is, which model, the prompt, its inputs and settings, then Reusar and
- * Copy. The full record (seed, cost, timing, request) stays folded under "All details".
+ * The selected result in the corner, compact: model, the prompt, its inputs, settings chips, then Reusar, Copy and
+ * "All details" on one line. The full record (seed, cost, timing, request) opens under it.
  */
 export function ResultSummary({ generation: g, asset }: { generation?: Generation; asset: Asset }) {
   const [more, setMore] = useState(false);
-  const KindIcon = KIND_ICON[asset.kind as keyof typeof KIND_ICON] ?? KIND_ICON.image;
   const text = g ? generationTitle(g) : '';
   const inputs = g ? generationInputs(g) : [];
   const s = g?.settings;
@@ -30,8 +26,7 @@ export function ResultSummary({ generation: g, asset }: { generation?: Generatio
   ].filter((c): c is string => Boolean(c));
   return (
     <div className="result-summary">
-      <div className="rs-line"><KindIcon size={14} /> {KIND_LABEL[asset.kind as keyof typeof KIND_LABEL] ?? asset.kind}</div>
-      {g ? <div className="rs-line"><Layers size={14} /> {g.modelName}{g.provider !== 'local' ? <span className="faint"> · {PROVIDER_LABELS[g.provider]}</span> : null}</div> : null}
+      {g ? <div className="rs-line"><Layers size={13} /> {g.modelName}{g.provider !== 'local' ? <span className="faint"> · {PROVIDER_LABELS[g.provider]}</span> : null}</div> : null}
       {text ? <p className="rs-prompt">{text}</p> : <p className="rs-prompt faint">{asset.origin === 'upload' ? 'Uploaded file' : 'No prompt'}</p>}
       {inputs.length ? (
         <div className="rs-inputs">
@@ -45,11 +40,11 @@ export function ResultSummary({ generation: g, asset }: { generation?: Generatio
       {chips.length ? <div className="rs-chips">{chips.map((c) => <span key={c} className="cc-mini num">{c}</span>)}</div> : null}
       <div className="rs-actions">
         <ReuseButton g={g} />
-        {g?.prompt && !g.op ? <Button size="sm" variant="secondary" icon={Copy} onClick={() => void copyText(g.prompt)}>Copy</Button> : null}
+        {g?.prompt && !g.op ? <Button size="sm" variant="ghost" icon={Copy} onClick={() => void copyText(g.prompt)}>Copy</Button> : null}
+        <button type="button" className="rs-more" aria-expanded={more} onClick={() => setMore(!more)}>
+          All details <ChevronDown size={13} className={more ? 'rot-180' : ''} />
+        </button>
       </div>
-      <button type="button" className="rs-more" aria-expanded={more} onClick={() => setMore(!more)}>
-        All details <ChevronDown size={13} className={more ? 'rot-180' : ''} />
-      </button>
       {more ? <GenerationInfo generation={g} asset={asset} /> : null}
     </div>
   );

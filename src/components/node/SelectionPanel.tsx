@@ -1,5 +1,5 @@
 import { Panel } from '@xyflow/react';
-import { Brush, Download, Paperclip, RectangleHorizontal, type LucideIcon } from 'lucide-react';
+import { Brush, Download, Paperclip, RectangleHorizontal, X, type LucideIcon } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { addConnected, newNodeData } from '../../engine/flow/actions';
 import { outputPort } from '../../engine/flow/graph';
@@ -11,6 +11,7 @@ import { OP_ICONS } from '../assets/AssetActions';
 import { OP_GROUP_LABEL, OP_GROUP_ORDER, opGroup, type OpGroupId } from '../assets/opGroups';
 import { KIND_ICON, useNodeOutput } from './nodes';
 import { NodeSide } from './NodeSide';
+import { toggleSelectionPanel, useSelectionPanel } from './NodeBarExtras';
 
 type Item = { key: string; icon: LucideIcon; label: string; tip?: string; detail?: string; onClick: () => void };
 
@@ -43,6 +44,9 @@ export function SelectionPanel({ sessionId, node }: { sessionId: string; node: G
         <span className="sp-title">{node.data.title}</span>
         {asset?.width && asset.height ? <span className="sp-size">{asset.width} × {asset.height}</span> : null}
         {all.length > 1 ? <span className="sp-size">{Math.max(0, all.indexOf(assetId)) + 1}/{all.length}</span> : null}
+        <button type="button" className="sp-close" aria-label="Hide all tools" data-tip="Hide (… in the node bar shows it again)" onClick={() => toggleSelectionPanel(false)}>
+          <X size={14} />
+        </button>
       </div>
       {OP_GROUP_ORDER.filter((g) => sections[g].length).map((g) => (
         <section key={g} className="sp-group" aria-label={OP_GROUP_LABEL[g]}>
@@ -58,12 +62,13 @@ export function SelectionPanel({ sessionId, node }: { sessionId: string; node: G
   );
 }
 
-/** The full canvas's side panels: the conversation and details at the left, the Selection panel (exactly one selected node with a result) at the right. */
+/** The full canvas's side panels: the corner at the left; at the right the Selection panel, when "…" in the node bar asked for it and exactly one node with a result is selected. */
 export function CanvasPanels({ sessionId, nodes }: { sessionId: string; nodes: GraphNode[] }) {
+  const open = useSelectionPanel((s) => s.open);
   return (
     <>
       <NodeSide sessionId={sessionId} />
-      {nodes.length === 1 ? <SelectionPanel key={nodes[0].id} sessionId={sessionId} node={nodes[0]} /> : null}
+      {open && nodes.length === 1 ? <SelectionPanel key={nodes[0].id} sessionId={sessionId} node={nodes[0]} /> : null}
     </>
   );
 }

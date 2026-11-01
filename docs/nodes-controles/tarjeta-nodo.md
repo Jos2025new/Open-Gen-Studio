@@ -42,13 +42,13 @@ related: [nodos-generacion, nodos-herramienta, nodos-texto-asset, ejecucion, pue
 | Sketch | `nodes.tsx:7` | Solo en el tablero de Studio; nodo con resultado de tipo imagen | `assetId` | `setUi({ sketch: { assetId, nodeId } })` | Editor Sketch | En el lienzo completo, en el panel Selección (Edit). Guardar deja una copia pintada que sustituye al resultado aguas abajo (`SketchEditor.tsx:192`) |
 | Reset image | `nodes.tsx:247` | Nodo con sketch | `sketch` | `setSketch(undefined)`: descarta el sketch y borra su copia (`flow/actions.ts:125`) | Resultado aguas abajo | La copia pintada se elimina sin confirmar |
 | Attach to prompt | `nodes.tsx:328` | Solo en el tablero de Studio; nodo con resultado | `assetId` | `useAsReference`: añade el asset a los adjuntos del Composer y le da foco (`engine/actions.ts:581`) | Composer | En el lienzo completo, en el panel Selección (Reuse). Un 3D entra como su imagen de vista; si aún no la tiene avisa |
-| Download | `nodes.tsx:331` | Solo en el tablero de Studio; nodo con resultado | `assetId` | `downloadAsset` | Archivo local | En el lienzo completo, en el panel Selección (Finalize) |
+| Download | `nodes.tsx:331` | Nodo con resultado (barra en los dos lienzos) | `assetId` | `downloadAsset` | Archivo local | También en el panel Selección (Finalize) |
 | Duplicate | `nodes.tsx:336` | Siempre en la barra | Nodo | `duplicateNode` | Grafo | |
 | Delete (papelera con confirmación) | `nodes.tsx:86` | Siempre en la barra | Nodo | Abre «Delete “título”? Its results stay in the gallery.»; Delete lo borra (`nodes.tsx:100`) | Grafo | Es la única vía de borrado de nodos con confirmación; el resto (Supr, panel, menú) no la pide |
 
 ## Panel Selección (arriba a la derecha)
 
-Desde 2026-10-31, en el lienzo completo (no en el tablero de Studio), un único nodo seleccionado **con resultado** muestra el panel `SelectionPanel` (`SelectionPanel.tsx:20`, montado por `SoloSelection` desde `NodeWorkspace.tsx`), con el marco de la toolbox. Las herramientas sobre el resultado salen de la barra del nodo y se agrupan aquí; la barra conserva Run, Detach/Reattach outputs, Open, Reset image, Duplicate y Delete. Sin resultado, el panel no se dibuja.
+Desde 2026-10-31, en el lienzo completo (no en el tablero de Studio), un único nodo seleccionado **con resultado** muestra el panel `SelectionPanel` (`SelectionPanel.tsx:20`, montado por `SoloSelection` desde `NodeWorkspace.tsx`), con el marco de la toolbox. Está **oculto al empezar**: lo muestra u oculta «…» al final de la barra del nodo (`PanelToggle`, `NodeBarExtras.tsx`; estado `useSelectionPanel`, no persiste) y lo cierra su X. La barra del lienzo completo queda: tres herramientas clave agrupadas (`KeyTools`: imagen Change angle, Relight y Animate; vídeo Extract frame, Continue shot y Upscale video; audio Transcribe; cada una añade un nodo conectado), Run, Detach/Reattach outputs, Open, Reset image, Download, Duplicate, Delete y «…». Sin resultado, el panel no se dibuja.
 
 | Control | Dónde aparece | Cuándo aparece | De qué depende | Qué modifica | Influye en | Notas |
 | --- | --- | --- | --- | --- | --- | --- |

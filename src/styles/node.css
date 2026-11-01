@@ -219,3 +219,7 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .selection-panel .sp-group + .sp-group { border-top: 1px solid var(--panel-line); margin-top: 4px; padding-top: 2px; }
 .selection-panel .menu-sep-label { padding: 8px 9px 3px; }
 .selection-panel .menu-item { padding: 6px 9px; font-size: var(--fs-s); }
+/* Node bar: the key tools as one group, set apart from Run and the rest. */
+.nt-group { display: flex; align-items: center; gap: 2px; padding-right: 4px; margin-right: 2px; border-right: 1px solid var(--border); }
+.selection-panel .sp-close { margin-left: auto; width: 24px; height: 24px; display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-s); color: var(--text-3); }
+.selection-panel .sp-close:hover { color: var(--text); background: var(--surface-3); }

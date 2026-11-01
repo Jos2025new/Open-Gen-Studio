@@ -95,7 +95,7 @@ export function NodeSide({ sessionId }: { sessionId: string }) {
   const active = (v: View) => open && !shown && view === v;
   const named = open && !shown;
   return (
-    <Panel position="top-left" className={`node-side nodrag nowheel ${open ? 'is-open' : 'is-folded'}`} aria-label="Conversation and Create">
+    <Panel position="top-left" className={`node-side nodrag nowheel ${open ? 'is-open' : 'is-folded'} ${shown ? 'has-result' : ''}`} aria-label="Conversation and Create">
       <div className="side-head" role="toolbar" aria-label="Corner">
         <button type="button" className={`side-icon ${active('chat') ? 'is-active' : ''}`} aria-label="Conversation" aria-pressed={active('chat')} data-tip={named ? undefined : 'Conversation'} onClick={() => pick('chat')}>
           <MessageSquare size={15} />

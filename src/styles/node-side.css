@@ -27,15 +27,15 @@
 .node-side .side-label { font-size: var(--fs-s); font-weight: 600; }
 .node-side .side-fold { margin-left: auto; color: var(--text-3); }
 .react-flow__panel.node-side.is-folded .side-fold { margin-left: 2px; }
-/* The selected result: kind, model, prompt, inputs, settings, Reusar and Copy; the full record folded. */
-.node-side .result-summary { display: flex; flex-direction: column; gap: 10px; }
-.node-side .rs-line { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: var(--fs-s); }
-.node-side .rs-prompt { margin: 2px 0; color: var(--text); font-size: var(--fs-l); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12lh; overflow: auto; }
-.node-side .rs-inputs { display: flex; flex-wrap: wrap; gap: 6px; }
-.node-side .rs-inputs .info-thumb { width: 44px; height: 44px; }
-.node-side .rs-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.node-side .rs-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.node-side .rs-actions > :only-child { grid-column: 1 / -1; }
-.node-side .rs-actions .btn { justify-content: center; height: 36px; }
-.node-side .rs-more { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; padding: 4px 2px; font-size: var(--fs-xs); color: var(--text-3); }
+/* The selected result, compact: model, prompt, inputs, settings chips, then Reusar · Copy · All details on one line. */
+.react-flow__panel.node-side.is-open.has-result { width: min(280px, calc(100% - var(--control-h) - 80px)); }
+.node-side .result-summary { display: flex; flex-direction: column; gap: 8px; }
+.node-side .rs-line { display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: var(--fs-xs); }
+.node-side .rs-prompt { margin: 0; color: var(--text); font-size: var(--fs-m); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8lh; overflow: auto; }
+.node-side .rs-inputs { display: flex; flex-wrap: wrap; gap: 5px; }
+.node-side .rs-inputs .info-thumb { width: 36px; height: 36px; }
+.node-side .rs-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.node-side .rs-chips .cc-mini { padding: 2px 7px; font-size: var(--fs-xs); }
+.node-side .rs-actions { display: flex; align-items: center; gap: 2px; margin: 0 -4px; }
+.node-side .rs-more { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px; font-size: var(--fs-xs); color: var(--text-3); }
 .node-side .rs-more:hover { color: var(--text); }

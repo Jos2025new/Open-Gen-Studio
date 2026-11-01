@@ -19,7 +19,7 @@ it('every op with one input has its own section, in Explore · Edit · Reuse · 
 it('the full canvas shows the Selection panel at the top right for exactly one selected node; Studio’s board does not', () => {
   expect(panel).toMatch(/<Panel position="top-right" className="selection-panel/);
   expect(ws).toMatch(/\{embedded \? null : <CanvasPanels sessionId=\{sessionId\}/);
-  expect(panel).toMatch(/nodes\.length === 1 \? <SelectionPanel/);
+  expect(panel).toMatch(/open && nodes\.length === 1 \? <SelectionPanel/);
   expect(ws).toMatch(/data: \{ node: n, solo, panel: !embedded \}/);
 });
 
@@ -37,3 +37,16 @@ it('with the panel, the node bar keeps Run, outputs, Open, Reset image, Duplicat
   expect(bar).toMatch(/\{panel \? null : \(/);
   for (const kept of ['<RunButton', 'aria-label="Open"', 'Reset image', 'aria-label="Duplicate"', '<DeleteButton']) expect(bar).toContain(kept);
 });
+
+it('the node bar opens with the key tools as one group, keeps Download, and ends with "…", which shows or hides the Selection panel (hidden at first)', () => {
+  const extras = readFileSync('src/components/node/NodeBarExtras.tsx', 'utf8');
+  expect(extras).toMatch(/image: \['angle', 'relight', 'animate'\]/);
+  expect(extras).toMatch(/create<\{ open: boolean \}>\(\(\) => \(\{ open: false \}\)\)/);
+  const bar = nodes.slice(nodes.indexOf('function NodeActions'), nodes.indexOf('function ParamSelect'));
+  const order = ['<KeyTools', '<RunButton', 'aria-label="Open"', 'aria-label="Download"', 'aria-label="Duplicate"', '<DeleteButton', '<PanelToggle'].map((t) => bar.indexOf(t));
+  expect(order.every((i) => i > 0)).toBe(true);
+  expect([...order].sort((a, b) => a - b)).toEqual(order);
+  expect(panel).toMatch(/\{open && nodes\.length === 1 \? <SelectionPanel/);
+  expect(panel).toMatch(/aria-label="Hide all tools"[^>]*onClick=\{\(\) => toggleSelectionPanel\(false\)\}/);
+});
+

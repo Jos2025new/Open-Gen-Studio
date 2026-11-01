@@ -97,13 +97,13 @@ it('Nodes keeps the floating prompt box; Create attaches through its picker; the
   expect(css).toMatch(/\.react-flow__panel\.node-side \{[^}]*max-height: calc\(100% - var\(--composer-height, 120px\) - 60px\);[^}]*border: 1px solid var\(--panel-line\); border-radius: var\(--toolbar-radius\)/);
 });
 
-it('the selected result reads like a card: kind, model, prompt, settings chips, Reusar and Copy; the full record folds under All details', () => {
+it('the selected result is a compact card: model, prompt, inputs, settings chips, then Reusar · Copy · All details on one line', () => {
   const src = readFileSync('src/components/node/ResultSummary.tsx', 'utf8');
-  const order = ['rs-line"><KindIcon', 'rs-line"><Layers', 'rs-prompt', 'rs-inputs', 'rs-chips', '<ReuseButton', 'icon={Copy}', 'All details <ChevronDown', '<GenerationInfo'].map((t) => src.indexOf(t));
+  const order = ['rs-line"><Layers', 'rs-prompt', 'rs-inputs', 'rs-chips', 'rs-actions', '<ReuseButton', 'icon={Copy}', 'All details <ChevronDown', '{more ? <GenerationInfo'].map((t) => src.indexOf(t));
   expect(order.every((i) => i > 0)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
-  expect(src).toMatch(/\{more \? <GenerationInfo/);
   expect(src).toContain('className="cc-mini num"');
+  expect(readFileSync('src/styles/node-side.css', 'utf8')).toMatch(/\.react-flow__panel\.node-side\.is-open\.has-result \{ width: min\(280px/);
 });
 
 it('Create uses the grid icon; Auto layout in the toolbox uses the tidy-blocks icon (not the Nodes icon), so the two never look alike', () => {
