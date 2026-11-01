@@ -9,7 +9,7 @@ export function StageEditHint(props: {
   doc: DesignDoc; shapeEditing: boolean; marquee: boolean; layersEmpty: boolean;
   canShowHandles: boolean; handleMode: 'scale' | 'rotate'; canShowObjects: boolean; active: Layer | null;
 }) {
-  useNodeEditMode((st) => st.mode); // re-render when the node mode changes
+  useNodeEditMode((st) => st.mode); useNodeEditMode((st) => st.select); // re-render when the node mode or element changes
   const { doc, shapeEditing, marquee, layersEmpty, canShowHandles, handleMode, canShowObjects, active } = props;
   return shapeEditing ? <StageHint id={shapeEditHint(doc).id} subtle>{shapeEditHint(doc).text}</StageHint>
     : marquee ? <StageHint id="edit-marquee" subtle>Drag selects objects or layers · Shift adds · Alt removes</StageHint>

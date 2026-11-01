@@ -26,6 +26,23 @@ export default [{
   tests: ['tests/marquee.test.ts', 'tests/layer-transform.test.ts', 'tests/object-ops.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
 },
 {
+  id: 'node-select-modes',
+  what: 'Selección por nodo, segmento o cara en la edición de nodos (teclas 1/2/3): la selección sigue siendo índices de nodo; segs/faces solo dicen qué elementos son y valen mientras coincidan con los nodos.',
+  sides: [
+    ['src/engine/design/selectMode.ts', 'export function deriveSel'],
+    ['src/engine/design/nodeEditMode.ts', "select: 'node'"],
+    ['src/engine/design/objectSelection.ts', 'segs?: number[]; faces?: number[]'],
+    ['src/components/designer/selectModeActions.ts', 'export function deleteBySelection'],
+    ['src/components/designer/SelectLayer.tsx', 'export function useSelectKeys'],
+    ['src/components/designer/PathNodes.tsx', '<SelectLayer'],
+    ['src/components/designer/SelectModeButtons.tsx', 'export function SelectModeButtons'],
+    ['src/components/designer/ContextStrip.tsx', '<SelectModeButtons'],
+    ['src/engine/shortcuts.ts', "'1 / 2 / 3 (nodes)'"],
+    ['src/styles/path-tools.css', '.sel-face'],
+  ],
+  tests: ['tests/select-mode.test.ts'],
+},
+{
   id: 'designer-toolbox-dock',
   what: 'Dock por modo; Edit sigue la selección.',
   sides: [

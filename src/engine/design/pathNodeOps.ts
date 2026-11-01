@@ -400,12 +400,12 @@ export function breakNodes(segs: Seg[], types: NodeType[], selected: number[]): 
 }
 
 /** Delete edges between adjacent selected nodes (Inkscape _deleteSegments L915–991), dropping isolated remnants. */
-export function deleteSegments(segs: Seg[], types: NodeType[], selected: number[]): { segs: Seg[]; types: NodeType[]; nodes: number[] } | null {
+export function deleteSegments(segs: Seg[], types: NodeType[], selected: number[], only?: number[]): { segs: Seg[]; types: NodeType[]; nodes: number[] } | null {
   const subs = toSubs(segs), sel = new Set(selected), out: TSub[] = [], nodes: number[] = [];
   let changed = false, offset = 0;
   subs.forEach((s, si) => {
     const base = globalIndex(subs, si, 0), m = s.nodes.length;
-    const cut = s.edges.map((_, k) => sel.has(base + k) && sel.has(base + (k + 1) % m));
+    const cut = s.edges.map((_, k) => sel.has(base + k) && sel.has(base + (k + 1) % m) && (!only || only.includes(base + k)));
     const emit = (order: number[], closed: boolean) => {
       const edges = order.slice(0, closed ? order.length : -1).map((k) => s.edges[k]);
       const nextTypes = order.map((k) => types[base + k] ?? 'c');

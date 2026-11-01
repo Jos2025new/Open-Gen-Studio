@@ -134,7 +134,10 @@ export function shapeEditHint(doc: DesignDoc): { id: string; text: string } {
   if (s?.type === 'path' && mode === 'cut') return { id: 'edit-nodes-cut', text: isFilledArea(s) ? 'Cut: drag a line to slice the shape · click the outline to open it · Esc or Done to finish' : 'Cut: click the path to cut it, or drag a line across it · Esc or Done to finish' };
   if (s?.type === 'path' && mode === 'erase') return { id: 'edit-nodes-erase', text: isFilledArea(s) ? 'Erase: drag to rub away area of the shape · set the size in the bar · Esc or Done to finish' : 'Erase: drag over the path to rub part of it out · set the size in the bar · Esc or Done to finish' };
   if (s?.type === 'path' && mode === 'lasso') return { id: 'edit-nodes-lasso', text: 'Lasso: drag a loop around nodes to select them · Shift adds to the selection · Esc or Done to finish' };
+  const pick = useNodeEditMode.getState().select;
+  if (s?.type === 'path' && mode === 'move' && pick === 'segment') return { id: 'edit-nodes-segment', text: 'Segment: click one, Shift adds · drag moves its nodes · Delete removes it · keys 1 node · 2 segment · 3 face' };
+  if (s?.type === 'path' && mode === 'move' && pick === 'face') return { id: 'edit-nodes-face', text: 'Face: click inside a closed shape, Shift adds · drag moves it · Delete removes it and its holes · keys 1 node · 2 segment · 3 face' };
   return s?.type === 'path'
-    ? { id: 'edit-nodes', text: 'Shift-click adds nodes · drag in empty space to select · drag a selected node to move the group · arrows move 2 px (Shift 20, Alt 1 screen px) · Delete removes selected nodes · Esc clears, then exits' }
+    ? { id: 'edit-nodes', text: 'Shift-click adds nodes · drag in empty space to select · drag a selected node to move the group · arrows move 2 px (Shift 20, Alt 1 screen px) · Delete removes selected nodes · keys 1 node · 2 segment · 3 face · Esc clears, then exits' }
     : { id: 'edit-shape', text: 'Drag the round handles: corners (Ctrl: both) and blur · double-click a handle for its value · Esc or Done to finish' };
 }

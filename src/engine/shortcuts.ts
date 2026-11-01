@@ -74,6 +74,7 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Shift-click / Shift-drag (nodes)', action: 'Toggle a node / add nodes with a marquee; Ctrl-drag selects outside; Ctrl+Shift-drag removes inside' },
         { keys: 'Mod+A (nodes)', action: 'Select every path node' },
         { keys: 'Arrow keys (nodes)', action: 'Move selected nodes 2 document px; Shift: 20 px; Alt: 1 screen px' },
+        { keys: '1 / 2 / 3 (nodes)', action: 'Select by node, segment or face (Move and Lasso)' },
         { keys: 'Esc (nodes)', action: 'Clear selected nodes; Esc again finishes editing' },
         { keys: 'Ctrl + drag a corner handle', action: 'Both corner radii together' },
         { keys: 'Shift+C / Shift+S / Shift+Y (nodes)', action: 'Cusp, smooth or symmetric node' },

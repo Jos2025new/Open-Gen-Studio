@@ -11,6 +11,7 @@ import { patchLayer } from '../../engine/design/actions';
 import type { Layer, VectorShape } from '../../engine/types';
 import { InlineToggle } from './InlineControls';
 import { NodeDoneButton, NodeModeButtons, NodeMoreMenu } from './NodeEditBar';
+import { SelectModeButtons } from './SelectModeButtons';
 import { patchShape, ShapeLookFields, usePickedShape } from './ShapeLookFields';
 import { PaintSwatch, ShapeParams } from './ShapePaint';
 import { ShapeMoreMenu } from './ShapeMoreMenu';
@@ -93,6 +94,7 @@ export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: 
       {/* One click transforms; double-click or «Edit shape» edits (docs/plan-edicion-formas.md). */}
       {editing ? <>
         <NodeModeButtons target={{ sessionId, docId: doc.id, layerId: selectedShape.layerId, shape: selectedShape.shape }} />
+        {isPath && !selectedShape.shape.prim && <SelectModeButtons docId={doc.id} shape={selectedShape.shape as VectorShape} />}
         {isPath && !selectedShape.shape.prim && <NodeMoreMenu sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape as VectorShape} />}
         <NodeDoneButton docId={doc.id} />
       </> : variant === 'strip' ? <>

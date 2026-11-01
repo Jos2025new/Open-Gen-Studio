@@ -18,6 +18,8 @@ import { useStore } from '../../store/store';
 import { snapIdleFeed, snapIdleStart, snapIdleStop } from './snapIdle';
 import { boardKey } from './boardKey';
 import { PathNodeTools } from './PathNodeTools';
+import { SelectLayer, useSelectKeys } from './SelectLayer';
+import { deleteBySelection } from './selectModeActions';
 
 /*
  * Inkscape's Node tool on a path shape in edit mode (docs/plan-edicion-formas.md): square nodes, round handles on
@@ -34,9 +36,10 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   const [hoverSeg, setHoverSeg] = useState<number | null>(null); // Bend mode: the segment under the pointer (or being bent)
   const segDrag = useRef<{ i: number; t: number; base: Seg[]; shape: VectorShape; moved: boolean } | null>(null);
   // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
-  const mode = useNodeEditMode((st) => st.mode), bend = mode === 'bend';
+  const mode = useNodeEditMode((st) => st.mode), bend = mode === 'bend', pickMode = useNodeEditMode((st) => st.select), selMode = mode === 'move' || mode === 'lasso' ? pickMode : 'node', picking = mode === 'move' && selMode !== 'node';
   const segs = pageSegs(shape), types = readTypes(segs, shape.nodeTypes);
   const edit = useShapeEdit((st) => st.byDoc[docId]), selected = edit?.shapeId === shape.id ? (edit.nodes ?? (edit.node == null ? [] : [edit.node])) : [], picked = selected[0];
+  useSelectKeys(docId, shape, !!edit && edit.shapeId === shape.id && (mode === 'move' || mode === 'lasso'));
   // Inkscape's Shift+C / Shift+S / Shift+Y on the picked node; not while typing in a field.
   useEffect(() => {
     if (!edit || edit.shapeId !== shape.id) return;
@@ -53,7 +56,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
       if (mod && e.key.toLowerCase() === 'a') { stop(); const all = nodeSegs(segs).seg.map((_, i) => i); setShapeEdit(docId, { ...edit, node: all[0], nodes: all }); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         stop();
-        if (selected.length) deletePathNodes(sessionId, docId, layerId, shape, selected, mod ? 'line' : 'auto');
+        if (selected.length && !deleteBySelection(sessionId, docId, layerId, shape, selMode, (ids) => setDeleteSegments(sessionId, docId, layerId, shape, selected, ids))) deletePathNodes(sessionId, docId, layerId, shape, selected, mod ? 'line' : 'auto');
         return;
       }
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
@@ -169,18 +172,19 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
     if (edit) setShapeEdit(docId, { ...edit, node: r.node, nodes: [r.node] });
   };
-  return <><svg ref={ref} className={`stroke-ruler shape-knots path-nodes${bend ? ' is-bend' : ''}`} aria-label="Path nodes" onPointerDown={(e) => {
+  return <><svg ref={ref} className={`stroke-ruler shape-knots path-nodes${bend ? ' is-bend' : ''}${picking ? ' is-sel' : ''}`} aria-label="Path nodes" onPointerDown={(e) => {
     if (e.button !== 0 || !(e.target instanceof SVGRectElement && e.target.classList.contains('node-marquee-hit'))) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { base: segs, shape, from: page(e), moved: false, selected: [...selected], initialSelected: [...selected], types: [...types], mods: { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey }, start: { x: e.clientX - ref.current!.getBoundingClientRect().left, y: e.clientY - ref.current!.getBoundingClientRect().top } };
   }} onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest('.path-node, .path-handle'))) addAt(e); }} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { drag.current = null; snapIdleStop(); setBox(null); }}>
     <rect className="node-marquee-hit" x="0" y="0" width="100%" height="100%" />
+    {(mode === 'move' || mode === 'lasso') && <SelectLayer svg={ref} sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} segs={segs} types={types} edit={edit} mode={selMode} interactive={picking} scr={scr} page={page} />}
     {box && <rect className="node-marquee" x={box.x} y={box.y} width={box.w} height={box.h} />}
     <path className="path-outline" d={outline} data-tip="Double-click to add a node" onDoubleClick={addAt} />
     {/* A wide invisible band over the outline: grab any point of a segment to bend it (the cursor says so). */}
     {bend && hoverSeg != null && segs[hoverSeg - 1] && segs[hoverSeg] && ['L', 'C'].includes(segs[hoverSeg].c) && <path className="bend-hl" d={serializeSegs([{ c: 'M', p: [scrT(segs[hoverSeg - 1].p[segs[hoverSeg - 1].p.length - 1])] }, { c: segs[hoverSeg].c, p: segs[hoverSeg].p.map(scrT) }])} />}
-    <path className="segment-hit" d={outline} fill="none" stroke="transparent" strokeWidth={bend ? 14 : 10} style={bend ? undefined : { cursor: 'move' }} data-tip={bend ? 'Drag so the curve passes through the pointer' : 'Drag to bend this segment · double-click to add a node'}
+    <path className="segment-hit" d={outline} fill="none" stroke="transparent" strokeWidth={bend ? 14 : 10} style={bend ? undefined : picking ? { pointerEvents: 'none' } : { cursor: 'move' }} data-tip={bend ? 'Drag so the curve passes through the pointer' : 'Drag to bend this segment · double-click to add a node'}
       onPointerMove={(e) => { if (!bend) return; if (segDrag.current) return setHoverSeg(segDrag.current.i); const q = page(e), r = nearestSegment(segs, [q.x, q.y]); setHoverSeg(r ? r.i : null); }}
       onPointerLeave={() => { if (!segDrag.current) setHoverSeg(null); }}
       onPointerDown={(e) => {
@@ -221,7 +225,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
         onPointerCancel: () => { drag.current = null; snapIdleStop(); setBox(null); },
       };
       return p.kind === 'node'
-        ? <rect key={`n${p.seg}`} className={`stroke-ruler-handle shape-knot path-node${selected.includes(nodeSegs(segs).seg.indexOf(p.seg)) ? ' is-picked' : ''}`} data-node={p.seg} data-tip="Node · Shift-click to add or remove · drag selected nodes together" x={c.x - 4.5} y={c.y - 4.5} width={9} height={9} {...handlers} />
+        ? <rect key={`n${p.seg}`} className={`stroke-ruler-handle shape-knot path-node${selected.includes(nodeSegs(segs).seg.indexOf(p.seg)) ? ' is-picked' : ''}${selMode !== 'node' ? ' is-dim' : ''}`} data-node={p.seg} data-tip="Node · Shift-click to add or remove · drag selected nodes together" x={c.x - (selMode === 'node' ? 4.5 : 3)} y={c.y - (selMode === 'node' ? 4.5 : 3)} width={selMode === 'node' ? 9 : 6} height={selMode === 'node' ? 9 : 6} {...handlers} />
         : <circle key={`h${p.seg}-${p.k}`} className="stroke-ruler-handle shape-knot path-handle" data-handle={`${p.seg}-${p.k}`} data-tip="Curve handle · drag to shape the curve" cx={c.x} cy={c.y} r={4} {...handlers} />;
     })}
   </svg>{(mode === 'cut' || mode === 'erase' || mode === 'lasso') && <PathNodeTools mode={mode} view={view} sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} selected={selected} />}</>;
@@ -292,8 +296,8 @@ export function setBreakNodes(sessionId: string, docId: string, layerId: string,
 }
 
 /** Delete selected segments as one undo step; retain the selected surviving endpoints by their new indices. */
-export function setDeleteSegments(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[]): void {
-  const segs = pageSegs(shape), r = deleteSegments(segs, readTypes(segs, shape.nodeTypes), selected);
+export function setDeleteSegments(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], only?: number[]): void {
+  const segs = pageSegs(shape), r = deleteSegments(segs, readTypes(segs, shape.nodeTypes), selected, only);
   if (!r) return;
   if (!r.segs.length) {
     const layer = getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId);

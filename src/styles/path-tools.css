@@ -17,3 +17,13 @@
 .path-nodes.is-bend .path-node { cursor: crosshair; }
 .path-tools .influence-ring { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 3; pointer-events: none; }
 .path-tools .influence-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; pointer-events: none; }
+/* Segment and face select (SelectLayer.tsx): the picked elements in the accent colour; nodes shrink and fade, and the layer takes the clicks. */
+.path-nodes .sel-seg { stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; fill: none; pointer-events: none; }
+.path-nodes .sel-seg.is-hover { stroke-width: 3; opacity: 0.5; }
+.path-nodes .sel-face { fill: color-mix(in srgb, var(--accent) 28%, transparent); fill-rule: evenodd; stroke: var(--accent); stroke-width: 1.5; pointer-events: none; }
+.path-nodes .sel-face.is-hover { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke-width: 1; }
+.path-nodes .path-node.is-dim { opacity: 0.75; }
+.path-nodes.is-sel .path-node { pointer-events: none; }
+.path-nodes.is-sel .sel-hit { cursor: pointer; }
+.node-select { display: inline-flex; gap: 2px; }
+.node-select .opt { padding-inline: 6px; }
