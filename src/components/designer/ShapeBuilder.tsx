@@ -10,8 +10,8 @@ import '../../styles/shape-builder.css';
 
 /*
  * Shape Builder (Shift+M, Illustrator's tool): with two or more shapes picked, the regions they make are shown as you
- * hover them; click or drag across regions to merge them into one shape, hold Alt to delete them instead, Esc cancels
- * the drag. Faces come from engine/design/shapeBuilder.ts (computed once per set of shapes). It covers the canvas while
+ * hover them; click or drag across regions to merge them into one shape; Delete mode (the toggle, or Alt held) removes them
+ * instead, Esc cancels the drag. Faces come from engine/design/shapeBuilder.ts (computed once per set of shapes). It covers the canvas while
  * the tool is active, so the Stage never sees its pointer events (wheel zoom is passed on to the canvas).
  */
 type Gesture = { start: Pt; startFace: number; touched: number[]; last: Pt; trail: Pt[]; layerId: string; ids: string[] };
@@ -24,33 +24,47 @@ export function ShapeBuilder({ view, sessionId, doc }: { view: View; sessionId: 
   const gesture = useRef<Gesture | null>(null);
   const [hover, setHover] = useState(-1);
   const [, redraw] = useState(0);
-  const [del, setDel] = useState(false);
+  const [alt, setAlt] = useState(false);
+  const [del, setDel] = useState(false); // Delete mode chosen with the visible toggle; Alt flips it while held
+  const space = useRef(false);
   const page = (e: { clientX: number; clientY: number }): Pt => { const p = screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect()); return [p.x, p.y]; };
   const scr = (p: Pt): Pt => { const q = documentToScreen({ x: p[0], y: p[1] }, view, { left: 0, top: 0 }); return [q.x, q.y]; };
   const cancel = () => { gesture.current = null; redraw((n) => n + 1); };
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') { setDel(e.type === 'keydown'); return; }
+      if (e.code === 'Space') { space.current = e.type === 'keydown'; return; }
+      if (e.key === 'Alt') { setAlt(e.type === 'keydown'); return; }
       if (e.key !== 'Escape' || !boardKey(e)) return;
       e.stopImmediatePropagation();
       if (gesture.current) cancel(); else setUi({ tool: 'move' });
     };
     window.addEventListener('keydown', key, true); window.addEventListener('keyup', key, true);
-    return () => { window.removeEventListener('keydown', key, true); window.removeEventListener('keyup', key, true); };
+    // Alt can be swallowed by the window manager (its keyup never arrives): losing focus drops it.
+    const blur = () => { setAlt(false); space.current = false; };
+    window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('keydown', key, true); window.removeEventListener('keyup', key, true); window.removeEventListener('blur', blur); };
   }, []);
   useEffect(() => {
     // Wheel zoom and pan keep working: the Stage canvas under this overlay gets the event.
     const el = ref.current, canvas = el?.parentElement?.querySelector('canvas.stage-canvas');
     if (!el || !canvas) return;
     const pass = (e: WheelEvent) => { e.preventDefault(); canvas.dispatchEvent(new WheelEvent('wheel', e)); };
+    // Middle button and Space+drag pan the Stage: hand it the press and capture the pointer there, so it gets the rest of the drag.
+    const pan = (e: PointerEvent) => {
+      if (e.button === 0 && !space.current) return;
+      e.preventDefault(); e.stopPropagation();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+      canvas.dispatchEvent(new (typeof PointerEvent === 'function' ? PointerEvent : MouseEvent)('pointerdown', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, button: e.button, buttons: e.buttons, pointerId: e.pointerId } as PointerEventInit));
+    };
+    el.addEventListener('pointerdown', pan, true);
     el.addEventListener('wheel', pass, { passive: false });
-    return () => el.removeEventListener('wheel', pass);
+    return () => { el.removeEventListener('wheel', pass); el.removeEventListener('pointerdown', pan, true); };
   }, [!!got]);
 
   const touch = (g: Gesture, to: Pt) => {
-    // Sample the way between pointer events so a fast drag cannot skip a thin region.
-    const n = Math.max(1, Math.ceil(Math.hypot(to[0] - g.last[0], to[1] - g.last[1]) / 2));
+    // Sample the way between pointer events, every 2 screen px, so a fast drag cannot skip a thin region.
+    const n = Math.max(1, Math.ceil((Math.hypot(to[0] - g.last[0], to[1] - g.last[1]) * view.zoom) / 2));
     for (let i = 1; i <= n; i++) {
       const f = faceAt(model!, [g.last[0] + ((to[0] - g.last[0]) * i) / n, g.last[1] + ((to[1] - g.last[1]) * i) / n]);
       if (f >= 0 && !g.touched.includes(f)) g.touched.push(f);
@@ -60,7 +74,7 @@ export function ShapeBuilder({ view, sessionId, doc }: { view: View; sessionId: 
   const done = (e: React.PointerEvent) => {
     const g = gesture.current;
     gesture.current = null;
-    if (g && g.touched.length) applyBuilder(sessionId, doc.id, g.layerId, g.ids, g.touched, e.altKey ? 'delete' : 'merge', g.startFace);
+    if (g && g.touched.length) applyBuilder(sessionId, doc.id, g.layerId, g.ids, g.touched, del !== e.altKey ? 'delete' : 'merge', g.startFace);
     redraw((n) => n + 1);
   };
 
@@ -69,7 +83,7 @@ export function ShapeBuilder({ view, sessionId, doc }: { view: View; sessionId: 
     : model!.shapes.length < 2 ? 'Shape Builder needs two or more shapes with a fill.' : null;
   const g = gesture.current, touched = g?.touched ?? [];
   const faces = model?.faces ?? [];
-  const mode = del ? 'delete' : 'merge';
+  const mode = del !== alt ? 'delete' : 'merge';
   return <>
     <svg ref={ref} className="stroke-ruler shape-knots shape-builder is-placing" aria-label="Shape Builder"
       onPointerDown={(e) => {
@@ -77,11 +91,11 @@ export function ShapeBuilder({ view, sessionId, doc }: { view: View; sessionId: 
         e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId);
         const p = page(e), f = faceAt(model, p);
         gesture.current = { start: p, startFace: f, touched: f >= 0 ? [f] : [], last: p, trail: [p], layerId: got.layerId, ids: got.shapes.map((s) => s.id) };
-        setDel(e.altKey); redraw((n) => n + 1);
+        setAlt(e.altKey); redraw((n) => n + 1);
       }}
       onPointerMove={(e) => {
         if (!model?.faces) return;
-        setDel(e.altKey);
+        setAlt(e.altKey);
         const p = page(e), cur = gesture.current;
         if (cur) { touch(cur, p); redraw((n) => n + 1); } else setHover(faceAt(model, p));
       }}
@@ -97,6 +111,10 @@ export function ShapeBuilder({ view, sessionId, doc }: { view: View; sessionId: 
       })}
       {g && g.trail.length > 1 && <polyline className={`sb-trail${mode === 'delete' ? ' is-delete' : ''}`} points={g.trail.map((q) => scr(q).join(',')).join(' ')} />}
     </svg>
+    {!note && <div className="shape-builder-mode" role="group" aria-label="Shape Builder mode">
+      {([['merge', 'Merge', 'Drag across regions to merge them into one shape'], ['delete', 'Delete', 'Drag across regions to delete them · hold Alt to flip the mode for a moment']] as const).map(([m, label, tip]) =>
+        <button key={m} type="button" className={`opt sb-mode${(m === 'delete') === del ? ' is-on' : ''}${m === 'delete' ? ' is-delete' : ''}`} aria-pressed={(m === 'delete') === del} data-tip={tip} onClick={() => setDel(m === 'delete')}>{label}</button>)}
+    </div>}
     {note && <div className="stage-hint">{note}</div>}
   </>;
 }

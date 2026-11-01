@@ -20,6 +20,8 @@ import { flatten } from '../src/engine/design/pathBoolean';
 import { parseSegs, type Pt, type Seg } from '../src/engine/design/pathNodes';
 import { booleanShapes, outlineOf } from '../src/engine/design/shapeBoolean';
 import { applyBoolean, applyBuilder, builderModel, faceAt } from '../src/engine/design/shapeBuilder';
+import { elementMatrix, gradientStyle } from '../src/engine/design/gradientPaint';
+import { apply } from '../src/engine/design/matrix';
 import { shortcutGroups } from '../src/engine/shortcuts';
 import { useStore } from '../src/store/store';
 import type { VectorLayer, VectorShape } from '../src/engine/types';
@@ -217,5 +219,85 @@ describe('visible controls and keys', () => {
     expect(keys.filter((k) => /Ctrl\+Alt\+U/.test(k))).toHaveLength(1);
     expect(keys.filter((k) => /Shift\+M/.test(k))).toHaveLength(1);
     expect(keys.filter((k) => /Mod \+ Alt \+ P/.test(k))).toHaveLength(1);
+  });
+});
+
+describe('review fixes: refusals, gradients, builder edge cases', () => {
+  const toasts = () => useStore.getState().ui.toasts.map((t: { text: string }) => t.text);
+  it('every refusal of Ctrl+Alt+U shows a toast (locked, hidden, raster, text, fewer than two) and the key stays claimed', () => {
+    const press = (sid: string, id: string) => { const e = new KeyboardEvent('keydown', { key: 'u', code: 'KeyU', ctrlKey: true, altKey: true, bubbles: true, cancelable: true }); designerKey(e, sid, getDoc(sid, id)); return e; };
+    const cases: Array<[string, (c: ReturnType<typeof setup>) => void, RegExp]> = [
+      ['locked', (c) => { const l = getDoc(c.sid, c.doc.id)!.layers[0]; l.locked = true; }, /locked/],
+      ['hidden', (c) => { const l = getDoc(c.sid, c.doc.id)!.layers[0]; l.visible = false; }, /hidden/],
+      ['one shape', (c) => setObjectPick(c.doc.id, { layerId: c.layer.id, ids: ['a'] }), /two or more/],
+      ['no picks', (c) => setObjectPick(c.doc.id, null), /two or more/],
+    ];
+    for (const [name, prep, re] of cases) {
+      const c = setup([A, B]);
+      prep(c);
+      useStore.setState((s) => ({ ui: { ...s.ui, toasts: [] } }));
+      const e = press(c.sid, c.doc.id);
+      expect(toasts().some((t) => re.test(t)), name).toBe(true);
+      expect(e.defaultPrevented, name).toBe(true);
+    }
+  });
+  it('gradients are page coordinates: a union result and builder leftovers paint the same colours at the same page points', () => {
+    const g = { kind: 'linear' as const, x1: 0, y1: 0, x2: 150, y2: 0, stops: [{ offset: 0, color: '#000000', alpha: 1 }, { offset: 1, color: '#ffffff', alpha: 1 }] };
+    const ga = rect('ga', 20, 30, 100, 100, '#f00', { fillGradient: g }), gb = rect('gb', 70, 80, 100, 100, '#00f');
+    const page = (s: VectorShape) => { const m = elementMatrix(s as never), l = (s as never as { fillGradient: typeof g }).fillGradient; const calls: number[][] = []; gradientStyle({ createLinearGradient: (...a: number[]) => { calls.push(a); return { addColorStop() {} }; } } as never, l, s as never); return apply(m, calls[0][0], calls[0][1]).concat(apply(m, calls[0][2], calls[0][3])); };
+    expect(page(ga)).toEqual([0, 0, 150, 0]);
+    const u = ok(booleanShapes('union', [ga, gb])).shapes[0];
+    expect(u.fillGradient).toEqual(g);
+    page(u).forEach((v, i) => expect(v).toBeCloseTo([0, 0, 150, 0][i], 4));
+    const { sid, doc, shapesNow } = setup([ga, gb]);
+    const model = builderModel([ga, gb]);
+    applyBuilder(sid, doc.id, doc.layers[0].id, ['ga', 'gb'], [faceAt(model, [30, 40])], 'delete');
+    const left = shapesNow().find((s) => s.id === 'ga')!;
+    page(left).forEach((v, i) => expect(v).toBeCloseTo([0, 0, 150, 0][i], 4));
+  });
+  it('merging every face of one lone original changes nothing and records no undo step', () => {
+    const { sid, doc, shapesNow } = setup([A, rect('far', 300, 300, 50, 50, '#0f0')]);
+    const model = builderModel([A, rect('far', 300, 300, 50, 50, '#0f0')]);
+    const before = shapesNow();
+    expect(applyBuilder(sid, doc.id, doc.layers[0].id, ['a', 'far'], [faceAt(model, [10, 10])], 'merge')).toBe(false);
+    expect(shapesNow()).toBe(before);
+  });
+  it('after a merge the rest of the selection stays picked; after undo the pick holds no missing id', () => {
+    const c1 = disc('c1', 100, 100, 50, '#0f0'), c2 = disc('c2', 150, 100, 50, '#ff0'), line = { ...base, id: 'ln', type: 'path', d: 'M0 0 L10 10', x: 0, y: 0, w: 10, h: 10, stroke: '#000', strokeWidth: 1 } as unknown as VectorShape;
+    const { sid, doc, shapesNow } = setup([c1, c2, line]);
+    const model = builderModel([c1, c2]);
+    applyBuilder(sid, doc.id, doc.layers[0].id, ['c1', 'c2', 'ln'], [faceAt(model, [60, 100]), faceAt(model, [125, 100])], 'merge');
+    const ids = useObjectSelection.getState().byDoc[doc.id]!.ids, have = shapesNow().map((s) => s.id);
+    expect(ids).toEqual(expect.arrayContaining(['ln', 'c2']));
+    expect(ids.every((id) => have.includes(id))).toBe(true);
+    undoDoc(sid, doc.id);
+    const now = shapesNow().map((s) => s.id), after = useObjectSelection.getState().byDoc[doc.id]?.ids ?? [];
+    expect(after.every((id) => now.includes(id))).toBe(true);
+  });
+  it('the toggle switches Merge / Delete, Alt flips it while held and blur drops a stuck Alt; pan presses go to the Stage canvas', async () => {
+    (SVGElement.prototype as unknown as { setPointerCapture: () => void }).setPointerCapture = () => undefined;
+    const c1 = disc('c1', 100, 100, 50, '#0f0'), c2 = disc('c2', 150, 100, 50, '#ff0');
+    const ctx = setup([c1, c2]), host = document.createElement('div'); document.body.appendChild(host);
+    const root = createRoot(host); roots.push(root);
+    await act(async () => root.render(createElement('div', null, createElement('canvas', { className: 'stage-canvas' }), createElement(ShapeBuilder, { view: { x: 0, y: 0, zoom: 1, width: 800, height: 600 } as never, sessionId: ctx.sid, doc: getDoc(ctx.sid, ctx.doc.id)! }))));
+    const canvas = host.querySelector('canvas')!; canvas.setPointerCapture = () => undefined;
+    const on = () => host.querySelector('.sb-mode.is-on')!.textContent;
+    expect(on()).toBe('Merge');
+    await act(async () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true })); });
+    expect(host.querySelector('.sb-trail, .sb-face')).toBeNull();
+    await act(async () => { window.dispatchEvent(new Event('blur')); });
+    await act(async () => (host.querySelectorAll('.sb-mode')[1] as HTMLButtonElement).click());
+    expect(on()).toBe('Delete');
+    const svg = host.querySelector('svg')!;
+    await act(async () => { svg.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 125, clientY: 100, button: 0 })); svg.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 125, clientY: 100, button: 0 })); });
+    expect(ctx.shapesNow().map((s) => s.type)).toEqual(['path', 'path']);
+    const seen: number[] = []; canvas.addEventListener('pointerdown', (e) => seen.push(e.button));
+    await act(async () => { svg.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 5, clientY: 5, button: 1 })); });
+    expect(seen).toEqual([1]);
+  });
+  it('faces carry a bounding box and fast drags sample every 2 screen px', () => {
+    const model = builderModel([disc('p', 100, 100, 50, '#0f0'), disc('q', 150, 100, 50, '#ff0')]);
+    expect(model.faces!.every((f) => f.box[0] < f.box[2] && f.box[1] < f.box[3])).toBe(true);
+    expect(faceAt(model, [0, 0])).toBe(-1);
   });
 });

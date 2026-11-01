@@ -12,3 +12,8 @@
 .shape-builder line.sb-hatch-del { stroke: var(--danger); stroke-width: 1; opacity: .75; }
 .shape-builder .sb-trail { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .shape-builder .sb-trail.is-delete { stroke: var(--danger); }
+.shape-builder-mode { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); background: var(--surface); border-radius: 5px; }
+.shape-builder-mode .sb-mode { height: 24px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--text-2); font-size: 12px; cursor: pointer; }
+.shape-builder-mode .sb-mode:hover { color: var(--text); }
+.shape-builder-mode .sb-mode.is-on { background: var(--surface-3); color: var(--text); }
+.shape-builder-mode .sb-mode.is-on.is-delete { color: var(--danger); }

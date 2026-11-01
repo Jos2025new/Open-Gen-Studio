@@ -192,8 +192,8 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Ctrl+J | Selected pixels to a new layer |
 | Ctrl+G | Group the selected layers |
 | Shift+R | Show or hide rulers |
-| Shift+M | Shape Builder: drag across regions of the picked shapes to merge them (Alt deletes, Esc cancels) |
-| Ctrl+Alt+U / S / I / E | Union, Subtract, Intersect, Exclude the picked shapes |
+| Shift+M | Shape Builder: drag across regions of the picked shapes to merge them (Delete mode or Alt removes them, Esc cancels) |
+| Ctrl+Alt+U / S / I / E | Union, Subtract, Intersect, Exclude the picked shapes (on macOS the browser takes Cmd+Alt+I/U for DevTools: use the buttons) |
 | Delete (with a selection) | Erase the selected pixels |
 | Mod + Z | Undo |
 | Mod + Shift + Z | Redo |
