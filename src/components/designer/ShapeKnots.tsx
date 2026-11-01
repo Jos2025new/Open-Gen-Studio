@@ -4,6 +4,7 @@ import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, 
 import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { PathNodes } from './PathNodes';
+import { StrokeTools } from './StrokeTools';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { useNodeEditMode } from '../../engine/design/nodeEditMode';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
@@ -42,6 +43,7 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [editing, doc.id, picked?.shape.type]);
+  if (edit?.strokes) return <StrokeTools view={view} sessionId={sessionId} doc={doc} />;
   if (edit?.paths && edit.paths.length > 1) {
     const layers = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
     const pickedLayers = layerPicks ?? [];

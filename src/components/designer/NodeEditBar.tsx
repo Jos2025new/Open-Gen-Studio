@@ -26,11 +26,12 @@ export function chooseNodeMode(mode: NodeEditMode, target?: NodeModeTarget): voi
   setNodeEditMode(mode);
 }
 
-export function NodeModeButtons({ target }: { target?: NodeModeTarget }) {
+/** `modes`: the modes to offer (Lineart strokes have no Lasso). */
+export function NodeModeButtons({ target, modes = NODE_EDIT_MODES }: { target?: NodeModeTarget; modes?: NodeEditMode[] }) {
   const mode = useNodeEditMode((s) => s.mode);
   const radius = useNodeEditMode((s) => s.eraseRadius);
   return <><div className="node-modes" role="radiogroup" aria-label="Node editing mode">
-    {NODE_EDIT_MODES.map((m) => {
+    {modes.map((m) => {
       const { label, icon: Icon, tip } = MODES[m], ready = NODE_EDIT_MODES_READY.includes(m), on = mode === m;
       return <button key={m} type="button" role="radio" aria-checked={on} disabled={!ready} className={`opt node-mode${on ? ' is-on is-active' : ''}`} data-tip={tip} onClick={() => chooseNodeMode(m, target)}><Icon size={13} />{label}</button>;
     })}

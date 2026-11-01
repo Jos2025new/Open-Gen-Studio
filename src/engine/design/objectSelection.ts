@@ -22,11 +22,11 @@ export function setObjectPick(docId: string, pick: ObjectPick | null): void {
   useObjectSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: pick && pick.ids.length ? pick : undefined } }));
   // Shape edit mode lives only while its shape is the one picked object (docs/plan-edicion-formas.md).
   const e = useShapeEdit.getState().byDoc[docId];
-  if (e && !(pick?.layerId === e.layerId && pick.ids.length === 1 && pick.ids[0] === e.shapeId)) setShapeEdit(docId, null);
+  if (e && !(pick?.layerId === e.layerId && (e.strokes || (pick.ids.length === 1 && pick.ids[0] === e.shapeId)))) setShapeEdit(docId, null);
 }
 
 /** The shape being edited (double-click or «Edit shape»): its own knots show, the transform handles hide. */
-export interface ShapeEdit { layerId: string; shapeId: string; /** Path edit: selected node indices; node remains as the primary index for existing controls. */ node?: number; nodes?: number[]; /** Explicit multi-path node selection; legacy fields above remain the single-path contract. */ paths?: Array<{ layerId: string; shapeId: string; nodes: number[] }> }
+export interface ShapeEdit { layerId: string; shapeId: string; /** Lineart strokes edit (strokeEdit.ts): the picked strokes of the layer, any number. */ strokes?: boolean; /** Path edit: selected node indices; node remains as the primary index for existing controls. */ node?: number; nodes?: number[]; /** Explicit multi-path node selection; legacy fields above remain the single-path contract. */ paths?: Array<{ layerId: string; shapeId: string; nodes: number[] }> }
 export const useShapeEdit = create<{ byDoc: Record<string, ShapeEdit | undefined> }>(() => ({ byDoc: {} }));
 /** Called when node editing of a shape ends or moves to another shape, before the mode resets (pathPieces.ts separates cut pieces here). */
 let leaveHook: ((docId: string, prev: ShapeEdit) => void) | null = null;
