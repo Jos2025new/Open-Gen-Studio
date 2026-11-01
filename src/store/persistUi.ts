@@ -48,6 +48,7 @@ export type PersistedUi = Pick<
   | 'tileSize'
   | 'selectShape'
   | 'lastVariant'
+  | 'cutGap'
   | 'wand'
   | 'strokeRuler'
   | 'strokeRulerKind'
@@ -80,6 +81,7 @@ export function pickUi(ui: UiState): PersistedUi {
     tileSize: ui.tileSize,
     selectShape: ui.selectShape,
     lastVariant: ui.lastVariant,
+    cutGap: ui.cutGap,
     wand: ui.wand,
     strokeRuler: ui.strokeRuler,
     strokeRulerKind: ui.strokeRulerKind,

@@ -7,6 +7,7 @@ import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPat
 import { InlineChoice, InlineSlider } from './InlineControls';
 import { Popover, usePopover } from '../ui/Popover';
 import { convertToPath } from './ShapeLookFields';
+import { setUi, useStore } from '../../store/store';
 
 /* Labelled mode bar of the node editor: icon + word, one mode active, then «More» (the node operations) and Done. */
 const MODES: Record<NodeEditMode, { label: string; icon: typeof Hand; tip: string }> = {
@@ -30,12 +31,15 @@ export function chooseNodeMode(mode: NodeEditMode, target?: NodeModeTarget): voi
 export function NodeModeButtons({ target, modes = NODE_EDIT_MODES }: { target?: NodeModeTarget; modes?: NodeEditMode[] }) {
   const mode = useNodeEditMode((s) => s.mode);
   const radius = useNodeEditMode((s) => s.eraseRadius);
+  const gap = useStore((s) => s.ui.cutGap ?? 0);
   return <><div className="node-modes" role="radiogroup" aria-label="Node editing mode">
     {modes.map((m) => {
       const { label, icon: Icon, tip } = MODES[m], ready = NODE_EDIT_MODES_READY.includes(m), on = mode === m;
       return <button key={m} type="button" role="radio" aria-checked={on} disabled={!ready} className={`opt node-mode${on ? ' is-on is-active' : ''}`} data-tip={tip} onClick={() => chooseNodeMode(m, target)}><Icon size={13} />{label}</button>;
     })}
-  </div>{mode === 'erase' && <InlineSlider label="Eraser" unit="px" min={2} max={100} allowManualOverflow value={radius} onChange={setEraseRadius} />}</>;
+  </div>{mode === 'erase' && <InlineSlider label="Eraser" unit="px" min={2} max={100} allowManualOverflow value={radius} onChange={setEraseRadius} />}
+  {/* Optional space between knife pieces so they are easy to tell apart and grab (0 = they touch, no seam). */}
+  {mode === 'cut' && <InlineSlider label="Gap" unit="px" min={0} max={20} step={0.5} allowManualOverflow value={gap} onChange={(v) => setUi({ cutGap: Math.max(0, v) })} />}</>;
 }
 
 export function NodeMoreMenu({ sessionId, docId, layerId, shape }: { sessionId: string; docId: string; layerId: string; shape: VectorShape }) {

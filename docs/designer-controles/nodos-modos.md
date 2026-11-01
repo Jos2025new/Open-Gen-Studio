@@ -36,7 +36,7 @@ Fuente de verdad: el modo vive en `useNodeEditMode` (`nodeEditMode.ts:13`). No s
 
 Una forma cerrada con relleno se trata por su área, como el cuchillo y el borrador de Inkscape o Illustrator (`isFilledArea`, `pathPieces.ts`). Los trazos abiertos y sin relleno siguen con las herramientas de borde de la tabla.
 
-- **Cut arrastrando (cuchillo):** la línea divide el área en piezas cerradas. Cada pieza es una forma con relleno que se puede volver a cortar o borrar. Desde `7cf8a0c7`, los puntos del borde se pegan a la línea del cuchillo y cada extremo de corte queda en un solo nodo, sin costura.
+- **Cut arrastrando (cuchillo):** la línea divide el área en piezas cerradas. Cada pieza es una forma con relleno que se puede volver a cortar o borrar. Desde `7cf8a0c7`, los puntos del borde se pegan a la línea del cuchillo y cada extremo de corte queda en un solo nodo, sin costura. Con el modo Cut activo, el campo **Gap** de la tira (`NodeEditBar.tsx`, `ui.cutGap`, recordado entre sesiones) deja ese espacio en px entre las piezas para verlas y agarrarlas mejor; 0, el valor por defecto, las deja tocándose (test: `tests/path-boolean.test.ts`, «a knife gap…»).
 - **Erase:** el área bajo el pincel desaparece al soltar; el resultado puede ser varias piezas. Un gesto, un paso de deshacer.
 - **Un intento que no divide ni borra nada** no cambia la forma y no deja paso de deshacer (función `apply` de `areaTools.ts`).
 - **Mientras se editan los nodos**, las piezas son subtrazados de la misma forma, así que se puede seguir cortando. **Al salir** (Done, Esc o cambio de herramienta) se separan por componente: cada contorno exterior con sus agujeros. Las piezas que no se tocaron conservan sus curvas; separar no repite la operación booleana.

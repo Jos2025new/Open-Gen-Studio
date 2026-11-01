@@ -139,18 +139,20 @@ export interface UiState extends PageUiPrefs {
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
   lightbox: { assetIds: string[]; index: number; back?: { assetIds: string[]; index: number } } | null;
-  /** Sketch editor: paint over a node's image (saved to the node), or draw a mask for Edit region / Remove object. */
+  /** Sketch editor: paint a node's image, or a mask for Edit region / Remove object. */
   sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;
   toasts: Toast[];
   tool: DesignTool;
   /** Brush and eraser; the tip fields (hardness, pressure, texture, blend, Keep Opacity) are design/brushEngine.ts. */
   brush: Omit<import('../engine/design/brushEngine').BrushOptions, 'size'> & { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
-  /** Designer colors: the last ones used (newest first) and the ones the user saved. */
+  /** Designer colors: recent (newest first) and saved. */
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */
   selectShape?: 'rect' | 'lasso' | 'wand';
   /** Toolbox: last variant used per family (ids). */
   lastVariant?: Record<string, string>;
+  /** Knife gap, px (0 = touching). */
+  cutGap?: number;
   /** Magic wand, like the bucket: color tolerance, grow, soft edge; how it combines; what it samples. */
   wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
   rulers?: boolean; showGuides?: boolean; lockGuides?: boolean;

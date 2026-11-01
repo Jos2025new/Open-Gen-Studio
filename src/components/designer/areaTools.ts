@@ -1,6 +1,7 @@
 import type { VectorShape } from '../../engine/types';
 import { pageSegs, type Pt, type Seg } from '../../engine/design/pathNodes';
 import { eraseArea, knifeArea } from '../../engine/design/pathBoolean';
+import { useStore } from '../../store/store';
 import { areaPieces, layerShapes, replaceWithSubpaths, usablePieces } from './pathPieces';
 
 /*
@@ -21,7 +22,7 @@ function apply(s: string, d: string, l: string, shape: VectorShape, out: Seg[][]
 /** Knife along `line` (own coordinates). False (and no undo step) when it divides nothing. */
 export function knifeFilled(s: string, d: string, l: string, shape: VectorShape, line: Pt[]): boolean {
   const segs = pageSegs(shape);
-  return apply(s, d, l, shape, knifeArea({ segs, fillRule: shape.fillRule }, line), segs);
+  return apply(s, d, l, shape, knifeArea({ segs, fillRule: shape.fillRule }, line, { gap: useStore.getState().ui.cutGap ?? 0 }), segs);
 }
 
 /** Area eraser: remove what the brush of `radius` swept along `trail` (own coordinates), in one undo step. */

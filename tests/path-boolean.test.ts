@@ -194,3 +194,16 @@ it('a knife cut leaves one node at each end of the cut, not a cluster of near-du
     }
   }
 });
+
+it('a knife gap leaves that much space between the pieces; 0 keeps them touching', async () => {
+  const { knifeArea, flatten } = await import('../src/engine/design/pathBoolean');
+  const sq = [{ c: 'M', p: [[0, 0]] }, { c: 'L', p: [[100, 0]] }, { c: 'L', p: [[100, 100]] }, { c: 'L', p: [[0, 100]] }, { c: 'Z', p: [] }] as never;
+  const xs = (segs: never) => flatten(segs, 0.05).flatMap((l) => l.points.map((p) => p[0]));
+  const spread = (gap: number) => {
+    const [a, b] = knifeArea({ segs: sq }, [[50, -10], [50, 110]], { gap }).map((p) => xs(p as never));
+    const [l, r] = Math.min(...a) < Math.min(...b) ? [a, b] : [b, a];
+    return Math.min(...r) - Math.max(...l);
+  };
+  expect(spread(0)).toBeLessThan(0.01);
+  expect(spread(4)).toBeCloseTo(4, 1);
+});

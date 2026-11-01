@@ -16,7 +16,7 @@ import type { Pt, Seg } from './pathNodes';
  */
 
 export type Area = { segs: Seg[]; fillRule?: 'nonzero' | 'evenodd' };
-export interface BooleanOptions { /** Flatten tolerance in px. Default 0.1. */ tol?: number; /** Refit tolerance in px. Default 0.25. */ fitTol?: number }
+export interface BooleanOptions { /** Flatten tolerance in px. Default 0.1. */ tol?: number; /** Refit tolerance in px. Default 0.25. */ fitTol?: number; /** Knife only: space left between the pieces in px (0 = they touch). */ gap?: number }
 type Op = 'union' | 'difference' | 'intersection' | 'xor';
 type Comp = Paths64; // [outer, ...holes]; outer has positive area, holes negative
 
@@ -295,7 +295,7 @@ export function eraseArea(area: Area, trail: Pt[], radius: number, o?: BooleanOp
 export function knifeArea(area: Area, line: Pt[], o?: BooleanOptions): Seg[][] {
   try {
     const { tol, fitTol } = opts(o);
-    const strip = stripPaths(line), parts = partsOf(area, tol);
+    const gap = Math.max(0, o?.gap ?? 0), strip = stripPaths(line, gap > 0 ? gap : KNIFE_W), parts = partsOf(area, tol);
     if (!parts.length || !strip.length) return [area?.segs ?? []];
     const sb = boundsOf(strip), min = minArea(tol);
     let cut = false;
@@ -304,7 +304,7 @@ export function knifeArea(area: Area, line: Pt[], o?: BooleanOptions): Seg[][] {
       const comps = pieces('difference', p.comp, strip, min);
       if (comps.length < 2) return [partSegs(p, fitTol)];
       cut = true;
-      return comps.map((c) => fitComp(c, fitTol, onLine(line)));
+      return comps.map((c) => fitComp(c, fitTol, gap > 0 ? undefined : onLine(line)));
     });
     return cut ? out : [area.segs];
   } catch { return [area?.segs ?? []]; }
