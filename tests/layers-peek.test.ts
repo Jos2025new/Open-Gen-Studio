@@ -57,6 +57,6 @@ it('the right panel uses it with no empty strip: unpinned takes no width, peeks 
 
 it('pinning or unpinning the panel resizes the canvas but keeps the user\'s zoom: only a new document or an untouched view refits', () => {
   const stage = readFileSync('src/components/designer/Stage.tsx', 'utf8');
-  expect(stage).toMatch(/setView\(\(untouched\.current = \{ zoom: z,/);
+  expect(stage).toMatch(/setView\(\(untouched\.current = fitView\(/);
   expect(stage).toMatch(/const key = `\$\{doc\.id\}:\$\{doc\.width\}x\$\{doc\.height\}`;\s*if \(size\.w && \(fitted\.current !== key \|\| view === untouched\.current\)\) \{/);
 });

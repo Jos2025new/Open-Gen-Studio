@@ -170,3 +170,9 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .designer-footer-tools .icon-btn:hover, .designer-footer-tools .icon-btn.is-active { color: var(--text); }
 /* The bar takes its content's width: the dock (and so the footer under it) follows, so the footer icons end at the bar's edge. */
 .composer-dock:has(.composer-tools-bar) { width: max-content; max-width: calc(100% - 48px); }
+/* Figma's model: the prompt box stays at the workspace's center whatever the panels do, so nothing jumps when one opens or
+   folds; Fit canvas centers the canvas on that line (fitView). It narrows evenly to clear the right panel and the side toolbox. */
+@media (min-width: 768px) {
+  .ws-designer .dock-designer { left: 50%; transform: translateX(-50%); width: min(800px, calc(100% - 2 * max(var(--layers-w, 0px), 84px) - 24px)); }
+  .ws-designer .dock-designer:has(.composer-tools-bar) { width: max-content; max-width: calc(100% - 2 * var(--layers-w, 0px) - 48px); }
+}

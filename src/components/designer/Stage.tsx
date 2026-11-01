@@ -17,6 +17,7 @@ import { SnapIndicator } from './SnapIndicator';
 import { AgentGlow } from './AgentGlow';
 import { moveMode, neighbourGaps } from '../../engine/design/neighbourGaps';
 import { stageWheel } from './wheelZoom';
+import { fitView } from './fitView';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
@@ -269,13 +270,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     return () => ro.disconnect();
   }, []);
 
-  const fit = useCallback(() => {
-    // Thin margin, as Photoshop or Krita; the bottom clears the toolbar.
-    const pad = size.w < 500 ? 12 : 24;
-    const bottom = board?.bottom ?? (window.innerWidth < 768 ? 12 : 120); // composer is below the canvas on narrow screens
-    const z = Math.max(0.05, Math.min((size.w - pad * 2) / doc.width, (size.h - pad - bottom) / doc.height, 4));
-    setView((untouched.current = { zoom: z, x: (size.w - doc.width * z) / 2, y: Math.max(pad / 2, (size.h - bottom - doc.height * z) / 2) }));
-  }, [size, doc.width, doc.height, board?.bottom]);
+  const fit = useCallback(() => setView((untouched.current = fitView(wrapRef.current, size, doc, board))), [size, doc.width, doc.height, board?.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const untouched = useRef<View | null>(null);
   useEffect(() => {
