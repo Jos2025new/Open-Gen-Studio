@@ -245,10 +245,23 @@ function hasCrossing(paths: Path64[]): boolean {
 const FILL_MAX_EDGES = 8000;
 
 /**
+ * Fill: contours that cross each other are one outline drawn in pieces, so each group is turned the way its largest
+ * contour goes (they add, the overlap fills). A contour that crosses no other keeps its direction: a ring's hole stays.
+ */
+function alignCrossing(paths: Path64[]): Path64[] {
+  const up = paths.map((_, i) => i), root = (i: number): number => (up[i] === i ? i : (up[i] = root(up[i])));
+  const r = edgePairs(paths, (u, v) => { if (u.ci !== v.ci && edgeRelation(u, v) === 'cross') up[root(u.ci)] = root(v.ci); });
+  if (r !== 'done') return paths;
+  const big = new Map<number, number>();
+  paths.forEach((p, i) => { const g = root(i), b = big.get(g); if (b === undefined || Math.abs(pathArea(p)) > Math.abs(pathArea(paths[b]))) big.set(g, i); });
+  return paths.map((p, i) => (Math.sign(pathArea(p)) === Math.sign(pathArea(paths[big.get(root(i))!])) ? p : [...p].reverse()));
+}
+
+/**
  * Resolves self-crossings. 'fill' (default): each contour fills everything it encloses, so a part folded back over the
  * original is straightened, it adds instead of cancelling. 'cut': nonzero winding, the folded lobes fill but where the
  * fold overlaps the original (+1 and -1) the overlap stays empty. In both, a hole made by a separate contour drawn the
- * other way (a ring) stays a hole. Curves are kept exactly (exactRebuild.ts): the only new nodes are the crossings.
+ * other way (a ring) stays a hole while it crosses nothing; in 'fill' contours that cross each other are aligned and add. Curves are kept exactly (exactRebuild.ts): the only new nodes are the crossings.
  * Returns `area.segs` itself when nothing crosses (callers skip the undo step) and on any failure.
  */
 export function fixOverlaps(area: Area, o?: BooleanOptions, mode: 'fill' | 'cut' = 'fill'): Seg[] {
@@ -259,13 +272,14 @@ export function fixOverlaps(area: Area, o?: BooleanOptions, mode: 'fill' | 'cut'
     let filled = paths;
     if (mode === 'fill' && paths.reduce((n, p) => n + p.length, 0) > FILL_MAX_EDGES) mode = 'cut'; // too big to search every face: winding semantics
     if (mode === 'fill') {
+      const aligned = alignCrossing(paths);
       // Each contour is cut at its crossings into the faces it encloses (the cancelled overlap among them); every face adds,
       // oriented as the contour was drawn (a flipped lobe stops cancelling). The contours then combine nonzero, so a ring drawn as two opposite contours keeps its hole.
-      filled = paths.flatMap((p) => {
+      filled = aligned.flatMap((p) => {
         if (!hasCrossing([p])) return [p]; // no crossing of its own: nothing to cut
         const parts = tg.faces(p);
         if (!parts) return [p];
-        const sign = orientation(p, parts, paths.filter((o) => o !== p));
+        const sign = orientation(p, parts, aligned.filter((o) => o !== p));
         return parts.filter((q) => Math.abs(pathArea(q)) >= minArea(tol)).map((q) => (sign > 0 ? q : [...q].reverse()));
       });
     }

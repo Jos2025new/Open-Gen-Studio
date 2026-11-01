@@ -144,6 +144,14 @@ it('Fill straightens the flipped part: the overlap is filled; Cut leaves it empt
   for (const out of [fill, cut]) { expect(winding(out, ...plusAt)).not.toBe(0); expect(winding(out, ...minusAt)).not.toBe(0); }
   expect(fixOverlaps({ segs: lobe })).toEqual(fill); // Fill is the default
 });
+it('Fill: a separate contour drawn the other way that crosses the body adds (the overlap fills); Cut leaves it empty', () => {
+  const two = [...poly([[0, 0], [100, 0], [100, 100], [0, 100]]), ...poly([[-40, 20], [-40, 80], [60, 50]])];
+  expect(winding(two, 20, 50)).toBe(0);
+  const fill = fixOverlaps({ segs: two }, undefined, 'fill'), cut = fixOverlaps({ segs: two }, undefined, 'cut');
+  expect(winding(fill, 20, 50)).not.toBe(0);
+  expect(winding(cut, 20, 50)).toBe(0);
+  for (const out of [fill, cut]) { expect(winding(out, -30, 50)).not.toBe(0); expect(winding(out, 80, 80)).not.toBe(0); }
+});
 it('a ring drawn as two opposite contours keeps its hole in both modes (beside a fold)', () => {
   const ring = [...poly([[0, 0], [100, 0], [100, 100], [0, 100]]), ...poly([[25, 25], [25, 75], [75, 75], [75, 25]]), ...poly([[200, 0], [300, 100], [300, 0], [200, 100]])];
   for (const m of ['fill', 'cut'] as const) {

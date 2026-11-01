@@ -74,11 +74,12 @@ Es el equivalente en 2D de **Recalculate normals** de Blender: en 2D, el sentido
 - **Fill** (por defecto): las partes plegadas se enderezan y **suman**; se rellena todo lo que encierra el contorno.
 - **Cut:** las partes plegadas se rellenan, pero donde el pliegue se solapa con el original (+1 y −1 se cancelan) el solape **queda vacío**, como un agujero.
 - En ambos modos, un anillo dibujado con dos contornos de sentido opuesto **sigue siendo anillo**.
+- Un contorno aparte dibujado al revés que **cruza** a otro no es un anillo: en Fill se gira como el mayor de su grupo y suma (el solape se rellena); en Cut el solape queda vacío.
 - **Recordado:** el modo se guarda en `ui.fixMode` (`store.ts`, `persistUi.ts`); por defecto, Fill.
 - **Conserva** el id y el estilo de la forma; el relleno vuelve a nonzero. Las curvas siguen siendo las originales: los únicos nodos nuevos son los cruces (ver la sección de reconstrucción exacta).
 - **Sin cruces**, la forma no cambia y no deja paso de deshacer (`fixShapeOverlaps` devuelve `false`).
 
-Pruebas: `tests/fix-overlaps.test.ts` (id y estilo, un paso de deshacer, sin cruces, las dos entradas de More, pliegue, Fill frente a Cut, anillo, curvas exactas) y `tests/path-boolean.test.ts` (`fixOverlaps`: pliegue, lazo, anillo). Sin prueba visual: la hace el usuario en el sandbox.
+Pruebas: `tests/fix-overlaps.test.ts` (id y estilo, un paso de deshacer, sin cruces, las dos entradas de More, pliegue, Fill frente a Cut, contorno aparte que cruza, anillo, curvas exactas) y `tests/path-boolean.test.ts` (`fixOverlaps`: pliegue, lazo, anillo). Sin prueba visual: la hace el usuario en el sandbox.
 
 **Pendiente** (D42): la selección Face de [nodos-modos](nodos-modos.md) no reconoce como caras las regiones de solape de un trazado que se cruza; hoy solo cuentan los subtrazados cerrados.
 
