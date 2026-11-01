@@ -54,6 +54,28 @@ Procedencia: `bendSegment.ts`, `pathCut.ts` y `vectorErase.ts` siguen las operac
 - E2E: `tests-e2e/path-nodes.spec.ts` abre el menú Más para las operaciones de nodos. No se ha ejecutado contra el sandbox en este cambio.
 - Prueba visual del gesto (puntero, vista previa de corte, cursor de Erase): **no hecha**. Los tests no cubren el gesto real del puntero.
 
+## Lineart: trazos elegidos
+
+Con Edit y uno o más trazos Lineart elegidos (`pickedStrokes`, `strokeEdit.ts`: todos son trazos de una capa vector visible y desbloqueada), la tira muestra el nombre de la capa, Color (con alfa), Size y Edit nodes (`StrokeEditBar.tsx`). Size se muestra y se fija como se ve en la página: un trazo escalado por su matriz conserva esa escala. Edit nodes (`editStrokes`) deja los trazos elegidos y entra en edición sin las manijas de transformación. Un trazo elegido junto a una forma, o en una capa bloqueada u oculta, no cuenta: la edición de trazos se cierra sola.
+
+La fila de edición tiene Move, Bend, Cut, Erase y Done (`STROKE_MODES`, `StrokeTools.tsx`). Lasso y Más son solo para paths.
+
+| Control | Dónde está hoy | Qué estado modifica | Notas |
+| --- | --- | --- | --- |
+| Move | Fila de edición (`StrokeTools.tsx`) | Arrastrar un punto de cada trazo (los vecinos lo siguen, como Alt+arrastre) | Solo manijas de los puntos |
+| Bend | Fila de edición | Arrastrar cerca de un trazo (`bendStroke`); la influencia viene de `lineartInfluence` (defecto 80) | Un solo paso de deshacer por gesto |
+| Cut | Fila de edición | Clic: corta el trazo elegido más cercano dentro del alcance (mitad del ancho más 12 px de pantalla); punto de vista previa bajo el puntero | `cutPickedStrokes`; si falla, no cambia nada (sin paso de deshacer). Un corte en un extremo que dejaría una pieza de menos de 2 puntos se rechaza |
+| Erase | Fila de edición; radio = slider «Eraser» de Erase | Arrastrar un círculo sobre el trazo (`erasePickedStrokes`) | Un gesto = un paso de deshacer (el primer cambio lo registra y el resto lo continúan); un gesto que no toca nada no registra nada |
+| Done | Fila de edición (`NodeDoneButton`) | Sale de la edición; los trazos siguen elegidos | Esc hace lo mismo (fase de captura: no quita también la elección) |
+
+Reglas de las piezas (`strokeCut.ts`):
+
+- Cortar o borrar deja piezas con el mismo estilo; **las piezas siguen elegidas** después de cada corte o borrado, así que se puede seguir cortando sin volver a elegir.
+- El afilado (taper) se conserva solo en los extremos que la pieza comparte con el trazo original; un extremo nuevo (corte o borrado) es romo.
+- Un trazo que se corta o se borra cambia de id: la elección se traslada a las piezas.
+
+Prueba: `tests/stroke-edit-strip.test.ts` (barra y fila), `tests/stroke-cut-erase.test.ts` (corte, borrado, fallos sin cambio, deshacer y extremos). Sin prueba visual: el usuario prueba el gesto en el sandbox. Límites conocidos: [pendientes](../pendientes-designer.md), D32 y D33.
+
 ## Enlaces
 
 - [[tira-contextual]] · [tira-contextual.md](tira-contextual.md)

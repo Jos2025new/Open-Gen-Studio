@@ -36,6 +36,18 @@ El usuario dijo que máscaras, ajustes, PSD y color son el próximo trabajo del 
 - **D3 · bajo · 2026-10-09 · Mismo campo fuera del Designer:** sliders de la galería, boceto, visor 3D y tarjeta de ajustes con estilo propio. Cambia la interfaz de otros espacios: preguntar antes.
 - **D17 · medio · 2026-10-10 · Interfaz del Designer al estilo ibisPaint y Photoshop** ([propuesta](propuesta-gui-pintura.md)): lo que se toca cada segundo siempre visible, herramientas con nombre, capas con efectos dentro, girar el lienzo e histograma. Secuencia vigente de 8 pasos; el primero es el inventario con un test de alcance. Pedido por el usuario, sin decidir el orden.
 
+## Límites y huecos de la tanda 2026-11-01
+
+Límites conocidos de los cambios de la [caja de herramientas](designer-controles/toolbox-dock.md) y los trazos Lineart ([nodos-modos](designer-controles/nodos-modos.md)). Los huecos D34 a D38 van en el orden de impacto que dio el usuario (el primero, el de más impacto); la prioridad es propuesta de Astra.
+
+- **D32 · bajo · 2026-11-01 · Slider de tamaño del trazo Lineart:** cada tick registra un paso de deshacer, igual que los campos de forma hoy. Agrupar el arrastre en un solo paso si el usuario lo nota.
+- **D33 · bajo · 2026-11-01 · Borrar un trazo entero y deshacer:** el deshacer devuelve el trazo, pero no lo deja elegido (`strokeEdit.ts`, `replace`).
+- **D34 · medio · 2026-11-01 · Edición de nodos dentro de Pen** (hueco de figcraft, el de más impacto).
+- **D35 · medio · 2026-11-01 · Bote de pintura por región** (hueco de figcraft).
+- **D36 · medio · 2026-11-01 · Constructor de formas y booleanas** (hueco de figcraft).
+- **D37 · bajo · 2026-11-01 · Herramienta Width** (hueco de figcraft).
+- **D38 · bajo · 2026-11-01 · Espaciado de párrafo en el texto:** hoy solo hay interlineado (Line) y espaciado entre letras (Spacing); ver [texto](designer-controles/texto.md).
+
 ## Auditoría del Designer (2026-10-22)
 
 De la [auditoría del Designer](../../ogs-designer-audit-2026-10-22.md) (HEAD `64fd215`), comprobados en el código y ordenados por lo que sufre el usuario. Ninguno pide tarjetas ni paradas: se arreglan por debajo, con una prueba que reproduzca cada caso. Son 11 hallazgos en 10 entradas: D26 agrupa los dos pasos de deshacer vacíos.

@@ -32,7 +32,9 @@ Todo esto vive en `LayersPanel` (`LayersPanel.tsx:271`) y se deshabilita con la 
 | Fill (por forma) | Pestaña Properties (`LayersPanel.tsx:298`) | `shape.fill` y alfa (`paintOpacityPatch`) | Cada forma de la capa (o solo las elegidas) | Aquí es un `InlineColor`, en la tira un `PaintSwatch` con degradados: dos controles distintos para lo mismo | Igual que hoy | se conserva | no dibujado |
 | Stroke (por forma) | Pestaña Properties (`LayersPanel.tsx:299`) | `shape.stroke` y alfa | Cada forma | Ídem | Igual que hoy | se conserva | no dibujado |
 | Stroke width (slider 0–40) | Pestaña Properties (`LayersPanel.tsx:300`) | `shape.strokeWidth` | Cada forma | — | Igual que hoy | se conserva | no dibujado |
+| Align (Inside / Center / Outside stroke) | Pestaña Properties (`ShapePaint.tsx`, `StrokeOptions`) y popover Stroke de la tira | `shape.strokeAlign` (vacío = Center) | Trazo con forma cerrada (rect, elipse, path con Z); en líneas y paths abiertos sale deshabilitado: «Align · Center» | Inside recorta el trazo a la forma; Outside usa regla par-impar (una forma con subtrazados que se cruzan puede verse mal). Outline stroke exige Center | Igual que hoy | se conserva | no dibujado |
 | Rx / Ry / Sharp corners (por forma) | Pestaña Properties (`LayersPanel.tsx:301` corners}) | `shape.rx`, `ry`, radios | Forma `rect` | — | Igual que hoy | se conserva | no dibujado |
+| Smoothing (0–100 %) | Pestaña Properties (`LayersPanel.tsx:304`, `ShapeLookFields.tsx:31`) | `shape.smooth` (vacío = esquinas redondas de siempre) | Rectángulo con radio en X e Y; deshabilitado si no los tiene | Aproximación G1 de la esquina (`traceRoundRect`, `shapeLook.ts`), no la continuidad de curvatura de iOS. No aparece en la tarjeta de formas: el siguiente rectángulo no lo hereda | Igual que hoy | se conserva | no dibujado |
 | Blur (por forma) | Pestaña Properties (misma línea que arriba) | `shape.blur` | Cada forma | — | Igual que hoy | se conserva | no dibujado |
 | Join / Miter limit / Cap / Dashes / Dash offset / Stroke behind fill (por forma) | Pestaña Properties (`ShapeLookFields.tsx:38`) | `shape.join`, `miter`, `cap`, `dash`, `dashOffset`, `paintOrder` | Cada forma; Miter limit solo con Join = Miter, Dash offset solo con dashes | Solo aquí y en la tarjeta de formas, nunca en la tira | Igual que hoy | se conserva | no dibujado |
 | Flatten and paint | Aviso sobre el lienzo (`DrawingChoice.tsx:36`) | `applyDrawingChoice('flatten')` | Pintar en Drawing sobre una capa con trazos editables | Popover junto al clic (`DrawingChoicePrompt`, `DesignerWorkspace.tsx:150`) | Igual que hoy | se conserva | no dibujado |
@@ -45,6 +47,11 @@ Todo esto vive en `LayersPanel` (`LayersPanel.tsx:271`) y se deshabilita con la 
 
 - Con Edit, una selección real nueva (objetos o varias capas) abre esta pestaña desde Tool. La lógica está en `usePropsOnPick.ts:9` y se llama desde `LayersPanel.tsx:130`; detalle en [[capas]].
 - Otras herramientas no la abren solas. Prueba: `tests/designer-props-on-pick.test.ts`.
+
+## Cambios del 2026-11-01: alineación del trazo y esquinas
+
+- **Align.** Inside y Outside solo en formas cerradas; el valor Center no se guarda (`strokeAlign` vacío). El dibujo recorta el trazo al doble de ancho (`strokeAligned`, `shapeLook.ts`); la exportación SVG usa un clipPath (Inside) o una máscara (Outside) (`export.ts`). Prueba: `tests/stroke-align.test.ts`. Prueba visual pendiente (el usuario, en el sandbox).
+- **Smoothing.** Redondea la esquina con un segmento más largo y tiradores de Bézier más largos (`traceRoundRect`, `smooth`); el radio no crece más allá de la mitad del lado. Prueba: `tests/corner-smoothing.test.ts`. Prueba visual pendiente.
 
 ## Enlaces
 

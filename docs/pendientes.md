@@ -154,6 +154,13 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | D16 | Capas FX: plan de pruebas completo | medio | 2026-10-08 |
 | D17 | Interfaz del Designer al estilo ibisPaint y Photoshop | medio | 2026-10-10 |
 | D18 | Lineart que se deforma al encoger (10 % residual) | medio | 2026-10-13 |
+| D32 | Slider de tamaño del trazo Lineart: un paso de deshacer por tick | bajo | 2026-11-01 |
+| D33 | Borrar un trazo entero y deshacer no restaura la elección | bajo | 2026-11-01 |
+| D34 | Edición de nodos dentro de Pen (figcraft) | medio | 2026-11-01 |
+| D35 | Bote de pintura por región (figcraft) | medio | 2026-11-01 |
+| D36 | Constructor de formas y booleanas (figcraft) | medio | 2026-11-01 |
+| D37 | Herramienta Width (figcraft) | bajo | 2026-11-01 |
+| D38 | Espaciado de párrafo en el texto | bajo | 2026-11-01 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 
