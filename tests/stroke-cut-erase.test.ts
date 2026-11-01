@@ -71,3 +71,11 @@ describe('eraseStroke', () => {
     expect(out[0].points[1]).toEqual([40, 100, expect.any(Number)]);
   });
 });
+
+it('pieces keep the taper only at the original ends; the new ends are blunt', async () => {
+  const { cutStroke } = await import('../src/engine/design/strokeCut');
+  const { newStroke, DEFAULT_STROKE_STYLE } = await import('../src/engine/design/strokes');
+  const s = newStroke([[0, 0, 0.5], [50, 0, 0.5], [100, 0, 0.5]], { ...DEFAULT_STROKE_STYLE, taperStart: 10, taperEnd: 20 }, false);
+  const [head, tail] = cutStroke(s, 50, 0, 5);
+  expect([head.taperStart, head.taperEnd, tail.taperStart, tail.taperEnd]).toEqual([10, 0, 0, 20]);
+});

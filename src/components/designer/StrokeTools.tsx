@@ -28,9 +28,12 @@ export function StrokeTools({ view, sessionId, doc }: { view: View; sessionId: s
   const drag = useRef<{ kind: 'bend'; base: Stroke[]; si: number; point: number; x: number; y: number; moved: boolean } | { kind: 'erase'; last: [number, number] | null; moved: boolean } | null>(null);
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && boardKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); setShapeEdit(doc.id, null); } };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
+    // Capture phase: runs before the Stage's own Esc (which would also drop the pick).
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
   }, [doc.id]);
+  // A pick that is no longer only strokes (a shape of the same layer, a locked or hidden layer) ends stroke editing.
+  useEffect(() => { if (!picked) setShapeEdit(doc.id, null); }, [picked, doc.id]);
   if (!picked) return null;
   const { layerId, strokes } = picked;
   const rect = () => ref.current!.getBoundingClientRect();

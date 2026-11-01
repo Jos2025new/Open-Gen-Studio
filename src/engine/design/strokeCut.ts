@@ -9,7 +9,11 @@ const lerp = (a: P3, b: P3, t: number): P3 => [a[0] + (b[0] - a[0]) * t, a[1] + 
 const EPS = 1e-6;
 
 /** A piece of `base` (matrix already applied) with new points and a new id; the style is the original's. */
-export function strokePiece(base: Stroke, points: P3[]): Stroke { return { ...base, id: uid('stk'), points }; }
+/** A piece keeps the taper only at the ends it shares with the original; a new end (cut or erased) is blunt. */
+export function strokePiece(base: Stroke, points: P3[]): Stroke {
+  const first = base.points[0], last = base.points[base.points.length - 1];
+  return { ...base, id: uid('stk'), points, taperStart: points[0] === first ? base.taperStart : 0, taperEnd: points[points.length - 1] === last ? base.taperEnd : 0 };
+}
 
 /** Nearest place on the polyline (page coordinates): the segment `index` (between points index and index+1), `t` along it, and the distance. */
 export function nearestOnStroke(s: Stroke, x: number, y: number): { index: number; t: number; point: P3; distance: number } | null {
