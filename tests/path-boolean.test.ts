@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest';
+import { booleanOp, eraseArea, eraseBand, faces, flatten, knifeArea, knifeStrip, mergeFaces, splitComponents } from '../src/engine/design/pathBoolean';
+import { parseSegs, type Pt, type Seg } from '../src/engine/design/pathNodes';
+import { shapeToPath } from '../src/engine/design/affine';
+import type { ShapeSpec } from '../src/engine/types';
+
+const rect = (x: number, y: number, w: number, h: number): Seg[] => parseSegs(`M ${x} ${y} L ${x + w} ${y} L ${x + w} ${y + h} L ${x} ${y + h} Z`);
+function circle(cx: number, cy: number, r: number): Seg[] {
+  const s = shapeToPath({ type: 'ellipse', x: cx - r, y: cy - r, w: 2 * r, h: 2 * r, fill: '#000', stroke: null, strokeWidth: 0, radius: 0 } as ShapeSpec);
+  return parseSegs((s as { d: string }).d);
+}
+const shoelace = (pts: Pt[]) => pts.reduce((s, p, i) => { const q = pts[(i + 1) % pts.length]; return s + (p[0] * q[1] - q[0] * p[1]) / 2; }, 0);
+/** Filled area by the rule: sum of signed loops (nonzero, holes oriented opposite) or outer minus holes by nesting (even-odd == abs sum with sign). */
+const loops = (segs: Seg[]) => flatten(segs, 0.05).map((l) => shoelace(l.points));
+const filled = (segs: Seg[]) => loops(segs).reduce((a, b) => a + b, 0);
+const count = (segs: Seg[], c: string) => segs.filter((s) => s.c === c).length;
+const near = (a: number, b: number, rel = 0.01) => expect(Math.abs(a - b)).toBeLessThanOrEqual(Math.abs(b) * rel + 0.5);
+
+describe('booleanOp', () => {
+  const a = rect(0, 0, 100, 100), b = rect(50, 50, 100, 100);
+  it('union / intersection / xor / difference areas', () => {
+    near(Math.abs(filled(booleanOp('union', [{ segs: a }], [{ segs: b }]))), 17500);
+    near(Math.abs(filled(booleanOp('intersection', [{ segs: a }], [{ segs: b }]))), 2500);
+    near(Math.abs(filled(booleanOp('xor', [{ segs: a }], [{ segs: b }]))), 15000);
+    near(Math.abs(filled(booleanOp('difference', [{ segs: a }], [{ segs: b }]))), 7500);
+  });
+  it('difference making a hole keeps opposite orientation (nonzero and evenodd both right)', () => {
+    const r = booleanOp('difference', [{ segs: rect(0, 0, 100, 100) }], [{ segs: rect(30, 30, 40, 40) }]);
+    const l = loops(r);
+    expect(l).toHaveLength(2);
+    expect(Math.sign(l[0])).not.toBe(Math.sign(l[1]));
+    near(Math.abs(l[0]) - Math.abs(l[1]), 8400);
+    near(Math.abs(filled(r)), 8400); // nonzero: signed sum
+    expect(splitComponents(r)).toHaveLength(1);
+  });
+  it('honours the subject fill rule', () => {
+    const star = [...rect(0, 0, 100, 100), ...rect(25, 25, 50, 50)]; // same direction: nonzero fills, evenodd makes a hole
+    near(Math.abs(filled(booleanOp('union', [{ segs: star, fillRule: 'nonzero' }], []))), 10000);
+    near(Math.abs(filled(booleanOp('union', [{ segs: star, fillRule: 'evenodd' }], []))) , 7500, 0.02);
+  });
+  it('refit keeps circles to few curves', () => {
+    const r = booleanOp('union', [{ segs: circle(50, 50, 40) }], []);
+    expect(count(r, 'C')).toBeLessThanOrEqual(8);
+    near(Math.abs(filled(r)), Math.PI * 1600, 0.01);
+  });
+  it('degenerate input never throws', () => {
+    expect(booleanOp('union', [], [])).toEqual([]);
+    expect(booleanOp('difference', [{ segs: [] }], [{ segs: a }])).toEqual([]);
+    expect(booleanOp('union', [{ segs: [{ c: 'M', p: [[NaN, 1]] }, { c: 'L', p: [[2, 3]] }] }], [])).toEqual([]);
+    near(Math.abs(filled(booleanOp('difference', [{ segs: a }], []))), 10000);
+  });
+});
+
+describe('erase and knife', () => {
+  const disc = { segs: circle(100, 100, 60) };
+  it('eraseBand: point is a circle, trail is a band', () => {
+    near(Math.abs(filled(eraseBand([[10, 10]], 5))), Math.PI * 25, 0.03);
+    near(Math.abs(filled(eraseBand([[0, 0], [100, 0]], 5))), 1000 + Math.PI * 25, 0.03);
+    expect(eraseBand([], 5)).toEqual([]);
+  });
+  it('a band through the middle gives 2 closed components', () => {
+    const parts = eraseArea(disc, [[20, 100], [180, 100]], 6);
+    expect(parts).toHaveLength(2);
+    for (const p of parts) { expect(count(p, 'Z')).toBe(1); expect(count(p, 'M')).toBe(1); }
+  });
+  it('rubbing only inside makes a hole', () => {
+    const parts = eraseArea(disc, [[80, 100], [120, 100]], 6);
+    expect(parts).toHaveLength(1);
+    expect(count(parts[0], 'M')).toBe(2);
+    expect(splitComponents(parts[0])).toHaveLength(1);
+  });
+  it('nothing touched returns the same reference; all erased returns []', () => {
+    expect(eraseArea(disc, [[300, 300], [320, 300]], 5)[0]).toBe(disc.segs);
+    expect(eraseArea(disc, [[100, 100]], 100)).toEqual([]);
+  });
+  it('knife: circle -> 2 pieces, each cut again -> 2 more; a miss returns the input', () => {
+    const two = knifeArea(disc, [[0, 100], [200, 100]]);
+    expect(two).toHaveLength(2);
+    for (const p of two) expect(count(p, 'Z')).toBe(1);
+    near(two.reduce((s, p) => s + Math.abs(filled(p)), 0), Math.PI * 3600, 0.01);
+    for (const p of two) expect(knifeArea({ segs: p }, [[100, 0], [100, 200]])).toHaveLength(2);
+    expect(knifeArea(disc, [[0, 0], [10, 0]])[0]).toBe(disc.segs);
+    expect(knifeArea(disc, [[100, 100], [120, 100]])[0]).toBe(disc.segs); // notch, not a cut
+    expect(knifeStrip([[0, 0], [10, 0]]).length).toBeGreaterThan(3);
+    expect(knifeStrip([[0, 0]])).toEqual([]);
+  });
+  it('splitComponents separates pieces', () => {
+    expect(splitComponents([...rect(0, 0, 10, 10), ...rect(50, 0, 10, 10)])).toHaveLength(2);
+    expect(splitComponents([])).toEqual([]);
+  });
+});
+
+describe('faces', () => {
+  it('two overlapping circles -> 3 faces with sources', () => {
+    const f = faces([{ segs: circle(0, 0, 50) }, { segs: circle(60, 0, 50) }])!;
+    expect(f).toHaveLength(3);
+    expect(f.map((x) => x.sources.join(',')).sort()).toEqual(['0', '0,1', '1']);
+    for (const x of f) expect(count(x.segs, 'C')).toBeLessThanOrEqual(8);
+  });
+  it('a cutter divides a face; mergeFaces joins adjacent faces without a seam', () => {
+    const f = faces([{ segs: circle(0, 0, 50) }, { segs: circle(60, 0, 50) }])!;
+    const only0 = f.find((x) => x.sources.join() === '0')!, both = f.find((x) => x.sources.length === 2)!;
+    const m = mergeFaces([only0.segs, both.segs]);
+    expect(count(m, 'M')).toBe(1);
+    near(Math.abs(filled(m)), Math.PI * 2500, 0.01);
+    const cut = faces([{ segs: rect(0, 0, 100, 100) }], [[[50, -10], [50, 110]]])!;
+    expect(cut).toHaveLength(2);
+    const whole = mergeFaces(cut.map((x) => x.segs));
+    expect(count(whole, 'M')).toBe(1);
+    near(Math.abs(filled(whole)), 10000, 0.005);
+  });
+  it('budget and degenerate', () => {
+    expect(faces(Array.from({ length: 65 }, () => ({ segs: rect(0, 0, 1, 1) })))).toBeNull();
+    expect(faces([])).toEqual([]);
+    expect(mergeFaces([])).toEqual([]);
+  });
+});
+
+describe('performance', () => {
+  it('eraseArea on ~500 vertices with a 50 point trail is fast', () => {
+    const pts: Pt[] = Array.from({ length: 500 }, (_, i): Pt => [300 + 200 * Math.cos((i / 500) * 6.2832) * (1 + 0.02 * Math.sin(i)), 300 + 200 * Math.sin((i / 500) * 6.2832)]);
+    const area = { segs: parseSegs(`M ${pts[0]} ${pts.slice(1).map((p) => `L ${p}`).join(' ')} Z`) };
+    const trail: Pt[] = Array.from({ length: 50 }, (_, i): Pt => [150 + i * 6, 300 + 40 * Math.sin(i / 5)]);
+    eraseArea(area, trail, 12);
+    const t0 = performance.now();
+    for (let i = 0; i < 5; i++) eraseArea(area, trail, 12);
+    const ms = (performance.now() - t0) / 5;
+    console.log(`eraseArea avg ${ms.toFixed(2)} ms`);
+    expect(ms).toBeLessThan(40);
+  });
+});
