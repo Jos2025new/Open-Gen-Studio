@@ -1,6 +1,6 @@
 import { type ComponentProps, type ReactNode } from 'react';
 import { GalleryVerticalEnd, PanelBottom, PanelLeft } from 'lucide-react';
-import { ToolDock } from './ToolDock';
+import { announceSidePopup, ToolDock, useSidePopup } from './ToolDock';
 import { ToolSettings } from './ToolSettings';
 import { DocumentChoices } from './DocumentPicker';
 import { setUi, useStore } from '../../store/store';
@@ -17,9 +17,10 @@ export function DockPlaceButton() {
 /** Side toolbox, first button: the session's designs as a popup at its right (the picker in the corner is hidden then). */
 function DesignsButton({ sessionId, active }: { sessionId: string; active: ComponentProps<typeof ToolSettings>['doc'] }) {
   const pop = usePopover();
+  useSidePopup('designs', pop.close);
   const docs = useStore((s) => s.sessions[sessionId]?.docs) ?? [active];
   return <>
-    <IconButton ref={pop.ref} icon={GalleryVerticalEnd} label={`Designs · ${active.name}`} size="md" aria-haspopup="listbox" aria-expanded={pop.open} active={pop.open} onClick={pop.toggle} />
+    <IconButton ref={pop.ref} icon={GalleryVerticalEnd} label={`Designs · ${active.name}`} size="md" aria-haspopup="listbox" aria-expanded={pop.open} active={pop.open} onClick={() => { if (!pop.open) announceSidePopup('designs'); pop.toggle(); }} />
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={212} label="Designs" className="designs-pop">
       <DocumentChoices sessionId={sessionId} docs={docs} active={active} />
     </Popover>

@@ -12,6 +12,7 @@ import { ResultSummary } from './ResultSummary';
 import { AttachStrip, DesignerTargetChip, SendDirect } from '../composer/Composer';
 import { MediaControls, ModelChip } from '../composer/MediaControls';
 import { MODES } from '../composer/ModeMenu';
+import { announceSidePopup, useSidePopup } from '../designer/ToolDock';
 
 type View = 'chat' | 'create';
 type Space = 'node' | 'designer';
@@ -46,11 +47,12 @@ export function CornerButtons({ sessionId, space = 'node' }: { sessionId: string
   const { view, open } = useCorner();
   const { items } = useSpaceFeed(sessionId, space);
   const pending = useStore((s) => Boolean(s.sessions[sessionId]?.agent.pending || s.sessions[sessionId]?.agent.busy));
+  const toggle = (v: View) => { if (space === 'designer') announceSidePopup('corner'); toggleCorner(v); };
   return (
     <>
-      <IconButton icon={LayoutGrid} label="Create" active={open && view === 'create'} aria-pressed={open && view === 'create'} onClick={() => toggleCorner('create')} />
+      <IconButton icon={LayoutGrid} label="Create" active={open && view === 'create'} aria-pressed={open && view === 'create'} onClick={() => toggle('create')} />
       <span className="canvas-nav-badged">
-        <IconButton icon={MessageSquare} label="Conversation" active={open && view === 'chat'} aria-pressed={open && view === 'chat'} onClick={() => toggleCorner('chat')} />
+        <IconButton icon={MessageSquare} label="Conversation" active={open && view === 'chat'} aria-pressed={open && view === 'chat'} onClick={() => toggle('chat')} />
         {items.length ? <span className="canvas-nav-badge num">{items.length}</span> : null}
         {pending ? <span className="pulse-dot" /> : null}
       </span>
@@ -164,6 +166,7 @@ const NodeFrame: Frame = ({ result, label, children }) => (
 
 /** Designer: the same panel at the right of the side toolbox (inside it, so it lines up with its top); hides while a tool's popups or Designs are open. */
 export function DesignerCorner({ sessionId }: { sessionId: string }) {
+  useSidePopup('corner', () => useCorner.setState({ open: false }));
   return <SideContent sessionId={sessionId} space="designer" frame={DesignerFrame} />;
 }
 const DesignerFrame: Frame = ({ label, children }) => <section className="node-side designer-corner" aria-label={label}>{children}</section>;

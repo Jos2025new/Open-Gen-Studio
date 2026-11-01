@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
-import { ToolDock } from '../src/components/designer/ToolDock';
+import { announceSidePopup, ToolDock } from '../src/components/designer/ToolDock';
 import { createDoc } from '../src/engine/design/doc';
 import { useStore } from '../src/store/store';
 
@@ -84,4 +84,26 @@ it('integrated (in the prompt box) or separate (upright at the left, with the de
   expect(css).toMatch(/\.designer:has\(\.designer-side\) \.document-picker \{ display: none; \}/);
   expect(css).toMatch(/body:has\(\.designs-pop\) \.designer-side \.tool-dock-stack \{ display: none; \}/);
   expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) \{ --designer-dock-left: max\(84px/);
+});
+
+it('side toolbox, one popup at a time: another popup closes the tool\'s; a family announces its own; the flat strip ignores it', async () => {
+  const seen: string[] = [];
+  const spy = (e: Event) => seen.push((e as CustomEvent<string>).detail);
+  window.addEventListener('ogs:side-popup', spy);
+  const upright = await render(true, 'Brush');
+  expect(seen).toEqual(['tools']);
+  expect(upright.host.querySelector('[aria-label="Brush variants"]')).not.toBeNull();
+  act(() => announceSidePopup('corner'));
+  expect(upright.host.querySelector('[aria-label="Brush variants"]')).toBeNull();
+  await upright.done();
+  const flat = await render(false, 'Brush');
+  expect(seen).toEqual(['tools', 'corner']);
+  act(() => announceSidePopup('designs'));
+  expect(flat.host.querySelector('[aria-label="Brush variants"]')).not.toBeNull();
+  await flat.done();
+  window.removeEventListener('ogs:side-popup', spy);
+  const sources = ['src/components/designer/ToolPalette.tsx', 'src/components/node/NodeSide.tsx'].map((f) => readFileSync(f, 'utf8')).join('\n');
+  expect(sources).toMatch(/useSidePopup\('designs', pop\.close\)/);
+  expect(sources).toMatch(/useSidePopup\('corner', \(\) => useCorner\.setState\(\{ open: false \}\)\)/);
+  expect(sources).toMatch(/if \(space === 'designer'\) announceSidePopup\('corner'\)/);
 });
