@@ -117,3 +117,12 @@ describe('lasso', () => {
     expect(nodesInLasso(square, [[200, 200], [300, 200], [300, 300]])).toEqual([]);
   });
 });
+
+it('a miss returns the path itself, so callers record nothing (closed path with an implicit close)', async () => {
+  const { cutPathAcross, cutPathAt } = await import('../src/engine/design/pathCut');
+  const { erasePath } = await import('../src/engine/design/vectorErase');
+  const tri = [{ c: 'M' as const, p: [[0, 0]] as [number, number][] }, { c: 'L' as const, p: [[10, 0]] as [number, number][] }, { c: 'L' as const, p: [[10, 10]] as [number, number][] }, { c: 'Z' as const, p: [] as [number, number][] }];
+  expect(cutPathAcross(tri, [50, 50], [60, 60])[0]).toBe(tri);
+  expect(erasePath(tri, [50, 50], 2)[0]).toBe(tri);
+  expect(cutPathAt(tri, 99, 0.5)[0]).toBe(tri);
+});

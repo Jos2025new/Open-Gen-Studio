@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 import { usePropsOnPick } from '../src/components/designer/usePropsOnPick';
 import { useStore } from '../src/store/store';
+import { useObjectSelection } from '../src/engine/design/objectSelection';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -13,8 +14,12 @@ async function setup(tab: string, selected: string[], tool = 'move') {
   const setTab = vi.fn();
   const host = document.createElement('div');
   const root = createRoot(host);
-  const Probe = (p: { tab: string; sel: string[] }) => { usePropsOnPick(p.tab, setTab, p.sel); return null; };
-  const show = (sel: string[], t = tab) => act(async () => root.render(createElement(Probe, { tab: t, sel })));
+  // `sel` are picked objects; `layers` the layer selection (the active layer alone is always there).
+  const Probe = (p: { tab: string; layers: string[] }) => { usePropsOnPick(p.tab, setTab, p.layers, 'd'); return null; };
+  const show = (sel: string[], t = tab, layers = ['layer']) => act(async () => {
+    useObjectSelection.setState({ byDoc: sel.length ? { d: { layerId: 'layer', ids: sel } } : {} });
+    root.render(createElement(Probe, { tab: t, layers }));
+  });
   await show(selected);
   return { setTab, show, done: () => act(async () => root.unmount()) };
 }
@@ -49,5 +54,14 @@ it('other tools keep their settings in view: choosing a layer to paint on does n
   const t = await setup('tool', ['a'], 'brush');
   await t.show(['b']);
   expect(t.setTab).not.toHaveBeenCalled();
+  await t.done();
+});
+
+it('the active layer alone changing (undo, a new layer) is not a pick; several layers are', async () => {
+  const t = await setup('tool', []);
+  await t.show([], 'tool', ['other']);
+  expect(t.setTab).not.toHaveBeenCalled();
+  await t.show([], 'tool', ['a', 'b']);
+  expect(t.setTab).toHaveBeenCalledWith('props');
   await t.done();
 });

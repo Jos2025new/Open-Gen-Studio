@@ -105,6 +105,8 @@ function cutContour(c: Contour, cuts: Array<{ edge: number; t: number }>): Seg[]
 
 /** Cut the path at parameter t of segment `segmentIndex` (index in `path`). Other subpaths come back untouched. */
 export function cutPathAt(path: Seg[], segmentIndex: number, t: number): Seg[][] {
+  // Nothing to cut returns the path itself (see cutPathAcross).
+  if (!contoursOf(path).some((c) => c.edges.some((e) => e.idx === segmentIndex))) return [path];
   return contoursOf(path).flatMap((c) => {
     const edge = c.edges.findIndex((e) => e.idx === segmentIndex);
     return edge < 0 ? [contourSegs(c.edges, c.closed)] : cutContour(c, [{ edge, t: Math.min(1, Math.max(0, t)) }]);
@@ -133,6 +135,8 @@ function crossings(e: Edge, a: Pt, b: Pt): number[] {
 
 /** Cut the path wherever the segment a→b crosses it (crossings within 0.01..0.99 of an edge). */
 export function cutPathAcross(path: Seg[], a: Pt, b: Pt): Seg[][] {
+  // A line that misses returns the path itself: nothing is rewritten, so no undo step and no lost node types.
+  if (!contoursOf(path).some((c) => c.edges.some((e) => crossings(e, a, b).length))) return [path];
   return contoursOf(path).flatMap((c) => {
     const cuts = c.edges.flatMap((e, edge) => crossings(e, a, b).map((t) => ({ edge, t })));
     return cuts.length ? cutContour(c, cuts) : [contourSegs(c.edges, c.closed)];

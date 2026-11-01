@@ -127,7 +127,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   // Several layers picked with Ctrl/Shift-click (Edit's Align and Transform act on all of them).
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
-  usePropsOnPick(tab, setTab, picked);
+  usePropsOnPick(tab, setTab, picked, doc.id);
   const objPick = useObjectSelection((st) => st.byDoc[doc.id]);
   const groups = liveGroups(doc);
   // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.

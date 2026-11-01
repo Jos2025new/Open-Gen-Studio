@@ -33,6 +33,8 @@ export function insideRanges(e: Edge, center: Pt, radius: number): Array<[number
 
 /** What is left of the path outside the circle: 0..n open paths (a path the circle misses comes back as is). */
 export function erasePath(path: Seg[], center: Pt, radius: number): Seg[][] {
+  // A miss returns the path itself: nothing is rewritten, so no undo step and no lost node types.
+  if (!contoursOf(path).some((c) => c.edges.some((e) => insideRanges(e, center, radius).length))) return [path];
   return contoursOf(path).flatMap((c) => {
     const per = c.edges.map((e) => insideRanges(e, center, radius));
     if (!per.some((r) => r.length)) return [contourSegs(c.edges, c.closed)];
