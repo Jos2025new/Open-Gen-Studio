@@ -22,7 +22,7 @@ export function applyLetterSpacing(ctx: CanvasRenderingContext2D, px: number): v
 export function applyTextCase(text: string, textCase?: TextLayer['textCase']): string {
   if (textCase === 'upper') return text.toUpperCase();
   if (textCase === 'lower') return text.toLowerCase();
-  if (textCase === 'title') return text.replace(/(^|\s)(\p{L})/gu, (_m, sp: string, c: string) => sp + c.toUpperCase());
+  if (textCase === 'title') return text.replace(/(^|[^\p{L}\p{N}'’])(\p{L})/gu, (_m, sp: string, c: string) => sp + c.toUpperCase());
   return text;
 }
 

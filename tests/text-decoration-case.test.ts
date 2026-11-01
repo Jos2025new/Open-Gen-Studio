@@ -39,3 +39,8 @@ describe('text decoration', () => {
     expect(svg).toMatch(/<rect [^>]*fill="#112233"\/><\/g>$/);
   });
 });
+
+it('Title case capitalizes after hyphens and brackets, as the editor (CSS capitalize) shows it', async () => {
+  const { applyTextCase } = await import('../src/engine/design/textLayout');
+  expect(applyTextCase('well-known (x) don’t', 'title')).toBe('Well-Known (X) Don’t');
+});

@@ -9,7 +9,7 @@ import { inkscapePrimAttrs } from './inkscapeShape';
 import { decorationRects } from './textLayout';
 import { blurFilterSvg, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
-import { fontStack } from './doc';
+import { fontStack, shapeBox } from './doc';
 import { strokeSvg } from './brushTextures';
 import { fxPlan } from '../fx/plan';
 import { fxFilter } from '../fx/svg';
@@ -73,14 +73,19 @@ export function shapeSvg(s: VectorShape): string {
  * else (a mask: white page, black shape). Dashes are halved so they keep their size at the doubled width.
  */
 function alignedBody(s: VectorShape): string {
-  const id = `sa-${xmlEscape(s.id)}`, big = 1e7;
+  const id = `sa-${xmlEscape(s.id)}`;
   const plain: VectorShape = { ...s, strokeAlign: undefined, };
   const fillEl = shapeBody({ ...plain, stroke: null, strokeGradient: undefined, dash: undefined });
   const strokeEl = shapeBody({ ...plain, fill: null, fillGradient: undefined, strokeWidth: s.strokeWidth * 2, dash: s.dash?.map((d) => d / 2), dashOffset: s.dashOffset ? s.dashOffset / 2 : s.dashOffset });
   let geo = shapeBody({ ...plain, fill: '#000', fillGradient: undefined, fillOpacity: undefined, stroke: null, strokeGradient: undefined, strokeWidth: 0, dash: undefined, paintOrder: undefined });
   const inside = strokeAlignOf(s) === 'inside';
   if (inside && s.fillRule === 'evenodd') geo = geo.replace(/^<(\w+) /, '<$1 clip-rule="evenodd" ');
-  const def = inside ? `<clipPath id="${id}">${geo}</clipPath>` : `<mask id="${id}" maskUnits="userSpaceOnUse" x="${-big}" y="${-big}" width="${2 * big}" height="${2 * big}"><rect x="${-big}" y="${-big}" width="${2 * big}" height="${2 * big}" fill="#fff"/>${geo}</mask>`;
+  // Outside: the shape is cut out even-odd, as the canvas clips it (render.ts), so both agree on self-overlaps.
+  if (!inside) geo = geo.replace(/^<(\w+) /, '<$1 fill-rule="evenodd" ');
+  // The mask covers the shape and its reach with room for turns and skews, not a huge page some renderers would allocate.
+  const b = shapeBox(s), m = Math.max(b.w, b.h) + s.strokeWidth * 4 + 1;
+  const n = (v: number) => +v.toFixed(3), area = `x="${n(b.x - m)}" y="${n(b.y - m)}" width="${n(b.w + 2 * m)}" height="${n(b.h + 2 * m)}"`;
+  const def = inside ? `<clipPath id="${id}">${geo}</clipPath>` : `<mask id="${id}" maskUnits="userSpaceOnUse" ${area}><rect ${area} fill="#fff"/>${geo}</mask>`;
   const stroked = `<g ${inside ? 'clip-path' : 'mask'}="url(#${id})">${strokeEl}</g>`;
   return `<g><defs>${def}</defs>${s.paintOrder === 'stroke' ? stroked + fillEl : fillEl + stroked}</g>`;
 }
