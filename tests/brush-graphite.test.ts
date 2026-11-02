@@ -70,7 +70,14 @@ describe('presets', () => {
     expect(grade('pencil-4b').leadHardness).toBe(0.15);
     const rest = [...PENCIL_PRESETS, ...DAB_PRESETS].filter((p) => !['pencil-2h', 'pencil-hb', 'pencil-4b'].includes(p.id));
     expect(rest).toHaveLength(8);
-    expect(sha(JSON.stringify(rest))).toBe('270641bb');
+    // Valley fill is the only thing added to these: without it they are as before.
+    const noFill = rest.map((p) => { const { valleyFill, ...v } = p.values; void valleyFill; return { ...p, values: v }; });
+    expect(sha(JSON.stringify(noFill))).toBe('270641bb');
+  });
+  it('valley fill: 2H 0.12, HB 0.2, 4B 0.3; the other pencils 0.15-0.25; dab presets none', () => {
+    expect([grade('pencil-2h').valleyFill, grade('pencil-hb').valleyFill, grade('pencil-4b').valleyFill]).toEqual([0.12, 0.2, 0.3]);
+    for (const p of PENCIL_PRESETS) { expect(p.values.valleyFill).toBeGreaterThanOrEqual(0.12); expect(p.values.valleyFill).toBeLessThanOrEqual(0.3); }
+    for (const p of DAB_PRESETS) expect(p.values.valleyFill).toBeUndefined();
   });
   it('a preset without lead hardness clears the previous one', () => {
     const out = applyBrushPreset(applyBrushPreset({ size: 1, color: '#000000' }, PENCIL_PRESETS[2]), PENCIL_PRESETS[3]);
@@ -87,10 +94,12 @@ describe('tooth v2', () => {
     expect(applyTooth(0.5, 0, 0.2)).toBeCloseTo(0.2, 12);
     expect(applyTooth(0.1, 0, 0.5)).toBe(0);
   });
-  it('tipFor records version 2 only with tooth', () => {
-    expect(tipFor({ size: 5, ...base, tooth: true }, false).toothVersion).toBe(2);
+  it('tipFor records the version (and valleyFill) only with tooth', () => {
+    expect(tipFor({ size: 5, ...base, tooth: true }, false).toothVersion).toBe(3);
     expect('toothVersion' in tipFor({ size: 5, ...base }, false)).toBe(false);
     expect('toothVersion' in tipFor({ size: 5, tooth: true }, false)).toBe(false);
+    expect('valleyFill' in tipFor({ size: 5, ...base }, false)).toBe(false);
+    expect(tipFor({ size: 5, ...base, tooth: true, valleyFill: 0.2 }, false).valleyFill).toBe(0.2);
   });
   it('capsule: version 2 equals the old result (golden hash from before the change)', () => {
     const v1 = capsule({ ...base, tooth: true, edge: 0.3 }), v2 = capsule({ ...base, tooth: true, toothVersion: 2, edge: 0.3 });
@@ -121,7 +130,7 @@ describe('tooth v2', () => {
     const faint = { ...DAB_PRESETS[1].values, textureStrength: 0.3 };
     const tip = tipFor({ ...faint, tooth: true, dabs: true }, false);
     tip.dabs!.seed = 5;
-    expect(tip.toothVersion).toBe(2);
+    expect(tip.toothVersion).toBe(3);
     const line = [[10, 40, 110, 40, 4]];
     const one = dabStroke(tip, [[60, 40, 60, 40, 4]], [1]), many = dabStroke(tip, line, [1]);
     const sum = (i: AlphaImage) => alphas(i).reduce((a, b) => a + b, 0), max = (i: AlphaImage) => Math.max(...alphas(i));
@@ -164,6 +173,74 @@ describe('inter-pass accumulation', () => {
       const layer = new Float32Array(W * H), seen: number[] = [];
       for (let s = 1; s <= 5; s++) { composite(layer, mk(s)); seen.push(mean(layer)); }
       for (let s = 1; s < 5; s++) expect(seen[s], JSON.stringify(seen)).toBeGreaterThan(seen[s - 1]);
+    }
+  });
+});
+
+describe('tooth v3: valley fill', () => {
+  const composite = (layer: Float32Array, m: AlphaImage) => { for (let k = 0; k < layer.length; k++) { const a = m.data[k * 4 + 3] / 255; layer[k] = layer[k] + (1 - layer[k]) * a; } };
+  const tex = { hardness: 1, texture: 'graphite', textureStrength: 0.5, tooth: true } as const;
+  const v3 = (fill: number, extra: Partial<BrushTip> = {}): BrushTip => ({ ...tex, toothVersion: 3, valleyFill: fill, ...extra });
+  const DD = (seed: number, flow = 0.06): BrushTip['dabs'] => ({ spacing: 0.25, scatter: 0, sizeJitter: 0, angleJitter: 0, flow, seed });
+  const line = [[20, 40, 100, 40, 14]];
+  const cap = (tip: BrushTip, d = 0.6) => { const i = img(); stampSegment(i, 0, 0, line[0], d, tip, [0, 0, 0]); return i; };
+  const dab = (tip: BrushTip, d = 0.6) => dabStroke(tip, line, [d]);
+  // Deep valleys: texture 0 inside the stroke's body, where the grain takes everything from a middling coverage.
+  const valleys: number[] = [];
+  for (let y = 37; y < 44; y++) for (let x = 30; x < 90; x++) if (textureAt('graphite', x, y) === 0) valleys.push(y * W + x);
+  const at = (i: AlphaImage | Float32Array, ks = valleys) => ks.map((k) => (i instanceof Float32Array ? i[k] : i.data[k * 4 + 3] / 255));
+  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+  const stages = (mk: (n: number) => AlphaImage) => { const layer = new Float32Array(W * H), out: number[] = []; for (let n = 1; n <= 5; n++) { composite(layer, mk(n)); out.push(mean(at(layer))); } return out; };
+  it('there are deep valleys to look at', () => { expect(valleys.length).toBeGreaterThan(40); });
+  it('one pass: valleyFill 0 leaves the deep valleys at 0, HB leaves them very low', () => {
+    for (const mk of [(t: BrushTip) => cap(t), (t: BrushTip) => dab({ ...t, dabs: DD(1) })]) {
+      const none = at(mk(v3(0))), hb = at(mk(v3(0.2)));
+      expect(none.filter((a) => a === 0).length).toBeGreaterThan(valleys.length * 0.8);
+      expect(mean(hb)).toBeGreaterThan(0);
+      expect(Math.max(...hb)).toBeLessThan(0.35 * 0.6 + 0.02);
+    }
+  });
+  it('five separate overlapping strokes: the valleys fill up monotonically, 5 passes at least 3x one pass', () => {
+    for (const fill of [0.12, 0.2, 0.3]) {
+      for (const seen of [stages(() => cap(v3(fill))), stages((n) => dab(v3(fill, { dabs: DD(n) })))]) {
+        for (let n = 1; n < 5; n++) expect(seen[n], JSON.stringify(seen)).toBeGreaterThan(seen[n - 1]);
+        expect(seen[4], JSON.stringify(seen)).toBeGreaterThanOrEqual(3 * seen[0]);
+      }
+    }
+    expect(Math.max(...stages(() => cap(v3(0))))).toBe(0);
+    expect(Math.max(...stages((n) => dab(v3(0, { dabs: DD(n) }))))).toBe(0);
+  });
+  it('more density, more deposit in the valleys', () => {
+    const t = { ...tex, textureStrength: 1 } as const;
+    expect(mean(at(cap({ ...t, toothVersion: 3, valleyFill: 0.3 }, 0.9)))).toBeGreaterThan(mean(at(cap({ ...t, toothVersion: 3, valleyFill: 0.3 }, 0.3))));
+    const lo = dab({ ...t, toothVersion: 3, valleyFill: 0.3, dabs: DD(1, 0.05) }, 0.3), hi = dab({ ...t, toothVersion: 3, valleyFill: 0.3, dabs: DD(1, 0.05) }, 1);
+    expect(mean(at(hi))).toBeGreaterThan(mean(at(lo)));
+  });
+  it('valleyFill 0 with v3 is exactly the v2 output', () => {
+    expect(Array.from(cap(v3(0), 0.5).data)).toEqual(Array.from(cap({ ...tex, toothVersion: 2 }, 0.5).data));
+    expect(Array.from(capsule({ ...base, tooth: true, toothVersion: 3, valleyFill: 0, edge: 0.3 }).data)).toEqual(Array.from(capsule({ ...base, tooth: true, toothVersion: 2, edge: 0.3 }).data));
+    expect(Array.from(dabStroke({ ...base, tooth: true, toothVersion: 3, valleyFill: 0, dabs: D }).data)).toEqual(Array.from(dabStroke({ ...base, tooth: true, toothVersion: 2, dabs: D }).data));
+    expect(alphas(dabStroke({ ...base, tooth: true, toothVersion: 3, valleyFill: 0.3, dabs: D }))).not.toEqual(alphas(dabStroke({ ...base, tooth: true, toothVersion: 2, dabs: D })));
+  });
+  it('is deterministic, and live, repaint and replay agree for dabs', () => {
+    const tip: BrushTip = { ...base, tooth: true, toothVersion: 3, valleyFill: 0.25, dabs: D };
+    const replay = dabStroke(tip);
+    expect(Array.from(dabStroke(tip).data)).toEqual(Array.from(replay.data));
+    expect(sha(capsule({ ...base, tooth: true, toothVersion: 3, valleyFill: 0.25 }))).toBe(sha(capsule({ ...base, tooth: true, toothVersion: 3, valleyFill: 0.25 })));
+    const live = { tip, color: '#000000', last: undefined as { width: number; density: number } | undefined, dabs: newDabState() };
+    const via = img();
+    path.forEach((s, i) => { stampTip(live, via, 0, 0, { x0: 0, y0: 0 }, s, dens[i]); live.last = { width: s[4], density: dens[i] }; });
+    expect(Array.from(via.data)).toEqual(Array.from(replay.data));
+    const rep = img();
+    repaintDabs(live, rep, 0, 0, { x0: 0, y0: 0 }, path, dens);
+    expect(Array.from(rep.data)).toEqual(Array.from(replay.data));
+  });
+  it('2H, HB and 4B at mid pressure: five passes always add to the valleys', () => {
+    const rows: Record<string, number[][]> = {};
+    for (const id of ['pencil-2h', 'pencil-hb', 'pencil-4b']) {
+      const v = grade(id), tip = tipFor({ ...v, size: 14 }, false), d = atPressure(v, 0.5).density;
+      rows[id] = [stages(() => cap(tip, d)), stages((n) => dab({ ...tip, dabs: DD(n) }, d))];
+      for (const r of rows[id]) expect(r[4]).toBeGreaterThan(r[0]);
     }
   });
 });

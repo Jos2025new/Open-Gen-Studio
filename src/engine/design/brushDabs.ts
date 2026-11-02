@@ -1,4 +1,4 @@
-import { applyTooth, hexRgb, profile, segmentBox, smoothNoise, stampSegment, textureAt, type AlphaImage, type BrushTip } from './brushEngine';
+import { applyTooth, applyToothV3, hexRgb, profile, segmentBox, smoothNoise, stampSegment, textureAt, type AlphaImage, type BrushTip } from './brushEngine';
 import { tipFrame } from './brushTipShape';
 
 /*
@@ -63,7 +63,7 @@ function dab(p: Plane, tip: BrushTip, cx: number, cy: number, R: number, aj: num
         // Tooth v2 waits for flush (one subtraction on the built-up coverage). The first tooth scaled each faint dab so a subtraction would not erase it.
         const t = textureAt(tex, x, y);
         if (!tooth) k *= 1 - strength * (1 - t);
-        else if (tip.toothVersion !== 2) k *= Math.max(0, 1 - 1.5 * strength * (1 - t));
+        else if (!tip.toothVersion) k *= Math.max(0, 1 - 1.5 * strength * (1 - t));
       }
       const i = (y - p.y) * p.w + (x - p.x), before = data[i];
       data[i] = before + (1 - before) * k;
@@ -96,12 +96,16 @@ function walk(st: DabState, tip: BrushTip, seg: readonly number[], density: numb
 /** Write the plane's coverage inside `r` into an RGBA mask whose top-left is (ix, iy) in layer pixels. */
 function flush(p: Plane | undefined, img: AlphaImage, ix: number, iy: number, rgb: [number, number, number], r: Rect, tip: BrushTip): void {
   if (!p) return;
-  const strength = clamp01(tip.textureStrength ?? 0), v2 = tip.tooth === true && tip.toothVersion === 2 && !!tip.texture && strength > 0;
+  const strength = clamp01(tip.textureStrength ?? 0), v2 = tip.tooth === true && (tip.toothVersion ?? 0) >= 2 && !!tip.texture && strength > 0;
   const x0 = Math.max(r.x0, p.x, ix), x1 = Math.min(r.x1, p.x + p.w, ix + img.width), y0 = Math.max(r.y0, p.y, iy), y1 = Math.min(r.y1, p.y + p.h, iy + img.height);
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       let cov = Math.min(1, p.data[(y - p.y) * p.w + (x - p.x)]);
-      if (v2 && cov > 0) cov = applyTooth(cov, textureAt(tip.texture, x, y), strength);
+      if (v2 && cov > 0) {
+        const tex = textureAt(tip.texture, x, y);
+        // v3: the accumulated coverage already carries each dab's density (flow × pressure), so it is the local density of the valley floor.
+        cov = tip.toothVersion === 3 ? applyToothV3(cov, tex, strength, tip.valleyFill ?? 0, cov) : applyTooth(cov, tex, strength);
+      }
       const a = Math.round(cov * 255);
       if (!a) continue;
       const i = ((y - iy) * img.width + (x - ix)) * 4;

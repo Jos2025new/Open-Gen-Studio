@@ -127,6 +127,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
         {pane('tip', <>
     {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
     {brush.texture && brush.texture !== 'none' && <InlineToggle label="Tooth" tip="Texture by pressure: light strokes catch only the paper's grain" checked={!!brush.tooth} onChange={(v) => set({ tooth: v })} />}
+    {brush.texture && brush.texture !== 'none' && brush.tooth && <InlineSlider label="Valley fill" tip="How much graphite reaches the paper's valleys each pass: repeat or press harder to close the holes" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.valleyFill ?? BRUSH_DEFAULTS.valleyFill} onChange={(v) => set({ valleyFill: v })} />}
     <InlineSlider label="Edge" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.edge ?? 0} onChange={(v) => set({ edge: v })} />
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
@@ -185,6 +186,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
     </div>
     {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
     {brush.texture && brush.texture !== 'none' && <InlineToggle label="Tooth" tip="Texture by pressure: light strokes catch only the paper's grain" checked={!!brush.tooth} onChange={(v) => set({ tooth: v })} />}
+    {brush.texture && brush.texture !== 'none' && brush.tooth && <InlineSlider label="Valley fill" tip="How much graphite reaches the paper's valleys each pass: repeat or press harder to close the holes" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.valleyFill ?? BRUSH_DEFAULTS.valleyFill} onChange={(v) => set({ valleyFill: v })} />}
     <InlineSlider label="Edge" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.edge ?? 0} onChange={(v) => set({ edge: v })} />
     <div className="brush-row">
       <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={brush.taperStart ?? 0} onChange={(v) => set({ taperStart: v })} />

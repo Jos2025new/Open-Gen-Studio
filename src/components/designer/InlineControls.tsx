@@ -13,7 +13,7 @@ import { ColorChannels } from './ColorChannels';
  * name on the left and the value on the right. Drag anywhere on it, use the arrow keys, scroll over it, or click
  * the value to type it. A short range shows its steps as dots. Every tool and panel uses this one.
  */
-export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, log = false, allowManualOverflow = false, disabled, icon, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; /** The track runs on a log scale (each stretch doubles the value): for zoom-like ranges such as 5%–3200%. */ log?: boolean; allowManualOverflow?: boolean; disabled?: boolean; /** Shown in place of the name where space is short; the name stays as its label and tooltip. */ icon?: ReactNode; onChange: (v: number) => void }) {
+export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, log = false, allowManualOverflow = false, disabled, icon, tip, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; /** The track runs on a log scale (each stretch doubles the value): for zoom-like ranges such as 5%–3200%. */ log?: boolean; allowManualOverflow?: boolean; disabled?: boolean; /** Shown in place of the name where space is short; the name stays as its label and tooltip. */ icon?: ReactNode; /** Tooltip on the whole field. */ tip?: string; onChange: (v: number) => void }) {
   // A typed value outside the range waits until the field is left (Enter or blur), so typing "250" into a 5–3200
   // field does not clamp at the first "2".
   const [draft, setDraft] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export function InlineSlider({ label, value, min, max, step = 1, unit = '', scal
   const fill = hi > lo ? Math.min(100, Math.max(0, ((pos(value) - lo) / (hi - lo)) * 100)) : 0;
   const steps = log ? 0 : Math.round((max - min) / step);
   const commit = (raw: string) => { setDraft(null); const v = +raw / scale; if (raw.trim() && Number.isFinite(v)) allowManualOverflow ? onChange(Math.max(min, v)) : set(v); };
-  return <label className={`opt opt-slider${disabled ? ' is-disabled' : ''}`} style={{ '--fill': `${fill}%` } as CSSProperties} onWheel={(e) => { if (!disabled) set(log ? value * (e.deltaY < 0 ? 1.1 : 1 / 1.1) : +(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
+  return <label className={`opt opt-slider${disabled ? ' is-disabled' : ''}`} data-tip={tip} style={{ '--fill': `${fill}%` } as CSSProperties} onWheel={(e) => { if (!disabled) set(log ? value * (e.deltaY < 0 ? 1.1 : 1 / 1.1) : +(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
     {steps > 1 && steps <= 12 && <span className="opt-ticks" aria-hidden="true">{Array.from({ length: steps - 1 }, (_, i) => <i key={i} style={{ left: `${((i + 1) / steps) * 100}%` }} />)}</span>}
     <Range className="opt-range" min={lo} max={hi} step={log ? 0.01 : step} value={pos(value)} disabled={disabled} aria-label={label} onChange={(e) => set(log ? 2 ** +e.target.value : +e.target.value)} />
     <span className="opt-label" data-tip={icon ? label : undefined}>{icon ?? label}</span>

@@ -25,7 +25,9 @@ export interface BrushTip {
   /** Tooth (Krita's subtract): the texture takes its share off the coverage, so light strokes catch only the paper's crests. Absent = the texture dims the ink (every older stroke). */
   tooth?: true;
   /** 2 = tooth subtracts once from the finished coverage (dabs add up first, then the grain takes its share). Absent = the first tooth: dabs scale each stamp. The capsule is the same in both. */
-  toothVersion?: 2;
+  toothVersion?: 2 | 3;
+  /** Tooth v3 (0–1): how much graphite reaches the paper's valleys each pass. Floor = valleyFill × (0.5 + 0.5 × density) × coverage, so repeated passes close the holes. */
+  valleyFill?: number;
   /** Living edge (0–1): the radius at the rim wobbles by this share with fixed noise. Absent = a clean capsule. */
   edge?: number;
   blend?: BrushBlend;
@@ -68,6 +70,8 @@ export interface BrushOptions {
   texture?: BrushTexture;
   textureStrength?: number;
   tooth?: boolean;
+  /** Valley fill (0–1), recorded with tooth (see BrushTip.valleyFill). */
+  valleyFill?: number;
   /** Lead hardness (0–1, from the clay fraction of the graphite): shapes how pressure becomes density. Absent = linear. */
   leadHardness?: number;
   edge?: number;
@@ -94,7 +98,7 @@ export const BRUSH_TEXTURES: Array<{ value: BrushTexture; label: string }> = [
 export const TIP_PRESETS = [1, 0.7, 0.4, 0.05];
 /** Values a brush has before the user sets them (the settings show the same ones). */
 // minSize below 1 so "Pressure → size" does something as soon as it is on (SAI starts near 15 %).
-export const BRUSH_DEFAULTS = { hardness: 1, minSize: 0.2, minDensity: 0.2, textureStrength: 0.5 };
+export const BRUSH_DEFAULTS = { hardness: 1, minSize: 0.2, minDensity: 0.2, textureStrength: 0.5, valleyFill: 0.15 };
 /** One-click sizes, as SAI's size grid. */
 export const SIZE_PRESETS = [2, 5, 8, 12, 16, 24, 32, 40, 48, 64, 80, 96, 128, 200];
 
@@ -103,6 +107,14 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** Tooth: the texture takes its share off the coverage (Krita's subtract), so faint strokes keep only the crests. */
 export function applyTooth(coverage: number, texture: number, strength: number): number {
   return Math.max(0, coverage - 1.5 * strength * (1 - texture));
+}
+
+/**
+ * Tooth v3: tooth plus a valley floor. Deep valleys give applyTooth exactly 0 on every pass, so repeating never closed them;
+ * here each pass leaves valleyFill × (0.5 + 0.5 × density) of its coverage (pressure helps), and the passes add up src-over.
+ */
+export function applyToothV3(coverage: number, texture: number, strength: number, valleyFill: number, density: number): number {
+  return Math.max(applyTooth(coverage, texture, strength), valleyFill * (0.5 + 0.5 * clamp01(density)) * coverage);
 }
 
 /**
@@ -167,7 +179,7 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
   const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
   const dabs = o.dabs ? { spacing: Math.min(2, Math.max(0.05, o.dabSpacing ?? DAB_DEFAULTS.spacing)), scatter: Math.min(3, Math.max(0, o.dabScatter ?? 0)), sizeJitter: Math.min(1, Math.max(0, o.dabSizeJitter ?? 0)), angleJitter: clamp01(o.dabAngleJitter ?? 0), flow: Math.min(1, Math.max(0.001, o.dabFlow ?? DAB_DEFAULTS.flow)), seed: 1 } : undefined;
-  return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth, toothVersion: 2 as const } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth, toothVersion: 3 as const, valleyFill: clamp01(o.valleyFill ?? BRUSH_DEFAULTS.valleyFill) } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */
@@ -241,7 +253,7 @@ export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: reado
       if (tip.texture && strength) {
         const tex = textureAt(tip.texture, x + ox, y + oy);
         // Tooth subtracts (light strokes keep only the crests); the old way dims the ink evenly.
-        cov = tooth ? applyTooth(cov, tex, strength) : cov * (1 - strength * (1 - tex));
+        cov = !tooth ? cov * (1 - strength * (1 - tex)) : tip.toothVersion === 3 ? applyToothV3(cov, tex, strength, tip.valleyFill ?? 0, d0 + (d1 - d0) * t) : applyTooth(cov, tex, strength);
       }
       const a = Math.round(cov * 255), i = (y * img.width + x) * 4;
       if (a > img.data[i + 3]) {
