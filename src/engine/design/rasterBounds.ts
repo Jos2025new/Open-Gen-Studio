@@ -79,9 +79,10 @@ export function extendLayerBox(id: string, canvas: HTMLCanvasElement, region: { 
  */
 export function extendRasterBounds(id: string, version: number, surface: RasterSurface, dirty: { x0: number; y0: number; x1: number; y1: number } | 'all', erasing = false): void {
   const cached = byLayer.get(id);
-  // Box sampling runs before dirty consumption in retainedFrame. An all-dirty buffer already sampled at this version
-  // needs a full redraw, but its exact total painted bounds remain known.
-  if (dirty === 'all' && cached?.version === version && cached.exact) return;
+  // Box sampling runs before dirty consumption in retainedFrame. A buffer already measured exactly at this version
+  // needs a redraw, but its bounds remain known: an all-dirty one always, and a stroke's area once the stroke is
+  // committed and idle (an erase's last segments would otherwise grow the box until the next change).
+  if (cached?.version === version && cached.exact && (dirty === 'all' || (cached.ref === surface.canvas && !paintingLive()))) return;
   const o = { x0: surface.x0, y0: surface.y0 }, width = surface.canvas.width, height = surface.canvas.height;
   const previous = cached && boxAt(cached, o);
   if (erasing && previous) { rememberLayerBox(id, version, previous, false, undefined, o); return; }

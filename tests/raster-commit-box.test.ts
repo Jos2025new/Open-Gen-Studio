@@ -109,6 +109,19 @@ describe('the eraser does not grow or move the layer box', () => {
     expect(reads.count).toBeGreaterThan(0);
   });
 
+  it('the erase stroke area taken after the commit does not grow the box measured since', () => {
+    const base = tallCanvas(64);
+    solid(base, 10, 10, 20, 20);
+    setBuffer('T', base);
+    const copy = beginEdit(tall);
+    paintLive(copy, beginLiveStroke(copy, '#000000', 1, true), { x: 100, y: 180 }, { x: 110, y: 186 }, 6, 1);
+    commitEdit('T');
+    solid(getRasterSurface('T')!.canvas as never, 10, 10, 20, 20); // the fake copy has no pixels: put them back
+    const measured = rasterPaintedBox(tall, true);
+    extendRasterBounds('T', bufferVersion('T'), getRasterSurface('T')!, { x0: 95, y0: 175, x1: 115, y1: 190 }); // the frame takes the stroke's area
+    expect(rasterPaintedBox(tall, false)).toEqual(measured);
+  });
+
   it('a dirty area in full-buffer pixels is placed from the canvas corner once (no drift)', () => {
     const base = tallCanvas(64);
     solid(base, 10, 10, 20, 20);
