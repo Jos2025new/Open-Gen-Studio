@@ -62,6 +62,16 @@ describe('ToolDock real interaction', () => {
     expect(host.querySelector('[aria-label="Brush variants"]')).toBeTruthy();
   });
 
+  it('coming back to the Brush family on Pencil keeps the brush as the user left it (HB only when Pencil is chosen)', async () => {
+    await click('Brush');
+    await click('Pencil');
+    expect(useStore.getState().ui.brush.size).toBe(5);
+    await act(async () => setUi({ brush: { ...useStore.getState().ui.brush, size: 40 } }));
+    await click('Eraser');
+    await click('Brush');
+    expect(useStore.getState().ui.brush.size).toBe(40);
+  });
+
   it('selects actual shape tools from the Edit row: the shapes live with Edit and Pan, there is no Shapes family', async () => {
     doc = { ...doc, paintMode: 'design' };
     await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc })));

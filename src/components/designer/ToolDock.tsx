@@ -111,7 +111,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     }
     // A merged tool keeps the type chosen in its settings (sector, arc, chord, star, arrow) when its button is pressed again.
     if (!variant.also?.includes(useStore.getState().ui.tool)) setUi({ tool: variant.tool });
-    if (variant.preset === 'pencil') setUi({ brush: applyBrushPreset(useStore.getState().ui.brush, PENCIL_PRESETS[1]) });
+    // HB only when Pencil is newly chosen: coming back to the family on Pencil keeps the user's tweaks.
+    const changed = !ownerId || useStore.getState().ui.lastVariant?.[ownerId] !== variant.id;
+    if (variant.preset === 'pencil' && changed) setUi({ brush: applyBrushPreset(useStore.getState().ui.brush, PENCIL_PRESETS[1]) });
     if (variant.preset === 'airbrush') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[3] } });
     if (ownerId && useStore.getState().ui.lastVariant?.[ownerId] !== variant.id) setUi({ lastVariant: { ...useStore.getState().ui.lastVariant, [ownerId]: variant.id } });
     dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id });
