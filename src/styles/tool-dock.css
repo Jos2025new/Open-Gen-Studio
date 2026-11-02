@@ -201,23 +201,27 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .context-strip .node-mode:focus-visible, .context-strip .node-done:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: 1px; }
 /* Done closes the row on the right and stays reachable while the row scrolls. */
 .context-strip .node-done { margin-left: auto; position: sticky; right: 0; }
-/* Subtoolbox fixed: the variants row sits directly above the toolbox, left-aligned with it, with 36 px targets and solid contrast. */
-.tool-dock-stack.is-fixed { align-items: flex-start; }
-.tool-dock .tool-dock-variants.is-fixed { max-width: calc(100% - 52px); min-height: 44px; padding: 4px; background: var(--surface-2); box-shadow: var(--shadow-card); }
+/* Subtoolbox fixed: as wide as the toolbox and centered on it, directly above it, with 36 px targets and solid contrast. */
+.tool-dock-stack.is-fixed { align-items: center; transition: bottom .22s ease; }
+.tool-dock .tool-dock-stack > .tool-dock-variants.is-fixed { width: 100%; min-height: 48px; padding: 6px; background: var(--surface-2); box-shadow: var(--shadow-card); }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn { width: 36px; height: 36px; }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .85; }
 .tool-dock:not(.is-vertical) .tool-dock-stack .tool-dock-card { order: -1; }
 .tool-dock { --tool-dock-width: min(640px, calc(100vw - 32px)); }
-/* Hide-prompt: on the right, outside the subtoolbox, no background of its own. */
-.tool-dock-hide-prompt { position: absolute; z-index: 7; right: 0; bottom: calc(100% + 8px); display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--text-2); background: transparent; border: 0; border-radius: var(--radius-s); cursor: pointer; }
+/* Hide-prompt: to the right, in its own gutter outside the subtoolbox, no background of its own. */
+.tool-dock-hide-prompt { position: absolute; z-index: 7; right: -46px; bottom: calc(100% + 14px); display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--text-2); background: transparent; border: 0; border-radius: var(--radius-s); cursor: pointer; transition: bottom .22s ease; }
 .tool-dock-hide-prompt:is(:hover, :focus-visible) { color: var(--text); background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .tool-dock-hide-prompt[aria-pressed="true"] { color: var(--active-text); }
 .tool-dock-hide-prompt:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
-/* Quick mode: « tool-icon, long Size and Opacity sliders, color circle, Eraser, Settings. */
-.composer-tools-bar .tool-dock-family.is-quick { justify-content: flex-start; gap: 8px; }
+/* Quick mode, in the subtoolbox: «, subtool icon, long Size and Opacity, color circle, Eraser, Settings. */
+.tool-dock-variants.is-quick { gap: 8px; }
 .tool-dock-quick-sliders { display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; }
 .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 120px; }
-/* Prompt box hidden: only the variants row and the toolbox remain; the toolbox keeps its own surface. */
+/* Prompt box hidden: the toolbox (and the footer) slide down out of view, the subtoolbox drops to the bottom; the box chrome fades. */
 .composer.is-prompt-hidden { background: transparent; border-color: transparent; box-shadow: none; }
-.composer.is-prompt-hidden .composer-footer, .composer.is-prompt-hidden .thread-peek { display: none; }
-.composer.is-prompt-hidden .tool-dock-family { background: var(--surface); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); padding: var(--toolbar-padding); }
+.composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
+.composer.is-prompt-hidden :is(.composer-footer, .composer-tools-bar > :not(.designer-palette), .tool-dock-family) { transform: translateY(calc(100% + 24px)); opacity: 0; visibility: hidden; pointer-events: none; }
+.composer.is-prompt-hidden .tool-dock-stack.is-fixed { bottom: 8px; }
+.composer.is-prompt-hidden .tool-dock-hide-prompt { bottom: 14px; }
+.composer.is-prompt-hidden .thread-peek { display: none; }
+@media (prefers-reduced-motion: reduce) { .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed, .tool-dock-hide-prompt { transition: none; } }
