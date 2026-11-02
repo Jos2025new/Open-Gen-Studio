@@ -43,6 +43,8 @@ export function newBrushStroke(brush: BrushOptions & { color: string; opacity: n
   travelled = 0;
   segmentAt = sampledAt;
   const tip = tipFor(brush, erase);
+  // Dabs: this stroke's own noise, recorded so it replays identically.
+  if (tip.dabs) tip.dabs.seed = Math.floor(Math.random() * 0x7fffffff);
   return { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase, tip };
 }
 

@@ -20,12 +20,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 307 | 237 |
+| [types.ts](../src/engine/types.ts) | 307 | 238 |
 | [store.ts](../src/store/store.ts) | 206 | 219 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 93 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 60 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 58 | 34 |
-| [media.ts](../src/lib/media.ts) | 48 | 41 |
+| [media.ts](../src/lib/media.ts) | 48 | 42 |
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
 | [ops.ts](../src/engine/ops.ts) | 43 | 17 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
@@ -33,7 +33,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 34 | 24 |
 | [format.ts](../src/lib/format.ts) | 34 | 1 |
 | [id.ts](../src/lib/id.ts) | 34 | 0 |
-| [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
+| [raster.ts](../src/engine/design/raster.ts) | 33 | 24 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 32 | 17 |
 | [types.ts](../src/engine/providers/types.ts) | 28 | 9 |
 | [pathNodes.ts](../src/engine/design/pathNodes.ts) | 27 | 15 |
@@ -56,19 +56,19 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 20 | 15 |
-| `src/engine` | 60 | 294 |
+| `src/engine` | 60 | 295 |
 | `src/engine/agent` | 53 | 109 |
-| `src/engine/design` | 117 | 143 |
+| `src/engine/design` | 118 | 144 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 301 |
+| `src/lib` | 33 | 302 |
 | `src/store` | 15 | 221 |
 
-183 de 546 módulos no tienen ningún test que los importe directamente.
+183 de 547 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

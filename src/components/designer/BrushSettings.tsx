@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
-import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
+import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, DAB_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { Segmented } from '../ui/primitives';
+import { stampDabStroke } from '../../engine/design/brushDabs';
 import { BrushTipShape } from './BrushTipShape';
 import { SizePresets } from './SizePresets';
 import { BrushPresetMenu } from './BrushPresetMenu';
@@ -43,13 +44,16 @@ function BrushPreview({ brush, erase }: { brush: Brush; erase: boolean }) {
     const k = size / brush.size, along = [0];
     for (let i = 0; i < n; i++) { const [ax, ay] = pt(i), [bx, by] = pt(i + 1); along.push(along[i] + Math.hypot(bx - ax, by - ay)); }
     let last: { width: number; density: number } | undefined;
+    const segs: number[][] = [], dens: number[] = [];
     for (let i = 0; i < n; i++) {
       const [ax, ay] = pt(i), [bx, by, p] = pt(i + 1);
       const { width: full, density } = atPressure({ ...brush, size }, p);
       const width = full * taperAt(along[i + 1], (brush.taperStart ?? 0) * k, 'start') * taperAt(along[n] - along[i + 1], (brush.taperEnd ?? 0) * k, 'end');
-      stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ?? { width: full * taperAt(0, (brush.taperStart ?? 0) * k, 'start'), density });
+      if (tip.dabs) { segs.push([ax, ay, bx, by, width]); dens.push(density); }
+      else stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ?? { width: full * taperAt(0, (brush.taperStart ?? 0) * k, 'start'), density });
       last = { width, density };
     }
+    if (tip.dabs) stampDabStroke(img, 0, 0, segs, dens, tip, rgb);
     const mask = document.createElement('canvas');
     mask.width = W; mask.height = H;
     mask.getContext('2d')!.putImageData(img, 0, 0);
@@ -139,6 +143,18 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => set({ stabilization: v })} />
       <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => set({ smoothing: v })} />
     </div>
+    <InlineToggle label="Dabs" tip="Paint as many small stamps, like MyPaint: grain, scatter and build-up" checked={!!brush.dabs} onChange={(v) => set({ dabs: v })} />
+    {brush.dabs && <>
+      <div className="brush-row">
+      <InlineSlider label="Spacing" unit="%" scale={100} min={0.05} max={1} step={0.01} value={brush.dabSpacing ?? DAB_DEFAULTS.spacing} onChange={(v) => set({ dabSpacing: v })} />
+      <InlineSlider label="Scatter" unit="%" scale={100} min={0} max={2} step={0.01} value={brush.dabScatter ?? DAB_DEFAULTS.scatter} onChange={(v) => set({ dabScatter: v })} />
+      </div>
+      <div className="brush-row">
+      <InlineSlider label="Size jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabSizeJitter ?? DAB_DEFAULTS.sizeJitter} onChange={(v) => set({ dabSizeJitter: v })} />
+      <InlineSlider label="Angle jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabAngleJitter ?? DAB_DEFAULTS.angleJitter} onChange={(v) => set({ dabAngleJitter: v })} />
+      </div>
+      <InlineSlider label="Flow" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.dabFlow ?? DAB_DEFAULTS.flow} onChange={(v) => set({ dabFlow: v })} />
+    </>}
         </>)}
         {pane('pressure', <>
     <InlineToggle label="Simulate pressure" tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner" checked={!!brush.simulatePressure} onChange={(v) => set({ simulatePressure: v })} />
@@ -177,6 +193,18 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => set({ stabilization: v })} />
       <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => set({ smoothing: v })} />
     </div>
+    <InlineToggle label="Dabs" tip="Paint as many small stamps, like MyPaint: grain, scatter and build-up" checked={!!brush.dabs} onChange={(v) => set({ dabs: v })} />
+    {brush.dabs && <>
+      <div className="brush-row">
+      <InlineSlider label="Spacing" unit="%" scale={100} min={0.05} max={1} step={0.01} value={brush.dabSpacing ?? DAB_DEFAULTS.spacing} onChange={(v) => set({ dabSpacing: v })} />
+      <InlineSlider label="Scatter" unit="%" scale={100} min={0} max={2} step={0.01} value={brush.dabScatter ?? DAB_DEFAULTS.scatter} onChange={(v) => set({ dabScatter: v })} />
+      </div>
+      <div className="brush-row">
+      <InlineSlider label="Size jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabSizeJitter ?? DAB_DEFAULTS.sizeJitter} onChange={(v) => set({ dabSizeJitter: v })} />
+      <InlineSlider label="Angle jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabAngleJitter ?? DAB_DEFAULTS.angleJitter} onChange={(v) => set({ dabAngleJitter: v })} />
+      </div>
+      <InlineSlider label="Flow" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.dabFlow ?? DAB_DEFAULTS.flow} onChange={(v) => set({ dabFlow: v })} />
+    </>}
     {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />

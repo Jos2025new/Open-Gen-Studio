@@ -1,6 +1,7 @@
 import type { RasterStroke } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
+import { stampDabStroke } from './brushDabs';
 
 import { editorCacheBudget } from './cacheBudget';
 
@@ -20,11 +21,12 @@ export function rasterStrokeMask(stroke: RasterStroke, tip: BrushTip): Mask {
     masks.delete(stroke.segments);
     editorCacheBudget.remove(found.id);
   }
-  const boxes = stroke.segments.map((s) => segmentBox(s, tip.edge));
+  const boxes = stroke.segments.map((s, i) => segmentBox(tip.dabs && i ? [s[0], s[1], s[2], s[3], Math.max(s[4], stroke.segments[i - 1][4])] : s, tip));
   const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
   const w = Math.max(...boxes.map((b) => b.x + b.w)) - x, h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
   const canvas = createCanvas(w, h), m = ctx2d(canvas), img = m.createImageData(canvas.width, canvas.height), rgb = hexRgb(stroke.color);
-  stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ? { width: stroke.segments[i - 1][4], density: tip.densities?.[i - 1] ?? 1 } : undefined));
+  if (tip.dabs) stampDabStroke(img, x, y, stroke.segments, tip.densities, tip, rgb);
+  else stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ? { width: stroke.segments[i - 1][4], density: tip.densities?.[i - 1] ?? 1 } : undefined));
   m.putImageData(img, 0, 0);
   const bytes = canvas.width * canvas.height * 4;
   // Stored under the shared budget: its drop callback forgets the mask, so the next use recomputes it.

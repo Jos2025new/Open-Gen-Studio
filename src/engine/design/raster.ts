@@ -6,7 +6,8 @@ import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media
 import { uid } from '../../lib/id';
 import type { Layer, RasterLayer } from '../types';
 import { toast } from '../../store/store';
-import { hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
+import { hexRgb, reachScale, segmentBox, stampSegment, type BrushTip } from './brushEngine';
+import { repaintDabs, skipDabs, stampTip, type DabState } from './brushDabs';
 import { layMask, strokeSegment } from './rasterDraw';
 export { drawRasterStroke, strokeSegment } from './rasterDraw';
 import { RASTER_HISTORY_TILE_SIZE, restoreRasterTiles, snapshotRasterTiles, tileKeysForRect, updateRasterTiles, type RasterHistorySnapshot } from './rasterHistoryTiles';
@@ -216,10 +217,9 @@ export function withPaintBase(layer: RasterLayer): RasterLayer {
 }
 
 /**
- * A stroke being painted, as SAI does it: segments go into a mask at full strength (overlaps cannot add up), and
- * the layer is the pixels it had before the stroke with the mask laid over at the brush opacity. Only the area
- * the new segment touches is recomposed, so a long stroke costs the same per move as a short one. base, mask and
- * the working canvas share one place; a stroke that leaves its box grows them together (paintLive).
+ * A stroke being painted, as SAI does it: segments go into a mask (overlaps keep the strongest coverage), and the
+ * layer is its pixels before the stroke with the mask laid over at the brush opacity. Only the area the new
+ * segment touches is recomposed. base, mask and the working canvas share one place and grow together (paintLive).
  */
 export interface LiveStroke {
   base: HTMLCanvasElement;
@@ -235,9 +235,11 @@ export interface LiveStroke {
   last?: { width: number; density: number };
   /**
    * The mask's pixels, kept in memory: segments are stamped here and only the touched area is written to the mask
-   * canvas, never read back (a canvas read waits for the GPU on every move). Absent for very large layers.
+   * canvas, never read back (a GPU wait). Absent for very large layers.
    */
   pixels?: ImageData;
+  /** Dab mode walker (brushDabs.ts). */
+  dabs?: DabState;
 }
 // Above this many pixels the live mask is read per segment as before, instead of holding a full copy in memory.
 const LIVE_PIXELS_MAX = 16_000_000;
@@ -296,7 +298,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
   touchBuffer(buf0);
   const owner = layerOfCanvas.get(buf0);
   // A segment starts at the previous width: its box covers the wider of the two.
-  const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0) * (1 + (live.tip?.edge ?? 0) / 2);
+  const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0) * reachScale(live.tip);
   if (owner) {
     const r = reach / 2 + 2;
     const d = { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r };
@@ -310,7 +312,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
   try {
     const g0 = geometryOf(buf0);
     const region = segmentRegion(a, b, reach, g0.fw, g0.fh);
-    if (!region) return buf0;
+    if (!region) { skipDabs(live, [a.x, a.y, b.x, b.y, width], density); return buf0; }
     const buf = fitLive(buf0, live, region);
     const g = geometryOf(buf);
     const A = { x: a.x - g.x0, y: a.y - g.y0 }, B = { x: b.x - g.x0, y: b.y - g.y0 };
@@ -321,11 +323,11 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
       if (w > 0 && h > 0) {
         const m = ctx2d(live.mask), all = livePixels(live);
         if (all) {
-          stampSegment(all, 0, 0, [A.x, A.y, B.x, B.y, width], density, live.tip, hexRgb(live.color), live.last);
+          stampTip(live, all, 0, 0, g, [a.x, a.y, b.x, b.y, width], density);
           m.putImageData(all, 0, 0, x, y, w, h);
         } else {
           const img = m.getImageData(x, y, w, h);
-          stampSegment(img, x, y, [A.x, A.y, B.x, B.y, width], density, live.tip, hexRgb(live.color), live.last);
+          stampTip(live, img, x, y, g, [a.x, a.y, b.x, b.y, width], density);
           m.putImageData(img, x, y);
         }
         live.last = { width, density };
@@ -357,12 +359,12 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
 
 /**
  * Paint again the part of the live stroke that `changed` covered (their old extent), from all of `segments`: what
- * the end taper needs, since a mask that keeps the strongest coverage cannot shrink in place.
+ * the end taper needs (the mask keeps the strongest coverage, so it cannot shrink in place).
  */
 export function repaintLive(buf0: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): HTMLCanvasElement {
   if (!live.tip || !changed.length) return buf0;
   touchBuffer(buf0);
-  const boxes = changed.map((s) => segmentBox(s, live.tip?.edge));
+  const boxes = changed.map((s) => segmentBox(s, live.tip));
   const g0 = geometryOf(buf0);
   const rx0 = Math.max(0, Math.min(...boxes.map((b) => b.x))), ry0 = Math.max(0, Math.min(...boxes.map((b) => b.y)));
   const rx1 = Math.min(g0.fw, Math.max(...boxes.map((b) => b.x + b.w))), ry1 = Math.min(g0.fh, Math.max(...boxes.map((b) => b.y + b.h)));
@@ -373,8 +375,9 @@ export function repaintLive(buf0: HTMLCanvasElement, live: LiveStroke, changed: 
   markHistoryDirty(buf, rx0, ry0, w, h);
   const m = ctx2d(live.mask), rgb = hexRgb(live.color), img = m.createImageData(w, h);
   const local = (seg: readonly number[]) => [seg[0] - g.x0, seg[1] - g.y0, seg[2] - g.x0, seg[3] - g.y0, seg[4]];
-  segments.forEach((seg, i) => {
-    const s = local(seg), b = segmentBox(s, live.tip!.edge);
+  if (live.tip.dabs) repaintDabs(live, img, x, y, g, segments, densities);
+  else segments.forEach((seg, i) => {
+    const s = local(seg), b = segmentBox(s, live.tip);
     if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, s, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
   });
   m.putImageData(img, x, y);

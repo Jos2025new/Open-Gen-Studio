@@ -38,7 +38,13 @@ export interface BrushTip {
   angle?: number;
   /** The angle is relative to the stroke's direction. */
   follow?: boolean;
+  /** Dab mode (brushDabs.ts): the stroke is many small stamps that build up. Absent = the capsule above, as every older stroke. */
+  dabs?: DabSettings;
 }
+
+/** MyPaint-style dabs. spacing: step as a share of the radius; scatter / sizeJitter: shares of the radius; angleJitter: share of 180°; flow: alpha of one dab; seed: this stroke's noise. */
+export interface DabSettings { spacing: number; scatter: number; sizeJitter: number; angleJitter: number; flow: number; seed: number }
+export const DAB_DEFAULTS = { spacing: 0.25, scatter: 0, sizeJitter: 0, angleJitter: 0, flow: 0.3 };
 
 /** The brush settings the tip comes from (ui.brush). */
 export interface BrushOptions {
@@ -67,6 +73,13 @@ export interface BrushOptions {
   roundness?: number;
   angle?: number;
   follow?: boolean;
+  /** Dab mode on, and its values (see DabSettings; the seed is made per stroke). */
+  dabs?: boolean;
+  dabSpacing?: number;
+  dabScatter?: number;
+  dabSizeJitter?: number;
+  dabAngleJitter?: number;
+  dabFlow?: number;
 }
 
 export const BRUSH_BLENDS: BrushBlend[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
@@ -134,7 +147,8 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const roundness = o.roundness !== undefined && o.roundness < 1 ? clampRoundness(o.roundness) : undefined;
   const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
   const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
-  return { hardness, ...shape, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  const dabs = o.dabs ? { spacing: Math.min(2, Math.max(0.05, o.dabSpacing ?? DAB_DEFAULTS.spacing)), scatter: Math.min(3, Math.max(0, o.dabScatter ?? 0)), sizeJitter: Math.min(1, Math.max(0, o.dabSizeJitter ?? 0)), angleJitter: clamp01(o.dabAngleJitter ?? 0), flow: Math.min(1, Math.max(0.001, o.dabFlow ?? DAB_DEFAULTS.flow)), seed: 1 } : undefined;
+  return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */
@@ -154,7 +168,7 @@ function hash(x: number, y: number): number {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
-function smoothNoise(x: number, y: number, cell: number): number {
+export function smoothNoise(x: number, y: number, cell: number): number {
   const gx = x / cell, gy = y / cell, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
   const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
   const a = hash(x0, y0), b = hash(x0 + 1, y0), c = hash(x0, y0 + 1), d = hash(x0 + 1, y0 + 1);
@@ -223,9 +237,15 @@ export function hexRgb(hex: string): [number, number, number] {
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
+/** How far a tip's reach exceeds the segment's width: the living edge and, with dabs, scatter and size jitter (both bounded). */
+export function reachScale(tip?: Pick<BrushTip, 'edge' | 'dabs'>): number {
+  const d = tip?.dabs;
+  return (1 + (tip?.edge ?? 0) / 2) * (d ? Math.min(4, Math.exp(3 * d.sizeJitter)) + 3 * d.scatter : 1);
+}
+
 /** The box a segment touches, padded for its radius and anti-aliasing. */
-export function segmentBox(seg: readonly number[], edge = 0): { x: number; y: number; w: number; h: number } {
-  const r = Math.max(0.5, seg[4] / 2) * (1 + edge / 2) + 2;
+export function segmentBox(seg: readonly number[], tip?: Pick<BrushTip, 'edge' | 'dabs'>): { x: number; y: number; w: number; h: number } {
+  const r = Math.max(0.5, seg[4] / 2) * reachScale(tip) + 2;
   const x = Math.floor(Math.min(seg[0], seg[2]) - r), y = Math.floor(Math.min(seg[1], seg[3]) - r);
   return { x, y, w: Math.ceil(Math.max(seg[0], seg[2]) + r) - x, h: Math.ceil(Math.max(seg[1], seg[3]) + r) - y };
 }

@@ -412,11 +412,12 @@ export default [
     sides: [
       ['src/engine/design/brushEngine.ts', 'export function stampSegment'],
       ['src/engine/design/rasterStrokeMask.ts', 'stampSegment(img'],
-      ['src/engine/design/raster.ts', 'stampSegment(img, x, y, [A.x, A.y, B.x, B.y, width], density, live.tip, hexRgb(live.color), live.last)'],
+      ['src/engine/design/raster.ts', 'stampTip(live, img, x, y, g, [a.x, a.y, b.x, b.y, width], density)'],
+      ['src/engine/design/brushDabs.ts', 'return stampSegment(img, ox, oy,'],
       ['src/engine/design/rasterDraw.ts', 'rasterStrokeMask(stroke, tip)'],
       ['src/components/designer/BrushSettings.tsx', 'stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ??'],
     ],
-    tests: ['tests/brush-engine.test.ts', 'tests/raster-stroke-mask.test.ts'],
+    tests: ['tests/brush-engine.test.ts', 'tests/raster-stroke-mask.test.ts', 'tests/brush-dabs.test.ts'],
   },
   {
     id: 'raster-png-worker',
