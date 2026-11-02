@@ -54,6 +54,7 @@ export type PersistedUi = Pick<
   | 'strokeRuler'
   | 'strokeRulerKind'
   | 'toolHelp'
+  | 'promptHidden'
   | 'drawingChoice'
   | 'autoSelect'
   | 'homeDrafts'
@@ -88,6 +89,7 @@ export function pickUi(ui: UiState): PersistedUi {
     strokeRuler: ui.strokeRuler,
     strokeRulerKind: ui.strokeRulerKind,
     toolHelp: ui.toolHelp,
+    promptHidden: ui.promptHidden,
     drawingChoice: ui.drawingChoice,
     autoSelect: ui.autoSelect,
     homeDrafts: ui.homeDrafts,

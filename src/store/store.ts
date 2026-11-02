@@ -163,8 +163,8 @@ export interface UiState extends PageUiPrefs {
   shapeLockRadii?: boolean;
   /** The help line above the Designer canvas (ToolHelp.tsx); on unless turned off. */
   toolHelp?: boolean;
-  /** Designer bottom bar: the toolbox (default) or the prompt box. */
-  designerDock?: 'tools' | 'prompt';
+  /** Designer bottom bar: toolbox or prompt box. */
+  designerDock?: 'tools' | 'prompt'; promptHidden?: boolean;
   /** Gradient tool (the main color is the brush color). */
   gradient?: { shape: 'linear' | 'radial'; mode: 'two' | 'fade'; color2: string; reverse?: boolean; opacity: number };
   /** Style of new Lineart strokes (editable afterwards per layer). */

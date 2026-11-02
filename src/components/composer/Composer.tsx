@@ -440,6 +440,7 @@ export function Composer() {
   const optionsLabel = takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files';
   const optionsDisabled = !takesImages && !takesAudio && mode !== 'model3d';
   const showTools = Boolean(toolsDock && designDoc);
+  const promptHidden = useStore((s) => s.ui.promptHidden) ?? false;
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
@@ -452,7 +453,7 @@ export function Composer() {
       {workspace !== 'chat' && workspace !== 'node' ? <ThreadPeek workspace={workspace} /> : null}
       <ComposerAlerts />
       <div
-        className={`composer ${dragOver ? 'is-drop' : ''}`}
+        className={`composer ${dragOver ? 'is-drop' : ''}${showTools && promptHidden ? ' is-prompt-hidden' : ''}`}
         data-mention-box
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/x-ogs-asset')) {

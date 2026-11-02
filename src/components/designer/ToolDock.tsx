@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
 import { applyBrushPreset, PENCIL_PRESETS } from '../../engine/design/brushPresets';
-import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
+import { ChevronsLeft, EyeOff, AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
 import { activeLayer } from '../../engine/design/doc';
 import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
+import { InlineColor, InlineSlider } from './InlineControls';
 import { ToolSettings } from './ToolSettings';
 import { CanvasSize } from './CanvasSize';
 import { GuidesCard } from './GuidesCard';
 import { EditCard, useEditCount } from './EditCard';
 import { ContextStrip } from './ContextStrip';
 import { useObjectSelection } from '../../engine/design/objectSelection';
+import { toolKey } from '../../engine/shortcuts';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
 import { entryVariant, initialToolboxState, reduceToolboxState, TOOLBOX, variantKey, withKey, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
 import '../../styles/tool-dock.css';
@@ -26,6 +28,8 @@ const ICONS: Record<string, LucideIcon> = {
   'square-dashed': SquareDashed, star: Star, spline: Spline, type: Type, 'wand-sparkles': WandSparkles,
   'ruler-dimension-line': Ruler, 'squares-unite': SquaresUnite,
 };
+/** Tools whose Size and Opacity sit in the toolbox itself (quick mode). */
+const QUICK_TOOLS: ReadonlySet<DesignTool> = new Set<DesignTool>(['brush', 'eraser']);
 const iconFor = (name: string): LucideIcon => ICONS[name] ?? CircleHelp;
 
 /** Designer toolbox (side or in the prompt box): one popup at a time. Opening one (a tool's variants, Create or Conversation, Designs) closes the others. */
@@ -78,6 +82,12 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const { depth, familyId } = dockState;
   const familyButtons = useRef(new Map<string, HTMLButtonElement>());
   const [height, setHeight] = useState(360);
+  // Quick mode (the Designer's bottom toolbox): the tool's icon, Size, Opacity, color, Eraser and Settings replace the tool list. Entered by choosing a tool that has settings; « leaves it.
+  const [quick, setQuick] = useState(false);
+  const brush = useStore((state) => state.ui.brush);
+  const promptHidden = useStore((state) => state.ui.promptHidden) ?? false;
+  const bottom = inDesigner && !vertical;
+  const quickShown = bottom && quick && QUICK_TOOLS.has(currentTool);
   const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? currentFamily;
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
@@ -93,6 +103,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const designer = vertical || inDesigner;
   useSidePopup('tools', () => { dispatch({ type: 'escape' }); dispatch({ type: 'escape' }); }, designer);
 
+  useEffect(() => { if (!QUICK_TOOLS.has(currentTool)) setQuick(false); }, [currentTool]);
   useEffect(() => {
     const desiredId = currentFamily?.id;
     if (desiredId && desiredId !== familyId) dispatch({ type: 'family', familyId: desiredId });
@@ -146,8 +157,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     event.preventDefault(); event.stopPropagation();
     if (familyId) familyButtons.current.get(familyId)?.focus();
   }}>
-    <div className="tool-dock-stack">
-      {depth !== 'closed' && selectedFamily && !stripShown && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
+    <div className={`tool-dock-stack${bottom ? ' is-fixed' : ''}`}>
+      {depth !== 'closed' && selectedFamily && !stripShown && <div className={`tool-dock-variants${bottom ? ' is-fixed' : ''}`} role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
           return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
@@ -175,7 +186,18 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
         </div>
       </section>}
     </div>
-    <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
+    {bottom && <button type="button" className="tool-dock-hide-prompt" aria-label="Hide prompt box" aria-pressed={promptHidden} data-tip={promptHidden ? 'Show the prompt box' : 'Hide the prompt box'} onClick={() => setUi({ promptHidden: !promptHidden })}><EyeOff size={16} /></button>}
+    {quickShown ? <div className="tool-dock-family is-quick" role="toolbar" aria-label="Quick settings" onKeyDown={moveToolbarFocus}>
+      <button type="button" className="icon-btn icon-btn-md tone-default" aria-label="Show all tools" data-tip="Show all tools" onClick={() => { setQuick(false); if (depth === 'open') dispatch({ type: 'escape' }); }}><ChevronsLeft size={16} /></button>
+      {iconButton(currentTool === 'eraser' ? 'eraser' : 'brush', currentTool === 'eraser' ? 'Eraser tool' : 'Brush tool', true, () => undefined)}
+      <div className="tool-dock-quick-sliders">
+        <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => setUi({ brush: { ...useStore.getState().ui.brush, size: v } })} />
+        <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...useStore.getState().ui.brush, opacity: v } })} />
+      </div>
+      {currentTool !== 'eraser' && <InlineColor label="Color" value={brush.color} iconOnly onChange={(v) => setUi({ brush: { ...useStore.getState().ui.brush, color: v } })} />}
+      {iconButton('eraser', 'Eraser', currentTool === 'eraser', () => setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }), false, undefined, toolKey('eraser'))}
+      <button type="button" className={`icon-btn icon-btn-md tone-default ${depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={depth === 'open'} data-tip="Advanced settings" onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button>
+    </div> : <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family) => {
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
         const soonReason = family.variants.every((variant) => variant.soon) ? family.variants.find((variant) => variant.soon)?.soon : undefined;
@@ -184,6 +206,15 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
             if (soonReason) return;
             if (designer) announceSidePopup('tools');
             if (stripShown && family.id === currentFamily?.id) { setVariantsAsked(true); if (depth === 'closed') dispatch({ type: 'family', familyId: family.id }); return; }
+            if (bottom && family.variants.some((variant) => variant.tool && QUICK_TOOLS.has(variant.tool))) {
+              // Choosing a tool that has settings enters quick mode; the full card stays closed until the gear asks for it.
+              const initial = entryVariant(family, lastVariant);
+              if (initial && !(initial.tool && QUICK_TOOLS.has(initial.tool))) { chooseVariant(initial, family.id); dispatch({ type: 'family', familyId: family.id }); return; }
+              if (initial) chooseVariant(initial, family.id);
+              setQuick(true);
+              if (family.id !== familyId || depth === 'closed') dispatch({ type: 'family', familyId: family.id }); else if (depth === 'open') dispatch({ type: 'escape' });
+              return;
+            }
             if (family.id !== familyId) {
               const initial = entryVariant(family, lastVariant);
               if (initial) chooseVariant(initial, family.id);
@@ -197,6 +228,6 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           {button}
         </span> : button;
       })}
-    </div>
+    </div>}
   </div>;
 }
