@@ -7,6 +7,7 @@ import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } f
 import { Segmented } from '../ui/primitives';
 import { BrushTipShape } from './BrushTipShape';
 import { SizePresets } from './SizePresets';
+import { BrushPresetMenu } from './BrushPresetMenu';
 
 /*
  * Brush and eraser settings, after PaintTool SAI's brush panel, in the app's own fields (one slider, one toggle,
@@ -106,6 +107,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
   if (card) return <div className="brush-card">
     <div className="brush-card-head">
       {head}
+      {!erase && <BrushPresetMenu />}
       <BrushPreview brush={brush} erase={erase} />
       <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />
     <div className="brush-row">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
+import { applyBrushPreset, PENCIL_PRESETS } from '../../engine/design/brushPresets';
 import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
@@ -48,7 +49,7 @@ function iconButton(name: string, label: string, active: boolean, onClick: () =>
 
 function toolFor(family: ToolboxFamily, current: DesignTool, shape: string, rulerKind: string, hardness: number): ToolboxVariant | undefined {
   const matches = family.variants.filter((variant) => variant.tool === current || !!variant.also?.includes(current));
-  return matches.find((variant) => variant.selectShape ? variant.selectShape === shape : variant.rulerKind ? variant.rulerKind === rulerKind : variant.preset === 'pencil' ? hardness === TIP_PRESETS[0] : variant.preset === 'airbrush' ? hardness === TIP_PRESETS[3] : !variant.preset) ?? matches[0];
+  return matches.find((variant) => variant.selectShape ? variant.selectShape === shape : variant.rulerKind ? variant.rulerKind === rulerKind : variant.preset === 'pencil' ? PENCIL_PRESETS.some((p) => p.values.hardness === hardness) : variant.preset === 'airbrush' ? hardness === TIP_PRESETS[3] : !variant.preset) ?? matches[0];
 }
 
 function familyFor(families: ToolboxFamily[], tool: DesignTool, shape: string, rulerKind: string, hardness: number) {
@@ -110,7 +111,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     }
     // A merged tool keeps the type chosen in its settings (sector, arc, chord, star, arrow) when its button is pressed again.
     if (!variant.also?.includes(useStore.getState().ui.tool)) setUi({ tool: variant.tool });
-    if (variant.preset === 'pencil') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[0] } });
+    if (variant.preset === 'pencil') setUi({ brush: applyBrushPreset(useStore.getState().ui.brush, PENCIL_PRESETS[1]) });
     if (variant.preset === 'airbrush') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[3] } });
     if (ownerId && useStore.getState().ui.lastVariant?.[ownerId] !== variant.id) setUi({ lastVariant: { ...useStore.getState().ui.lastVariant, [ownerId]: variant.id } });
     dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id });

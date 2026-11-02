@@ -50,7 +50,7 @@ describe('ToolDock real interaction', () => {
     await click('Pencil');
     expect(host.querySelector('[aria-label="Pencil settings"]'), 'picking a variant does not open the card').toBeNull();
     expect(useStore.getState().ui.tool).toBe('brush');
-    expect(useStore.getState().ui.brush.hardness).toBe(1);
+    expect(useStore.getState().ui.brush.hardness, "Pencil applies the HB preset").toBe(0.85);
     await click('Pencil');
     expect(['Brush', 'Pencil', 'Airbrush'].filter((label) => host.querySelector(`[aria-label="Brush variants"] button[aria-label="${label}"]`)?.getAttribute('aria-pressed') === 'true')).toEqual(['Pencil']);
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
