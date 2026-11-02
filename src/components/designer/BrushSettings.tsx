@@ -165,6 +165,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSlider label="Min size" unit="%" scale={100} min={0} max={1} step={0.01} disabled={brush.pressureSize === false} value={brush.minSize ?? BRUSH_DEFAULTS.minSize} onChange={(v) => set({ minSize: v })} />
       <InlineToggle label="Pressure → density" tip="Lighter pressure paints fainter, down to the minimum density" checked={!!brush.pressureDensity} onChange={(v) => set({ pressureDensity: v })} />
       <InlineSlider label="Min density" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!brush.pressureDensity} value={brush.minDensity ?? BRUSH_DEFAULTS.minDensity} onChange={(v) => set({ minDensity: v })} />
+      {brush.pressureDensity && <InlineSlider label="Lead hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.leadHardness ?? 0.25} onChange={(v) => set({ leadHardness: v })} />}
         </>)}
         {!erase && pane('blend', <>
     {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
@@ -221,6 +222,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSlider label="Min size" unit="%" scale={100} min={0} max={1} step={0.01} disabled={brush.pressureSize === false} value={brush.minSize ?? BRUSH_DEFAULTS.minSize} onChange={(v) => set({ minSize: v })} />
       <InlineToggle label="Pressure → density" tip="Lighter pressure paints fainter, down to the minimum density" checked={!!brush.pressureDensity} onChange={(v) => set({ pressureDensity: v })} />
       <InlineSlider label="Min density" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!brush.pressureDensity} value={brush.minDensity ?? BRUSH_DEFAULTS.minDensity} onChange={(v) => set({ minDensity: v })} />
+      {brush.pressureDensity && <InlineSlider label="Lead hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.leadHardness ?? 0.25} onChange={(v) => set({ leadHardness: v })} />}
       {!erase && <InlineToggle label="Keep opacity" tip="Paint only where the layer already has pixels; transparent areas stay transparent" checked={!!brush.keepOpacity} onChange={(v) => set({ keepOpacity: v })} />}
     </>}
   </>;

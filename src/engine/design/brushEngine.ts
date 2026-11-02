@@ -24,6 +24,8 @@ export interface BrushTip {
   textureStrength?: number;
   /** Tooth (Krita's subtract): the texture takes its share off the coverage, so light strokes catch only the paper's crests. Absent = the texture dims the ink (every older stroke). */
   tooth?: true;
+  /** 2 = tooth subtracts once from the finished coverage (dabs add up first, then the grain takes its share). Absent = the first tooth: dabs scale each stamp. The capsule is the same in both. */
+  toothVersion?: 2;
   /** Living edge (0–1): the radius at the rim wobbles by this share with fixed noise. Absent = a clean capsule. */
   edge?: number;
   blend?: BrushBlend;
@@ -66,6 +68,8 @@ export interface BrushOptions {
   texture?: BrushTexture;
   textureStrength?: number;
   tooth?: boolean;
+  /** Lead hardness (0–1, from the clay fraction of the graphite): shapes how pressure becomes density. Absent = linear. */
+  leadHardness?: number;
   edge?: number;
   blend?: BrushBlend;
   keepOpacity?: boolean;
@@ -96,13 +100,28 @@ export const SIZE_PRESETS = [2, 5, 8, 12, 16, 24, 32, 40, 48, 64, 80, 96, 128, 2
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
+/** Tooth: the texture takes its share off the coverage (Krita's subtract), so faint strokes keep only the crests. */
+export function applyTooth(coverage: number, texture: number, strength: number): number {
+  return Math.max(0, coverage - 1.5 * strength * (1 - texture));
+}
+
+/**
+ * Pressure to density for a pencil. Linear from minDensity (p = 0) to 1 (p = 1); with leadHardness the pressure goes
+ * through p^gamma, gamma = 0.6 + 1.6 * leadHardness. A soft lead (low clay, gamma < 1) gives more at light and medium
+ * pressure; a hard one (gamma > 1) needs more pressure. Monotonic, same ends, no jumps. Absent leadHardness = linear.
+ */
+export function pencilDensityCurve(p: number, minDensity: number, leadHardness?: number): number {
+  const q = clamp01(p), shaped = leadHardness === undefined ? q : q ** (0.6 + 1.6 * clamp01(leadHardness));
+  return minDensity + (1 - minDensity) * shaped;
+}
+
 /** Width and density at a pressure (0–1): the minimum share at no pressure, all of it at full pressure. */
 export function atPressure(o: BrushOptions, pressure: number): { width: number; density: number } {
   const p = clamp01(pressure);
   const minSize = clamp01(o.minSize ?? BRUSH_DEFAULTS.minSize), minDensity = clamp01(o.minDensity ?? BRUSH_DEFAULTS.minDensity);
   return {
     width: o.pressureSize === false ? o.size : o.size * (minSize + (1 - minSize) * p),
-    density: o.pressureDensity ? minDensity + (1 - minDensity) * p : 1,
+    density: o.pressureDensity ? pencilDensityCurve(p, minDensity, o.leadHardness) : 1,
   };
 }
 
@@ -148,7 +167,7 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
   const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
   const dabs = o.dabs ? { spacing: Math.min(2, Math.max(0.05, o.dabSpacing ?? DAB_DEFAULTS.spacing)), scatter: Math.min(3, Math.max(0, o.dabScatter ?? 0)), sizeJitter: Math.min(1, Math.max(0, o.dabSizeJitter ?? 0)), angleJitter: clamp01(o.dabAngleJitter ?? 0), flow: Math.min(1, Math.max(0.001, o.dabFlow ?? DAB_DEFAULTS.flow)), seed: 1 } : undefined;
-  return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth, toothVersion: 2 as const } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */
@@ -222,7 +241,7 @@ export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: reado
       if (tip.texture && strength) {
         const tex = textureAt(tip.texture, x + ox, y + oy);
         // Tooth subtracts (light strokes keep only the crests); the old way dims the ink evenly.
-        cov = tooth ? Math.max(0, cov - 1.5 * strength * (1 - tex)) : cov * (1 - strength * (1 - tex));
+        cov = tooth ? applyTooth(cov, tex, strength) : cov * (1 - strength * (1 - tex));
       }
       const a = Math.round(cov * 255), i = (y * img.width + x) * 4;
       if (a > img.data[i + 3]) {

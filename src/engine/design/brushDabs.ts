@@ -1,4 +1,4 @@
-import { hexRgb, profile, segmentBox, smoothNoise, stampSegment, textureAt, type AlphaImage, type BrushTip } from './brushEngine';
+import { applyTooth, hexRgb, profile, segmentBox, smoothNoise, stampSegment, textureAt, type AlphaImage, type BrushTip } from './brushEngine';
 import { tipFrame } from './brushTipShape';
 
 /*
@@ -60,9 +60,10 @@ function dab(p: Plane, tip: BrushTip, cx: number, cy: number, R: number, aj: num
       if (d > rt + 0.5) continue;
       let k = profile(d, rt, tip.hardness) * w;
       if (tex && strength) {
-        // A dab is faint, so tooth scales it (a subtraction would erase it): the pits of the grain take their share off.
+        // Tooth v2 waits for flush (one subtraction on the built-up coverage). The first tooth scaled each faint dab so a subtraction would not erase it.
         const t = textureAt(tex, x, y);
-        k *= tooth ? Math.max(0, 1 - 1.5 * strength * (1 - t)) : 1 - strength * (1 - t);
+        if (!tooth) k *= 1 - strength * (1 - t);
+        else if (tip.toothVersion !== 2) k *= Math.max(0, 1 - 1.5 * strength * (1 - t));
       }
       const i = (y - p.y) * p.w + (x - p.x), before = data[i];
       data[i] = before + (1 - before) * k;
@@ -93,12 +94,15 @@ function walk(st: DabState, tip: BrushTip, seg: readonly number[], density: numb
 }
 
 /** Write the plane's coverage inside `r` into an RGBA mask whose top-left is (ix, iy) in layer pixels. */
-function flush(p: Plane | undefined, img: AlphaImage, ix: number, iy: number, rgb: [number, number, number], r: Rect): void {
+function flush(p: Plane | undefined, img: AlphaImage, ix: number, iy: number, rgb: [number, number, number], r: Rect, tip: BrushTip): void {
   if (!p) return;
+  const strength = clamp01(tip.textureStrength ?? 0), v2 = tip.tooth === true && tip.toothVersion === 2 && !!tip.texture && strength > 0;
   const x0 = Math.max(r.x0, p.x, ix), x1 = Math.min(r.x1, p.x + p.w, ix + img.width), y0 = Math.max(r.y0, p.y, iy), y1 = Math.min(r.y1, p.y + p.h, iy + img.height);
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
-      const a = Math.round(Math.min(1, p.data[(y - p.y) * p.w + (x - p.x)]) * 255);
+      let cov = Math.min(1, p.data[(y - p.y) * p.w + (x - p.x)]);
+      if (v2 && cov > 0) cov = applyTooth(cov, textureAt(tip.texture, x, y), strength);
+      const a = Math.round(cov * 255);
       if (!a) continue;
       const i = ((y - iy) * img.width + (x - ix)) * 4;
       img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2]; img.data[i + 3] = a;
@@ -111,7 +115,7 @@ export function stampDabStroke(img: AlphaImage, ox: number, oy: number, segments
   const st = newDabState(), r = { x0: ox, y0: oy, x1: ox + img.width, y1: oy + img.height };
   ensure(st, r, 0);
   segments.forEach((seg, i) => walk(st, tip, seg, densities?.[i] ?? 1, r));
-  flush(st.plane, img, ox, oy, rgb, r);
+  flush(st.plane, img, ox, oy, rgb, r, tip);
 }
 
 /**
@@ -127,7 +131,7 @@ export function stampTip(live: { tip?: BrushTip; color: string; last?: { width: 
   const r = { x0: Math.max(b.x, ix), y0: Math.max(b.y, iy), x1: Math.min(b.x + b.w, ix + img.width), y1: Math.min(b.y + b.h, iy + img.height) };
   if (r.x1 > r.x0 && r.y1 > r.y0) ensure(st, r, 48);
   walk(st, tip, seg, density, r.x1 > r.x0 && r.y1 > r.y0 ? r : NONE);
-  flush(st.plane, img, ix, iy, rgb, r);
+  flush(st.plane, img, ix, iy, rgb, r, tip);
 }
 
 /** A segment the live stroke did not paint (off the page): the walker still crosses it, so later dabs stay where replay puts them. */
@@ -143,5 +147,5 @@ export function repaintDabs(live: { tip?: BrushTip; color: string; dabs?: DabSta
   for (let y = r.y0; y < r.y1; y++) p.data.fill(0, (y - p.y) * p.w + (r.x0 - p.x), (y - p.y) * p.w + (r.x1 - p.x));
   st.lanes = []; st.index = 0; st.count = 0;
   segments.forEach((seg, i) => walk(st, tip, seg, densities?.[i] ?? 1, r));
-  flush(p, img, ix, iy, hexRgb(live.color), r);
+  flush(p, img, ix, iy, hexRgb(live.color), r, tip);
 }
