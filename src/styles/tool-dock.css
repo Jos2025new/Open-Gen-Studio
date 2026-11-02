@@ -209,6 +209,8 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .tool-dock:not(.is-vertical) .tool-dock-stack .tool-dock-card { order: -1; }
 .tool-dock { --tool-dock-width: min(640px, calc(100vw - 32px)); }
 /* Hide-prompt: the last item of the toolbox bar (after a divider, no background); when the toolbox is hidden it stays as a pill at the bottom edge. */
+.tool-dock-eye-slot { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.tool-dock-eye-slot:empty { display: none; }
 .tool-dock-hide-prompt { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--text-2); background: transparent; border: 0; border-radius: var(--radius-s); cursor: pointer; }
 .composer-tools-bar .tool-dock-hide-prompt { width: 40px; height: 40px; }
 .tool-dock-hide-prompt:is(:hover, :focus-visible) { color: var(--text); background: color-mix(in srgb, var(--surface-2) 60%, transparent); }

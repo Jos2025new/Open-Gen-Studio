@@ -490,7 +490,7 @@ export function Composer() {
         />
         {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={false} onAdd={() => fileRef.current?.click()} />
-          <DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" />
+          <DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" /><span className="tool-dock-eye-slot" />
         </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row is-compact">

@@ -5,6 +5,7 @@ import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
 import { activeLayer } from '../../engine/design/doc';
+import { createPortal } from 'react-dom';
 import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { QUICK, QuickControls, rowFits } from './QuickSettings';
@@ -146,6 +147,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const collapsibleFor = (tool?: DesignTool) => !!tool && !!QUICK[tool] && subtools && !rowFits(tool, selectedFamily?.variants.length ?? 0);
   const showGear = !!selectedVariant && !selectedVariant.soon && currentTool !== 'hand';
   const enterQuick = () => { setQuick(true); if (depth === 'open') dispatch({ type: 'escape' }); };
+  // The eye sits at the bar's very end, after the zoom rail (the composer's slot), not inside the scrolling tool list.
+  const [eyeSlot, setEyeSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { if (bottom) setEyeSlot(document.querySelector<HTMLElement>('.composer-tools-bar > .tool-dock-eye-slot')); }, [bottom]);
   const hideButton = <button type="button" className={`tool-dock-hide-prompt${promptHidden ? ' is-pill' : ''}`} aria-label="Hide prompt box" aria-pressed={promptHidden} data-tip={promptHidden ? 'Show the prompt box' : 'Hide the prompt box'} onClick={() => setUi({ promptHidden: !promptHidden })}><EyeOff size={16} /></button>;
   const gear = showGear && <button type="button" className={`icon-btn icon-btn-md tone-default ${depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={depth === 'open'} data-tip="Advanced settings" onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button>;
   const bottomRow = bottom && depth !== 'closed' && selectedFamily && !stripShown && (subtools || hasQuick || showGear) && <div className={`tool-dock-variants is-fixed${quickShown ? ' is-quick' : ''}`} role="toolbar" aria-label={quickShown || !subtools ? 'Quick settings' : `${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
@@ -232,7 +236,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           {button}
         </span> : button;
       })}
-      {bottom && !promptHidden && <span className="tool-dock-end"><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</span>}
+      {bottom && !promptHidden && (eyeSlot ? createPortal(<><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</>, eyeSlot) : <span className="tool-dock-end"><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</span>)}
     </div>
   </div>;
 }
