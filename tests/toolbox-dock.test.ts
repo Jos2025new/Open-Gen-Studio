@@ -179,3 +179,8 @@ describe('ToolDock real interaction', () => {
     for (let i = 1; i < dots.length; i++) expect(dots[i], `dot ${i}`).toBeGreaterThan(dots[i - 1]);
   });
 });
+
+it('the brush card keeps its width when the pressure hint comes and goes (Simulate pressure)', async () => {
+  const { readFileSync } = await import('node:fs');
+  expect(readFileSync('src/styles/tool-dock.css', 'utf8')).toMatch(/\.brush-card-pane > \.opt-hint \{ contain: inline-size; \}/);
+});

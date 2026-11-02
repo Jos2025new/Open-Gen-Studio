@@ -101,6 +101,8 @@
 .brush-card-panes { display: grid; }
 .brush-card-pane { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .brush-card-pane[data-active="false"] { visibility: hidden; }
+/* A hint wraps inside the card instead of widening it: the card keeps its width when the hint comes and goes. */
+.brush-card-pane > .opt-hint { contain: inline-size; }
 /* Every field in the card is one height: a column flex must not stretch the rows' flex-basis 100% into height. */
 :is(.brush-card-head, .brush-card-pane) > .opt:not(.opt-presets):not(.is-icon) { flex: none; }
 .tool-dock-card .opt:not(.opt-presets):not(.is-icon):not(.paint-mode) { height: 36px; box-sizing: border-box; }
