@@ -219,8 +219,6 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 120px; }
 /* The colour sits on a light disc so any colour stands out against the dark bar. */
 .tool-dock-variants.is-quick .opt-color.is-icon { background: var(--text); padding: 3px; border-radius: 50%; }
-/* Tools dock: a thin frame around the bar and the subtoolbox, same roundness. */
-.composer:has(.composer-tools-bar) { padding: 4px; }
 /* Prompt box hidden: the toolbox (and the footer) slide down out of view, the subtoolbox drops to the bottom; the box chrome fades. */
 .composer.is-prompt-hidden { background: transparent; border-color: transparent; box-shadow: none; }
 .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }

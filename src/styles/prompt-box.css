@@ -87,6 +87,8 @@
 
 /* Protect both the prompt and its controls from canvas content. */
 .composer-dock.dock-node::before, .composer-dock.dock-designer::before { content: ''; position: absolute; z-index: -1; inset: -12px -12px -40px; background: var(--bg-canvas); pointer-events: none; border-radius: calc(var(--r-l) + 12px) calc(var(--r-l) + 12px) 0 0; }
+/* Designer: the backdrop hugs the bar (same roundness, thin rim). */
+.composer-dock.dock-designer::before { inset: -4px -4px -40px; border-radius: calc(var(--r-l) + 4px) calc(var(--r-l) + 4px) 0 0; }
 /* One-line prompt: the round buttons sit the same distance from every edge, and the corner is concentric with them
    (button radius 18 + padding 8 + border 1). */
 .composer:has(.is-compact) { padding: 8px; border-radius: 27px; }
