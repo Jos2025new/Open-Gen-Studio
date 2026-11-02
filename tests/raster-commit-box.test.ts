@@ -32,10 +32,10 @@ vi.mock('../src/lib/media', () => {
   };
 });
 
-import { beginEdit, commitEdit, getRasterSurface, setBuffer } from '../src/engine/design/raster';
+import { beginEdit, bufferVersion, commitEdit, getRasterSurface, setBuffer } from '../src/engine/design/raster';
 import { paintLive, beginLiveStroke } from '../src/engine/design/raster';
 import { pixelBox } from '../src/engine/design/render';
-import { rasterPaintedBox } from '../src/engine/design/rasterBounds';
+import { extendRasterBounds, rasterPaintedBox } from '../src/engine/design/rasterBounds';
 import { place } from '../src/engine/design/rasterSurface';
 import type { RasterLayer } from '../src/engine/types';
 
@@ -88,8 +88,53 @@ describe('pointer-up does not scan the layer', () => {
   });
 });
 
-function fakeCanvas() {
-  const c = { width: SIZE, height: SIZE, data: new Uint8ClampedArray(SIZE * SIZE * 4), getContext: () => ({ getImageData: () => { reads.count++; return { data: c.data }; } }) };
+describe('the eraser does not grow or move the layer box', () => {
+  // A tall layer: the full buffer is SIZE × 2·SIZE, its stored canvas covers only the lower part (corner at y = 64).
+  const tall = { ...layer, id: 'T', height: SIZE * 2, pxHeight: SIZE * 2 } as RasterLayer;
+  const tallCanvas = (y0: number, h = SIZE) => place(fakeCanvas(SIZE, h), { x0: 0, y0, fw: SIZE, fh: SIZE * 2 });
+
+  it('an erase stroke past the pixels leaves the box where the pixels are', () => {
+    const base = tallCanvas(64);
+    solid(base, 10, 10, 20, 20);
+    setBuffer('T', base);
+    expect(rasterPaintedBox(tall, true)).toEqual({ x: 10, y: 74, w: 10, h: 10 });
+    const copy = beginEdit(tall);
+    const live = beginLiveStroke(copy, '#000000', 1, true);
+    paintLive(copy, live, { x: 100, y: 180 }, { x: 110, y: 186 }, 6, 1);
+    commitEdit('T');
+    // The stroke never adds to the box; it stays a bound (not exact), so the next read measures the canvas again.
+    expect(rasterPaintedBox(tall, false)).toEqual({ x: 10, y: 74, w: 10, h: 10 });
+    reads.count = 0;
+    rasterPaintedBox(tall, true);
+    expect(reads.count).toBeGreaterThan(0);
+  });
+
+  it('a dirty area in full-buffer pixels is placed from the canvas corner once (no drift)', () => {
+    const base = tallCanvas(64);
+    solid(base, 10, 10, 20, 20);
+    setBuffer('T', base);
+    rasterPaintedBox(tall, true);
+    const s = getRasterSurface('T')!;
+    extendRasterBounds('T', bufferVersion('T'), s, { x0: 12, y0: 76, x1: 18, y1: 82 });
+    expect(rasterPaintedBox(tall, false)).toEqual({ x: 10, y: 74, w: 10, h: 10 });
+    extendRasterBounds('T', bufferVersion('T'), s, { x0: 40, y0: 150, x1: 50, y1: 160 }, true); // erasing: never adds
+    expect(rasterPaintedBox(tall, false)).toEqual({ x: 10, y: 74, w: 10, h: 10 });
+  });
+
+  it('a box measured before the canvas grew upward stays on the same pixels', () => {
+    const base = tallCanvas(64);
+    solid(base, 10, 10, 20, 20);
+    setBuffer('T', base);
+    rasterPaintedBox(tall, true);
+    const grown = tallCanvas(0, SIZE + 64); // same pixels, 64 rows higher in the new canvas
+    solid(grown, 10, 74, 20, 84);
+    setBuffer('T', grown);
+    expect(rasterPaintedBox(tall, false)).toEqual({ x: 10, y: 74, w: 10, h: 10 });
+  });
+});
+
+function fakeCanvas(w = SIZE, h = SIZE) {
+  const c = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4), getContext: () => ({ getImageData: () => { reads.count++; return { data: c.data }; } }) };
   return c as unknown as HTMLCanvasElement & { data: Uint8ClampedArray };
 }
 void getRasterSurface; void pixelBox;

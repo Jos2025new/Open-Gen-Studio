@@ -23,13 +23,32 @@ export function alphaBounds(px: Uint32Array, width: number, height: number, thre
 
 const painted = new WeakMap<HTMLCanvasElement, Map<number, { version: number; box: ReturnType<typeof alphaBounds> }>>();
 // Last measured bounds per layer ID survive immutable canvas replacement. A pending dirty rect is unioned into them.
-const byLayer = new Map<string, { version: number; box: ReturnType<typeof alphaBounds>; exact: boolean; ref?: HTMLCanvasElement }>();
+// Each box is in the pixels of the canvas it was measured in; `o` is that canvas's corner in the full buffer. A stroke
+// that grows the canvas moves the corner, so a read shifts the box to the current corner instead of drifting with it.
+type Origin = { x0: number; y0: number };
+type Entry = { version: number; box: ReturnType<typeof alphaBounds>; exact: boolean; ref?: HTMLCanvasElement; o: Origin };
+const byLayer = new Map<string, Entry>();
 /** `version` of a box carried to a stroke's working canvas: no content version matches it, so reads never trust it alone. */
 const CARRIED = -2;
-function rememberLayerBox(id: string, version: number, box: ReturnType<typeof alphaBounds>, exact: boolean, ref?: HTMLCanvasElement): void {
+const ZERO: Origin = { x0: 0, y0: 0 };
+/** Layers whose current stroke erases: it only takes pixels away, so it never grows the layer's box. */
+const erasing = new Set<string>();
+export const erasingLive = (layerId: string): boolean => erasing.has(layerId);
+/** Sets whether the layer's stroke erases; returns whether it did. */
+export function markErasing(layerId: string, on: boolean): boolean {
+  const was = erasing.has(layerId);
+  if (on) erasing.add(layerId); else erasing.delete(layerId);
+  return was;
+}
+function rememberLayerBox(id: string, version: number, box: ReturnType<typeof alphaBounds>, exact: boolean, ref: HTMLCanvasElement | undefined, o: Origin): void {
   byLayer.delete(id);
-  byLayer.set(id, { version, box, exact, ref });
+  byLayer.set(id, { version, box, exact, ref, o: { x0: o.x0, y0: o.y0 } });
   if (byLayer.size > 512) byLayer.delete(byLayer.keys().next().value!);
+}
+/** The entry's box in the pixels of a canvas whose corner is `o`. */
+function boxAt(e: Entry, o: Origin): ReturnType<typeof alphaBounds> {
+  const dx = e.o.x0 - o.x0, dy = e.o.y0 - o.y0, b = e.box;
+  return !b || (!dx && !dy) ? b : { x0: b.x0 + dx, y0: b.y0 + dy, x1: b.x1 + dx, y1: b.y1 + dy };
 }
 /**
  * A stroke starts on a copy of the layer's canvas (same pixels, same place): the exact box of the layer moves to the
@@ -37,32 +56,41 @@ function rememberLayerBox(id: string, version: number, box: ReturnType<typeof al
  */
 export function carryLayerBox(id: string, from: HTMLCanvasElement, to: HTMLCanvasElement): void {
   const e = byLayer.get(id);
-  if (e?.exact && e.ref === from) rememberLayerBox(id, CARRIED, e.box, true, to);
+  if (e?.exact && e.ref === from) rememberLayerBox(id, CARRIED, e.box, true, to, e.o);
 }
 /**
  * A stroke commit: the layer's exact box becomes the carried box united with the stroke's region (full-buffer pixels),
  * stamped with the version the commit left. Without a carried box, the next read measures the canvas as before.
+ * An erase stroke only takes pixels away: the box stays as a bound, not exact, and the next idle read measures it.
  */
-export function extendLayerBox(id: string, canvas: HTMLCanvasElement, region: { x0: number; y0: number; x1: number; y1: number }, version: number, origin: { x0: number; y0: number }): void {
-  const e = byLayer.get(id);
+export function extendLayerBox(id: string, canvas: HTMLCanvasElement, region: { x0: number; y0: number; x1: number; y1: number }, version: number, origin: Origin): void {
+  const erase = markErasing(id, false), e = byLayer.get(id);
   if (!e || !e.exact || e.ref !== canvas || e.version !== CARRIED) return;
+  const prev = boxAt(e, origin);
+  if (erase) { rememberLayerBox(id, version, prev, false, canvas, origin); return; }
   const local = { x0: Math.max(0, region.x0 - origin.x0), y0: Math.max(0, region.y0 - origin.y0), x1: Math.min(canvas.width, region.x1 - origin.x0), y1: Math.min(canvas.height, region.y1 - origin.y0) };
   const hasLocal = local.x1 > local.x0 && local.y1 > local.y0;
-  const prev = e.box;
   const box = !hasLocal ? prev : !prev ? local : { x0: Math.min(prev.x0, local.x0), y0: Math.min(prev.y0, local.y0), x1: Math.max(prev.x1, local.x1), y1: Math.max(prev.y1, local.y1) };
-  rememberLayerBox(id, version, box, true, canvas);
+  rememberLayerBox(id, version, box, true, canvas, origin);
 }
-/** Keep total layer bounds conservative after a write without reading the changed canvas back. */
-export function extendRasterBounds(id: string, version: number, width: number, height: number, dirty: { x0: number; y0: number; x1: number; y1: number } | 'all'): void {
+/**
+ * Keep total layer bounds conservative after a write without reading the changed canvas back. `dirty` is in full-buffer
+ * pixels; the box is kept in the pixels of the layer's canvas (corner x0, y0). Erasing never adds to the bound.
+ */
+export function extendRasterBounds(id: string, version: number, surface: RasterSurface, dirty: { x0: number; y0: number; x1: number; y1: number } | 'all', erasing = false): void {
   const cached = byLayer.get(id);
   // Box sampling runs before dirty consumption in retainedFrame. An all-dirty buffer already sampled at this version
   // needs a full redraw, but its exact total painted bounds remain known.
   if (dirty === 'all' && cached?.version === version && cached.exact) return;
-  const previous = cached?.box;
-  const next = dirty === 'all' || !previous
+  const o = { x0: surface.x0, y0: surface.y0 }, width = surface.canvas.width, height = surface.canvas.height;
+  const previous = cached && boxAt(cached, o);
+  if (erasing && previous) { rememberLayerBox(id, version, previous, false, undefined, o); return; }
+  const d = dirty === 'all' ? null : { x0: Math.max(0, dirty.x0 - o.x0), y0: Math.max(0, dirty.y0 - o.y0), x1: Math.min(width, dirty.x1 - o.x0), y1: Math.min(height, dirty.y1 - o.y0) };
+  const next = !d || !previous
     ? { x0: 0, y0: 0, x1: width, y1: height }
-    : { x0: Math.min(previous.x0, dirty.x0), y0: Math.min(previous.y0, dirty.y0), x1: Math.max(previous.x1, dirty.x1), y1: Math.max(previous.y1, dirty.y1) };
-  rememberLayerBox(id, version, next, false);
+    : d.x1 <= d.x0 || d.y1 <= d.y0 ? previous
+    : { x0: Math.min(previous.x0, d.x0), y0: Math.min(previous.y0, d.y0), x1: Math.max(previous.x1, d.x1), y1: Math.max(previous.y1, d.y1) };
+  rememberLayerBox(id, version, next, false, undefined, o);
 }
 /** Bounds follow each canvas content version; live paint uses the dirty region until the stroke ends. */
 export function pixelBox(buf: HTMLCanvasElement, version: number, readPixels = true, threshold = 8): ReturnType<typeof alphaBounds> | undefined {
@@ -79,18 +107,18 @@ export function pixelBox(buf: HTMLCanvasElement, version: number, readPixels = t
   return hit.box;
 }
 
-function layerPixelBox(id: string, buf: HTMLCanvasElement, version: number, readPixels: boolean): ReturnType<typeof alphaBounds> | undefined {
+function layerPixelBox(id: string, buf: HTMLCanvasElement, version: number, readPixels: boolean, o: Origin = ZERO): ReturnType<typeof alphaBounds> | undefined {
   const previous = byLayer.get(id);
   if (!readPixels) {
-    if (previous) { rememberLayerBox(id, previous.version, previous.box, previous.exact, previous.ref); return previous.box; }
+    if (previous) { rememberLayerBox(id, previous.version, previous.box, previous.exact, previous.ref, previous.o); return boxAt(previous, o); }
     return pixelBox(buf, version, false, 0);
   }
-  if (previous?.version === version && previous.exact && previous.ref === buf) { rememberLayerBox(id, version, previous.box, true, buf); return previous.box; }
+  if (previous?.version === version && previous.exact && previous.ref === buf) { rememberLayerBox(id, version, previous.box, true, buf, previous.o); return boxAt(previous, o); }
   // A live stroke may mutate its canvas before the next version is committed; keep its dirty bound conservative and
   // defer the alpha scan until the stroke is idle instead of promoting a stale pixelBox hit to an exact new version.
-  if (paintingLive()) return previous?.box ?? pixelBox(buf, version, false, 0);
+  if (paintingLive()) return previous ? boxAt(previous, o) : pixelBox(buf, version, false, 0);
   const box = pixelBox(buf, version, true, 0);
-  if (box !== undefined) rememberLayerBox(id, version, box, true, buf);
+  if (box !== undefined) rememberLayerBox(id, version, box, true, buf, o);
   return box;
 }
 
@@ -107,13 +135,13 @@ export function rasterPaintedBox(l: Extract<Layer, { type: 'raster' }>, readPixe
   };
   const base = l.paintBaseId ? getRasterSurface(l.paintBaseId) : undefined;
   if (base?.canvas.width && l.paintStrokes) {
-    const b0 = layerPixelBox(l.paintBaseId!, base.canvas, bufferVersion(l.paintBaseId!), readPixels);
-    const composed = includeComposite ? layerPixelBox(l.id, buf, bufferVersion(l.id), readPixels) : undefined;
+    const b0 = layerPixelBox(l.paintBaseId!, base.canvas, bufferVersion(l.paintBaseId!), readPixels, base);
+    const composed = includeComposite ? layerPixelBox(l.id, buf, bufferVersion(l.id), readPixels, surface) : undefined;
     const all = unionBox([...(b0 ? [toPage(b0, base)] : []), ...(composed ? [toPage(composed, surface)] : []), ...l.paintStrokes.map((st) => rasterStrokeBox(l, st)).filter((b): b is Box => b != null)]);
     if (!all) return null;
     const x0 = Math.max(all.x, l.x), y0 = Math.max(all.y, l.y), x1 = Math.min(all.x + all.w, l.x + l.width), y1 = Math.min(all.y + all.h, l.y + l.height);
     return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
   }
-  const box = layerPixelBox(l.id, buf, bufferVersion(l.id), readPixels);
+  const box = layerPixelBox(l.id, buf, bufferVersion(l.id), readPixels, surface);
   return box ? toPage(box, surface) : null;
 }

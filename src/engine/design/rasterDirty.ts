@@ -2,7 +2,7 @@ import type { Layer } from '../types';
 import { mapBox } from './matrix';
 import { bufferVersion, getRasterSurface, rasterBufferIds, takeDirty, type Dirty } from './raster';
 import type { Rect } from './retainedPage';
-import { extendRasterBounds } from './rasterBounds';
+import { erasingLive, extendRasterBounds } from './rasterBounds';
 
 /** Take pending raster writes and map their buffer pixels through layer placement into retained-page pixels. */
 export function rasterDirtyRect(layer: Layer, scale: number): Rect | null {
@@ -15,7 +15,7 @@ export function rasterDirtyRect(layer: Layer, scale: number): Rect | null {
     if (id !== layer.id || !dirty) continue;
     // Dirty areas are in full-buffer pixels: the layer's size in them, not the size of the box.
     const surface = getRasterSurface(id);
-    if (surface) extendRasterBounds(id, bufferVersion(id), surface.fw, surface.fh, dirty);
+    if (surface) extendRasterBounds(id, bufferVersion(id), surface, dirty, erasingLive(id));
     const fw = surface?.fw ?? 0, fh = surface?.fh ?? 0;
     const local = dirty === 'all' || !fw || !fh ? { x: layer.x, y: layer.y, w: layer.width, h: layer.height } : {
       x: layer.x + dirty.x0 * layer.width / fw,

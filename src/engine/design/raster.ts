@@ -10,7 +10,7 @@ import { hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
 import { layMask, strokeSegment } from './rasterDraw';
 export { drawRasterStroke, strokeSegment } from './rasterDraw';
 import { RASTER_HISTORY_TILE_SIZE, restoreRasterTiles, snapshotRasterTiles, tileKeysForRect, updateRasterTiles, type RasterHistorySnapshot } from './rasterHistoryTiles';
-import { carryLayerBox, extendLayerBox } from './rasterBounds';
+import { carryLayerBox, extendLayerBox, markErasing } from './rasterBounds';
 import { UNREADABLE_EDIT } from './rasterMissing';
 import { assembleFull, cropToContent, emptyBox, geometryOf, growTo, isPlaced, place, regionOf, regrid, sameBox, type Region, type RasterSurface } from './rasterSurface';
 
@@ -300,6 +300,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
   if (owner) {
     const r = reach / 2 + 2;
     const d = { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r };
+    markErasing(owner, live.erase);
     markDirty(owner, d);
     const cur = strokeSpan.get(owner);
     const reg = { x0: Math.floor(d.x0), y0: Math.floor(d.y0), x1: Math.ceil(d.x1), y1: Math.ceil(d.y1) };
@@ -425,7 +426,7 @@ export function commitEdit(layerId: string): void {
   strokeSpan.delete(layerId);
   if (current) flushHistoryTiles(current);
   touchBuffer(current);
-  // The layer's box is known without reading the canvas back: the box before the stroke plus the stroke's region.
+  // Box before the stroke + its region, no read-back (an erase: measure again).
   if (current && span) extendLayerBox(layerId, current, span, bufferVersion(layerId), geometryOf(current));
   schedulePersist(layerId);
   notify();
