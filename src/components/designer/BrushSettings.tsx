@@ -122,6 +122,8 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <div className="brush-card-panes">
         {pane('tip', <>
     {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
+    {brush.texture && brush.texture !== 'none' && <InlineToggle label="Tooth" tip="Texture by pressure: light strokes catch only the paper's grain" checked={!!brush.tooth} onChange={(v) => set({ tooth: v })} />}
+    <InlineSlider label="Edge" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.edge ?? 0} onChange={(v) => set({ edge: v })} />
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
     <BrushTipShape angle={brush.angle ?? 0} roundness={brush.roundness ?? 1} onChange={set} />
@@ -165,6 +167,8 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSelect label="Texture" icon={<TextureIcon texture={brush.texture ?? 'none'} />} value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     </div>
     {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
+    {brush.texture && brush.texture !== 'none' && <InlineToggle label="Tooth" tip="Texture by pressure: light strokes catch only the paper's grain" checked={!!brush.tooth} onChange={(v) => set({ tooth: v })} />}
+    <InlineSlider label="Edge" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.edge ?? 0} onChange={(v) => set({ edge: v })} />
     <div className="brush-row">
       <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={brush.taperStart ?? 0} onChange={(v) => set({ taperStart: v })} />
       <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={brush.taperEnd ?? 0} onChange={(v) => set({ taperEnd: v })} />

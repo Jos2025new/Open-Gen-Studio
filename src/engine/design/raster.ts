@@ -91,7 +91,7 @@ const layerOfCanvas = new WeakMap<HTMLCanvasElement, string>();
 /** History-only tile grids. Rendering has its own dirtyBy lifecycle below. */
 const historyTiles = new WeakMap<HTMLCanvasElement, RasterHistorySnapshot>();
 const historyDirty = new WeakMap<HTMLCanvasElement, Set<string>>();
-/** What each layer changed since the last frame that composed it (Paso 3: the retained page reads and clears it). */
+/** What each layer changed since its last composed frame (the retained page reads and clears it). */
 const dirtyBy = new Map<string, Dirty>();
 
 function markDirty(layerId: string, d: Dirty): void {
@@ -282,7 +282,7 @@ function fitLive(buf: HTMLCanvasElement, live: LiveStroke, need: Region): HTMLCa
   return next;
 }
 
-/** The full-buffer area a segment with `reach` touches: its tip box and the padded box, inside the page. */
+/** The full-buffer area a segment with `reach` touches (tip box and padded box), inside the page. */
 function segmentRegion(a: { x: number; y: number }, b: { x: number; y: number }, reach: number, fw: number, fh: number): Region | null {
   const pad = reach / 2 + 2;
   const sb = segmentBox([a.x, a.y, b.x, b.y, reach]);
@@ -296,7 +296,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
   touchBuffer(buf0);
   const owner = layerOfCanvas.get(buf0);
   // A segment starts at the previous width: its box covers the wider of the two.
-  const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
+  const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0) * (1 + (live.tip?.edge ?? 0) / 2);
   if (owner) {
     const r = reach / 2 + 2;
     const d = { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r };
@@ -315,7 +315,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
     const g = geometryOf(buf);
     const A = { x: a.x - g.x0, y: a.y - g.y0 }, B = { x: b.x - g.x0, y: b.y - g.y0 };
     if (live.tip) {
-      // The tip engine: the segment's coverage goes into the mask where it is stronger than what is there.
+      // Tip engine: the segment's coverage enters the mask where it is stronger.
       const box = segmentBox([A.x, A.y, B.x, B.y, reach]);
       const x = Math.max(0, box.x), y = Math.max(0, box.y), w = Math.min(buf.width, box.x + box.w) - x, h = Math.min(buf.height, box.y + box.h) - y;
       if (w > 0 && h > 0) {
@@ -338,7 +338,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
     if (w <= 0 || h <= 0) return buf;
     markHistoryDirty(buf, x + g.x0, y + g.y0, w, h);
     if (live.clip) {
-      // Keep the stroke only where the selection is (soft edges stay soft).
+      // Keep the stroke only inside the selection.
       const m = ctx2d(live.mask);
       m.save();
       m.globalCompositeOperation = 'destination-in';
@@ -362,7 +362,7 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
 export function repaintLive(buf0: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): HTMLCanvasElement {
   if (!live.tip || !changed.length) return buf0;
   touchBuffer(buf0);
-  const boxes = changed.map(segmentBox);
+  const boxes = changed.map((s) => segmentBox(s, live.tip?.edge));
   const g0 = geometryOf(buf0);
   const rx0 = Math.max(0, Math.min(...boxes.map((b) => b.x))), ry0 = Math.max(0, Math.min(...boxes.map((b) => b.y)));
   const rx1 = Math.min(g0.fw, Math.max(...boxes.map((b) => b.x + b.w))), ry1 = Math.min(g0.fh, Math.max(...boxes.map((b) => b.y + b.h)));
@@ -374,7 +374,7 @@ export function repaintLive(buf0: HTMLCanvasElement, live: LiveStroke, changed: 
   const m = ctx2d(live.mask), rgb = hexRgb(live.color), img = m.createImageData(w, h);
   const local = (seg: readonly number[]) => [seg[0] - g.x0, seg[1] - g.y0, seg[2] - g.x0, seg[3] - g.y0, seg[4]];
   segments.forEach((seg, i) => {
-    const s = local(seg), b = segmentBox(s);
+    const s = local(seg), b = segmentBox(s, live.tip!.edge);
     if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, s, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
   });
   m.putImageData(img, x, y);
@@ -504,7 +504,7 @@ function writeLayer(layerId: string): Promise<void> {
     const revision = bufferVersion(layerId);
     try {
       await blobDb.set(keyFor(layerId), await canvasToBlob(assembleFull(c), 'image/png'));
-      // Live strokes mutate this same canvas in place; reference equality alone cannot acknowledge an old snapshot.
+      // Live strokes mutate this canvas in place; reference equality cannot acknowledge an old snapshot.
       if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId) && !idles.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
       localFailed.delete(layerId);
@@ -551,7 +551,7 @@ if (typeof window !== 'undefined') {
 /** The layer's stored pixels failed to read (D30): the Layers panel marks it, edits say so. */
 export function isUnreadable(layerId: string): boolean { return unreadable.has(layerId); }
 
-/** Load buffers for layers that are not in memory yet (after reload). A stored full buffer is cropped to its box. */
+/** Load buffers for layers not in memory yet (after reload); a stored full buffer is cropped to its box. */
 export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
   const layers = pixelLayers(allLayers);
   let changed = false;
@@ -571,7 +571,7 @@ export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
       }
       // A missing foundation must never be replaced by blank pixels when objects are moved.
       if (!full && baseIds.has(l.id)) return;
-      // Recovered: an unreadable layer never holds a buffer (storeCanvas, beginEdit), so nothing drawn is replaced.
+      // Recovered: an unreadable layer never holds a buffer (storeCanvas, beginEdit).
       unreadable.delete(l.id);
       if (buffers.has(l.id)) return;
       buffers.set(l.id, full ? cropToContent(full) : emptyBox(l.pxWidth, l.pxHeight));

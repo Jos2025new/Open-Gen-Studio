@@ -12,7 +12,7 @@ import { clampRoundness, toTipFrame, tipFrame, wrapAngle } from './brushTipShape
  * no tip and keep the canvas line renderer they were painted with (raster.ts), so old documents look the same.
  */
 
-export type BrushTexture = 'none' | 'paper' | 'canvas' | 'grain';
+export type BrushTexture = 'none' | 'paper' | 'canvas' | 'grain' | 'graphite';
 export type BrushBlend = Extract<BlendMode, 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten'>;
 
 /** What a saved stroke needs to be drawn again; absent = a stroke from before this engine. */
@@ -22,6 +22,10 @@ export interface BrushTip {
   texture?: BrushTexture;
   /** How much the texture takes away (0–1). */
   textureStrength?: number;
+  /** Tooth (Krita's subtract): the texture takes its share off the coverage, so light strokes catch only the paper's crests. Absent = the texture dims the ink (every older stroke). */
+  tooth?: true;
+  /** Living edge (0–1): the radius at the rim wobbles by this share with fixed noise. Absent = a clean capsule. */
+  edge?: number;
   blend?: BrushBlend;
   /** Paint only where the layer already has pixels (SAI's Keep Opacity). */
   keepOpacity?: boolean;
@@ -55,6 +59,8 @@ export interface BrushOptions {
   taperEnd?: number;
   texture?: BrushTexture;
   textureStrength?: number;
+  tooth?: boolean;
+  edge?: number;
   blend?: BrushBlend;
   keepOpacity?: boolean;
   /** Tip shape (see BrushTip); roundness 1 / angle 0 / follow off are the plain round tip. */
@@ -65,7 +71,7 @@ export interface BrushOptions {
 
 export const BRUSH_BLENDS: BrushBlend[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
 export const BRUSH_TEXTURES: Array<{ value: BrushTexture; label: string }> = [
-  { value: 'none', label: 'None' }, { value: 'paper', label: 'Paper' }, { value: 'canvas', label: 'Canvas' }, { value: 'grain', label: 'Grain' },
+  { value: 'none', label: 'None' }, { value: 'paper', label: 'Paper' }, { value: 'canvas', label: 'Canvas' }, { value: 'grain', label: 'Grain' }, { value: 'graphite', label: 'Graphite' },
 ];
 /** The four tip profiles of SAI's tip row, hard to soft. */
 export const TIP_PRESETS = [1, 0.7, 0.4, 0.05];
@@ -120,13 +126,15 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   // A texture without a recorded strength (a preset, an older brush) gets the default, as the panel gives it.
   const strength = o.textureStrength ?? BRUSH_DEFAULTS.textureStrength;
   const texture = o.texture && o.texture !== 'none' && strength > 0 ? o.texture : undefined;
+  const tooth = texture && o.tooth ? true : undefined;
+  const edge = o.edge && o.edge > 0 ? Math.min(1, o.edge) : undefined;
   const blend = !erase && o.blend && o.blend !== 'normal' ? o.blend : undefined;
   const keepOpacity = !erase && o.keepOpacity ? true : undefined;
   // A round tip records nothing, so those strokes stay byte-identical; angle and follow mean nothing without a squeeze.
   const roundness = o.roundness !== undefined && o.roundness < 1 ? clampRoundness(o.roundness) : undefined;
   const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
   const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
-  return { hardness, ...shape, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  return { hardness, ...shape, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */
@@ -159,6 +167,11 @@ export function textureAt(kind: BrushTexture | undefined, x: number, y: number):
     case 'paper': return 0.55 * smoothNoise(x, y, 3) + 0.3 * smoothNoise(x, y, 9) + 0.15 * hash(x, y);
     case 'canvas': return 0.5 + 0.25 * Math.sin(x * 0.9) * Math.sin(y * 0.9) + 0.25 * smoothNoise(x, y, 6);
     case 'grain': return hash(x, y) < 0.35 ? 0.15 : 1;
+    // Fine, slightly elongated grain (cells wider than tall) with contrast: crests near 1, pits near 0.
+    case 'graphite': {
+      const g = 0.6 * smoothNoise(x * 0.7, y, 2) + 0.4 * hash(x, y);
+      return g < 0.35 ? 0 : g > 0.7 ? 1 : (g - 0.35) / 0.35;
+    }
     default: return 1;
   }
 }
@@ -174,8 +187,9 @@ export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: reado
   const [ax, ay, bx, by, width] = seg;
   const w0 = from?.width ?? width, d0 = clamp01(from?.density ?? density), d1 = clamp01(density);
   const r = Math.max(0.5, Math.max(w0, width) / 2), dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
-  const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - r - 1 - ox)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - r - 1 - oy));
-  const x1 = Math.min(img.width, Math.ceil(Math.max(ax, bx) + r + 1 - ox)), y1 = Math.min(img.height, Math.ceil(Math.max(ay, by) + r + 1 - oy));
+  const tooth = tip.tooth === true, edge = tip.edge ?? 0, reach = r * (1 + edge / 2);
+  const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach - 1 - ox)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach - 1 - oy));
+  const x1 = Math.min(img.width, Math.ceil(Math.max(ax, bx) + reach + 1 - ox)), y1 = Math.min(img.height, Math.ceil(Math.max(ay, by) + reach + 1 - oy));
   const strength = clamp01(tip.textureStrength ?? 0);
   // Elliptical tip: measure in the tip's own frame, where it is a circle (brushTipShape.ts). Round tips take the same path with identity values.
   const fr = tipFrame(tip, dx, dy);
@@ -186,10 +200,16 @@ export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: reado
       let px = x + ox + 0.5, py = y + oy + 0.5;
       if (fr) [px, py] = toTipFrame(fr, px, py);
       const t = slen2 ? clamp01(((px - sax) * sdx + (py - say) * sdy) / slen2) : 0;
-      const d = Math.hypot(px - sax - t * sdx, py - say - t * sdy), rt = Math.max(0.5, (w0 + (width - w0) * t) / 2);
+      const d = Math.hypot(px - sax - t * sdx, py - say - t * sdy);
+      let rt = Math.max(0.5, (w0 + (width - w0) * t) / 2);
+      if (edge) rt = Math.max(0.5, rt * (1 + edge * (smoothNoise(x + ox, y + oy, 3) - 0.5)));
       if (d > rt + 0.5) continue;
       let cov = profile(d, rt, tip.hardness) * (d0 + (d1 - d0) * t);
-      if (tip.texture && strength) cov *= 1 - strength * (1 - textureAt(tip.texture, x + ox, y + oy));
+      if (tip.texture && strength) {
+        const tex = textureAt(tip.texture, x + ox, y + oy);
+        // Tooth subtracts (light strokes keep only the crests); the old way dims the ink evenly.
+        cov = tooth ? Math.max(0, cov - 1.5 * strength * (1 - tex)) : cov * (1 - strength * (1 - tex));
+      }
       const a = Math.round(cov * 255), i = (y * img.width + x) * 4;
       if (a > img.data[i + 3]) {
         img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2]; img.data[i + 3] = a;
@@ -204,8 +224,8 @@ export function hexRgb(hex: string): [number, number, number] {
 }
 
 /** The box a segment touches, padded for its radius and anti-aliasing. */
-export function segmentBox(seg: readonly number[]): { x: number; y: number; w: number; h: number } {
-  const r = Math.max(0.5, seg[4] / 2) + 2;
+export function segmentBox(seg: readonly number[], edge = 0): { x: number; y: number; w: number; h: number } {
+  const r = Math.max(0.5, seg[4] / 2) * (1 + edge / 2) + 2;
   const x = Math.floor(Math.min(seg[0], seg[2]) - r), y = Math.floor(Math.min(seg[1], seg[3]) - r);
   return { x, y, w: Math.ceil(Math.max(seg[0], seg[2]) + r) - x, h: Math.ceil(Math.max(seg[1], seg[3]) + r) - y };
 }

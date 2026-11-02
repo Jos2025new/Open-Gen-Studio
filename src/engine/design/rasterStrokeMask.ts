@@ -20,7 +20,7 @@ export function rasterStrokeMask(stroke: RasterStroke, tip: BrushTip): Mask {
     masks.delete(stroke.segments);
     editorCacheBudget.remove(found.id);
   }
-  const boxes = stroke.segments.map(segmentBox);
+  const boxes = stroke.segments.map((s) => segmentBox(s, tip.edge));
   const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
   const w = Math.max(...boxes.map((b) => b.x + b.w)) - x, h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
   const canvas = createCanvas(w, h), m = ctx2d(canvas), img = m.createImageData(canvas.width, canvas.height), rgb = hexRgb(stroke.color);
