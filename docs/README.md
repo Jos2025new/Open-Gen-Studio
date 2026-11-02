@@ -48,6 +48,7 @@
 - Toolbox y pestañas (2026-11-01): tecla en tooltip, franja con selección, Properties al elegir: código `ToolDock.tsx`, `usePropsOnPick.ts`; test `tests/tool-dock-strip-and-keys.test.ts`, `tests/designer-props-on-pick.test.ts`; ver [toolbox-dock](designer-controles/toolbox-dock.md).
 - Edición de nodos y selección Node·Segment·Face (2026-11-01): código `selectMode.ts`; test `tests/select-mode.test.ts`; sin prueba visual; ver [nodos-modos](designer-controles/nodos-modos.md).
 - [Booleanas, Shape Builder y Fix overlaps](designer-controles/booleanas.md) (2026-11-01): test `tests/fix-overlaps.test.ts`; sin prueba visual.
+- [Pincel: lápiz, Tooth, Edge y dabs](designer-controles/pincel.md) (2026-11-01): código `brushDabs.ts`, `brushEngine.ts`, `brushPresets.ts`; test `tests/brush-dabs.test.ts`, `tests/brush-living-edge.test.ts`, `tests/brush-presets.test.ts`; falta calibrar.
 - [cuota provisional de trazos raster](raster-limit.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
@@ -85,6 +86,7 @@
 - [0024 — Identidad visual: sistema de tarjetas, bases y resaltado (aceptado 2026-10-20; pasos 1 y 2 en `task/workflow-ask-first`)](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md).
 - [0025 — Revisión de la sesión «house party»: número confirmado, revisiones del plan, crédito, cambio de modelo o proveedor y aspecto por entregable (aceptado 2026-10-20)](decisions/0025-revision-sesion-house-party.md).
 - [0026 — Motor de booleanas: Clipper2 (BSL-1.0) y ajuste de curvas (aceptado 2026-11-01; actualizado el mismo día)](decisions/0026-motor-booleano.md).
+- [0027 — Motor del pincel raster: cápsula y modo dabs (aceptado 2026-11-01)](decisions/0027-motor-pincel-dabs.md).
 
 ## Propuestas de interfaz
 
@@ -96,21 +98,21 @@
 - [Persistencia protegida](persistencia-protegida.md) (2026-10-18): archivos y tests protegidos por la regla 5 de AGENTS.md, revisiones y evidencia por tipo de cambio; lo comprueba `scripts/check-protected.mjs`.
 - [Propuesta: persistencia protegida](propuesta-zonas-protegidas.md) (2026-10-18), implementada: documento, regla y comprobación; SQLite como dirección de la fase 2.
 - [Propuesta: Spaces separados de los Workspaces, con lugar y modo en cada generación](propuesta-sesion-espacios.md) (2026-10-18), sustituida por la v5: campos place y mode, Reusar, historial de prompts y espacio recordado.
-- [Propuesta v5: Spaces separados de los Workspaces](propuesta-spaces-v5.md) (2026-10-18), implementada en dos etapas (`task/space-session-1`, 2026-10-19): resultados de texto, guarda de hidratación, presupuesto de tamaño y porqués.
-- [Propuesta: el agente pregunta antes de cargar un workflow](propuesta-workflow-despues-de-preguntar.md) (2026-10-19), sin implementar: ficha corta antes de preguntar, `ready: true`, entregable frente a propósito; plan para otro agente.
-- [Propuesta: sistema visual acotado de las tarjetas del chat](propuesta-sistema-visual-tarjetas.md) (2026-10-20), sin implementar: inventario con valores fijos, tres tamaños (mínimo, medio, estándar), reglas para agentes y plan de migración.
+- [Propuesta v5: Spaces separados de los Workspaces](propuesta-spaces-v5.md) (2026-10-18), implementada en dos etapas (`task/space-session-1`, 2026-10-19): resultados de texto, guarda de hidratación y presupuesto de tamaño.
+- [Propuesta: el agente pregunta antes de cargar un workflow](propuesta-workflow-despues-de-preguntar.md) (2026-10-19), sin implementar: ficha corta antes de preguntar, `ready: true`; plan para otro agente.
+- [Propuesta: sistema visual acotado de las tarjetas del chat](propuesta-sistema-visual-tarjetas.md) (2026-10-20), sin implementar: inventario con valores fijos, tres tamaños, reglas para agentes y plan de migración.
 - [Maqueta estática del sistema visual de tarjetas](mockups/tarjetas.html) (2026-10-20), con su [CSS propuesto](mockups/propuesta.css): antes y después, con las hojas reales de la app.
 - [Propuesta aprobada: bases y color de resaltado](propuesta-temas.md) (2026-10-20), paso 2 (tokens, bases y selector en Ajustes) implementado en `task/workflow-ask-first`: selector Sistema/Atlas/Grafito/Claro/Original, seis resaltados con Aurora, contrastes WCAG, almacenamiento. Maqueta en [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html); CSS: [Atlas](mockups/base-atlas.css), [Grafito](mockups/base-grafito.css), [Claro](mockups/base-claro.css), [Original](mockups/base-original.css), [acentos](mockups/acentos.css), [Aurora](mockups/aurora.css).
 - [Propuesta: toolbox del Designer como dock con barra contextual](propuesta-toolbox-dock.md) (2026-10-23): pasada 1 implementada; las pestañas y los ajustes contextuales avanzados quedan pendientes.
 - [Plan: toolbox del Designer por flujo de trabajo](plan-toolbox-dock.md) (2026-10-23): alcance, reparto y evidencia de la pasada 1.
-- [Maqueta: toolbox del Designer](mockups/toolbox-dock.html) (2026-10-23): variantes con icono arriba, ajustes en medio y 11 iconos abajo. Los controles son el HTML real de la app, capturado del sandbox con [capture-tools.js](mockups/toolbox-dock/capture-tools.js) y [capture-dock.js](mockups/toolbox-dock/capture-dock.js) y empaquetado por [build.mjs](mockups/toolbox-dock/build.mjs) en [real-1.js](mockups/toolbox-dock/real-1.js), [real-2.js](mockups/toolbox-dock/real-2.js), [real-3.js](mockups/toolbox-dock/real-3.js), [real-4.js](mockups/toolbox-dock/real-4.js), [real-5.js](mockups/toolbox-dock/real-5.js), [real-6.js](mockups/toolbox-dock/real-6.js), [real-7.js](mockups/toolbox-dock/real-7.js), [real-8.js](mockups/toolbox-dock/real-8.js), [real-9.js](mockups/toolbox-dock/real-9.js) (generados; no editar).
+- [Maqueta: toolbox del Designer](mockups/toolbox-dock.html) (2026-10-23): variantes arriba, ajustes en medio y 11 iconos abajo. HTML real de la app, capturado con [capture-tools.js](mockups/toolbox-dock/capture-tools.js) y [capture-dock.js](mockups/toolbox-dock/capture-dock.js) y empaquetado por [build.mjs](mockups/toolbox-dock/build.mjs) en [real-1.js](mockups/toolbox-dock/real-1.js) [real-2.js](mockups/toolbox-dock/real-2.js) [real-3.js](mockups/toolbox-dock/real-3.js) [real-4.js](mockups/toolbox-dock/real-4.js) [real-5.js](mockups/toolbox-dock/real-5.js) [real-6.js](mockups/toolbox-dock/real-6.js) [real-7.js](mockups/toolbox-dock/real-7.js) [real-8.js](mockups/toolbox-dock/real-8.js) [real-9.js](mockups/toolbox-dock/real-9.js) (generados; no editar).
 - [Inventario de herramientas del Designer](inventario-herramientas-designer.md) y [parte 2](inventario-herramientas-designer-2.md) (2026-10-23): redirigidos a las notas de Controles del Designer (abajo); no añadir datos ahí.
-- [Controles del Designer: matriz de estado actual](designer-controles/README.md) (2026-10-28): una nota por superficie con cada control, su archivo:línea, estado que cambia, cuándo aparece y su lugar en la reagrupación propuesta; el índice de la carpeta enlaza todas las notas, la revisión de ubicación y la investigación de disposición de interfaz.
+- [Controles del Designer: matriz de estado actual](designer-controles/README.md) (2026-10-28): una nota por superficie con cada control, su archivo:línea, estado que cambia, cuándo aparece y su lugar en la reagrupación propuesta.
 - [Controles de Studio](studio-controles/README.md) (2026-10-28): 248 controles por superficie, leídos del código; su índice enlaza cada nota.
 - [Controles de Nodes](nodes-controles/README.md) (2026-10-28): 393 filas por superficie, leídas del código; su índice enlaza cada nota.
 - [Rastreo de historia](rastreo/README.md) (2026-10-28): pendientes, decisiones revertidas, regresiones y contradicciones por área, verificados en el código.
-- [Maquetas de ajustes del Designer](mockups/designer-ajustes/index.html) (2026-10-28, sin implementar, borrador de la reagrupación): [a1-brush-orden](mockups/designer-ajustes/a1-brush-orden.html), [a2-capas-acciones](mockups/designer-ajustes/a2-capas-acciones.html), [a4-seleccion-modo](mockups/designer-ajustes/a4-seleccion-modo.html), [a5-fx-add-arriba](mockups/designer-ajustes/a5-fx-add-arriba.html), [b-iconos](mockups/designer-ajustes/b-iconos.html), [b8-dock-toggle-duplicado](mockups/designer-ajustes/b8-dock-toggle-duplicado.html), [c10-guias](mockups/designer-ajustes/c10-guias.html), [c11-alinear](mockups/designer-ajustes/c11-alinear.html), [c13-gradiente-end](mockups/designer-ajustes/c13-gradiente-end.html), [c9-brush-avanzado](mockups/designer-ajustes/c9-brush-avanzado.html), [d14-navegador](mockups/designer-ajustes/d14-navegador.html), [f-variantes](mockups/designer-ajustes/f-variantes.html), [g-swatch-dock](mockups/designer-ajustes/g-swatch-dock.html), [index](mockups/designer-ajustes/index.html).
-- [Designer: documento técnico](designer-tecnico.md) y [parte 2](designer-tecnico-2.md) (2026-10-23): arquitectura, motor, persistencia, superficies, hallazgos, pendientes y pruebas, con `archivo:línea`; enlaza el inventario con [[wikilinks]] estilo Obsidian.
+- [Maquetas de ajustes del Designer](mockups/designer-ajustes/index.html) (2026-10-28, sin implementar): [a1-brush-orden](mockups/designer-ajustes/a1-brush-orden.html), [a2-capas-acciones](mockups/designer-ajustes/a2-capas-acciones.html), [a4-seleccion-modo](mockups/designer-ajustes/a4-seleccion-modo.html), [a5-fx-add-arriba](mockups/designer-ajustes/a5-fx-add-arriba.html), [b-iconos](mockups/designer-ajustes/b-iconos.html), [b8-dock-toggle-duplicado](mockups/designer-ajustes/b8-dock-toggle-duplicado.html), [c10-guias](mockups/designer-ajustes/c10-guias.html), [c11-alinear](mockups/designer-ajustes/c11-alinear.html), [c13-gradiente-end](mockups/designer-ajustes/c13-gradiente-end.html), [c9-brush-avanzado](mockups/designer-ajustes/c9-brush-avanzado.html), [d14-navegador](mockups/designer-ajustes/d14-navegador.html), [f-variantes](mockups/designer-ajustes/f-variantes.html), [g-swatch-dock](mockups/designer-ajustes/g-swatch-dock.html), [index](mockups/designer-ajustes/index.html).
+- [Designer: documento técnico](designer-tecnico.md) y [parte 2](designer-tecnico-2.md): arquitectura, motor, persistencia, superficies, hallazgos, pendientes y pruebas, con `archivo:línea`.
 - [Designer: guía de usuario](designer-guia-usuario.md) (2026-10-23): cómo usar cada herramienta, capas, selección, efectos, exportar y atajos, en español llano.
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
@@ -154,7 +156,7 @@
 - [023-2026-10-W41: Revisión de Astra, exportación, Niveles y Curvas, reglas (2026-10-10)](history/023-2026-10-W41.md) — 8573 bytes.
 - [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 29926 bytes.
 - [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12; sesión del 2026-10-13 al final)](history/025-2026-10-W42.md) — ver tamaño en el archivo.
-- [026-2026-10-W42: Designer, formas, paint, nodos y cierre de snapping (2026-10-13–14)](history/026-2026-10-W42.md) — incluye evidencia por commit, aprobación manual y correcciones de espaciado; la última E2E queda pendiente por sandbox ocupado.
+- [026-2026-10-W42: Designer, formas, paint, nodos y cierre de snapping (2026-10-13–14)](history/026-2026-10-W42.md) — evidencia por commit, aprobación manual y espaciado; E2E pendiente por sandbox ocupado.
 - [027-2026-10-W42: selección por modo en Edit](history/027-2026-10-W42.md) — Align conserva su guardia de modo y Edit incorpora marquee por objetos/capas.
 - [028-2026-10-W42: redondeo común de rectángulos seleccionados](history/028-2026-10-W42.md) — Rx/Ry actúa sobre los rectángulos del conjunto explícito en Object o Layer.
 - [029-2026-10-W42: edición de nodos en varios paths](history/029-2026-10-W42.md) — selección y movimiento multi-path en Object o Layer, con límites explícitos.
@@ -167,10 +169,10 @@
 - [036-2026-10-W42: Align en el panel derecho](history/036-2026-10-W42.md) — Align contextual dentro de Tool cuando Edit está activa.
 - [037-2026-10-W42: roles de referencia, realismo y precios de OpenRouter](history/037-2026-10-W42.md) — cambios de dos ramas, decisiones, bugs y pendientes.
 - [038-2026-10-W42: modos, Check status, agente y guías (2026-10-14/15)](history/038-2026-10-W42.md) — decisiones del usuario, atribución, límites y pendientes de `task/ref-roles`.
-- [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](history/039-2026-10-W42.md) — por commit: qué, dónde, evidencia (tests, capturas, sin ver en navegador) y decisiones del usuario.
+- [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](history/039-2026-10-W42.md) — por commit: qué, dónde, evidencia y decisiones del usuario.
 - [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](history/040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
 - [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](history/041-2026-10-W42.md) — una sola tarjeta antes del plan.
-- [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas, decisiones, commits, fallos de verificación, arreglos y la guarda de esquema.
+- [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](history/042-2026-10-W42.md) — método, límites de la evidencia, maquetas, decisiones, commits, arreglos y guarda de esquema.
 - [043-2026-10-W42: incidente de guardado, plan y fase 1 de la protección (2026-10-18)](history/043-2026-10-W42.md) — incidente, diagnóstico, commits de `task/save-guard`, pruebas y pendientes.
 - [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
 - [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](history/045-2026-10-W42.md).
@@ -185,9 +187,10 @@
 - [054-2026-10-W44: origen y cierre del toolbox, limpieza de ramas del 2026-10-27 y typecheck en `npm test` (2026-10-27)](history/054-2026-10-W44.md).
 - [055-2026-10-W44: cierre de mapas, integración y limpieza (2026-10-29)](history/055-2026-10-W44.md).
 - [056-2026-10-W44: barra de paneles, Vista y Filtros, Home, barra lateral y caja de Nodes (2026-10-31)](history/056-2026-10-W44.md).
+- [057-2026-11-W44: lápiz y dabs, bordes vivos, borrador raster y arreglos de booleanas (2026-11-01)](history/057-2026-11-W44.md).
 - [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
-- [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` (bugs confirmados) en `tests/repro-*.test.ts`; H11 descartado.
-- [Auditoría externa (2026-10-29)](audits/auditoria-externa-2026-10-29.md): 11 de 39 citas no sostenían su frase; la rama compacta de formas es alcanzable; la objeción inicial sobre H3 fue retractada.
+- [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` en `tests/repro-*.test.ts`; H11 descartado.
+- [Auditoría externa (2026-10-29)](audits/auditoria-externa-2026-10-29.md): 11 de 39 citas no sostenían su frase; la rama compacta de formas es alcanzable; objeción sobre H3 retractada.
 - [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
 - [Auditoría OpenRouter contra su doc oficial (2026-10-25)](audits/auditoria-openrouter.md): modelos de vídeo e imagen principales; vídeo sin `input_references` ni passthrough; nada corregido aún.
 - [Verificación de Manus AI de la auditoría OpenRouter, cruzada con el código (2026-10-25)](audits/auditoria-openrouter-manus.md): 10 puntos de código comprobados; nada corregido aún.
@@ -195,8 +198,8 @@
 - [Investigación: sondeo de trabajos de vídeo (2026-10-25)](investigacion-sondeo-video.md): intervalos de OpenMontage, ComfyUI, fal, Replicate, Runway, Vercel AI SDK y LiteLLM; base de la decisión D4.
 - [Plan: proveedores contra su doc oficial (2026-10-25)](plan-proveedores-2026-10-25.md): fases atómicas con evidencia, decisiones D1-D4 y verificación.
 - [Ejecución del plan de proveedores](proveedores-ejecucion-2026-10-25.md): cambios por fase, pruebas y límites de la evidencia.
-- [Autocompletado de referencias con @: investigación](investigacion-selector-referencias.md) y [maqueta histórica](mockups/referencias-arroba.html): el usuario pide solo el selector en los campos actuales, sin rediseño ni aprobación de maqueta.
-- [Auditoría NanoGPT contra su doc oficial (2026-10-25)](audits/auditoria-nanogpt.md) y [segunda pasada](audits/auditoria-nanogpt-2.md): referencias solo por enlace, sin subida; último fotograma de H3 Max y Gemini Omni; nada corregido aún.
+- [Autocompletado de referencias con @: investigación](investigacion-selector-referencias.md) y [maqueta histórica](mockups/referencias-arroba.html): el usuario pide solo el selector en los campos actuales, sin rediseño.
+- [Auditoría NanoGPT contra su doc oficial (2026-10-25)](audits/auditoria-nanogpt.md) y [segunda pasada](audits/auditoria-nanogpt-2.md): referencias solo por enlace; último fotograma de H3 Max y Gemini Omni; nada corregido aún.
 
 ## Trazabilidad
 

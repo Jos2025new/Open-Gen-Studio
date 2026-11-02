@@ -51,6 +51,11 @@ Límites conocidos de los cambios de la [caja de herramientas](designer-controle
 - **D41 · bajo · 2026-11-01 · Arrastrar las manijas de Bend** (propuesta). En Bend solo responden los nodos y los segmentos; las manijas no se mueven con el arrastre (`PathNodes.tsx:104`). Ver [nodos-modos](designer-controles/nodos-modos.md).
 - **D42 · medio · 2026-11-01 · Caras de un trazado que se cruza a sí mismo** (propuesta). La selección Face de los nodos solo reconoce subtrazados cerrados; las regiones de solape de un trazado que se cruza no son caras (`selectMode.ts`, `facesOf`). Propuesta: tratarlas como caras al elegir, con su relleno. Ver [nodos-modos](designer-controles/nodos-modos.md) y [booleanas](designer-controles/booleanas.md).
 - **D43 · medio · 2026-11-01 · Reconstrucción exacta de curvas (Z tags)** (**corregido** en código y tests, `tests/fix-overlaps.test.ts`; falta prueba visual del usuario). Casos cubiertos en `exactRebuild.ts`: cúbico que se cierra sobre sí mismo, T-junctions, orientación y guarda de trazados grandes. Ver [booleanas](designer-controles/booleanas.md).
+- **D44 · medio · 2026-11-01 · Calibrar los presets de lápiz para que sean físicamente exactos.** Los 8 presets y los de dabs gustaron en el sandbox, pero el usuario los probará a fondo antes. Ver [057](history/057-2026-11-W44.md), [0027](decisions/0027-motor-pincel-dabs.md).
+- **D45 · bajo · 2026-11-01 · Desviaciones de los dabs frente a MyPaint:** el espaciado no se mide en el marco elíptico, Tooth escala el sello en vez de restar, no hay linealización de la opacidad y el plano es la caja del trazo + 48 px (`brushDabs.ts`).
+- **D46 · medio · 2026-11-01 · `raster.ts` en el límite (29 997 bytes de 30 000):** el próximo cambio ahí debe ir a otro archivo (`check-docs` y la regla de archivos ≤ 30 KB).
+- **D47 · medio · 2026-11-01 · Rediseño del panel Edit/Move** (propuesta, a la espera de aprobación del usuario). Antes de implementar, comprobar qué hace «Settings…».
+- **D48 · bajo · 2026-11-01 · Prueba visual de la disposición de la tarjeta Brush:** el aviso de presión ya no la ensancha y las filas se apilan desde arriba (`tool-dock.css`); solo se comprobó por tests.
 
 ## Auditoría del Designer (2026-10-22)
 
