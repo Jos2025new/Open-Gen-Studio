@@ -184,3 +184,10 @@ it('the brush card keeps its width when the pressure hint comes and goes (Simula
   const { readFileSync } = await import('node:fs');
   expect(readFileSync('src/styles/tool-dock.css', 'utf8')).toMatch(/\.brush-card-pane > \.opt-hint \{ contain: inline-size; \}/);
 });
+
+it('brush card panes stack their rows from the top (a short tab does not spread out to the tallest one)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync('src/styles/tool-dock.css', 'utf8');
+  expect(css).toMatch(/\.brush-card-pane > \* \{ flex: none; \}/);
+  expect(css).toMatch(/\.brush-card-pane \{ justify-content: flex-start; \}/);
+});

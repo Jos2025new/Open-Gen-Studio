@@ -105,6 +105,9 @@
 .brush-card-pane > .opt-hint { contain: inline-size; }
 /* Every field in the card is one height: a column flex must not stretch the rows' flex-basis 100% into height. */
 :is(.brush-card-head, .brush-card-pane) > .opt:not(.opt-presets):not(.is-icon) { flex: none; }
+/* The panes share the tallest one's height: rows keep their own height and stack from the top instead of spreading out. */
+.brush-card-pane > * { flex: none; }
+.brush-card-pane { justify-content: flex-start; }
 .tool-dock-card .opt:not(.opt-presets):not(.is-icon):not(.paint-mode) { height: 36px; box-sizing: border-box; }
 .brush-card .opt.opt-presets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .brush-card .opt-presets button { width: auto; }
