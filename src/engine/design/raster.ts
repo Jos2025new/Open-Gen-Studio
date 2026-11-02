@@ -88,7 +88,7 @@ export function snapshotBuffers(layerIds: string[]): Map<string, HTMLCanvasEleme
 export type Dirty = { x0: number; y0: number; x1: number; y1: number } | 'all';
 /** Which layer a buffer belongs to (buffers are replaced by copies; this follows them). */
 const layerOfCanvas = new WeakMap<HTMLCanvasElement, string>();
-/** History-only tile grids. Rendering has its own dirtyBy lifecycle below. */
+/** History-only tile grids (rendering uses dirtyBy below). */
 const historyTiles = new WeakMap<HTMLCanvasElement, RasterHistorySnapshot>();
 const historyDirty = new WeakMap<HTMLCanvasElement, Set<string>>();
 /** What each layer changed since its last composed frame (the retained page reads and clears it). */
@@ -504,7 +504,7 @@ function writeLayer(layerId: string): Promise<void> {
     const revision = bufferVersion(layerId);
     try {
       await blobDb.set(keyFor(layerId), await canvasToBlob(assembleFull(c), 'image/png'));
-      // Live strokes mutate this canvas in place; reference equality cannot acknowledge an old snapshot.
+      // Live strokes mutate this same canvas in place; reference equality alone cannot acknowledge an old snapshot.
       if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId) && !idles.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
       localFailed.delete(layerId);
