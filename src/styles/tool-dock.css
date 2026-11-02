@@ -202,28 +202,29 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 /* Done closes the row on the right and stays reachable while the row scrolls. */
 .context-strip .node-done { margin-left: auto; position: sticky; right: 0; }
 /* Subtoolbox fixed: as wide as the toolbox and centered on it, directly above it, with 36 px targets and solid contrast. */
-.tool-dock-stack.is-fixed { align-items: center; transition: bottom .22s ease; }
+.tool-dock-stack.is-fixed { align-items: center; transition: bottom .22s ease, right .22s ease; }
 .tool-dock .tool-dock-stack > .tool-dock-variants.is-fixed { width: 100%; min-height: 48px; padding: 6px; background: var(--surface-2); box-shadow: var(--shadow-card); }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn { width: 36px; height: 36px; }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .85; }
 .tool-dock:not(.is-vertical) .tool-dock-stack .tool-dock-card { order: -1; }
 .tool-dock { --tool-dock-width: min(640px, calc(100vw - 32px)); }
-/* Hide-prompt: to the right, in its own gutter outside the subtoolbox, no background of its own. */
-.tool-dock-hide-prompt { position: absolute; z-index: 7; right: -46px; bottom: calc(100% + 14px); display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--text-2); background: transparent; border: 0; border-radius: var(--radius-s); cursor: pointer; transition: bottom .22s ease; }
+/* Hide-prompt: the last item of the toolbox bar (after a divider, no background); when the toolbox is hidden it stays as a pill at the bottom edge. */
+.tool-dock-hide-prompt { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--text-2); background: transparent; border: 0; border-radius: var(--radius-s); cursor: pointer; }
+.composer-tools-bar .tool-dock-hide-prompt { width: 40px; height: 40px; }
 .tool-dock-hide-prompt:is(:hover, :focus-visible) { color: var(--text); background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .tool-dock-hide-prompt[aria-pressed="true"] { color: var(--active-text); }
 .tool-dock-hide-prompt:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
+.tool-dock-hide-prompt.is-pill { position: absolute; z-index: 7; right: 0; bottom: 8px; width: 40px; height: 48px; background: var(--surface-2); border: 1px solid var(--panel-line); box-shadow: var(--shadow-card); }
 /* Quick mode, in the subtoolbox: «, subtool icon, long Size and Opacity, color circle, Eraser, Settings. */
-.tool-dock-variants.is-quick { gap: 8px; }
+.tool-dock-variants.is-fixed { gap: 8px; }
 .tool-dock-quick-sliders { display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; }
 .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 120px; }
 /* The colour sits on a light disc so any colour stands out against the dark bar. */
-.tool-dock-variants.is-quick .opt-color.is-icon { background: var(--text); padding: 3px; border-radius: 50%; }
+.tool-dock-variants.is-fixed .opt-color.is-icon { background: var(--text); padding: 3px; border-radius: 50%; }
 /* Prompt box hidden: the toolbox (and the footer) slide down out of view, the subtoolbox drops to the bottom; the box chrome fades. */
 .composer.is-prompt-hidden { background: transparent; border-color: transparent; box-shadow: none; }
 .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
 .composer.is-prompt-hidden :is(.composer-footer, .composer-tools-bar > :not(.designer-palette), .tool-dock-family) { transform: translateY(calc(100% + 24px)); opacity: 0; visibility: hidden; pointer-events: none; }
-.composer.is-prompt-hidden .tool-dock-stack.is-fixed { bottom: 8px; }
-.composer.is-prompt-hidden .tool-dock-hide-prompt { bottom: 14px; }
+.composer.is-prompt-hidden .tool-dock-stack.is-fixed { bottom: 8px; right: 47px; }
 .composer.is-prompt-hidden .thread-peek { display: none; }
-@media (prefers-reduced-motion: reduce) { .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed, .tool-dock-hide-prompt { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed { transition: none; } }

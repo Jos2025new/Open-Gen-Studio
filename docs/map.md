@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 307 | 238 |
-| [store.ts](../src/store/store.ts) | 206 | 220 |
+| [store.ts](../src/store/store.ts) | 207 | 220 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 93 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 60 | 4 |
 | [actions.ts](../src/engine/design/actions.ts) | 58 | 34 |
@@ -49,7 +49,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
 | `src/components/composer` | 13 | 13 |
-| `src/components/designer` | 72 | 41 |
+| `src/components/designer` | 73 | 41 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
 | `src/components/shell` | 35 | 23 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 33 | 303 |
 | `src/store` | 15 | 222 |
 
-183 de 547 módulos no tienen ningún test que los importe directamente.
+183 de 548 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
