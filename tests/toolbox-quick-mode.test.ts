@@ -98,3 +98,10 @@ describe('quick mode of the subtoolbox', () => {
     expect(css).toMatch(/prefers-reduced-motion: reduce\)[^}]*transition: none/);
   });
 });
+
+it('the quick colour sits on a light disc and the tools-dock frame is thin', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync('src/styles/tool-dock.css', 'utf8');
+  expect(css).toMatch(/\.tool-dock-variants\.is-quick \.opt-color\.is-icon \{ background: var\(--text\)/);
+  expect(css).toMatch(/\.composer:has\(\.composer-tools-bar\) \{ padding: 4px; \}/);
+});
