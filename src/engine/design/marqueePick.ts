@@ -2,22 +2,20 @@ import type { DesignDoc, Layer } from '../types';
 import { layerBox, toLayerSpace } from './render';
 import { getRasterSurface } from './raster';
 import { bufferAlpha } from './hitAlpha';
+import { rasterPaintedBox } from './rasterBounds';
 import { layerObjects } from './objectOps';
 import { marqueeBounds, type MarqueeBounds } from './marquee';
 
 /*
- * What the Edit marquee finds under a rectangle. A vector layer counts by its objects (shapes, lines), a raster layer
- * by its painted pixels (a baked drawing has no objects), other layers by their box. Pure: no store, no selection.
+ * What the Edit marquee finds under a rectangle. A vector layer counts by its objects (shapes, lines), other layers by
+ * their box. A raster layer without objects (a fill, a baked drawing) is like a frame in Figma: the rectangle must hold
+ * all its painted pixels, or a page-wide backdrop it only crosses would join and stretch the selection. Pure.
  */
 
 const touches = (b: MarqueeBounds, r: { x: number; y: number; w: number; h: number }) =>
   r.x <= b.right && r.x + r.w >= b.left && r.y <= b.bottom && r.y + r.h >= b.top;
 
-/**
- * True when some pixel of a raster layer with alpha lies inside the rectangle (page coordinates), unless every pixel
- * there is painted: then the rectangle was drawn on top of that layer (a backdrop, a fill), as Figma leaves a frame the
- * marquee starts in.
- */
+/** True when some pixel of a raster layer with alpha lies inside the rectangle (page coordinates). */
 export function rasterPaintedIn(l: Layer, b: MarqueeBounds): boolean {
   if (l.type !== 'raster') return false;
   const surface = getRasterSurface(l.id);
@@ -29,12 +27,16 @@ export function rasterPaintedIn(l: Layer, b: MarqueeBounds): boolean {
   const y0 = Math.max(0, Math.floor((Math.min(ay, by) - l.y) * sy) - surface.y0), y1 = Math.min(buf.height - 1, Math.ceil((Math.max(ay, by) - l.y) * sy) - surface.y0);
   if (x1 < x0 || y1 < y0) return false;
   const alpha = bufferAlpha(l.id, buf);
-  // The rectangle must lie inside the stored canvas for "all painted" to mean the whole area is covered.
-  const inside = Math.floor((Math.min(ax, bx) - l.x) * sx) >= surface.x0 && Math.floor((Math.min(ay, by) - l.y) * sy) >= surface.y0
-    && Math.ceil((Math.max(ax, bx) - l.x) * sx) - surface.x0 < buf.width && Math.ceil((Math.max(ay, by) - l.y) * sy) - surface.y0 < buf.height;
-  let some = false, all = inside;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { if (alpha[y * buf.width + x] > 16) some = true; else all = false; if (some && !all) return true; }
-  return some && !all;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (alpha[y * buf.width + x] > 16) return true;
+  return false;
+}
+
+/** True when the rectangle holds every painted pixel of a raster layer (page coordinates) and touches some. */
+export function rasterEnclosed(l: Layer, b: MarqueeBounds): boolean {
+  if (l.type !== 'raster') return false;
+  const box = rasterPaintedBox(l);
+  if (!box) return false;
+  return box.x >= b.left && box.y >= b.top && box.x + box.w <= b.right && box.y + box.h <= b.bottom && rasterPaintedIn(l, b);
 }
 
 export interface MarqueeFound {
@@ -44,7 +46,7 @@ export interface MarqueeFound {
   layers: string[];
 }
 
-export function marqueeFind(doc: DesignDoc, x0: number, y0: number, x1: number, y1: number, painted: (l: Layer, b: MarqueeBounds) => boolean = rasterPaintedIn): MarqueeFound {
+export function marqueeFind(doc: DesignDoc, x0: number, y0: number, x1: number, y1: number, painted: (l: Layer, b: MarqueeBounds) => boolean = rasterEnclosed): MarqueeFound {
   const b = marqueeBounds(x0, y0, x1, y1);
   const objects = new Map<string, string[]>();
   const layers: string[] = [];
