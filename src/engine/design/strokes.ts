@@ -58,7 +58,16 @@ export function bakeStroke(s: Stroke): Stroke {
   return { ...rest, size: s.size * k, taperStart: s.taperStart * k, taperEnd: s.taperEnd * k, points: worldPoints(s) };
 }
 
-const locals = new WeakMap<object, { key: string; local: number[][] }>();
+const locals = new WeakMap<object, { key: string; local: number[][]; path?: Path2D }>();
+
+function localEntry(s: Stroke): { key: string; local: number[][]; path?: Path2D } {
+  const key = JSON.stringify(s, (k, v) => (k === 'points' || k === 'matrix' || k === 'id' ? undefined : v));
+  const hit = locals.get(s.points);
+  if (hit?.key === key) return hit;
+  const e = { key, local: nibActive(s) ? nibStrokeOutline(s.points, strokeOptions(s), s) : getStroke(s.points, strokeOptions(s)) };
+  locals.set(s.points, e);
+  return e;
+}
 
 function computed(s: Stroke): { outline: number[][]; path: string } {
   let c = outlines.get(s);
@@ -67,10 +76,7 @@ function computed(s: Stroke): { outline: number[][]; path: string } {
     // thresholds in perfect-freehand then see the geometry as it was drawn.
     // The local outline depends on the points and the style, not on the matrix: a moved stroke (same points, new
     // matrix) reuses it and only maps it again, so dragging many strokes does not recompute them every frame.
-    const key = JSON.stringify(s, (k, v) => (k === 'points' || k === 'matrix' || k === 'id' ? undefined : v));
-    const hit = locals.get(s.points);
-    const local = hit?.key === key ? hit.local : nibActive(s) ? nibStrokeOutline(s.points, strokeOptions(s), s) : getStroke(s.points, strokeOptions(s));
-    if (hit?.local !== local) locals.set(s.points, { key, local });
+    const local = localEntry(s).local;
     const outline = s.matrix ? local.map(([x, y]) => apply(s.matrix!, x, y)) : local;
     c = { outline, path: outlinePath(outline) };
     outlines.set(s, c);
@@ -240,13 +246,22 @@ export function restyleStrokes(strokes: Stroke[], patch: Partial<StrokeStyle>): 
 
 /** Solid ink stroke on a canvas. Textured strokes are drawn by design/brushTextures.ts. */
 export function drawSolidStroke(ctx: CanvasRenderingContext2D, s: Stroke): void {
-  const d = strokePath(s);
-  if (!d) return;
+  const p = solidPath(s);
+  if (!p) return;
   ctx.save();
   ctx.globalAlpha *= s.opacity;
   ctx.fillStyle = s.color;
-  ctx.fill(new Path2D(d));
+  // A moved stroke keeps its local path and only changes the canvas transform: no new path per frame.
+  if (s.matrix) ctx.transform(...s.matrix);
+  ctx.fill(p);
   ctx.restore();
+}
+
+function solidPath(s: Stroke): Path2D | null {
+  if (!s.matrix) { const d = strokePath(s); return d ? new Path2D(d) : null; }
+  const hit = localEntry(s);
+  if (!hit.path) { const d = outlinePath(hit.local); if (!d) return null; hit.path = new Path2D(d); }
+  return hit.path;
 }
 
 export function solidStrokeSvg(s: Stroke, xmlEscape: (v: string) => string): string {
