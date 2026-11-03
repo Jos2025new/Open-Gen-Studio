@@ -32,3 +32,13 @@ describe('moving strokes reuses their outline', () => {
     expect(calls.n).toBe(0);
   });
 });
+
+describe('stroke box on move', () => {
+  it('carries the box shifted instead of rescanning', async () => {
+    const { strokeBox, shiftStroke, newStroke } = await import('../src/engine/design/strokes');
+    const s = newStroke([[0, 0, 0.5], [10, 5, 0.5]], { tool: 'pen', color: '#000', size: 4, opacity: 1 } as never, false);
+    const b = strokeBox(s)!;
+    const m = shiftStroke(s, 7, -3);
+    expect(strokeBox(m)).toEqual({ ...b, x: b.x + 7, y: b.y - 3 });
+  });
+});

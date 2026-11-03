@@ -19,7 +19,7 @@ export function useEditCount(doc: DesignDoc): number {
   const layerGroup = mode === 'layers' || (!objectPick && layerIds.length > 1);
   if (layerGroup) return layerIds.length;
   const layer = objectPick && doc.layers.find((l) => l.id === objectPick.layerId);
-  if (layer) { const ids = objectPick!.ids.filter((id) => layerObjects(layer).some((o) => o.id === id)); if (ids.length) return ids.length; }
+  if (layer) { const own = new Set(layerObjects(layer).map((o) => o.id)); const ids = objectPick!.ids.filter((id) => own.has(id)); if (ids.length) return ids.length; }
   const active = doc.layers.find((l) => l.id === doc.activeLayerId);
   return active && !layerObjects(active).length && active.type !== 'vector' ? 1 : 0;
 }

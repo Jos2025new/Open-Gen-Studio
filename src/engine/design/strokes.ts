@@ -112,7 +112,17 @@ export function strokeSamples(s: Stroke) {
   return getStrokePoints(b.points, strokeOptions(b));
 }
 
+// A moved stroke inherits its box shifted, so dragging a group never re-scans outlines.
+const boxes = new WeakMap<Stroke, Box | null>();
+
 export function strokeBox(s: Stroke): Box | null {
+  if (boxes.has(s)) return boxes.get(s)!;
+  const b = scanBox(s);
+  boxes.set(s, b);
+  return b;
+}
+
+function scanBox(s: Stroke): Box | null {
   const o = strokeOutline(s);
   const pts = o.length ? o : s.points;
   if (!pts.length) return null;
@@ -163,7 +173,10 @@ export function nearStroke(s: Stroke, x: number, y: number, tolerance: number): 
 /** Move a stroke by its matrix: the points (and their cached outline) stay as they are. */
 export function shiftStroke(s: Stroke, dx: number, dy: number): Stroke {
   const m = s.matrix ?? [1, 0, 0, 1, 0, 0];
-  return { ...s, matrix: [m[0], m[1], m[2], m[3], m[4] + dx, m[5] + dy] };
+  const out: Stroke = { ...s, matrix: [m[0], m[1], m[2], m[3], m[4] + dx, m[5] + dy] };
+  const b = boxes.get(s);
+  if (b !== undefined) boxes.set(out, b && { ...b, x: b.x + dx, y: b.y + dy });
+  return out;
 }
 
 export function translateStroke(s: Stroke, dx: number, dy: number): Stroke {
