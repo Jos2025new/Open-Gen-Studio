@@ -2,7 +2,8 @@ import type { ShapeSpec, Stroke, VectorLayer } from '../types';
 import { shapeBox, type Box } from './doc';
 import { strokeReach } from './shapeLook';
 import { localBox, toLocal } from './shapeTransform';
-import { strokeBox } from './strokes';
+import { strokeBox, worldPoints } from './strokes';
+import { lengthScale } from './matrix';
 
 /*
  * A click on a vector object lands on what it draws, not on the box around it: an ellipse's corners, the empty side
@@ -31,7 +32,8 @@ export function shapeHit(s: ShapeSpec, x: number, y: number): boolean {
 
 export function strokeHit(s: Stroke, x: number, y: number): boolean {
   if (!s.points.length) return inBox(strokeBox(s), x, y);
-  const reach = s.size / 2 + SLACK, p = s.points;
+  // A scaled or moved stroke keeps its matrix: test where it is drawn (its page points, its scaled width).
+  const reach = (s.size * (s.matrix ? lengthScale(s.matrix) : 1)) / 2 + SLACK, p = worldPoints(s);
   if (p.length === 1) return Math.hypot(x - p[0][0], y - p[0][1]) <= reach;
   for (let i = 1; i < p.length; i++) if (segmentDistance(x, y, p[i - 1][0], p[i - 1][1], p[i][0], p[i][1]) <= reach) return true;
   return false;

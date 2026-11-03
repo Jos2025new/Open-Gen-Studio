@@ -41,3 +41,11 @@ describe('clicks land on what a vector object draws', () => {
     expect(objectAt(l, 50, 50)).not.toBeNull();
   });
 });
+
+describe('a scaled stroke is hit where it is drawn', () => {
+  it('a stroke shrunk to half by its matrix is hit at its new place, not its old one', () => {
+    const s = { ...newStroke([[100, 100, 0.5], [300, 100, 0.5]], DEFAULT_STROKE_STYLE, false), matrix: [0.5, 0, 0, 0.5, 0, 0] as [number, number, number, number, number, number] };
+    expect(strokeHit(s, 100, 50)).toBe(true); // drawn from (50, 50) to (150, 50)
+    expect(strokeHit(s, 250, 100)).toBe(false); // the old place is empty
+  });
+});
