@@ -20,7 +20,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 307 | 239 |
+| [types.ts](../src/engine/types.ts) | 307 | 240 |
 | [store.ts](../src/store/store.ts) | 207 | 220 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 93 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 60 | 4 |
@@ -56,9 +56,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 20 | 15 |
-| `src/engine` | 60 | 296 |
+| `src/engine` | 60 | 297 |
 | `src/engine/agent` | 53 | 109 |
-| `src/engine/design` | 118 | 147 |
+| `src/engine/design` | 118 | 148 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |

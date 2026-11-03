@@ -5,7 +5,7 @@ import { setDoc, toast, useStore } from '../../store/store';
 import { record } from './history';
 import { shapeBox, translateLayer } from './doc';
 import { looksUnchanged, noChangeNote } from './symmetry';
-import { strokeBox, translateStroke } from './strokes';
+import { shiftStroke, strokeBox } from './strokes';
 import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
 import {composeRaster} from './rasterCompose';
 import { alignBoxDelta, turnVector, unionBoxes, type AlignTo, type Box, type RelativeTo, type Turn } from './transform';
@@ -67,7 +67,7 @@ export function translateObjects(layer: Layer, ids: string[], dx: number, dy: nu
   if (layer.type === 'vector') return {
     ...layer,
     shapes: layer.shapes.map((s) => (ids.includes(s.id) ? { ...s, x: s.x + dx, y: s.y + dy } : s)),
-    ...(layer.strokes ? { strokes: layer.strokes.map((s) => (ids.includes(s.id) ? translateStroke(s, dx, dy) : s)) } : {}),
+    ...(layer.strokes ? { strokes: layer.strokes.map((s) => (ids.includes(s.id) ? shiftStroke(s, dx, dy) : s)) } : {}),
   };
   return layer;
 }

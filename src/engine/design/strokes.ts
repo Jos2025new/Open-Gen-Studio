@@ -58,12 +58,19 @@ export function bakeStroke(s: Stroke): Stroke {
   return { ...rest, size: s.size * k, taperStart: s.taperStart * k, taperEnd: s.taperEnd * k, points: worldPoints(s) };
 }
 
+const locals = new WeakMap<object, { key: string; local: number[][] }>();
+
 function computed(s: Stroke): { outline: number[][]; path: string } {
   let c = outlines.get(s);
   if (!c) {
     // The outline is computed in the stroke's own frame, with its own numbers, then mapped by the matrix: the
     // thresholds in perfect-freehand then see the geometry as it was drawn.
-    const local = nibActive(s) ? nibStrokeOutline(s.points, strokeOptions(s), s) : getStroke(s.points, strokeOptions(s));
+    // The local outline depends on the points and the style, not on the matrix: a moved stroke (same points, new
+    // matrix) reuses it and only maps it again, so dragging many strokes does not recompute them every frame.
+    const key = JSON.stringify(s, (k, v) => (k === 'points' || k === 'matrix' || k === 'id' ? undefined : v));
+    const hit = locals.get(s.points);
+    const local = hit?.key === key ? hit.local : nibActive(s) ? nibStrokeOutline(s.points, strokeOptions(s), s) : getStroke(s.points, strokeOptions(s));
+    if (hit?.local !== local) locals.set(s.points, { key, local });
     const outline = s.matrix ? local.map(([x, y]) => apply(s.matrix!, x, y)) : local;
     c = { outline, path: outlinePath(outline) };
     outlines.set(s, c);
@@ -151,6 +158,12 @@ export function nearStroke(s: Stroke, x: number, y: number, tolerance: number): 
     if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= tolerance + size / 2) return true;
   }
   return false;
+}
+
+/** Move a stroke by its matrix: the points (and their cached outline) stay as they are. */
+export function shiftStroke(s: Stroke, dx: number, dy: number): Stroke {
+  const m = s.matrix ?? [1, 0, 0, 1, 0, 0];
+  return { ...s, matrix: [m[0], m[1], m[2], m[3], m[4] + dx, m[5] + dy] };
 }
 
 export function translateStroke(s: Stroke, dx: number, dy: number): Stroke {
