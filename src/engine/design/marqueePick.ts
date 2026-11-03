@@ -13,7 +13,11 @@ import { marqueeBounds, type MarqueeBounds } from './marquee';
 const touches = (b: MarqueeBounds, r: { x: number; y: number; w: number; h: number }) =>
   r.x <= b.right && r.x + r.w >= b.left && r.y <= b.bottom && r.y + r.h >= b.top;
 
-/** True when some pixel of a raster layer with alpha lies inside the rectangle (page coordinates). */
+/**
+ * True when some pixel of a raster layer with alpha lies inside the rectangle (page coordinates), unless every pixel
+ * there is painted: then the rectangle was drawn on top of that layer (a backdrop, a fill), as Figma leaves a frame the
+ * marquee starts in.
+ */
 export function rasterPaintedIn(l: Layer, b: MarqueeBounds): boolean {
   if (l.type !== 'raster') return false;
   const surface = getRasterSurface(l.id);
@@ -25,8 +29,12 @@ export function rasterPaintedIn(l: Layer, b: MarqueeBounds): boolean {
   const y0 = Math.max(0, Math.floor((Math.min(ay, by) - l.y) * sy) - surface.y0), y1 = Math.min(buf.height - 1, Math.ceil((Math.max(ay, by) - l.y) * sy) - surface.y0);
   if (x1 < x0 || y1 < y0) return false;
   const alpha = bufferAlpha(l.id, buf);
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (alpha[y * buf.width + x] > 16) return true;
-  return false;
+  // The rectangle must lie inside the stored canvas for "all painted" to mean the whole area is covered.
+  const inside = Math.floor((Math.min(ax, bx) - l.x) * sx) >= surface.x0 && Math.floor((Math.min(ay, by) - l.y) * sy) >= surface.y0
+    && Math.ceil((Math.max(ax, bx) - l.x) * sx) - surface.x0 < buf.width && Math.ceil((Math.max(ay, by) - l.y) * sy) - surface.y0 < buf.height;
+  let some = false, all = inside;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { if (alpha[y * buf.width + x] > 16) some = true; else all = false; if (some && !all) return true; }
+  return some && !all;
 }
 
 export interface MarqueeFound {
