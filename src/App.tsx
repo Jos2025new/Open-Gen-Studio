@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from './store/store';
 import { ensureSchema, loadCatalogs, loadLlmCatalog } from './engine/catalog';
 import { adoptRemoteAssets, resumeInterrupted } from './engine/jobs';
+import { startJobTrace } from './engine/jobTrace';
 import { settleInterruptedPlans } from './engine/agent/runtime';
 import { syncBlobsToDisk } from './lib/idb';
 import { Sidebar } from './components/shell/Sidebar';
@@ -46,6 +47,7 @@ export function App() {
     void ensureSchema(st.composer.image.modelRef);
     void ensureSchema(st.composer.video.modelRef);
     if (st.settings.agent.provider !== 'offline') void loadLlmCatalog(st.settings.agent.provider);
+    startJobTrace();
     void resumeInterrupted();
     // Plans cut by the reload follow their resumed generations; results still only at a provider get saved.
     settleInterruptedPlans();

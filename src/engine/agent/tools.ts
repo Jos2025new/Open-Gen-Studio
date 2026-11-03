@@ -6,6 +6,7 @@ import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
 import { AGENT_OP_IDS } from '../ops';
 import { DESIGNER_TOOLS } from './designerTools';
+import { JOB_TOOLS } from './jobStatus';
 import { LAYER_DOC } from './layerDoc';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
@@ -123,6 +124,7 @@ export const TOOLS: ToolSpec[] = [
     },
   },
   ...DESIGNER_TOOLS,
+  ...JOB_TOOLS,
   {
     type: 'function',
     function: {

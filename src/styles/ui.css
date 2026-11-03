@@ -145,3 +145,6 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 .accent-swatch.is-on { outline: 2px solid var(--text); outline-offset: 2px; }
 .topbar-slot-left:empty { display: none; }
 .topbar-slot-left { gap: 2px; }
+/* Details: folding sections and the live trace (GenerationInfo). */
+.info-fold { min-width: 0; }.info-fold:hover { color: var(--text-2); }.info-fold .rot90 { transform: rotate(90deg); }.info-fold-extra { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.info-trace { list-style: none; max-height: 180px; overflow: auto; font-size: 11px; line-height: 1.6; }

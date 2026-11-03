@@ -281,7 +281,8 @@ export function fitStepParams(step: RawOpStep, fields: OpField[], text: string, 
     const loose = step.loose[f.key];
     const v = (step.params?.[f.key] ?? (typeof loose === 'string' || typeof loose === 'number' ? loose : undefined)) as AdvancedValue | undefined;
     if (f.type !== 'choice') {
-      params[f.key] = typeof v === 'string' ? v : f.default;
+      // A number the agent wrote for a text field ("seconds": 1.7) is the same value as text.
+      params[f.key] = typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : f.default;
       continue;
     }
     const valid = f.options?.some((o) => o.value === String(v)) ? String(v) : undefined;
@@ -312,6 +313,14 @@ export function fitStepParams(step: RawOpStep, fields: OpField[], text: string, 
     params[f.key] = f.default;
     if (v != null) adjustments.push(`${step.id}: ${f.key} "${String(v)}" → ${f.default}`);
   }
+  // A second given without "which" (or with the "last" default filled in) is that second, not the last frame.
+  const second = parseFloat(String(params.seconds).replace(',', '.'));
+  if (step.op === 'extract_frame' && params.which !== 'time' && step.params?.which !== 'first' && step.params?.which !== 'last' && Number.isFinite(second)) {
+    params.which = 'time';
+    adjustments.push(`${step.id}: frame at ${String(params.seconds)}s`);
+  }
+  // "At second" with no second used to give the last frame without a word; the agent writes the second instead.
+  if (step.op === 'extract_frame' && params.which === 'time' && !Number.isFinite(second)) errors.push(`${step.where}: op "extract_frame" with which "time" needs params.seconds, a number like 1.5.`);
   // The upscale note is computed from the factor kept here, so the card never names another one.
   const note = step.op === 'upscale' ? upscaleNote(text, ctx.sourceLongEdge, params.factor) : fitted.ok ? fitted.note : undefined;
   if (note) adjustments.push(`${step.id}: ${note}`);

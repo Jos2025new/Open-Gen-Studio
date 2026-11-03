@@ -58,7 +58,7 @@
 .info-inputs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .info-thumb { width: 56px; height: 56px; border-radius: var(--radius-xs); overflow: hidden; border: 1px solid var(--border-strong); flex-shrink: 0; }
 .info-text { margin: 0; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
-.info-text.is-folded { display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent); mask-image: linear-gradient(to bottom, #000 70%, transparent); }
+.info-text.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent); mask-image: linear-gradient(to bottom, #000 70%, transparent); }
 .info-more { display: inline-flex; align-items: center; gap: 3px; margin-top: 6px; font-size: 11px; color: var(--text-2); }.info-more:hover { color: var(--text); }.info-more .flip { transform: rotate(180deg); }
 .info-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 11px; }.info-row dt { color: var(--text-3); flex-shrink: 0; }.info-row dd { margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; }
 .op-form { padding: 9px; }.op-head { display: flex; gap: 8px; margin: 4px 0 16px; }.op-field { margin: 12px 0; }.back-btn { align-self: flex-start; padding: 3px; }

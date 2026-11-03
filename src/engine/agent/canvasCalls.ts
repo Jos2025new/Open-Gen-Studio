@@ -25,6 +25,7 @@ import { get, session } from './runtimeShared';
 import { flushToolResults, guideLabel } from './conversation';
 import { planRecoveryProblem, presentNodeRun, resumePlan } from './planRun';
 import { activityLog } from './activityLog';
+import { generationStatus, generationStatusSchema } from './jobStatus';
 
 type CallCtx = {
   sessionId: string;
@@ -105,6 +106,15 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
       respond('The image follows in the next message.');
       afterTools.push(userMessage('Canvas view:', view));
     }
+  }
+  return { handled: true, workspace: c.workspace };
+          }
+          if (call.name === 'generation_status') {
+  const v = generationStatusSchema.safeParse(parsed.value ?? {});
+  if (!v.success) respond(`Invalid generation_status input: ${formatZodError(v.error)}`);
+  else {
+    log.action({ icon: 'search', label: 'Checked running generations' });
+    respond(await generationStatus(sessionId, v.data.check_now ?? true, until));
   }
   return { handled: true, workspace: c.workspace };
           }

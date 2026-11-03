@@ -1,6 +1,8 @@
 import { AgentAttachToggle } from './AgentAttachToggle';
-import { useState } from 'react';
-import { ChevronDown, Copy, Info, Sparkles, Wrench } from 'lucide-react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { Activity, ChevronDown, ChevronRight, Copy, Info, RefreshCw, Sparkles, Wrench } from 'lucide-react';
+import { checkJobsNow } from '../../engine/providers/shared';
+import { traceOf, useJobTrace } from '../../engine/jobTrace';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
@@ -12,8 +14,32 @@ import type { Asset, Generation } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button, CostTag } from '../ui/primitives';
 
-// Longer prompts start folded to a few lines ("See all").
-const LONG_PROMPT = 280;
+// Sections the user opened stay open the next time Details shows (this app session only).
+const opened = { details: false, trace: false };
+
+function clock(t: number): string {
+  return new Date(t).toLocaleTimeString([], { hour12: false });
+}
+
+/** A section whose title folds it, with a chevron; `extra` stays visible on the right. */
+function Fold({ id, icon: Icon, title, extra, aside, children }: { id: keyof typeof opened; icon: typeof Info; title: string; extra?: React.ReactNode; aside?: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(opened[id]);
+  const toggle = () => setOpen((v) => (opened[id] = !v));
+  return (
+    <section className="info-sect">
+      <div className="info-sect-head">
+        <button type="button" className="info-sect-title info-fold" aria-expanded={open} onClick={toggle}>
+          <ChevronRight size={13} className={open ? 'rot90' : undefined} />
+          <Icon size={13} />
+          {title}
+          {extra ? <span className="info-fold-extra">{extra}</span> : null}
+        </button>
+        {aside}
+      </div>
+      {open ? children : null}
+    </section>
+  );
+}
 
 export function generationTitle(g: Generation): string {
   // A storyboard without a main prompt is named by its shots.
@@ -34,6 +60,7 @@ export function debugText(g: Generation): string {
     `model: ${g.modelName} (${g.modelRef})`,
     `status: ${g.status}${g.error ? ` · ${g.error}` : ''}`,
     g.sent ? JSON.stringify(g.sent, null, 2) : 'no request record',
+    ...traceOf(g.id).map((e) => `${new Date(e.at).toISOString()} ${e.text}`),
   ].join('\n');
 }
 
@@ -54,10 +81,14 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
   // A Space result names its Space, never the hidden container.
   const session = place === 'space-create' || place === 'space-tools' ? PLACE_LABEL[place] : title;
   const [open, setOpen] = useState(false);
+  // Folded to three lines; "See all" only when the text really goes past them.
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  const trace = useJobTrace(g?.id);
+  const active = g?.status === 'running' || g?.status === 'queued';
   const rows: Array<[string, React.ReactNode]> = [];
   // What went in: the operation's source, the start frame and the references, shown above the prompt.
   const inputs = g ? generationInputs(g) : [];
-  const text = g ? generationTitle(g) : '';
   if (g) {
     rows.push(['Model', `${g.modelName}${g.provider !== 'local' ? ` · ${PROVIDER_LABELS[g.provider]}` : ''}`]);
     const s = g.settings;
@@ -84,6 +115,11 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
     if (!asset.stored) rows.push(['Storage', 'Provider URL only (may expire)']);
   }
   if (session) rows.push(['Session', session]);
+  const text = g ? generationTitle(g) : '';
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (el && !open) setOverflows(el.scrollHeight > el.clientHeight + 1);
+  }, [text, open]);
   return (
     <div className="info">
       {g && (text || inputs.length) ? (
@@ -112,8 +148,8 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
                 ))}
               </div>
             ) : null}
-            {text ? <p className={`info-text ${text.length > LONG_PROMPT && !open ? 'is-folded' : ''}`}>{text}</p> : null}
-            {text.length > LONG_PROMPT ? (
+            {text ? <p ref={textRef} className={`info-text ${!open ? 'is-folded' : ''}`}>{text}</p> : null}
+            {overflows || open ? (
               <button type="button" className="info-more" onClick={() => setOpen((v) => !v)}>
                 {open ? 'Show less' : 'See all'}
                 <ChevronDown size={13} className={open ? 'flip' : undefined} />
@@ -122,18 +158,33 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
           </div>
         </section>
       ) : null}
-      <section className="info-sect">
-        <div className="info-sect-head">
-          <span className="info-sect-title">
-            <Info size={13} />
-            Details
-          </span>
-          {g?.sent ? (
+      {g && (active || trace.length) ? (
+        <Fold
+          id="trace"
+          icon={Activity}
+          title="Trace"
+          extra={trace.at(-1)?.text}
+          aside={active ? <Button size="sm" variant="secondary" icon={RefreshCw} onClick={checkJobsNow}>Check now</Button> : null}
+        >
+          <ol className="info-box info-trace">
+            {trace.length ? trace.map((e, i) => (
+              <li key={i}>
+                <span className="num faint">{clock(e.at)}</span> {e.text}
+              </li>
+            )) : <li className="faint">No check yet since the app opened.</li>}
+          </ol>
+        </Fold>
+      ) : null}
+      <Fold
+        id="details"
+        icon={Info}
+        title="Details"
+        aside={g?.sent ? (
             <Button size="sm" variant="secondary" icon={Wrench} onClick={() => void copyText(debugText(g))}>
               Copy debug info
             </Button>
           ) : null}
-        </div>
+      >
         <dl className="info-box info-rows">
           {rows.map(([k, v]) => (
             <div key={k} className="info-row">
@@ -142,7 +193,7 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
             </div>
           ))}
         </dl>
-      </section>
+      </Fold>
     </div>
   );
 }

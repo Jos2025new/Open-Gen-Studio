@@ -238,7 +238,7 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
   if (id === 'join_clips') return joinClips(g, [sourceAssetId, ...String(params.clips ?? '').split(',').filter(Boolean)], signal, String(params.music ?? '') || undefined, params.loudness === 'social');
   const images: Array<{ blob: Blob; width: number; height: number }> = [];
   if (id === 'extract_frame') {
-    const seconds = parseFloat(String(params.seconds ?? ''));
+    const seconds = parseFloat(String(params.seconds ?? '').replace(',', '.'));
     const which = params.which === 'first' ? 'first' : params.which === 'time' && Number.isFinite(seconds) ? seconds : 'last';
     images.push(await frameInput(sourceAssetId, which));
   } else if (id === 'grid_split') {
