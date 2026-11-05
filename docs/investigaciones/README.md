@@ -35,6 +35,6 @@ Necesitan el motor empaquetado con rolldown a partir de los puntos de entrada (`
 Reducidas a JPEG de menos de 30 KB (originales PNG de 12 a 440 KB).
 
 - [fit8.jpg](grafito-2026-11/hojas/fit8.jpg): lámina real arriba y modelo fit8 abajo.
-- [js_vs.jpg](grafito-2026-11/hojas/js_vs.jpg): lámina real y, debajo, el modelo y el motor en JavaScript (orden de las dos filas inferiores sin verificar en la hoja).
+- [js_vs.jpg](grafito-2026-11/hojas/js_vs.jpg): de arriba abajo: lámina real, modelo fit8 y motor en JavaScript.
 - [chk.jpg](grafito-2026-11/hojas/chk.jpg) y [chk2.jpg](grafito-2026-11/hojas/chk2.jpg): líneas en Chrome real con 1, 3 y 12 pasadas, y con 1 a 30 pasadas (2H, 2B y 6B).
 - [ab.jpg](grafito-2026-11/hojas/ab.jpg): rayado en zigzag, columnas `477a3ebb` (la que gustó), `87fd100c` (rechazada) y `11fc968e` (recalibrada); filas 2H, 2B y 6B.
