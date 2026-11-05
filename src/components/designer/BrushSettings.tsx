@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
-import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, DAB_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
+import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, DAB_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture, BRUSH_MAX_SIZE } from '../../engine/design/brushEngine';
 import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { Segmented } from '../ui/primitives';
@@ -102,7 +102,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
   const [advanced, setAdvanced] = useState(false);
   const [tab, setTab] = useState<BrushTab>('tip');
   if (compact) return <>
-    <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
+    <InlineSlider label="Size" unit="px" min={1} max={BRUSH_MAX_SIZE} log value={brush.size} onChange={(v) => set({ size: Math.round(v) })} />
     {!erase && <InlineColor label="Color" value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
     {/* Smoothing and Stabilize live in the Tool tab: set once, not touched every stroke. */}
@@ -116,7 +116,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />
     <div className="brush-row">
       {!erase && <InlineColor label="Color" iconOnly value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
-      <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
+      <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={BRUSH_MAX_SIZE} log value={brush.size} onChange={(v) => set({ size: Math.round(v) })} />
       <InlineSlider label="Opacity" icon={<Droplet size={13} />} unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
       <InlineSelect label="Texture" icon={<TextureIcon texture={brush.texture ?? 'none'} />} value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     </div>
@@ -180,7 +180,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
     <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />
     <div className="brush-row">
       {!erase && <InlineColor label="Color" iconOnly value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
-      <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
+      <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={BRUSH_MAX_SIZE} log value={brush.size} onChange={(v) => set({ size: Math.round(v) })} />
       <InlineSlider label="Opacity" icon={<Droplet size={13} />} unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
       <InlineSelect label="Texture" icon={<TextureIcon texture={brush.texture ?? 'none'} />} value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     </div>

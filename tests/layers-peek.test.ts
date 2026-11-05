@@ -43,6 +43,10 @@ it('unpinned: the tabs stand in a vertical bar; hovering one peeks the panel on 
   act(() => root.unmount()); host.remove();
 });
 
+it('pinned, the panel is the same floating card and takes no room from the stage', () => {
+  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.ws-designer \.layers-panel:not\(\.is-peek\) \{ position: absolute; z-index: 30; top: 12px; right: 12px; bottom: 12px;[^}]*border-radius: var\(--toolbar-radius\)/);
+});
+
 it('the right panel uses it with no empty strip: unpinned takes no width, peeks beside the bar in its pinned width, the header pin toggles', () => {
   const panel = readFileSync('src/components/designer/LayersPanel.tsx', 'utf8');
   expect(panel).toMatch(/const peek = usePanelPeek\(collapsed\);/);
@@ -55,7 +59,7 @@ it('the right panel uses it with no empty strip: unpinned takes no width, peeks 
   expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.layers-panel\.is-peek \{ position: absolute; z-index: 30; top: 12px; right: calc\(12px \+ var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 2px \+ var\(--canvas-pop-gap\)\);[^}]*width: var\(--layers-peek-w, 260px\);/);
 });
 
-it('pinning or unpinning the panel resizes the canvas but keeps the user\'s zoom: only a new document or an untouched view refits', () => {
+it('pinning or unpinning the panel keeps the user\'s view: only a new document or an untouched view refits', () => {
   const stage = readFileSync('src/components/designer/Stage.tsx', 'utf8');
   expect(stage).toMatch(/setView\(\(untouched\.current = fitView\(/);
   expect(stage).toMatch(/const key = `\$\{doc\.id\}:\$\{doc\.width\}x\$\{doc\.height\}`;\s*if \(size\.w && \(fitted\.current !== key \|\| view === untouched\.current\)\) \{/);

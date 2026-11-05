@@ -144,7 +144,7 @@
 
 .palette-quick .tool-settings { max-width: none; overflow: visible; flex-shrink: 0; }
 
-.ws-designer { --designer-dock-left: max(24px, min(calc(50% - 400px), calc(100% - var(--layers-w, 260px) - 824px))); }
+.ws-designer { --designer-dock-left: max(calc(var(--layers-w, 0px) + 24px), calc(50% - 400px)); }
 .ws-designer .dock-designer { left: var(--designer-dock-left); transform: none; width: min(800px, calc(100% - var(--layers-w, 260px) - var(--designer-dock-left) - 24px)); }
 .designer-palette .palette-quick { flex: 0 1 auto; min-width: 0; gap: 2px; }
 .palette-quick-scroll { display: flex; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: none; }

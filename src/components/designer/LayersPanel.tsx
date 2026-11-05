@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PanelPeekHandle, usePanelPeek } from './LayersPeek';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import type { RelativeTo } from '../../engine/design/transform';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
@@ -90,7 +90,6 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const pendingPaintLayer = doc.layers.find((item): item is Extract<Layer, { type: 'raster' }> => item.id === pendingPaintId && item.type === 'raster');
   const tool = useStore((s) => s.ui.tool);
   const pop = usePopover();
-  const addPop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
   // The FX layer whose editor is open next to its row (double-click), and that row.
   const [fxEdit, setFxEdit] = useState<string | null>(null);
@@ -147,7 +146,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     setDrag(null);
   };
 
-  // The composer dock centers itself on the free canvas area using this variable.
+  // What a pinned panel covers: the toolbox stays centered in the window and narrows to clear it, and Fit leaves that margin on both sides.
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty('--layers-w', collapsed ? '0px' : `${width}px`);
@@ -230,14 +229,9 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     <div className="layer-actions">
-      <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" className="layer-new-btn" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
-      <Popover open={addPop.open} anchor={addPop.ref} onClose={addPop.close} placement="bottom-start" width={180} label="New layer">
-        <div className="menu" role="menu">
-          <MenuItem icon={Image} label="Raster" detail="Pixels: paint, images" onClick={() => { addEmptyLayer(sessionId, doc.id, 'raster'); addPop.close(); }} />
-          <MenuItem icon={Shapes} label="Vector" detail="Shapes and lineart" onClick={() => { addEmptyLayer(sessionId, doc.id, 'vector'); addPop.close(); }} />
-          <MenuItem icon={Type} label="Text" onClick={() => { addEmptyLayer(sessionId, doc.id, 'text'); addPop.close(); }} />
-        </div>
-      </Popover>
+      <IconButton icon={Image} label="New raster layer · pixels: paint, images" size="sm" onClick={() => addEmptyLayer(sessionId, doc.id, 'raster')} />
+      <IconButton icon={Shapes} label="New vector layer · shapes and lineart" size="sm" onClick={() => addEmptyLayer(sessionId, doc.id, 'vector')} />
+      <IconButton icon={Type} label="New text layer" size="sm" onClick={() => addEmptyLayer(sessionId, doc.id, 'text')} />
       <FxMenu sessionId={sessionId} doc={doc} layer={layer} />
       {layer && <>
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />

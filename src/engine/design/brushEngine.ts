@@ -106,6 +106,8 @@ export const TIP_PRESETS = [1, 0.7, 0.4, 0.05];
 /** Values a brush has before the user sets them (the settings show the same ones). */
 // minSize below 1 so "Pressure → size" does something as soon as it is on (SAI starts near 15 %).
 export const BRUSH_DEFAULTS = { hardness: 1, minSize: 0.2, minDensity: 0.2, textureStrength: 0.5, valleyFill: 0.15 };
+/** The Size slider's top; the slider is logarithmic, so the sizes used most keep most of its travel. */
+export const BRUSH_MAX_SIZE = 1000;
 /** One-click sizes, as SAI's size grid. */
 export const SIZE_PRESETS = [2, 5, 8, 12, 16, 24, 32, 40, 48, 64, 80, 96, 128, 200];
 
