@@ -72,3 +72,5 @@ De la [auditoría del Designer](../../ogs-designer-audit-2026-10-22.md) (HEAD `6
 - **D27 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D28 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D29 · bajo · 2026-10-23 · Los PNG de capas borradas o fusionadas se quedan en el disco.** D19 ya las saca de memoria; borrar sus archivos es un borrado de datos y necesita aprobación explícita antes de tocar `deleteBuffers` (zona protegida).
+- **D49 · medio · 2026-11-04 · Objetivo de rendimiento al arrastrar un grupo: ~12 ms entre fotogramas (ahora ~22 ms).** Siguiente paso: separar `render.frame` entre grupo y resto; luego cachear las capas quietas como bitmap y repintar solo el grupo (hipótesis, sin medir). Ver [057](history/057-2026-11-W44.md).
+- **D50 · medio · 2026-11-04 · Revisión visual del usuario pendiente:** ajustes rápidos por herramienta, umbral de plegado de 560 px, pastilla del ojo al ocultar, marquee y golpe de trazos. Además, el atajo de traza Ctrl+Alt+P no funcionó (la URL `?trace=<etiqueta>` sí); sin investigar. Calibración de presets en D44; panel Edit/Move en D47.

@@ -33,7 +33,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 
 - [pendientes-agente](pendientes-agente.md): agente (A1 a A24) y proveedores, precios y coste (B1 a B12).
 - [pendientes-sistema](pendientes-sistema.md): datos y guardado (C0 a C6), calidad y pruebas (C7 a C14), funciones propuestas (F1 a F7), decisiones y ramas (G1 a G7).
-- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D48).
+- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D50).
 - [pendientes-gui](pendientes-gui.md): interfaz por espacios, Home, tarjetas del chat (39 filas; abiertas, prioridad y origen en su cabecera).
 - [pendientes-cerrados](pendientes-cerrados.md): lo hecho, superado u obsoleto, con evidencia.
 - Otras fuentes únicas: [render-estado](render-estado.md) (render y rendimiento, D14), [modelos-pruebas](modelos-pruebas.md) (A22), [fx-pruebas](fx-pruebas.md) (D16), [gui-cohesion-pruebas](gui-cohesion-pruebas.md) (cómo probar la interfaz).
@@ -170,6 +170,8 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | D46 | `raster.ts` en el límite de 30 KB | medio | 2026-11-01 |
 | D47 | Rediseño del panel Edit/Move (espera aprobación) | medio | 2026-11-01 |
 | D48 | Prueba visual de la disposición de la tarjeta Brush | bajo | 2026-11-01 |
+| D49 | Objetivo de arrastre de grupo ~12 ms entre fotogramas | medio | 2026-11-04 |
+| D50 | Revisión visual de ajustes rápidos, marquee y golpe; atajo de traza | medio | 2026-11-04 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 
