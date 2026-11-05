@@ -64,27 +64,25 @@ describe('pencilDensityCurve', () => {
 });
 
 describe('presets', () => {
-  it('2H, HB and 4B carry the clay fraction; the rest are untouched', () => {
-    expect(grade('pencil-2h').leadHardness).toBe(0.34);
-    expect(grade('pencil-hb').leadHardness).toBe(0.26);
-    expect(grade('pencil-4b').leadHardness).toBe(0.15);
-    const rest = [...PENCIL_PRESETS, ...DAB_PRESETS].filter((p) => !['pencil-2h', 'pencil-hb', 'pencil-4b'].includes(p.id));
+  it('the measured grades carry their lead; the rest are untouched', () => {
+    const GRADES = ['pencil-2h', 'pencil-hb', 'pencil-2b', 'pencil-4b', 'pencil-6b'];
+    expect(GRADES.map((id) => grade(id).lead)).toEqual(['2H', 'HB', '2B', '4B', '6B']);
+    const rest = [...PENCIL_PRESETS, ...DAB_PRESETS].filter((p) => !GRADES.includes(p.id));
     expect(rest).toHaveLength(8);
     // Valley fill is the only thing added to these: without it they are as before.
     const noFill = rest.map((p) => { const { valleyFill, ...v } = p.values; void valleyFill; return { ...p, values: v }; });
     expect(sha(JSON.stringify(noFill))).toBe('270641bb');
   });
-  it('valley fill: 2H 0.12, HB 0.2, 4B 0.3; the other pencils 0.15-0.25; dab presets none', () => {
-    expect([grade('pencil-2h').valleyFill, grade('pencil-hb').valleyFill, grade('pencil-4b').valleyFill]).toEqual([0.12, 0.2, 0.3]);
-    for (const p of PENCIL_PRESETS) { expect(p.values.valleyFill).toBeGreaterThanOrEqual(0.12); expect(p.values.valleyFill).toBeLessThanOrEqual(0.3); }
+  it('valley fill: the other pencils 0.15-0.25; measured grades and dab presets none', () => {
+    for (const p of PENCIL_PRESETS) {
+      if (p.values.lead) { expect(p.values.valleyFill).toBeUndefined(); continue; }
+      expect(p.values.valleyFill).toBeGreaterThanOrEqual(0.12); expect(p.values.valleyFill).toBeLessThanOrEqual(0.3);
+    }
     for (const p of DAB_PRESETS) expect(p.values.valleyFill).toBeUndefined();
   });
   it('a preset without lead hardness clears the previous one', () => {
     const out = applyBrushPreset(applyBrushPreset({ size: 1, color: '#000000' }, PENCIL_PRESETS[2]), PENCIL_PRESETS[3]);
     expect(out.leadHardness).toBeUndefined();
-  });
-  it('same pressure, three grades: 4B > HB > 2H at low and mid pressure', () => {
-    for (const p of [0.25, 0.5]) { expect(dens_('pencil-4b', p)).toBeGreaterThan(dens_('pencil-hb', p)); expect(dens_('pencil-hb', p)).toBeGreaterThan(dens_('pencil-2h', p)); }
   });
 });
 

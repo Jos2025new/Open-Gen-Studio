@@ -170,7 +170,7 @@ describe('live paint equals replay', () => {
 describe('presets', () => {
   it('adds three dab presets and leaves the pencils as they were', () => {
     expect(DAB_PRESETS.map((p) => p.id)).toEqual(['dabs-2b', 'dabs-4h', 'dabs-acrylic']);
-    expect(PENCIL_PRESETS).toHaveLength(8);
+    expect(PENCIL_PRESETS).toHaveLength(10);
     for (const p of PENCIL_PRESETS) expect(p.values.dabs).toBeUndefined();
     const tip = tipFor(applyBrushPreset({ size: 9, color: '#000000', opacity: 1 }, DAB_PRESETS[2]), false);
     expect(tip.dabs).toMatchObject({ sizeJitter: 0.2, angleJitter: 1 });

@@ -1,5 +1,6 @@
 import type { BlendMode } from '../types';
 import { clampRoundness, toTipFrame, tipFrame, wrapAngle } from './brushTipShape';
+import { stampLeadSegment, type LeadGrade } from './brushLead';
 
 /*
  * The raster brush tip, as PaintTool SAI shapes it: a hardness profile, pressure on size and density, paper texture,
@@ -44,6 +45,8 @@ export interface BrushTip {
   follow?: boolean;
   /** Dab mode (brushDabs.ts): the stroke is many small stamps that build up. Absent = the capsule above, as every older stroke. */
   dabs?: DabSettings;
+  /** Graphite measured from a real sheet (brushLead.ts). seed: this stroke's variation. Replaces hardness, texture and edge. */
+  lead?: { grade: LeadGrade; seed: number };
 }
 
 /** MyPaint-style dabs. spacing: step as a share of the radius; scatter / sizeJitter: shares of the radius; angleJitter: share of 180°; flow: alpha of one dab; seed: this stroke's noise. */
@@ -88,6 +91,8 @@ export interface BrushOptions {
   dabSizeJitter?: number;
   dabAngleJitter?: number;
   dabFlow?: number;
+  /** A measured graphite grade (see BrushTip.lead). */
+  lead?: LeadGrade;
 }
 
 export const BRUSH_BLENDS: BrushBlend[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
@@ -179,6 +184,7 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
   const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
   const dabs = o.dabs ? { spacing: Math.min(2, Math.max(0.05, o.dabSpacing ?? DAB_DEFAULTS.spacing)), scatter: Math.min(3, Math.max(0, o.dabScatter ?? 0)), sizeJitter: Math.min(1, Math.max(0, o.dabSizeJitter ?? 0)), angleJitter: clamp01(o.dabAngleJitter ?? 0), flow: Math.min(1, Math.max(0.001, o.dabFlow ?? DAB_DEFAULTS.flow)), seed: 1 } : undefined;
+  if (o.lead && !erase) return { hardness, lead: { grade: o.lead, seed: 1 }, ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
   return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth, toothVersion: 3 as const, valleyFill: clamp01(o.valleyFill ?? BRUSH_DEFAULTS.valleyFill) } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
@@ -228,6 +234,7 @@ export interface AlphaImage { data: Uint8ClampedArray; width: number; height: nu
  * coverage. The colour is written with it, so the mask can be composited as the paint itself.
  */
 export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: readonly number[], density: number, tip: BrushTip, rgb: [number, number, number], from?: { width: number; density: number }): void {
+  if (tip.lead) return stampLeadSegment(img, ox, oy, seg, density, tip, rgb, from);
   // Width and density run from the previous segment's to this one's, so pressure changes blend instead of stepping.
   const [ax, ay, bx, by, width] = seg;
   const w0 = from?.width ?? width, d0 = clamp01(from?.density ?? density), d1 = clamp01(density);

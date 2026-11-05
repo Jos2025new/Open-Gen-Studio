@@ -8,7 +8,7 @@ const preset = (id: string) => PENCIL_PRESETS.find((p) => p.id === id)!;
 
 describe('pencil brush presets', () => {
   it('every preset sets every field, with pressure on', () => {
-    expect(PENCIL_PRESETS).toHaveLength(8);
+    expect(PENCIL_PRESETS).toHaveLength(10);
     for (const p of PENCIL_PRESETS) {
       for (const k of KEYS) expect(p.values[k], `${p.id}.${k}`).not.toBeUndefined();
       expect(p.values.pressureSize && p.values.pressureDensity).toBe(true);
@@ -30,7 +30,7 @@ describe('pencil brush presets', () => {
     for (const p of PENCIL_PRESETS) {
       const tip = tipFor(applyBrushPreset({ color: '#000000' }, p), false);
       expect(tip.hardness).toBe(p.values.hardness);
-      expect(tip.texture).toBe(p.values.texture);
+      if (!p.values.lead) expect(tip.texture).toBe(p.values.texture);
       expect(tip.densities).toEqual([]);
       if (p.values.roundness < 1) expect(tip.roundness).toBe(p.values.roundness);
     }

@@ -1,17 +1,26 @@
 import type { BrushOptions } from './brushEngine';
+import type { LeadGrade } from './brushLead';
 
 /** Pencil presets: they only fill ui.brush (never the color); saved strokes carry the resulting tip, so they look the same. */
-export type PresetValues = Required<Pick<BrushOptions, 'size' | 'hardness' | 'minSize' | 'minDensity' | 'pressureSize' | 'pressureDensity' | 'simulatePressure' | 'pressureSpeed' | 'taperStart' | 'taperEnd' | 'texture' | 'textureStrength' | 'tooth' | 'edge' | 'roundness' | 'angle' | 'follow' | 'blend' | 'keepOpacity'>> & Pick<BrushOptions, 'leadHardness' | 'valleyFill' | 'dabs' | 'dabSpacing' | 'dabScatter' | 'dabSizeJitter' | 'dabAngleJitter' | 'dabFlow'> & { opacity: number; smoothing: number; stabilization: number };
+export type PresetValues = Pick<BrushOptions, 'lead'> & Required<Pick<BrushOptions, 'size' | 'hardness' | 'minSize' | 'minDensity' | 'pressureSize' | 'pressureDensity' | 'simulatePressure' | 'pressureSpeed' | 'taperStart' | 'taperEnd' | 'texture' | 'textureStrength' | 'tooth' | 'edge' | 'roundness' | 'angle' | 'follow' | 'blend' | 'keepOpacity'>> & Pick<BrushOptions, 'leadHardness' | 'valleyFill' | 'dabs' | 'dabSpacing' | 'dabScatter' | 'dabSizeJitter' | 'dabAngleJitter' | 'dabFlow'> & { opacity: number; smoothing: number; stabilization: number };
 export interface BrushPreset { id: string; label: string; values: PresetValues }
 
-const P = (id: string, label: string, size: number, hardness: number, minSize: number, minDensity: number, texture: 'paper' | 'grain' | 'graphite', textureStrength: number, edge: number, roundness: number, angle: number, follow: boolean, blend: 'normal' | 'multiply', opacity: number, stabilization: number, smoothing: number, taperStart: number, taperEnd: number, leadHardness?: number, valleyFill?: number): BrushPreset => ({
+const P = (id: string, label: string, size: number, hardness: number, minSize: number, minDensity: number, texture: 'paper' | 'grain' | 'graphite', textureStrength: number, edge: number, roundness: number, angle: number, follow: boolean, blend: 'normal' | 'multiply' | 'darken', opacity: number, stabilization: number, smoothing: number, taperStart: number, taperEnd: number, leadHardness?: number, valleyFill?: number): BrushPreset => ({
   id, label, values: { size, hardness, minSize, minDensity, pressureSize: true, pressureDensity: true, simulatePressure: false, pressureSpeed: 1, taperStart, taperEnd, texture, textureStrength, tooth: true, edge, roundness, angle, follow, blend, keepOpacity: false, opacity, smoothing, stabilization, ...(leadHardness === undefined ? {} : { leadHardness }), ...(valleyFill === undefined ? {} : { valleyFill }) },
 });
 
+/** A measured grade (brushLead.ts): `darken` makes its colour a ceiling, and pressure only sets how far a pass goes. */
+const L = (id: string, label: string, lead: LeadGrade, size: number, taperStart: number, taperEnd: number): BrushPreset => {
+  const base = P(id, label, size, 1, 0.6, 0.1, 'graphite', 0, 0, 1, 0, false, 'darken', 1, 2, 2, taperStart, taperEnd);
+  return { ...base, values: { ...base.values, lead } };
+};
+
 export const PENCIL_PRESETS: BrushPreset[] = [
-  P('pencil-2h', 'Pencil 2H', 3, 1, 0.35, 0.3, 'graphite', 0.25, 0.15, 1, 0, false, 'normal', 0.65, 3, 3, 4, 6, 0.34, 0.12),
-  P('pencil-hb', 'Pencil HB', 5, 0.85, 0.25, 0.3, 'graphite', 0.35, 0.25, 1, 0, false, 'normal', 0.85, 4, 3, 6, 10, 0.26, 0.2),
-  P('pencil-4b', 'Pencil 4B', 24, 0.55, 0.4, 0.3, 'graphite', 0.6, 0.4, 0.8, 0, false, 'multiply', 0.8, 1, 1, 0, 0, 0.15, 0.3),
+  L('pencil-2h', 'Pencil 2H', '2H', 4, 3, 6),
+  L('pencil-hb', 'Pencil HB', 'HB', 5, 3, 8),
+  L('pencil-2b', 'Pencil 2B', '2B', 5, 2, 6),
+  L('pencil-4b', 'Pencil 4B', '4B', 6, 1, 4),
+  L('pencil-6b', 'Pencil 6B', '6B', 8, 1, 4),
   P('pencil-soft', 'Soft pencil', 14, 0.25, 0.3, 0.15, 'paper', 0.5, 0.35, 1, 0, false, 'multiply', 0.55, 1, 2, 0, 0, undefined, 0.2),
   P('pencil-tilted', 'Tilted pencil', 44, 0.4, 0.5, 0.25, 'paper', 0.7, 0.45, 0.28, -35, false, 'multiply', 0.5, 0, 1, 0, 0, undefined, 0.2),
   P('pencil-shade', 'Quick shade', 60, 0.5, 0.6, 0.2, 'paper', 0.65, 0.4, 0.4, -30, false, 'multiply', 0.35, 0, 0, 0, 0, undefined, 0.2),
@@ -35,7 +44,7 @@ export const DAB_PRESETS: BrushPreset[] = [
 /** The brush with the preset's values; color (and anything not in the preset, like mirror) stays. */
 export function applyBrushPreset<B extends object>(brush: B, preset: BrushPreset): B & PresetValues {
   // A plain preset switches dab mode off; a dab preset brings its own.
-  return { ...brush, dabs: false, leadHardness: undefined, valleyFill: undefined, ...preset.values };
+  return { ...brush, dabs: false, lead: undefined, leadHardness: undefined, valleyFill: undefined, ...preset.values };
 }
 
 /** The preset whose values all still match the brush, if any. */

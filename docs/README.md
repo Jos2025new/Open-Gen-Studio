@@ -86,7 +86,8 @@
 - [0024 — Identidad visual: sistema de tarjetas, bases y resaltado (aceptado 2026-10-20; pasos 1 y 2 en `task/workflow-ask-first`)](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md).
 - [0025 — Revisión de la sesión «house party»: número confirmado, revisiones del plan, crédito, cambio de modelo o proveedor y aspecto por entregable (aceptado 2026-10-20)](decisions/0025-revision-sesion-house-party.md).
 - [0026 — Motor de booleanas: Clipper2 (BSL-1.0) y ajuste de curvas (aceptado 2026-11-01; actualizado el mismo día)](decisions/0026-motor-booleano.md).
-- [0027 — Motor del pincel raster: cápsula y modo dabs (aceptado 2026-11-01)](decisions/0027-motor-pincel-dabs.md).
+- [0027 — Pincel: cápsula, dabs (aceptado 2026-11-01)](decisions/0027-motor-pincel-dabs.md).
+- [0028 — Grafito (propuesto)](decisions/0028-lapiz-grafito.md).
 
 ## Propuestas de interfaz
 
