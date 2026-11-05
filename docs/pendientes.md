@@ -33,7 +33,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 
 - [pendientes-agente](pendientes-agente.md): agente (A1 a A24) y proveedores, precios y coste (B1 a B12).
 - [pendientes-sistema](pendientes-sistema.md): datos y guardado (C0 a C6), calidad y pruebas (C7 a C14), funciones propuestas (F1 a F7), decisiones y ramas (G1 a G7).
-- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D50).
+- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D59).
 - [pendientes-gui](pendientes-gui.md): interfaz por espacios, Home, tarjetas del chat (39 filas; abiertas, prioridad y origen en su cabecera).
 - [pendientes-cerrados](pendientes-cerrados.md): lo hecho, superado u obsoleto, con evidencia.
 - Otras fuentes únicas: [render-estado](render-estado.md) (render y rendimiento, D14), [modelos-pruebas](modelos-pruebas.md) (A22), [fx-pruebas](fx-pruebas.md) (D16), [gui-cohesion-pruebas](gui-cohesion-pruebas.md) (cómo probar la interfaz).
@@ -172,6 +172,15 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | D48 | Prueba visual de la disposición de la tarjeta Brush | bajo | 2026-11-01 |
 | D49 | Objetivo de arrastre de grupo ~12 ms entre fotogramas | medio | 2026-11-04 |
 | D50 | Revisión visual de ajustes rápidos, marquee y golpe; atajo de traza | medio | 2026-11-04 |
+| D51 | Franja junto a la tarjeta del pincel que no pinta; círculo del pincel que desaparece | alto | 2026-11-05 |
+| D52 | Sin ver: recalibración del frotado, presets propios y tecla repetida | alto | 2026-11-05 |
+| D53 | Ajustes sin efecto con presets `lead` (siguen visibles) | medio | 2026-11-05 |
+| D54 | Una pasada muy clara en 2H casi no se ve; grano grueso | medio | 2026-11-05 |
+| D55 | Propuestas en espera: Size logarítmico, panel flotante, botones de capa | medio | 2026-11-05 |
+| D56 | Código de GIMP sin leer (falta la ruta) | bajo | 2026-11-05 |
+| D57 | Guardado sin capas sin explicar; deshacer solo en memoria (protegida) | alto | 2026-11-05 |
+| D58 | Aceptar o rechazar la ADR 0028 | medio | 2026-11-05 |
+| D59 | Latencia: eventos predichos y canvas desynchronized sin probar | bajo | 2026-11-05 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 

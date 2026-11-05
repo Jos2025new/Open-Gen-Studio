@@ -128,6 +128,7 @@
 - [Regiones retenidas del Designer](render-regions.md): dirty raster, cajas totales, FX y evidencia de paridad.
 
 - [Timeline breve de esta sesión de Designer UX](timeline-designer-ux.md) (desde 2026-10-11).
+- [Investigaciones con scripts reproducibles](investigaciones/README.md): grafito 2026-11.
 
 ## Historial
 
@@ -189,6 +190,7 @@
 - [055-2026-10-W44: cierre de mapas, integración y limpieza (2026-10-29)](history/055-2026-10-W44.md).
 - [056-2026-10-W44: barra de paneles, Vista y Filtros, Home, barra lateral y caja de Nodes (2026-10-31)](history/056-2026-10-W44.md).
 - [057-2026-11-W44: lápiz y dabs, bordes vivos, borrador raster y arreglos de booleanas (2026-11-01)](history/057-2026-11-W44.md).
+- [058-2026-11-W45: lápiz de grafito (fit8), preset que se conserva y tecla repetida (2026-11-05)](history/058-2026-11-W45.md).
 - [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
 - [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` en `tests/repro-*.test.ts`; H11 descartado.
 - [Auditoría externa (2026-10-29)](audits/auditoria-externa-2026-10-29.md): 11 de 39 citas no sostenían su frase; la rama compacta de formas es alcanzable; objeción sobre H3 retractada.
@@ -211,21 +213,21 @@ Tabla «Registro» del antiguo `TRAZABILIDAD.md` (hoy una nota local, fuera del 
 
 ## Verificación
 
-- [Conservación transversal: propuesta ejecutada, contrato, pruebas y medición pendiente](continuity-contract.md).
+- [Conservación transversal](continuity-contract.md).
 
 - [Error de referencia 3D: adjunto, captura vigente y límites](agent-3d-view-reference.md).
 
-- [Contrato del operador: recorrido corregido, sesiones existentes y límites](agent-operator-contract.md).
+- [Contrato del operador](agent-operator-contract.md).
 
 - [P0 + P1a: biblioteca, consentimiento, pruebas y límites](agent-library-consent.md).
 
 - [Contrato operativo del agente: evidencia H01–H13, inferencias y límites](agent-contract-evidence.md).
-- [Contrato operativo: recorridos, UX, riesgos y validación a largo plazo](agent-contract-validation.md).
+- [Contrato operativo](agent-contract-validation.md).
 
 - [Línea base del agente: script, resultados y límites](agent-baseline.md).
-- [Comparación NanoGPT: resultados DeepSeek y ampliación aprobada hasta USD 1, coste, caché y límites](nanogpt-price-comparison.md).
+- [Comparación NanoGPT](nanogpt-price-comparison.md).
 - [Prueba manual de revisión de precio: Continuar y Cancelar sin gasto](price-review-sandbox.md).
-- [NanoGPT expansion-2: resultados por llamada, diagnóstico, coste, caché y límites](nanogpt-price-expansion-2.md).
+- [NanoGPT expansion-2](nanogpt-price-expansion-2.md).
 
 `node scripts/check-docs.mjs` comprueba tamaños, índice, ADRs, enlaces de las fichas y posibles secretos. `node scripts/check-sizes.mjs` aplica el límite de 30 KB fuera de `docs/` (ADR 0008). `npm test` ejecuta primero las salvaguardas y estas dos comprobaciones. La lectura de data/ real no forma parte de estos controles.
 
