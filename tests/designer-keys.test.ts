@@ -42,6 +42,16 @@ describe('Designer keyboard shortcuts', () => {
     } finally { stop(); }
   });
 
+  it.each(['Delete', 'Backspace'])('holding %s deletes the picked layers once, not one layer per key repeat', (key) => {
+    const stop = listen();
+    try {
+      press(key);
+      press(key, { repeat: true });
+      press(key, { repeat: true });
+      expect(fx.deleteLayers).toHaveBeenCalledTimes(1);
+    } finally { stop(); }
+  });
+
   it.each(['Delete', 'Backspace'])('deletes picked layers on %s from a real keydown', (key) => {
     fx.deleteLayers.mockReturnValue(0);
     const stop = listen();

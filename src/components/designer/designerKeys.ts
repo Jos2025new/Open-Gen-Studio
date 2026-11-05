@@ -97,8 +97,10 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
     if (pk && pickedHere(doc)) { if (!nudgeObjects(sessionId, doc.id, pk.layerId, pk.ids, ux * k, uy * k)) toast(`"${layer.name}" is locked. Unlock it to move it.`, 'info'); }
     else window.dispatchEvent(new CustomEvent('ogs:pan', { detail: { ux, uy, shift: e.shiftKey } }));
   } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && layer) {
-    // Delete or Backspace: every picked layer at once (one undo step); locked ones stay.
+    // Delete or Backspace: every picked layer at once (one undo step); locked ones stay. Holding the key does not
+    // repeat it: each repeat took the next layer, and one undo then brought back only the last one deleted.
     e.preventDefault();
+    if (e.repeat) return;
     const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
     const kept = deleteLayers(sessionId, doc.id, ids);
     if (kept) toast(kept === ids.length ? `"${layer.name}" is locked. Unlock it to delete it.` : `${kept} locked layer${kept === 1 ? '' : 's'} kept.`, 'info');
