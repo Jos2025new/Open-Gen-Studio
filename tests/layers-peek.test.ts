@@ -44,7 +44,7 @@ it('unpinned: the tabs stand in a vertical bar; hovering one peeks the panel on 
 });
 
 it('pinned, the panel is the same floating card and takes no room from the stage', () => {
-  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.ws-designer \.layers-panel:not\(\.is-peek\) \{ position: absolute; z-index: 30; top: 12px; right: 12px; bottom: 12px;[^}]*border-radius: var\(--toolbar-radius\)/);
+  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.ws-designer \.layers-panel:not\(\.is-peek\) \{ position: absolute; z-index: 30; top: 0; right: 12px; bottom: 0;[^}]*border-radius: var\(--toolbar-radius\)/);
 });
 
 it('the right panel uses it with no empty strip: unpinned takes no width, peeks beside the bar in its pinned width, the header pin toggles', () => {
