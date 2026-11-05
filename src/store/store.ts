@@ -144,7 +144,9 @@ export interface UiState extends PageUiPrefs {
   toasts: Toast[];
   tool: DesignTool;
   /** Brush and eraser; the tip fields (hardness, pressure, texture, blend, Keep Opacity) are design/brushEngine.ts. */
-  brush: Omit<import('../engine/design/brushEngine').BrushOptions, 'size'> & { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
+  brush: import('../engine/design/brushPresets').BrushUi;
+  /** Brush presets the user saved. */
+  brushPresets?: import('../engine/design/brushPresets').BrushPreset[];
   /** Designer colors: recent and saved. */
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */

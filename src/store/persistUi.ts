@@ -34,6 +34,7 @@ export type PersistedUi = Pick<
   UiState,
   | 'workspace'
   | 'brush'
+  | 'brushPresets'
   | 'lineart'
   | 'shape'
   | 'text'
@@ -69,6 +70,7 @@ export function pickUi(ui: UiState): PersistedUi {
   return {
     workspace: ui.workspace,
     brush: ui.brush,
+    brushPresets: ui.brushPresets,
     lineart: ui.lineart,
     shape: ui.shape,
     text: ui.text,

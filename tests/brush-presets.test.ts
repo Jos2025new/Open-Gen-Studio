@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { tipFor } from '../src/engine/design/brushEngine';
-import { activePreset, applyBrushPreset, PENCIL_PRESETS, type PresetValues } from '../src/engine/design/brushPresets';
+import { activePreset, applyBrushPreset, PENCIL_PRESETS, presetEdited, presetFromBrush, type PresetValues } from '../src/engine/design/brushPresets';
 import { TOOLBOX } from '../src/components/designer/toolboxModel';
 
 const KEYS: Array<keyof PresetValues> = ['size', 'hardness', 'minSize', 'minDensity', 'pressureSize', 'pressureDensity', 'simulatePressure', 'pressureSpeed', 'taperStart', 'taperEnd', 'texture', 'textureStrength', 'roundness', 'angle', 'follow', 'blend', 'keepOpacity', 'opacity', 'smoothing', 'stabilization'];
@@ -24,7 +24,10 @@ describe('pencil brush presets', () => {
     const out = applyBrushPreset(applyBrushPreset({ size: 1, color: '#000000', opacity: 1 }, preset('pencil-4b')), preset('pencil-2h'));
     for (const k of KEYS) expect(out[k], k).toEqual(preset('pencil-2h').values[k]);
     expect(activePreset(out)?.id).toBe('pencil-2h');
-    expect(activePreset({ ...out, size: 7 })).toBeUndefined();
+    // Changing a setting keeps the preset and marks it edited.
+    expect(activePreset({ ...out, size: 7 })?.id).toBe('pencil-2h');
+    expect(presetEdited(out, preset('pencil-2h'))).toBe(false);
+    expect(presetEdited({ ...out, size: 7 }, preset('pencil-2h'))).toBe(true);
   });
   it('tipFor gives a valid tip for each preset', () => {
     for (const p of PENCIL_PRESETS) {
@@ -34,6 +37,16 @@ describe('pencil brush presets', () => {
       expect(tip.densities).toEqual([]);
       if (p.values.roundness < 1) expect(tip.roundness).toBe(p.values.roundness);
     }
+  });
+  it('a saved preset brings the brush back, color and mirror aside, and lead grades stay', () => {
+    const tuned = { ...applyBrushPreset({ color: '#123456', mirror: true }, preset('pencil-2b')), size: 33, minDensity: 0.5 };
+    const mine = presetFromBrush('brp_1', 'Mine', tuned);
+    expect(mine.values).not.toHaveProperty('color');
+    expect(mine.values).not.toHaveProperty('mirror');
+    const back = applyBrushPreset(applyBrushPreset({ color: '#000000', mirror: false }, preset('pencil-soft')), mine);
+    expect(back).toMatchObject({ color: '#000000', mirror: false, size: 33, minDensity: 0.5, lead: '2B', presetId: 'brp_1' });
+    expect(presetEdited(back, mine)).toBe(false);
+    expect(activePreset(back, [mine])?.label).toBe('Mine');
   });
   it('the toolbox pencil variant is the HB preset', () => {
     const v = TOOLBOX.find((f) => f.id === 'brush')!.variants.find((x) => x.id === 'pencil')!;

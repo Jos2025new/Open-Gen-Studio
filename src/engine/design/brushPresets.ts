@@ -1,6 +1,9 @@
 import type { BrushOptions } from './brushEngine';
 import type { LeadGrade } from './brushLead';
 
+/** The brush as the UI keeps it (ui.brush). */
+export type BrushUi = Omit<BrushOptions, 'size'> & { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
+
 /** Pencil presets: they only fill ui.brush (never the color); saved strokes carry the resulting tip, so they look the same. */
 export type PresetValues = Pick<BrushOptions, 'lead'> & Required<Pick<BrushOptions, 'size' | 'hardness' | 'minSize' | 'minDensity' | 'pressureSize' | 'pressureDensity' | 'simulatePressure' | 'pressureSpeed' | 'taperStart' | 'taperEnd' | 'texture' | 'textureStrength' | 'tooth' | 'edge' | 'roundness' | 'angle' | 'follow' | 'blend' | 'keepOpacity'>> & Pick<BrushOptions, 'leadHardness' | 'valleyFill' | 'dabs' | 'dabSpacing' | 'dabScatter' | 'dabSizeJitter' | 'dabAngleJitter' | 'dabFlow'> & { opacity: number; smoothing: number; stabilization: number };
 export interface BrushPreset { id: string; label: string; values: PresetValues }
@@ -42,12 +45,27 @@ export const DAB_PRESETS: BrushPreset[] = [
 ];
 
 /** The brush with the preset's values; color (and anything not in the preset, like mirror) stays. */
-export function applyBrushPreset<B extends object>(brush: B, preset: BrushPreset): B & PresetValues {
+export function applyBrushPreset<B extends object>(brush: B, preset: BrushPreset): B & PresetValues & { presetId: string } {
   // A plain preset switches dab mode off; a dab preset brings its own.
-  return { ...brush, dabs: false, lead: undefined, leadHardness: undefined, valleyFill: undefined, ...preset.values };
+  return { ...brush, dabs: false, lead: undefined, leadHardness: undefined, valleyFill: undefined, ...preset.values, presetId: preset.id };
 }
 
-/** The preset whose values all still match the brush, if any. */
-export function activePreset(brush: Partial<PresetValues>): BrushPreset | undefined {
-  return [...PENCIL_PRESETS, ...DAB_PRESETS].find((p) => !!brush.dabs === !!p.values.dabs && (Object.keys(p.values) as Array<keyof PresetValues>).every((k) => (brush[k] ?? (k === 'keepOpacity' || k === 'follow' || k === 'tooth' ? false : k === 'edge' ? 0 : undefined)) === p.values[k]) && brush.leadHardness === p.values.leadHardness && brush.valleyFill === p.values.valleyFill);
+const DEFAULT_OFF = (k: keyof PresetValues) => (k === 'keepOpacity' || k === 'follow' || k === 'tooth' ? false : k === 'edge' ? 0 : undefined);
+
+/** Whether the brush's settings have left the preset's values. */
+export function presetEdited(brush: Partial<PresetValues>, preset: BrushPreset): boolean {
+  return !(!!brush.dabs === !!preset.values.dabs && (Object.keys(preset.values) as Array<keyof PresetValues>).every((k) => (brush[k] ?? DEFAULT_OFF(k)) === preset.values[k]) && brush.lead === preset.values.lead && brush.leadHardness === preset.values.leadHardness && brush.valleyFill === preset.values.valleyFill);
+}
+
+/** The preset the brush started from: changing a setting does not lose it. A brush saved before that was recorded goes by its values. */
+export function activePreset(brush: Partial<PresetValues> & { presetId?: string }, saved: readonly BrushPreset[] = []): BrushPreset | undefined {
+  const all = [...PENCIL_PRESETS, ...DAB_PRESETS, ...saved];
+  return brush.presetId ? all.find((p) => p.id === brush.presetId) : all.find((p) => !presetEdited(brush, p));
+}
+
+/** A preset of the brush as it is now: everything but the color and the mirror, which applying a preset leaves alone. */
+export function presetFromBrush(id: string, label: string, brush: Partial<PresetValues>): BrushPreset {
+  const keys = [...Object.keys(PENCIL_PRESETS[0].values), 'dabs', 'dabSpacing', 'dabScatter', 'dabSizeJitter', 'dabAngleJitter', 'dabFlow', 'leadHardness', 'valleyFill'] as Array<keyof PresetValues>;
+  const values = Object.fromEntries(keys.flatMap((k) => (brush[k] === undefined ? [] : [[k, brush[k]]])));
+  return { id, label, values: values as PresetValues };
 }

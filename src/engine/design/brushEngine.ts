@@ -93,6 +93,8 @@ export interface BrushOptions {
   dabFlow?: number;
   /** A measured graphite grade (see BrushTip.lead). */
   lead?: LeadGrade;
+  /** The preset this brush started from; it stays when a setting changes (brushPresets.ts). */
+  presetId?: string;
 }
 
 export const BRUSH_BLENDS: BrushBlend[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
