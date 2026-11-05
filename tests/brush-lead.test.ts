@@ -37,10 +37,22 @@ describe('graphite grades', () => {
     }
   });
 
+  it('a thin tip keeps its edge when the stroke is cut into small segments', () => {
+    const width = (step: number) => {
+      const m = mask(), tip = tipFor({ size: 5, lead: '2B' }, false); tip.lead!.seed = 7;
+      const p = line(step);
+      for (let i = 1; i < p.length; i++) stampSegment(m, 0, 0, [p[i - 1][0], 48, p[i][0], 48, 5], 1, tip, [0, 0, 0]);
+      const at = (y: number) => { let s = 0; for (let x = 30; x < 66; x++) s += m.data[(y * N + x) * 4 + 3]; return s / 36; };
+      return at(48) / Math.max(1, at(50));
+    };
+    expect(Math.abs(width(2) - width(80))).toBeLessThan(0.25 * width(80));
+  });
+
   it('going back over a spot without lifting builds up, up to opaque at most', () => {
     for (const g of ['2H', '2B', '6B'] as const) {
       const once = along(g, line(3)), back = along(g, [...line(3), ...line(3, 88, 8)]), many = along(g, Array.from({ length: 12 }, (_, i) => (i % 2 ? line(3, 88, 8) : line(3))).flat());
-      expect(back).toBeGreaterThan(once * 1.3);
+      expect(back).toBeGreaterThan(once * 1.1);
+      expect(back).toBeLessThan(once * 1.6); // Rubbing builds up slowly: lifting and passing again is what adds a full deposit.
       expect(many).toBeGreaterThan(back);
       expect(many).toBeLessThanOrEqual(255);
     }
