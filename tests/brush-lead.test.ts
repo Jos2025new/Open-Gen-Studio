@@ -19,7 +19,33 @@ function tone(lead: LeadGrade, passes: number, density = 1): number {
   return sum / n;
 }
 
+/** Mean alpha over the middle of a stroke drawn along `path` (one tip, one mask). */
+function along(lead: LeadGrade, path: number[][]): number {
+  const m = mask(), tip = tipOf(lead);
+  for (let i = 1; i < path.length; i++) stampSegment(m, 0, 0, [path[i - 1][0], path[i - 1][1], path[i][0], path[i][1], 24], 1, tip, [0, 0, 0]);
+  let sum = 0, n = 0;
+  for (let y = 44; y < 52; y++) for (let x = 40; x < 56; x++) { sum += m.data[(y * N + x) * 4 + 3]; n++; }
+  return sum / n;
+}
+const line = (step: number, from = 8, to = 88) => { const p: number[][] = []; for (let x = from; to > from ? x <= to : x >= to; x += to > from ? step : -step) p.push([x, 48]); return p; };
+
 describe('graphite grades', () => {
+  it('a straight stroke is one crossing however it is cut into segments', () => {
+    for (const g of ['2H', '2B', '6B'] as const) {
+      const whole = along(g, line(80));
+      for (const step of [1, 3, 10]) expect(Math.abs(along(g, line(step)) - whole), `${g} step ${step}`).toBeLessThan(0.05 * whole + 1);
+    }
+  });
+
+  it('going back over a spot without lifting builds up, up to opaque at most', () => {
+    for (const g of ['2H', '2B', '6B'] as const) {
+      const once = along(g, line(3)), back = along(g, [...line(3), ...line(3, 88, 8)]), many = along(g, Array.from({ length: 12 }, (_, i) => (i % 2 ? line(3, 88, 8) : line(3))).flat());
+      expect(back).toBeGreaterThan(once * 1.3);
+      expect(many).toBeGreaterThan(back);
+      expect(many).toBeLessThanOrEqual(255);
+    }
+  });
+
   it('softer grades are darker at the same pressure and passes', () => {
     const tones = (['2H', 'HB', '2B', '4B'] as const).map((g) => tone(g, 6));
     for (let i = 1; i < tones.length; i++) expect(tones[i]).toBeLessThan(tones[i - 1]);

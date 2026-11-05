@@ -18,6 +18,7 @@ El pincel medido a 20 px tenía los grados invertidos (4B más claro que 2H), la
 
 - **Un grado es un tono máximo, no una opacidad.** `brushLead.ts` escribe en cada píxel el color de ese máximo (más claro en los valles del papel) y como alfa cuánto avanza esta pasada hacia él.
 - **Se compone con `darken`.** Es exactamente `T -= (T - techo) * alfa` donde `T > techo`: las pasadas se acumulan y paran en el tono del grado, y un grado duro no aclara a uno blando. **El trazo no lee la capa:** deshacer, mover y reconstruir siguen usando la máscara en caché.
+- **Se acumula con la distancia que frota.** Cada segmento deposita la parte de un cruce que cubre en ese píxel: una recta suma un cruce exacto (sin cuentas, se corte como se corte) y repasar sin soltar acumula como otra pasada, hasta el tono del grado.
 - **Papel medido.** Espectro radial del papel de la muestra 2B, sintetizado con fases aleatorias en una baldosa de 256 px.
 - **Un trazo ancho es un haz de trazos finos,** cada uno con su ganancia, según la distancia a la línea central.
 - **Los parámetros vienen del ajuste** (`LEAD_FITS`). Lo que el ajuste repartía entre muchos trazos finos por píxel, una pasada lo lleva en proporción al rayado de una mano.

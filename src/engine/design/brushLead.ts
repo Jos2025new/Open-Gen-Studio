@@ -145,7 +145,12 @@ function tablesFor(grade: LeadGrade): LeadTables {
 
 const smooth = (a: number, b: number, v: number) => { const t = Math.min(1, Math.max(0, (v - a) / Math.max(1e-6, b - a))); return t * t * (3 - 2 * t); };
 
-/** Lays one segment of a graphite stroke into the mask, keeping each pixel's strongest pass (see stampSegment). */
+/**
+ * Lays one segment of a graphite stroke into the mask. Graphite builds up with the distance the tip rubs over a pixel: a
+ * segment deposits the share of one crossing it covers there (its length under the tip over the tip's chord at that pixel).
+ * A straight stroke adds up to exactly one crossing however it is cut into segments, so there are no beads, and going
+ * back over a spot without lifting builds up like another pass. The mask's own alpha is the only state.
+ */
 export function stampLeadSegment(img: AlphaImage, ox: number, oy: number, seg: readonly number[], density: number, tip: BrushTip, rgb: [number, number, number], from?: { width: number; density: number }): void {
   const lead = tip.lead!, f = LEAD_FITS[lead.grade], T = tablesFor(lead.grade), P = paperTiles();
   const [ax, ay, bx, by, width] = seg;
@@ -153,7 +158,7 @@ export function stampLeadSegment(img: AlphaImage, ox: number, oy: number, seg: r
   const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy, len = Math.sqrt(len2), rMax = Math.max(0.5, Math.max(w0, width) / 2), reach = rMax + 0.15 * Math.min(rMax, f.w);
   const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach - 1 - ox)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach - 1 - oy));
   const x1 = Math.min(img.width, Math.ceil(Math.max(ax, bx) + reach + 1 - ox)), y1 = Math.min(img.height, Math.ceil(Math.max(ay, by) + reach + 1 - oy));
-  const seed = lead.seed | 0, sx = seed & MASK, sy = (seed >>> 8) & MASK, hairCell = Math.max(1, f.dens * 1.5), hairShift = (seed >>> 16) & MASK;
+  const seed = lead.seed | 0, sx = seed & MASK, sy = (seed >>> 8) & MASK, hairCell = Math.max(1, f.dens * 1.5), hairShift = (seed >>> 16) & MASK, ux = len ? dx / len : 0, uy = len ? dy / len : 0, dither = (Math.round(ax) * 31 + Math.round(ay) * 17) & MASK;
   const data = img.data, gMul = (1 - T.grey), R = 255 - rgb[0], G = 255 - rgb[1], B = 255 - rgb[2], softDiv = 256 / (2 * f.soft), alScale = AL_STEPS / AL_MAX;
   for (let y = y0; y < y1; y++) {
     const ly = y + oy, py = ly + 0.5 - ay, row = (ly & MASK) * SIZE, row2 = ((ly + sy) & MASK) * SIZE;
@@ -162,6 +167,13 @@ export function stampLeadSegment(img: AlphaImage, ox: number, oy: number, seg: r
       const t = len2 ? Math.min(1, Math.max(0, (px * dx + py * dy) / len2)) : 0, qx = px - t * dx, qy = py - t * dy, d2 = qx * qx + qy * qy;
       const rt = Math.max(0.5, (w0 + (width - w0) * t) / 2), hw = Math.min(rt, f.w), outer = rt + 0.15 * hw;
       if (d2 >= outer * outer) continue;
+      // The share of one crossing this segment covers at this pixel; a lone dot counts as part of one.
+      let share = 0.6;
+      if (len) {
+        const along = px * ux + py * uy, h = px * uy - py * ux, c = Math.sqrt(Math.max(1e-6, outer * outer - h * h));
+        share = (Math.min(len, along + c) - Math.max(0, along - c)) / (2 * c);
+        if (share <= 0) continue;
+      }
       const d = Math.sqrt(d2), inner = outer - (1.15 - f.edge) * hw, edge = 1 - smooth(inner, outer, d);
       // Fine strokes run along the stroke: a wide tip is a bundle of them, each with its own gain.
       const across = (len ? (dx * py - dy * px) / len : 0) / hairCell + 128 + hairShift, h0 = Math.floor(across), hf = across - h0;
@@ -172,8 +184,10 @@ export function stampLeadSegment(img: AlphaImage, ox: number, oy: number, seg: r
       const level = 0.8 * P.height[i0] + 0.2 * P.fine[i0] + f.jit * (2 * P.fine[i2] - 1);
       const pi = (level - T.thresh[ai] + f.soft) * softDiv;
       const m = edge * T.deposit * T.gate[ai] * T.pen[pi <= 0 ? 0 : pi >= 256 ? 256 : pi | 0];
-      const a = Math.round(Math.min(1, m) * 255), i = (y * img.width + x) * 4;
-      if (a > data[i + 3]) {
+      // (1 - m)^share, without a power per pixel. The rounding is dithered, or the small steps of a faint lead would be lost at 8 bits.
+      const n = Math.min(0.98, m), rate = share * n * (1 + n * (0.5 + n * (1 / 3 + n * 0.25))), keep = rate < 0.3 ? 1 - rate * (1 - rate * (0.5 - rate / 6)) : Math.exp(-rate);
+      const i = (y * img.width + x) * 4, before = data[i + 3], a = Math.min(255, (255 - (255 - before) * keep + P.fine[((ly + dither) & MASK) * SIZE | ((lx + dither) & MASK)]) | 0);
+      if (a > before) {
         const depth = gMul * (1 - f.dc * P.valley[i0]);
         data[i] = 255 - R * depth; data[i + 1] = 255 - G * depth; data[i + 2] = 255 - B * depth; data[i + 3] = a;
       }
