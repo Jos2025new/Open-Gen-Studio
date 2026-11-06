@@ -108,7 +108,7 @@ describe('quick mode of the subtoolbox', () => {
 it('the quick colour sits on a light disc and the tools-dock frame is thin', async () => {
   const { readFileSync } = await import('node:fs');
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
-  expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.opt-color\.is-icon \{ background: var\(--text\)/);
+  expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.opt-color\.is-icon \{ background: var\(--text-3\)/);
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-designer::before \{ inset: -4px -100vw -40px;/);
 });
 

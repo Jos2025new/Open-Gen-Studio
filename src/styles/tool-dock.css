@@ -210,7 +210,7 @@
 .tool-dock-quick-sliders { display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; }
 .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 120px; }
 /* The colour sits on a light disc so any colour stands out against the dark bar. */
-.tool-dock-variants.is-fixed .opt-color.is-icon { background: var(--text); padding: 3px; border-radius: 50%; }
+.tool-dock-variants.is-fixed .opt-color.is-icon { background: var(--text-3); padding: 2px; border-radius: 50%; }
 /* Bar hidden: its contents slide down out of view; the box chrome fades. */
 .composer.is-prompt-hidden { background: transparent; border-color: transparent; box-shadow: none; }
 .composer .composer-tools-bar > * { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
