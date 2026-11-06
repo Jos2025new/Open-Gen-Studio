@@ -188,7 +188,8 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
   const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
   const dabs = o.dabs ? { spacing: Math.min(2, Math.max(0.05, o.dabSpacing ?? DAB_DEFAULTS.spacing)), scatter: Math.min(3, Math.max(0, o.dabScatter ?? 0)), sizeJitter: Math.min(1, Math.max(0, o.dabSizeJitter ?? 0)), angleJitter: clamp01(o.dabAngleJitter ?? 0), flow: Math.min(1, Math.max(0.001, o.dabFlow ?? DAB_DEFAULTS.flow)), seed: 1 } : undefined;
-  if (o.lead && !erase) return { hardness, lead: { grade: o.lead, seed: 1 }, ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  // Dabs is its own engine: with it on, the brush paints dabs and leaves the measured lead.
+  if (o.lead && !erase && !o.dabs) return { hardness, lead: { grade: o.lead, seed: 1 }, ...shape, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth, toothVersion: 3 as const, valleyFill: clamp01(o.valleyFill ?? BRUSH_DEFAULTS.valleyFill) } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
   return { hardness, ...shape, ...(dabs ? { dabs } : {}), ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(tooth ? { tooth, toothVersion: 3 as const, valleyFill: clamp01(o.valleyFill ?? BRUSH_DEFAULTS.valleyFill) } : {}), ...(edge ? { edge } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 

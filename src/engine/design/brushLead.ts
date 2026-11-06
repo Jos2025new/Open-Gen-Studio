@@ -1,4 +1,5 @@
-import type { AlphaImage, BrushTip } from './brushEngine';
+import { applyToothV3, smoothNoise, textureAt, type AlphaImage, type BrushTip } from './brushEngine';
+import { tipFrame } from './brushTipShape';
 
 /*
  * Graphite as measured on a real 12-grade swatch sheet (docs/decisions/0028-lapiz-grafito.md). A grade is a darkest tone, not
@@ -157,25 +158,32 @@ export function stampLeadSegment(img: AlphaImage, ox: number, oy: number, seg: r
   const lead = tip.lead!, f = LEAD_FITS[lead.grade], T = tablesFor(lead.grade), P = paperTiles();
   const [ax, ay, bx, by, width] = seg;
   const w0 = from?.width ?? width, d0 = Math.min(1, Math.max(0, from?.density ?? density)), d1 = Math.min(1, Math.max(0, density));
-  const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy, len = Math.sqrt(len2), rMax = Math.max(0.5, Math.max(w0, width) / 2), reach = rMax + 0.15 * Math.min(rMax, f.w);
+  const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy, len = Math.sqrt(len2), rMax = Math.max(0.5, Math.max(w0, width) / 2), living = tip.edge ?? 0, reach = (rMax + 0.15 * Math.min(rMax, f.w)) * (1 + living / 2);
+  // The tip's own settings, none of them in a preset's way: at their defaults every value below is the identity. An elliptical tip is measured in its frame, where it is a circle (brushTipShape.ts).
+  const fr = tipFrame(tip, dx, dy), fc = fr?.c ?? 1, fs = fr?.s ?? 0, fa = fr?.aspect ?? 1;
+  const sdx = fc * dx - fs * dy, sdy = (fs * dx + fc * dy) * fa, slen2 = sdx * sdx + sdy * sdy, slen = Math.sqrt(slen2), sux = slen ? sdx / slen : 0, suy = slen ? sdy / slen : 0;
+  const soft = 1 - tip.hardness, tex = tip.texture, strength = tip.textureStrength ?? 0, tooth = tip.tooth === true;
   const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - reach - 1 - ox)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - reach - 1 - oy));
   const x1 = Math.min(img.width, Math.ceil(Math.max(ax, bx) + reach + 1 - ox)), y1 = Math.min(img.height, Math.ceil(Math.max(ay, by) + reach + 1 - oy));
-  const seed = lead.seed | 0, sx = seed & MASK, sy = (seed >>> 8) & MASK, hairCell = Math.max(1, f.dens * 1.5), hairShift = (seed >>> 16) & MASK, ux = len ? dx / len : 0, uy = len ? dy / len : 0, dither = (Math.round(ax) * 31 + Math.round(ay) * 17) & MASK;
+  const seed = lead.seed | 0, sx = seed & MASK, sy = (seed >>> 8) & MASK, hairCell = Math.max(1, f.dens * 1.5), hairShift = (seed >>> 16) & MASK, dither = (Math.round(ax) * 31 + Math.round(ay) * 17) & MASK;
   const data = img.data, gMul = (1 - T.grey), R = 255 - rgb[0], G = 255 - rgb[1], B = 255 - rgb[2], softDiv = 256 / (2 * f.soft), alScale = AL_STEPS / AL_MAX;
   for (let y = y0; y < y1; y++) {
     const ly = y + oy, py = ly + 0.5 - ay, row = (ly & MASK) * SIZE, row2 = ((ly + sy) & MASK) * SIZE;
     for (let x = x0; x < x1; x++) {
       const lx = x + ox, px = lx + 0.5 - ax;
-      const t = len2 ? Math.min(1, Math.max(0, (px * dx + py * dy) / len2)) : 0, qx = px - t * dx, qy = py - t * dy, d2 = qx * qx + qy * qy;
-      const rt = Math.max(0.5, (w0 + (width - w0) * t) / 2), hw = Math.min(rt, f.w), outer = rt + 0.15 * hw;
+      const fx = fc * px - fs * py, fy = (fs * px + fc * py) * fa;
+      const t = slen2 ? Math.min(1, Math.max(0, (fx * sdx + fy * sdy) / slen2)) : 0, qx = fx - t * sdx, qy = fy - t * sdy, d2 = qx * qx + qy * qy;
+      let rt = Math.max(0.5, (w0 + (width - w0) * t) / 2);
+      if (living) rt = Math.max(0.5, rt * (1 + living * (smoothNoise(lx, ly, 3) - 0.5)));
+      const hw = Math.min(rt, f.w), outer = rt + 0.15 * hw;
       if (d2 >= outer * outer) continue;
       let share = 0, side = 0;
-      if (len) {
-        side = px * uy - py * ux;
-        const along = px * ux + py * uy, c = Math.sqrt(Math.max(1e-6, outer * outer - side * side));
-        share = Math.max(0, Math.min(len, along + c) - Math.max(0, along)) / (2 * c);
+      if (slen) {
+        side = fx * suy - fy * sux;
+        const along = fx * sux + fy * suy, c = Math.sqrt(Math.max(1e-6, outer * outer - side * side));
+        share = Math.max(0, Math.min(slen, along + c) - Math.max(0, along)) / (2 * c);
       }
-      const inner = outer - (1.15 - f.edge) * hw, edge = 1 - smooth(inner, outer, Math.sqrt(d2));
+      const inner = outer - (1.15 - f.edge) * hw - soft * rt, edge = 1 - smooth(inner, outer, Math.sqrt(d2));
       // Fine strokes run along the stroke: a wide tip is a bundle of them, each with its own gain.
       const across = (len ? (dx * py - dy * px) / len : 0) / hairCell + 128 + hairShift, h0 = Math.floor(across), hf = across - h0;
       const hair = P.hair[h0 & MASK] + (P.hair[(h0 + 1) & MASK] - P.hair[h0 & MASK]) * hf;
@@ -184,7 +192,11 @@ export function stampLeadSegment(img: AlphaImage, ox: number, oy: number, seg: r
       const ai = Math.min(AL_STEPS, (al * alScale) | 0);
       const level = 0.8 * P.height[i0] + 0.2 * P.fine[i0] + f.jit * (2 * P.fine[i2] - 1);
       const pi = (level - T.thresh[ai] + f.soft) * softDiv;
-      const n = Math.min(0.98, T.deposit * T.gate[ai] * T.pen[pi <= 0 ? 0 : pi >= 256 ? 256 : pi | 0]);
+      let n = Math.min(0.98, T.deposit * T.gate[ai] * T.pen[pi <= 0 ? 0 : pi >= 256 ? 256 : pi | 0]);
+      if (tex && strength) {
+        const grain = textureAt(tex, lx, ly);
+        n *= tooth ? applyToothV3(1, grain, strength, tip.valleyFill ?? 0, d0 + (d1 - d0) * t) : 1 - strength * (1 - grain);
+      }
       // (1 - n)^share, without a power per pixel. The rounding is dithered, or the small steps of a faint lead would be lost at 8 bits.
       const rub = n * (1 - smooth(inner, outer, Math.abs(side))), rate = share * RUB * rub * (1 + rub * (0.5 + rub * (1 / 3 + rub * 0.25))), keep = rate < 0.3 ? 1 - rate * (1 - rate * (0.5 - rate / 6)) : Math.exp(-rate);
       const i = (y * img.width + x) * 4, before = data[i + 3];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAB_DEFAULTS } from '../src/engine/design/brushEngine';
-import { flowBlocked, flowOf, withFlow, FLOW_SPACING } from '../src/engine/design/brushFlow';
+import { flowOf, withFlow, FLOW_SPACING } from '../src/engine/design/brushFlow';
 import { applyBrushPreset, PENCIL_PRESETS, presetEdited } from '../src/engine/design/brushPresets';
 
 describe('flow', () => {
@@ -27,11 +27,8 @@ describe('flow', () => {
     expect(withFlow({ dabs: true }, NaN)).toEqual({});
   });
 
-  it('is blocked for measured graphite', () => {
-    const lead = { lead: 'HB' as never };
-    expect(flowBlocked(lead)).toBe(true);
-    expect(withFlow(lead, 0.4)).toEqual({});
-    expect(flowBlocked({})).toBe(false);
+  it('turns Dabs on for a graphite grade too', () => {
+    expect(withFlow({}, 0.4)).toEqual({ dabs: true, dabSpacing: FLOW_SPACING, dabFlow: 0.4 });
   });
 
   it('marks the active preset as edited, like any other change', () => {

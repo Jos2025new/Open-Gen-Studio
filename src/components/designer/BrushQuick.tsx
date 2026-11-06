@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Blend, Droplets, Lock, Unlock } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { BRUSH_BLENDS, type BrushBlend } from '../../engine/design/brushEngine';
-import { flowBlocked, flowOf, FLOW_MIN, withFlow } from '../../engine/design/brushFlow';
+import { flowOf, FLOW_MIN, withFlow } from '../../engine/design/brushFlow';
 import { InlineSelect, InlineSlider } from './InlineControls';
 import { Popover, usePopover } from '../ui/Popover';
 
@@ -13,9 +13,8 @@ const setBrush = (patch: object) => setUi({ brush: { ...useStore.getState().ui.b
 /** Flow as one slider. Under 100 % it turns Dabs on (see brushFlow.ts); measured graphite cannot take it. */
 export function FlowField({ icon }: { icon?: ReactNode }) {
   const brush = useStore((s) => s.ui.brush);
-  const blocked = flowBlocked(brush);
-  return <InlineSlider label="Flow" icon={icon} unit="%" scale={100} min={FLOW_MIN} max={1} step={0.01} value={blocked ? 1 : flowOf(brush)} disabled={blocked}
-    tip={blocked ? 'Flow does not apply to graphite pencils' : 'How much each stamp adds. Under 100 % the brush paints with Dabs'} onChange={(v) => setBrush(withFlow(useStore.getState().ui.brush, v))} />;
+  return <InlineSlider label="Flow" icon={icon} unit="%" scale={100} min={FLOW_MIN} max={1} step={0.01} value={flowOf(brush)}
+    tip="How much each stamp adds. Under 100 % the brush paints with Dabs" onChange={(v) => setBrush(withFlow(useStore.getState().ui.brush, v))} />;
 }
 
 /** The six blend modes behind one round button. */
@@ -36,7 +35,7 @@ export function LockAlphaButton() {
 /** Flow behind one round button (the quick row has no room for a third slider): the same field in a small popover. */
 export function FlowMenu() {
   const pop = usePopover(), brush = useStore((s) => s.ui.brush);
-  const pct = Math.round((flowBlocked(brush) ? 1 : flowOf(brush)) * 100);
+  const pct = Math.round(flowOf(brush) * 100);
   return <>
     <button type="button" ref={pop.ref} className="opt opt-pick is-icon" aria-label={`Flow · ${pct}%`} data-tip={`Flow: ${pct}%`} aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}><Droplets size={15} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={200} label="Flow"><div className="snap-pop"><FlowField /></div></Popover>

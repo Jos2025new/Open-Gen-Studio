@@ -107,3 +107,38 @@ describe('graphite grades', () => {
     expect(applyBrushPreset(lead, PENCIL_PRESETS.find((p) => p.id === 'pencil-soft')!).lead).toBeUndefined();
   });
 });
+
+describe('the tip settings act on a graphite grade', () => {
+  const size = 80;
+  const lay = (o: Partial<Parameters<typeof tipFor>[0]>, seg: number[] = [40, 40, 40, 40, 40]) => {
+    const img = { data: new Uint8ClampedArray(size * size * 4), width: size, height: size };
+    stampSegment(img, 0, 0, seg, 1, tipFor({ size: 40, lead: 'HB', ...o }, false), [0, 0, 0]);
+    return img;
+  };
+  const extent = (img: { data: Uint8ClampedArray }) => {
+    let w = 0, h = 0;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (img.data[(y * size + x) * 4 + 3]) { w = Math.max(w, Math.abs(x + 0.5 - 40)); h = Math.max(h, Math.abs(y + 0.5 - 40)); }
+    return { w, h };
+  };
+  const painted = (img: { data: Uint8ClampedArray }) => { let n = 0; for (let i = 3; i < img.data.length; i += 4) n += img.data[i]; return n; };
+
+  it('Roundness squeezes it, and Angle turns the squeeze', () => {
+    const flat = extent(lay({ roundness: 0.3 })), turned = extent(lay({ roundness: 0.3, angle: 90 }));
+    expect(flat.h).toBeLessThan(flat.w * 0.6);
+    expect(turned.w).toBeLessThan(turned.h * 0.6);
+  });
+  it('Follow stroke turns it with the direction', () => {
+    const across = (o: Partial<Parameters<typeof tipFor>[0]>) => extent(lay(o, [40, 10, 40, 70, 40])).w;
+    expect(across({ roundness: 0.3, follow: true })).toBeLessThan(across({ roundness: 0.3 }) * 0.6);
+  });
+  it('Hardness, Edge and Texture change what it lays; at their defaults nothing changes', () => {
+    const base = lay({});
+    expect(painted(lay({ hardness: 0.2 }))).toBeLessThan(painted(lay({ hardness: 1 })));
+    expect(lay({ hardness: 1, edge: 0.8 }).data).not.toEqual(lay({ hardness: 1 }).data);
+    expect(painted(lay({ hardness: 1, texture: 'paper', textureStrength: 1 }))).toBeLessThan(painted(lay({ hardness: 1 })));
+    expect(lay({}).data).toEqual(base.data);
+  });
+  it('Dabs takes over from the measured lead', () => {
+    expect(tipFor({ size: 40, lead: 'HB', dabs: true }, false).lead).toBeUndefined();
+  });
+});
