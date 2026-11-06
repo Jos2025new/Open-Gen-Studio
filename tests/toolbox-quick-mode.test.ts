@@ -47,6 +47,9 @@ describe('quick mode of the subtoolbox', () => {
     await enter(); await click('Show all tools');
     expect(quick()).toBeNull();
     expect(host.querySelector('[aria-label="Brush variants"] [aria-label="Pencil"]')).toBeTruthy();
+    // A row that does not fit never squeezes the settings next to the subtools.
+    expect(host.querySelector('[aria-label="Brush variants"] .tool-dock-quick-sliders')).toBeNull();
+    expect(host.querySelector('[aria-label="Brush variants"] [aria-label^="Eraser"]')).toBeNull();
     await sub('Pencil');
     expect(quick()).toBeTruthy();
   });

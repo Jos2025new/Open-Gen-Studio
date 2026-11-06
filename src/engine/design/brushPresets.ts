@@ -2,7 +2,7 @@ import type { BrushOptions } from './brushEngine';
 import type { LeadGrade } from './brushLead';
 
 /** The brush as the UI keeps it (ui.brush). */
-export type BrushUi = Omit<BrushOptions, 'size'> & { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
+export type BrushUi = Omit<BrushOptions, 'size'> & { size: number; /** The Size field's range: a view of the slider, not part of a preset. */ sizeRange?: 1 | 10; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
 
 /** Pencil presets: they only fill ui.brush (never the color); saved strokes carry the resulting tip, so they look the same. */
 export type PresetValues = Pick<BrushOptions, 'lead'> & Required<Pick<BrushOptions, 'size' | 'hardness' | 'minSize' | 'minDensity' | 'pressureSize' | 'pressureDensity' | 'simulatePressure' | 'pressureSpeed' | 'taperStart' | 'taperEnd' | 'texture' | 'textureStrength' | 'tooth' | 'edge' | 'roundness' | 'angle' | 'follow' | 'blend' | 'keepOpacity'>> & Pick<BrushOptions, 'leadHardness' | 'valleyFill' | 'dabs' | 'dabSpacing' | 'dabScatter' | 'dabSizeJitter' | 'dabAngleJitter' | 'dabFlow'> & { opacity: number; smoothing: number; stabilization: number };

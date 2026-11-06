@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { BRUSH_MAX_SIZE } from '../../engine/design/brushEngine';
 import type { DesignTool } from '../../engine/design/rules';
 import { setRuler } from '../../engine/design/strokeRuler';
 import { setUi, useStore } from '../../store/store';
+import { BrushSizeField } from './BrushSizeField';
 import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
 
 /** What each control of the subtoolbox's quick settings edits. All of them exist in the tool's card already. */
@@ -28,7 +28,7 @@ function Control({ kind, docId }: { kind: QuickKind; docId: string }) {
   const setLine = (patch: object) => setUi({ lineart: { ...useStore.getState().ui.lineart, ...patch } });
   const r = ruler && ruler.docId === docId ? ruler : null;
   switch (kind) {
-    case 'size': return <InlineSlider label="Size" unit="px" min={1} max={BRUSH_MAX_SIZE} log value={brush.size} onChange={(v) => setBrush({ size: Math.round(v) })} />;
+    case 'size': return <BrushSizeField />;
     case 'opacity': return <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setBrush({ opacity: v })} />;
     case 'threshold': return <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setBrush({ fillThreshold: v })} />;
     case 'color': return <InlineColor label="Color" value={brush.color} iconOnly onChange={(v) => setBrush({ color: v })} />;

@@ -230,3 +230,14 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .composer.is-prompt-hidden .tool-dock-stack.is-fixed { bottom: 8px; right: 47px; }
 .composer.is-prompt-hidden .thread-peek { display: none; }
 @media (prefers-reduced-motion: reduce) { .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed { transition: none; } }
+
+/* The Size field's range button (BrushSizeField.tsx): sits over the track, right after the name. */
+.opt-size-range { position: relative; flex: none; margin: 0 auto 0 -2px; padding: 1px 2px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; cursor: pointer; }
+.opt-size-range:hover { background: var(--surface-3); color: var(--text); }
+/* Where the quick row leaves the field too narrow for it, the number stays: the card still has the button. */
+.tool-dock-quick-sliders > .opt-slider { container-type: inline-size; }
+/* Up to four digits of value always show: the card gives Size more of its row, the quick row less padding. */
+.opt-slider:has(.opt-size-range) .opt-readout { flex: none; }
+.brush-row > .opt-slider:has(.opt-size-range) { flex-grow: 1.4; }
+.tool-dock-quick-sliders > .opt-slider:has(.opt-size-range) { padding: 0 6px; }
+@container (max-width: 96px) { .opt-size-range, .tool-dock-quick-sliders .opt-unit, .tool-dock-quick-sliders .opt-label { display: none; } }

@@ -146,6 +146,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const hasQuick = !!QUICK[currentTool];
   const collapsibleFor = (tool?: DesignTool) => !!tool && !!QUICK[tool] && subtools && !rowFits(tool, selectedFamily?.variants.length ?? 0);
   const showGear = !!selectedVariant && !selectedVariant.soon && currentTool !== 'hand';
+  // A row that does not fit shows either the subtools or the settings, never squeezed together.
+  const quickInline = hasQuick && (quickShown || !hasQuickCollapsible);
   const enterQuick = () => { setQuick(true); if (depth === 'open') dispatch({ type: 'escape' }); };
   // The eye sits at the bar's very end, after the zoom rail (the composer's slot), not inside the scrolling tool list.
   const [eyeSlot, setEyeSlot] = useState<HTMLElement | null>(null);
@@ -160,10 +162,10 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
       const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
       return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); if (collapsibleFor(variant.tool)) enterQuick(); else if (active) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
     })}
-    {!quickShown && subtools && hasQuick && <span className="tool-dock-separator" aria-hidden="true" />}
-    {hasQuick && <QuickControls tool={currentTool} docId={doc.id} />}
+    {!quickShown && subtools && quickInline && <span className="tool-dock-separator" aria-hidden="true" />}
+    {quickInline && <QuickControls tool={currentTool} docId={doc.id} />}
     <span className="tool-dock-grow" />
-    {(currentTool === 'brush' || currentTool === 'eraser') && iconButton('eraser', 'Eraser', currentTool === 'eraser', () => { setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }); }, false, undefined, toolKey('eraser'))}
+    {quickInline && (currentTool === 'brush' || currentTool === 'eraser') && iconButton('eraser', 'Eraser', currentTool === 'eraser', () => { setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }); }, false, undefined, toolKey('eraser'))}
     {gear}
   </div>;
 
