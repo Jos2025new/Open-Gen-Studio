@@ -19,7 +19,7 @@ related: [toolbox-dock, barra-superior, documentos, guias]
 | H (campo numérico) | Formulario (`CanvasSize.tsx:66`) | `h` local | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |
 | Unidad px / mm / in (segmentado) | Formulario (`CanvasSize.tsx:67`) | `ui.pageUnit` | Formulario abierto | Persiste | Igual que hoy | se conserva | no dibujado |
 | DPI (campo 1–1200) | Formulario (`CanvasSize.tsx:68`) | `ui.pageDpi` | Unidad distinta de px | Defecto 96 | Igual que hoy | se conserva | no dibujado |
-| Page color | Formulario (`CanvasSize.tsx:69`) | Color local; se aplica a `doc.background` con Apply | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |
+| Page color y Transparent | Formulario (`CanvasSize.tsx`) | Color local, se aplica a `doc.background` con Apply; Transparent lo deja sin fondo al momento | Formulario abierto | — | Igual que hoy | se conserva | no dibujado |
 | Keep ratio (casilla) | Formulario (`CanvasSize.tsx:70`) | Estado local `lock` y `ratio` | Formulario abierto | No persiste | Igual que hoy | se conserva | no dibujado |
 | Anchor (rejilla de 9 botones) | Formulario (`CanvasSize.tsx:73`) | Estado local `anchor` | Formulario abierto | Dice dónde queda la página actual; sin texto en cada botón (solo `aria-label`) | Igual que hoy | se conserva | no dibujado |
 | Center (botón) | Formulario (`CanvasSize.tsx:76`) | `anchor` = middle-center | Anclaje distinto del centro | — | Igual que hoy | se conserva | no dibujado |

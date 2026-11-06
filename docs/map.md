@@ -29,13 +29,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
 | [ops.ts](../src/engine/ops.ts) | 44 | 18 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
-| [doc.ts](../src/engine/design/doc.ts) | 39 | 60 |
+| [doc.ts](../src/engine/design/doc.ts) | 40 | 61 |
 | [format.ts](../src/lib/format.ts) | 35 | 1 |
 | [id.ts](../src/lib/id.ts) | 35 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 34 | 24 |
 | [raster.ts](../src/engine/design/raster.ts) | 34 | 26 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 32 | 17 |
-| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 29 | 0 |
+| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 30 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 29 | 9 |
 | [pathNodes.ts](../src/engine/design/pathNodes.ts) | 27 | 15 |
 | [render.ts](../src/engine/design/render.ts) | 23 | 9 |
@@ -49,7 +49,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
 | `src/components/composer` | 15 | 14 |
-| `src/components/designer` | 90 | 49 |
+| `src/components/designer` | 91 | 49 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
 | `src/components/shell` | 35 | 23 |
@@ -58,7 +58,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 20 | 15 |
 | `src/engine` | 61 | 302 |
 | `src/engine/agent` | 54 | 111 |
-| `src/engine/design` | 132 | 167 |
+| `src/engine/design` | 132 | 168 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 33 | 310 |
 | `src/store` | 15 | 230 |
 
-193 de 583 módulos no tienen ningún test que los importe directamente.
+194 de 584 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

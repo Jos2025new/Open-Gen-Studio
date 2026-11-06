@@ -11,6 +11,7 @@ import { useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
 import { DOC_PRESETS } from '../../engine/design/doc';
+import { DocBackgroundChoice } from './DocBackgroundChoice';
 import { canRedo, canUndo, historyDepth, subscribeHistory } from '../../engine/design/history';
 import { designerKey } from './designerKeys';
 import { ValueNotice } from './ValueNotice';
@@ -93,6 +94,7 @@ export function DesignerWorkspace() {
         </>}
       </span>
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
+        <DocBackgroundChoice />
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
       {doc && trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 11, alignSelf: 'center' }}>History trimmed</span>}
@@ -154,6 +156,6 @@ export function DesignerWorkspace() {
       <DrawingChoicePrompt sessionId={session.id} doc={doc} />
       <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
     </> :
-      <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}</div></div>}
+      <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}</div><DocBackgroundChoice /></div>}
   </div>;
 }

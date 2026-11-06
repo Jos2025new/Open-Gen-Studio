@@ -166,7 +166,7 @@ export function professionalDocument(): { doc: DesignDoc; rasterLayers: RasterLa
     { id: 'prof-grp-ajustes', name: 'Ajustes' },
     { id: 'prof-grp-vectores', name: 'Vectores' },
   ];
-  const doc: DesignDoc = { ...createDoc('Profesional sintético 2048 (Tarea 1)', PROFESSIONAL_SIZE, PROFESSIONAL_SIZE), id: 'bench-doc-profesional', groups, layers, activeLayerId: PROFESSIONAL_IDS.paintLayer };
+  const doc: DesignDoc = { ...createDoc('Profesional sintético 2048 (Tarea 1)', PROFESSIONAL_SIZE, PROFESSIONAL_SIZE, '#101012'), id: 'bench-doc-profesional', groups, layers, activeLayerId: PROFESSIONAL_IDS.paintLayer };
   return { doc, rasterLayers: layers.filter((l): l is RasterLayer => l.type === 'raster') };
 }
 

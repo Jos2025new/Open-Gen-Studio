@@ -41,7 +41,13 @@ export const DOC_PRESETS: Array<{ id: string; label: string; width: number; heig
   { id: 'a4', label: 'A4 portrait', width: 1240, height: 1754 },
 ];
 
-export function createDoc(name: string, width: number, height: number, background: string | null = '#101012'): DesignDoc {
+/** The background new documents take, chosen where they are created; none (transparent) until then. */
+export const NEW_DOC_BACKGROUND_PREF = 'ogs:new-doc-background';
+export function newDocBackground(): string | null {
+  try { const raw = localStorage.getItem(NEW_DOC_BACKGROUND_PREF); return raw == null ? null : (JSON.parse(raw) as string | null); } catch { return null; }
+}
+
+export function createDoc(name: string, width: number, height: number, background: string | null = null): DesignDoc {
   const now = Date.now();
   // New documents paint in Drawing (ADR 0016); older ones have no saved choice and open by what they contain.
   return { id: uid('doc'), name, width, height, background, layers: [], activeLayerId: null, createdAt: now, updatedAt: now, paintMode: 'drawing' };

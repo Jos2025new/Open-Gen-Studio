@@ -245,3 +245,9 @@
 .fx-menu .menu-item { padding: 6px 9px; }
 /* The keyboard value notice ("Brush size 24 px"): one line, top centre of the board, below the stage hint's place. */
 .value-notice { position: absolute; z-index: 20; top: 48px; left: 50%; transform: translateX(-50%); padding: 4px 10px; border: 1px solid var(--panel-line); border-radius: var(--radius-s); background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); box-shadow: var(--shadow-card); pointer-events: none; }
+/* A document's background where it is created and in its page settings: the checkerboard is the transparent choice. */
+.doc-bg-choice { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; color: var(--text-2); font-size: var(--fs-sm); }
+.doc-bg-choice > span { margin-right: auto; }
+.designer-empty .doc-bg-choice > span { margin-right: 0; }
+.doc-bg-transparent { width: 24px; height: 24px; flex: none; border-radius: var(--radius-s); border: 1px solid var(--border); background: repeating-conic-gradient(#2a2a30 0 25%, #34343b 0 50%) 0 0 / 8px 8px; }
+.doc-bg-transparent.is-on { border-color: var(--border-focus); box-shadow: 0 0 0 1px var(--border-focus); }

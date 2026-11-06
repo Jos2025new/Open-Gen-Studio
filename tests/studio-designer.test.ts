@@ -39,6 +39,7 @@ const onView = (e: Event) => seenZoom.push((e as CustomEvent<number>).detail);
 beforeEach(() => {
   const noop: unknown = new Proxy(function () {}, { get: (_t, k) => (k === 'canvas' ? document.createElement('canvas') : k === 'getTransform' ? () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }) : noop), apply: () => noop, set: () => true });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation((() => noop) as never);
+  vi.stubGlobal('DOMMatrix', class { translate() { return this; } });
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 600 });
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 600 });
   (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class { observe() {} disconnect() {} unobserve() {} };

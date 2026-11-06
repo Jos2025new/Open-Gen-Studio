@@ -5,6 +5,7 @@ import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AspectGlyph } from '../composer/MediaControls';
 import { DOC_PRESETS } from '../../engine/design/doc';
+import { DocBackgroundChoice } from '../designer/DocBackgroundChoice';
 import { newBlankDoc } from '../../engine/design/actions';
 import { DocumentChoices } from '../designer/DocumentPicker';
 import { EXPORT_FORMATS, IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from '../designer/designerFile';
@@ -39,6 +40,7 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
           {doc && <MenuItem icon={Images} label="Save to gallery…" onClick={() => go('save')} />}
           {doc && <MenuItem icon={ArrowUpFromLine} label="Export…" onClick={() => go('export')} />}
         </>}
+        {view === 'new' && <DocBackgroundChoice />}
         {view === 'new' && DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(sessionId, p); close(); }} />)}
         {view === 'open' && doc && <DocumentChoices sessionId={sessionId} docs={docs} active={doc} />}
         {view === 'export' && EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => void output(false, f.id)} />)}

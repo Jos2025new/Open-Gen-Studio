@@ -7,6 +7,7 @@ import { mutateDoc } from '../../engine/design/actions';
 import { setUi, toast, useStore } from '../../store/store';
 import { Button, IconButton, Segmented } from '../ui/primitives';
 import { InlineColor, InlineSelect } from './InlineControls';
+import { TransparentSwatch } from './DocBackgroundChoice';
 import { Popover, usePopover } from '../ui/Popover';
 
 /** Page size: width and height with an anchor (where the current page stays), or trim to what is drawn. `inline` shows the form without the popover (the toolbox card). */
@@ -55,7 +56,7 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
   const orient = (o: Orientation) => { if (o !== orientationOf(w, h)) { setW(h); setH(w); setRatio(h / w); } };
   const apply = () => {
     const err = resizeCanvas(sessionId, doc.id, w, h, anchor);
-    if (!err && bgEdit !== null && bgEdit !== (doc.background ?? '#ffffff')) mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: bgEdit }));
+    if (!err && bgEdit !== null && bgEdit !== doc.background) mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: bgEdit }));
     done(err);
   };
   const form = <div className="canvas-size">
@@ -67,6 +68,7 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
         <Segmented size="sm" value={unit} options={PAGE_UNITS.map((u) => ({ value: u, label: u }))} onChange={setUnit} />
         {unit !== 'px' && <label>DPI<input type="number" min={1} max={1200} value={dpi} onChange={(e) => setDpi(+e.target.value)} /></label>}
         <InlineColor label="Page color" value={bg} onChange={setBgEdit} />
+        <TransparentSwatch on={!doc.background && bgEdit === null} onClick={() => { setBgEdit(null); mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: null })); }} />
         <label className="check-row"><input type="checkbox" checked={lock} onChange={(e) => { setLock(e.target.checked); if (e.target.checked && h) setRatio(w / h); }} />Keep ratio</label>
       </div>
       <span className="field-label">Anchor · where the current page stays</span>

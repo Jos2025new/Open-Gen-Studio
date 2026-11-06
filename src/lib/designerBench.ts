@@ -37,7 +37,7 @@ async function prepare(kind: 'habitual' | 'exigente') {
     doc.activeLayerId = doc.layers.find((l) => l.type === 'raster' && l.paintStrokes?.length)?.id ?? doc.layers[0]?.id ?? null;
   } else {
     useStore.setState((s) => ({ sessions: appendBenchSessions(s.sessions, createSession) }));
-    doc = createDoc('Fluidity demanding: 300 × 120 segments', 1920, 1080);
+    doc = createDoc('Fluidity demanding: 300 × 120 segments', 1920, 1080, '#101012');
     const layer = newRasterLayer('300 long editable strokes', { x: 0, y: 0, width: 1920, height: 1080 }, { width: 1920, height: 1080 });
     const base = document.createElement('canvas'); base.width = 1920; base.height = 1080;
     layer.paintBaseId = `${layer.id}-base`; layer.paintStrokes = longBenchStrokes();

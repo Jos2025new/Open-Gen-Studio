@@ -69,7 +69,7 @@ export function selectDoc(sessionId: string, docId: string): void {
 
 export function newBlankDoc(sessionId: string, preset: { label: string; width: number; height: number }): DesignDoc {
   const count = sessionDocs(sessionId).length + 1;
-  const doc = D.createDoc(`Design ${count}`, preset.width, preset.height);
+  const doc = D.createDoc(`Design ${count}`, preset.width, preset.height, D.newDocBackground());
   addDoc(sessionId, doc);
   return doc;
 }
