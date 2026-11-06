@@ -48,7 +48,7 @@ export function Sidebar() {
   const sidebarRef = useRef<HTMLElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
   const [folded, setFolded] = usePref('ogs:sidebar-folded', false);
-  // Folded, the bar peeks: hovering or focusing its icon (or the left edge) shows it floating over the workspace, in
+  // Folded, the bar peeks: hovering or focusing its icon shows it floating over the workspace, in
   // the chosen width, without moving anything; leaving hides it after a short pause; clicking the icon pins it.
   const [peek, setPeek] = useState(false);
   const hideTimer = useRef<number | undefined>(undefined);
@@ -102,7 +102,6 @@ export function Sidebar() {
 
   return (
     <>
-    {folded && !peeking ? <div className="side-peek-edge" aria-hidden onMouseEnter={showPeek} /> : null}
     <nav ref={sidebarRef} className={`sidebar ${folded && !peeking ? 'is-folded' : ''} ${peeking ? 'is-peek' : ''} ${wide && !narrow && (!folded || peeking) ? 'is-wide' : ''}`} aria-label="Main"
       onMouseEnter={peeking ? showPeek : undefined} onMouseLeave={peeking ? hidePeek : undefined}
       onBlur={peeking ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) hidePeek(); } : undefined}>

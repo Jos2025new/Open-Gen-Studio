@@ -37,8 +37,9 @@ it('folded, hovering the icon shows the bar floating (peek) without unfolding th
   expect(nav().className).toContain('is-folded');
 });
 
-it('the left edge also peeks, and clicking the icon pins the bar', () => {
-  hover(host.querySelector('.side-peek-edge')!, 'mouseover');
+it('only the icon peeks, not the left edge, and clicking the icon pins the bar', () => {
+  expect(host.querySelector('.side-peek-edge')).toBeNull();
+  hover(icon(), 'mouseover');
   expect(nav().className).toContain('is-peek');
   expect(icon().getAttribute('aria-label')).toBe('Pin panel');
   act(() => icon().click());
