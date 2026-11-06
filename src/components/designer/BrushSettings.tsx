@@ -3,6 +3,7 @@ import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
 import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, DAB_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { BrushSizeField } from './BrushSizeField';
+import { FlowField } from './BrushQuick';
 import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { Segmented } from '../ui/primitives';
@@ -155,7 +156,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSlider label="Size jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabSizeJitter ?? DAB_DEFAULTS.sizeJitter} onChange={(v) => set({ dabSizeJitter: v })} />
       <InlineSlider label="Angle jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabAngleJitter ?? DAB_DEFAULTS.angleJitter} onChange={(v) => set({ dabAngleJitter: v })} />
       </div>
-      <InlineSlider label="Flow" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.dabFlow ?? DAB_DEFAULTS.flow} onChange={(v) => set({ dabFlow: v })} />
+      <FlowField />
     </>}
         </>)}
         {pane('pressure', <>
@@ -207,7 +208,7 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
       <InlineSlider label="Size jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabSizeJitter ?? DAB_DEFAULTS.sizeJitter} onChange={(v) => set({ dabSizeJitter: v })} />
       <InlineSlider label="Angle jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.dabAngleJitter ?? DAB_DEFAULTS.angleJitter} onChange={(v) => set({ dabAngleJitter: v })} />
       </div>
-      <InlineSlider label="Flow" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.dabFlow ?? DAB_DEFAULTS.flow} onChange={(v) => set({ dabFlow: v })} />
+      <FlowField />
     </>}
     {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />

@@ -9,6 +9,9 @@ import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
 import { deletePickedNode } from './PathNodes';
 import { boardKey } from './boardKey';
+import { SELECT_SHAPES } from '../../engine/design/selectShape';
+import { sizeRangeFor, stepBrushSize } from '../../engine/design/brushSizeStep';
+import { showValueNotice } from '../../engine/design/valueNotice';
 import { deleteLayers, mergeDown, redoDoc, undoDoc } from '../../engine/design/actions';
 import { activeLayer } from '../../engine/design/doc';
 import { record } from '../../engine/design/history';
@@ -16,8 +19,11 @@ import { toolBlockReason } from '../../engine/design/rules';
 import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 import { applyBoolean } from '../../engine/design/shapeBuilder';
 import type { BoolOp } from '../../engine/design/shapeBoolean';
+import type { UiState } from '../../store/store';
 
 const BOOLEAN_KEYS: Record<string, BoolOp> = { u: 'union', s: 'subtract', i: 'intersect', e: 'exclude' };
+
+const SHAPE_NAMES: Record<string, string> = { rect: 'Rectangle', ellipse: 'Ellipse', lasso: 'Lasso', polygon: 'Polygon', wand: 'Magic wand' };
 
 const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
@@ -39,6 +45,24 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
   const layer = activeLayer(doc);
   const k = e.key.toLowerCase();
   const mod = e.ctrlKey || e.metaKey;
+  // `[` and `]` (AltGr on a Spanish keyboard, which Windows reports as Ctrl+Alt): the brush or eraser size, read from `key`, not `code`.
+  const altGr = Boolean(e.getModifierState?.('AltGraph'));
+  const ui = useStore.getState().ui;
+  if ((e.key === '[' || e.key === ']') && (altGr || (!mod && !e.altKey)) && (ui.tool === 'brush' || ui.tool === 'eraser') && (!tools || tools.has(ui.tool))) {
+    e.preventDefault();
+    const size = stepBrushSize(ui.brush.size, e.key === ']' ? 1 : -1);
+    setUi({ brush: { ...ui.brush, size, sizeRange: sizeRangeFor(size, ui.brush.sizeRange) } });
+    showValueNotice(`${ui.tool === 'eraser' ? 'Eraser' : 'Brush'} size ${size} px`);
+    return;
+  }
+  // Ctrl/Cmd + `=` / `+` zoom in, `-` zoom out, `0` fit (the buttons' events); numpad keys by `code`. Always cancelled: the browser would zoom the page.
+  const zoomKey = e.code === 'NumpadAdd' ? '+' : e.code === 'NumpadSubtract' ? '-' : e.code === 'Numpad0' ? '0' : e.key;
+  if (mod && !e.altKey && (zoomKey === '=' || zoomKey === '+' || zoomKey === '-' || zoomKey === '0')) {
+    e.preventDefault();
+    if (zoomKey === '0') window.dispatchEvent(new Event('ogs:designer-fit'));
+    else window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: zoomKey === '-' ? 0.8 : 1.25 }));
+    return;
+  }
   if (mod && (k === 'z' || k === 'y')) {
     // Ctrl+Z undo; Ctrl+Shift+Z and Ctrl+Y redo.
     e.preventDefault();
@@ -106,6 +130,15 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
     if (kept) toast(kept === ids.length ? `"${layer.name}" is locked. Unlock it to delete it.` : `${kept} locked layer${kept === 1 ? '' : 's'} kept.`, 'info');
   } else if (!mod && !e.altKey && !e.shiftKey && DESIGN_TOOL_KEYS[e.key.toLowerCase()]) {
     const tool = DESIGN_TOOL_KEYS[e.key.toLowerCase()];
+    if (tool === 'select' && ui.tool === 'select' && (!tools || tools.has('select'))) {
+      // M while already in Select cycles its shape: rectangle, ellipse, lasso, polygon, magic wand.
+      e.preventDefault();
+      if (e.repeat) return;
+      const next = SELECT_SHAPES[(SELECT_SHAPES.indexOf((ui.selectShape ?? 'rect') as (typeof SELECT_SHAPES)[number]) + 1) % SELECT_SHAPES.length];
+      setUi({ selectShape: next } as Partial<UiState>);
+      showValueNotice(`Select: ${SHAPE_NAMES[next]}`);
+      return;
+    }
     if ((!tools || tools.has(tool)) && !toolBlockReason(tool, layer)) { e.preventDefault(); setUi({ tool }); }
   }
 }

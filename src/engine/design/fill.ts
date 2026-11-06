@@ -1,28 +1,45 @@
 import type { DesignDoc } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
-import { setDoc } from '../../store/store';
+import { setDoc, toast } from '../../store/store';
 import { insertLayer, newRasterLayer } from './doc';
-import { drawDoc } from './render';
-import { getRasterSurface, setBuffer } from './raster';
+import { renderSource, type SampleSource } from './sampleSource';
+import { setBuffer } from './raster';
 import { record } from './history';
 import { getSelection, selectionMask } from './pixelSelection';
-import { pixelsNotReady } from './rasterMissing';
+import { colorMatcher, gapMask, similarMask } from './fillGap';
 
-/** Sample visible colors, keeping the fill separate from the source artwork. */
-export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: number, color: string, opacity: number, options: { threshold?: number; expand?: number; smooth?: number } = {}): void {
+export type FillOptions = {
+  threshold?: number; expand?: number; smooth?: number;
+  /** What the fill reads: everything visible, or the active layer's own pixels (the fill then lands right under that layer). */
+  source?: SampleSource;
+  /** Openings in the outline up to this many pixels (0..16) do not let the fill leak. Ignored with `similar`. */
+  gap?: number;
+  /** Every similar pixel of the page, not only the ones connected to the click. */
+  similar?: boolean;
+};
+
+/** Sample the chosen source, keeping the fill separate from the source artwork. */
+export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: number, color: string, opacity: number, options: FillOptions = {}): void {
   const threshold = Math.max(0, Math.min(255, options.threshold ?? 24));
   const expand = Math.round(Math.max(0, Math.min(12, options.expand ?? 0)));
   const smooth = Math.max(0, Math.min(4, options.smooth ?? 0));
   const w = Math.round(doc.width), h = Math.round(doc.height);
   x = Math.floor(x); y = Math.floor(y);
   if (x < 0 || y < 0 || x >= w || y >= h) return;
-  const missing = doc.layers.filter((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id));
-  if (missing.length) throw new Error(pixelsNotReady(missing.map((l) => l.id)));
-  const canvas = createCanvas(w, h);
+  const source = options.source ?? 'all';
+  const gap = Math.round(Math.max(0, Math.min(16, options.gap ?? 0)));
+  const read = renderSource(doc, source, { origin: 'fill' });
+  if (typeof read === 'string') throw new Error(read);
+  const { canvas } = read;
   const ctx = ctx2d(canvas);
-  drawDoc(ctx, doc, { origin: 'fill' });
   const pixels = ctx.getImageData(0, 0, w, h).data;
-  const region = floodMask(pixels, w, h, x, y, threshold, expand);
+  let region: Uint8Array | null = null;
+  if (options.similar) region = similarMask(pixels, w, h, x, y, threshold, expand);
+  else if (gap > 0) {
+    region = gapMask(pixels, w, h, x, y, threshold, gap, expand);
+    if (!region) toast('Too close to the outline to close gaps: filled without closing them.', 'info');
+  }
+  region ??= floodMask(pixels, w, h, x, y, threshold, expand);
   const out = ctx.createImageData(w, h);
   const rgb = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   for (let i = 0; i < region.length; i++) {
@@ -54,7 +71,7 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
   if (!sel && region.every(value => value === 1) && smooth === 0) Object.assign(layer, { pageFill: { color, rev: layer.rev } });
   record(doc);
   setBuffer(layer.id, canvas);
-  setDoc(sessionId, doc.id, (d) => insertLayer(d, layer, 'top'));
+  setDoc(sessionId, doc.id, (d) => insertLayer(d, layer, source === 'layer' ? 'below' : 'top'));
 }
 
 /**
@@ -62,14 +79,7 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
  * then grown `expand` pixels. Shared by the bucket and the magic wand. 1 = in the region.
  */
 export function floodMask(pixels: Uint8ClampedArray, w: number, h: number, x: number, y: number, threshold: number, expand: number): Uint8Array {
-  const seed = (y * w + x) * 4;
-  const alpha = pixels[seed + 3];
-  const matches = (i: number) => {
-    const p = i * 4, a = pixels[p + 3];
-    if (Math.abs(a - alpha) > threshold) return false;
-    for (let c = 0; c < 3; c++) if (Math.abs(pixels[p + c] * a / 255 - pixels[seed + c] * alpha / 255) > threshold) return false;
-    return true;
-  };
+  const matches = colorMatcher(pixels, y * w + x, threshold);
   const seen = new Uint8Array(w * h);
   const region = new Uint8Array(w * h);
   const queue = new Int32Array(w * h);

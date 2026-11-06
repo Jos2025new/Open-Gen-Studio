@@ -30,6 +30,59 @@ function listen() { const listener = (event: Event) => designerKey(event as Keyb
 afterEach(() => { fx.setUi.mockClear(); fx.deleteLayers.mockClear(); document.body.innerHTML = ''; });
 
 describe('Designer keyboard shortcuts', () => {
+  it('[ and ] step the brush and eraser size, AltGr included, and only in those tools', () => {
+    const stop = listen();
+    try {
+      fx.ui = { rulers: false, tool: 'brush', brush: { size: 30, color: '#fff', opacity: 1 } } as any;
+      expect(press(']').defaultPrevented).toBe(true);
+      expect(fx.setUi).toHaveBeenLastCalledWith({ brush: expect.objectContaining({ size: 32 }) });
+      press('[', { ctrlKey: true, altKey: true });
+      expect(fx.setUi).toHaveBeenCalledTimes(1);
+      press('[', { ctrlKey: true, altKey: true, modifierAltGraph: true });
+      expect(fx.setUi).toHaveBeenCalledTimes(2);
+      fx.ui = { rulers: false, tool: 'move', brush: { size: 30 } } as any;
+      fx.setUi.mockClear();
+      press(']');
+      expect(fx.setUi).not.toHaveBeenCalled();
+    } finally { fx.ui = { rulers: false } as any; stop(); }
+  });
+
+  it('Ctrl + / - / 0 zoom and fit, cancelled; not with Alt', () => {
+    const stop = listen();
+    const seen: Array<[string, unknown]> = [];
+    const grab = (name: string) => (ev: Event) => seen.push([name, (ev as CustomEvent).detail]);
+    const zoom = grab('zoom'), fit = grab('fit');
+    window.addEventListener('ogs:designer-zoom', zoom); window.addEventListener('ogs:designer-fit', fit);
+    try {
+      expect(press('=', { ctrlKey: true }).defaultPrevented).toBe(true);
+      press('+', { ctrlKey: true, shiftKey: true });
+      press('-', { metaKey: true });
+      press('0', { ctrlKey: true });
+      press('x', { ctrlKey: true, code: 'NumpadAdd' });
+      press('=', { ctrlKey: true, altKey: true });
+      expect(seen).toEqual([['zoom', 1.25], ['zoom', 1.25], ['zoom', 0.8], ['fit', undefined], ['zoom', 1.25]]);
+      seen.length = 0;
+      const inInput = document.body.appendChild(document.createElement('input'));
+      press('=', { ctrlKey: true }, inInput);
+      expect(seen).toEqual([]);
+    } finally { window.removeEventListener('ogs:designer-zoom', zoom); window.removeEventListener('ogs:designer-fit', fit); stop(); }
+  });
+
+  it('M in Select cycles its shape; elsewhere it picks Select', () => {
+    const stop = listen();
+    try {
+      fx.ui = { rulers: false, tool: 'select', selectShape: 'rect' } as any;
+      press('m');
+      expect(fx.setUi).toHaveBeenLastCalledWith({ selectShape: 'ellipse' });
+      fx.ui = { rulers: false, tool: 'select', selectShape: 'wand' } as any;
+      press('m');
+      expect(fx.setUi).toHaveBeenLastCalledWith({ selectShape: 'rect' });
+      fx.ui = { rulers: false, tool: 'brush' } as any;
+      press('m');
+      expect(fx.setUi).toHaveBeenLastCalledWith({ tool: 'select' });
+    } finally { fx.ui = { rulers: false } as any; stop(); }
+  });
+
   it('runs every tool shortcut from a real keydown, even from another paint mode, without changing the document mode', () => {
     const stop = listen();
     try {

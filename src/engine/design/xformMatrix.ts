@@ -8,20 +8,22 @@ export interface XformDrag {
   box: { x: number; y: number; w: number; h: number };
 }
 
-/** The transform a handle drag means, in page coordinates (Shift: keep proportions / 15° steps). `alt` is accepted and not used yet. */
+/** The transform a handle drag means, in page coordinates (Shift: keep proportions / 15° steps; Alt: scale from the centre of the box). */
 export function xformMatrix(d: XformDrag, p: { x: number; y: number }, mods: { shift: boolean; alt: boolean }): Mat {
   const { box, h } = d;
   const { shift } = mods;
   if (d.op === 'scale') {
     // The opposite side or corner stays put.
-    const ax = box.x + box.w / 2 - (h.fx * box.w) / 2, ay = box.y + box.h / 2 - (h.fy * box.h) / 2;
+    // With Alt the centre stays put instead (both sides move).
+    const mx = box.x + box.w / 2, my = box.y + box.h / 2;
+    const ax = mods.alt ? mx : mx - (h.fx * box.w) / 2, ay = mods.alt ? my : my - (h.fy * box.h) / 2;
     const clamp = (v: number) => (Math.abs(v) < 0.01 ? Math.sign(v || 1) * 0.01 : v);
-    let sx = h.fx ? (p.x - ax) / (h.x - ax) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay) : 1;
+    let sx = h.fx ? (p.x - ax) / (h.x - ax || 1) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay || 1) : 1;
     // Ctrl or Shift (Inkscape's Ctrl): width and height keep their ratio. A side handle scales both axes,
     // about the opposite side's middle.
     if (shift && h.fx && h.fy) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
-    else if (shift && h.fx) return scaleAbout(clamp(sx), clamp(Math.abs(sx)), ax, box.y + box.h / 2);
-    else if (shift && h.fy) return scaleAbout(clamp(Math.abs(sy)), clamp(sy), box.x + box.w / 2, ay);
+    else if (shift && h.fx) return scaleAbout(clamp(sx), clamp(Math.abs(sx)), ax, my);
+    else if (shift && h.fy) return scaleAbout(clamp(Math.abs(sy)), clamp(sy), mx, ay);
     return scaleAbout(clamp(sx), clamp(sy), ax, ay);
   }
   if (d.op === 'rotate') {

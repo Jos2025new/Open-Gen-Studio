@@ -13,6 +13,7 @@ import { setDoc, toast } from '../../store/store';
 import { applyDrawingChoice, drawingPreference, justClosedChoice, requestDrawingChoice } from '../../engine/design/drawingChoice';
 import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
 import { pixelsNotReady } from '../../engine/design/rasterMissing';
+import { rememberPaintEnd } from '../../engine/design/paintLastPoint';
 
 /** The raster layer a brush stroke would land on (the active one, or the one above it), or null. */
 export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | null {
@@ -62,6 +63,7 @@ export function commitStagePaintGesture(args: {
   const layer = doc?.layers.find((item): item is RasterLayer => item.id === gesture.layerId && item.type === 'raster');
   const pixels = getRasterSurface(gesture.layerId)?.canvas;
   if (!doc || !layer) return;
+  rememberPaintEnd(docId, gesture.layerId, gesture.erase, gesture.last);
 
   if (pixels) endBrushStroke(gesture.stroke, gesture.live, pixels, layer, brush);
   args.flushFrame();
