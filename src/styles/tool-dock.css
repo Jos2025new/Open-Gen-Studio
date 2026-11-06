@@ -238,6 +238,13 @@
 .composer-tools-rail .tool-dock-variants.is-fixed .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .85; }
 /* Any tool: its sliders take the row's free space; the spacer only separates the row's end when nothing can stretch. */
 .composer-tools-rail .tool-dock-quick-sliders { flex: 1 1 0; }
-.composer-tools-rail .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 72px; }
+.composer-tools-rail .tool-dock-quick-sliders { gap: 8px; }
+.composer-tools-rail .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 72px; padding: 0 6px; }
+.composer-tools-rail .tool-dock-quick-sliders .opt-readout { margin-inline: auto; }
+/* One size and tone for every button of the bar; the groups (tool, settings, actions, view) read by dividers, not by uneven gaps. */
+.composer-tools-rail .tool-dock-variants.is-fixed .opt-color.is-icon { flex: 0 0 28px; width: 28px; height: 28px; align-self: center; }
+.composer-tools-rail .designer-footer-tools { gap: 0; }
+.composer-tools-rail .designer-footer-tools::before { content: ''; align-self: center; width: 1px; height: 24px; margin-right: 8px; background: var(--panel-line); }
+.composer-tools-rail .designer-footer-tools .icon-btn { width: 36px; height: 36px; color: var(--text-2); }
 .composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders) .tool-dock-grow { display: none; }
 .composer-tools-rail .tool-dock-stack > .tool-dock-card { position: absolute; z-index: 7; left: 0; right: 0; bottom: calc(100% + 8px); width: fit-content; max-width: 100%; margin-inline: auto; }
