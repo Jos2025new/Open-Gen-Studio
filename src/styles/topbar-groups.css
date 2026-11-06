@@ -13,3 +13,14 @@
 .topbar-export.btn { height: 32px; padding: 0 14px; border-radius: var(--toolbar-radius); font-weight: 600; }
 .topbar-left .save-indicator { height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 12px; color: var(--text-3); }
 .topbar-left .save-indicator:hover { color: var(--text); }
+
+/* A window too narrow for the labels keeps the top bar on one row: what is only text gives way, its icon or tooltip stays. */
+@media (min-width: 541px) and (max-width: 767px) {
+  :root .topbar { flex-wrap: nowrap; --session-title-width: 96px; }
+  :root .topbar .topbar-left { width: auto; flex: 0 1 auto; min-width: 0; }
+  :root .topbar .topbar-right { flex: 0 1 auto; min-width: 0; scrollbar-width: none; }
+  :root .topbar .topbar-export.btn { gap: 0; padding: 0 9px; font-size: 0; }
+  :root .topbar .selection-chip { display: none; }
+  :root .topbar .save-indicator { gap: 0; font-size: 0; }
+}
+

@@ -59,7 +59,7 @@
   .composer-dock, .chat-welcome, .chat-empty .suggestions { width: min(800px, calc(100% - 32px)); }
 }
 /* Studio and Nodes keep the margins of the Designer's prompt box, so the box does not stretch across a narrower window. */
-@media (min-width: 768px) {
+@media (min-width: 541px) {
   .composer-dock:is(.dock-chat, .dock-node), .chat-welcome, .chat-empty .suggestions { width: min(800px, calc(100% - 192px)); }
 }
 @media (max-width: 767px) {

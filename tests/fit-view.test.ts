@@ -9,6 +9,13 @@ it('Fit canvas centers the canvas in the window', () => {
   expect(v.zoom).toBeCloseTo((900 - 24 - 120) / 1000);
 });
 
+it('a narrow window clears the toolbox, the panel tabs and the bar', () => {
+  const v = fitView({ w: 640, h: 700 }, { width: 1000, height: 1000 });
+  expect(v.zoom).toBeCloseTo((640 - 144) / 1000);
+  expect(v.x).toBeCloseTo(72);
+  expect(v.y + 1000 * v.zoom).toBeLessThan(700 - 120);
+});
+
 it('a pinned panel leaves its margin on both sides, keeping the center', () => {
   document.documentElement.style.setProperty('--layers-w', '260px');
   const v = fitView({ w: 1300, h: 900 }, { width: 2000, height: 500 });

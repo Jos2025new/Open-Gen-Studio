@@ -8,6 +8,6 @@
 @keyframes layers-peek-in { from { opacity: 0; transform: translateX(12px); } }
 @media (prefers-reduced-motion: reduce) { .layers-panel.is-peek { animation: none; } }
 /* Pinned: the same floating card, in its own place at the right. It takes no room from the stage, so pinning or unpinning moves neither toolbox nor canvas. */
-@media (min-width: 768px) {
+@media (min-width: 541px) {
   .ws-designer .layers-panel:not(.is-peek) { position: absolute; z-index: 30; top: 0; right: 12px; bottom: 0; width: var(--layers-peek-w, 260px); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); overflow: hidden; box-shadow: var(--shadow-pop); }
 }

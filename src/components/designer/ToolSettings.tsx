@@ -15,6 +15,7 @@ import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
 import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { SelectionActions } from './SelectionActions';
+import { GRADIENT_DEFAULT } from '../../engine/design/gradient';
 import { toast } from '../../store/store';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
@@ -236,7 +237,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, m
   if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} compact={compact} />;
   if (tool === 'eyedropper') return <div className="tool-settings" role="toolbar" aria-label="Eyedropper settings"><InlineColor label="Picked" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} /><span className="opt-hint">Click the page to pick its visible color</span></div>;
   if (tool === 'gradient') {
-    const g = gradient ?? { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1 };
+    const g = gradient ?? GRADIENT_DEFAULT;
     const set = (patch: Partial<typeof g>) => setUi({ gradient: { ...g, ...patch } });
     return <div className="tool-settings" role="toolbar" aria-label="Gradient settings">
       <InlineSelect label="Shape" value={g.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => set({ shape: v })} />

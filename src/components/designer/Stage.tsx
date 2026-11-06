@@ -18,7 +18,7 @@ import { SnapIndicator } from './SnapIndicator';
 import { AgentGlow } from './AgentGlow';
 import { moveMode, neighbourGaps } from '../../engine/design/neighbourGaps';
 import { stageWheel } from './wheelZoom';
-import { fitView } from './fitView';
+import { fitView, useKeepCenter } from './fitView';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
@@ -45,7 +45,7 @@ import { PRIM_TOOLS, placedPath, primFromUi, primShape } from '../../engine/desi
 import { boxShape } from '../../engine/design/shapeDraw';
 import { gestureBuffers, transformLayer } from '../../engine/design/affine';
 import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/design/matrix';
-import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
+import { applyGradient, GRADIENT_DEFAULT, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { editShape, objectPick, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
 import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
@@ -98,7 +98,6 @@ const RULER = 18;
 const tok = (n: string, f: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
 /** The selection colour (the highlight's --accent, a hex) at an alpha: handles and picks follow the chosen highlight. */
 const accentA = (a = 1) => { const n = parseInt(tok('--accent', '#d4f25a').slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
-const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
 type ShapeTool = keyof typeof SHAPE_NAMES;
 /** Drawn between two points (stroke only), not inside a box. */
@@ -275,6 +274,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const fit = useCallback(() => setView((untouched.current = fitView(size, doc, board))), [size, doc.width, doc.height, board?.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const untouched = useRef<View | null>(null);
+  useKeepCenter(size, setView);
   useLayoutEffect(() => {
     const key = `${doc.id}:${doc.width}x${doc.height}`;
     if (size.w && (fitted.current !== key || view === untouched.current)) {

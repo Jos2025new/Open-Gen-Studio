@@ -154,9 +154,9 @@
 .context-scroll:hover:not(:disabled) { background: var(--surface-hover); }
 .designer-palette { --palette-left: var(--designer-dock-left); }
 .layers-panel .panel-tab { width: auto; flex: 0 1 auto; gap: 6px; padding: 0 8px; font-size: 11px; }
-@media (max-width: 767px) {
+@media (max-width: 540px) {
   .ws-designer { --designer-dock-left: 10px; }
-  .ws-designer .dock-designer { width: calc(100% - 20px); }
+  .ws-designer .dock-designer { width: calc(100% - var(--designer-dock-left) - 10px); }
   .designer-palette { --palette-left: 10px; }
 
 }

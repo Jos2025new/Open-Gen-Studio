@@ -168,7 +168,7 @@
 .composer-tools-bar { justify-content: space-between; }
 /* The prompt box is centered in the window, and Fit canvas centers there too (fitView): pinning the right panel moves neither.
    The panel floats, so a short window narrows the box by the panel's width on both sides, to clear it and stay centered. */
-@media (min-width: 768px) {
+@media (min-width: 541px) {
   .ws-designer .dock-designer { left: 50%; transform: translateX(-50%); width: min(800px, calc(100% - 2 * var(--layers-w, 0px) - 192px)); }
 }
 /* Selection strip and node-edit bar: one compact row directly above the toolbox, scrolling sideways when short (never wrapping). */

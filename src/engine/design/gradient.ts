@@ -69,3 +69,6 @@ export function applyGradient(sessionId: string, doc: DesignDoc, spec: GradientS
   setBuffer(layer.id, canvas);
   setDoc(sessionId, doc.id, (d) => insertLayer(d, layer, 'above'));
 }
+
+/** A new gradient: from the color to transparent. */
+export const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1, reverse: false };

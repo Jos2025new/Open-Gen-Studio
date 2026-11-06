@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { getDoc } from '../../engine/design/actions';
+import { GRADIENT_DEFAULT } from '../../engine/design/gradient';
 import { record } from '../../engine/design/history';
 import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { getSelection, invertSelection, selectAll, useSelectionVersion } from '../../engine/design/pixelSelection';
@@ -29,7 +30,6 @@ const LONG = new Set<QuickKind>(['wandTolerance', 'wandExpand', 'size', 'opacity
 /** Estimated width (px) of a tool's quick settings, and of the row with `subtools` buttons: decides inline or collapsed («). */
 const WIDE: Partial<Record<QuickKind, number>> = { gradientShape: 120, gradientColors: 150, selectOps: 110, editMode: 130, autoSelect: 110 };
 export const quickWidth = (tool: DesignTool | undefined) => (tool ? QUICK[tool] ?? [] : []).reduce((w, k) => w + (WIDE[k] ?? (LONG.has(k) ? 150 : 44)), 0);
-const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1, reverse: false };
 
 export const ROW_BUDGET = 560;
 export const rowFits = (tool: DesignTool | undefined, subtools: number) => subtools * 36 + quickWidth(tool) + 90 <= ROW_BUDGET;
