@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { getDoc } from '../../engine/design/actions';
 import { record } from '../../engine/design/history';
 import { strokeObjectsAvailable } from '../../engine/design/paintMode';
-import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { getSelection, growSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { setRuler } from '../../engine/design/strokeRuler';
 import { setUi, toast, useStore } from '../../store/store';
 import { AutoSelectToggle, EditModeToggle, WAND_DEFAULT } from './ToolSettings';
@@ -12,16 +12,17 @@ import { BrushSizeField } from './BrushSizeField';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 /** What each control of the subtoolbox's quick settings edits. All of them exist in the tool's card already. */
-export type QuickKind = 'gradientShape' | 'gradientColors' | 'wandTolerance' | 'selectOps' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear';
+export type QuickKind = 'gradientShape' | 'gradientColors' | 'wandMode' | 'wandTolerance' | 'wandExpand' | 'wandSmooth' | 'selectOps' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear';
 const SHAPES: QuickKind[] = ['strokeWidth', 'stroke', 'fill'], LINES: QuickKind[] = ['strokeWidth', 'stroke'];
 /** Per tool: at most 2 long sliders first, then 1–2 small controls. A tool absent here has no quick settings (its card may still exist). */
 export const QUICK: Partial<Record<DesignTool, QuickKind[]>> = {
   brush: ['size', 'opacity', 'color'], eraser: ['size', 'opacity'], fill: ['opacity', 'threshold', 'color'], gradient: ['gradientShape', 'gradientOpacity', 'gradientColors'], eyedropper: ['color'],
   lineart: ['lineartSize', 'lineartOpacity', 'lineartColor'], rect: SHAPES, ellipse: SHAPES, sector: SHAPES, arc: SHAPES, chord: SHAPES, polygon: SHAPES, star: SHAPES,
   line: LINES, arrow: LINES, curve: LINES, text: ['fontSize', 'textColor'], ruler: ['rulerSnap', 'rulerClear'],
-  select: ['wandTolerance', 'selectOps'], move: ['editMode', 'autoSelect'],
+  select: ['wandMode', 'wandTolerance', 'wandExpand', 'wandSmooth', 'selectOps'], move: ['editMode', 'autoSelect'],
 };
-const LONG = new Set<QuickKind>(['wandTolerance', 'size', 'opacity', 'threshold', 'gradientOpacity', 'lineartSize', 'lineartOpacity', 'strokeWidth', 'fontSize']);
+const WAND_ONLY = new Set<QuickKind>(['wandMode', 'wandTolerance', 'wandExpand', 'wandSmooth']);
+const LONG = new Set<QuickKind>(['wandTolerance', 'wandExpand', 'wandSmooth', 'size', 'opacity', 'threshold', 'gradientOpacity', 'lineartSize', 'lineartOpacity', 'strokeWidth', 'fontSize']);
 /** Estimated width (px) of a tool's quick settings, and of the row with `subtools` buttons: decides inline or collapsed («). */
 const WIDE: Partial<Record<QuickKind, number>> = { gradientShape: 120, gradientColors: 150, selectOps: 230, editMode: 130, autoSelect: 110 };
 export const quickWidth = (tool: DesignTool | undefined) => (tool ? QUICK[tool] ?? [] : []).reduce((w, k) => w + (WIDE[k] ?? (LONG.has(k) ? 150 : 44)), 0);
@@ -32,8 +33,12 @@ function SelectQuick({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) 
   useSelectionVersion();
   const sel = getSelection(doc.id);
   const cur = () => getDoc(sessionId, doc.id)!;
+  const [grow, setGrow] = useState(2);
   const toLayer = () => { const err = selectionToLayer(sessionId, cur()); if (err) toast(err, 'error'); };
   return <>
+    <InlineSlider label="Amount" unit="px" tip="How far Grow and Shrink move the selection's edge" min={1} max={50} value={grow} onChange={setGrow} />
+    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); growSelection(cur(), -grow); }} data-tip={`Shrinks the selection ${grow} px on every side`}>Shrink</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); growSelection(cur(), grow); }} data-tip={`Grows the selection ${grow} px on every side`}>Grow</button>
     <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Ctrl+A">All</button>
     <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
@@ -53,7 +58,10 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
   const setLine = (patch: object) => setUi({ lineart: { ...useStore.getState().ui.lineart, ...patch } });
   const r = ruler && ruler.docId === docId ? ruler : null;
   switch (kind) {
-    case 'wandTolerance': return <InlineSlider label="Tolerance" min={0} max={255} value={wand.threshold} onChange={(v) => setUi({ wand: { ...wand, threshold: v } })} />;
+    case 'wandMode': return <InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setUi({ wand: { ...wand, mode: v } })} />;
+    case 'wandTolerance': return <InlineSlider label="Tolerance" tip="How different a color can be and still be picked" min={0} max={255} value={wand.threshold} onChange={(v) => setUi({ wand: { ...wand, threshold: v } })} />;
+    case 'wandExpand': return <InlineSlider label="Expand" unit="px" tip="Widens each new pick by this much" min={0} max={12} value={wand.expand} onChange={(v) => setUi({ wand: { ...wand, expand: v } })} />;
+    case 'wandSmooth': return <InlineSlider label="Smooth" unit="px" tip="Softens the jagged edge of each new pick" min={0} max={4} step={0.5} value={wand.smooth} onChange={(v) => setUi({ wand: { ...wand, smooth: v } })} />;
     case 'selectOps': return <SelectQuick sessionId={sessionId} doc={doc} />;
     case 'editMode': return <EditModeToggle objects={strokeObjectsAvailable(doc)} />;
     case 'autoSelect': return <AutoSelectToggle />;
@@ -84,7 +92,7 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
 /** The quick settings of `tool`: long sliders share the row, small controls follow. */
 export function QuickControls({ tool, sessionId, doc }: { tool: DesignTool; sessionId: string; doc: DesignDoc }): ReactNode {
   const wandShape = useStore((s) => s.ui.selectShape) === 'wand';
-  const kinds = QUICK[tool]?.filter((k) => k !== 'wandTolerance' || wandShape);
+  const kinds = QUICK[tool]?.filter((k) => !WAND_ONLY.has(k) || wandShape);
   if (!kinds) return null;
   const long = kinds.filter((k) => LONG.has(k));
   return <>

@@ -151,7 +151,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const subtools = (selectedFamily?.variants.length ?? 0) > 1;
   const hasQuick = !!QUICK[currentTool];
   const collapsibleFor = (tool?: DesignTool) => !!tool && !!QUICK[tool] && subtools && !rowFits(tool, selectedFamily?.variants.length ?? 0);
-  const showGear = !!selectedVariant && !selectedVariant.soon && currentTool !== 'hand';
+  // The eyedropper's only setting is the color the row already shows: no card to open.
+  const noCard = bottom && selectedVariant?.tool === 'eyedropper';
+  const showGear = !!selectedVariant && !selectedVariant.soon && currentTool !== 'hand' && !noCard;
   // A row that does not fit shows either the subtools or the settings, never squeezed together.
   const quickInline = hasQuick && (quickShown || !hasQuickCollapsible);
   const enterQuick = () => { setQuick(true); if (depth === 'open') dispatch({ type: 'escape' }); };
@@ -168,7 +170,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
         : iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}
     </> : subtools && selectedFamily.variants.map((variant) => {
       const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
-      return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); if (collapsibleFor(variant.tool)) enterQuick(); else if (active) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
+      return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); if (collapsibleFor(variant.tool)) enterQuick(); else if (active && !noCard) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
     })}
     {!quickShown && subtools && quickInline && <span className="tool-dock-separator" aria-hidden="true" />}
     {quickInline && <QuickControls tool={currentTool} sessionId={sessionId} doc={doc} />}
@@ -209,7 +211,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
       </div>}
       {/* Edit with a selection and its card not open: the contextual strip alone, where the card would open. */}
       {stripShown && <section className="tool-dock-card tool-dock-strip" aria-label="Selection controls"><ContextStrip sessionId={sessionId} doc={doc} variant="strip" /></section>}
-      {depth === 'open' && selectedVariant && !selectedVariant.soon && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
+      {depth === 'open' && selectedVariant && !selectedVariant.soon && !noCard && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
         <button type="button" className="tool-dock-grip" role="separator" aria-orientation="horizontal" aria-label="Resize tool settings" tabIndex={0} onKeyDown={onGripKey} onPointerDown={(event) => {
           const startY = event.clientY; const startHeight = height; const el = event.currentTarget;
           el.setPointerCapture(event.pointerId);

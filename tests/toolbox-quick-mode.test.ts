@@ -171,6 +171,9 @@ describe('subtoolbox row for every tool', () => {
     await act(async () => [...row()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
     expect(labels(row())).toEqual(expect.arrayContaining(['All', 'Invert', 'Deselect', 'To layer']));
     expect(labels(row())).toEqual(expect.arrayContaining(['Rectangular selection', 'Lasso']));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Shrink', 'Grow']));
+    await act(async () => setUi({ selectShape: 'wand' }));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'Tolerance', 'Expand', 'Smooth', 'Shrink', 'Grow']));
     await act(async () => setUi({ tool: 'gradient', gradient: undefined }));
     expect(row()!.querySelector('.tool-dock-quick-sliders .opt-slider')).not.toBeNull();
     const second = () => row()!.querySelector<HTMLButtonElement>('.quick-color-pair [role="switch"]')!;
@@ -181,6 +184,7 @@ describe('subtoolbox row for every tool', () => {
     expect(row()!.querySelectorAll('.quick-color-pair .opt-color')).toHaveLength(2);
     await act(async () => setUi({ tool: 'eyedropper' }));
     expect(row()!.querySelector('.tool-dock-quick-sliders')).toBeNull();
+    expect(row()!.querySelector('[aria-label="Settings"]')).toBeNull();
   });
 
   it('QUICK maps every control to at most 2 long sliders', async () => {

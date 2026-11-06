@@ -242,6 +242,7 @@
 .composer-tools-rail .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: 36px; white-space: nowrap; }
 .composer-tools-rail .tool-dock-quick-sliders:has(> :only-child) { flex: 0 1 180px; }
 .composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders > :only-child) .tool-dock-grow { display: block; }
+.composer-tools-rail .tool-dock-variants.is-fixed > .opt-slider { flex: 0 0 112px; }
 /* Colors that belong together share one capsule; the toggle turns the second on. */
 .quick-color-pair { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 36px; padding: 0 4px; background: var(--field-bg); border-radius: 18px; }
 .quick-color-pair .opt-toggle { height: auto; padding: 0 2px; background: transparent; border: 0; }

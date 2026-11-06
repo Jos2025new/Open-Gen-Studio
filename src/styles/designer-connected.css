@@ -198,7 +198,7 @@
 .opt-slider .opt-num { pointer-events: auto; cursor: text; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
 .opt-slider .opt-unit { margin-left: 0; }
 .opt-ticks { position: absolute; inset: 0; pointer-events: none; }
-.opt-ticks i { position: absolute; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: var(--text-3, var(--text-2)); opacity: .55; }
+.opt-ticks i { position: absolute; bottom: 3px; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: var(--text-3, var(--text-2)); opacity: .55; }
 .opt-slider.is-disabled { opacity: .45; }
 .opt-slider.is-disabled .opt-range { cursor: default; }
 .opt-toggle { cursor: pointer; text-align: left; }
