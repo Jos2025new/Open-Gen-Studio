@@ -133,7 +133,10 @@ it('the Designer side toolbox opens the same panel: Create offers only Image (wi
   expect(host.querySelector('.tools .canvas-nav-badge')?.textContent).toBe('1');
   act(() => host.querySelector<HTMLElement>('.tools [aria-label="Create"]')?.click());
   expect([...host.querySelectorAll<HTMLButtonElement>('.designer-corner .side-kind')].map((b) => `${b.textContent?.trim()}${b.disabled ? ' off' : ''}`)).toEqual(['Image', 'Video off', 'Audio off', '3D off']);
-  expect(host.querySelector('.designer-corner .target-mock')).not.toBeNull();
+  expect(host.querySelector('.designer-corner .side-prompt')).toBeNull();
+  act(() => host.querySelector<HTMLElement>('.designer-corner .side-kind')?.click());
+  expect(useStore.getState().ui.designerDock).toBe('prompt');
+  expect(host.querySelector('.designer-corner')).toBeNull();
   act(() => host.querySelector<HTMLElement>('.tools [aria-label="Conversation"]')?.click());
   expect(host.querySelector('.designer-corner .feed-mock')).not.toBeNull();
   act(() => root.unmount());
@@ -142,9 +145,8 @@ it('the Designer side toolbox opens the same panel: Create offers only Image (wi
 it('in the Designer the panel lives in the side toolbox, gives way to its popups and replaces the Conversation card', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
   expect(palette).toMatch(/<DesignsButton [^>]*\/>\s*<CornerButtons sessionId=\{settings\.sessionId\} space="designer" \/>/);
-  expect(palette).toMatch(/\{viewBar\}\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>/);
-  expect(readFileSync('src/styles/node-side.css', 'utf8')).toMatch(/\.composer-tools-bar \.node-side\.designer-corner \{ left: 0; top: auto; bottom: calc\(100% \+ var\(--canvas-pop-gap\)\); \}/);
+  expect(palette).toMatch(/<\/div>\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>/);
   const css = readFileSync('src/styles/node-side.css', 'utf8');
-  expect(css).toMatch(/:is\(\.designer-side, \.composer-tools-bar\):has\(\.tool-dock-stack > \*\) \.designer-corner, body:has\(\.designs-pop\) \.designer-corner \{ display: none; \}/);
-  expect(css).toMatch(/\.ws-designer:has\(\.designer-side, \.designer-dock-start\) :is\(\.thread-peek, \.thread-peek-folded\) \{ display: none; \}/);
+  expect(css).toMatch(/body:has\(\.designs-pop\) \.designer-corner \{ display: none; \}/);
+  expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) :is\(\.thread-peek, \.thread-peek-folded\) \{ display: none; \}/);
 });

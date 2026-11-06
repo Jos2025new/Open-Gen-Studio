@@ -47,7 +47,7 @@ export default [{
   what: 'Dock por modo; Edit sigue la selección.',
   sides: [
     ['src/components/designer/ToolDock.tsx', 'export function ToolDock'],
-    ['src/components/composer/Composer.tsx', '<ToolDock '],
+    ['src/components/composer/Composer.tsx', '<DockSlot '],
     ['src/components/designer/ToolPalette.tsx', '<ToolDock '],
     ['src/components/studio/EmbeddedDesignerBar.tsx', '<ToolDock '],
     ['src/components/designer/ToolDock.tsx', '<EditCard '],

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement, type Ref } from 'react';
 import { applyBrushPreset, PENCIL_PRESETS } from '../../engine/design/brushPresets';
 import { ChevronsLeft, EyeOff, AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
@@ -67,10 +67,10 @@ function restrictToolbox(tools?: ReadonlySet<DesignTool>): ToolboxFamily[] {
 }
 
 /**
- * `vertical`: the same strip turned upright (the Designer's side toolbox): variants in a column and the card at their right,
- * the grip under the card; arrows Up and Down also move along it. `designer`: the Designer's own toolbox (vertical implies it).
+ * `vertical`: the strip turned upright; arrows Up and Down also move along it. `designer`: the Designer's own toolbox: the active
+ * tool's options go to `optionsSlot`, in the bar at the bottom, and nowhere while the prompt box is there instead.
  */
-export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false, designer: inDesigner = false }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean; designer?: boolean }) {
+export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical = false, designer: inDesigner = false, optionsSlot = null }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool>; vertical?: boolean; designer?: boolean; optionsSlot?: HTMLElement | null }) {
   const currentTool = useStore((state) => state.ui.tool);
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
@@ -85,7 +85,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   // Quick mode (the subtoolbox row): the subtool's icon, Size, Opacity, color, Eraser and Settings replace the variants. Entered by choosing a subtool that has settings; « leaves it.
   const [quick, setQuick] = useState(false);
   const promptHidden = useStore((state) => state.ui.promptHidden) ?? false;
-  const bottom = inDesigner && !vertical;
+  const bottom = inDesigner;
   const hasQuickCollapsible = !!QUICK[currentTool] && (selectedFamilyLen(shownFamilies, currentFamily) > 1) && !rowFits(currentTool, selectedFamilyLen(shownFamilies, currentFamily));
   const quickShown = bottom && quick && hasQuickCollapsible;
   const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? currentFamily;
@@ -102,6 +102,12 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   // The Designer's toolbox (either place; Studio's is not) shares one popup at a time with Designs and Create/Conversation.
   const designer = vertical || inDesigner;
   useSidePopup('tools', () => { dispatch({ type: 'escape' }); dispatch({ type: 'escape' }); }, designer);
+  // Changing tool brings its options back in place of the prompt box.
+  const shownTool = useRef(currentTool);
+  useEffect(() => {
+    if (inDesigner && shownTool.current !== currentTool) setUi({ designerDock: 'tools' });
+    shownTool.current = currentTool;
+  }, [currentTool, inDesigner]);
 
   useEffect(() => { if (!hasQuickCollapsible) setQuick(false); }, [currentTool]);
   useEffect(() => {
@@ -151,10 +157,10 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const enterQuick = () => { setQuick(true); if (depth === 'open') dispatch({ type: 'escape' }); };
   // The eye sits at the bar's very end, after the zoom rail (the composer's slot), not inside the scrolling tool list.
   const [eyeSlot, setEyeSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => { if (bottom) setEyeSlot(document.querySelector<HTMLElement>('.composer-tools-bar > .tool-dock-eye-slot')); }, [bottom]);
+  useEffect(() => { setEyeSlot(optionsSlot ? document.querySelector<HTMLElement>('.composer-tools-bar > .tool-dock-eye-slot') : null); }, [optionsSlot]);
   const hideButton = <button type="button" className={`tool-dock-hide-prompt${promptHidden ? ' is-pill' : ''}`} aria-label="Hide prompt box" aria-pressed={promptHidden} data-tip={promptHidden ? 'Show the prompt box' : 'Hide the prompt box'} onClick={() => setUi({ promptHidden: !promptHidden })}><EyeOff size={16} /></button>;
   const gear = showGear && <button type="button" className={`icon-btn icon-btn-md tone-default ${depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={depth === 'open'} data-tip="Advanced settings" onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button>;
-  const bottomRow = bottom && depth !== 'closed' && selectedFamily && !stripShown && (subtools || hasQuick || showGear) && <div className={`tool-dock-variants is-fixed${quickShown ? ' is-quick' : ''}`} role="toolbar" aria-label={quickShown || !subtools ? 'Quick settings' : `${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
+  const bottomRow = bottom && selectedFamily && !stripShown && (subtools || hasQuick || showGear) && <div className={`tool-dock-variants is-fixed${quickShown ? ' is-quick' : ''}`} role="toolbar" aria-label={quickShown || !subtools ? 'Quick settings' : `${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
     {quickShown ? <>
       <button type="button" className="icon-btn icon-btn-md tone-default" aria-label="Show all tools" data-tip="Show all tools" onClick={() => { setQuick(false); if (depth === 'open') dispatch({ type: 'escape' }); }}><ChevronsLeft size={16} /></button>
       {iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}
@@ -169,6 +175,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     {gear}
   </div>;
 
+  const placeStack = (stack: ReactElement) => !bottom ? stack : optionsSlot ? createPortal(stack, optionsSlot) : null;
+  const pillHome = optionsSlot?.closest('.composer');
   const setHeightFrom = (next: number) => setHeight(Math.max(140, Math.min(window.innerHeight * 0.6, next)));
   const onGripKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
@@ -185,7 +193,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     event.preventDefault(); event.stopPropagation();
     if (familyId) familyButtons.current.get(familyId)?.focus();
   }}>
-    <div className={`tool-dock-stack${bottom ? ' is-fixed' : ''}`}>
+    {placeStack(<div className={`tool-dock-stack${bottom ? ' is-fixed' : ''}`} style={{ '--tool-dock-card-height': `${height}px` } as CSSProperties}>
       {bottomRow}
       {!bottom && depth !== 'closed' && selectedFamily && !stripShown && <div className={`tool-dock-variants${bottom ? ' is-fixed' : ''}`} role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
@@ -214,8 +222,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           {selectedVariant.action === 'guides' && <div className="tool-dock-actions"><GuidesCard sessionId={sessionId} doc={doc} /></div>}
         </div>
       </section>}
-    </div>
-    {bottom && promptHidden && hideButton}
+    </div>)}
+    {bottom && promptHidden && pillHome && createPortal(hideButton, pillHome)}
     <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family) => {
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
@@ -223,7 +231,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
         const button = <span key={family.id}>
           {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
             if (soonReason) return;
-            if (designer) announceSidePopup('tools');
+            if (designer) { announceSidePopup('tools'); setUi({ designerDock: 'tools' }); }
             if (stripShown && family.id === currentFamily?.id) { setVariantsAsked(true); if (depth === 'closed') dispatch({ type: 'family', familyId: family.id }); return; }
             if (family.id !== familyId) {
               const initial = entryVariant(family, lastVariant);
@@ -238,7 +246,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           {button}
         </span> : button;
       })}
-      {bottom && !promptHidden && (eyeSlot ? createPortal(<><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</>, eyeSlot) : <span className="tool-dock-end"><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</span>)}
+      {!promptHidden && eyeSlot && createPortal(<><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</>, eyeSlot)}
     </div>
   </div>;
 }

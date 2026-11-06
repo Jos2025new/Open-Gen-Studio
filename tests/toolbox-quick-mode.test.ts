@@ -11,14 +11,17 @@ import { setUi, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const initialUi = useStore.getState().ui;
-let root: Root, host: HTMLDivElement;
+let root: Root, host: HTMLDivElement, optionsSlot: HTMLElement;
 
 beforeEach(async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   useStore.setState({ ui: { ...initialUi, tool: 'move', selectShape: 'rect', promptHidden: false } });
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, designer: true })));
+  host = document.createElement('div'); document.body.append(host);
+  host.innerHTML = '<div class="composer"><div class="composer-tools-bar"><div class="designer-dock-options"></div><span class="tool-dock-eye-slot"></span></div></div><div class="mount"></div>';
+  optionsSlot = host.querySelector<HTMLElement>('.designer-dock-options')!;
+  root = createRoot(host.querySelector('.mount')!);
+  await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, designer: true, optionsSlot })));
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); useStore.setState({ ui: initialUi }); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -92,11 +95,10 @@ describe('quick mode of the subtoolbox', () => {
     expect(useStore.getState().ui.promptHidden).toBe(false);
   });
 
-  it('hiding slides the toolbox down with a transition (reduced motion respected) and drops the subtoolbox to the bottom', () => {
+  it('hiding slides the bar down with a transition (reduced motion respected)', () => {
     expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/showTools && promptHidden \? ' is-prompt-hidden'/);
     const css = readFileSync('src/styles/tool-dock.css', 'utf8');
-    expect(css).toMatch(/\.composer\.is-prompt-hidden .*\.tool-dock-family\) \{ transform: translateY\(/);
-    expect(css).toMatch(/\.composer\.is-prompt-hidden \.tool-dock-stack\.is-fixed \{ bottom: 8px; right: 47px; \}/);
+    expect(css).toMatch(/\.composer\.is-prompt-hidden \.composer-tools-bar > \* \{ transform: translateY\(/);
     expect(css).toMatch(/\.tool-dock-hide-prompt\.is-pill \{ position: absolute;[^}]*bottom: 8px;/);
     expect(css).toMatch(/transition: transform \.22s/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\)[^}]*transition: none/);
@@ -112,8 +114,8 @@ it('the quick colour sits on a light disc and the tools-dock frame is thin', asy
 
 describe('hide button placement', () => {
   it('the hide button is the last item of the toolbox bar after a divider; hidden, it becomes a pill outside the bar and still unhides', async () => {
-    const bar = () => host.querySelector('[aria-label="Tools"]')!;
-    expect(bar().querySelector('.tool-dock-end:last-child > .tool-dock-separator + [aria-label="Hide prompt box"]')).toBeTruthy();
+    const bar = () => host.querySelector('.composer-tools-bar')!;
+    expect(bar().querySelector('.tool-dock-eye-slot > .tool-dock-separator + [aria-label="Hide prompt box"]')).toBeTruthy();
     await click('Hide prompt box');
     expect(bar().querySelector('[aria-label="Hide prompt box"]')).toBeNull();
     const pill = host.querySelector('.tool-dock-hide-prompt.is-pill')!;
@@ -158,7 +160,7 @@ describe('subtoolbox row for every tool', () => {
 
   it('a tool with neither subtools nor settings shows no row at all', async () => {
     const tools = new Set(['hand']) as unknown as ReadonlySet<never>;
-    await act(async () => { setUi({ tool: 'hand' }); root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, designer: true, tools })); });
+    await act(async () => { setUi({ tool: 'hand' }); root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, designer: true, optionsSlot, tools })); });
     await click('Edit');
     expect(row()).toBeNull();
   });
@@ -171,6 +173,6 @@ describe('subtoolbox row for every tool', () => {
 
 it('the eye goes to the bar end slot after the zoom rail, not inside the scrolling tool list', async () => {
   const { readFileSync } = await import('node:fs');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="end" \/><DesignerFooterTools \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><DesignerFooterTools \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/createPortal\([^;]*hideButton[^;]*eyeSlot\)/);
 });

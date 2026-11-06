@@ -20,11 +20,10 @@ it('a pinned panel leaves its margin on both sides, keeping the center', () => {
 it('the prompt box is centered on that same line, narrowing to clear the panel', () => {
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
   expect(css).toMatch(/\.ws-designer \.dock-designer \{ left: 50%; transform: translateX\(-50%\);/);
-  expect(css).toMatch(/\.ws-designer \.dock-designer:has\(\.composer-tools-bar\) \{ width: min\(800px, calc\(100% - 2 \* var\(--layers-w, 0px\) - 48px\)\); \}/);
   // A peeking panel floats over: only a pinned panel sets the width the box centers against.
   expect(readFileSync('src/components/designer/LayersPanel.tsx', 'utf8')).toContain("root.setProperty('--layers-w', collapsed ? '0px' : `${width}px`);");
-  // Same width as the prompt box in Studio and Nodes (800 px): no jump when switching spaces or the toolbox's place.
-  expect(css).toMatch(/\.composer-dock:has\(\.composer-tools-bar\) \{ width: min\(800px, calc\(100% - 48px\)\); \}\s*\.composer-dock \.composer:has\(\.composer-tools-bar\) \{ width: 100%; \}\s*\.composer-tools-bar \{ justify-content: space-between; \}/);
+  // The bar takes the prompt box's width: no jump when one replaces the other.
+  expect(css).toContain('.composer-dock .composer:has(.composer-tools-bar) { width: 100%; }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(800px, calc(100% - 48px)); }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock:is\(\.dock-chat, \.dock-node\), [^{]*\{ width: min\(800px, calc\(100% - 192px\)\); \}/);
   expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).toContain('fitView(size, doc, board)');

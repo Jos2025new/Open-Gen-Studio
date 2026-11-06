@@ -174,8 +174,6 @@
 /* Designer: the toolbox lives in the prompt dock (the "+" menu switches it to the prompt box). */
 .composer-tools-bar { flex-wrap: nowrap; align-items: center; min-width: 0; }
 .composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; }
-.composer-tools-bar .designer-palette.is-docked { position: static; flex: 1 1 auto; min-width: 0; max-width: none; }
-.composer-tools-bar .designer-palette.is-docked .icon-btn.is-active::after { top: auto; bottom: -5px; }
 
 /*
  * One field per setting (InlineControls.tsx): the whole field is the control. A slider is filled up to its value
@@ -252,7 +250,6 @@
 .stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }
 .stroke-ruler-guide line.ray { stroke-width: 1; stroke-dasharray: none; opacity: .18; filter: none; }
 /* Context strip (ContextStrip.tsx): the active tool's essentials above the tool box; lines wrap, nothing scrolls. */
-.composer-tools-bar .designer-palette.is-docked { position: static; top: auto; left: auto; }
 .composer-tools-bar .context-strip { left: 64px; max-width: calc(100% - 84px); }
 /* Not docked, the palette floats at the top of the page: the strip opens below it. */
 .designer-palette:not(.is-docked) .context-strip { bottom: auto; top: calc(100% + 8px); }

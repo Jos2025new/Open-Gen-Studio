@@ -1,7 +1,6 @@
 import { type ComponentProps, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { create } from 'zustand';
-import { GalleryVerticalEnd, PanelBottom, PanelLeft } from 'lucide-react';
+import { GalleryVerticalEnd, MessageSquare, PanelBottom } from 'lucide-react';
 import { announceSidePopup, ToolDock, useSidePopup } from './ToolDock';
 import { ToolSettings } from './ToolSettings';
 import { DocumentChoices } from './DocumentPicker';
@@ -11,68 +10,55 @@ import { Popover, usePopover } from '../ui/Popover';
 import { CornerButtons, DesignerCorner } from '../node/NodeSide';
 import { ViewToggles } from './ToolHelp';
 
-/** Under the prompt box: moves the toolbox between the prompt box and the side. */
+/** Beside the bar's contents: swaps the prompt box and the options of the active tool. */
 export function DockPlaceButton() {
   const docked = (useStore((s) => s.ui.designerDock) ?? 'tools') === 'tools';
-  return <IconButton icon={docked ? PanelLeft : PanelBottom} label={docked ? 'Toolbox at the side' : 'Toolbox in the prompt box'} size="sm" onClick={() => setUi({ designerDock: docked ? 'prompt' : 'tools' })} />;
+  return <IconButton icon={docked ? MessageSquare : PanelBottom} label={docked ? 'Show the prompt box' : 'Show the tool options'} size="sm" onClick={() => setUi({ designerDock: docked ? 'prompt' : 'tools' })} />;
 }
 
-/** In the toolbox bar, after the canvas view: the tool help switch and where the toolbox sits. */
+/** At the end of the bar and of the prompt's strip: the tool help switch and the swap between them. */
 export function DesignerFooterTools() {
   return <span className="designer-footer-tools"><ViewToggles /><DockPlaceButton /></span>;
 }
 
-/**
- * The toolbox in the prompt box carries what the side toolbox carries: Designs, Create and Conversation before the
- * tools, the canvas view after them. The bar leaves two slots; ToolPalette fills them through portals.
- */
-const useDockSlot = create<{ start: HTMLElement | null; end: HTMLElement | null }>(() => ({ start: null, end: null }));
-export function DockSlot({ at }: { at: 'start' | 'end' }) {
-  return <div className={`designer-dock-${at}`} ref={(el) => useDockSlot.setState({ [at]: el })} />;
+/** The bar at the bottom leaves this slot for the active tool's options; ToolDock fills it through a portal. */
+const useDockSlot = create<{ el: HTMLElement | null }>(() => ({ el: null }));
+const setDockSlot = (el: HTMLElement | null) => useDockSlot.setState({ el });
+export function DockSlot() {
+  return <div className="designer-dock-options tool-dock" ref={setDockSlot} />;
 }
 
-/** First button of the toolbox: the session's designs as a popup beside it (right of the side toolbox, above the bar); the picker in the corner is hidden then. */
-function DesignsButton({ sessionId, active, up = false }: { sessionId: string; active: ComponentProps<typeof ToolSettings>['doc']; up?: boolean }) {
+/** First button of the toolbox: the session's designs as a popup beside it (right of the toolbox); the picker in the corner is hidden then. */
+function DesignsButton({ sessionId, active }: { sessionId: string; active: ComponentProps<typeof ToolSettings>['doc'] }) {
   const pop = usePopover();
   useSidePopup('designs', pop.close);
   const docs = useStore((s) => s.sessions[sessionId]?.docs) ?? [active];
   return <>
     <IconButton ref={pop.ref} icon={GalleryVerticalEnd} label={`Designs · ${active.name}`} size="md" aria-haspopup="listbox" aria-expanded={pop.open} active={pop.open} onClick={() => { if (!pop.open) announceSidePopup('designs'); pop.toggle(); }} />
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement={up ? 'top-start' : 'right-start'} align="start" width={212} label="Designs" className={up ? 'designs-pop is-up' : 'designs-pop'}>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" align="start" width={212} label="Designs" className="designs-pop">
       <DocumentChoices sessionId={sessionId} docs={docs} active={active} />
     </Popover>
   </>;
 }
 
 /**
- * The toolbox outside the prompt box: the same strip as in the composer, turned upright at the left, with the designs,
- * Create and Conversation on top (as in Nodes) and the canvas view (zoom, fit, view toggles) under it in one frame. In the
- * prompt box the same pieces sit before and after the tools, and their popups open above the bar.
+ * The toolbox: an upright strip at the left, with the designs, Create and Conversation on top (as in Nodes) and the canvas
+ * view (zoom, fit, view toggles) under it in one frame. The active tool's options sit at the bottom, where the prompt box
+ * sits when it is asked for.
  */
 export function ToolPalette({ history, view, ...settings }: ComponentProps<typeof ToolSettings> & { history?: ReactNode; view: ReactNode }) {
-  const docked = (useStore((s) => s.ui.designerDock) ?? 'tools') === 'tools';
-  const slot = useDockSlot();
-  const viewBar = <div className="designer-view" role="toolbar" aria-label="Canvas view" aria-orientation={docked ? 'horizontal' : 'vertical'}>
-    {history ? <div className="view-history">{history}</div> : null}
-    {view}
-  </div>;
-  if (docked) return slot.start && slot.end ? <>
-    {createPortal(<>
-      <DesignsButton sessionId={settings.sessionId} active={settings.doc} up />
-      <CornerButtons sessionId={settings.sessionId} space="designer" />
-      <span className="tool-dock-separator" aria-hidden="true" />
-      <DesignerCorner sessionId={settings.sessionId} />
-    </>, slot.start)}
-    {createPortal(<><span className="tool-dock-separator" aria-hidden="true" />{viewBar}</>, slot.end)}
-  </> : viewBar;
+  const slot = useDockSlot((s) => s.el);
   return <div className="designer-side">
     <DesignsButton sessionId={settings.sessionId} active={settings.doc} />
     <CornerButtons sessionId={settings.sessionId} space="designer" />
     <span className="tool-dock-separator" aria-hidden="true" />
     <div className="designer-palette is-side">
-      <ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} vertical />
+      <ToolDock sessionId={settings.sessionId} doc={settings.doc} selectedCurve={settings.selectedCurve} vertical designer optionsSlot={slot} />
     </div>
-    {viewBar}
+    <div className="designer-view" role="toolbar" aria-label="Canvas view" aria-orientation="vertical">
+      {history ? <div className="view-history">{history}</div> : null}
+      {view}
+    </div>
     <DesignerCorner sessionId={settings.sessionId} />
   </div>;
 }

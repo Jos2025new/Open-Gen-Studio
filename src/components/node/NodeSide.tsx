@@ -5,11 +5,11 @@ import { Info, LayoutGrid, MessageSquare, Plus, X } from 'lucide-react';
 import type { MediaKind } from '../../engine/types';
 import { nodeAttempt, nodeOutputAsset } from '../../engine/flow/graph';
 import { useNodeSelection } from '../../engine/flow/selection';
-import { setComposer, useStore } from '../../store/store';
+import { setComposer, setUi, useStore } from '../../store/store';
 import { FeedList, NoticeView } from '../chat/FeedList';
 import { IconButton } from '../ui/primitives';
 import { ResultSummary } from './ResultSummary';
-import { AttachStrip, DesignerTargetChip, SendDirect } from '../composer/Composer';
+import { AttachStrip, SendDirect } from '../composer/Composer';
 import { MediaControls, ModelChip } from '../composer/MediaControls';
 import { MODES } from '../composer/ModeMenu';
 import { announceSidePopup, useSidePopup } from '../designer/ToolDock';
@@ -47,7 +47,13 @@ export function CornerButtons({ sessionId, space = 'node' }: { sessionId: string
   const { view, open } = useCorner();
   const { items } = useSpaceFeed(sessionId, space);
   const pending = useStore((s) => Boolean(s.sessions[sessionId]?.agent.pending || s.sessions[sessionId]?.agent.busy));
-  const toggle = (v: View) => { if (space === 'designer') announceSidePopup('corner'); toggleCorner(v); };
+  const toggle = (v: View) => {
+    if (space === 'designer') {
+      announceSidePopup('corner');
+      if (v === 'chat') setUi({ designerDock: open && view === 'chat' ? 'tools' : 'prompt' });
+    }
+    toggleCorner(v);
+  };
   return (
     <>
       <IconButton icon={LayoutGrid} label="Create" active={open && view === 'create'} aria-pressed={open && view === 'create'} onClick={() => toggle('create')} />
@@ -60,7 +66,7 @@ export function CornerButtons({ sessionId, space = 'node' }: { sessionId: string
   );
 }
 
-/** Create: the composer's direct controls, stacked. Same store as the prompt box, so both always show the same kind, model, settings, prompt and references. */
+/** Create: the composer's direct controls, stacked (in the Designer, only the kinds, which open the prompt box). Same store as the prompt box, so both always show the same kind, model, settings, prompt and references. */
 function CreateForm({ designer = false }: { designer?: boolean }) {
   const mode = useStore((s) => s.composer.mode);
   const text = useStore((s) => s.composer.text);
@@ -69,18 +75,24 @@ function CreateForm({ designer = false }: { designer?: boolean }) {
   useEffect(() => {
     if (mode !== 'agent') lastKind = mode;
   }, [mode]);
+  const pickKind = (id: typeof mode) => {
+    setComposer({ mode: id });
+    // In the Designer the kind's settings and prompt are the prompt box's, as in Studio.
+    if (designer) { setUi({ designerDock: 'prompt' }); useCorner.setState({ open: false }); }
+  };
   return (
     <div className="side-create">
       <div className="side-kinds" role="radiogroup" aria-label="Kind">
         {MODES.filter((m) => m.id !== 'agent').map((m) => {
           // As in the prompt box: Designer layers hold images, text and shapes.
           const off = designer && m.id !== 'image';
-          return <button key={m.id} type="button" role="radio" aria-checked={m.id === kind} disabled={off} className={`side-kind ${m.id === kind ? 'is-active' : ''}`} data-tip={off ? 'Designer layers hold images, text and shapes' : m.desc} onClick={() => setComposer({ mode: m.id })}>
+          return <button key={m.id} type="button" role="radio" aria-checked={m.id === kind} disabled={off} className={`side-kind ${m.id === kind ? 'is-active' : ''}`} data-tip={off ? 'Designer layers hold images, text and shapes' : m.desc} onClick={() => pickKind(m.id)}>
             <m.icon size={14} /> {m.label}
           </button>;
         })}
       </div>
-      <div className="side-row"><ModelChip kind={kind} />{designer && kind === 'image' ? <DesignerTargetChip /> : null}</div>
+      {designer ? null : <>
+      <div className="side-row"><ModelChip kind={kind} /></div>
       <textarea className="side-prompt" rows={5} value={text} placeholder="Describe what you want to create…" aria-label="Prompt" onChange={(e) => setComposer({ text: e.target.value })} />
       <AttachStrip ids={attachments} />
       <button type="button" className="side-add" onClick={() => window.dispatchEvent(new Event('ogs:attach'))}>
@@ -88,6 +100,7 @@ function CreateForm({ designer = false }: { designer?: boolean }) {
       </button>
       <div className="side-row side-chips"><MediaControls kind={kind} showModel={false} /></div>
       <div className="side-generate"><SendDirect kind={kind} /></div>
+      </>}
     </div>
   );
 }

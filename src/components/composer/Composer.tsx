@@ -19,7 +19,6 @@ import { SpendConfirm } from '../ui/SpendConfirm';
 import { ComposerStrip } from './ComposerStrip';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
-import { ToolDock } from '../designer/ToolDock';
 import { DesignerFooterTools, DockSlot } from '../designer/ToolPalette';
 import { ScrollRail } from './ScrollRail';
 import { AgentSend } from './AgentSend';
@@ -498,7 +497,7 @@ export function Composer() {
         />
         {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
-          <ScrollRail className="composer-tools-rail" backLabel="Previous tools" onLabel="More tools"><DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" /><DesignerFooterTools /></ScrollRail><span className="tool-dock-eye-slot" />
+          <ScrollRail className="composer-tools-rail" backLabel="Previous options" onLabel="More options"><DockSlot /><DesignerFooterTools /></ScrollRail><span className="tool-dock-eye-slot" />
         </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row is-compact">
