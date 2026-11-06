@@ -170,8 +170,15 @@ describe('subtoolbox row for every tool', () => {
     await act(async () => { setUi({ tool: 'select', selectShape: 'rect' }); });
     await act(async () => [...row()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
     expect(labels(row())).toEqual(expect.arrayContaining(['All', 'Invert', 'Deselect', 'To layer']));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Rectangular selection', 'Lasso']));
     await act(async () => setUi({ tool: 'gradient', gradient: undefined }));
     expect(row()!.querySelector('.tool-dock-quick-sliders .opt-slider')).not.toBeNull();
+    const second = () => row()!.querySelector<HTMLButtonElement>('.quick-color-pair [role="switch"]')!;
+    expect(second().getAttribute('aria-checked')).toBe('false');
+    expect(row()!.querySelectorAll('.quick-color-pair .opt-color')).toHaveLength(1);
+    await act(async () => second().click());
+    expect(useStore.getState().ui.gradient?.mode).toBe('two');
+    expect(row()!.querySelectorAll('.quick-color-pair .opt-color')).toHaveLength(2);
     await act(async () => setUi({ tool: 'eyedropper' }));
     expect(row()!.querySelector('.tool-dock-quick-sliders')).toBeNull();
   });

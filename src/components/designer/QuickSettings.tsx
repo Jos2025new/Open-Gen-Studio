@@ -9,23 +9,23 @@ import { setRuler } from '../../engine/design/strokeRuler';
 import { setUi, toast, useStore } from '../../store/store';
 import { AutoSelectToggle, EditModeToggle, WAND_DEFAULT } from './ToolSettings';
 import { BrushSizeField } from './BrushSizeField';
-import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
+import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 /** What each control of the subtoolbox's quick settings edits. All of them exist in the tool's card already. */
-export type QuickKind = 'wandTolerance' | 'selectOps' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'color2' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear';
+export type QuickKind = 'gradientShape' | 'gradientColors' | 'wandTolerance' | 'selectOps' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear';
 const SHAPES: QuickKind[] = ['strokeWidth', 'stroke', 'fill'], LINES: QuickKind[] = ['strokeWidth', 'stroke'];
 /** Per tool: at most 2 long sliders first, then 1–2 small controls. A tool absent here has no quick settings (its card may still exist). */
 export const QUICK: Partial<Record<DesignTool, QuickKind[]>> = {
-  brush: ['size', 'opacity', 'color'], eraser: ['size', 'opacity'], fill: ['opacity', 'threshold', 'color'], gradient: ['gradientOpacity', 'color', 'color2'], eyedropper: ['color'],
+  brush: ['size', 'opacity', 'color'], eraser: ['size', 'opacity'], fill: ['opacity', 'threshold', 'color'], gradient: ['gradientShape', 'gradientOpacity', 'gradientColors'], eyedropper: ['color'],
   lineart: ['lineartSize', 'lineartOpacity', 'lineartColor'], rect: SHAPES, ellipse: SHAPES, sector: SHAPES, arc: SHAPES, chord: SHAPES, polygon: SHAPES, star: SHAPES,
   line: LINES, arrow: LINES, curve: LINES, text: ['fontSize', 'textColor'], ruler: ['rulerSnap', 'rulerClear'],
   select: ['wandTolerance', 'selectOps'], move: ['editMode', 'autoSelect'],
 };
 const LONG = new Set<QuickKind>(['wandTolerance', 'size', 'opacity', 'threshold', 'gradientOpacity', 'lineartSize', 'lineartOpacity', 'strokeWidth', 'fontSize']);
 /** Estimated width (px) of a tool's quick settings, and of the row with `subtools` buttons: decides inline or collapsed («). */
-const WIDE: Partial<Record<QuickKind, number>> = { selectOps: 230, editMode: 130, autoSelect: 110 };
+const WIDE: Partial<Record<QuickKind, number>> = { gradientShape: 120, gradientColors: 150, selectOps: 230, editMode: 130, autoSelect: 110 };
 export const quickWidth = (tool: DesignTool | undefined) => (tool ? QUICK[tool] ?? [] : []).reduce((w, k) => w + (WIDE[k] ?? (LONG.has(k) ? 150 : 44)), 0);
-const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
+const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1 };
 
 /** What finishes or changes a pixel selection, the same actions as its card. */
 function SelectQuick({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
@@ -62,7 +62,12 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
     case 'threshold': return <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setBrush({ fillThreshold: v })} />;
     case 'color': return <InlineColor label="Color" value={brush.color} iconOnly onChange={(v) => setBrush({ color: v })} />;
     case 'gradientOpacity': return <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={gradient.opacity} onChange={(v) => setUi({ gradient: { ...gradient, opacity: v } })} />;
-    case 'color2': return <InlineColor label="Second" value={gradient.color2} iconOnly onChange={(v) => setUi({ gradient: { ...gradient, color2: v } })} />;
+    case 'gradientShape': return <InlineSelect label="Shape" value={gradient.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => setUi({ gradient: { ...gradient, shape: v } })} />;
+    case 'gradientColors': return <span className="quick-color-pair">
+      <InlineColor label="Color" value={brush.color} iconOnly onChange={(v) => setBrush({ color: v })} />
+      <InlineToggle label="Second" tip="Off: from the color to transparent" checked={gradient.mode === 'two'} onChange={(on) => setUi({ gradient: { ...gradient, mode: on ? 'two' : 'fade' } })} />
+      {gradient.mode === 'two' ? <InlineColor label="Second" value={gradient.color2} iconOnly onChange={(v) => setUi({ gradient: { ...gradient, color2: v } })} /> : null}
+    </span>;
     case 'lineartSize': return <InlineSlider label="Size" unit="px" min={1} max={120} value={lineart.size} onChange={(v) => setLine({ size: v })} />;
     case 'lineartOpacity': return <InlineSlider label="Opacity" unit="%" scale={100} min={0.05} max={1} step={0.01} value={lineart.opacity} onChange={(v) => setLine({ opacity: v })} />;
     case 'lineartColor': return <InlineColor label="Color" value={lineart.color} iconOnly onChange={(v) => setLine({ color: v })} />;

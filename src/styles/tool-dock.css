@@ -240,4 +240,9 @@
 .composer-tools-rail .tool-dock-variants.is-fixed .opt-color.is-icon { flex: 0 0 28px; width: 28px; height: 28px; align-self: center; }
 .composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders) .tool-dock-grow { display: none; }
 .composer-tools-rail .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: 36px; white-space: nowrap; }
+.composer-tools-rail .tool-dock-quick-sliders:has(> :only-child) { flex: 0 1 180px; }
+.composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders > :only-child) .tool-dock-grow { display: block; }
+/* Colors that belong together share one capsule; the toggle turns the second on. */
+.quick-color-pair { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 36px; padding: 0 4px; background: var(--field-bg); border-radius: 18px; }
+.quick-color-pair .opt-toggle { height: auto; padding: 0 2px; background: transparent; border: 0; }
 .composer-tools-rail .tool-dock-stack > .tool-dock-card { position: absolute; z-index: 7; left: 0; right: 0; bottom: calc(100% + 8px); width: fit-content; max-width: 100%; margin-inline: auto; }

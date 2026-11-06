@@ -98,7 +98,7 @@ const RULER = 18;
 const tok = (n: string, f: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
 /** The selection colour (the highlight's --accent, a hex) at an alpha: handles and picks follow the chosen highlight. */
 const accentA = (a = 1) => { const n = parseInt(tok('--accent', '#d4f25a').slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
-const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
+const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
 type ShapeTool = keyof typeof SHAPE_NAMES;
 /** Drawn between two points (stroke only), not inside a box. */

@@ -236,7 +236,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, m
   if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} compact={compact} />;
   if (tool === 'eyedropper') return <div className="tool-settings" role="toolbar" aria-label="Eyedropper settings"><InlineColor label="Picked" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} /><span className="opt-hint">Click the page to pick its visible color</span></div>;
   if (tool === 'gradient') {
-    const g = gradient ?? { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
+    const g = gradient ?? { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1 };
     const set = (patch: Partial<typeof g>) => setUi({ gradient: { ...g, ...patch } });
     return <div className="tool-settings" role="toolbar" aria-label="Gradient settings">
       <InlineSelect label="Shape" value={g.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => set({ shape: v })} />

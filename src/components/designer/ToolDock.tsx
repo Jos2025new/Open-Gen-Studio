@@ -163,7 +163,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const bottomRow = bottom && selectedFamily && !stripShown && (subtools || hasQuick || showGear) && <div className={`tool-dock-variants is-fixed${quickShown ? ' is-quick' : ''}`} role="toolbar" aria-label={quickShown || !subtools ? 'Quick settings' : `${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
     {quickShown ? <>
       <button type="button" className="icon-btn icon-btn-md tone-default" aria-label="Show all tools" data-tip="Show all tools" onClick={() => { setQuick(false); if (depth === 'open') dispatch({ type: 'escape' }); }}><ChevronsLeft size={16} /></button>
-      {iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}
+      {selectedVariant?.sameSettings
+        ? selectedFamily.variants.filter((variant) => variant.sameSettings).map((variant) => <span key={variant.id}>{iconButton(variant.icon, variant.label, variant.id === selectedVariant.id, () => chooseVariant(variant))}</span>)
+        : iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}
     </> : subtools && selectedFamily.variants.map((variant) => {
       const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
       return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); if (collapsibleFor(variant.tool)) enterQuick(); else if (active) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
