@@ -20,11 +20,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 310 | 241 |
+| [types.ts](../src/engine/types.ts) | 311 | 241 |
 | [store.ts](../src/store/store.ts) | 210 | 224 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 92 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 59 | 4 |
-| [actions.ts](../src/engine/design/actions.ts) | 58 | 34 |
+| [actions.ts](../src/engine/design/actions.ts) | 59 | 34 |
 | [media.ts](../src/lib/media.ts) | 48 | 42 |
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
 | [ops.ts](../src/engine/ops.ts) | 44 | 18 |

@@ -150,7 +150,7 @@ export function SelectionChip({ docId }: { docId: string }) {
   </span>;
 }
 
-const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as 'replace' | 'add' | 'subtract', sample: 'all' as 'layer' | 'all' };
+export const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as 'replace' | 'add' | 'subtract', sample: 'all' as 'layer' | 'all' };
 
 /** Pixel selection: its shape, and what to do with what is selected. */
 function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc: DesignDoc; compact?: boolean }) {

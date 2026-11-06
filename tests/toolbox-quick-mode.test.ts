@@ -165,6 +165,17 @@ describe('subtoolbox row for every tool', () => {
     expect(row()).toBeNull();
   });
 
+  it('every tool with settings has essentials: the selection acts, the gradient shows its opacity without a saved gradient, the eyedropper leaves no empty slider slot', async () => {
+    await click('Brush');
+    await act(async () => { setUi({ tool: 'select', selectShape: 'rect' }); });
+    await act(async () => [...row()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
+    expect(labels(row())).toEqual(expect.arrayContaining(['All', 'Invert', 'Deselect', 'To layer']));
+    await act(async () => setUi({ tool: 'gradient', gradient: undefined }));
+    expect(row()!.querySelector('.tool-dock-quick-sliders .opt-slider')).not.toBeNull();
+    await act(async () => setUi({ tool: 'eyedropper' }));
+    expect(row()!.querySelector('.tool-dock-quick-sliders')).toBeNull();
+  });
+
   it('QUICK maps every control to at most 2 long sliders', async () => {
     const { QUICK } = await import('../src/components/designer/QuickSettings');
     for (const [tool, kinds] of Object.entries(QUICK)) expect(kinds!.filter((k) => /size|opacity|threshold|Width|fontSize/i.test(k)).length, tool).toBeLessThanOrEqual(2);
@@ -173,6 +184,6 @@ describe('subtoolbox row for every tool', () => {
 
 it('the eye goes to the bar end slot after the zoom rail, not inside the scrolling tool list', async () => {
   const { readFileSync } = await import('node:fs');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><DesignerFooterTools \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/createPortal\([^;]*hideButton[^;]*eyeSlot\)/);
 });

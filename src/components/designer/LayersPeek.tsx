@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FocusEvent } from 'react';
 import { AlertTriangle, Layers, SlidersHorizontal, Wrench } from 'lucide-react';
 import { IconButton } from '../ui/primitives';
+import { ViewToggles } from './ToolHelp';
 import '../../styles/layers-peek.css';
 
 type Tab = 'props' | 'tool' | 'layers';
@@ -45,6 +46,7 @@ export function PanelPeekHandle({ warn, tab, onTab, show, hide }: { warn: boolea
         <IconButton key={id} icon={Icon} label={`${name} · click to pin`} size="sm" active={tab === id} aria-pressed={tab === id} tipSide="right"
           onMouseEnter={() => { onTab(id, false); show(); }} onMouseLeave={hide} onFocus={() => { onTab(id, false); show(); }} onClick={() => onTab(id, true)} />
       ))}
+      <ViewToggles tipSide="right" />
       {warn ? <IconButton icon={AlertTriangle} label="Open layers panel to confirm painting" size="sm" onClick={() => onTab('layers', true)} /> : null}
     </aside>
   </>;

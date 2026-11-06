@@ -45,9 +45,9 @@ export function ToolHelpLine() {
 }
 
 /** The view group's switches (what you see, not how tools act): page rulers and guides, and the tool help line. */
-export function ViewToggles() {
+export function ViewToggles({ tipSide }: { tipSide?: 'right' }) {
   const help = useStore((s) => s.ui.toolHelp ?? true);
   return <>
-    <IconButton icon={HelpCircle} label={`${help ? 'Hide' : 'Show'} tool help`} size="sm" active={help} aria-pressed={help} onClick={() => setUi({ toolHelp: !help })} />
+    <IconButton icon={HelpCircle} label={`${help ? 'Hide' : 'Show'} tool help`} size="sm" tipSide={tipSide} active={help} aria-pressed={help} onClick={() => setUi({ toolHelp: !help })} />
   </>;
 }

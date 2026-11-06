@@ -11,6 +11,7 @@ import { OPS } from '../../engine/ops';
 import { BLEND_MODES, drawLayer } from '../../engine/design/render';
 import { layerSelection, pickLayer, pickLayerRange, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
+import { ViewToggles } from './ToolHelp';
 import { Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
@@ -177,6 +178,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </button>
       ))}
       <span className="panel-tabs-gap" />
+      <ViewToggles />
       <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<RasterLimitApproval layer={pendingPaintLayer} /><IconButton icon={collapsed ? PanelRightOpen : PanelRightClose} label={collapsed ? 'Pin layers panel' : 'Collapse layers panel'} size="sm" onClick={() => setCollapsed(!collapsed)} /></div>
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">

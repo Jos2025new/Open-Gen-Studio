@@ -26,7 +26,7 @@ it('unpinned: the tabs stand in a vertical bar; hovering one peeks the panel on 
   const bar = () => host.querySelector('.layers-peek-handle');
   const tab = (name: string) => host.querySelector<HTMLButtonElement>(`.layers-peek-handle [aria-label="${name} · click to pin"]`)!;
   expect(bar()?.getAttribute('aria-orientation')).toBe('vertical');
-  expect([...bar()!.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Properties · click to pin', 'Tool · click to pin', 'Layers · click to pin']);
+  expect([...bar()!.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Properties · click to pin', 'Tool · click to pin', 'Layers · click to pin', 'Hide tool help']);
   expect(host.querySelector('.layers-panel')).toBeNull();
   act(() => { tab('Tool').dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); });
   expect(host.querySelector('.layers-panel.is-peek')?.getAttribute('data-tab')).toBe('tool');

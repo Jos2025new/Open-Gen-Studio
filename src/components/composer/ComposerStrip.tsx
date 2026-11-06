@@ -3,7 +3,6 @@ import { AgentControls } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
 import { MediaControls, ModelChip } from './MediaControls';
 import { ScrollRail } from './ScrollRail';
-import { DesignerFooterTools } from '../designer/ToolPalette';
 import { useStore } from '../../store/store';
 
 /** The settings of the mode just above the prompt, without a background: the model at the far end, the rest in a row that scrolls with « » when it does not fit. */
@@ -17,7 +16,6 @@ export function ComposerStrip({ target }: { /** What a generation lands on, when
       {target}
     </ScrollRail>
     <div className="composer-strip-end">
-      {designer ? <DesignerFooterTools /> : null}
       {agent ? (designer ? null : <AgentModelControls />) : <ModelChip kind={mode} />}
     </div>
   </div>;

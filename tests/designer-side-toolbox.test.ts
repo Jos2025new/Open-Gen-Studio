@@ -66,19 +66,19 @@ it('upright, the popups are vertical too: variants in a column, the chevron poin
   await done();
 });
 
-it('the swap button and the tool help sit at the end of the bar and of the strip; the toolbox no longer carries them', () => {
+it('the tool help sits in the right panel and its handle; neither the bar nor the toolbox carries it', () => {
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).not.toContain('{place}');
-  expect(readFileSync('src/components/designer/ToolPalette.tsx', 'utf8')).toMatch(/<span className="designer-footer-tools"><ViewToggles \/><DockPlaceButton \/><\/span>/);
+  expect(readFileSync('src/components/designer/LayersPeek.tsx', 'utf8')).toContain('<ViewToggles tipSide="right" />');
+  expect(readFileSync('src/components/designer/LayersPanel.tsx', 'utf8')).toContain('<ViewToggles />');
   expect(readFileSync('src/components/designer/DesignerWorkspace.tsx', 'utf8')).not.toContain('<ViewToggles');
   expect(readFileSync('src/components/studio/EmbeddedDesignerBar.tsx', 'utf8')).not.toMatch(/<ToolDock[^>]* designer[ />]/);
 });
 
 it('the toolbox is always upright at the left; the bottom holds the active tool\'s options or the prompt box', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
-  expect(palette).toMatch(/<IconButton icon=\{docked \? MessageSquare : PanelBottom\} label=\{docked \? 'Show the prompt box' : 'Show the tool options'\} size="sm" onClick=\{\(\) => setUi\(\{ designerDock: docked \? 'prompt' : 'tools' \}\)\} \/>/);
   expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<CornerButtons [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical designer optionsSlot=\{slot\} \/>\s*<\/div>\s*<div className="designer-view"/);
   expect(palette).not.toContain('createPortal');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><DesignerFooterTools \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><\/ScrollRail>/);
   const dock = readFileSync('src/components/designer/ToolDock.tsx', 'utf8');
   expect(dock).toMatch(/const placeStack = [^\n]*optionsSlot \? createPortal\(stack, optionsSlot\) : null;/);
   expect(dock).toMatch(/if \(designer\) \{ announceSidePopup\('tools'\); setUi\(\{ designerDock: 'tools' \}\); \}/);

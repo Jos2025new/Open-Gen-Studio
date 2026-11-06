@@ -162,10 +162,6 @@
 .composer-tools-bar .designer-view { position: static; flex-direction: row; gap: 3px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .composer-tools-bar .designer-view .zoom-value { height: 34px; min-height: 0; }
 /* Under the prompt box, opposite the workspace menu: tool help and where the toolbox sits. */
-.designer-footer-tools { display: inline-flex; align-items: center; gap: 2px; }
-.designer-footer-tools .icon-btn { width: 28px; height: 28px; color: var(--text-3); }
-.designer-footer-tools .icon-btn svg { width: 16px; height: 16px; }
-.designer-footer-tools .icon-btn:hover, .designer-footer-tools .icon-btn.is-active { color: var(--text); }
 /* The bar is as wide as the prompt box in every space (800 px), so nothing changes width when switching spaces or the toolbox's place;
    its three groups spread across it (Designs and the panels' buttons, tools, view), and the footer ends at its edge. */
 .composer-dock .composer:has(.composer-tools-bar) { width: 100%; }
@@ -241,10 +237,7 @@
 .composer-tools-rail .tool-dock-quick-sliders { gap: 8px; }
 .composer-tools-rail .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 72px; padding: 0 6px; }
 .composer-tools-rail .tool-dock-quick-sliders .opt-readout { margin-inline: auto; }
-/* One size and tone for every button of the bar; the groups (tool, settings, actions, view) read by dividers, not by uneven gaps. */
 .composer-tools-rail .tool-dock-variants.is-fixed .opt-color.is-icon { flex: 0 0 28px; width: 28px; height: 28px; align-self: center; }
-.composer-tools-rail .designer-footer-tools { gap: 0; }
-.composer-tools-rail .designer-footer-tools::before { content: ''; align-self: center; width: 1px; height: 24px; margin-right: 8px; background: var(--panel-line); }
-.composer-tools-rail .designer-footer-tools .icon-btn { width: 36px; height: 36px; color: var(--text-2); }
 .composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders) .tool-dock-grow { display: none; }
+.composer-tools-rail .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: 36px; white-space: nowrap; }
 .composer-tools-rail .tool-dock-stack > .tool-dock-card { position: absolute; z-index: 7; left: 0; right: 0; bottom: calc(100% + 8px); width: fit-content; max-width: 100%; margin-inline: auto; }

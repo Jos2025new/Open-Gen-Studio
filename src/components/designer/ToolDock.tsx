@@ -169,7 +169,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
       return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); if (collapsibleFor(variant.tool)) enterQuick(); else if (active) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
     })}
     {!quickShown && subtools && quickInline && <span className="tool-dock-separator" aria-hidden="true" />}
-    {quickInline && <QuickControls tool={currentTool} docId={doc.id} />}
+    {quickInline && <QuickControls tool={currentTool} sessionId={sessionId} doc={doc} />}
     <span className="tool-dock-grow" />
     {quickInline && (currentTool === 'brush' || currentTool === 'eraser') && iconButton('eraser', 'Eraser', currentTool === 'eraser', () => { setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }); }, false, undefined, toolKey('eraser'))}
     {gear}

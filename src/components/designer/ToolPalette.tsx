@@ -1,25 +1,13 @@
 import { type ComponentProps, type ReactNode } from 'react';
 import { create } from 'zustand';
-import { GalleryVerticalEnd, MessageSquare, PanelBottom } from 'lucide-react';
+import { GalleryVerticalEnd } from 'lucide-react';
 import { announceSidePopup, ToolDock, useSidePopup } from './ToolDock';
 import { ToolSettings } from './ToolSettings';
 import { DocumentChoices } from './DocumentPicker';
-import { setUi, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { CornerButtons, DesignerCorner } from '../node/NodeSide';
-import { ViewToggles } from './ToolHelp';
-
-/** Beside the bar's contents: swaps the prompt box and the options of the active tool. */
-export function DockPlaceButton() {
-  const docked = (useStore((s) => s.ui.designerDock) ?? 'tools') === 'tools';
-  return <IconButton icon={docked ? MessageSquare : PanelBottom} label={docked ? 'Show the prompt box' : 'Show the tool options'} size="sm" onClick={() => setUi({ designerDock: docked ? 'prompt' : 'tools' })} />;
-}
-
-/** At the end of the bar and of the prompt's strip: the tool help switch and the swap between them. */
-export function DesignerFooterTools() {
-  return <span className="designer-footer-tools"><ViewToggles /><DockPlaceButton /></span>;
-}
 
 /** The bar at the bottom leaves this slot for the active tool's options; ToolDock fills it through a portal. */
 const useDockSlot = create<{ el: HTMLElement | null }>(() => ({ el: null }));
