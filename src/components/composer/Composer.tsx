@@ -21,6 +21,7 @@ import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
 import { ToolDock } from '../designer/ToolDock';
 import { DesignerFooterTools, DockSlot } from '../designer/ToolPalette';
+import { ScrollRail } from './ScrollRail';
 import { AgentSend } from './AgentSend';
 
 export function AttachStrip({ ids }: { ids: string[] }) {
@@ -437,13 +438,22 @@ export function Composer() {
   const optionsLabel = takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files';
   const optionsDisabled = !takesImages && !takesAudio && mode !== 'model3d';
   const showTools = Boolean(toolsDock && designDoc);
+  // The prompt's height follows its text at its current width: a narrower or wider box wraps it differently.
+  const [promptWidth, setPromptWidth] = useState(0);
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setPromptWidth(ta.clientWidth));
+    observer.observe(ta);
+    return () => observer.disconnect();
+  }, [showTools]);
   const promptHidden = useStore((s) => s.ui.promptHidden) ?? false;
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = '0px';
     ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
-  }, [text, mode, showTools, workspace]);
+  }, [text, mode, showTools, workspace, promptWidth]);
 
   return (
     <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
@@ -488,7 +498,7 @@ export function Composer() {
         />
         {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
-          <DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" /><DesignerFooterTools /><span className="tool-dock-eye-slot" />
+          <ScrollRail className="composer-tools-rail" backLabel="Previous tools" onLabel="More tools"><DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" /><DesignerFooterTools /></ScrollRail><span className="tool-dock-eye-slot" />
         </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row is-compact">

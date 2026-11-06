@@ -58,6 +58,10 @@
   .composer { padding: 12px 16px; }
   .composer-dock, .chat-welcome, .chat-empty .suggestions { width: min(800px, calc(100% - 32px)); }
 }
+/* Studio and Nodes keep the margins of the Designer's prompt box, so the box does not stretch across a narrower window. */
+@media (min-width: 768px) {
+  .composer-dock:is(.dock-chat, .dock-node), .chat-welcome, .chat-empty .suggestions { width: min(800px, calc(100% - 192px)); }
+}
 @media (max-width: 767px) {
   .composer { padding: 12px; border-radius: 20px; }
   .composer-bar { gap: 6px; }
@@ -86,9 +90,9 @@
 .ws-chat:has(.chat-empty) .composer-dock.dock-chat::before { content: none; }
 
 /* Protect both the prompt and its controls from canvas content. */
-.composer-dock.dock-node::before, .composer-dock.dock-designer::before { content: ''; position: absolute; z-index: -1; inset: -12px -12px -40px; background: var(--bg-canvas); pointer-events: none; border-radius: calc(var(--r-l) + 12px) calc(var(--r-l) + 12px) 0 0; }
-/* Designer: the backdrop hugs the bar (same roundness, thin rim). */
-.composer-dock.dock-designer::before { inset: -4px -4px -40px; border-radius: calc(var(--r-l) + 4px) calc(var(--r-l) + 4px) 0 0; }
+.composer-dock.dock-node::before, .composer-dock.dock-designer::before { content: ''; position: absolute; z-index: -1; inset: -12px -100vw -40px; background: var(--bg-canvas); pointer-events: none; }
+/* Designer: the backdrop starts just above the bar; the workspace clips both to its edges. */
+.composer-dock.dock-designer::before { inset: -4px -100vw -40px; }
 /* One-line prompt: the round buttons sit the same distance from every edge, and the corner is concentric with them
    (button radius 18 + padding 8 + border 1). */
 .composer:has(.is-compact) { padding: 8px; border-radius: 27px; }
@@ -105,7 +109,6 @@
 .composer-strip-rail > * { flex: none; }
 .composer-strip-end { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; margin-left: 8px; }
 .composer-strip-end > :is(.chip, .models-chip) { min-width: 0; }
-.composer-strip-end > .designer-footer-tools { flex: none; }
 .composer-strip-nudge { flex: none; width: 22px; height: 26px; display: grid; place-items: center; border-radius: var(--radius-s); color: var(--text-2); }
 .composer-strip-nudge:hover { background: var(--surface-3); color: var(--text); }
 .composer-strip .models-chip { background: transparent; color: var(--text-2); }
@@ -113,20 +116,21 @@
 .composer-strip .chip, .composer-strip .agent-mode { border-color: transparent; box-shadow: none; background-color: transparent; }
 .composer-strip .agent-mode[aria-expanded="true"] { background-color: var(--surface-3); color: var(--text); }
 /* The "+" control center: zones told apart by tone, not lines. */
-.popover.control-center { padding: 0; overflow: hidden; display: grid; grid-template-rows: 1fr auto; height: 330px; max-height: calc(100vh - 80px); border-color: color-mix(in oklab, var(--border) 60%, transparent); box-shadow: 0 4px 14px rgb(0 0 0 / .18); }
+.popover.control-center { padding: 0; overflow: hidden; display: grid; grid-template-rows: 1fr auto; max-height: calc(100vh - 80px); border-color: color-mix(in oklab, var(--border) 60%, transparent); box-shadow: 0 4px 14px rgb(0 0 0 / .18); }
 .control-center-top { display: grid; grid-template-columns: 128px 1fr; min-height: 0; }
 .control-center-nav { display: flex; flex-direction: column; gap: 2px; padding: 6px; background: color-mix(in oklab, var(--surface-2) 65%, var(--surface)); }
-.control-center-nav button { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 34px; padding: 0 9px; border-radius: var(--radius-s); color: var(--text-2); text-align: left; font-size: 13px; }
+.control-center-nav button { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 34px; padding: 0 9px; border-radius: var(--radius-s); color: var(--text-2); text-align: left; font-size: var(--fs-m); }
 .control-center-nav button:hover { color: var(--text); }
 .control-center-nav button.is-current { background: var(--surface-2); color: var(--text); }
 .control-center-agent { margin-top: 6px; justify-content: flex-start !important; }
 .control-center-agent svg:last-child:not(:first-child) { margin-left: auto; }
 .control-center-agent.is-on { color: var(--text); }
-.control-center-pane { padding: 6px; overflow-y: auto; min-width: 0; }
+.control-center-pane { padding: 6px; overflow-y: auto; min-width: 0; contain: size; } /* the sections set the height: nothing empty under Agent, a long pane scrolls */
+.control-center-pane .composer-options-file { font-size: var(--fs-m); }
 .control-center-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 2px 2px 6px; }
 .control-center-thumbs button { aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-s); background: var(--surface-3); }
 .control-center-thumbs :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; }
 .control-center-spaces { display: flex; gap: 8px; padding: 7px; background: color-mix(in oklab, var(--surface-2) 40%, var(--surface)); }
-.control-center-spaces button { flex: 1; min-height: 30px; border-radius: 999px; color: var(--text-2); font-size: 12px; }
+.control-center-spaces button { flex: 1; min-height: 30px; border-radius: 999px; color: var(--text-2); font-size: var(--fs-s); }
 .control-center-spaces button:hover { color: var(--text); }
 .control-center-spaces button.is-on { background: var(--surface-2); color: var(--text); }

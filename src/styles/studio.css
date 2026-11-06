@@ -1,7 +1,7 @@
 /* Studio: the chat workspace as chat (left) + a Generations board (right), closable and resizable. Tokens only. */
 .workspace.ws-chat.has-studio-board { padding-right: var(--studio-w); }
-.workspace.ws-chat.has-studio-board .composer-dock { left: calc((100% - var(--studio-w)) / 2); width: min(800px, calc(100% - var(--studio-w) - 48px)); }
-.workspace.ws-chat.has-studio-board:has(.chat-empty) .composer-dock { left: auto; width: min(800px, calc(100% - 48px)); }
+.workspace.ws-chat.has-studio-board .composer-dock { left: calc((100% - var(--studio-w)) / 2); width: min(800px, calc(100% - var(--studio-w) - 192px)); }
+.workspace.ws-chat.has-studio-board:has(.chat-empty) .composer-dock { left: auto; width: min(800px, calc(100% - 192px)); }
 .workspace.ws-chat.has-studio-board > .chat { height: 100%; }
 .workspace.is-home > .studio-board, .workspace.is-space > .studio-board { visibility: hidden; }
 .studio-board { position: absolute; top: 0; right: 0; bottom: 0; z-index: 13; display: flex; min-width: 0; border-left: 1px solid var(--frame-border); background: var(--surface); }

@@ -61,7 +61,7 @@ export function ComposerOptions({ label, disabled, onAdd, onAsset }: { label: st
     <button ref={pop.ref} type="button" className={`composer-options-trigger ${pop.open ? 'is-open' : ''}`} aria-label="Control center" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>
       <Plus size={19} />
     </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={420} align="start" label="Control center" className="composer-options control-center">
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={420} align="start" clearOf=".composer" label="Control center" className="composer-options control-center">
       <div className="control-center-top">
         <nav className="control-center-nav" aria-label="Sections">
           {SECTIONS.map((s) => <button key={s.id} type="button" className={s.id === section ? 'is-current' : ''} aria-current={s.id === section ? 'true' : undefined} onMouseEnter={() => setSection(s.id)} onFocus={() => setSection(s.id)} onClick={() => setSection(s.id)}>

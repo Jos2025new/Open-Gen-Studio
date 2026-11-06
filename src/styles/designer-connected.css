@@ -176,7 +176,6 @@
 .composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; }
 .composer-tools-bar .designer-palette.is-docked { position: static; flex: 1 1 auto; min-width: 0; max-width: none; }
 .composer-tools-bar .designer-palette.is-docked .icon-btn.is-active::after { top: auto; bottom: -5px; }
-@media (max-width: 900px) { .composer-tools-bar { flex-wrap: wrap; } }
 
 /*
  * One field per setting (InlineControls.tsx): the whole field is the control. A slider is filled up to its value

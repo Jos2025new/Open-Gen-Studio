@@ -17,7 +17,7 @@ export function DockPlaceButton() {
   return <IconButton icon={docked ? PanelLeft : PanelBottom} label={docked ? 'Toolbox at the side' : 'Toolbox in the prompt box'} size="sm" onClick={() => setUi({ designerDock: docked ? 'prompt' : 'tools' })} />;
 }
 
-/** Under the prompt box, opposite the workspace menu: the tool help switch and where the toolbox sits. */
+/** In the toolbox bar, after the canvas view: the tool help switch and where the toolbox sits. */
 export function DesignerFooterTools() {
   return <span className="designer-footer-tools"><ViewToggles /><DockPlaceButton /></span>;
 }

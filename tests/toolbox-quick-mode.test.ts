@@ -107,7 +107,7 @@ it('the quick colour sits on a light disc and the tools-dock frame is thin', asy
   const { readFileSync } = await import('node:fs');
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
   expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.opt-color\.is-icon \{ background: var\(--text\)/);
-  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-designer::before \{ inset: -4px -4px -40px;/);
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-designer::before \{ inset: -4px -100vw -40px;/);
 });
 
 describe('hide button placement', () => {
@@ -171,6 +171,6 @@ describe('subtoolbox row for every tool', () => {
 
 it('the eye goes to the bar end slot after the zoom rail, not inside the scrolling tool list', async () => {
   const { readFileSync } = await import('node:fs');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="end" \/><DesignerFooterTools \/><span className="tool-dock-eye-slot" \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="end" \/><DesignerFooterTools \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/createPortal\([^;]*hideButton[^;]*eyeSlot\)/);
 });

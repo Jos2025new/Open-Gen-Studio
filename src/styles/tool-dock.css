@@ -84,7 +84,7 @@
 .edit-card > .tool-setting { align-self: flex-start; }
 .tool-dock-end { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 /* In the composer the bar itself is the toolbox (mockup): one box, the row and card as wide as it, icons spread along it. */
-.composer:has(.composer-tools-bar) { position: relative; padding: 9px 8px 8px; } /* the same insets around the + as the prompt box in Studio and Nodes */
+.composer:has(.composer-tools-bar) { position: relative; padding: 8px; border-radius: 27px; } /* the same shape and insets around the + as the prompt box in Studio and Nodes */
 .composer-tools-bar { position: static; }
 .composer-tools-bar .tool-dock { position: static; flex: 1 1 auto; width: auto; }
 .composer-tools-bar .designer-palette.is-docked { display: flex; flex: 1 1 auto; min-width: 0; }
@@ -212,7 +212,7 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .tool-dock-eye-slot { display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .tool-dock-eye-slot:empty { display: none; }
 .tool-dock-hide-prompt { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; color: var(--text-2); background: transparent; border: 0; border-radius: var(--radius-s); cursor: pointer; }
-.composer-tools-bar .tool-dock-hide-prompt { width: 40px; height: 40px; }
+.composer-tools-bar .tool-dock-hide-prompt { width: 36px; height: 36px; }
 .tool-dock-hide-prompt:is(:hover, :focus-visible) { color: var(--text); background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .tool-dock-hide-prompt[aria-pressed="true"] { color: var(--active-text); }
 .tool-dock-hide-prompt:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
@@ -225,11 +225,11 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .tool-dock-variants.is-fixed .opt-color.is-icon { background: var(--text); padding: 3px; border-radius: 50%; }
 /* Prompt box hidden: the toolbox (and the footer) slide down out of view, the subtoolbox drops to the bottom; the box chrome fades. */
 .composer.is-prompt-hidden { background: transparent; border-color: transparent; box-shadow: none; }
-.composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
-.composer.is-prompt-hidden :is(.composer-tools-bar > :not(.designer-palette), .tool-dock-family) { transform: translateY(calc(100% + 24px)); opacity: 0; visibility: hidden; pointer-events: none; }
+.composer :is(.composer-tools-bar > :not(.composer-tools-rail), .composer-tools-rail > :not(.designer-palette)), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
+.composer.is-prompt-hidden :is(.composer-tools-bar > :not(.composer-tools-rail), .composer-tools-rail > :not(.designer-palette), .tool-dock-family) { transform: translateY(calc(100% + 24px)); opacity: 0; visibility: hidden; pointer-events: none; }
 .composer.is-prompt-hidden .tool-dock-stack.is-fixed { bottom: 8px; right: 47px; }
 .composer.is-prompt-hidden .thread-peek { display: none; }
-@media (prefers-reduced-motion: reduce) { .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .composer :is(.composer-tools-bar > :not(.composer-tools-rail), .composer-tools-rail > :not(.designer-palette)), .composer .tool-dock-family, .tool-dock-stack.is-fixed { transition: none; } }
 
 /* The Size field's range button (BrushSizeField.tsx): sits over the track, right after the name. */
 .opt-size-range { position: relative; flex: none; margin: 0 auto 0 -2px; padding: 1px 2px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; cursor: pointer; }
@@ -241,3 +241,8 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .brush-row > .opt-slider:has(.opt-size-range) { flex-grow: 1.4; }
 .tool-dock-quick-sliders > .opt-slider:has(.opt-size-range) { padding: 0 6px; }
 @container (max-width: 96px) { .opt-size-range, .tool-dock-quick-sliders .opt-unit, .tool-dock-quick-sliders .opt-label { display: none; } }
+
+/* The bar stays on one line: what does not fit scrolls with « ». Static, so the subtoolbox and cards above it are not clipped; the padding keeps the mark under the active tool. */
+.composer-tools-rail { position: static; flex: 1 1 auto; justify-content: space-between; gap: 8px; padding-block: 6px; margin-block: -6px; }
+.composer-tools-rail > .designer-palette.is-docked { flex: 1 0 auto; }
+.composer-tools-rail .tool-dock-family { overflow: visible; }

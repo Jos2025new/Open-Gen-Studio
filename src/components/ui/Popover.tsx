@@ -48,12 +48,14 @@ interface PopoverProps {
   /** Start-aligned only: near the boundary, 'slide' keeps the full width by moving left; the default narrows beside the anchor. */
   edge?: 'narrow' | 'slide';
   boundarySelector?: string;
+  /** Opens clear of this ancestor of the anchor instead of the anchor itself (a button low in a tall box). */
+  clearOf?: string;
   className?: string;
   label?: string;
   children: ReactNode;
 }
 
-export function Popover({ open, anchor, onClose, placement = 'top-start', width = 300, align = 'end', edge = 'narrow', boundarySelector, className, label, children }: PopoverProps) {
+export function Popover({ open, anchor, onClose, placement = 'top-start', width = 300, align = 'end', edge = 'narrow', boundarySelector, clearOf, className, label, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({ visibility: 'hidden' });
   const onCloseRef = useRef(onClose);
@@ -86,11 +88,12 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
     } else {
       const left = placement === 'bottom-center' || placement === 'top-center' ? r.left + (r.width - w) / 2 : align === 'start' ? r.left : r.right - w;
       next.left = boundPopoverLeft(left, w, start, hi);
-      const above = r.top - GAP - MARGIN;
+      const top = (clearOf ? a.closest(clearOf)?.getBoundingClientRect().top : undefined) ?? r.top;
+      const above = top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;
       const openAbove = openPopoverAbove(placement, above, below, contentH);
       if (openAbove) {
-        next.bottom = vh - r.top + GAP;
+        next.bottom = vh - top + GAP;
         next.maxHeight = above;
       } else {
         next.top = r.bottom + GAP;
@@ -98,7 +101,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       }
     }
     setStyle(next);
-  }, [anchor, placement, width, align, edge, boundarySelector]);
+  }, [anchor, placement, width, align, edge, boundarySelector, clearOf]);
 
   useLayoutEffect(() => {
     if (!open) return;

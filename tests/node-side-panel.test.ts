@@ -91,12 +91,12 @@ it('one selected node with a result shows its details; closing them returns to t
 it('Nodes keeps the floating prompt box; Create attaches through its picker; the corner stays clear of it', () => {
   const composer = readFileSync('src/components/composer/Composer.tsx', 'utf8');
   expect(composer).toMatch(/\{workspace !== 'chat' && workspace !== 'node' \? <ThreadPeek workspace=\{workspace\} \/> : null\}/);
-  expect(composer).toMatch(/\}, \[text, mode, showTools, workspace\]\);/);
+  expect(composer).toMatch(/\}, \[text, mode, showTools, workspace, promptWidth\]\);/);
   expect(composer).toMatch(/window\.addEventListener\('ogs:attach', pick\)/);
   expect(readFileSync('src/components/node/NodeSide.tsx', 'utf8')).toMatch(/window\.dispatchEvent\(new Event\('ogs:attach'\)\)/);
   expect(readFileSync('src/components/node/SelectionPanel.tsx', 'utf8')).toMatch(/<NodeSide sessionId=\{sessionId\} \/>/);
   const css = readFileSync('src/styles/node-side.css', 'utf8');
-  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-node::before, \.composer-dock\.dock-designer::before \{ content: ''[^}]*inset: -12px -12px -40px; background: var\(--bg-canvas\);[^}]*border-radius: calc\(var\(--r-l\) \+ 12px\)/);
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-node::before, \.composer-dock\.dock-designer::before \{ content: ''[^}]*inset: -12px -100vw -40px; background: var\(--bg-canvas\); pointer-events: none; \}/);
   expect(readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8')).toMatch(/\{add\}\s*<CornerButtons sessionId=\{sessionId\} \/>\s*<span className="canvas-nav-sep" \/>/);
   expect(css).toMatch(/body:has\(\.canvas-nav-pop, \.node-lib-pop\) \.react-flow__panel\.node-side, \.react-flow:has\(\.canvas-map\) \.react-flow__panel\.node-side \{ display: none; \}/);
   const node = readFileSync('src/styles/node.css', 'utf8');

@@ -48,7 +48,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src` | 2 | 0 |
 | `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
-| `src/components/composer` | 14 | 14 |
+| `src/components/composer` | 15 | 14 |
 | `src/components/designer` | 74 | 43 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 33 | 304 |
 | `src/store` | 15 | 226 |
 
-181 de 553 módulos no tienen ningún test que los importe directamente.
+182 de 554 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

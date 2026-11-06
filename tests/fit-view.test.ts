@@ -26,5 +26,6 @@ it('the prompt box is centered on that same line, narrowing to clear the panel',
   // Same width as the prompt box in Studio and Nodes (800 px): no jump when switching spaces or the toolbox's place.
   expect(css).toMatch(/\.composer-dock:has\(\.composer-tools-bar\) \{ width: min\(800px, calc\(100% - 48px\)\); \}\s*\.composer-dock \.composer:has\(\.composer-tools-bar\) \{ width: 100%; \}\s*\.composer-tools-bar \{ justify-content: space-between; \}/);
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(800px, calc(100% - 48px)); }');
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock:is\(\.dock-chat, \.dock-node\), [^{]*\{ width: min\(800px, calc\(100% - 192px\)\); \}/);
   expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).toContain('fitView(size, doc, board)');
 });
