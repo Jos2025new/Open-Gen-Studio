@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { combineSelection, wandSelection } from '../../engine/design/pixelSelection';
 import { record } from '../../engine/design/history';
-import { combineFrom, type Mods } from '../../engine/design/modifierGate';
+import { combineFrom, eventMods, type Mods } from '../../engine/design/modifierGate';
 import type { SelectShape } from '../../engine/design/selectShape';
 import { toast, useStore } from '../../store/store';
 import { dragDown, dragMove, dragUp, type DragGesture } from './selectDrag';
@@ -33,6 +33,14 @@ export function selectDown(a: SelectDown): SelectGesture | 'handled' | null {
   return dragDown(a.p, a.shape === 'lasso' ? 'lasso' : a.shape === 'ellipse' ? 'ellipse' : 'rect', combine);
 }
 
+/** A press, with the outline to show set through `setDraft`; the gesture left dragging, or null when nothing is. */
+export function selectPress(a: SelectDown, setDraft: (d: Draft) => void): SelectGesture | null {
+  const g = selectDown(a);
+  if (g === 'handled') setDraft(selectHover(a.p, a.mods) ?? null);
+  else if (g) setDraft([...g.points]);
+  return g === 'handled' ? null : g;
+}
+
 /** The pointer moved with the button down: the outline to show. `mods` are the keys held now (Shift: square, Alt: from the centre). */
 export const selectMove = (g: SelectGesture, p: { x: number; y: number }, zoom: number, mods?: Mods): Draft =>
   isMove(g) ? moveMove(g, p, zoom) : dragMove(g, p, zoom, mods);
@@ -46,20 +54,44 @@ export const selectRefresh = (g: SelectGesture, zoom: number, mods: Mods): Draft
  */
 export const selectHover = (p: { x: number; y: number }, mods: Mods): Draft | undefined => polygonHover(p, mods);
 
+/** No button down: the polygon's rubber band follows the pointer. */
+export function selectIdle(p: { x: number; y: number }, mods: Mods, setDraft: (d: Draft) => void): void {
+  const h = selectHover(p, mods);
+  if (h) setDraft(h);
+}
+
 export const selectUp = (g: SelectGesture, a: { sessionId: string; doc: DesignDoc; draft: Draft; zoom: number }): void =>
   isMove(g) ? moveUp(g, a) : dragUp(g, a);
 
 /** Cancels a half-drawn polygon when the tool, shape or document changes, and gives it Esc, Enter and Backspace before the shortcuts see them. */
-export function useSelectSession(docId: string, tool: string, shape: SelectShape, setDraft?: (d: Draft) => void): void {
-  useEffect(() => () => { if (polygonDraft()) setDraft?.(null); polygonCancel(); }, [docId, tool, shape, setDraft]);
+export function useSelectSession(docId: string, tool: string, shape: SelectShape, setDraft: (d: Draft) => void, layerId: string | null, drag: RefObject<{ kind: string } | null>, zoom: number): void {
+  useSelectRefresh(drag, zoom, setDraft);
+  useEffect(() => () => { if (polygonDraft()) setDraft(null); polygonCancel(); }, [docId, layerId, tool, shape, setDraft]);
   useEffect(() => {
     if (tool !== 'select' || shape !== 'polygon') return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      if (polygonKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); setDraft?.(polygonDraft()); }
+      if (polygonKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); setDraft(polygonDraft()); }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [tool, shape, setDraft]);
+}
+
+/** Shift or Alt pressed or let go while a selection drags under a still pointer: the outline again from the latest point. */
+export function useSelectRefresh(drag: RefObject<{ kind: string } | null>, zoom: number, setDraft: (d: Draft) => void): void {
+  const z = useRef(zoom);
+  z.current = zoom;
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      const d = drag.current;
+      if (d?.kind !== 'select') return;
+      const next = selectRefresh(d as SelectGesture, z.current, eventMods(e));
+      if (next) setDraft(next);
+    };
+    window.addEventListener('keydown', on);
+    window.addEventListener('keyup', on);
+    return () => { window.removeEventListener('keydown', on); window.removeEventListener('keyup', on); };
+  }, [drag, setDraft]);
 }

@@ -6,11 +6,12 @@ import { screenToDocument, type Point, type View } from './viewCoordinates';
 export function useCursorPreview(view: View, canvas: RefObject<HTMLCanvasElement | null>, options: CursorTools, bend: BendCursor | null) {
   const [screen, setScreen] = useState<Point | null>(null);
   const [alt, setAlt] = useState(false);
+  const [shift, setShift] = useState(false);
   const enabled = hasCursorPreview(options);
   useEffect(() => {
-    if (!enabled) { setScreen(null); setAlt(false); return; }
-    const key = (e: KeyboardEvent) => setAlt(e.altKey);
-    const blur = () => { setScreen(null); setAlt(false); };
+    if (!enabled) { setScreen(null); setAlt(false); setShift(false); return; }
+    const key = (e: KeyboardEvent) => { setAlt(e.altKey); setShift(e.shiftKey); };
+    const blur = () => { setScreen(null); setAlt(false); setShift(false); };
     window.addEventListener('keydown', key);
     window.addEventListener('keyup', key);
     window.addEventListener('blur', blur);
@@ -20,8 +21,10 @@ export function useCursorPreview(view: View, canvas: RefObject<HTMLCanvasElement
   return {
     point,
     indicator: point ? cursorIndicator(options, point, view.zoom, alt, bend) : null,
-    move: (e: { clientX: number; clientY: number; altKey: boolean }) => {
-      if (enabled) { setScreen({ x: e.clientX, y: e.clientY }); setAlt(e.altKey); }
+    /** Shift and Alt as held now (the Select badge shows what a press would do). */
+    mods: { shift, alt },
+    move: (e: { clientX: number; clientY: number; altKey: boolean; shiftKey: boolean }) => {
+      if (enabled) { setScreen({ x: e.clientX, y: e.clientY }); setAlt(e.altKey); setShift(e.shiftKey); }
     },
     leave: () => setScreen(null),
   };

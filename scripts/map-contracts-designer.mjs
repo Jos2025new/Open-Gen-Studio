@@ -56,6 +56,47 @@ export default [{
   tests: ['tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-keys.test.ts'],
 },
 {
+  id: 'designer-select-family',
+  what: 'Familia Select: formas, Mode con Intersect, insignia del cursor y gestos.',
+  sides: [
+    ['src/components/designer/toolboxModel.ts', "family('select'"],
+    ['src/engine/design/selectShape.ts', 'export const SELECT_SHAPES'],
+    ['src/engine/design/pixelSelection.ts', "'intersect'"],
+    ['src/components/designer/ToolSettings.tsx', 'export const SELECT_MODES'],
+    ['src/components/designer/QuickSettings.tsx', 'options={SELECT_MODES}'],
+    ['src/components/designer/Stage.tsx', 'selectPress('],
+    ['src/components/designer/Stage.tsx', '<SelectCursor '],
+  ],
+  tests: ['tests/toolbox-model.test.ts', 'tests/select-cursor.test.ts', 'tests/select-polygon.test.ts'],
+},
+{
+  id: 'color-pair',
+  what: 'Color secundario: una fuente para X / D, el par de colores, Fill con Ctrl y el degradado.',
+  sides: [
+    ['src/engine/design/colorPair.ts', 'export function secondaryOf'],
+    ['src/components/designer/ColorPair.tsx', 'export function ColorPair'],
+    ['src/components/designer/colorKeys.ts', 'export function colorKey'],
+    ['src/components/designer/designerKeys.ts', 'colorKey(e)'],
+    ['src/components/designer/QuickSettings.tsx', '<ColorPair compact'],
+    ['src/components/designer/ToolSettings.tsx', '<ColorPair dimSecondary'],
+    ['src/components/designer/Stage.tsx', 'color2: secondaryOf(brush, gradientUi)'],
+  ],
+  tests: ['tests/color-keys.test.ts', 'tests/designer-keys.test.ts'],
+},
+{
+  id: 'sample-source',
+  what: 'Origen del muestreo (todas las capas o la activa) común a Fill y al Cuentagotas; el gesto de muestreo vive en StageSample.',
+  sides: [
+    ['src/engine/design/sampleSource.ts', 'export function renderSource'],
+    ['src/engine/design/fill.ts', "origin: 'fill'"],
+    ['src/engine/design/swatches.ts', "origin: 'color-sample'"],
+    ['src/components/designer/StageSample.ts', 'export function samplingGesture'],
+    ['src/components/designer/Stage.tsx', 'samplingGesture(tool, e)'],
+    ['src/components/designer/Stage.tsx', 'runFill(sessionId'],
+  ],
+  tests: ['tests/sample-radius.test.ts', 'tests/stage-sample.test.ts', 'tests/fill-source.test.ts'],
+},
+{
   id: 'designer-shape-booleans',
   what: 'Union, Subtract, Intersect, Exclude y Divide visibles con 2+ formas elegidas (atajos Ctrl+Alt+U/S/I/E); Shape Builder (Shift+M) fusiona o borra caras con Alt.',
   sides: [

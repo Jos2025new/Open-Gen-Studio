@@ -1,5 +1,6 @@
 import type { DesignTool } from '../../engine/design/rules';
 import { toolKey } from '../../engine/shortcuts';
+import type { SelectShape } from '../../engine/design/selectShape';
 
 /** Icon keys are names only so this table stays data-only and easy to inspect. */
 export type ToolboxVariant = {
@@ -7,14 +8,14 @@ export type ToolboxVariant = {
   label: string;
   icon: string;
   tool?: DesignTool;
-  selectShape?: 'rect' | 'lasso' | 'wand';
+  selectShape?: SelectShape;
   rulerKind?: 'line' | 'ellipse' | 'perspective';
   preset?: 'pencil' | 'airbrush';
   action?: 'size' | 'guides';
   soon?: string;
   /** Other tools this variant covers: the type or end option inside its settings (Ellipse: sector, arc, chord). */
   also?: DesignTool[];
-  /** Variants with the same settings stay side by side when the row shows them (rectangle and lasso). */
+  /** Variants with the same settings stay side by side when the row shows them (rectangle, ellipse and lasso). */
   sameSettings?: boolean;
 };
 export type ToolboxFamily = { id: string; label: string; icon: string; variants: ToolboxVariant[] };
@@ -26,9 +27,10 @@ const family = (id: string, label: string, icon: string, variants: ToolboxVarian
 /** One toolbox for both paint modes, in the order of the mockup; Drawing/Design stays a document setting inside the brush card. */
 export const TOOLBOX: ToolboxFamily[] = [
   family('edit', 'Edit', 'mouse-pointer-2', [v('edit', 'Edit', 'mouse-pointer-2', 'move'), v('hand', 'Pan', 'hand', 'hand'), v('rect', 'Rectangle', 'square', 'rect'), v('ellipse', 'Ellipse', 'circle', 'ellipse', { also: ['sector', 'arc', 'chord'] }), v('line', 'Line', 'minus', 'line', { also: ['arrow'] }), v('polygon', 'Polygon / Star', 'pentagon', 'polygon', { also: ['star'] }), v('shape-builder', 'Shape Builder', 'squares-unite', 'shapeBuilder')]),
+  family('select', 'Select', 'square-dashed', [v('selection-rect', 'Rectangular selection', 'square-dashed', 'select', { selectShape: 'rect', sameSettings: true }), v('selection-ellipse', 'Elliptical selection', 'circle-dashed', 'select', { selectShape: 'ellipse', sameSettings: true }), v('lasso', 'Lasso', 'lasso', 'select', { selectShape: 'lasso', sameSettings: true }), v('selection-polygon', 'Polygonal selection', 'lasso-select', 'select', { selectShape: 'polygon' }), v('wand', 'Magic wand', 'wand-sparkles', 'select', { selectShape: 'wand' })]),
   family('layout', 'Layout', 'layout-panel-top', [v('sizes', 'Sizes', 'crop', undefined, { action: 'size' }), soon('grid', 'Grid', 'grid-3x3', 'A layout grid is planned.'), v('guides', 'Guides', 'ruler-dimension-line', undefined, { action: 'guides' }), soon('templates', 'Templates', 'layout-template', 'Templates are planned.')]),
   family('pen', 'Pen', 'pen-tool', [v('lineart', 'Lineart', 'pen-tool', 'lineart'), v('curve', 'Curve', 'spline', 'curve'), soon('bezier-pen', 'Bezier pen', 'pen-tool', 'A vector Bezier pen is planned.'), soon('cutter', 'Cutter', 'scissors', 'A path cutter is planned.')]),
-  family('brush', 'Brush', 'brush', [v('brush', 'Brush', 'brush', 'brush'), v('pencil', 'Pencil', 'pencil', 'brush', { preset: 'pencil' }), v('airbrush', 'Airbrush', 'airbrush', 'brush', { preset: 'airbrush' }), v('fill', 'Fill', 'paint-bucket', 'fill'), v('gradient', 'Gradient', 'blend', 'gradient'), v('selection-rect', 'Rectangular selection', 'square-dashed', 'select', { selectShape: 'rect', sameSettings: true }), v('lasso', 'Lasso', 'lasso', 'select', { selectShape: 'lasso', sameSettings: true }), v('wand', 'Magic wand', 'wand-sparkles', 'select', { selectShape: 'wand' }), v('eyedropper', 'Eyedropper', 'pipette', 'eyedropper'), soon('sculpt', 'Sculpt', 'sculpt', 'Sculpting brushes are planned.'), soon('blur', 'Blur', 'blend', 'Blur and smudge tools are planned.')]),
+  family('brush', 'Brush', 'brush', [v('brush', 'Brush', 'brush', 'brush'), v('pencil', 'Pencil', 'pencil', 'brush', { preset: 'pencil' }), v('airbrush', 'Airbrush', 'airbrush', 'brush', { preset: 'airbrush' }), v('fill', 'Fill', 'paint-bucket', 'fill'), v('gradient', 'Gradient', 'blend', 'gradient'), v('eyedropper', 'Eyedropper', 'pipette', 'eyedropper'), soon('sculpt', 'Sculpt', 'sculpt', 'Sculpting brushes are planned.'), soon('blur', 'Blur', 'blend', 'Blur and smudge tools are planned.')]),
   family('eraser', 'Eraser', 'eraser', [v('eraser', 'Eraser', 'eraser', 'eraser')]),
   family('text', 'Text', 'type', [v('text', 'Text', 'type', 'text')]),
   family('ruler', 'Ruler', 'drafting-compass', [v('ruler-straight', 'Straight ruler', 'minus', 'ruler', { rulerKind: 'line' }), v('ruler-ellipse', 'Ellipse ruler', 'circle', 'ruler', { rulerKind: 'ellipse' }), v('ruler-perspective', 'Perspective ruler', 'ruler-dimension-line', 'ruler', { rulerKind: 'perspective' })]),

@@ -9,6 +9,7 @@ import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
 import { deletePickedNode } from './PathNodes';
 import { boardKey } from './boardKey';
+import { colorKey } from './colorKeys';
 import { SELECT_SHAPES } from '../../engine/design/selectShape';
 import { sizeRangeFor, stepBrushSize } from '../../engine/design/brushSizeStep';
 import { showValueNotice } from '../../engine/design/valueNotice';
@@ -140,5 +141,5 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
       return;
     }
     if ((!tools || tools.has(tool)) && !toolBlockReason(tool, layer)) { e.preventDefault(); setUi({ tool }); }
-  }
+  } else colorKey(e);
 }

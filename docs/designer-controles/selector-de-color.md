@@ -25,6 +25,10 @@ related: [pincel, relleno, degradado, formas, texto, lineart, propiedades, estad
 | Saved (muestras, clic derecho borra) | Popover (`InlineControls.tsx:78`) | Color del llamador; clic derecho llama a `removeSwatch` (`swatches.ts:31`) | Si hay guardados | ÚNICO menú contextual de color: el clic derecho borra sin confirmación (tooltip «right-click to remove») | Igual que hoy | se conserva | no dibujado |
 | Hueco `children` del popover | Bajo los canales (`InlineControls.tsx:71`) | Lo que ponga cada llamador | Según llamador | Casilla «No fill»/«No stroke» (formas, `ToolSettings.tsx:267`), selector Solid/Linear/Radial y Start/End (`ShapePaint.tsx:58`), y las opciones del trazo (`ShapePaint.tsx:82`) | Igual que hoy | se conserva | no dibujado |
 
+## Color secundario (2026-11-06)
+
+`ui.brush.secondary` (por defecto el `color2` del degradado, o negro). Control `ColorPair`: principal ⇄ secundario; X intercambia y D repone. En Gradient es la única fuente del segundo color. Sin probar en navegador.
+
 ## Enlaces
 
 - [[pincel]] · [pincel.md](pincel.md)

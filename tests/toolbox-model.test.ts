@@ -36,7 +36,11 @@ describe('toolbox family memory', () => {
     const { entryVariant } = await import('../src/components/designer/toolboxModel');
     const brush = TOOLBOX.find((family) => family.id === 'brush')!;
     expect(entryVariant(brush)?.id).toBe('brush');
-    expect(entryVariant(brush, { brush: 'lasso' })?.id).toBe('lasso');
+    expect(entryVariant(brush, { brush: 'lasso' })?.id, 'lasso lives in Select now').toBe('brush');
+    const select = TOOLBOX.find((family) => family.id === 'select')!;
+    expect(select.variants.map((variant) => variant.id)).toEqual(['selection-rect', 'selection-ellipse', 'lasso', 'selection-polygon', 'wand']);
+    expect(entryVariant(select, { select: 'lasso' })?.id).toBe('lasso');
+    expect(entryVariant(select)?.id).toBe('selection-rect');
     expect(entryVariant(brush, { brush: 'sculpt' })?.id, 'a soon variant is never remembered').toBe('brush');
     expect(entryVariant(brush, { brush: 'gone' })?.id).toBe('brush');
     expect(entryVariant(TOOLBOX.find((family) => family.id === 'layout')!)?.id, 'Sizes has no tool').toBeUndefined();

@@ -17,6 +17,10 @@ Eyedropper (tecla I, icono pipette) recoge el color **visible** bajo el puntero,
 | Clic en la página | Lienzo (`Stage.tsx:626`) | `ui.brush.color` y color reciente (`rememberColor`, `ui.swatches.recent`) | Tool = eyedropper | Si la página es transparente ahí, avisa «Nothing to pick here» y no cambia nada | Igual que hoy | se conserva | no dibujado |
 | Alt + clic con Brush o Fill | Lienzo (misma rama) | `ui.brush.color` | Tool = brush o fill | No existe con Eraser, Gradient ni formas | Igual que hoy | se conserva | no dibujado |
 
+## Cableado del 2026-11-06
+
+El clic es ahora un arrastre: la lupa junto al cursor muestra el color en vivo (la hoja se compone una vez al pulsar) y se confirma al soltar; Shift escribe el secundario. Ajustes Radius (0 a un cuadrado de (2r+1)² px, promedio con alfa premultiplicado) y Sample (All layers / Layer). En herramientas de color: Alt+clic o Ctrl+Shift+clic (duda abierta: ¿alias o preferencia?). Sin probar en navegador.
+
 ## Enlaces
 
 - [[relleno]] · [relleno.md](relleno.md)

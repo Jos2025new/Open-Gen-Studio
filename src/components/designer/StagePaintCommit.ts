@@ -13,7 +13,8 @@ import { setDoc, toast } from '../../store/store';
 import { applyDrawingChoice, drawingPreference, justClosedChoice, requestDrawingChoice } from '../../engine/design/drawingChoice';
 import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
 import { pixelsNotReady } from '../../engine/design/rasterMissing';
-import { rememberPaintEnd } from '../../engine/design/paintLastPoint';
+import { lastPaintPoint, rememberPaintEnd } from '../../engine/design/paintLastPoint';
+import { activeRuler, beginRulerStroke } from '../../engine/design/strokeRuler';
 
 /** The raster layer a brush stroke would land on (the active one, or the one above it), or null. */
 export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | null {
@@ -21,6 +22,13 @@ export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | nu
   const paintable = (item: Layer | null | undefined): item is RasterLayer => !!item && item.type === 'raster' && !item.locked && item.visible && !isProtectedImage(item);
   const above = selected ? doc.layers[doc.layers.indexOf(selected) + 1] : undefined;
   return erase ? selected?.type === 'raster' && !selected.locked && selected.visible ? selected : null : paintable(selected) ? selected : paintable(above) && !above.sourceAssetId ? above : null;
+}
+
+/** Where a brush press paints from (`p0`) and where the stroke continues (`p1`): Shift+click is a straight line from the last stroke's end on this layer, unless a ruler is on. */
+export function paintStart(doc: DesignDoc, layerId: string, erase: boolean, shift: boolean, p: { x: number; y: number }) {
+  const from = activeRuler(doc.id) ? null : lastPaintPoint(doc, layerId, erase, shift);
+  const p0 = beginRulerStroke(doc.id, from ?? p);
+  return { p0, p1: from ? p : p0 };
 }
 
 export function prepareStagePaint(doc: DesignDoc, erase: boolean): boolean {

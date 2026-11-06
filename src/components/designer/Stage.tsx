@@ -7,7 +7,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
 import { brushPoint } from '../../engine/design/brushControl';
-import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox, updateLayer } from '../../engine/design/doc';
@@ -24,7 +23,7 @@ import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee
 import { StageEditHint, StageHint } from './StageEditHint';
 import { beginLiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
-import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
+import { rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots } from './ShapeKnots';
 import { worldPoints } from '../../engine/design/strokes';
@@ -37,8 +36,10 @@ import {composeMoving} from '../../engine/design/rasterCompose';
 import { record, unrecord } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
-import { setDoc, setUi, toast, useStore } from '../../store/store';
-import { rememberColor, sampleColor } from '../../engine/design/swatches';
+import { setDoc, toast, useStore } from '../../store/store';
+import { secondaryOf } from '../../engine/design/colorPair';
+import { beginSample, moveSample, runFill, sampleUp, samplingGesture, showLoupe, type SampleDrag } from './StageSample';
+import { SampleLoupe, type SampleLoupeHandle } from './SampleLoupe';
 import { clearGuides, placeGuide, removeGuide, rulerStep, type GuideAxis } from '../../engine/design/guides';
 import { pathBox, toolPath } from '../../engine/design/shapeTools';
 import { PRIM_TOOLS, placedPath, primFromUi, primShape } from '../../engine/design/primitives';
@@ -49,12 +50,12 @@ import { applyGradient, GRADIENT_DEFAULT, paintGradient, type GradientSpec } fro
 import { editShape, objectPick, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
 import { getSelection, selectionClipFor, useSelectionVersion } from '../../engine/design/pixelSelection';
-import { drawSelect, selectDown, selectMove, selectUp, useSelectSession, type SelectGesture } from './StageSelect';
+import { drawSelect, selectIdle, selectMove, selectPress, selectUp, useSelectSession, type SelectGesture } from './StageSelect';
 import { SelectCursor } from './SelectCursor';
 import { useModifierKeys } from './useModifierKeys';
 import { eventMods, markDown } from '../../engine/design/modifierGate';
-import { lockedDelta, lockedPoint } from '../../engine/design/axisLock';
-import { lastPaintPoint } from '../../engine/design/paintLastPoint';
+import { keepAxis, lockedAxis, lockedPoint } from '../../engine/design/axisLock';
+import { snapAngle } from '../../engine/design/selectGeometry';
 import { xformMatrix } from '../../engine/design/xformMatrix';
 import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
 import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoordinates';
@@ -63,7 +64,7 @@ import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
 import { clickCandidate, pixelTarget } from '../../engine/design/autoSelect';
 import { usePanRequest } from './usePanRequest';
-import { commitStagePaintGesture, drawingChoiceFirst, pixelsNotReady, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
+import { commitStagePaintGesture, drawingChoiceFirst, paintStart, pixelsNotReady, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 
 
@@ -79,6 +80,7 @@ type Drag =
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
   | SelectGesture
+  | SampleDrag
   | { kind: 'shape'; tool: ShapeTool; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
@@ -228,11 +230,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const [guideHover, setGuideHover] = useState<GuideAxis | null>(null);
   const [guidePreview, setGuidePreview] = useState<{ axis: GuideAxis; at: number; index?: number } | null>(null);
   const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
-  useSelectSession(doc.id, tool, selectShape);
   const gradientUi = useStore((s) => s.ui.gradient) ?? GRADIENT_DEFAULT;
-  const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color };
+  const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color, color2: secondaryOf(brush, gradientUi) };
   // The selection being drawn (page coordinates), shown until pointer up.
   const [selDraft, setSelDraft] = useState<Array<[number, number]> | null>(null);
+  const loupe = useRef<SampleLoupeHandle>(null);
+  useSelectSession(doc.id, tool, selectShape, setSelDraft, doc.activeLayerId, drag, view.zoom);
   const [editMarquee, setEditMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const fitted = useRef<string | null>(null);
 
@@ -579,6 +582,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (!current) return;
     const act = activeLayer(current);
 
+    if (samplingGesture(tool, e)) {
+      const s = beginSample(current, p, tool, e);
+      if (s) { drag.current = s; showLoupe(loupe, view, p, s.color); }
+      return;
+    }
+
     if (tool === 'gradient') {
       drag.current = { kind: 'gradient', x0: p.x, y0: p.y, x1: p.x, y1: p.y };
       setPreview(drag.current);
@@ -586,25 +595,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
 
     if (tool === 'select') {
-      const g = selectDown({ doc: current, p, shape: selectShape, mods: eventMods(e) });
-      if (g && g !== 'handled') { drag.current = g; setSelDraft([...g.points]); }
+      drag.current = selectPress({ doc: current, p, shape: selectShape, mods: eventMods(e), zoom: view.zoom }, setSelDraft);
       return;
     }
 
-    // Eyedropper, or Alt-click with the brush or the fill: the visible color under the pointer becomes the color.
-    if (tool === 'eyedropper' || (e.altKey && (tool === 'brush' || tool === 'fill'))) {
-      const color = sampleColor(current, p.x, p.y);
-      if (!color) return void toast('Nothing to pick here: the page is transparent at this point.', 'info');
-      setUi({ brush: { ...useStore.getState().ui.brush, color } });
-      rememberColor(color);
-      return;
-    }
-
-    if (tool === 'fill') {
-      try { fillRegion(sessionId, current, p.x, p.y, brush.color, brush.opacity, { threshold: brush.fillThreshold, expand: brush.fillExpand, smooth: brush.fillSmooth }); }
-      catch (error) { toast(error instanceof Error ? error.message : 'Could not fill this region.', 'error'); }
-      return;
-    }
+    if (tool === 'fill') return runFill(sessionId, current, p, e);
 
     // Edit tool on a guide: drag it (back onto its ruler removes it).
     if (canDragGuides(tool, guidesShown, guidesLocked)) {
@@ -793,9 +788,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const stroke = newBrushStroke(brush, erase);
       // With a pixel selection, the stroke lands only inside it.
       const clip = selectionClipFor(current, prepared);
-      const p0 = beginRulerStroke(doc.id, lastPaintPoint(doc, target.id, erase) ?? p);
-      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p0, control: p0, time: e.timeStamp, erase, direct };
+      const { p0, p1 } = paintStart(doc, target.id, erase, e.shiftKey, p);
+      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p1, control: p1, time: e.timeStamp, erase, direct };
       paintSegment(target, p0, p0, penPressure(e));
+      if (p1 !== p0) paintSegment(target, p0, p1, penPressure(e));
       return;
     }
 
@@ -915,7 +911,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const over = near('x') ? 'x' : near('y') ? 'y' : null;
       if (over !== guideHover) setGuideHover(over);
     }
+    if (!d && tool === 'select') selectIdle(p, eventMods(e), setSelDraft);
     if (!d) return;
+    if (d.kind === 'sample') return void showLoupe(loupe, view, p, moveSample(d, doc, p));
     snapIdleFeed(d, e, onPointerMove);
     if (d.kind === 'pixelMove') { d.move.update(lockedPoint(p, d.start, e));
     } else if (d.kind === 'pan') {
@@ -945,6 +943,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
       // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
+      const ax = lockedAxis(p.x - d.startX, p.y - d.startY, e);
       let { x: ox, y: oy } = lockedPoint(p, { x: d.startX, y: d.startY }, e);
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       // Raster strokes are painted, never snapped (Drawing); the switch applies to vector objects and layers.
@@ -953,6 +952,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
         const s = snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         ox += s.dx; oy += s.dy;
+        const k = keepAxis({ dx: ox - d.startX, dy: oy - d.startY }, ax);
+        ox = d.startX + k.dx; oy = d.startY + k.dy;
         showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
       } else {
         snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).clear();
@@ -964,7 +965,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (!started(d, p)) return;
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
-      let { dx, dy } = lockedDelta(p.x - d.startX, p.y - d.startY, e);
+      const ax = lockedAxis(p.x - d.startX, p.y - d.startY, e);
+      let { dx, dy } = keepAxis({ dx: p.x - d.startX, dy: p.y - d.startY }, ax);
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       // Ctrl/Meta pressed in the drag: no snap, still measured (neighbourGaps.ts).
       const mode = moveMode(snap.on, e.altKey, e.ctrlKey || e.metaKey, ctrlAtDown.current);
@@ -974,6 +976,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         const session = snapSessionOf(d, doc, ids, d.layerId, snap, view, size);
         const s = mode.snap ? session.step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp) : (session.clear(), null);
         dx += s?.dx ?? 0; dy += s?.dy ?? 0;
+        ({ dx, dy } = keepAxis({ dx, dy }, ax));
         showGuides({ x: s?.viewGuides?.x, y: s?.viewGuides?.y, m: [...(s?.measures ?? []), ...neighbourGaps(box, doc.layers, ids, s)], a: s?.alignments });
       } else {
         snapSessionOf(d, doc, new Set(group.map((l) => l.id)), d.layerId, snap, view, size).clear();
@@ -1027,28 +1030,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       d.at = d.axis === 'x' ? p.x : p.y;
       setGuidePreview({ axis: d.axis, index: d.index, at: d.at });
     } else if (d.kind === 'gradient') {
-      let x1 = p.x, y1 = p.y;
       // Shift: the line snaps to 45° steps, as in SAI.
-      if (e.shiftKey) {
-        const ang = Math.round(Math.atan2(y1 - d.y0, x1 - d.x0) / (Math.PI / 4)) * (Math.PI / 4);
-        const len = Math.hypot(x1 - d.x0, y1 - d.y0);
-        x1 = d.x0 + Math.cos(ang) * len;
-        y1 = d.y0 + Math.sin(ang) * len;
-      }
-      d.x1 = x1;
-      d.y1 = y1;
+      const q = e.shiftKey ? snapAngle({ x: d.x0, y: d.y0 }, p) : p;
+      d.x1 = q.x;
+      d.y1 = q.y;
       setPreview({ ...d });
     } else if (d.kind === 'select') {
-      setSelDraft(selectMove(d, p, view.zoom));
+      setSelDraft(selectMove(d, p, view.zoom, eventMods(e)));
     } else if (d.kind === 'shape') {
       let x1 = p.x;
       let y1 = p.y;
       if (e.shiftKey) {
         if (STROKE_ONLY(d.tool)) {
-          const ang = Math.round(Math.atan2(y1 - d.y0, x1 - d.x0) / (Math.PI / 4)) * (Math.PI / 4);
-          const len = Math.hypot(x1 - d.x0, y1 - d.y0);
-          x1 = d.x0 + Math.cos(ang) * len;
-          y1 = d.y0 + Math.sin(ang) * len;
+          ({ x: x1, y: y1 } = snapAngle({ x: d.x0, y: d.y0 }, p));
         } else {
           const s = Math.max(Math.abs(x1 - d.x0), Math.abs(y1 - d.y0));
           x1 = d.x0 + Math.sign(x1 - d.x0 || 1) * s;
@@ -1073,6 +1067,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     snapIdleStop();
     endDragPreview();
     if (!d) return;
+    if (d.kind === 'sample') return sampleUp(loupe, d, doc, e?.type === 'pointercancel' || !e ? null : toDoc(e.clientX, e.clientY));
     if (d.kind === 'editMarquee') {
       setEditMarquee(null);
       finishEditMarquee({ drag: d, sessionId, doc, zoom: view.zoom, release: e ? toDoc(e.clientX, e.clientY) : undefined, cancelled: e?.type === 'pointercancel' });
@@ -1246,7 +1241,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         onDoubleClick={onDoubleClick}
       />
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
-      <SelectCursor tool={tool} point={cursor.point} view={view} />
+      <SelectCursor tool={tool} point={cursor.point} view={view} mods={cursor.mods} />
+      <SampleLoupe ref={loupe} />
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
       {(tool === 'move' ? !editLayers || shapeEditing : tool === 'shapeBuilder') && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}

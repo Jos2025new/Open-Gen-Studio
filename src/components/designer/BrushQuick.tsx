@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { Blend, Lock, Unlock } from 'lucide-react';
+import { Blend, Droplets, Lock, Unlock } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { BRUSH_BLENDS, type BrushBlend } from '../../engine/design/brushEngine';
 import { flowBlocked, flowOf, FLOW_MIN, withFlow } from '../../engine/design/brushFlow';
 import { InlineSelect, InlineSlider } from './InlineControls';
+import { Popover, usePopover } from '../ui/Popover';
 
 /* Flow, Blend and Lock alpha: the brush's own controls that the quick row and the Brush tabs share (one state, one look). */
 
@@ -30,4 +31,14 @@ export function LockAlphaButton() {
     style={on ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => setBrush({ keepOpacity: !on })}>
     {on ? <Lock size={15} /> : <Unlock size={15} />}
   </button>;
+}
+
+/** Flow behind one round button (the quick row has no room for a third slider): the same field in a small popover. */
+export function FlowMenu() {
+  const pop = usePopover(), brush = useStore((s) => s.ui.brush);
+  const pct = Math.round((flowBlocked(brush) ? 1 : flowOf(brush)) * 100);
+  return <>
+    <button type="button" ref={pop.ref} className="opt opt-pick is-icon" aria-label={`Flow · ${pct}%`} data-tip={`Flow: ${pct}%`} aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}><Droplets size={15} /></button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={200} label="Flow"><div className="snap-pop"><FlowField /></div></Popover>
+  </>;
 }

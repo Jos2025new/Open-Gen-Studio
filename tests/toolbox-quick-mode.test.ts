@@ -41,7 +41,7 @@ describe('quick mode of the subtoolbox', () => {
     expect(host.querySelector('[aria-label="Brush variants"]')).toBeNull();
     const parts = [...quick()!.querySelectorAll('button, .opt-label')].map((e) => e.getAttribute('aria-label') ?? e.textContent);
     const at = (name: string) => parts.findIndex((p) => p === name || p?.startsWith(name));
-    const order = ['Show all tools', 'Brush tool', 'Size', 'Opacity', 'Color', 'Eraser', 'Settings'].map(at);
+    const order = ['Show all tools', 'Brush tool', 'Size', 'Opacity', 'Flow', 'Color', 'Eraser', 'Settings'].map(at);
     expect(order.every((i) => i >= 0), JSON.stringify(parts)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
@@ -166,26 +166,32 @@ describe('subtoolbox row for every tool', () => {
   });
 
   it('every tool with settings has essentials: the selection acts, the gradient shows its opacity without a saved gradient, the eyedropper leaves no empty slider slot', async () => {
-    await click('Brush');
+    await click('Select');
     await act(async () => { setUi({ tool: 'select', selectShape: 'rect' }); });
     await act(async () => [...row()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'All', 'Invert']));
-    expect(labels(row())).toEqual(expect.arrayContaining(['Rectangular selection', 'Lasso']));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Rectangular selection', 'Elliptical selection', 'Lasso']));
     await act(async () => setUi({ selectShape: 'wand' }));
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'Tolerance', 'Grow / shrink']));
     expect(labels(row())).not.toContain('All');
     await act(async () => setUi({ selectShape: 'rect' }));
     await act(async () => setUi({ tool: 'gradient', gradient: undefined }));
     expect(row()!.querySelector('.tool-dock-quick-sliders .opt-slider')).not.toBeNull();
-    const second = () => row()!.querySelector<HTMLButtonElement>('.quick-color-pair [role="switch"]')!;
+    const second = () => row()!.querySelector<HTMLButtonElement>('[role="switch"]')!;
     expect(second().getAttribute('aria-checked')).toBe('false');
-    expect(row()!.querySelectorAll('.quick-color-pair .opt-color')).toHaveLength(1);
+    expect(row()!.querySelectorAll('.quick-color-pair .opt-color')).toHaveLength(2); // always both; the second is faded while the gradient fades out
     await act(async () => second().click());
     expect(useStore.getState().ui.gradient?.mode).toBe('two');
     expect(row()!.querySelectorAll('.quick-color-pair .opt-color')).toHaveLength(2);
     await act(async () => setUi({ tool: 'eyedropper' }));
-    expect(row()!.querySelector('.tool-dock-quick-sliders')).toBeNull();
+    expect(labels(row())).toEqual(expect.arrayContaining(['Radius', 'Sample']));
     expect(row()!.querySelector('[aria-label="Settings"]')).toBeNull();
+  });
+
+  it('the brush row fits its budget: Size, Opacity, Flow and the colors, with Blend and Lock alpha in the card', async () => {
+    const { QUICK, quickWidth, ROW_BUDGET } = await import('../src/components/designer/QuickSettings');
+    expect(QUICK.brush).toEqual(['size', 'opacity', 'flow', 'colorPair']);
+    for (const tool of ['brush', 'fill', 'eyedropper', 'gradient'] as const) expect(quickWidth(tool) + 90, tool).toBeLessThanOrEqual(ROW_BUDGET);
   });
 
   it('QUICK maps every control to at most 2 long sliders', async () => {

@@ -42,6 +42,10 @@ Todo lo de aquí vive en `Stage` (`Stage.tsx:588`) y no tiene botón. La lista s
 | Pista de herramienta bloqueada | Lienzo (`Stage.tsx:1353`) | Ninguno | Brush o Eraser sin capa válida | Texto del motivo (`toolBlockReason`) | Igual que hoy | se conserva | no dibujado |
 | Soltar un activo de la galería | Lienzo (`Stage.tsx:1294`) | `placeAsset` | Sobre el lienzo | Ver [[documentos]] | Igual que hoy | se conserva | no dibujado |
 
+## Cableado del 2026-11-06
+
+Shift+clic línea recta, Shift = eje al mover (capas y objetos, después del snap), Alt = desde el centro al escalar, muestreo por arrastre y gestos de Select (ver [[seleccion]], [[atajos]]). Sin probar en navegador.
+
 ## Enlaces
 
 - [[atajos]] · [atajos.md](atajos.md)

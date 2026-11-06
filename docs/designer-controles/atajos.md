@@ -54,6 +54,16 @@ El manejador es `designerKey` (`designerKeys.ts:31`), registrado en la ventana p
 | Ctrl + arrastrar un asa de esquina | Lienzo (asas de forma) | Los dos radios a la vez | Editando un rect | Listada; el candado «Lock radii» hace lo mismo ([[tira-contextual]]) | Igual que hoy | se conserva | no dibujado |
 | Mod + Alt + P | Atajo de pruebas de la app (`shortcuts.ts:21`) | Inicia/para una traza de rendimiento | Global | No es del Designer; solo aparece en el grupo «Testing» | Igual que hoy | se conserva | no dibujado |
 
+## Cableado del 2026-11-06 (sin probar en navegador)
+
+- `[` / `]`: tamaño del pincel o la goma (en teclado español, AltGr); aviso breve «Brush size N px» arriba y al centro (`ValueNotice`).
+- Ctrl + `=` / `-` / `0` (y teclado numérico): acercar, alejar, encajar la página; siempre se cancela el zoom del navegador.
+- `M` ya en Select: siguiente forma. Shift+M sigue siendo Shape Builder.
+- `X` intercambia color principal y secundario; `D` los repone a blanco y negro (defecto de la app; duda abierta frente a negro/blanco). Ignoradas con Ctrl, Alt, Shift o en un campo de texto.
+- Shift+clic con pincel o goma: línea recta desde donde acabó el último trazo de esa capa (no con regla; tras deshacer puede apuntar a un trazo borrado). Shift al mover: bloquea el eje (el Shift mantenido desde el clic es del modo de selección). Alt al escalar: desde el centro y sin snap (el snap ya se apagaba con Alt).
+- Muestreo de color: Alt+clic (no en Lineart, donde Alt dobla un trazo) o **Ctrl+Shift+clic** (también en Lineart) en las herramientas de color; Ctrl+Shift gana al relleno. Alt puede chocar con el gestor de ventanas de Linux (duda abierta).
+- Fill: Ctrl/⌘+clic rellena con el secundario; Shift+clic invierte Connected / All similar en ese clic.
+
 ## Enlaces
 
 - [[navegacion-zoom]] · [navegacion-zoom.md](navegacion-zoom.md)

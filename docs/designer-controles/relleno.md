@@ -20,6 +20,10 @@ Fill (tecla G) rellena la zona de color parecido bajo el clic y deja el resultad
 | Rellenar (clic en la página) | Lienzo (`Stage.tsx:635`) | Capa raster nueva con la zona (`fillRegion`) | Tool = fill | Si falla, un aviso con el motivo | Igual que hoy | se conserva | no dibujado |
 | Alt + clic (recoger color) | Lienzo (`Stage.tsx:626`) | `ui.brush.color` | Tool = fill o brush | Mismo gesto que el Cuentagotas | Igual que hoy | se conserva | no dibujado |
 
+## Cableado del 2026-11-06
+
+Fill usa `runFill` (`StageSample.ts`): origen Source (All layers / Layer, con la capa nueva debajo de la activa), Close gaps (0 a 16 px; no aplica a All similar), Area Connected / All similar (Shift+clic lo invierte en ese clic) y Ctrl/⌘+clic con el color secundario. La tarjeta es `FillSettings`. Fill sigue creando una capa nueva. Sin probar en navegador; tiempos en lienzos grandes sin medir.
+
 ## Enlaces
 
 - [[degradado]] · [degradado.md](degradado.md)

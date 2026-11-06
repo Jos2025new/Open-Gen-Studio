@@ -186,7 +186,17 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | T | Text |
 | K | Ruler |
 | Space (hold) | Pan |
-| Alt-click (Brush, Fill) | Pick a color from the canvas |
+| X / D | Swap the primary and secondary color / reset them to white and black |
+| Alt-click or Ctrl+Shift-click (color tools) | Pick a color from the canvas (Lineart: Ctrl+Shift only); the Eyedropper picks with a plain click, Shift-click for the secondary color |
+| Ctrl-click (Fill) | Fill with the secondary color; Shift-click flips Connected / All similar for that click |
+| [ / ] | Smaller / larger Brush or Eraser (on a Spanish keyboard: AltGr + [ / ]) |
+| Ctrl + = / - / 0 | Zoom in / out / fit the page |
+| M (in Select) | Next selection shape: rectangle, ellipse, lasso, polygon, magic wand |
+| Shift-click (Brush, Eraser) | Straight line from where the last stroke on this layer ended |
+| Shift (while moving) | Lock the move to one axis |
+| Shift / Alt (selection) | Held at the press they set the Mode: Shift adds, Alt subtracts, Shift+Alt intersects. Pressed while dragging: Shift square or circle, Alt from the centre |
+| Alt (scaling) | Scale from the center, without snapping |
+| Enter / Esc / Backspace (polygon selection) | Close the polygon / throw it away / remove the last point |
 | Ctrl+A / Ctrl+D | Select all pixels / deselect |
 | Ctrl+Shift+I | Invert the selection |
 | Ctrl+J | Selected pixels to a new layer |

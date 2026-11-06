@@ -1,4 +1,6 @@
+import type { RefObject } from 'react';
 import type { DesignDoc } from '../../engine/types';
+import type { SampleLoupeHandle } from './SampleLoupe';
 import { ctx2d } from '../../lib/media';
 import { setUi, toast, useStore } from '../../store/store';
 import { fillRegion } from '../../engine/design/fill';
@@ -7,6 +9,16 @@ import { renderSource } from '../../engine/design/sampleSource';
 import { averageColor, clampRadius, rememberColor, sampleColor } from '../../engine/design/swatches';
 
 /* The eyedropper's gesture, and the Fill's click, kept out of Stage: modifiers, live sampling while dragging, the click's options. */
+
+/** The loupe by the pointer (stage pixels from the view), showing `color`. */
+export const showLoupe = (loupe: RefObject<SampleLoupeHandle | null>, view: { x: number; y: number; zoom: number }, p: { x: number; y: number }, color: string | null): void =>
+  loupe.current?.show(view.x + p.x * view.zoom, view.y + p.y * view.zoom, color);
+
+/** Pointer up: hide the loupe and keep the color; `p` null (cancelled) keeps nothing. */
+export function sampleUp(loupe: RefObject<SampleLoupeHandle | null>, d: SampleDrag, doc: DesignDoc, p: { x: number; y: number } | null): void {
+  loupe.current?.hide();
+  if (p) endSample(d, doc, p);
+}
 
 export type SampleTarget = 'primary' | 'secondary';
 type Sheet = { data: Uint8ClampedArray; w: number; h: number };

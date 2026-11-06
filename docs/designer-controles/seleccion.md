@@ -34,6 +34,16 @@ Las tres variantes (Rectangular selection, Lasso, Magic wand) son la misma herra
 | Ctrl+A / Ctrl+D / Ctrl+Shift+I / Ctrl+J / Delete | Teclado (`designerKeys.ts:55`) | Como los botones | Foco fuera de campos de texto | Ver [[atajos]] | Igual que hoy | se conserva | no dibujado |
 | Copiar / cortar con selección | Teclado del navegador, `designerClipboard` (`designerClipboard.ts:45`) | Portapapeles (imagen PNG); cortar borra tras confirmar | Hay selección | Sin selección, copia la capa raster activa | Igual que hoy | se conserva | no dibujado |
 
+## Familia Select propia y gestos nuevos (2026-11-06, cableado en `task/plus-center`)
+
+- **Select es una familia del toolbox**, justo después de Edit (duda abierta: posición). Orden: Rectangular selection, Elliptical selection, Lasso, Polygonal selection, Magic wand; ya no están en Brush. Rectángulo, elipse y lazo comparten ajustes (`sameSettings`); `M` entra con la forma recordada y, **ya en Select, cicla** rectángulo → elipse → lazo → polígono → varita (Shift+M sigue siendo Shape Builder; duda abierta). Ids conservados: `selection-rect`, `lasso`, `wand`; nuevos `selection-ellipse`, `selection-polygon`.
+- **Mode** ofrece New, Add, Subtract e **Intersect** (`ui.wand.mode`, nombre heredado). Al pulsar, Shift añade, Alt resta y Shift+Alt interseca; el cursor muestra una insignia + / − / ∩ con lo que haría una pulsación ahora (`SelectCursor`).
+- **Arrastre**: Shift fuerza cuadrado o círculo, Alt dibuja desde el centro, con lectura W × H junto al cursor; se actualizan al pulsar la tecla sin mover el ratón. Un Shift o Alt mantenido desde antes del clic es del modo, no de la forma.
+- **Polígono**: clic = vértice; cierra con clic en el primer vértice, Enter o doble clic; Esc lo descarta, Backspace quita el último, Shift fuerza 45°. Cambiar de herramienta, forma, documento **o capa** lo cancela.
+- **Mover el contorno** (rectángulo, elipse, lazo; Mode New, sin teclas): arrastrar dentro de la selección la mueve sin tocar píxeles, un paso de deshacer. Consecuencia: ya no se empieza una selección nueva arrastrando dentro de la actual (Ctrl+D, clic fuera o modo Add). Edit sigue cortando píxeles.
+- Decidido: sin feather, sin antialias, sin selección desde el alfa y sin Contiguous; el borde duro es deliberado.
+- **Sin probar en navegador**: insignia, lectura W × H, banda elástica y cierre del polígono, mover contorno, ni Alt / Shift+Alt frente al gestor de ventanas (KDE/XFCE usan Alt+arrastre; Shift+Alt cambia la distribución de teclado en muchos Linux). Salida sin Alt: el selector Mode.
+
 ## Enlaces
 
 - [[toolbox-dock]] · [toolbox-dock.md](toolbox-dock.md)

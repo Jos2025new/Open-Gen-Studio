@@ -1,5 +1,5 @@
 {
-  "src/components/designer/Stage.tsx": 78731,
+  "src/components/designer/Stage.tsx": 74669,
   "src/components/node/nodes.tsx": 44895,
   "src/engine/actions.ts": 40714,
   "src/engine/agent/context.ts": 44464,

@@ -40,6 +40,10 @@ related: [pincel-avanzado, borrador, selector-de-color, regla, lienzo-gestos, to
 | Settings… (botón) | Tira contextual, extremo (`ContextStrip.tsx:110`) | Evento `ogs:designer-panel` → pestaña Tool/Props del panel derecho (`LayersPanel.tsx:117`) | Siempre que la tira sea visible — Solo en la tira: «código muerto por lectura (`f11a0dd`; [rastreo 2.6](../rastreo/designer.md)) — requiere decisión y prueba en sandbox» | Es el camino a «todos los ajustes» desde la tira | Igual que hoy | se conserva | no dibujado |
 | Alt+clic (Brush) | Lienzo (`Stage.tsx:626`) | `ui.brush.color` y color reciente (`rememberColor`) | Tool = brush o fill | Recoge el color visible bajo el puntero; avisa si la página es transparente ahí | Igual que hoy | se conserva | no dibujado |
 
+## Flow, Blend y Lock alpha (2026-11-06)
+
+Flow en la fila rápida (botón con popover) y en la pestaña; por debajo de 100 % activa Dabs (`brushFlow.ts`); no aplica a los lápices de grafito medidos. Blend y Lock alpha siguen en la pestaña (la fila rápida no tiene sitio). Rendimiento de Dabs a 24, 200 y 600 px sin medir.
+
 ## Enlaces
 
 - [[pincel-avanzado]] · [pincel-avanzado.md](pincel-avanzado.md)

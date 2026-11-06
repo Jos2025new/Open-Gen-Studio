@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement, type Ref } from 'react';
 import { applyBrushPreset, PENCIL_PRESETS } from '../../engine/design/brushPresets';
-import { ChevronsLeft, EyeOff, AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
+import { ChevronsLeft, EyeOff, AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleDashed, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, LassoSelect, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
@@ -21,7 +21,7 @@ import { entryVariant, initialToolboxState, reduceToolboxState, TOOLBOX, variant
 import '../../styles/tool-dock.css';
 
 const ICONS: Record<string, LucideIcon> = {
-  airbrush: AirVent, blend: Blend, brush: Brush, 'chart-pie': ChartPie, circle: Circle, crop: Crop,
+  airbrush: AirVent, blend: Blend, brush: Brush, 'chart-pie': ChartPie, circle: Circle, 'circle-dashed': CircleDashed, 'lasso-select': LassoSelect, crop: Crop,
   'drafting-compass': DraftingCompass, eraser: Eraser, eye: Eye, 'grid-3x3': Grid3X3, hand: Hand,
   'layout-panel-top': LayoutPanelTop, 'layout-template': LayoutTemplate, lasso: Lasso, minus: Minus,
   'mouse-pointer-2': MousePointer2, 'move-up-right': MoveUpRight, 'paint-bucket': PaintBucket, 'pen-tool': PenTool,
@@ -151,7 +151,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const subtools = (selectedFamily?.variants.length ?? 0) > 1;
   const hasQuick = !!QUICK[currentTool];
   const collapsibleFor = (tool?: DesignTool) => !!tool && !!QUICK[tool] && subtools && !rowFits(tool, selectedFamily?.variants.length ?? 0);
-  // The eyedropper's only setting is the color the row already shows: no card to open.
+  // The eyedropper's settings (radius, source, colors) all sit in the row: no card to open.
   const noCard = bottom && selectedVariant?.tool === 'eyedropper';
   const showGear = !!selectedVariant && !selectedVariant.soon && currentTool !== 'hand' && !noCard;
   // A row that does not fit shows either the subtools or the settings, never squeezed together.

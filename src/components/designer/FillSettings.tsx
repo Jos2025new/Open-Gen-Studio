@@ -1,13 +1,15 @@
+import type { ReactNode } from 'react';
 import { setUi, useStore } from '../../store/store';
-import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
+import { InlineSelect, InlineSlider } from './InlineControls';
+import { ColorPair } from './ColorPair';
 
 const SOURCES = [{ value: 'all' as const, label: 'All layers' }, { value: 'layer' as const, label: 'Layer' }];
 const AREAS = [{ value: 'connected', label: 'Connected' }, { value: 'similar', label: 'All similar' }];
 
 /** What the Fill reads: everything visible, or the active layer (the fill then lands right under it). */
-export function FillSourceField() {
+export function FillSourceField({ icon }: { icon?: ReactNode }) {
   const brush = useStore((s) => s.ui.brush);
-  return <InlineSelect label="Source" value={brush.fillSource ?? 'all'} options={SOURCES} onChange={(v) => setUi({ brush: { ...brush, fillSource: v } })} />;
+  return <InlineSelect label="Source" icon={icon} value={brush.fillSource ?? 'all'} options={SOURCES} onChange={(v) => setUi({ brush: { ...brush, fillSource: v } })} />;
 }
 
 /** Openings in the outline up to this size do not let the fill leak. Not used by All similar. */
@@ -20,7 +22,7 @@ export function FillGapField() {
 export function FillSettings({ compact = false }: { compact?: boolean }) {
   const brush = useStore((s) => s.ui.brush);
   return <>
-    <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
+    <ColorPair />
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />
     <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setUi({ brush: { ...brush, fillThreshold: v } })} />
     <FillSourceField />

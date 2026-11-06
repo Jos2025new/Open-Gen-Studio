@@ -13,7 +13,10 @@ import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
-import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion, type SelectCombine } from '../../engine/design/pixelSelection';
+import { ColorPair } from './ColorPair';
+import { FillSettings } from './FillSettings';
+import { SamplerSettings } from './SamplerSettings';
 import { SelectionActions } from './SelectionActions';
 import { GRADIENT_DEFAULT } from '../../engine/design/gradient';
 import { toast } from '../../store/store';
@@ -151,7 +154,9 @@ export function SelectionChip({ docId }: { docId: string }) {
   </span>;
 }
 
-export const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as 'replace' | 'add' | 'subtract', sample: 'all' as 'layer' | 'all' };
+/** How a new selection combines with the one there; the same four in the card and in the quick row. */
+export const SELECT_MODES = [{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }, { value: 'intersect' as const, label: 'Intersect' }];
+export const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as SelectCombine, sample: 'all' as 'layer' | 'all' };
 
 /** Pixel selection: its shape, and what to do with what is selected. */
 function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc: DesignDoc; compact?: boolean }) {
@@ -164,7 +169,7 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
   const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
   const cur = () => getDoc(sessionId, doc.id)!;
   const wandOn = shape === 'wand';
-  const shapeField = <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'lasso' as const, label: 'Lasso' }, { value: 'wand' as const, label: 'Magic wand' }]} onChange={(v) => setUi({ selectShape: v })} />;
+  const shapeField = <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'ellipse' as const, label: 'Ellipse' }, { value: 'lasso' as const, label: 'Lasso' }, { value: 'polygon' as const, label: 'Polygon' }, { value: 'wand' as const, label: 'Magic wand' }]} onChange={(v) => setUi({ selectShape: v })} />;
   if (compact) return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
     {shapeField}
     {/* What finishes a selection stays at hand, also in the quick strip. */}
@@ -172,7 +177,7 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
   </div>;
   return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
-    <div className="brush-row select-row">{shapeField}{<InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} />}</div>
+    <div className="brush-row select-row">{shapeField}<InlineSelect label="Mode" value={wand.mode} options={SELECT_MODES} onChange={(v) => setWand({ mode: v })} /></div>
     {wandOn ? <>
       <div className="brush-row select-row">
         <InlineSlider label="Tolerance" tip="How different a color can be and still be picked: low = only that color, high = a wider range" min={0} max={255} value={wand.threshold} onChange={(v) => setWand({ threshold: v })} />
@@ -216,7 +221,6 @@ export function TextStyleFields({ value, onChange, compact = false }: { value: T
 export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, modeToggle = true, card = false }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null; compact?: boolean; modeToggle?: boolean; card?: boolean }) {
   useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
-  const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
   const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
@@ -235,19 +239,15 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, m
   };
   if (tool === 'hand') return null;
   if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} compact={compact} />;
-  if (tool === 'eyedropper') return <div className="tool-settings" role="toolbar" aria-label="Eyedropper settings"><InlineColor label="Picked" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} /><span className="opt-hint">Click the page to pick its visible color</span></div>;
+  if (tool === 'eyedropper') return <SamplerSettings compact={compact} />;
   if (tool === 'gradient') {
     const g = gradient ?? GRADIENT_DEFAULT;
     const set = (patch: Partial<typeof g>) => setUi({ gradient: { ...g, ...patch } });
     return <div className="tool-settings" role="toolbar" aria-label="Gradient settings">
       <InlineSelect label="Shape" value={g.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => set({ shape: v })} />
-      <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
+      <ColorPair dimSecondary={g.mode !== 'two'} />
       <InlineSelect label="To" value={g.mode} options={[{ value: 'two' as const, label: 'Second color' }, { value: 'fade' as const, label: 'Transparent' }]} onChange={(v) => set({ mode: v })} />
-      {g.mode === 'two' && <InlineColor label="Second" value={g.color2} onChange={(v) => set({ color2: v })} />}
-      {!compact && <>
-      <button type="button" className="opt" onClick={() => setUi({ brush: { ...brush, color: g.color2 }, gradient: { ...g, color2: brush.color } })} data-tip="Swap the two colors">⇄</button>
-      <InlineToggle label="Reverse" checked={!!g.reverse} onChange={(v) => set({ reverse: v })} />
-      </>}
+      {!compact && <InlineToggle label="Reverse" checked={!!g.reverse} onChange={(v) => set({ reverse: v })} />}
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
@@ -256,15 +256,8 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, m
         {tool === 'text' ? <>
           {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}
           <TextStyleFields value={text} compact={compact} onChange={(p) => setUi({ text: { ...text, ...p } })} />
-        </> : tool === 'ruler' ? <RulerSettings docId={doc.id} /> : tool === 'fill' ? <>
-          <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
-          <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />
-          <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setUi({ brush: { ...brush, fillThreshold: v } })} />
-          {!compact && <>
-          <InlineSlider label="Expand" unit="px" min={0} max={12} value={brush.fillExpand ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillExpand: v } })} />
-          <InlineSlider label="Smooth" unit="px" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillSmooth: v } })} />
-          </>}
-        </> : tool === 'lineart' ? <>
+        </> : tool === 'ruler' ? <RulerSettings docId={doc.id} /> : tool === 'fill' ? <FillSettings compact={compact} />
+        : tool === 'lineart' ? <>
           <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
           {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
         </> : paint ? card ? <BrushSettings erase={tool === 'eraser'} card head={modeToggle ? <PaintModeToggle sessionId={sessionId} doc={doc} /> : null} /> : <>{modeToggle ? <PaintModeToggle sessionId={sessionId} doc={doc} /> : null}<BrushSettings erase={tool === 'eraser'} compact={compact} /></> : <>

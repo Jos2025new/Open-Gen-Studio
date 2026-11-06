@@ -91,7 +91,10 @@ Generado por \`node scripts/map.mjs --write\`; [índice y cobertura](map.md). Se
 | --- | --- | --- |
 ${rows.join('\n')}
 `;
-const midpoint = Math.ceil(contractRows.length / 2);
+// Half the bytes, not half the rows: the rows differ a lot in length and each page must stay under the size limit.
+const total = contractRows.reduce((n, row) => n + row.length + 1, 0);
+let acc = 0;
+const midpoint = contractRows.findIndex((row) => (acc += row.length + 1) >= total / 2) + 1;
 const contractMap = contractPage(contractRows.slice(0, midpoint), 1);
 const contractMap2 = contractPage(contractRows.slice(midpoint), 2);
 

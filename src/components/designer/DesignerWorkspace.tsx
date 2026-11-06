@@ -13,6 +13,7 @@ import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
 import { DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, historyDepth, subscribeHistory } from '../../engine/design/history';
 import { designerKey } from './designerKeys';
+import { ValueNotice } from './ValueNotice';
 import { designerClipboard } from './designerClipboard';
 import { EXPORT_FORMATS, IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from './designerFile';
 import { TopbarActions } from '../shell/TopBar';
@@ -149,6 +150,7 @@ export function DesignerWorkspace() {
         </>} />
       <ToolHelpLine />
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />
+      <ValueNotice />
       <DrawingChoicePrompt sessionId={session.id} doc={doc} />
       <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
     </> :

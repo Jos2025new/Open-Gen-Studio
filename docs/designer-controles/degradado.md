@@ -24,6 +24,10 @@ Gradient (tecla U) arrastra una línea del primer al segundo color y deja el res
 | Tiradores del degradado de una forma (centro/inicio/fin) | Lienzo (`ShapeHandles.tsx:75`) | `fillGradient` / `strokeGradient` de la forma elegida | Tool = move, modo Objects y una forma con degradado | Solo hover/arrastre; tooltip «Fill gradient start…» | Igual que hoy | se conserva | no dibujado |
 | Tipo Solid / Linear / Radial y stop Start / End de una forma | Popover Fill/Stroke de la tira (`ShapePaint.tsx:58`) | `fillGradient`/`strokeGradient` de la forma (`patchShape`) | Forma elegida con Edit (Objects) | El stop activo (Start/End) es estado local: se pierde al cambiar de selección. Ver [[tira-contextual]] | Igual que hoy | se conserva | no dibujado |
 
+## Color secundario (2026-11-06)
+
+El segundo color del degradado es el secundario global (`secondaryOf`). El modo sigue en color → transparente; el interruptor Second pasa a color → secundario, y el secundario se ve atenuado mientras no se usa. Shift en el arrastre usa el mismo paso de 45° que las formas (`snapAngle`).
+
 ## Enlaces
 
 - [[relleno]] · [relleno.md](relleno.md)

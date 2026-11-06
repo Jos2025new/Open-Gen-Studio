@@ -32,7 +32,10 @@ describe('one real-size cursor for raster, vector and deformation', () => {
     expect(html).toContain(`translate(${100 + point.x * zoom - 10 * zoom}px, ${50 + point.y * zoom - 10 * zoom}px)`);
   });
   it('unrelated tools have no cursor work or overlay', () => {
-    for (const tool of ['hand', 'text', 'select', 'gradient', 'move'] as const) expect(hasCursorPreview({ ...options, tool })).toBe(false);
+    for (const tool of ['hand', 'text', 'gradient', 'move'] as const) expect(hasCursorPreview({ ...options, tool })).toBe(false);
+    // Select has a badge cursor, never a size circle.
+    expect(hasCursorPreview({ ...options, tool: 'select' })).toBe(true);
+    expect(cursorIndicator({ ...options, tool: 'select' }, point, 1, false)).toBeNull();
     expect(renderToStaticMarkup(createElement(BrushCursor, { point: null, view: { x: 0, y: 0, zoom: 1 }, indicator: null }))).toBe('');
   });
 });

@@ -3,6 +3,7 @@ import { Hand, Maximize, Minus, MousePointer2, Plus, Redo2, Undo2 } from 'lucide
 import { IconButton } from '../ui/primitives';
 import { Stage } from '../designer/Stage';
 import { designerKey } from '../designer/designerKeys';
+import { ValueNotice } from '../designer/ValueNotice';
 import { designerClipboard } from '../designer/designerClipboard';
 import { redoDoc, undoDoc } from '../../engine/design/actions';
 import { canRedo, canUndo, subscribeHistory } from '../../engine/design/history';
@@ -60,6 +61,7 @@ export function EmbeddedDesigner() {
     </div>
     {doc ? <>
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={null} setSelectedCurve={() => undefined} board={{ scope: root, bottom: EMBEDDED_FIT_BOTTOM }} />
+      <ValueNotice />
       <EmbeddedDesignerBar sessionId={session.id} doc={doc} />
     </> : <p className="muted studio-designer-none">No design in this session yet. Use File → New, or ask the agent to send the chat images to the Designer.</p>}
   </div>;

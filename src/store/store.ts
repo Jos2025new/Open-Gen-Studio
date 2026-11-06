@@ -5,6 +5,8 @@ import { persistState } from './persistJson';
 import { keptDrafts } from './homeDrafts';
 import { pickUi, sanitizeUi, type PageUiPrefs, type PersistedUi } from './persistUi';
 import { historyDepth } from '../engine/design/history';
+import type { SelectShape } from '../engine/design/selectShape';
+import type { SelectCombine } from '../engine/design/pixelSelection';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
 import { objectPick } from '../engine/design/objectSelection';
@@ -149,14 +151,14 @@ export interface UiState extends PageUiPrefs {
   brushPresets?: import('../engine/design/brushPresets').BrushPreset[];
   /** Designer colors: recent and saved. */
   swatches?: { recent: string[]; saved: string[] };
-  /** Pixel selection tool: rectangle (default) or lasso. */
-  selectShape?: 'rect' | 'lasso' | 'wand';
+  /** Select shape. */
+  selectShape?: SelectShape;
   /** Toolbox: last variant per family. */
   lastVariant?: Record<string, string>;
   /** Knife gap px; Fix overlaps mode. */
   cutGap?: number; fixMode?: 'fill' | 'cut';
   /** Magic wand, like the bucket: color tolerance, grow, soft edge; how it combines; what it samples. */
-  wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
+  wand?: { threshold: number; expand: number; smooth: number; mode: SelectCombine; sample: 'layer' | 'all' };
   rulers?: boolean; showGuides?: boolean; lockGuides?: boolean;
   /** Stroke ruler (SAI 2): the guide the brush follows, and the kind the Ruler tool places next (strokeRuler.ts). */
   strokeRuler?: import('../engine/design/strokeRuler').StrokeRuler | null;
