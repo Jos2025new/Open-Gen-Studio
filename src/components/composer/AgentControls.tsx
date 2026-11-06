@@ -128,14 +128,14 @@ export function AgentMode() {
   </>;
 }
 
-export function AgentControls({ showMode = true }: { showMode?: boolean }) {
+export function AgentControls({ showMode = true, activeOnly = true }: { showMode?: boolean; activeOnly?: boolean }) {
   const workflowId = useStore((s) => s.composer.workflowId);
   const workspace = useStore((s) => s.ui.workspace);
   const wf = workflowById(workflowId);
   return (
     <>
       {showMode ? <AgentMode /> : null}
-      <AgentOptions activeOnly />
+      <AgentOptions activeOnly={activeOnly} />
       {wf && !wf.workspaces.includes(workspace) ? (
         <Chip icon={X} muted onClick={() => setComposer({ workflowId: null })} data-tip="This workflow does not apply here; it will be ignored">
           Not for {workspace}

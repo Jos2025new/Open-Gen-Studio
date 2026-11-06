@@ -16,14 +16,11 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip, costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { AgentControls, AgentMode } from './AgentControls';
-import { AgentModelControls } from './AgentModelControls';
-import { MediaControls } from './MediaControls';
+import { ComposerStrip } from './ComposerStrip';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
 import { ToolDock } from '../designer/ToolDock';
 import { DesignerFooterTools, DockSlot } from '../designer/ToolPalette';
-import { ComposerWorkspaceMenu } from '../shell/WorkspaceMenu';
 import { AgentSend } from './AgentSend';
 
 export function AttachStrip({ ids }: { ids: string[] }) {
@@ -452,6 +449,7 @@ export function Composer() {
     <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
       {workspace !== 'chat' && workspace !== 'node' ? <ThreadPeek workspace={workspace} /> : null}
       <ComposerAlerts />
+      {showTools ? null : <ComposerStrip target={workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null} />}
       <div
         className={`composer ${dragOver ? 'is-drop' : ''}${showTools && promptHidden ? ' is-prompt-hidden' : ''}`}
         data-mention-box
@@ -489,12 +487,12 @@ export function Composer() {
           }}
         />
         {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
-          <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={false} onAdd={() => fileRef.current?.click()} />
-          <DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" /><span className="tool-dock-eye-slot" />
+          <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
+          <DockSlot at="start" /><div className="designer-palette is-docked"><ToolDock sessionId={sessionId} doc={designDoc} designer /></div><DockSlot at="end" /><DesignerFooterTools /><span className="tool-dock-eye-slot" />
         </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row is-compact">
-          <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={mode === 'agent'} onAdd={() => fileRef.current?.click()} />
+          <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
           <textarea
             ref={taRef}
             className="composer-input"
@@ -524,34 +522,16 @@ export function Composer() {
           {mentions.menu}
           {mode === 'agent' ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : <SendDirect kind={mode} compact />}
         </div>
-        <div className="composer-bar">
-          {editing ? (
-            <span className="editing-chip" data-tip={editingPrompt}>
-              <Pencil size={12} />
-              Reusing
-              <button type="button" aria-label="Stop reusing" onClick={() => setComposer({ editing: null })}>
-                <X size={12} />
-              </button>
-            </span>
-          ) : null}
-          <div className="composer-controls">
-            {mode === 'agent' ? <AgentControls showMode={false} /> : null}
-          </div>
-        </div>
+        {editing ? <div className="composer-bar">
+          <span className="editing-chip" data-tip={editingPrompt}>
+            <Pencil size={12} />
+            Reusing
+            <button type="button" aria-label="Stop reusing" onClick={() => setComposer({ editing: null })}>
+              <X size={12} />
+            </button>
+          </span>
+        </div> : null}
         </>}
-      </div>
-      <div className="composer-footer">
-        <div className="composer-footer-start">
-          <ComposerWorkspaceMenu />
-          {mode !== 'agent' && !showTools ? <>
-            <MediaControls kind={mode} />
-            {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
-          </> : null}
-        </div>
-        <div className="composer-footer-end">
-          {workspace === 'designer' ? <DesignerFooterTools /> : null}
-          {mode === 'agent' && workspace !== 'designer' ? <><AgentMode /><AgentModelControls /></> : null}
-        </div>
       </div>
     </div>
   );

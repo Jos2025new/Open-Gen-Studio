@@ -66,10 +66,11 @@ it('upright, the popups are vertical too: variants in a column, the chevron poin
   await done();
 });
 
-it('the place button and the tool help sit under the prompt box, opposite the workspace menu; the toolbox no longer carries them', () => {
+it('the place button and the tool help sit in the strip above the prompt, or at the end of the tools bar; the toolbox no longer carries them', () => {
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).not.toContain('{place}');
   expect(readFileSync('src/components/designer/ToolPalette.tsx', 'utf8')).toMatch(/<span className="designer-footer-tools"><ViewToggles \/><DockPlaceButton \/><\/span>/);
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<div className="composer-footer-end">\s*\{workspace === 'designer' \? <DesignerFooterTools \/> : null\}/);
+  expect(readFileSync('src/components/composer/ComposerStrip.tsx', 'utf8')).toMatch(/\{designer \? <DesignerFooterTools \/> : null\}/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="end" \/><DesignerFooterTools \/>/);
   expect(readFileSync('src/components/designer/DesignerWorkspace.tsx', 'utf8')).not.toContain('<ViewToggles');
   expect(readFileSync('src/components/studio/EmbeddedDesignerBar.tsx', 'utf8')).not.toMatch(/<ToolDock[^>]* designer[ />]/);
 });

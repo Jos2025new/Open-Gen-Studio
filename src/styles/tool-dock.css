@@ -225,11 +225,11 @@ body:has(.designs-pop) .designer-side .tool-dock-stack { display: none; }
 .tool-dock-variants.is-fixed .opt-color.is-icon { background: var(--text); padding: 3px; border-radius: 50%; }
 /* Prompt box hidden: the toolbox (and the footer) slide down out of view, the subtoolbox drops to the bottom; the box chrome fades. */
 .composer.is-prompt-hidden { background: transparent; border-color: transparent; box-shadow: none; }
-.composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
-.composer.is-prompt-hidden :is(.composer-footer, .composer-tools-bar > :not(.designer-palette), .tool-dock-family) { transform: translateY(calc(100% + 24px)); opacity: 0; visibility: hidden; pointer-events: none; }
+.composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family { transition: transform .22s ease, opacity .22s ease, visibility .22s; }
+.composer.is-prompt-hidden :is(.composer-tools-bar > :not(.designer-palette), .tool-dock-family) { transform: translateY(calc(100% + 24px)); opacity: 0; visibility: hidden; pointer-events: none; }
 .composer.is-prompt-hidden .tool-dock-stack.is-fixed { bottom: 8px; right: 47px; }
 .composer.is-prompt-hidden .thread-peek { display: none; }
-@media (prefers-reduced-motion: reduce) { .composer .composer-footer, .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .composer .composer-tools-bar > :not(.designer-palette), .composer .tool-dock-family, .tool-dock-stack.is-fixed { transition: none; } }
 
 /* The Size field's range button (BrushSizeField.tsx): sits over the track, right after the name. */
 .opt-size-range { position: relative; flex: none; margin: 0 auto 0 -2px; padding: 1px 2px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; cursor: pointer; }

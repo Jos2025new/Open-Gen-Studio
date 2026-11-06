@@ -171,6 +171,6 @@ describe('subtoolbox row for every tool', () => {
 
 it('the eye goes to the bar end slot after the zoom rail, not inside the scrolling tool list', async () => {
   const { readFileSync } = await import('node:fs');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="end" \/><span className="tool-dock-eye-slot" \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="end" \/><DesignerFooterTools \/><span className="tool-dock-eye-slot" \/>/);
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/createPortal\([^;]*hideButton[^;]*eyeSlot\)/);
 });

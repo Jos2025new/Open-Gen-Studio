@@ -98,12 +98,35 @@
 .is-compact .send-btn.is-agent, .is-compact .send-btn.is-stop, .is-compact .send-btn.is-generate { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; padding: 0; }
 .composer:has(.is-compact) .composer-bar:not(:has(.composer-controls > *, .editing-chip)) { display: none; }
 .composer:has(.is-compact) .composer-bar:has(.composer-controls > *, .editing-chip) { margin-top: 8px; }
-.composer-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 6px 0; }
-.composer-footer-start { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
-.composer-footer-end { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; flex-wrap: wrap; }
-.composer-footer .models-chip { background: transparent; color: var(--text-2); }
-.composer-footer .models-chip.is-active { background: var(--surface-3); color: var(--text); border-color: transparent; }
-.composer-footer .chip, .composer-footer .agent-mode { border-color: transparent; box-shadow: none; }
-.composer-footer .agent-mode { background-color: transparent; }
-.composer-footer .agent-mode[aria-expanded="true"] { background-color: var(--surface-3); color: var(--text); }
-@media (max-width: 480px) { .composer-footer { align-items: flex-start; } .composer-footer-end { gap: 4px; } }
+.composer-strip { display: flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 6px 4px; }
+.composer-strip { max-width: 100%; }
+.composer-strip-rail { flex: 1 1 72px; min-width: 72px; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.composer-strip-rail::-webkit-scrollbar { display: none; }
+.composer-strip-rail > * { flex: none; }
+.composer-strip-end { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; margin-left: 8px; }
+.composer-strip-end > :is(.chip, .models-chip) { min-width: 0; }
+.composer-strip-end > .designer-footer-tools { flex: none; }
+.composer-strip-nudge { flex: none; width: 22px; height: 26px; display: grid; place-items: center; border-radius: var(--radius-s); color: var(--text-2); }
+.composer-strip-nudge:hover { background: var(--surface-3); color: var(--text); }
+.composer-strip .models-chip { background: transparent; color: var(--text-2); }
+.composer-strip .models-chip.is-active { background: var(--surface-3); color: var(--text); border-color: transparent; }
+.composer-strip .chip, .composer-strip .agent-mode { border-color: transparent; box-shadow: none; background-color: transparent; }
+.composer-strip .agent-mode[aria-expanded="true"] { background-color: var(--surface-3); color: var(--text); }
+/* The "+" control center: zones told apart by tone, not lines. */
+.popover.control-center { padding: 0; overflow: hidden; display: grid; grid-template-rows: 1fr auto; height: 330px; max-height: calc(100vh - 80px); border-color: color-mix(in oklab, var(--border) 60%, transparent); box-shadow: 0 4px 14px rgb(0 0 0 / .18); }
+.control-center-top { display: grid; grid-template-columns: 128px 1fr; min-height: 0; }
+.control-center-nav { display: flex; flex-direction: column; gap: 2px; padding: 6px; background: color-mix(in oklab, var(--surface-2) 65%, var(--surface)); }
+.control-center-nav button { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 34px; padding: 0 9px; border-radius: var(--radius-s); color: var(--text-2); text-align: left; font-size: 13px; }
+.control-center-nav button:hover { color: var(--text); }
+.control-center-nav button.is-current { background: var(--surface-2); color: var(--text); }
+.control-center-agent { margin-top: 6px; justify-content: flex-start !important; }
+.control-center-agent svg:last-child:not(:first-child) { margin-left: auto; }
+.control-center-agent.is-on { color: var(--text); }
+.control-center-pane { padding: 6px; overflow-y: auto; min-width: 0; }
+.control-center-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 2px 2px 6px; }
+.control-center-thumbs button { aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-s); background: var(--surface-3); }
+.control-center-thumbs :is(img, video) { display: block; width: 100%; height: 100%; object-fit: cover; }
+.control-center-spaces { display: flex; gap: 8px; padding: 7px; background: color-mix(in oklab, var(--surface-2) 40%, var(--surface)); }
+.control-center-spaces button { flex: 1; min-height: 30px; border-radius: 999px; color: var(--text-2); font-size: 12px; }
+.control-center-spaces button:hover { color: var(--text); }
+.control-center-spaces button.is-on { background: var(--surface-2); color: var(--text); }
