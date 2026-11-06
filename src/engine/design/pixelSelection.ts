@@ -31,7 +31,7 @@ export interface PixelSelection {
   edge?: HTMLCanvasElement;
 }
 
-export type SelectCombine = 'replace' | 'add' | 'subtract';
+export type SelectCombine = 'replace' | 'add' | 'subtract' | 'intersect';
 
 const byDoc = new Map<string, PixelSelection>();
 const listeners = new Set<() => void>();
@@ -158,15 +158,15 @@ export function maskSelection(mask: HTMLCanvasElement): PixelSelection | null {
   return { points: [], mask, box: { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, edge };
 }
 
-/** `next` combined with the current selection: replaced, added to it, or cut out of it. */
+/** `next` combined with the current selection: replaced, added to it, cut out of it, or kept only where both overlap. */
 export function combineSelection(doc: DesignDoc, next: PixelSelection | null, mode: SelectCombine): void {
   const cur = getSelection(doc.id);
   if (mode === 'replace' || !cur) return setSelection(doc.id, mode === 'subtract' ? cur : next);
-  if (!next) return;
+  if (!next) return mode === 'intersect' ? setSelection(doc.id, null) : undefined;
   const out = createCanvas(Math.round(doc.width), Math.round(doc.height));
   const c = ctx2d(out);
   c.drawImage(selectionMask(doc, cur), 0, 0);
-  c.globalCompositeOperation = mode === 'add' ? 'source-over' : 'destination-out';
+  c.globalCompositeOperation = mode === 'add' ? 'source-over' : mode === 'intersect' ? 'destination-in' : 'destination-out';
   c.drawImage(selectionMask(doc, next), 0, 0);
   setSelection(doc.id, maskSelection(out));
 }

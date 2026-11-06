@@ -44,11 +44,18 @@ import { pathBox, toolPath } from '../../engine/design/shapeTools';
 import { PRIM_TOOLS, placedPath, primFromUi, primShape } from '../../engine/design/primitives';
 import { boxShape } from '../../engine/design/shapeDraw';
 import { gestureBuffers, transformLayer } from '../../engine/design/affine';
-import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/design/matrix';
+import { type Mat } from '../../engine/design/matrix';
 import { applyGradient, GRADIENT_DEFAULT, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { editShape, objectPick, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
-import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
+import { getSelection, selectionClipFor, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { drawSelect, selectDown, selectMove, selectUp, useSelectSession, type SelectGesture } from './StageSelect';
+import { SelectCursor } from './SelectCursor';
+import { useModifierKeys } from './useModifierKeys';
+import { eventMods, markDown } from '../../engine/design/modifierGate';
+import { lockedDelta, lockedPoint } from '../../engine/design/axisLock';
+import { lastPaintPoint } from '../../engine/design/paintLastPoint';
+import { xformMatrix } from '../../engine/design/xformMatrix';
 import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
 import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoordinates';
 import { useCursorPreview } from '../../engine/design/useCursorPreview';
@@ -61,7 +68,7 @@ import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 
 
 type Drag =
-  | { kind: 'pixelMove'; move: PixelMove }
+  | { kind: 'pixelMove'; move: PixelMove; start: { x: number; y: number } }
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
@@ -71,7 +78,7 @@ type Drag =
   | StagePaintGesture
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
-  | { kind: 'select'; lasso: boolean; points: Array<[number, number]>; combine: SelectCombine }
+  | SelectGesture
   | { kind: 'shape'; tool: ShapeTool; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
@@ -201,7 +208,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const [hoverHandle, setHoverHandle] = useState<string | null>(null);
   const xformRaf = useRef<number | null>(null);
   const xformAt = useRef<{ d: Extract<Drag, { kind: 'xform' }>; m: Mat } | null>(null);
-  const [shiftDown, setShiftDown] = useState(false);
+  const { shift: shiftDown, held: modsHeld } = useModifierKeys(insideRef);
   const drag = useRef<Drag | null>(null);
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
@@ -221,6 +228,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const [guideHover, setGuideHover] = useState<GuideAxis | null>(null);
   const [guidePreview, setGuidePreview] = useState<{ axis: GuideAxis; at: number; index?: number } | null>(null);
   const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
+  useSelectSession(doc.id, tool, selectShape);
   const gradientUi = useStore((s) => s.ui.gradient) ?? GRADIENT_DEFAULT;
   const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color };
   // The selection being drawn (page coordinates), shown until pointer up.
@@ -345,32 +353,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     drawDoc(ctx, doc, { hideLayerId: editingText ?? undefined });
     // Gradient being dragged: drawn live over the page, as it will land.
     if (preview?.kind === 'gradient') paintGradient(ctx, doc, gradientSpec, preview.x0, preview.y0, preview.x1, preview.y1, getSelection(doc.id));
-    // Pixel selection: a dashed two-tone outline (dark under light) that reads on any artwork.
-    const sel = selDraft ? { points: selDraft } : getSelection(doc.id);
-    // A pixel mask (magic wand, combined selections): its precomputed dashed outline.
-    if (!selDraft && sel && 'edge' in sel && sel.edge) {
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sel.edge, 0, 0);
-      ctx.restore();
-    }
-    if (sel && sel.points.length > 1) {
-      ctx.save();
-      // Inverted: the page edge is part of the outline too, so it reads as "everything but this".
-      if ('inverted' in sel && sel.inverted) {
-        ctx.beginPath();
-        ctx.rect(0, 0, doc.width, doc.height);
-        sel.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        ctx.closePath();
-      } else selectionPath(ctx, doc, { points: sel.points });
-      ctx.lineWidth = 1 / view.zoom;
-      ctx.strokeStyle = '#000000';
-      ctx.stroke();
-      ctx.setLineDash([4 / view.zoom, 4 / view.zoom]);
-      ctx.strokeStyle = '#ffffff';
-      ctx.stroke();
-      ctx.restore();
-    }
+    drawSelect(ctx, doc, view, selDraft, modsHeld.current);
     // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
     ctx.strokeStyle = tok('--border-strong', '#55555e');
     ctx.lineWidth = 1 / view.zoom;
@@ -559,14 +542,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       if (!insideRef.current) return;
-      if (e.key === 'Shift') setShiftDown(true);
       if (e.code === 'Space' && !isTyping(e)) {
         setSpaceDown(true);
         e.preventDefault();
       }
     };
     const onUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') setShiftDown(false);
       if (e.code === 'Space') setSpaceDown(false);
     };
     window.addEventListener('keydown', onDown);
@@ -584,6 +565,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
 
   const onPointerDown = (e: React.PointerEvent) => {
     ctrlAtDown.current = e.ctrlKey || e.metaKey;
+    markDown(e);
     if (editingText) return;
     cursor.move(e);
     const p = toDoc(e.clientX, e.clientY);
@@ -604,18 +586,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
 
     if (tool === 'select') {
-      // Shift adds to the selection, Alt cuts out of it; otherwise the Mode chosen for every shape.
-      const wand = useStore.getState().ui.wand;
-      const combine: SelectCombine = e.altKey ? 'subtract' : e.shiftKey ? 'add' : wand?.mode ?? 'replace';
-      if (selectShape === 'wand') {
-        const next = wandSelection(current, p.x, p.y, wand ?? {});
-        if (typeof next === 'string') return void toast(next, 'error');
-        record(current);
-        combineSelection(current, next, combine);
-        return;
-      }
-      drag.current = { kind: 'select', lasso: selectShape === 'lasso', points: [[p.x, p.y]], combine };
-      setSelDraft([[p.x, p.y]]);
+      const g = selectDown({ doc: current, p, shape: selectShape, mods: eventMods(e) });
+      if (g && g !== 'handled') { drag.current = g; setSelDraft([...g.points]); }
       return;
     }
 
@@ -650,7 +622,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
 
     if (tool === 'move') {
       const move = startPixelMove(sessionId, current, p, 3 / view.zoom);
-      if (move) { if (move !== true) drag.current = { kind: 'pixelMove', move }; return; }
+      if (move) { if (move !== true) drag.current = { kind: 'pixelMove', move, start: p }; return; }
       const tol = (HANDLE + 4) / view.zoom;
       const hHit = [...handles].reverse().find((h) => Math.abs(p.x - h.x) <= tol && Math.abs(p.y - h.y) <= tol);
       if (hHit && tBox && pivotAt) {
@@ -821,7 +793,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const stroke = newBrushStroke(brush, erase);
       // With a pixel selection, the stroke lands only inside it.
       const clip = selectionClipFor(current, prepared);
-      const p0 = beginRulerStroke(doc.id, p);
+      const p0 = beginRulerStroke(doc.id, lastPaintPoint(doc, target.id, erase) ?? p);
       drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p0, control: p0, time: e.timeStamp, erase, direct };
       paintSegment(target, p0, p0, penPressure(e));
       return;
@@ -913,34 +885,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
   };
 
-  /** The transform a handle drag means, in page coordinates (Shift: keep proportions / 15° steps). */
-  const xformMatrix = (d: Extract<Drag, { kind: 'xform' }>, p: { x: number; y: number }, shift: boolean): Mat => {
-    const { box, h } = d;
-    if (d.op === 'scale') {
-      // The opposite side or corner stays put.
-      const ax = box.x + box.w / 2 - (h.fx * box.w) / 2, ay = box.y + box.h / 2 - (h.fy * box.h) / 2;
-      const clamp = (v: number) => (Math.abs(v) < 0.01 ? Math.sign(v || 1) * 0.01 : v);
-      let sx = h.fx ? (p.x - ax) / (h.x - ax) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay) : 1;
-      // Ctrl or Shift (Inkscape's Ctrl): width and height keep their ratio. A side handle scales both axes,
-      // about the opposite side's middle.
-      if (shift && h.fx && h.fy) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
-      else if (shift && h.fx) return scaleAbout(clamp(sx), clamp(Math.abs(sx)), ax, box.y + box.h / 2);
-      else if (shift && h.fy) return scaleAbout(clamp(Math.abs(sy)), clamp(sy), box.x + box.w / 2, ay);
-      return scaleAbout(clamp(sx), clamp(sy), ax, ay);
-    }
-    if (d.op === 'rotate') {
-      let a = Math.atan2(p.y - d.cy, p.x - d.cx) - Math.atan2(d.startY - d.cy, d.startX - d.cx);
-      if (shift) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
-      return rotateAbout(a, d.cx, d.cy);
-    }
-    if (d.op === 'skew') {
-      // Top/bottom sides slide sideways (skew x); left/right sides slide up and down (skew y). About the center.
-      if (h.fy) { let k = (p.x - d.startX) / (h.y - d.cy || 1); if (shift) k = Math.tan(Math.round(Math.atan(k) / (Math.PI / 12)) * (Math.PI / 12)); return skewAbout(k, 0, d.cx, d.cy); }
-      let k = (p.y - d.startY) / (h.x - d.cx || 1); if (shift) k = Math.tan(Math.round(Math.atan(k) / (Math.PI / 12)) * (Math.PI / 12));
-      return skewAbout(0, k, d.cx, d.cy);
-    }
-    return [1, 0, 0, 1, 0, 0];
-  };
   /** Lay the latest handle transform onto the layers as they were when the drag began (once a frame). */
   const applyXform = (persist: boolean) => {
     if (xformRaf.current != null) cancelAnimationFrame(xformRaf.current);
@@ -973,7 +917,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
     if (!d) return;
     snapIdleFeed(d, e, onPointerMove);
-    if (d.kind === 'pixelMove') { d.move.update(p);
+    if (d.kind === 'pixelMove') { d.move.update(lockedPoint(p, d.start, e));
     } else if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
     } else if (d.kind === 'editMarquee') {
@@ -994,14 +938,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         q = { x: gx ?? p.x, y: gy ?? p.y };
         showGuides({ x: gx, y: gy });
       }
-      xformAt.current = { d, m: xformMatrix(d, q, e.shiftKey || e.ctrlKey || e.metaKey) };
+      xformAt.current = { d, m: xformMatrix(d, q, { shift: e.shiftKey || e.ctrlKey || e.metaKey, alt: e.altKey }) };
       xformRaf.current ??= requestAnimationFrame(() => applyXform(false));
     } else if (d.kind === 'objMove') {
       if (!started(d, p)) return;
       // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
       // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
-      let ox = p.x, oy = p.y;
+      let { x: ox, y: oy } = lockedPoint(p, { x: d.startX, y: d.startY }, e);
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       // Raster strokes are painted, never snapped (Drawing); the switch applies to vector objects and layers.
       const b0 = snap.on && !e.altKey && d.base.type !== 'raster' ? objectsBox(d.base, d.ids) : null;
@@ -1020,7 +964,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (!started(d, p)) return;
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
-      let dx = p.x - d.startX, dy = p.y - d.startY;
+      let { dx, dy } = lockedDelta(p.x - d.startX, p.y - d.startY, e);
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       // Ctrl/Meta pressed in the drag: no snap, still measured (neighbourGaps.ts).
       const mode = moveMode(snap.on, e.altKey, e.ctrlKey || e.metaKey, ctrlAtDown.current);
@@ -1095,11 +1039,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       d.y1 = y1;
       setPreview({ ...d });
     } else if (d.kind === 'select') {
-      if (d.lasso) {
-        const last = d.points[d.points.length - 1];
-        if (Math.hypot(p.x - last[0], p.y - last[1]) * view.zoom >= 2) d.points.push([p.x, p.y]);
-        setSelDraft([...d.points]);
-      } else setSelDraft(rectPoints(d.points[0][0], d.points[0][1], p.x, p.y));
+      setSelDraft(selectMove(d, p, view.zoom));
     } else if (d.kind === 'shape') {
       let x1 = p.x;
       let y1 = p.y;
@@ -1138,7 +1078,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       finishEditMarquee({ drag: d, sessionId, doc, zoom: view.zoom, release: e ? toDoc(e.clientX, e.clientY) : undefined, cancelled: e?.type === 'pointercancel' });
       return;
     }
-    if (d.kind === 'pixelMove') { if (e) d.move.update(toDoc(e.clientX, e.clientY)); return; }
+    if (d.kind === 'pixelMove') { if (e) d.move.update(lockedPoint(toDoc(e.clientX, e.clientY), d.start, e)); return; }
     // A guide lands where the pointer is released (a quick drag may send no move in between).
     if (d.kind === 'guide' && e) { const p = toDoc(e.clientX, e.clientY); d.at = d.axis === 'x' ? p.x : p.y; }
     showGuides({});
@@ -1197,15 +1137,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       return;
     }
     if (d.kind === 'select') {
-      const pts = selDraft ?? [];
+      selectUp(d, { sessionId, doc, draft: selDraft, zoom: view.zoom });
       setSelDraft(null);
-      // A click without a drag clears the selection.
-      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
-      const tiny = !pts.length || (Math.max(...xs) - Math.min(...xs)) * view.zoom < 3 || (Math.max(...ys) - Math.min(...ys)) * view.zoom < 3;
-      // A selection change is an undo step of its own (as in GIMP and Krita), unless nothing changes.
-      if (!(tiny && (d.combine !== 'replace' || !getSelection(doc.id)))) record(getDoc(sessionId, doc.id) ?? doc);
-      if (d.combine === 'replace') setSelection(doc.id, tiny ? null : { points: pts });
-      else if (!tiny) combineSelection(doc, { points: pts }, d.combine);
       return;
     }
     if (d.kind === 'shape') {
@@ -1313,6 +1246,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         onDoubleClick={onDoubleClick}
       />
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
+      <SelectCursor tool={tool} point={cursor.point} view={view} />
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
       {(tool === 'move' ? !editLayers || shapeEditing : tool === 'shapeBuilder') && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}

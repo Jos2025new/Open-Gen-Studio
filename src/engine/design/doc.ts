@@ -81,14 +81,14 @@ export function activeLayer(doc: DesignDoc | null | undefined): Layer | null {
   return doc.layers.find((l) => l.id === doc.activeLayerId) ?? null;
 }
 
-/** Insert a layer. 'base' = position 0 (layer 1), 'above' = right above the active layer, 'top' = last. */
-export function insertLayer(doc: DesignDoc, layer: Layer, where: 'base' | 'above' | 'top' = 'above'): DesignDoc {
+/** Insert a layer. 'base' = position 0 (layer 1), 'above' = right above the active layer, 'below' = right under it (last without one), 'top' = last. */
+export function insertLayer(doc: DesignDoc, layer: Layer, where: 'base' | 'above' | 'below' | 'top' = 'above'): DesignDoc {
   const layers = [...doc.layers];
   let idx = layers.length;
   if (where === 'base') idx = 0;
-  else if (where === 'above') {
+  else if (where === 'above' || where === 'below') {
     const a = layers.findIndex((l) => l.id === doc.activeLayerId);
-    idx = a >= 0 ? a + 1 : layers.length;
+    idx = a >= 0 ? (where === 'above' ? a + 1 : a) : layers.length;
   }
   layers.splice(idx, 0, layer);
   return touch({ ...doc, layers, activeLayerId: layer.id });

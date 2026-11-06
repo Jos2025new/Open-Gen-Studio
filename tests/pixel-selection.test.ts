@@ -41,3 +41,39 @@ describe('magic wand region (shared with the bucket)', () => {
     expect([...floodMask(gap, 3, 1, 0, 0, 10, 0)]).toEqual([1, 0, 0]);
   });
 });
+
+import { vi } from 'vitest';
+import { combineSelection } from '../src/engine/design/pixelSelection';
+import * as media from '../src/lib/media';
+
+describe('combining selections: intersect', () => {
+  const mask = () => ({ width: 4, height: 1 } as HTMLCanvasElement);
+  const d = { id: 'd2', width: 4, height: 1 } as Parameters<typeof selectAll>[0];
+  const fakeOps = () => {
+    const ops: string[] = [];
+    const ctx = {
+      globalCompositeOperation: 'source-over',
+      drawImage() { ops.push(this.globalCompositeOperation); },
+      // Everything on, so the combined mask is not empty.
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4).fill(255) }),
+      createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+      putImageData() {},
+    };
+    vi.spyOn(media, 'createCanvas').mockImplementation((w, h) => ({ width: w, height: h } as HTMLCanvasElement));
+    vi.spyOn(media, 'ctx2d').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    return ops;
+  };
+  it('keeps what both cover (destination-in); without a selection it replaces; no shape clears', () => {
+    const ops = fakeOps();
+    setSelection('d2', { points: [], mask: mask() });
+    combineSelection(d, { points: [], mask: mask() }, 'intersect');
+    expect(ops).toEqual(['source-over', 'destination-in']);
+    expect(getSelection('d2')?.mask).toBeDefined();
+    combineSelection(d, null, 'intersect');
+    expect(getSelection('d2')).toBeNull();
+    const next = { points: [], mask: mask() };
+    combineSelection(d, next, 'intersect');
+    expect(getSelection('d2')).toBe(next);
+    vi.restoreAllMocks();
+  });
+});
