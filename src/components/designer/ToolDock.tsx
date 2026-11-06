@@ -14,6 +14,7 @@ import { CanvasSize } from './CanvasSize';
 import { GuidesCard } from './GuidesCard';
 import { EditCard, useEditCount } from './EditCard';
 import { ContextStrip } from './ContextStrip';
+import { SelectionBar } from './SelectionActions';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { toolKey } from '../../engine/shortcuts';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
@@ -209,6 +210,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
           {depth === 'open' ? (vertical ? <ChevronLeft size={16} /> : <ChevronDown size={16} />) : (vertical ? <ChevronRight size={16} /> : <ChevronUp size={16} />)}
         </button></>}
       </div>}
+      {bottom && depth !== 'open' && !stripShown && <SelectionBar sessionId={sessionId} doc={doc} />}
       {/* Edit with a selection and its card not open: the contextual strip alone, where the card would open. */}
       {stripShown && <section className="tool-dock-card tool-dock-strip" aria-label="Selection controls"><ContextStrip sessionId={sessionId} doc={doc} variant="strip" /></section>}
       {depth === 'open' && selectedVariant && !selectedVariant.soon && !noCard && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>

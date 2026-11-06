@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import { AlignCenterVertical, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
-import { useState } from 'react';
 import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
@@ -14,7 +13,8 @@ import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
-import { clearSelected, fillSelection, getSelection, growSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { SelectionActions } from './SelectionActions';
 import { toast } from '../../store/store';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
@@ -158,36 +158,36 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
   const shape = useStore((s) => s.ui.selectShape ?? 'rect');
   const wand = useStore((s) => s.ui.wand) ?? WAND_DEFAULT;
   const setWand = (patch: Partial<typeof WAND_DEFAULT>) => setUi({ wand: { ...wand, ...patch } });
-  const brush = useStore((s) => s.ui.brush);
   const sel = getSelection(doc.id);
-  const [grow, setGrow] = useState(2);
+  const workspace = useStore((s) => s.ui.workspace);
   const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
   const cur = () => getDoc(sessionId, doc.id)!;
-  return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
-    <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'lasso' as const, label: 'Lasso' }, { value: 'wand' as const, label: 'Magic wand' }]} onChange={(v) => setUi({ selectShape: v })} />
-    {shape === 'wand' ? <>
-      <span data-tip="How different a color can be and still be picked: low = only that color, high = a wider range"><InlineSlider label="Tolerance" min={0} max={255} value={wand.threshold} onChange={(v) => setWand({ threshold: v })} /></span>
-      <InlineSlider label="Expand" unit="px" min={0} max={12} value={wand.expand} onChange={(v) => setWand({ expand: v })} />
-      <InlineSlider label="Smooth" unit="px" min={0} max={4} step={0.5} value={wand.smooth} onChange={(v) => setWand({ smooth: v })} />
-      <span data-tip="New replaces the selection; Add and Subtract change it (Shift adds, Alt subtracts with any shape)"><InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} /></span>
-      <span data-tip="Active layer: only its own pixels and elements decide · All layers: the whole visible picture"><InlineSelect label="Sample" value={wand.sample} options={[{ value: 'layer' as const, label: 'Active layer' }, { value: 'all' as const, label: 'All layers' }]} onChange={(v) => setWand({ sample: v })} /></span>
-    </> : null}
+  const wandOn = shape === 'wand';
+  const shapeField = <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'lasso' as const, label: 'Lasso' }, { value: 'wand' as const, label: 'Magic wand' }]} onChange={(v) => setUi({ selectShape: v })} />;
+  if (compact) return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
+    {shapeField}
     {/* What finishes a selection stays at hand, also in the quick strip. */}
-    {compact && <>
     <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
-    </>}
-    {!compact && <>
-    <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Ctrl+A">All</button>
-    <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
-    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
-    <InlineSlider label="Grow / shrink" unit="px" min={1} max={50} value={grow} onChange={setGrow} />
-    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); growSelection(cur(), grow); }} data-tip={`Grows the selection ${grow} px on every side`}>Grow</button>
-    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); growSelection(cur(), -grow); }} data-tip={`Shrinks the selection ${grow} px on every side`}>Shrink</button>
-    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => clearSelected(sessionId, cur()))} data-tip="Delete · erases the selected pixels of the active raster layer">Delete</button>
-    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => fillSelection(sessionId, cur(), brush.color, brush.opacity))} data-tip="Fills the selection with the brush color, on a new layer">Fill</button>
-    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
-    </>}
+  </div>;
+  return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
+    <div className="brush-row select-row">{shapeField}{wandOn ? <InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} /> : null}</div>
+    {wandOn ? <>
+      <div className="brush-row select-row">
+        <InlineSlider label="Tolerance" tip="How different a color can be and still be picked: low = only that color, high = a wider range" min={0} max={255} value={wand.threshold} onChange={(v) => setWand({ threshold: v })} />
+        <InlineSelect label="Sample" value={wand.sample} options={[{ value: 'layer' as const, label: 'Active layer' }, { value: 'all' as const, label: 'All layers' }]} onChange={(v) => setWand({ sample: v })} />
+      </div>
+      <div className="brush-row select-row">
+        <InlineSlider label="Grow / shrink" unit="px" tip="Widens each pick, or narrows it when negative" min={-50} max={50} value={wand.expand} onChange={(v) => setWand({ expand: v })} />
+        <InlineSlider label="Smooth" unit="px" tip="Softens the jagged edge of each pick" min={0} max={4} step={0.5} value={wand.smooth} onChange={(v) => setWand({ smooth: v })} />
+      </div>
+    </> : null}
+    <div className="brush-row select-row select-actions">
+      <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Selects the whole page · Ctrl+A">All</button>
+      <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Selects everything else · Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
+    </div>
+    {/* In the Designer these float in the selection bar; Studio's board has no such bar. */}
+    {workspace !== 'designer' && sel ? <div className="brush-row select-row select-actions"><SelectionActions sessionId={sessionId} doc={doc} /></div> : null}
   </div>;
 }
 

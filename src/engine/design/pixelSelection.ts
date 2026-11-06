@@ -81,8 +81,15 @@ export function invertSelection(doc: DesignDoc): void {
  * neighbourhood, done with the mask drawn shifted (2·px + 1 draws per axis, on the GPU); shrinking grows the outside.
  */
 export function growSelection(doc: DesignDoc, px: number): void {
-  const sel = getSelection(doc.id), r = Math.round(Math.abs(px));
-  if (!sel || !r) return;
+  const sel = getSelection(doc.id);
+  if (!sel || !Math.round(Math.abs(px))) return;
+  setSelection(doc.id, maskSelection(growMask(selectionMask(doc, sel), px)));
+}
+
+/** A mask `px` wider on every side (narrower when negative). */
+function growMask(mask: HTMLCanvasElement, px: number): HTMLCanvasElement {
+  const r = Math.round(Math.abs(px));
+  if (!r) return mask;
   const flip = (src: HTMLCanvasElement) => {
     const out = createCanvas(src.width, src.height), c = ctx2d(out);
     c.fillStyle = '#fff';
@@ -96,9 +103,8 @@ export function growSelection(doc: DesignDoc, px: number): void {
     for (let k = -r; k <= r; k++) c.drawImage(src, k * dx, k * dy);
     return out;
   };
-  const mask = selectionMask(doc, sel);
   const grown = (m: HTMLCanvasElement) => spread(spread(m, 1, 0), 0, 1);
-  setSelection(doc.id, maskSelection(px > 0 ? grown(mask) : flip(grown(flip(mask)))));
+  return px > 0 ? grown(mask) : flip(grown(flip(mask)));
 }
 
 const masks = new WeakMap<PixelSelection, HTMLCanvasElement>();
@@ -167,7 +173,7 @@ export function combineSelection(doc: DesignDoc, next: PixelSelection | null, mo
 
 export interface WandOptions { threshold?: number; expand?: number; smooth?: number; sample?: 'layer' | 'all' }
 /**
- * Magic wand: the area of similar color around (x, y), like the bucket (same tolerance, expand and smooth), sampled
+ * Magic wand: the area of similar color around (x, y), like the bucket's tolerance, grown or shrunk by `expand` and smoothed, sampled
  * from the active layer alone or from everything visible. Returns the selection, or why not.
  */
 export function wandSelection(doc: DesignDoc, x: number, y: number, o: WandOptions): PixelSelection | null | string {
@@ -182,12 +188,14 @@ export function wandSelection(doc: DesignDoc, x: number, y: number, o: WandOptio
   const sample = createCanvas(w, h);
   const sc = ctx2d(sample);
   if (only) drawLayer(sc, { ...only, visible: true }); else drawDoc(sc, doc, { origin: 'selection' });
-  const region = floodMask(sc.getImageData(0, 0, w, h).data, w, h, x, y, Math.max(0, Math.min(255, o.threshold ?? 24)), Math.round(Math.max(0, Math.min(12, o.expand ?? 0))));
-  const mask = createCanvas(w, h);
-  const mc = ctx2d(mask);
-  const img = mc.createImageData(w, h);
+  const region = floodMask(sc.getImageData(0, 0, w, h).data, w, h, x, y, Math.max(0, Math.min(255, o.threshold ?? 24)), 0);
+  const picked = createCanvas(w, h);
+  const pc = ctx2d(picked);
+  const img = pc.createImageData(w, h);
   for (let i = 0; i < region.length; i++) if (region[i]) { const p = i * 4; img.data[p] = img.data[p + 1] = img.data[p + 2] = img.data[p + 3] = 255; }
-  mc.putImageData(img, 0, 0);
+  pc.putImageData(img, 0, 0);
+  const mask = growMask(picked, Math.max(-50, Math.min(50, o.expand ?? 0)));
+  const mc = ctx2d(mask);
   const smooth = Math.max(0, Math.min(4, o.smooth ?? 0));
   if (smooth > 0) {
     const hard = createCanvas(w, h);
