@@ -604,9 +604,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
 
     if (tool === 'select') {
-      // Shift adds to the selection, Alt cuts out of it (any shape); the wand also has its own default mode.
+      // Shift adds to the selection, Alt cuts out of it; otherwise the Mode chosen for every shape.
       const wand = useStore.getState().ui.wand;
-      const combine: SelectCombine = e.altKey ? 'subtract' : e.shiftKey ? 'add' : selectShape === 'wand' ? wand?.mode ?? 'replace' : 'replace';
+      const combine: SelectCombine = e.altKey ? 'subtract' : e.shiftKey ? 'add' : wand?.mode ?? 'replace';
       if (selectShape === 'wand') {
         const next = wandSelection(current, p.x, p.y, wand ?? {});
         if (typeof next === 'string') return void toast(next, 'error');

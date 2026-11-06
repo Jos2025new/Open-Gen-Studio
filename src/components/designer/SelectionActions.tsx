@@ -1,7 +1,7 @@
 import type { DesignDoc } from '../../engine/types';
 import { getDoc } from '../../engine/design/actions';
 import { record } from '../../engine/design/history';
-import { clearSelected, fillSelection, getSelection, growSelection, invertSelection, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { clearSelected, fillSelection, getSelection, growSelection, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast, useStore } from '../../store/store';
 
 const GROW_STEP = 2;
@@ -11,10 +11,8 @@ export function SelectionActions({ sessionId, doc }: { sessionId: string; doc: D
   const brush = useStore((s) => s.ui.brush);
   const cur = () => getDoc(sessionId, doc.id)!;
   const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
-  const inverted = getSelection(doc.id)?.inverted;
   return <>
     <button type="button" className="opt" onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Removes the selection · Ctrl+D">Deselect</button>
-    <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Selects everything else · Ctrl+Shift+I">{inverted ? 'Inverted' : 'Invert'}</button>
     <button type="button" className="opt" onClick={() => { record(cur()); growSelection(cur(), -GROW_STEP); }} data-tip={`Shrinks the selection ${GROW_STEP} px on every side`}>Shrink</button>
     <button type="button" className="opt" onClick={() => { record(cur()); growSelection(cur(), GROW_STEP); }} data-tip={`Grows the selection ${GROW_STEP} px on every side`}>Grow</button>
     <button type="button" className="opt" onClick={() => run(() => fillSelection(sessionId, cur(), brush.color, brush.opacity))} data-tip="Fills the selection with the brush color, on a new layer">Fill</button>
@@ -23,9 +21,8 @@ export function SelectionActions({ sessionId, doc }: { sessionId: string; doc: D
   </>;
 }
 
-/** Floats above the bar only while something is selected, whatever the tool. */
-export function SelectionBar({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+/** The row's part of them: there only while something is selected. */
+export function SelectionQuick({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   useSelectionVersion();
-  if (!getSelection(doc.id)) return null;
-  return <section className="tool-dock-card tool-dock-strip selection-bar" aria-label="Selection actions"><SelectionActions sessionId={sessionId} doc={doc} /></section>;
+  return getSelection(doc.id) ? <SelectionActions sessionId={sessionId} doc={doc} /> : null;
 }

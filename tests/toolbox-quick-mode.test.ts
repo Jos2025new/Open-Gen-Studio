@@ -169,7 +169,7 @@ describe('subtoolbox row for every tool', () => {
     await click('Brush');
     await act(async () => { setUi({ tool: 'select', selectShape: 'rect' }); });
     await act(async () => [...row()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
-    expect(labels(row())).toEqual(expect.arrayContaining(['All', 'Invert']));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'All', 'Invert']));
     expect(labels(row())).toEqual(expect.arrayContaining(['Rectangular selection', 'Lasso']));
     await act(async () => setUi({ selectShape: 'wand' }));
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'Tolerance', 'Grow / shrink']));

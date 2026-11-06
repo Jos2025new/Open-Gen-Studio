@@ -171,7 +171,7 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
   </div>;
   return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
-    <div className="brush-row select-row">{shapeField}{wandOn ? <InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} /> : null}</div>
+    <div className="brush-row select-row">{shapeField}{<InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} />}</div>
     {wandOn ? <>
       <div className="brush-row select-row">
         <InlineSlider label="Tolerance" tip="How different a color can be and still be picked: low = only that color, high = a wider range" min={0} max={255} value={wand.threshold} onChange={(v) => setWand({ threshold: v })} />

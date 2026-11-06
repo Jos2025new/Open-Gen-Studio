@@ -7,31 +7,34 @@ import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { getSelection, invertSelection, selectAll, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { setRuler } from '../../engine/design/strokeRuler';
 import { setUi, useStore } from '../../store/store';
+import { SelectionQuick } from './SelectionActions';
 import { AutoSelectToggle, EditModeToggle, WAND_DEFAULT } from './ToolSettings';
 import { BrushSizeField } from './BrushSizeField';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 /** What each control of the subtoolbox's quick settings edits. All of them exist in the tool's card already. */
-export type QuickKind = 'gradientShape' | 'gradientColors' | 'wandMode' | 'wandTolerance' | 'wandExpand' | 'selectOps' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear';
+export type QuickKind = 'gradientShape' | 'gradientColors' | 'selectMode' | 'wandTolerance' | 'wandExpand' | 'selectOps' | 'selectActions' | 'gradientReverse' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear';
 const SHAPES: QuickKind[] = ['strokeWidth', 'stroke', 'fill'], LINES: QuickKind[] = ['strokeWidth', 'stroke'];
 /** Per tool: at most 2 long sliders first, then 1–2 small controls. A tool absent here has no quick settings (its card may still exist). */
 export const QUICK: Partial<Record<DesignTool, QuickKind[]>> = {
-  brush: ['size', 'opacity', 'color'], eraser: ['size', 'opacity'], fill: ['opacity', 'threshold', 'color'], gradient: ['gradientShape', 'gradientOpacity', 'gradientColors'], eyedropper: ['color'],
+  brush: ['size', 'opacity', 'color'], eraser: ['size', 'opacity'], fill: ['opacity', 'threshold', 'color'], gradient: ['gradientShape', 'gradientOpacity', 'gradientColors', 'gradientReverse'], eyedropper: ['color'],
   lineart: ['lineartSize', 'lineartOpacity', 'lineartColor'], rect: SHAPES, ellipse: SHAPES, sector: SHAPES, arc: SHAPES, chord: SHAPES, polygon: SHAPES, star: SHAPES,
   line: LINES, arrow: LINES, curve: LINES, text: ['fontSize', 'textColor'], ruler: ['rulerSnap', 'rulerClear'],
-  select: ['wandMode', 'wandTolerance', 'wandExpand', 'selectOps'], move: ['editMode', 'autoSelect'],
+  select: ['selectMode', 'wandTolerance', 'wandExpand', 'selectOps', 'selectActions'], move: ['editMode', 'autoSelect'],
 };
-const WAND_ONLY = new Set<QuickKind>(['wandMode', 'wandTolerance', 'wandExpand']);
+const WAND_ONLY = new Set<QuickKind>(['wandTolerance', 'wandExpand']);
+/** Controls that come before the long sliders. */
+const LEADING = new Set<QuickKind>(['selectMode', 'gradientShape']);
 const LONG = new Set<QuickKind>(['wandTolerance', 'wandExpand', 'size', 'opacity', 'threshold', 'gradientOpacity', 'lineartSize', 'lineartOpacity', 'strokeWidth', 'fontSize']);
 /** Estimated width (px) of a tool's quick settings, and of the row with `subtools` buttons: decides inline or collapsed («). */
 const WIDE: Partial<Record<QuickKind, number>> = { gradientShape: 120, gradientColors: 150, selectOps: 110, editMode: 130, autoSelect: 110 };
 export const quickWidth = (tool: DesignTool | undefined) => (tool ? QUICK[tool] ?? [] : []).reduce((w, k) => w + (WIDE[k] ?? (LONG.has(k) ? 150 : 44)), 0);
-const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1 };
+const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'fade' as const, color2: '#000000', opacity: 1, reverse: false };
 
 export const ROW_BUDGET = 560;
 export const rowFits = (tool: DesignTool | undefined, subtools: number) => subtools * 36 + quickWidth(tool) + 90 <= ROW_BUDGET;
 
-/** Rectangle and lasso have nothing to tune: what they offer at hand is to start from everything. */
+/** Rectangle and lasso start from everything or its opposite; the wand starts from its click. */
 function SelectQuick({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   useSelectionVersion();
   const cur = () => getDoc(sessionId, doc.id)!;
@@ -51,10 +54,12 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
   const setLine = (patch: object) => setUi({ lineart: { ...useStore.getState().ui.lineart, ...patch } });
   const r = ruler && ruler.docId === docId ? ruler : null;
   switch (kind) {
-    case 'wandMode': return <InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setUi({ wand: { ...wand, mode: v } })} />;
+    case 'selectMode': return <InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setUi({ wand: { ...wand, mode: v } })} />;
     case 'wandTolerance': return <InlineSlider label="Tolerance" tip="How different a color can be and still be picked" min={0} max={255} value={wand.threshold} onChange={(v) => setUi({ wand: { ...wand, threshold: v } })} />;
     case 'wandExpand': return <InlineSlider label="Grow / shrink" unit="px" tip="Widens each pick, or narrows it when negative" min={-50} max={50} value={wand.expand} onChange={(v) => setUi({ wand: { ...wand, expand: v } })} />;
     case 'selectOps': return <SelectQuick sessionId={sessionId} doc={doc} />;
+    case 'selectActions': return <SelectionQuick sessionId={sessionId} doc={doc} />;
+    case 'gradientReverse': return <InlineToggle label="Reverse" checked={!!gradient.reverse} onChange={(v) => setUi({ gradient: { ...gradient, reverse: v } })} />;
     case 'editMode': return <EditModeToggle objects={strokeObjectsAvailable(doc)} />;
     case 'autoSelect': return <AutoSelectToggle />;
     case 'size': return <BrushSizeField />;
@@ -88,7 +93,8 @@ export function QuickControls({ tool, sessionId, doc }: { tool: DesignTool; sess
   if (!kinds) return null;
   const long = kinds.filter((k) => LONG.has(k));
   return <>
+    {kinds.filter((k) => LEADING.has(k)).map((k) => <Control key={k} kind={k} sessionId={sessionId} doc={doc} />)}
     {long.length ? <div className="tool-dock-quick-sliders">{long.map((k) => <Control key={k} kind={k} sessionId={sessionId} doc={doc} />)}</div> : null}
-    {kinds.filter((k) => !LONG.has(k)).map((k) => <Control key={k} kind={k} sessionId={sessionId} doc={doc} />)}
+    {kinds.filter((k) => !LONG.has(k) && !LEADING.has(k)).map((k) => <Control key={k} kind={k} sessionId={sessionId} doc={doc} />)}
   </>;
 }

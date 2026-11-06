@@ -232,24 +232,21 @@
 .composer-tools-rail .tool-dock-stack > .tool-dock-variants.is-fixed { width: 100%; min-height: 0; min-width: min-content; padding: 0; overflow: visible; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .composer-tools-rail .tool-dock-variants.is-fixed .icon-btn { width: 36px; height: 36px; }
 .composer-tools-rail .tool-dock-variants.is-fixed .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .85; }
-/* Any tool: its sliders take the row's free space; the spacer only separates the row's end when nothing can stretch. */
-.composer-tools-rail .tool-dock-quick-sliders { flex: 1 1 0; }
+/* Any tool: the row's items spread across the bar, with no hole at one end; sliders stop at a handy width. */
+.composer-tools-rail .tool-dock-variants.is-fixed { justify-content: space-between; }
+.composer-tools-rail .tool-dock-variants.is-fixed .tool-dock-grow { display: none; }
+.composer-tools-rail .tool-dock-quick-sliders { flex: 0 1 auto; }
 .composer-tools-rail .tool-dock-quick-sliders { gap: 8px; }
-.composer-tools-rail .tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 112px; padding: 0 6px; }
+.composer-tools-rail .tool-dock-quick-sliders > * { flex: 0 1 140px; min-width: 112px; padding: 0 6px; }
 .composer-tools-rail .tool-dock-quick-sliders .opt-readout { margin-inline: auto; }
 .composer-tools-rail .tool-dock-variants.is-fixed .opt-color.is-icon { flex: 0 0 28px; width: 28px; height: 28px; align-self: center; }
-.composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders) .tool-dock-grow { display: none; }
 .composer-tools-rail .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: 36px; white-space: nowrap; }
-.composer-tools-rail .tool-dock-quick-sliders:has(> :only-child) { flex: 0 1 180px; }
-.composer-tools-rail .tool-dock-variants:has(.tool-dock-quick-sliders > :only-child) .tool-dock-grow { display: block; }
 /* Colors that belong together share one capsule; the toggle turns the second on. */
 .quick-color-pair { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 36px; padding: 0 4px; background: var(--field-bg); border-radius: 18px; }
 .quick-color-pair .opt-toggle { height: auto; padding: 0 2px; background: transparent; border: 0; }
 .composer-tools-rail .tool-dock-stack > .tool-dock-card { position: absolute; z-index: 7; left: 0; right: 0; bottom: calc(100% + 8px); width: fit-content; max-width: 100%; margin-inline: auto; }
 
-/* Pixel selection: the card's rows span the card; acts take only their width; the selection bar floats one row above the options. */
+/* Pixel selection: the card's rows span the card; acts take only their width. */
 .tool-settings > .select-row { grid-column: 1 / -1; }
 .select-actions { flex-wrap: wrap; }
 .select-actions > .opt { flex: none; width: auto; }
-.selection-bar { display: flex; gap: 2px; width: fit-content; }
-.selection-bar > .opt { flex: none; height: 32px; background: transparent; border: 0; white-space: nowrap; }
