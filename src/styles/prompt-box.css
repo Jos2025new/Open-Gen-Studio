@@ -6,7 +6,7 @@
 .composer-bar { gap: 10px; min-height: 36px; flex-wrap: wrap; }
 .composer-controls { flex: 1 1 200px; flex-wrap: wrap; overflow: visible; max-height: none; }
 .composer-bar .mode-btn { height: 34px; border: 0; border-radius: var(--radius); background: var(--surface-3); padding: 0 11px; flex-shrink: 0; }
-.composer-bar .segmented { border: 0; border-radius: var(--radius); padding: 3px; background: var(--surface); }
+.composer-bar .segmented { border: 0; border-radius: var(--radius); padding: 3px; background: var(--surface-2); }
 .composer-bar .segmented button { height: 28px; border-radius: var(--radius-s); padding: 0 10px; }
 .composer-bar .segmented .is-active { background: var(--surface-3); }
 .composer-end { gap: 12px; max-width: 100%; flex-wrap: wrap; }

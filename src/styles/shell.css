@@ -3,7 +3,7 @@
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .workspace { flex: 1; min-height: 0; position: relative; background: var(--bg-canvas); overflow: hidden; }
 .sidebar { width: var(--sidebar-w); height: calc(100dvh - 12px); margin: 6px; flex-shrink: 0; position: relative; isolation: isolate; display: flex; align-items: center; flex-direction: column; padding: 0 5px 12px; border: 0; overflow: visible; background: transparent; z-index: 30; }
-.sidebar::before { content: ''; position: absolute; inset: calc(var(--topbar-h) - 2px) 0 0; border: 1px solid var(--frame-border); border-radius: var(--r-m); background: var(--surface); z-index: -1; }
+.sidebar::before { content: ''; position: absolute; inset: calc(var(--topbar-h) - 2px) 0 0; border: 1px solid var(--bar-line); border-radius: var(--r-m); background: var(--bar-bg); z-index: -1; }
 .brand { height: var(--topbar-h); width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; }.brand-name, .wide-only { display: none; }.side-collapse { position: absolute; inset: 0; margin: auto; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--text-2); opacity: 0; transition: opacity .12s; }.brand:hover .side-collapse, .side-collapse:focus-visible { opacity: 1; }.sidebar.is-folded .brand:hover .brand-mark { opacity: 0; }.side-collapse:hover { color: var(--text); background: var(--surface-3); }.brand-mark { transition: opacity .12s; }
 :root.sidebar-wide { --sidebar-w: 208px; }
 :root.sidebar-folded { --sidebar-w: 56px; }

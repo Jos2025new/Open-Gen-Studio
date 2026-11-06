@@ -61,7 +61,9 @@
   --control-icon: 18px;
   --control-gap: 6px;
   --toolbar-padding: 6px;
-  --toolbar-radius: 12px;
+  /* Every floating bar and panel docked to one: main bar, toolboxes, prompt box, top bar groups, right bar. Change them here. */
+  --bar-bg: var(--surface); --bar-line: var(--frame-border); --bar-shadow: none;
+  --toolbar-radius: var(--r-m);
   --slider-track-h: 4px;
   --slider-thumb: 14px;
 

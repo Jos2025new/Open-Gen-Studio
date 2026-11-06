@@ -8,7 +8,8 @@
 :root .sidebar .side-btn svg { width: 16px; height: 16px; }
 :root .sidebar .side-btn:not(.is-active):not(.is-open):not(:hover):not(.side-new) svg { color: var(--text-3); }
 
-:root .composer, :root .bubble { background: var(--surface-2); }
+:root .composer { background: var(--bar-bg); }
+:root .bubble { background: var(--surface-2); }
 :root .bubble, :root .agent-text, :root .composer-input { color: var(--text-content); }
 
 /* Top bar, same hierarchy (2026-10-31, from three app top bars): the session title is the one bright thing, a little

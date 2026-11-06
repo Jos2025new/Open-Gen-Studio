@@ -22,10 +22,10 @@
   max-width: 100%;
   min-width: 0;
   padding: var(--toolbar-padding);
-  background: var(--surface-2);
-  border: 1px solid var(--panel-line);
+  background: var(--bar-bg);
+  border: 1px solid var(--bar-line);
   border-radius: var(--toolbar-radius);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--bar-shadow);
   overflow-x: auto;
 }
 .tool-dock-family { width: 100%; }
@@ -45,10 +45,10 @@
   height: auto;
   max-height: min(var(--tool-dock-card-height), 60vh);
   overflow: auto;
-  background: var(--surface);
-  border: 1px solid var(--panel-line);
+  background: var(--bar-bg);
+  border: 1px solid var(--bar-line);
   border-radius: var(--toolbar-radius);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--bar-shadow);
 }
 .tool-dock-strip { padding: 6px; overflow: visible; }
 .tool-dock-grip {
@@ -111,7 +111,7 @@
 .brush-card .opt.opt-presets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .brush-card .opt-presets button { width: auto; }
 /* Hierarchy: the toolbox leads, the variant row follows (lighter, smaller); in both, only the active item is at full strength. */
-.tool-dock .tool-dock-variants { background: color-mix(in srgb, var(--surface-2) 70%, transparent); box-shadow: none; padding: 3px; }
+.tool-dock .tool-dock-variants { background: var(--bar-bg); box-shadow: none; padding: 3px; }
 .tool-dock .tool-dock-variants .icon-btn { width: 32px; height: 32px; }
 .tool-dock .tool-dock-variants .icon-btn svg { width: 18px; height: 18px; }
 .tool-dock :is(.tool-dock-family, .tool-dock-variants) .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .55; transition: opacity .12s; }
@@ -141,7 +141,7 @@
 .brush-tip-fields { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0; }
 /* Designer, toolbox outside the prompt box (ToolPalette): the same strip turned upright at the left, the canvas view under
    it in one frame; variants and the settings card open at its right, aligned to its top, like the Nodes toolbox menus. */
-.designer-side { position: absolute; z-index: 10; left: 16px; top: 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--frame-border); border-radius: var(--r-m); background: var(--surface); }
+.designer-side { position: absolute; z-index: 10; left: 16px; top: 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--bar-line); border-radius: var(--r-m); background: var(--bar-bg); }
 /* Same frame and icon tone as the main bar (.sidebar::before, .side-btn): one grey at rest, nothing dimmed. */
 .designer-side .tool-dock .tool-dock-family .icon-btn:not(.is-active):not([aria-expanded]):not([aria-disabled="true"]) { opacity: 1; }
 .designer-side .icon-btn:not(.is-active, :hover, :focus-visible, [aria-expanded="true"]) svg { color: var(--text-3); }
@@ -190,7 +190,7 @@
 .context-strip .node-done { margin-left: auto; position: sticky; right: 0; }
 /* Subtoolbox fixed: as wide as the toolbox and centered on it, directly above it, with 36 px targets and solid contrast. */
 .tool-dock-stack.is-fixed { align-items: center; transition: bottom .22s ease, right .22s ease; }
-.tool-dock .tool-dock-stack > .tool-dock-variants.is-fixed { width: 100%; min-height: 48px; padding: 6px; background: var(--surface-2); box-shadow: var(--shadow-card); }
+.tool-dock .tool-dock-stack > .tool-dock-variants.is-fixed { width: 100%; min-height: 48px; padding: 6px; background: var(--bar-bg); box-shadow: var(--bar-shadow); }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn { width: 36px; height: 36px; }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .85; }
 .tool-dock:not(.is-vertical) .tool-dock-stack .tool-dock-card { order: -1; }
@@ -203,7 +203,7 @@
 .tool-dock-hide-prompt:is(:hover, :focus-visible) { color: var(--text); background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .tool-dock-hide-prompt[aria-pressed="true"] { color: var(--active-text); }
 .tool-dock-hide-prompt:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
-.tool-dock-hide-prompt.is-pill { position: absolute; z-index: 7; right: 0; bottom: 8px; width: 40px; height: 48px; background: var(--surface-2); border: 1px solid var(--panel-line); box-shadow: var(--shadow-card); }
+.tool-dock-hide-prompt.is-pill { position: absolute; z-index: 7; right: 0; bottom: 8px; width: 40px; height: 48px; background: var(--bar-bg); border: 1px solid var(--bar-line); box-shadow: var(--bar-shadow); }
 /* Quick mode, in the subtoolbox: «, subtool icon, long Size and Opacity, color circle, Eraser, Settings. */
 .tool-dock-variants.is-fixed { gap: 8px; }
 .tool-dock-quick-sliders { display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; }

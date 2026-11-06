@@ -60,7 +60,7 @@
 /* Canvas toolbox: one vertical bar on the left, in the Designer's toolbar style (same padding, radius, line, plane and
    control size); separators run across it, the zoom value sits between + and −. */
 :root { --canvas-pop-gap: 6px; }
-.canvas-navigation { max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.canvas-navigation { max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--bar-line); border-radius: var(--toolbar-radius); background: var(--bar-bg); box-shadow: var(--bar-shadow); }
 .canvas-navigation .icon-btn { flex-shrink: 0; width: var(--control-h); height: var(--control-h); border-radius: var(--radius-s); }
 .canvas-navigation .icon-btn svg { width: var(--control-icon); height: var(--control-icon); }
 .canvas-nav-sep { flex-shrink: 0; width: 18px; border-top: 1px solid var(--border); margin: 3px 0; }
@@ -215,7 +215,7 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .cut-trail polyline { fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; stroke-linejoin: round; }
 .react-flow__edge.is-cut-hit .react-flow__edge-path { stroke: var(--danger) !important; stroke-width: 3; }
 /* Selection panel: the selected node's result tools, by section, at the top right (same frame as the canvas toolbox). */
-.selection-panel { width: 240px; max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; padding: 4px; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.selection-panel { width: 240px; max-height: calc(100% - 24px); overflow-y: auto; scrollbar-width: none; padding: 4px; border: 1px solid var(--bar-line); border-radius: var(--toolbar-radius); background: var(--bar-bg); box-shadow: var(--bar-shadow); }
 .selection-panel .sp-head { display: flex; align-items: center; gap: 8px; padding: 9px 9px 7px; color: var(--text); font-size: var(--fs-s); }
 .selection-panel .sp-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .selection-panel .sp-size { flex-shrink: 0; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }

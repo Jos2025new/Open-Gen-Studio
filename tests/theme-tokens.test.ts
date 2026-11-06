@@ -145,7 +145,7 @@ const TODAY: Record<string, string> = {
   '--r-s': '6px', '--r-m': '16px', '--r-l': '24px', '--r-full': '999px',
   '--fs-xs': '11px', '--fs-s': '12px', '--fs-m': '13px', '--fs-l': '15px', '--fs-xl': '20px',
   '--sp-1': '4px', '--sp-2': '8px', '--sp-3': '12px', '--sp-4': '16px', '--sp-5': '24px',
-  '--control-h': '32px', '--control-icon': '18px', '--control-gap': '6px', '--toolbar-padding': '6px', '--toolbar-radius': '12px',
+  '--control-h': '32px', '--control-icon': '18px', '--control-gap': '6px', '--toolbar-padding': '6px', '--toolbar-radius': '16px',
   '--slider-track-h': '4px', '--slider-thumb': '14px',
   '--shadow-pop': '0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35)',
   '--shadow-card': '0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.25)',
@@ -192,9 +192,9 @@ describe('app CSS and canvas drawing follow the theme', () => {
     expect(rule('ui.css', '.toast-success > svg:first-child')).toContain('var(--ok)');
     expect(rule('base.css', '::selection')).toMatch(/background: var\(--select-on-soft\);\s*color: var\(--select-on\)/);
   });
-  it('floating panels share one border logic: --panel-line at rest, --panel-line-focus only when focused', () => {
+  it('floating panels share one border logic: --bar-line at rest, --panel-line-focus only when focused', () => {
     const rest: [string, string][] = [['composer.css', '.composer'], ['composer.css', '.thread-peek.is-open'], ['designer-connected.css', '.context-strip'], ['tool-dock.css', '.tool-dock-variants, .tool-dock-family'], ['tool-dock.css', '.tool-dock-card'], ['designer-connected.css', '.designer-view']];
-    for (const [f, sel] of rest) expect(rule(f, sel), sel).toMatch(/border: 1px solid var\(--panel-line\)/);
+    for (const [f, sel] of rest) expect(rule(f, sel), sel).toMatch(/border: 1px solid var\(--bar-line\)/);
     expect(rule('composer.css', '.composer:focus-within')).toContain('var(--panel-line-focus)');
     expect(read('composer.css')).toMatch(/\.context-strip:focus-within[^{]*\{ border-color: var\(--panel-line-focus\); \}/);
     for (const b of ['atlas', 'grafito', 'claro', 'blanco']) {

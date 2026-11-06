@@ -11,7 +11,7 @@ it('Nodes has one vertical canvas toolbox with every canvas tool, in order (Crea
   expect(order.every((i) => i > 0)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   expect(nav.match(/placement="right-start"/g)).toHaveLength(3);
-  expect(readFileSync('src/styles/node.css', 'utf8')).toMatch(/\.canvas-navigation \{[^}]*flex-direction: column;[^}]*border: 1px solid var\(--panel-line\); border-radius: var\(--toolbar-radius\)/);
+  expect(readFileSync('src/styles/node.css', 'utf8')).toMatch(/\.canvas-navigation \{[^}]*flex-direction: column;[^}]*border: 1px solid var\(--bar-line\); border-radius: var\(--toolbar-radius\)/);
 });
 
 it('the top bar keeps only Run all; Add node, Auto layout and Fit view live in the toolbox', () => {

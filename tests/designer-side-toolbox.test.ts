@@ -126,6 +126,6 @@ it('top bar: new document and undo/redo beside the title, Save to gallery and th
 it('the side toolbox wears the main bar\'s frame and one icon grey', async () => {
   const { readFileSync } = await import('node:fs');
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
-  expect(css).toMatch(/\.designer-side \{[^}]*border: 1px solid var\(--frame-border\); border-radius: var\(--r-m\); background: var\(--surface\); \}/);
+  expect(css).toMatch(/\.designer-side \{[^}]*border: 1px solid var\(--bar-line\); border-radius: var\(--r-m\); background: var\(--bar-bg\); \}/);
   expect(css).toMatch(/\.designer-side \.icon-btn:not\([^)]*\) svg \{ color: var\(--text-3\); \}/);
 });

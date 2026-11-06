@@ -1,5 +1,5 @@
 /* Top bar groups (Designer first): related actions share one frame, as in the canvas toolbars. */
-.topbar-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); }
+.topbar-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--bar-line); border-radius: var(--toolbar-radius); background: var(--bar-bg); }
 .topbar-group .icon-btn { width: 32px; height: 32px; border-radius: calc(var(--toolbar-radius) - 3px); color: var(--text-2); }
 .topbar-group .icon-btn svg { width: 17px; height: 17px; }
 .topbar-group .icon-btn:not(:disabled):hover, .topbar-group .icon-btn.is-active { color: var(--text); background: var(--surface-3, var(--surface)); }
