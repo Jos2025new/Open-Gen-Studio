@@ -48,7 +48,7 @@ export function ComposerOptions({ label, disabled, onAdd, onAsset }: { label: st
       <Row icon={<FolderOpen size={17} />} label="All sessions" onClick={pick(() => setUi({ panel: 'sessions' }))} />
     </>;
     if (section === 'library') return <>
-      <div className="control-center-thumbs">{Object.values(assets).filter(isListed).sort((a, b) => b.createdAt - a.createdAt).slice(0, 9).map((a) => <button key={a.id} type="button" aria-label={`Attach ${a.kind}`} data-tip="Attach to the prompt" onClick={pick(() => onAsset(a.id))}><AssetMedia assetId={a.id} hoverPlay={false} autoPlay={false} draggable={false} /></button>)}</div>
+      <div className="control-center-thumbs">{Object.values(assets).filter(isListed).sort((a, b) => b.createdAt - a.createdAt).slice(0, 6).map((a) => <button key={a.id} type="button" aria-label={`Attach ${a.kind}`} data-tip="Attach to the prompt" onClick={pick(() => onAsset(a.id))}><AssetMedia assetId={a.id} hoverPlay={false} autoPlay={false} draggable={false} /></button>)}</div>
       <Row icon={<FolderOpen size={17} />} label="Open Library" onClick={pick(openLibrary)} />
     </>;
     if (section === 'tools') return ALL_TOOLS.map((t) => <Row key={t.id} icon={<t.icon size={17} />} label={t.label} onClick={pick(() => openTool(t))} />);
@@ -65,7 +65,7 @@ export function ComposerOptions({ label, disabled, onAdd, onAsset }: { label: st
       <div className="control-center-top">
         <nav className="control-center-nav" aria-label="Sections">
           {SECTIONS.map((s) => <button key={s.id} type="button" className={s.id === section ? 'is-current' : ''} aria-current={s.id === section ? 'true' : undefined} onMouseEnter={() => setSection(s.id)} onFocus={() => setSection(s.id)} onClick={() => setSection(s.id)}>
-            <span>{s.label}</span>{s.id === 'create' ? <ChevronRight size={14} /> : null}
+            <span>{s.label}</span>{s.id === section ? <ChevronRight size={14} /> : null}
           </button>)}
           <button type="button" className={`control-center-agent ${mode === 'agent' ? 'is-on' : ''}`} aria-pressed={mode === 'agent'} onClick={pick(() => { setComposer({ mode: 'agent' }); promptDock(); })}>
             <Bot size={15} /><span>Agent</span>{mode === 'agent' ? <Check size={14} /> : null}

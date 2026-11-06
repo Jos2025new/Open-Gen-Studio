@@ -5,11 +5,18 @@ import type { Session } from '../../engine/types';
 
 /** Object URL (or remote URL) for an asset's media, loaded lazily from IndexedDB. */
 export function useAssetUrl(assetId: string | null | undefined): string | null {
+  return useAssetSource(assetId).url;
+}
+
+/** The asset's URL, and `lost` once its stored bytes turned out to be gone (nothing more is coming). */
+export function useAssetSource(assetId: string | null | undefined): { url: string | null; lost: boolean } {
   const remote = useStore((s) => (assetId ? s.assets[assetId]?.remoteUrl : undefined));
   const stored = useStore((s) => (assetId ? s.assets[assetId]?.stored : undefined));
   const [url, setUrl] = useState<string | null>(() => (assetId ? peekAssetUrl(assetId) ?? null : null));
+  const [lost, setLost] = useState(false);
   useEffect(() => {
     let alive = true;
+    setLost(false);
     if (!assetId) {
       setUrl(null);
       return;
@@ -24,13 +31,15 @@ export function useAssetUrl(assetId: string | null | undefined): string | null {
       return;
     }
     void loadAssetUrl(assetId).then((u) => {
-      if (alive) setUrl(u ?? remote ?? null);
+      if (!alive) return;
+      setUrl(u ?? remote ?? null);
+      setLost(!u && !remote);
     });
     return () => {
       alive = false;
     };
   }, [assetId, remote, stored]);
-  return url;
+  return { url, lost };
 }
 
 export function useActiveSession(): Session {

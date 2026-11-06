@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { AudioLines, ImageOff, Box, Play } from 'lucide-react';
 import { useStore } from '../../store/store';
 import { formatDuration } from '../../lib/format';
-import { useAssetUrl } from './hooks';
+import { useAssetSource } from './hooks';
 
 /** Renders an asset (image or video) from local storage or its remote URL. */
 export function AssetMedia({
@@ -24,10 +24,10 @@ export function AssetMedia({
   autoPlay?: boolean;
 }) {
   const asset = useStore((s) => s.assets[assetId]);
-  const url = useAssetUrl(asset?.kind === 'model3d' ? null : assetId);
+  const { url, lost } = useAssetSource(asset?.kind === 'model3d' ? null : assetId);
   // Failure belongs to one URL: when the local copy replaces a blocked remote link, try again.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const failed = !!url && failedUrl === url;
+  const failed = lost || (!!url && failedUrl === url);
   const setFailed = (f: boolean) => setFailedUrl(f ? url : null);
   const videoRef = useRef<HTMLVideoElement>(null);
   if (!asset) {

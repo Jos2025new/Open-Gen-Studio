@@ -66,4 +66,13 @@ describe('the strip above the prompt', () => {
     act(() => root.render(createElement(ComposerStrip)));
     expect(host.querySelector('.composer-strip-nudge')).toBeNull();
   });
+  it('marks only the open section with the arrow', () => {
+    act(() => root.render(createElement(ComposerOptions, { onAsset: () => undefined, onAdd: () => undefined, label: 'Attach', disabled: false } as never)));
+    act(() => (host.querySelector('button') as HTMLButtonElement).click());
+    const withArrow = () => [...document.querySelectorAll('.control-center-nav button:not(.control-center-agent)')].filter((b) => b.querySelector('.lucide-chevron-right')).map((b) => b.textContent?.trim());
+    expect(withArrow()).toHaveLength(1);
+    const library = [...document.querySelectorAll<HTMLButtonElement>('.control-center-nav button')].find((b) => b.textContent?.trim() === 'Library')!;
+    act(() => library.click());
+    expect(withArrow()).toEqual(['Library']);
+  });
 });
