@@ -191,6 +191,7 @@
 - [056-2026-10-W44: barra de paneles, Vista y Filtros, Home, barra lateral y caja de Nodes (2026-10-31)](history/056-2026-10-W44.md).
 - [057-2026-11-W44: lápiz y dabs, bordes vivos, borrador raster y arreglos de booleanas (2026-11-01)](history/057-2026-11-W44.md).
 - [058-2026-11-W45: lápiz de grafito (fit8), preset que se conserva y tecla repetida (2026-11-05)](history/058-2026-11-W45.md).
+- [059: traspaso de accesibilidad (2026-11-07)](history/059-2026-11-W45-traspaso.md).
 - [Encargo para un auditor externo (2026-10-28)](audits/encargo-auditor-externo.md): docs y caza de un bug, solo sandbox y sin gasto.
 - [Reproducciones de sospechas (2026-10-29)](audits/repro-2026-10-29.md): 11 `it.fails` en `tests/repro-*.test.ts`; H11 descartado.
 - [Auditoría externa (2026-10-29)](audits/auditoria-externa-2026-10-29.md): 11 de 39 citas no sostenían su frase; la rama compacta de formas es alcanzable; objeción sobre H3 retractada.
