@@ -16,7 +16,14 @@
         } catch (e) {}
         r.setAttribute('data-base', b);
         r.setAttribute('data-accent', a);
-        try { if (localStorage.getItem('ogs-contrast') === 'soft') r.setAttribute('data-contrast', 'soft'); } catch (e) {}
+        try { var c = localStorage.getItem('ogs-contrast'); if (c === 'soft' || c === 'high') r.setAttribute('data-contrast', c); } catch (e) {}
+        // Accessibility: text size (one of the standard steps), reduce motion (stored choice, else the OS), stronger focus outline.
+        try { var t = Number(localStorage.getItem('ogs-text-scale')); if ([0.875, 1.125, 1.25, 1.5, 1.75, 2].indexOf(t) >= 0) { r.setAttribute('data-text-scale', String(t)); r.style.setProperty('--text-scale', String(t)); } } catch (e) {}
+        try {
+          var m = localStorage.getItem('ogs-motion'), rm = m === 'on' || (m !== 'off' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+          if (rm) r.classList.add('reduce-motion'); else if (m === 'off') r.setAttribute('data-motion', 'full');
+        } catch (e) {}
+        try { if (localStorage.getItem('ogs-focus') === 'on') r.classList.add('focus-strong'); } catch (e) {}
       })();
     </script>
     <title>Open Gen Studio</title>

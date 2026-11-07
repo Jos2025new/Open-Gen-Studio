@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '../ui/icons';
 import {
   Camera,
   AudioLines,
@@ -32,7 +32,7 @@ import {
   WandSparkles,
   UserPlus,
   Workflow,
-} from 'lucide-react';
+} from '../ui/icons';
 import { OPS, opsFor } from '../../engine/ops';
 import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
 import { openAssetInDesigner } from '../../engine/design/actions';

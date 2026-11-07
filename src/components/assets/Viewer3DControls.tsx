@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Camera, ChevronDown, ChevronRight, Hand, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { Box, Camera, ChevronDown, ChevronRight, Hand, RotateCcw, ZoomIn, ZoomOut } from '../ui/icons';
 import { Chip, IconButton, MenuItem, Segmented, Toggle, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { resetView, setOrbit, setView3d, snapshot3d, useViewer3d, VIEW3D_DEFAULT, VIEWS, zoomBy } from './viewer3d';

@@ -1,4 +1,4 @@
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from '../ui/icons';
 import type { VectorShape } from '../../engine/types';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { canOutlineStroke, outlineStrokeShapes } from '../../engine/design/outlineStroke';

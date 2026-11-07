@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, BellRing, Eye, EyeOff, ExternalLink, KeyRound, PanelTop } from 'lucide-react';
+import { Bell, BellRing, Eye, EyeOff, ExternalLink, KeyRound, PanelTop } from '../../ui/icons';
 import { askNotifyPermission } from '../../../lib/doneNotice';
 import { loadCatalogs, loadLlmCatalog } from '../../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../../engine/providers/registry';

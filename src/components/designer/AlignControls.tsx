@@ -4,7 +4,7 @@ import {
   AlignVerticalDistributeCenter, ArrowDownFromLine, ArrowLeftFromLine,
   ArrowRightFromLine, ArrowUpFromLine, Maximize, Minimize,
   type LucideIcon,
-} from 'lucide-react';
+} from '../ui/icons';
 import type { AlignTo, RelativeTo } from '../../engine/design/transform';
 
 const HORIZONTAL: Array<{ id: AlignTo; label: string; icon: LucideIcon; reason?: 'anchor' }> = [

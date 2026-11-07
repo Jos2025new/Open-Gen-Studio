@@ -1,6 +1,6 @@
 import { Model3DViewer } from './Model3DViewer';
 import { useEffect } from 'react';
-import { ChevronsLeft, ChevronsRight, Download, X } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Download, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { downloadAsset } from '../../engine/actions';
 import { AssetMedia } from '../ui/AssetMedia';

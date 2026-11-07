@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Calendar, DollarSign, ArrowDownAZ, ArrowUpDown, Layers3, Maximize2, Minimize2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, DollarSign, ArrowDownAZ, ArrowUpDown, Layers3, Maximize2, Minimize2, X } from '../ui/icons';
 import { formatUsd } from '../../lib/format';
 import { CATEGORY_LABELS, periodStart, summarizeSpend, type SpendPeriod, type SpendRow } from '../../engine/spending';
 import { PROVIDER_LABELS } from '../../engine/providers/types';

@@ -1,6 +1,6 @@
 import { type ComponentProps, type ReactNode } from 'react';
 import { create } from 'zustand';
-import { GalleryVerticalEnd } from 'lucide-react';
+import { GalleryVerticalEnd } from '../ui/icons';
 import { announceSidePopup, ToolDock, useSidePopup } from './ToolDock';
 import { ToolSettings } from './ToolSettings';
 import { DocumentChoices } from './DocumentPicker';

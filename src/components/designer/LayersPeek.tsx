@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FocusEvent } from 'react';
-import { AlertTriangle, Layers, SlidersHorizontal, Wrench } from 'lucide-react';
+import { AlertTriangle, Layers, SlidersHorizontal, Wrench } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 import { ViewToggles } from './ToolHelp';
 import '../../styles/layers-peek.css';

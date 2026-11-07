@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown } from '../ui/icons';
 import { setComposer, setUi, useStore } from '../../store/store';
 import { nodeWorkNotInChat, nodesToChat } from '../../engine/flow/fromNodes';
 import { ImportFromNodes } from '../ui/ImportFromChat';
 import { studioCanvases, useStudioBoard } from '../../lib/studioBoard';
+import { scrollBehavior } from '../../lib/theme';
 import { FeedList } from './FeedList';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -96,7 +97,7 @@ export function ChatWorkspace() {
           aria-label="Jump to latest"
           onClick={() => {
             const el = scrollRef.current;
-            if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+            if (el) el.scrollTo({ top: el.scrollHeight, behavior: scrollBehavior() });
           }}
         >
           <ArrowDown size={15} />

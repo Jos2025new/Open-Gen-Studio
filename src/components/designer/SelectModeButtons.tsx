@@ -11,7 +11,7 @@ const LABELS: Record<SelectMode, { label: string; key: string; tip: string }> = 
 };
 
 function Glyph({ m }: { m: SelectMode }) {
-  return <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+  return <svg style={{ width: `calc(14px * var(--text-scale, 1))`, height: `calc(14px * var(--text-scale, 1))` }} viewBox="0 0 14 14" aria-hidden="true">
     {m === 'node' && <><path d="M2 11 L7 3 L12 11" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.45" /><rect x="5" y="1.5" width="4" height="4" fill="currentColor" /></>}
     {m === 'segment' && <><path d="M2 11 L7 3 L12 11 Z" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.45" /><path d="M2 11 L7 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></>}
     {m === 'face' && <path d="M2 11 L7 3 L12 11 Z" fill="currentColor" fillOpacity="0.4" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />}

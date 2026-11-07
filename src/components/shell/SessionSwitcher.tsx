@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, CheckSquare, ChevronDown, Pin, Plus, Search, Trash } from 'lucide-react';
+import { Check, CheckSquare, ChevronDown, Pin, Plus, Search, Trash } from '../ui/icons';
 import { newSession, selectSession, setUi, useStore } from '../../store/store';
 import { setLeftSlot } from './topbarSlot';
 import { formatRelative } from '../../lib/format';

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownUp, Check, ChevronDown, KeyRound, ListFilter, Search, Settings2 } from 'lucide-react';
+import { ArrowDownUp, Check, ChevronDown, KeyRound, ListFilter, Search, Settings2 } from '../ui/icons';
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';

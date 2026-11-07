@@ -3,7 +3,7 @@ import { NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react'
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter,
   AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, ChevronRight, ClipboardCopy, Group, Scissors, Trash, Ungroup, X,
-} from 'lucide-react';
+} from '../ui/icons';
 import { alignNodes, copyNodes, cutNodes, groupNodes, renameGroup, setGroupColor, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
 import { deleteNodes } from '../../engine/flow/actions';
 import type { Graph, GraphGroup } from '../../engine/types';

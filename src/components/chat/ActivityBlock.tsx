@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Braces, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from 'lucide-react';
+import { BookOpen, Braces, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from '../ui/icons';
 import type { ActivityEntry, ActivityFeedItem, AgentState } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { useNow } from '../ui/hooks';

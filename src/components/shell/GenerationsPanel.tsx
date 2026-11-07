@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CornerDownRight, Image as ImageIcon, Search, ListFilter, ArrowUpDown, Eye, EyeOff, X } from 'lucide-react';
+import { CornerDownRight, Image as ImageIcon, Search, ListFilter, ArrowUpDown, Eye, EyeOff, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { generationTitle } from '../assets/GenerationInfo';

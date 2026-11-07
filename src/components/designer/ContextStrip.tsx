@@ -1,4 +1,4 @@
-import { Settings2 } from 'lucide-react';
+import { Settings2 } from '../ui/icons';
 import { useStore } from '../../store/store';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';

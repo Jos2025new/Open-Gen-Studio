@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, FastForward } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, FastForward } from '../ui/icons';
 import { EditAnswerButton } from './EditAnswerButton';
 import { ClampText } from './PlanParts';
 import { pickAnswers, skipQuestions, submitAnswers } from '../../engine/agent/runtime';

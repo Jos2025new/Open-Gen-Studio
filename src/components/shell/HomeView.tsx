@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, Folder, Minus, Plus, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Folder, Minus, Plus, type LucideIcon } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind } from '../../engine/types';
 import { connectedProviders, modelsOf } from '../../engine/catalog';

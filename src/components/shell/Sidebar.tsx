@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderClock, Images, Wallet, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, Plus } from 'lucide-react';
+import { FolderClock, Images, Wallet, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, Plus } from '../ui/icons';
 import { newSession, setUi, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { ProviderPool } from './ProviderPool';
@@ -10,7 +10,7 @@ import '../../styles/sidebar-peek.css';
 
 /** The house icon, shared by the sidebar's Home item and the top bar's Home button. */
 export function HomeIcon({ size = 18 }: { size?: number }) {
-  return <svg className="home-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+  return <svg className="home-icon" style={{ width: `calc(${size}px * var(--text-scale, 1))`, height: `calc(${size}px * var(--text-scale, 1))` }} viewBox="0 0 24 24" fill="none" aria-hidden>
     <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
   </svg>;
 }

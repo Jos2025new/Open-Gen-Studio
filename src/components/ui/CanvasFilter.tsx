@@ -1,4 +1,4 @@
-import { MessageSquare, PenTool, Workflow } from 'lucide-react';
+import { MessageSquare, PenTool, Workflow } from './icons';
 import type { Workspace } from '../../engine/types';
 
 export type CanvasFilterValue = 'all' | Workspace;

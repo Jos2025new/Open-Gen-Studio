@@ -1,6 +1,6 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
-import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound, RotateCw } from 'lucide-react';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound, RotateCw } from '../ui/icons';
 import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
 import { cancelGeneration } from '../../engine/jobs';
 import { plannedSpend, spentLabel } from './planSpent';

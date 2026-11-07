@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { Bot, Database, Keyboard, Palette, Plug, Wallet, Workflow } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Bot, Database, Keyboard, Palette, Plug, Wallet, Workflow } from '../ui/icons';
+import type { LucideIcon } from '../ui/icons';
 import { loadCatalogs } from '../../engine/catalog';
 import { usePref } from '../ui/hooks';
 import { PopoverHeader } from '../ui/Popover';

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from './icons';
 import { MenuItem } from './primitives';
 import { Popover, usePopover } from './Popover';
 

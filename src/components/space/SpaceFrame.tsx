@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent, type ReactNode } from 'react';
-import { Library } from 'lucide-react';
+import { Library } from '../ui/icons';
 import { usePref } from '../ui/hooks';
 import { IconButton } from '../ui/primitives';
 import { openLibrary } from '../shell/navModel';

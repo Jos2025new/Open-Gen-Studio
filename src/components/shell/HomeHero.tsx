@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { SPACES, newCanvas, newDesign } from './navModel';
 import { HomeBar } from './HomeBar';
+import { prefersReducedMotion } from '../../lib/theme';
 
 const INTERVAL_MS = 7000;
 
@@ -19,14 +20,13 @@ function HeroMark({ index }: { index: number }) {
     <path d="M40 30l12 24-12 6-12-6z" /><path d="M40 60V44" /><circle cx="40" cy="42" r="2.5" />
   </svg>;
 }
-const reducedMotion = (): boolean => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
 
 /** Three slides (Studio, Canvas, Designer) that rotate every 7 s. Paused by hover or focus, never under reduced motion. */
 export function HomeHero() {
   const [index, setIndex] = useState(0);
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
-  const [reduced] = useState(reducedMotion);
+  const [reduced] = useState(prefersReducedMotion);
   const playing = !hover && !focus && !reduced;
 
   useEffect(() => {

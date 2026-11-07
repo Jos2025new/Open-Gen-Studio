@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw, Settings2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw, Settings2 } from '../ui/icons';
 import { ADAPTERS, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import type { RemoteProviderId } from '../../engine/types';
@@ -129,7 +129,7 @@ export function ProviderPool({ wide }: { wide: boolean }) {
 function ProviderKeyIcon() {
   return (
     <span className="provider-key-mark" aria-hidden>
-      <svg width={14} height={14} viewBox="0 0 20 20" fill="none">
+      <svg style={{ width: `calc(${14}px * var(--text-scale, 1))`, height: `calc(${14}px * var(--text-scale, 1))` }} viewBox="0 0 20 20" fill="none">
         <circle cx="6.5" cy="7" r="3" />
         <path d="m8.8 9.2 6 6m-2.3-2.3 1.8-1.8m.3 4.1h1.7v-1.7" />
       </svg>

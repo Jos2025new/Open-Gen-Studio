@@ -11,7 +11,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { Copy, Film, Image as ImageIcon, Play, Plus, Trash, Type } from 'lucide-react';
+import { Copy, Film, Image as ImageIcon, Play, Plus, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, resultHandle, runsGeneration, NO_RESULT, GONE_HANDLE } from '../../engine/flow/graph';

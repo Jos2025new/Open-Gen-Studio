@@ -1,4 +1,4 @@
-import { CircleAlert, Info, TriangleAlert, X } from 'lucide-react';
+import { CircleAlert, Info, TriangleAlert, X } from '../ui/icons';
 import { dismissAlert, useAlerts } from '../../engine/alerts';
 
 /** Warnings right above the prompt box (no credit, a switched model, agent errors), until closed. */

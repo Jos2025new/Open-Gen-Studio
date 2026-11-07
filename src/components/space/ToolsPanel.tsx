@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ImagePlus, Zap } from 'lucide-react';
+import { ImagePlus, Zap } from '../ui/icons';
 import { toast, setUi, useStore } from '../../store/store';
 import { uploadFiles } from '../../engine/actions';
 import { OPS } from '../../engine/ops';

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '../ui/icons';
 import type { Layer } from '../../engine/types';
 import { ensureBuffers, isUnreadable, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { IconButton } from '../ui/primitives';

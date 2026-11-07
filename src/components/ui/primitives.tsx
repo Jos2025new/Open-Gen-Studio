@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode, Ref } from 'react';
-import type { LucideIcon } from 'lucide-react';
-import { LoaderCircle } from 'lucide-react';
+import type { LucideIcon } from './icons';
+import { LoaderCircle } from './icons';
 import { formatUsd } from '../../lib/format';
 import type { Estimate } from '../../engine/types';
 

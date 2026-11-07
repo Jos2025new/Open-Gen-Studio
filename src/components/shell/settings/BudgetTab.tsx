@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from 'lucide-react';
+import { BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
 import { formatUsd } from '../../../lib/format';
 import { askAgain } from '../../../engine/budget';
 import { priceMargin } from '../../../engine/priceAuthorization';

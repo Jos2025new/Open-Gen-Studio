@@ -1,7 +1,7 @@
 import { ShapeLookFields } from './ShapeLookFields';
 import { record } from '../../engine/design/history';
 import type { ReactNode } from 'react';
-import { AlignCenterVertical, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { AlignCenterVertical, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, RefreshCw, RotateCcw, RotateCw } from '../ui/icons';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { MenuItem, Segmented } from '../ui/primitives';

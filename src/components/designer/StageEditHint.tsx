@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X } from '../ui/icons';
 import type { DesignDoc, Layer } from '../../engine/types';
 import { layerObjects } from '../../engine/design/objectOps';
 import { shapeEditHint } from './ShapeKnots';

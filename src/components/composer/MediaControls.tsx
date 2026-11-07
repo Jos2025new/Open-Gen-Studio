@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
+import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from '../ui/icons';
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, lyricsParam, paramByRole, pixelSizes, maxCountPerRequest, STRUCTURED_TYPES } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';

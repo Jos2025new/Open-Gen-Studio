@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, Lock, LockOpen } from 'lucide-react';
+import { ArrowRight, Check, Lock, LockOpen } from '../ui/icons';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
 import { selectDraft, unlockDraft } from '../../engine/agent/draftActions';
 import { IMAGE_COUNTS, sectionsOf, choiceEstimate, settingsOptions } from '../../engine/agent/settingsCard';

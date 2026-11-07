@@ -4,7 +4,7 @@ import { setUi, useStore } from '../../store/store';
 import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, DAB_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { BrushSizeField } from './BrushSizeField';
 import { FlowField } from './BrushQuick';
-import { Circle, Droplet } from 'lucide-react';
+import { Circle, Droplet } from '../ui/icons';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { Segmented } from '../ui/primitives';
 import { stampDabStroke } from '../../engine/design/brushDabs';
@@ -26,7 +26,7 @@ export function TipIcon({ hardness }: { hardness: number }) {
     const x = i / 24, d = Math.abs(x - 0.5) * 2;
     return `${(x * 22 + 1).toFixed(1)},${(13 - profile(d * 10, 10, hardness) * 11).toFixed(1)}`;
   });
-  return <svg width="24" height="14" viewBox="0 0 24 14" aria-hidden="true"><polygon points={`1,13 ${pts.join(' ')} 23,13`} fill="currentColor" /></svg>;
+  return <svg style={{ width: `calc(24px * var(--text-scale, 1))`, height: `calc(14px * var(--text-scale, 1))` }} viewBox="0 0 24 14" aria-hidden="true"><polygon points={`1,13 ${pts.join(' ')} 23,13`} fill="currentColor" /></svg>;
 }
 
 /** A stroke drawn with the current settings, light to full pressure and back, the way the canvas will paint it. */

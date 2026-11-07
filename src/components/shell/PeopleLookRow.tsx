@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { setSettings, useStore } from '../../store/store';
 import { DEFAULT_PEOPLE_LOOK } from '../../engine/peopleLook';
-import { UserRound } from 'lucide-react';
+import { UserRound } from '../ui/icons';
 import { SetRow } from './settings/SettingsRows';
 
 /** Settings → Agent: the look of people the user does not describe (empty = the default, shown as placeholder). */

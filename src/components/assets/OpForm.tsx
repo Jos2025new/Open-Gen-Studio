@@ -1,4 +1,4 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from '../ui/icons';
 import { OPS } from '../../engine/ops';
 import type { OpId } from '../../engine/types';
 import { SpendConfirm } from '../ui/SpendConfirm';

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowDownUp, Check, ListFilter } from 'lucide-react';
+import { ArrowDownUp, Check, ListFilter } from './icons';
 import { contextLabel, type LlmCapability, type LlmModel, type LlmSort } from '../../engine/providers/llm';
 import { formatUsd } from '../../lib/format';
 import { FilterMenu } from './FilterMenu';

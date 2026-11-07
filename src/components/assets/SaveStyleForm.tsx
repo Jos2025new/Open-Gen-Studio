@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera } from '../ui/icons';
 import { captureOfAsset, saveCaptureStyle } from '../../engine/captureLibrary';
 import { libraryItem } from '../../engine/actions';
 import { useStore } from '../../store/store';

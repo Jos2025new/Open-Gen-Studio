@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Archive, AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Funnel, Image, LayoutGrid, MessageSquare, Paperclip, Star, Trash, X } from 'lucide-react';
+import { Archive, AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Funnel, Image, LayoutGrid, MessageSquare, Paperclip, Star, Trash, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';

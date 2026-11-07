@@ -5,7 +5,7 @@
 :root { --text-content: color-mix(in srgb, var(--text) 70%, #fff); }
 [data-base="claro"], [data-base="blanco"] { --text-content: color-mix(in srgb, var(--text) 70%, #000); }
 
-:root .sidebar .side-btn svg { width: 16px; height: 16px; }
+:root .sidebar .side-btn svg { width: calc(16px * var(--text-scale, 1)); height: calc(16px * var(--text-scale, 1)); }
 :root .sidebar .side-btn:not(.is-active):not(.is-open):not(:hover):not(.side-new) svg { color: var(--text-3); }
 
 :root .composer { background: var(--bar-bg); }
@@ -17,17 +17,17 @@
    the text menus (Connected, Generations) read at the title's scale but in the secondary colour. Workspace tools in
    the right slot keep their own styles. */
 :root .topbar { --session-title-width: 260px; }
-:root .topbar .session-title-btn { color: var(--text); font-size: 14px; font-weight: 550; padding: 4px 8px; }
+:root .topbar .session-title-btn { color: var(--text); font-size: calc(14px * var(--text-scale, 1)); font-weight: 550; padding: 4px 8px; }
 :root .topbar .session-title-btn > svg { color: var(--text-3); }
 :root .topbar .session-title-btn:hover > svg, :root .topbar .session-title-btn.is-open > svg { color: var(--text); }
-:root .topbar .title-input { font-size: 14px; font-weight: 550; }
-:root .topbar-home, :root .topbar-left .icon-btn, :root .topbar-right > .icon-btn { width: 30px; height: 30px; color: var(--text-3); }
-:root .topbar-home svg, :root .topbar-left .icon-btn svg, :root .topbar-right > .icon-btn svg { width: 16px; height: 16px; }
+:root .topbar .title-input { font-size: calc(14px * var(--text-scale, 1)); font-weight: 550; }
+:root .topbar-home, :root .topbar-left .icon-btn, :root .topbar-right > .icon-btn { width: calc(30px * var(--text-scale, 1)); height: calc(30px * var(--text-scale, 1)); color: var(--text-3); }
+:root .topbar-home svg, :root .topbar-left .icon-btn svg, :root .topbar-right > .icon-btn svg { width: calc(16px * var(--text-scale, 1)); height: calc(16px * var(--text-scale, 1)); }
 :root .topbar-left .icon-btn:hover, :root .topbar-right > .icon-btn:hover, :root .topbar-right > .icon-btn.is-active { color: var(--text); }
 :root .topbar-left { gap: 4px; }
 :root .topbar-right { gap: 6px; }
-:root .topbar-menu { height: 30px; padding: 0 10px; font-size: 13px; color: var(--text-2); }
+:root .topbar-menu { height: calc(30px*var(--text-scale)); padding: 0 10px; font-size: var(--fs-m); color: var(--text-2); }
 @media (max-width: 767px) {
   :root .topbar { --session-title-width: 160px; }
-  :root .topbar-menu { padding: 0 6px; font-size: 12px; }
+  :root .topbar-menu { padding: 0 6px; font-size: var(--fs-s); }
 }

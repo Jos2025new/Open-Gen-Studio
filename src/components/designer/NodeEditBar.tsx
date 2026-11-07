@@ -1,4 +1,4 @@
-import { Hand, Spline, Scissors, Eraser, Lasso, MoreHorizontal, X } from 'lucide-react';
+import { Hand, Spline, Scissors, Eraser, Lasso, MoreHorizontal, X } from '../ui/icons';
 import type { VectorShape } from '../../engine/types';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { NODE_EDIT_MODES, NODE_EDIT_MODES_READY, setEraseRadius, setNodeEditMode, useNodeEditMode, type NodeEditMode } from '../../engine/design/nodeEditMode';
@@ -76,5 +76,5 @@ export function NodeDoneButton({ docId }: { docId: string }) {
    unequal lengths; symmetric: in line and equal. The name stays as the choice's label and tooltip. */
 function NodeTypeIcon({ t }: { t: 'c' | 's' | 'z' }) {
   const handles = t === 'c' ? 'M4 15 L9 9 L15 15' : t === 's' ? 'M3 9 H9 H16' : 'M4 9 H9 H14';
-  return <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d={handles} fill="none" stroke="currentColor" strokeWidth="1.5" /><rect x="7.5" y="7.5" width="3" height="3" fill="currentColor" /></svg>;
+  return <svg style={{ width: `calc(18px * var(--text-scale, 1))`, height: `calc(18px * var(--text-scale, 1))` }} viewBox="0 0 18 18" aria-hidden="true"><path d={handles} fill="none" stroke="currentColor" strokeWidth="1.5" /><rect x="7.5" y="7.5" width="3" height="3" fill="currentColor" /></svg>;
 }

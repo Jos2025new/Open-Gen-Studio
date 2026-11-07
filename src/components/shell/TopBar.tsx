@@ -1,7 +1,7 @@
 import { SaveIndicator } from './SaveIndicator';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, History, Settings } from 'lucide-react';
+import { ArrowLeft, History, Settings } from '../ui/icons';
 import { renameSession, setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { SettingsPanel } from './SettingsPanel';

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis } from '../ui/icons';
 import { OPS } from '../../engine/ops';
 import { addConnected, newNodeData } from '../../engine/flow/actions';
 import type { GraphNode, OpId, PortType } from '../../engine/types';

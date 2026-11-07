@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { History, Star } from 'lucide-react';
+import { History, Star } from '../ui/icons';
 import { loadPromptHistory, promptHistoryDirection, recordPrompt, subscribePromptHistory, toggleFavorite, type PromptHistory as HistoryData } from '../../lib/promptHistory';
 import { setComposer, toast } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';

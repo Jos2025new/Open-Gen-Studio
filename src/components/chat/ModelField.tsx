@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from '../ui/icons';
 import { choiceEstimate, defaultChoice } from '../../engine/agent/settingsCard';
 import type { SettingsChoice } from '../../engine/types';
 import { formatUsd } from '../../lib/format';

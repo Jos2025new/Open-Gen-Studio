@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Blend, Droplets, Lock, Unlock } from 'lucide-react';
+import { Blend, Droplets, Lock, Unlock } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { BRUSH_BLENDS, type BrushBlend } from '../../engine/design/brushEngine';
 import { flowOf, FLOW_MIN, withFlow } from '../../engine/design/brushFlow';

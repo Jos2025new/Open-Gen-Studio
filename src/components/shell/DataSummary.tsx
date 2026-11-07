@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download } from '../ui/icons';
 import { diskAvailable } from '../../lib/disk';
 import { useStore } from '../../store/store';
 import { visibleSessions } from '../../store/spaceSession';

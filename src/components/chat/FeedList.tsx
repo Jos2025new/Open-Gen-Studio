@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { ignoreExcess, openBudgetSettings } from '../../engine/budget';
-import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
+import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from '../ui/icons';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
 import { copyText } from '../../engine/actions';

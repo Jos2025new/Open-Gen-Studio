@@ -1,4 +1,4 @@
-import { HelpCircle, X } from 'lucide-react';
+import { HelpCircle, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import type { DesignTool } from '../../engine/design/rules';
 import { TOOL_NAMES } from '../../engine/shortcuts';

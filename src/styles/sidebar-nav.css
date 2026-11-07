@@ -1,7 +1,7 @@
 /* Sidebar destinations (SidebarNav.tsx) and the narrow bar's icon-only rule. Tokens only. */
 .side-scroll { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: var(--sp-1); scrollbar-width: thin; }
 .sidebar:not(.is-wide) .side-label { display: none; }
-.sidebar:not(.is-wide) .side-btn { height: 36px; }
+.sidebar:not(.is-wide) .side-btn { height: calc(36px*var(--text-scale)); }
 /* Narrow bar: a hairline between the spaces and the Create and Tools flyouts. */
 .sidebar:not(.is-wide) .side-scroll .side-sep { width: 20px; margin: var(--sp-1) auto; }
 .nav-section { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-2); }
@@ -15,8 +15,8 @@
 .nav-item:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
 .nav-item:disabled { opacity: .5; cursor: default; }
 .nav-item.is-active { color: var(--active-text); background: var(--active-bg); }
-.nav-item.is-row { height: 30px; padding: 0 var(--sp-2); }
-.nav-list.is-tall .nav-item.is-row { height: 38px; }
+.nav-item.is-row { height: calc(30px*var(--text-scale)); padding: 0 var(--sp-2); }
+.nav-list.is-tall .nav-item.is-row { height: calc(38px*var(--text-scale)); }
 .nav-item.is-tile { flex-direction: column; justify-content: center; gap: var(--sp-1); height: 56px; padding: var(--sp-1); font-size: var(--fs-s); border: 1px solid var(--border); border-radius: var(--r-m); }
 .nav-soon { margin-left: auto; font-size: var(--fs-xs); color: var(--text-4); }
 .nav-more { color: var(--text-3); font-size: var(--fs-s); }
@@ -24,7 +24,7 @@
 .nav-flyout { display: grid; gap: var(--sp-2); padding: 0 var(--sp-3) var(--sp-3); }
 .nav-flyout .nav-item.is-tile { height: 84px; gap: var(--sp-2); text-align: center; line-height: 1.25; background: var(--surface-3); border-color: var(--border); font-size: var(--fs-s); color: var(--text); }
 .nav-flyout .nav-item.is-tile:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
-.nav-flyout .nav-item.is-tile svg { width: 20px; height: 20px; }
+.nav-flyout .nav-item.is-tile svg { width: calc(20px * var(--text-scale, 1)); height: calc(20px * var(--text-scale, 1)); }
 .popover:has(.nav-flyout) { padding: 0; border-radius: var(--r-m); }
 /* The narrow bar is 48px (the theme token keeps 56px; this layout rule wins over it). */
 html:root:not(.sidebar-wide), html:root.sidebar-folded { --sidebar-w: 48px; }

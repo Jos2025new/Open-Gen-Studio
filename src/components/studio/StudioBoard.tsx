@@ -1,5 +1,5 @@
 import { useRef, type PointerEvent } from 'react';
-import { X } from 'lucide-react';
+import { X } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 import { SpaceBoard } from '../space/SpaceBoard';
 import { EmbeddedNodeCanvas } from '../node/NodeWorkspace';

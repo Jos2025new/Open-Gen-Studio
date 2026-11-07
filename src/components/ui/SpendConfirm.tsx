@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Zap } from 'lucide-react';
+import { Zap } from './icons';
 import { formatUsd } from '../../lib/format';
 import type { Estimate } from '../../engine/types';
 import { useStore } from '../../store/store';

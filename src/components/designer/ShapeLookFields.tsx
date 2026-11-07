@@ -79,8 +79,8 @@ export function convertToPath(sessionId: string, docId: string, layerId: string,
 /* Join and cap drawn as what they do (Inkscape's Stroke style icons), so the choices fit one row; the name stays
    as the button's accessible label and tooltip. */
 function JoinIcon({ j }: { j: 'miter' | 'round' | 'bevel' }) {
-  return <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M3 13 V5 H15" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin={j} strokeLinecap="butt" /></svg>;
+  return <svg style={{ width: `calc(18px * var(--text-scale, 1))`, height: `calc(14px * var(--text-scale, 1))` }} viewBox="0 0 18 14" aria-hidden="true"><path d="M3 13 V5 H15" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin={j} strokeLinecap="butt" /></svg>;
 }
 function CapIcon({ c }: { c: 'butt' | 'round' | 'square' }) {
-  return <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7 H11" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap={c} /><path d="M2 7 H11" stroke="var(--bg, #000)" strokeWidth="1" /></svg>;
+  return <svg style={{ width: `calc(18px * var(--text-scale, 1))`, height: `calc(14px * var(--text-scale, 1))` }} viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7 H11" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap={c} /><path d="M2 7 H11" stroke="var(--bg, #000)" strokeWidth="1" /></svg>;
 }

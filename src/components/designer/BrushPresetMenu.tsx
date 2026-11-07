@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Pencil, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { Check, Pencil, RotateCcw, Save, Trash2 } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { activePreset, applyBrushPreset, DAB_PRESETS, PENCIL_PRESETS, presetEdited, presetFromBrush, type BrushPreset } from '../../engine/design/brushPresets';
 import { uid } from '../../lib/id';

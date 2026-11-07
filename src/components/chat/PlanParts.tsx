@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, MessageSquarePlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, MessageSquarePlus } from '../ui/icons';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button } from '../ui/primitives';

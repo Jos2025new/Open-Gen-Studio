@@ -1,6 +1,6 @@
 import { PromptHistory, recordCreatePrompt, usePromptHistory } from './PromptHistory';
 import { useRef } from 'react';
-import { Paperclip } from 'lucide-react';
+import { Paperclip } from '../ui/icons';
 import { setComposer, toast, useStore } from '../../store/store';
 import { attachFiles } from '../../engine/actions';
 import { attachProblem } from './actionRoute';

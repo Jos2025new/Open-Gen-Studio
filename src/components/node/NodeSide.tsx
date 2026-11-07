@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { Panel } from '@xyflow/react';
-import { Info, LayoutGrid, MessageSquare, Plus, X } from 'lucide-react';
+import { Info, LayoutGrid, MessageSquare, Plus, X } from '../ui/icons';
 import type { MediaKind } from '../../engine/types';
 import { nodeAttempt, nodeOutputAsset } from '../../engine/flow/graph';
 import { useNodeSelection } from '../../engine/flow/selection';

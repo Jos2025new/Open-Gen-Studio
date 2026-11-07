@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Check, ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from 'lucide-react';
+import { Check, ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { ImproveShotButton } from './ImproveShotButton';
 import { copyText, downloadAsset, editInComposer, toggleFavorite, regenerate, regenerateEstimate } from '../../engine/actions';
@@ -14,6 +14,7 @@ import { DownloadButton, FavoriteButton } from '../assets/AssetActions';
 import { GenerationInfo } from '../assets/GenerationInfo';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { StopFollowingPopover } from './StopFollowing';
+import { scrollBehavior } from '../../lib/theme';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { GenerationNotices } from './GenerationNotices';
 import { chatResults } from './GenerationCard';
@@ -21,7 +22,7 @@ import { chatResults } from './GenerationCard';
 /** A running placeholder opens the Generations board on Ongoing. */
 function showOngoing() {
   setStudioBoard({ open: true, view: 'assets' });
-  window.setTimeout(() => document.querySelector('.space-ongoing')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+  window.setTimeout(() => document.querySelector('.space-ongoing')?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }), 50);
 }
 
 /**

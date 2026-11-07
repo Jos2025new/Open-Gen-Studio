@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '../ui/icons';
 import { ensureSchema, opModelFor, videoOpFits } from '../../engine/catalog';
 import type { AdvancedValue } from '../../engine/types';
 import { useStore } from '../../store/store';

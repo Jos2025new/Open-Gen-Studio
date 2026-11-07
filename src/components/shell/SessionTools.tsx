@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, ChartNoAxesColumn, CircleAlert, CircleCheck, Clock, Coins, Ellipsis, Eye, EyeOff, Images, Loader, Pencil, Pin, PinOff, Sparkles, Trash } from 'lucide-react';
+import { Archive, ArchiveRestore, ChartNoAxesColumn, CircleAlert, CircleCheck, Clock, Coins, Ellipsis, Eye, EyeOff, Images, Loader, Pencil, Pin, PinOff, Sparkles, Trash } from '../ui/icons';
 import { setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { setUserHidden } from '../../store/userHidden';

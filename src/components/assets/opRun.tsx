@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '../ui/icons';
 import { opFollowsSource } from '../../engine/catalog';
 import { OPS, defaultOpParams } from '../../engine/ops';
 import { layerOpEstimate, opEstimate, runAssetOp, runLayerOp } from '../../engine/actions';

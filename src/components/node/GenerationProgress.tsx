@@ -1,4 +1,4 @@
-import { LoaderCircle } from 'lucide-react';
+import { LoaderCircle } from '../ui/icons';
 import { nodeAttempt } from '../../engine/flow/graph';
 import type { GraphNode } from '../../engine/types';
 import { useStore } from '../../store/store';

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Link2, Link2Off } from 'lucide-react';
+import { Link2, Link2Off } from '../ui/icons';
 import type { DesignDoc, Layer } from '../../engine/types';
 import { layerBox } from '../../engine/design/render';
 import { scaleLayer, translateLayer } from '../../engine/design/doc';

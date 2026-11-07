@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Copy, Layers } from 'lucide-react';
+import { ChevronDown, Copy, Layers } from '../ui/icons';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { copyText } from '../../engine/actions';

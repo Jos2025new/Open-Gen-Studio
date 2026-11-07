@@ -1,4 +1,4 @@
-import { RefreshCw, RotateCw } from 'lucide-react';
+import { RefreshCw, RotateCw } from '../ui/icons';
 import { planRecovery, planRecoveryProblem, resumePlan, type PlanRecoveryMode } from '../../engine/agent/runtime';
 import { dontAskAgain, withOncePass, overLimit, overLimitText } from '../../engine/budget';
 import { canRecheck, recheckGeneration, retryGeneration } from '../../engine/jobs';

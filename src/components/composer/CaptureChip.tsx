@@ -1,4 +1,4 @@
-import { Camera } from 'lucide-react';
+import { Camera } from '../ui/icons';
 import { DIRECTIVES, IMPERFECTIONS, LEGACY_PRESETS, TONES, presetById, presetsFor, type CaptureSel } from '../../engine/captureStyles';
 import type { GenSettings } from '../../engine/types';
 import { setComposerMedia, useStore } from '../../store/store';

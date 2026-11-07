@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { getBezierPath, Handle, Position, useInternalNode, useReactFlow, useViewport } from '@xyflow/react';
-import { Plus } from 'lucide-react';
+import { Plus } from '../ui/icons';
 import { addConnected } from '../../engine/flow/actions';
 import { GONE_HANDLE, NO_RESULT, resultHandle, runsGeneration } from '../../engine/flow/graph';
 import type { GraphNode, PortType } from '../../engine/types';

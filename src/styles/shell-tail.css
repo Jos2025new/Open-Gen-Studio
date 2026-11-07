@@ -1,0 +1,21 @@
+/* Last rules of shell.css (moved to keep shell.css within its size baseline); imported right after it, same cascade. */
+
+/* Settings → Shortcuts */
+.set-keys { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.set-keys dl { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.set-key-row { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: var(--fs-s); }
+.set-key-row dt { margin: 0; }
+.set-key-row dd { margin: 0; color: var(--text-2); }
+
+/* Top bar at large browser zoom: the right side may shrink instead of sliding over the canvas name. The tool options
+   (Designer) are what gives way, scrolling sideways; buttons and the rest keep their size. */
+.topbar-left { flex: 0 1 auto; min-width: 140px; max-width: 40%; }
+.topbar-left .title-btn { min-width: 0; }
+.topbar-right { flex-shrink: 1; min-width: 0; }
+.topbar-slot { flex: 1 1 auto; min-width: 0; }
+.topbar-slot > * { flex-shrink: 0; }
+.topbar-slot > .tool-settings { flex-shrink: 1; min-width: 110px; overflow-x: auto; }
+.topbar-right > :not(.topbar-slot) { flex-shrink: 0; }
+
+.ml-foot-icon.session-new { color: var(--new-text); background: var(--new-bg); border: 1px solid var(--new-line); }
+.ml-foot-icon.session-new:hover { color: var(--new-text); background: var(--new-hover); border-color: var(--new-line); }

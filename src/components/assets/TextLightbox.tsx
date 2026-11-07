@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { GenerationInfo } from './GenerationInfo';

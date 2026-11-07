@@ -1,5 +1,5 @@
-import { AudioLines, Brush, Captions, Clapperboard, Eraser, Film, FastForward, Image, Maximize2, Play, Scissors, Wand2, ChevronDown } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { AudioLines, Brush, Captions, Clapperboard, Eraser, Film, FastForward, Image, Maximize2, Play, Scissors, Wand2, ChevronDown } from '../../ui/icons';
+import type { LucideIcon } from '../../ui/icons';
 import { isConnected, modelSummary, opModelFor, pickImageEditModel, transcriberFor } from '../../../engine/catalog';
 import type { ModelSummary } from '../../../engine/types';
 import type { OpEngine } from '../../../engine/ops';

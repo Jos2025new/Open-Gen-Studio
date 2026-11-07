@@ -1,38 +1,38 @@
 /* Session info (top bar): sections with a small grey head and a count, rows of icon · label · value or status. */
 .session-info-pop { padding: 0; }
-.si-title { padding: 12px 14px 10px; font-size: 14px; font-weight: 550; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.si-title { padding: 12px 14px 10px; font-size: calc(14px * var(--text-scale, 1)); font-weight: 550; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .si-sec { padding: 8px 6px 6px; }
 .si-sec + .si-sec { border-top: 1px solid var(--border); }
-.si-sec h4 { margin: 0 8px 4px; font-size: 11px; font-weight: 500; color: var(--text-3); }
+.si-sec h4 { margin: 0 8px 4px; font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }
 .si-sec h4 .num { margin-left: 4px; }
-.si-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 8px; border-radius: 7px; font-size: 13px; color: var(--text-2); }
+.si-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 8px; border-radius: 7px; font-size: var(--fs-m); color: var(--text-2); }
 .si-row > svg:first-child { flex-shrink: 0; color: var(--text-3); }
 .si-row > span:not(.si-thumb) { flex: 1; min-width: 0; }
 .si-row > b { font-weight: 500; color: var(--text); }
 .si-gen-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.si-row .faint { flex: 0 0 auto !important; font-size: 11px; }
+.si-row .faint { flex: 0 0 auto !important; font-size: var(--fs-xs); }
 .si-ok { color: var(--ok); }
 .si-warn { color: var(--warn); }
 .si-thumb { flex-shrink: 0; width: 26px; height: 26px; border-radius: 5px; overflow: hidden; background: var(--surface-3); }
 .si-thumb img, .si-thumb video { width: 100%; height: 100%; object-fit: cover; }
-.si-more { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; padding: 0 8px; border-radius: 7px; font-size: 12px; color: var(--text-3); }
+.si-more { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; padding: 0 8px; border-radius: 7px; font-size: var(--fs-s); color: var(--text-3); }
 .si-more:hover { color: var(--text); }
-.si-empty { margin: 2px 8px 4px; font-size: 12px; color: var(--text-3); }
+.si-empty { margin: 2px 8px 4px; font-size: var(--fs-s); color: var(--text-3); }
 /* Two lines per run or result: what it was, then the small facts (model · aspect or size · when). */
 .si-two { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; padding: 4px 0; }
-.si-two small { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-two small { font-size: var(--fs-xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .si-thumb { width: 30px; height: 30px; }
 /* Usage as a mini dashboard: three figures, spend by type with thin bars, the budget counter (all sessions). */
 .si-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 2px 8px 8px; }
 .si-tile { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 8px; background: var(--surface-3); }
-.si-tile span { font-size: 11px; color: var(--text-3); }
-.si-tile b { font-size: 14px; font-weight: 600; color: var(--text); }
+.si-tile span { font-size: var(--fs-xs); color: var(--text-3); }
+.si-tile b { font-size: calc(14px * var(--text-scale, 1)); font-weight: 600; color: var(--text); }
 .si-bars { list-style: none; margin: 0 8px 6px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.si-bars li { display: grid; grid-template-columns: 1fr auto; row-gap: 3px; font-size: 12px; color: var(--text-2); }
-.si-bars small { color: var(--text-3); font-size: 11px; }
+.si-bars li { display: grid; grid-template-columns: 1fr auto; row-gap: 3px; font-size: var(--fs-s); color: var(--text-2); }
+.si-bars small { color: var(--text-3); font-size: var(--fs-xs); }
 .si-bars b { font-weight: 500; color: var(--text); }
 .si-bars i { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: var(--text-3); opacity: .55; }
-.si-budget { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin: 2px 8px 6px; font-size: 11px; color: var(--text-3); }
+.si-budget { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin: 2px 8px 6px; font-size: var(--fs-xs); color: var(--text-3); }
 .si-budget .num { text-align: right; color: var(--text-2); }
 .si-budget > i { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
 .si-budget > i > b { display: block; height: 100%; background: var(--accent); }

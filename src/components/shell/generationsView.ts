@@ -1,4 +1,4 @@
-import { Box, FileText, Film, Image as ImageIcon, Music } from 'lucide-react';
+import { Box, FileText, Film, Image as ImageIcon, Music } from '../ui/icons';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import type { Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';

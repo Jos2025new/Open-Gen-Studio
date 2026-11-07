@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from './icons';
 
 /**
  * Whether an agent model sees images, as its provider's catalog says. Without vision the agent cannot look at

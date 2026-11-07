@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, Eye, EyeOff, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Eye, EyeOff, Grid2X2, LayoutGrid, Maximize2, Minimize2, Pin, PinOff, Plus, Trash, X } from '../ui/icons';
 import { newSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';

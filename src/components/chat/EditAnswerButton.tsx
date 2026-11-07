@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react';
+import { Pencil } from '../ui/icons';
 import { canReopenCard, reopenCard } from '../../engine/agent/runtime';
 import { useStore } from '../../store/store';
 

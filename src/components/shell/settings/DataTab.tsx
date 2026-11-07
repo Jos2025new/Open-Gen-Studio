@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Brush, HardDrive, Keyboard, Paintbrush, Trash, TriangleAlert } from 'lucide-react';
+import { Brush, HardDrive, Keyboard, Paintbrush, Trash, TriangleAlert } from '../../ui/icons';
 import { setDrawingPreference } from '../../../engine/design/drawingChoice';
 import { shortcutGroups } from '../../../engine/shortcuts';
 import { useStore, wipeAllData } from '../../../store/store';

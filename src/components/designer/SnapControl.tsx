@@ -1,4 +1,4 @@
-import { ChevronDown, Magnet } from 'lucide-react';
+import { ChevronDown, Magnet } from '../ui/icons';
 import { snapOptsFor } from '../../engine/design/snap';
 import { activeDoc } from '../../engine/design/actions';
 import { paintModeOf } from '../../engine/design/paintMode';

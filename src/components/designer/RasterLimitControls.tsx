@@ -1,5 +1,5 @@
 import { useRef, useSyncExternalStore } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from '../ui/icons';
 import type { RasterLayer } from '../../engine/types';
 import { patchLayer } from '../../engine/design/actions';
 import {

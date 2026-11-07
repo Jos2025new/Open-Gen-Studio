@@ -1,5 +1,5 @@
-import { Bot, Box, Check, ChevronDown, Film, Image, Music } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Bot, Box, Check, ChevronDown, Film, Image, Music } from '../ui/icons';
+import type { LucideIcon } from '../ui/icons';
 import type { ComposerMode } from '../../engine/types';
 import { setComposer, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';

@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '../ui/icons';
 import { useStore } from '../../store/store';
 import { AGENT_ATTACHABLE, toggleAgentAttachment } from '../../engine/actions';
 

@@ -89,7 +89,7 @@
 .composer-tools-bar .tool-dock { position: static; flex: 1 1 auto; width: auto; }
 .composer-tools-bar .tool-dock-family { justify-content: space-between; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .composer-tools-bar .tool-dock-family .icon-btn { width: 40px; height: 40px; }
-.composer-tools-bar .tool-dock-family .icon-btn svg { width: 22px; height: 22px; }
+.composer-tools-bar .tool-dock-family .icon-btn svg { width: calc(22px * var(--text-scale, 1)); height: calc(22px * var(--text-scale, 1)); }
 /* Brush card (mockup): brush on the left, tabs on the right; all tabs share one cell so the card keeps its height. */
 .tool-dock-settings:has(.brush-card) { display: block; }
 .brush-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; min-height: 100%; }
@@ -107,13 +107,13 @@
 /* The panes share the tallest one's height: rows keep their own height and stack from the top instead of spreading out. */
 .brush-card-pane > * { flex: none; }
 .brush-card-pane { justify-content: flex-start; }
-.tool-dock-card .opt:not(.opt-presets):not(.is-icon):not(.paint-mode) { height: 36px; box-sizing: border-box; }
+.tool-dock-card .opt:not(.opt-presets):not(.is-icon):not(.paint-mode) { height: calc(36px*var(--text-scale)); box-sizing: border-box; }
 .brush-card .opt.opt-presets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .brush-card .opt-presets button { width: auto; }
 /* Hierarchy: the toolbox leads, the variant row follows (lighter, smaller); in both, only the active item is at full strength. */
 .tool-dock .tool-dock-variants { background: var(--bar-bg); box-shadow: none; padding: 3px; }
 .tool-dock .tool-dock-variants .icon-btn { width: 32px; height: 32px; }
-.tool-dock .tool-dock-variants .icon-btn svg { width: 18px; height: 18px; }
+.tool-dock .tool-dock-variants .icon-btn svg { width: calc(18px * var(--text-scale, 1)); height: calc(18px * var(--text-scale, 1)); }
 .tool-dock :is(.tool-dock-family, .tool-dock-variants) .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .55; transition: opacity .12s; }
 .tool-dock :is(.tool-dock-family, .tool-dock-variants) .icon-btn:not(.is-active):is(:hover, :focus-visible) { opacity: 1; }
 .tool-dock :is(.tool-dock-family, .tool-dock-variants) .icon-btn[aria-disabled="true"] { opacity: .3; }
@@ -161,7 +161,7 @@
 .ws-designer:has(.designer-side) { --designer-dock-left: max(84px, calc(var(--layers-w, 0px) + 24px), calc(50% - 400px)); }
 /* Designer, toolbox in the prompt box: Designs, Create and Conversation before the tools and the canvas view after them,
    in the bar's own size, as the side toolbox has them (ToolPalette's slots). */
-.composer-tools-bar :is(.designer-dock-start, .designer-dock-end, .tool-dock-family) .icon-btn svg { width: 19px; height: 19px; }
+.composer-tools-bar :is(.designer-dock-start, .designer-dock-end, .tool-dock-family) .icon-btn svg { width: calc(19px * var(--text-scale, 1)); height: calc(19px * var(--text-scale, 1)); }
 .composer-tools-bar .designer-view { position: static; flex-direction: row; gap: 3px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .composer-tools-bar .designer-view .zoom-value { height: 34px; min-height: 0; }
 /* Under the prompt box, opposite the workspace menu: tool help and where the toolbox sits. */
@@ -203,7 +203,7 @@
 .tool-dock-hide-prompt:is(:hover, :focus-visible) { color: var(--text); background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .tool-dock-hide-prompt[aria-pressed="true"] { color: var(--active-text); }
 .tool-dock-hide-prompt:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
-.tool-dock-hide-prompt.is-pill { position: absolute; z-index: 7; right: 0; bottom: 8px; width: 40px; height: 48px; background: var(--bar-bg); border: 1px solid var(--bar-line); box-shadow: var(--bar-shadow); }
+.tool-dock-hide-prompt.is-pill { position: absolute; z-index: 7; right: 0; bottom: 8px; width: 40px; height: calc(48px*var(--text-scale)); background: var(--bar-bg); border: 1px solid var(--bar-line); box-shadow: var(--bar-shadow); }
 /* Quick mode, in the subtoolbox: «, subtool icon, long Size and Opacity, color circle, Eraser, Settings. */
 .tool-dock-variants.is-fixed { gap: 8px; }
 .tool-dock-quick-sliders { display: flex; flex: 1 1 auto; gap: 12px; min-width: 0; }
@@ -243,7 +243,7 @@
 .composer-tools-rail .tool-dock-quick-sliders > * { flex: 0 1 140px; min-width: 112px; padding: 0 6px; }
 .composer-tools-rail .tool-dock-quick-sliders .opt-readout { margin-inline: auto; }
 .composer-tools-rail .tool-dock-variants.is-fixed .opt-color.is-icon { flex: 0 0 28px; width: 28px; height: 28px; align-self: center; }
-.composer-tools-rail .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: 36px; white-space: nowrap; }
+.composer-tools-rail .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: calc(36px*var(--text-scale)); white-space: nowrap; }
 /* Colors that belong together share one capsule; the toggle turns the second on. */
 .quick-color-pair { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 36px; padding: 0 4px; background: var(--field-bg); border-radius: 18px; }
 .quick-color-pair .opt-toggle { height: auto; padding: 0 2px; background: transparent; border: 0; }

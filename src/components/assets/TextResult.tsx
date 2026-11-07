@@ -1,4 +1,4 @@
-import { Copy, Music } from 'lucide-react';
+import { Copy, Music } from '../ui/icons';
 import type { Generation } from '../../engine/types';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { applyLyrics, copyText } from '../../engine/actions';

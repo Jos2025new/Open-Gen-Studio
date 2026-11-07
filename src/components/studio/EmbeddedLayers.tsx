@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 import { patchLayer, setActiveLayer } from '../../engine/design/actions';
 import { layerSelection, pickLayer, pickLayerRange, useLayerSelection } from '../../engine/design/selection';

@@ -1,4 +1,4 @@
-import { ArrowUp, CircleStop } from 'lucide-react';
+import { ArrowUp, CircleStop } from '../ui/icons';
 import { stopAgent } from '../../engine/agent/runtime';
 
 export function AgentSend({ busy, canSend, submit }: { busy: boolean; canSend: boolean; submit: () => void }) {

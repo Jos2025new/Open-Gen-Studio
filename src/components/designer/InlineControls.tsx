@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '../ui/icons';
 import { MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { useStore } from '../../store/store';

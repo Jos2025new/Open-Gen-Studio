@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Crop } from 'lucide-react';
+import { Crop } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import { ANCHORS, MAX_SIDE, resizeCanvas, trimToContent, type Anchor } from '../../engine/design/canvasSize';
 import { FORMAT_PRESETS, PAGE_UNITS, DEFAULT_DPI, orientationOf, presetPx, pxToUnit, unitToPx, type Orientation, type PageUnit } from '../../engine/design/pageUnits';

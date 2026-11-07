@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Circle, MoveHorizontal, Square } from 'lucide-react';
+import { Circle, MoveHorizontal, Square } from '../ui/icons';
 import type { GradientPaint, GradientStop } from '../../engine/shapeSpec';
 import type { VectorShape } from '../../engine/types';
 import { defaultGradient } from '../../engine/design/gradientPaint';

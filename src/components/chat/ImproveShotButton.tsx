@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles } from '../ui/icons';
 import { improveEstimate, improvePlan, improveShot } from '../../engine/improveShot';
 import type { Estimate, Generation } from '../../engine/types';
 import { Popover, usePopover } from '../ui/Popover';

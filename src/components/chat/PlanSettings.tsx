@@ -1,4 +1,4 @@
-import { WandSparkles } from 'lucide-react';
+import { WandSparkles } from '../ui/icons';
 import { changePlanChoice, changePlanDraft, planDraft, promptWriterOn, rewritePrompts, setPromptWriter, usePlanRewrite, type GenKind } from '../../engine/agent/planSettings';
 import type { PlanFeedItem, SettingsSection } from '../../engine/types';
 import { useStore } from '../../store/store';

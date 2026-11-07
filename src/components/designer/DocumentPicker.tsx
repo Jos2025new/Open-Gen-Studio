@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import { selectDoc } from '../../engine/design/actions';
 import { drawDoc } from '../../engine/design/render';

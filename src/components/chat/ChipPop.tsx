@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '../ui/icons';
 import { Popover, usePopover } from '../ui/Popover';
 
 /** A setting chip (icon + value) that opens its choices in a popover rising directly above it. */

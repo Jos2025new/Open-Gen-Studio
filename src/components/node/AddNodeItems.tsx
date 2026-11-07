@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Box, ChevronRight, FileImage, Film, Image as ImageIcon, Music, Search, Type, Upload, Wand, type LucideIcon } from 'lucide-react';
+import { Box, ChevronRight, FileImage, Film, Image as ImageIcon, Music, Search, Type, Upload, Wand, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';

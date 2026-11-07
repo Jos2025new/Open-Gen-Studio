@@ -1,4 +1,4 @@
-import { ChevronDown, Scissors, SquaresExclude, SquaresIntersect, SquaresSubtract, SquaresUnite, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Scissors, SquaresExclude, SquaresIntersect, SquaresSubtract, SquaresUnite, type LucideIcon } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import { setUi } from '../../store/store';
 import { useObjectSelection } from '../../engine/design/objectSelection';

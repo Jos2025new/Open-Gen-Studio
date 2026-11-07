@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Sparkles, Wrench, type LucideIcon } from 'lucide-react';
+import { ChevronDown, Sparkles, Wrench, type LucideIcon } from '../ui/icons';
 import { useStore } from '../../store/store';
 import { usePref } from '../ui/hooks';
 import { Popover, usePopover } from '../ui/Popover';

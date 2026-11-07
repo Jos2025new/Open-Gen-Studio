@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { scrollBehavior } from '../../lib/theme';
+import { ChevronsLeft, ChevronsRight } from '../ui/icons';
 
 /** A row that scrolls sideways, with « » only while something is out of view. */
 export function ScrollRail({ className = '', backLabel, onLabel, children }: { className?: string; backLabel: string; onLabel: string; children: ReactNode }) {
@@ -19,7 +20,7 @@ export function ScrollRail({ className = '', backLabel, onLabel, children }: { c
     for (const child of r.children) observer.observe(child);
     return () => observer.disconnect();
   });
-  const nudge = (by: number) => rail.current?.scrollBy({ left: by, behavior: 'smooth' });
+  const nudge = (by: number) => rail.current?.scrollBy({ left: by, behavior: scrollBehavior() });
   return <>
     {can.back ? <button type="button" className="composer-strip-nudge" aria-label={backLabel} onClick={() => nudge(-160)}><ChevronsLeft size={14} /></button> : null}
     <div ref={rail} className={`composer-strip-rail ${className}`} onScroll={measure}>{children}</div>

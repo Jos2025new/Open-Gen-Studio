@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDownToLine, Check, X } from 'lucide-react';
+import { ArrowDownToLine, Check, X } from './icons';
 import { AssetMedia } from './AssetMedia';
 import { Popover, PopoverHeader, usePopover } from './Popover';
 import { Button, IconButton } from './primitives';

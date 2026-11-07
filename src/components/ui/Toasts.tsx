@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info, X } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, X } from './icons';
 import { dismissToast, useStore } from '../../store/store';
 
 export function Toasts() {

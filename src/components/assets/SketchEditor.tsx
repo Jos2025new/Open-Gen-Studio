@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Brush, Eraser, Redo2, Undo2, WandSparkles, X } from 'lucide-react';
+import { Brush, Eraser, Redo2, Undo2, WandSparkles, X } from '../ui/icons';
 import { opEstimate, runAssetOp } from '../../engine/actions';
 import { opModelFor } from '../../engine/catalog';
 import { assetCanvas, canvasToAsset } from '../../engine/design/actions';

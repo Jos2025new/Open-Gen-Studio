@@ -42,11 +42,11 @@ export function ColorChannels({ value, hue, onHueChange, onChange, alpha, onAlph
     </label>}
     <div className="color-fields" style={{ display: 'flex', gap: 6 }}>
       {fields.map(([short, name, v, max, index]) => <label key={short} title={`${name} (0–${max})`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-        <span className="muted" style={{ fontSize: 11 }}>{short}</span>
+        <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>{short}</span>
         <input className="color-num" type="number" min={0} max={max} step={1} aria-label={name} value={Math.round(v)} style={{ width: '100%', minWidth: 0 }} onChange={(e) => setChannel(index, e.target.value)} />
       </label>)}
       {onAlphaChange && alpha !== undefined && <label title="Opacity (0–100)" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-        <span className="muted" style={{ fontSize: 11 }}>A</span>
+        <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>A</span>
         <input className="color-num" type="number" min={0} max={100} step={1} aria-label="A" value={alpha} style={{ width: '100%', minWidth: 0 }} onChange={(e) => { const v = parseIntRange(e.target.value, 100); if (v !== null) onAlphaChange(v); }} />
       </label>}
     </div>

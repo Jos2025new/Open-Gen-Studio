@@ -4,6 +4,6 @@
 .switch-row.is-selecting .session-check { width: 18px; opacity: 1; margin-right: 0; border-width: 1px; }
 /* A short search, then the actions on the same row: the workspace's (Import from Chat…), select several, new session. */
 .switch-head { gap: 2px; }
-.switch-head .ml-search { padding: 3px 8px; margin-right: 4px; font-size: 12px; }
-.switch-head .ml-search input { font-size: 12px; }
+.switch-head .ml-search { padding: 3px 8px; margin-right: 4px; font-size: var(--fs-s); }
+.switch-head .ml-search input { font-size: var(--fs-s); }
 .switch-actions { display: contents; }

@@ -1,5 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
-import { AudioLines, Box, Clock, Copy, Download, Eye, EyeOff, FileText, Film, MessageSquare, Paperclip, RotateCcw, Star, Trash } from 'lucide-react';
+import { AudioLines, Box, Clock, Copy, Download, Eye, EyeOff, FileText, Film, MessageSquare, Paperclip, RotateCcw, Star, Trash } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { copyText, deleteAssets, downloadAsset, toggleFavorite } from '../../engine/actions';
 import { canReuse, reuseGeneration } from '../../store/reuse';

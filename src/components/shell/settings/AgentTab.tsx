@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bot, Box, Brain, Eye, Check, ChevronDown, Cpu, Gauge, Lightbulb, ListChecks, MessagesSquare, Search, Sparkles } from 'lucide-react';
+import { Bot, Box, Brain, Eye, Check, ChevronDown, Cpu, Gauge, Lightbulb, ListChecks, MessagesSquare, Search, Sparkles } from '../../ui/icons';
 import { loadLlmCatalog, pickAgentModel, repickAgentModel } from '../../../engine/catalog';
 import { LLM_LABELS, LLM_TIERS, filterLlm, limitedLlmFallback, llmMakers, type LlmCapability, type LlmModel, type LlmSort } from '../../../engine/providers/llm';
 import type { LlmProviderId } from '../../../engine/types';

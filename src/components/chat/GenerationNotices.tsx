@@ -1,4 +1,4 @@
-import { CircleAlert, Info } from 'lucide-react';
+import { CircleAlert, Info } from '../ui/icons';
 import type { Generation } from '../../engine/types';
 
 /** What came back differs from what was asked, and what the app did on its own: shown wherever a result is shown. */

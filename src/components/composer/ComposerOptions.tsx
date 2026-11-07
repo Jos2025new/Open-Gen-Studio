@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Bot, Check, ChevronRight, FolderOpen, Paperclip, Plus } from 'lucide-react';
+import { Bot, Check, ChevronRight, FolderOpen, Paperclip, Plus } from '../ui/icons';
 import { MODES } from './ModeMenu';
 import { AssetMedia } from '../ui/AssetMedia';
 import { ALL_TOOLS, isListed, openLibrary, openTool } from '../shell/navModel';

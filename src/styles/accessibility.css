@@ -1,0 +1,50 @@
+/* Look → Accessibility: text size, reduce motion and a stronger focus outline. Classes and attributes come from
+   src/lib/theme.ts (and the pre-paint script in index.html). */
+
+/* Icons sized by a numeric `size` prop carry --icon-size (src/components/ui/icon-core.tsx), never inline width/height. This
+   rule has zero specificity, so any stylesheet rule that sizes the icon (var(--control-icon), a fixed px) still wins. */
+:where(svg[style*="--icon-size"]) {
+  width: calc(var(--icon-size) * var(--text-scale, 1));
+  height: calc(var(--icon-size) * var(--text-scale, 1));
+}
+
+/* Text size: the app sets its sizes in px, so html[data-text-scale] (with --text-scale on <html>) multiplies the font-size
+   tokens and the body size instead of zooming; sizes written as literal px in a component rule do not follow it. */
+html[data-text-scale] {
+  --fs-xs: calc(11px * var(--text-scale));
+  --fs-s: calc(12px * var(--text-scale));
+  --fs-m: calc(13px * var(--text-scale));
+  --fs-l: calc(15px * var(--text-scale));
+  --fs-xl: calc(20px * var(--text-scale));
+  --fs-title: calc(16px * var(--text-scale));
+  --fs-chat: calc(15px * var(--text-scale));
+  /* Icon and control/bar sizes follow Text size too (tokens.css values), so icons and fixed-height rows keep up with the text. */
+  --control-h: calc(32px * var(--text-scale));
+  --control-icon: calc(18px * var(--text-scale));
+  --feed-icon: calc(13px * var(--text-scale));
+  --slider-thumb: calc(14px * var(--text-scale));
+  --topbar-h: calc(48px * var(--text-scale));
+}
+html[data-text-scale] .icon-btn-sm { width: calc(27px * var(--text-scale)); height: calc(27px * var(--text-scale)); }
+html[data-text-scale] .icon-btn-lg { width: calc(38px * var(--text-scale)); height: calc(38px * var(--text-scale)); }
+
+/* Fixed px heights on text controls are written as calc(Npx * var(--text-scale, 1)) in each stylesheet (scripts/find-fixed-text-heights.mjs
+   lists any that don't), so rows grow with the text from 112.5 % on. */
+
+/* Reduce motion: on by default when the OS asks for it (base.css), or when the user switches it on. */
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+/* Stronger focus outline: thick, in the highlight colour, drawn inset (-3px) so a parent with overflow: hidden doesn't clip
+   it. On controls filled with the highlight colour an inset accent line would vanish: there it takes the ink used on the highlight colour. */
+html.focus-strong :focus-visible {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: -3px !important;
+}
+html.focus-strong :is(.btn-primary, .send-btn, .notice-retry.is-primary, .cc-ratio.is-on):focus-visible { outline-color: var(--accent-ink, var(--bg)) !important; }

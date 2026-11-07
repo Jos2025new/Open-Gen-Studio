@@ -2,7 +2,7 @@ import { ReuseButton } from '../assets/ReuseButton';
 import { TextTile } from '../assets/TextTile';
 import { useEta } from '../ui/useEta';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, ListFilter, Eye, EyeOff, Star } from 'lucide-react';
+import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, ListFilter, Eye, EyeOff, Star } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind, Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';

@@ -1,4 +1,4 @@
-import { PanelRight } from 'lucide-react';
+import { PanelRight } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 import { setStudioBoard, useStudioBoard } from '../../lib/studioBoard';
 

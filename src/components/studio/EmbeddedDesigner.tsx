@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Hand, Maximize, Minus, MousePointer2, Plus, Redo2, Undo2 } from 'lucide-react';
+import { Hand, Maximize, Minus, MousePointer2, Plus, Redo2, Undo2 } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 import { Stage } from '../designer/Stage';
 import { designerKey } from '../designer/designerKeys';

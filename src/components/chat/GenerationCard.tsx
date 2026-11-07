@@ -1,7 +1,7 @@
 import { TextResult } from '../assets/TextResult';
 import { useEta } from '../ui/useEta';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
+import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { StopFollowingPopover } from './StopFollowing';

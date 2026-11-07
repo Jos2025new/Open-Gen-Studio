@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, EllipsisVertical, Search, X, type LucideIcon } from 'lucide-react';
+import { Check, ChevronDown, EllipsisVertical, Search, X, type LucideIcon } from './icons';
 import { Button, IconButton, Segmented, Toggle } from './primitives';
 import { InlineSlider } from '../designer/InlineControls';
 import { Popover, PopoverHeader, usePopover } from './Popover';

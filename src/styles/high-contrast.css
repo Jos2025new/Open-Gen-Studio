@@ -1,0 +1,28 @@
+/* High contrast (Look → Accessibility → Contrast, html[data-contrast="high"]): the inverse of soft-contrast.css, one rule
+   over every base. Soft pulls surfaces and borders toward an anchor; High pushes text and borders away from it, toward
+   full ink (--hc-ink: white on the dark bases, black on Light and White). The text steps blend toward ink and keep a
+   share of their own value: --text-2 15 %, --text-3 25 %, --text-4 35 %, so muted text reads at 4.5:1 or better on every
+   surface; --text itself is full ink. Borders take 40 % (border), 60 % (strong) and 80 % (focus) of the way to ink.
+   Surfaces, accents and the bases themselves are untouched.
+   Same mechanism as soft: html captures the base's values (--raw-*) and body redefines the tokens from them. */
+html[data-contrast="high"] {
+  --hc-ink: #fff;
+  --raw-text: var(--text); --raw-text-2: var(--text-2); --raw-text-3: var(--text-3); --raw-text-4: var(--text-4);
+  --raw-border: var(--border); --raw-border-strong: var(--border-strong); --raw-border-focus: var(--border-focus);
+}
+html[data-contrast="high"][data-base="claro"], html[data-contrast="high"][data-base="blanco"] { --hc-ink: #000; }
+html[data-contrast="high"] body {
+  --text: var(--hc-ink);
+  --text-2: color-mix(in oklab, var(--hc-ink) 85%, var(--raw-text-2));
+  --text-3: color-mix(in oklab, var(--hc-ink) 75%, var(--raw-text-3));
+  --text-4: color-mix(in oklab, var(--hc-ink) 65%, var(--raw-text-4));
+  --text-content: var(--hc-ink);
+  --border: color-mix(in oklab, var(--hc-ink) 40%, var(--raw-border));
+  --border-strong: color-mix(in oklab, var(--hc-ink) 60%, var(--raw-border-strong));
+  --border-focus: color-mix(in oklab, var(--hc-ink) 80%, var(--raw-border-focus));
+  /* Tokens tokens.css derives from the ones above resolve on html; they are restated here so they read the strengthened set. */
+  --panel-line: var(--border-strong); --panel-line-focus: var(--border-focus);
+  --new-line: var(--border-strong); --new-text: var(--text); --active-text: var(--text); --money: var(--text);
+  --frame-border: var(--border);
+  --field-fill: color-mix(in srgb, var(--text) 10%, transparent);
+}

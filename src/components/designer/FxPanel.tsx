@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Contrast, Layers as LayersIcon, Sparkles, Trash } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Contrast, Layers as LayersIcon, Sparkles, Trash } from '../ui/icons';
 import type { DesignDoc, Layer } from '../../engine/types';
 import type { FxGroup, FxLayer, FxOp } from '../../engine/fx/types';
 import { FX_DEFS, fxKindsOf, type FxParam } from '../../engine/fx/defs';

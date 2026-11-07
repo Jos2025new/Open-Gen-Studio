@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Archive, ArchiveRestore, Box, Eye, EyeOff, Image, MessageSquare, Music, Pencil, PenTool, Pin, PinOff, Trash, Video, Workflow } from 'lucide-react';
+import { Archive, ArchiveRestore, Box, Eye, EyeOff, Image, MessageSquare, Music, Pencil, PenTool, Pin, PinOff, Trash, Video, Workflow } from '../ui/icons';
 import { renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { isRunning } from '../../engine/jobs';

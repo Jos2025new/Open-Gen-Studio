@@ -1,5 +1,5 @@
 import { useRef, type FormEvent } from 'react';
-import { ArrowRight, Paperclip, X } from 'lucide-react';
+import { ArrowRight, Paperclip, X } from '../ui/icons';
 import { setComposer, setUi, useStore } from '../../store/store';
 import { agentAccepts } from '../../engine/agent/sendGate';
 import { attachFiles } from '../../engine/actions';

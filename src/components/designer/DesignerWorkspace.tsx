@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { AspectGlyph } from '../composer/MediaControls';
-import { ArrowUpFromLine, Images, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
+import { ArrowUpFromLine, Images, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from '../ui/icons';
 import { useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
@@ -97,7 +97,7 @@ export function DesignerWorkspace() {
         <DocBackgroundChoice />
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
-      {doc && trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 11, alignSelf: 'center' }}>History trimmed</span>}
+      {doc && trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 'var(--fs-xs)', alignSelf: 'center' }}>History trimmed</span>}
     </TopbarActions>
     <TopbarActions>
       {doc && <SelectionChip docId={doc.id} />}

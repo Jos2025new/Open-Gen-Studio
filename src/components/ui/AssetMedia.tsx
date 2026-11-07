@@ -1,6 +1,6 @@
 import { ensureModelThumbnail, thumbStale } from '../../lib/model3dThumb';
 import { useRef, useState } from 'react';
-import { AudioLines, ImageOff, Box, Play } from 'lucide-react';
+import { AudioLines, ImageOff, Box, Play } from './icons';
 import { useStore } from '../../store/store';
 import { formatDuration } from '../../lib/format';
 import { useAssetSource } from './hooks';

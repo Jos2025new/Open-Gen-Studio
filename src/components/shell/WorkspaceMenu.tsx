@@ -1,4 +1,4 @@
-import { MessageSquare, PenTool, Workflow, type LucideIcon } from 'lucide-react';
+import { MessageSquare, PenTool, Workflow, type LucideIcon } from '../ui/icons';
 import type { Workspace } from '../../engine/types';
 
 export const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: string }> = [

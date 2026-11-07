@@ -1,4 +1,5 @@
 :root {
+  --text-scale: 1;
   color-scheme: dark;
 
   /* Surfaces: near-black neutrals, one step apart. */

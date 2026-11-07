@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from '../ui/icons';
 import { aspectLabel, ratioOf } from '../../engine/params';
 
 /** Width and height of a true-proportion shape whose longest side is `max` px (never distorted by a minimum). */

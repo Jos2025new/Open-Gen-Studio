@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus } from '../ui/icons';
 import { normalizeStructured, type PaletteValue } from '../../engine/params';
 import type { MediaKind, ParamDef, SavedStyle } from '../../engine/types';
 import { createRecraftStyle } from '../../engine/actions';

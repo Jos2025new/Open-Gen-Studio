@@ -48,25 +48,25 @@ it('each section groups its rows under titled cards, and rows lead with an icon'
 
 it('Look shows each base as a small picture in its own colours; System shows dark and light halves', () => {
   tab('Look');
-  expect(groups()).toEqual(['Theme']);
+  expect(groups()).toEqual(['Theme', 'Accessibility']);
   const thumbs = [...host.querySelectorAll('.theme-thumb')];
   expect(thumbs.map((t) => t.textContent)).toEqual(['System', 'Atlas', 'Graphite', 'Light', 'White', 'Original (old)']);
   expect([...thumbs[0].querySelectorAll('.theme-mini')].map((m) => m.getAttribute('data-base'))).toEqual(['atlas', 'claro']);
   expect(thumbs[2].querySelector('.theme-mini')?.getAttribute('data-base')).toBe('grafito');
 });
 
-it('Soft contrast is one on/off rule for every base: the toggle sets html[data-contrast], is remembered, and the pre-paint script restores it', () => {
+it('Soft contrast is one rule for every base: the Contrast choice sets html[data-contrast], is remembered, and the pre-paint script restores it', () => {
   tab('Look');
-  const toggle = host.querySelector<HTMLElement>('[role="switch"][aria-label="Soft contrast"]')!;
-  expect(toggle.getAttribute('aria-checked')).toBe('false');
-  act(() => toggle.click());
+  const choice = (name: string) => [...host.querySelectorAll<HTMLElement>('[role="radio"]')].find((b) => b.textContent === name)!;
+  expect(choice('Normal').getAttribute('aria-checked')).toBe('true');
+  act(() => choice('Soft').click());
   expect(document.documentElement.getAttribute('data-contrast')).toBe('soft');
   expect(localStorage.getItem('ogs-contrast')).toBe('soft');
   const script = /<script>([\s\S]*?)<\/script>/.exec(readFileSync('index.html', 'utf8'))?.[1] ?? '';
   const got: Record<string, string> = {};
   new Function('document', 'localStorage', 'matchMedia', script)({ documentElement: { setAttribute: (k: string, v: string) => (got[k] = v) } }, localStorage, matchMedia);
   expect(got['data-contrast']).toBe('soft');
-  act(() => toggle.click());
+  act(() => choice('Normal').click());
   expect(document.documentElement.hasAttribute('data-contrast')).toBe(false);
   expect(localStorage.getItem('ogs-contrast')).toBeNull();
 });
@@ -80,7 +80,7 @@ it('the soft rule only moves surfaces, borders and what derives from them: never
 
 it('the brightness hierarchy dims and shrinks the frame icons, steps the composer and bubble up, and lifts conversation text', () => {
   const css = readFileSync('src/styles/hierarchy.css', 'utf8');
-  expect(css).toMatch(/\.side-btn svg \{ width: 16px; height: 16px; \}/);
+  expect(css).toMatch(/\.side-btn svg \{ width: calc\(16px \* var\(--text-scale, 1\)\); height: calc\(16px \* var\(--text-scale, 1\)\); \}/);
   expect(css).toMatch(/:not\(:hover\)[^{]*svg \{ color: var\(--text-3\); \}/);
   expect(css).toMatch(/:root \.composer \{ background: var\(--bar-bg\); \}/);
   expect(css).toMatch(/:root \.bubble \{ background: var\(--surface-2\); \}/);
@@ -90,7 +90,7 @@ it('the brightness hierarchy dims and shrinks the frame icons, steps the compose
 
 it('the top bar follows the same hierarchy: a brighter, larger title, one icon size, dimmed icons', () => {
   const css = readFileSync('src/styles/hierarchy.css', 'utf8');
-  expect(css).toMatch(/\.session-title-btn \{ color: var\(--text\); font-size: 14px/);
-  expect(css).toMatch(/\.topbar-right > \.icon-btn \{ width: 30px; height: 30px; color: var\(--text-3\); \}/);
-  expect(css).toMatch(/\.topbar-menu \{ height: 30px; padding: 0 10px; font-size: 13px/);
+  expect(css).toMatch(/\.session-title-btn \{ color: var\(--text\); font-size: calc\(14px \* var\(--text-scale, 1\)\)/);
+  expect(css).toMatch(/\.topbar-right > \.icon-btn \{ width: calc\(30px \* var\(--text-scale, 1\)\); height: calc\(30px \* var\(--text-scale, 1\)\); color: var\(--text-3\); \}/);
+  expect(css).toMatch(/\.topbar-menu \{ height: calc\(30px\*var\(--text-scale\)\); padding: 0 10px; font-size: var\(--fs-m\)/);
 });

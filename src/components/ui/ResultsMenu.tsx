@@ -1,4 +1,4 @@
-import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { ChevronDown, type LucideIcon } from './icons';
 import type { ReactNode } from 'react';
 import { Popover, usePopover } from './Popover';
 import './ResultsMenu.css';

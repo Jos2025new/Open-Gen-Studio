@@ -1,5 +1,5 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { Maximize, Minus, Plus } from 'lucide-react';
+import { Maximize, Minus, Plus } from '../ui/icons';
 import { IconButton } from '../ui/primitives';
 
 /** The embedded node canvas's only controls: zoom and fit. */

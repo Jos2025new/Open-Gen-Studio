@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Activity, Flag, Square } from 'lucide-react';
+import { Activity, Flag, Square } from '../ui/icons';
 import { mark, onTraceChange, startTrace, stopTrace, traceFromUrl, traceStatus } from '../../lib/trace';
 import { toast } from '../../store/store';
 

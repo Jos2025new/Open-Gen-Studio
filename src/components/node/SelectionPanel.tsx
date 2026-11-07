@@ -1,5 +1,5 @@
 import { Panel } from '@xyflow/react';
-import { Brush, Download, Paperclip, RectangleHorizontal, X, type LucideIcon } from 'lucide-react';
+import { Brush, Download, Paperclip, RectangleHorizontal, X, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { addConnected, newNodeData } from '../../engine/flow/actions';
 import { outputPort } from '../../engine/flow/graph';

@@ -23,7 +23,7 @@ function mockMedia() {
 let host: HTMLDivElement;
 let root: Root;
 const mount = () => act(() => root.render(createElement(AppearanceSection)));
-const radios = () => [...host.querySelectorAll<HTMLButtonElement>('[role=radio]')];
+const radios = () => [...host.querySelectorAll<HTMLButtonElement>('.theme-thumb[role=radio]')];
 const swatches = () => [...host.querySelectorAll<HTMLButtonElement>('.accent-swatch')];
 
 beforeEach(() => {

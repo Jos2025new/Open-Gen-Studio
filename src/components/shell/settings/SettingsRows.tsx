@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from '../../ui/icons';
 
 /** A titled group of Settings rows: a small head (icon and title) over one framed card; rows inside are split by hairlines. */
 export function SetGroup({ icon: Icon, title, children }: { icon?: LucideIcon; title?: string; children: ReactNode }) {

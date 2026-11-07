@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { ChevronDown, MessageSquare } from 'lucide-react';
+import { ChevronDown, MessageSquare } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { FeedList, NoticeView } from '../chat/FeedList';
 

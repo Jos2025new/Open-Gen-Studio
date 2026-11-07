@@ -2,7 +2,7 @@ import { ModelBrandIcon } from '../ui/ModelBrandIcon';
 import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import { filterLlm, llmMaker, llmMakers, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Search } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Search } from '../ui/icons';
 import { useState } from 'react';
 import { modelSummary, pickComposerModel, preferredModel, resetAgentModel, resetComposerModel } from '../../engine/catalog';
 import type { ModelSummary } from '../../engine/types';

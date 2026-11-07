@@ -1,4 +1,4 @@
-import { Check, ChevronDown, KeyRound, Plus } from 'lucide-react';
+import { Check, ChevronDown, KeyRound, Plus } from '../ui/icons';
 import type { RemoteProviderId } from '../../engine/types';
 import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';

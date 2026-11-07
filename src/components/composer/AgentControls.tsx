@@ -1,4 +1,4 @@
-import { Check, ChevronDown, GitBranch, Sparkles, X } from 'lucide-react';
+import { Check, ChevronDown, GitBranch, Sparkles, X } from '../ui/icons';
 import { SKILLS, WORKFLOWS, skillById, workflowById } from '../../engine/skills';
 import type { AgentStyle } from '../../engine/types';
 import { setComposer, useStore } from '../../store/store';

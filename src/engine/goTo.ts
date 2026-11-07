@@ -2,6 +2,7 @@ import { canvasIndex } from './canvas';
 import { focusNodes } from './flow/selection';
 import { selectDoc, setActiveLayer } from './design/actions';
 import type { Generation, Workspace } from './types';
+import { scrollBehavior } from '../lib/theme';
 import { placeLabel } from './place';
 import { selectSession, setUi, useStore } from '../store/store';
 
@@ -67,7 +68,7 @@ export function goToGeneration(g: Generation): void {
     window.setTimeout(() => {
       const el = document.getElementById(`gen-${g.id}`);
       if (!el) return;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
       el.classList.add('is-flash');
       window.setTimeout(() => el.classList.remove('is-flash'), 1600);
     }, 120);

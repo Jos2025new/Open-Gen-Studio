@@ -1,4 +1,4 @@
-import { Box, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, type LucideIcon } from 'lucide-react';
+import { Box, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, type LucideIcon } from '../ui/icons';
 import type { AssetKind, ComposerMode, OpId, Workspace } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
 import { newSession, setComposer, setUi } from '../../store/store';

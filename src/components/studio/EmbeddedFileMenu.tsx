@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ArrowUpFromLine, ChevronLeft, FilePlus2, FileText, FolderOpen, Images, ImagePlus } from 'lucide-react';
+import { ArrowUpFromLine, ChevronLeft, FilePlus2, FileText, FolderOpen, Images, ImagePlus } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';

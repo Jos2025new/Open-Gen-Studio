@@ -10,7 +10,7 @@ import { setRuler } from '../../engine/design/strokeRuler';
 import { setUi, useStore } from '../../store/store';
 import { SelectionQuick } from './SelectionActions';
 import { AutoSelectToggle, EditModeToggle, SELECT_MODES, WAND_DEFAULT } from './ToolSettings';
-import { Layers } from 'lucide-react';
+import { Layers } from '../ui/icons';
 import { FlowMenu, BlendMenu, LockAlphaButton } from './BrushQuick';
 import { ColorPair } from './ColorPair';
 import { FillGapField, FillSourceField } from './FillSettings';

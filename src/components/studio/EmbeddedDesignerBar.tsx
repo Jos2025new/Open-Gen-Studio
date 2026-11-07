@@ -1,4 +1,4 @@
-import { Brush as BrushIcon, Circle, Layers as LayersIcon } from 'lucide-react';
+import { Brush as BrushIcon, Circle, Layers as LayersIcon } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { IconButton } from '../ui/primitives';

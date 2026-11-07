@@ -2,7 +2,7 @@ import { ComposerAlerts } from './ComposerAlerts';
 import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
 import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowUp, Layers, Pencil, X, Zap } from 'lucide-react';
+import { ArrowUp, Layers, Pencil, X, Zap } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';

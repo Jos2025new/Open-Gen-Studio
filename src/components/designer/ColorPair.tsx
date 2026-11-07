@@ -1,4 +1,4 @@
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { secondaryOf, setSecondary, swapColors } from '../../engine/design/colorPair';
 import { InlineColor } from './InlineControls';

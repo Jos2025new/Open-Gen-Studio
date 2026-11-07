@@ -1,6 +1,6 @@
 import { AgentAttachToggle } from './AgentAttachToggle';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Activity, ChevronDown, ChevronRight, Copy, Info, RefreshCw, Sparkles, Wrench } from 'lucide-react';
+import { Activity, ChevronDown, ChevronRight, Copy, Info, RefreshCw, Sparkles, Wrench } from '../ui/icons';
 import { checkJobsNow } from '../../engine/providers/shared';
 import { traceOf, useJobTrace } from '../../engine/jobTrace';
 import { OPS } from '../../engine/ops';
