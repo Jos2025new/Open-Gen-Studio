@@ -61,7 +61,9 @@ export function bakeStroke(s: Stroke): Stroke {
 const locals = new WeakMap<object, { key: string; local: number[][]; path?: Path2D }>();
 
 function localEntry(s: Stroke): { key: string; local: number[][]; path?: Path2D } {
-  const key = JSON.stringify(s, (k, v) => (k === 'points' || k === 'matrix' || k === 'id' ? undefined : v));
+  // The point count is part of the key: a gesture's array grows while it is drawn, and an outline cached from its
+  // first points must not stand for the finished stroke.
+  const key = s.points.length + JSON.stringify(s, (k, v) => (k === 'points' || k === 'matrix' || k === 'id' ? undefined : v));
   const hit = locals.get(s.points);
   if (hit?.key === key) return hit;
   const e = { key, local: nibActive(s) ? nibStrokeOutline(s.points, strokeOptions(s), s) : getStroke(s.points, strokeOptions(s)) };
@@ -128,10 +130,11 @@ export function strokeBox(s: Stroke): Box | null {
   return b;
 }
 
+// The outline and the path together: with few, far-apart points perfect-freehand can return an outline collapsed
+// at the start, and a box from it alone cut textured strokes (drawn from their path) to a dot.
 function scanBox(s: Stroke): Box | null {
-  const o = strokeOutline(s);
-  const pts = o.length ? o : s.points;
-  if (!pts.length) return null;
+  const pts: Iterable<number[]> = [...strokeOutline(s), ...worldPoints(s)];
+  if (!s.points.length) return null;
   let x0 = Infinity;
   let y0 = Infinity;
   let x1 = -Infinity;

@@ -118,3 +118,20 @@ describe('textured strokes (stamps along the path)', () => {
     expect(svg).not.toContain('blob:');
   });
 });
+
+describe('stroke box covers the path', () => {
+  it('a stroke whose point array grew after a first outline boxes its whole path', () => {
+    // As in the sandbox report: the gesture's array is outlined early, then grows before the stroke is kept.
+    const style = { ...DEFAULT_STROKE_STYLE, size: 15, thinning: -0.54, taperStart: 24, taperEnd: 53, texture: { spacing: 0.15, jitter: 0.4, seed: 1, stamp: 'bristle' } };
+    const pts: Array<[number, number, number]> = [[156.8, 754.8, 0.5]];
+    strokeBox(newStroke(pts, style, true));
+    pts.push([545.8, 866.6, 0.5], [934.8, 978.4, 0.5]);
+    const s = newStroke(pts, style, true);
+    const b = strokeBox(s)!;
+    expect(b.w).toBeGreaterThan(700);
+    for (const p of stampPlacements(s)) {
+      expect(p.x).toBeGreaterThanOrEqual(b.x - s.size);
+      expect(p.x).toBeLessThanOrEqual(b.x + b.w + s.size);
+    }
+  });
+});
