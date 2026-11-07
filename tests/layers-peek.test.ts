@@ -44,7 +44,7 @@ it('unpinned: the tabs stand in a vertical bar; hovering one peeks the panel on 
 });
 
 it('pinned, the panel is the same floating card and takes no room from the stage', () => {
-  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.ws-designer \.layers-panel:not\(\.is-peek\) \{ position: absolute; z-index: 30; top: 0; right: 12px; bottom: 0;[^}]*border-radius: var\(--toolbar-radius\)/);
+  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.ws-designer \.layers-panel:not\(\.is-peek\) \{ position: absolute; z-index: 30; top: 0; right: 0\.75rem; bottom: 0;[^}]*border-radius: var\(--toolbar-radius\)/);
 });
 
 it('the right panel uses it with no empty strip: unpinned takes no width, peeks beside the bar in its pinned width, the header pin toggles', () => {
@@ -56,7 +56,7 @@ it('the right panel uses it with no empty strip: unpinned takes no width, peeks 
   expect(panel).toMatch(/\$\{peek\.on \? ' is-peek' : ''\}`\} aria-label="Layers" \{\.\.\.peek\.panelProps\}>/);
   expect(panel).toMatch(/label=\{collapsed \? 'Pin layers panel' : 'Collapse layers panel'\} size="sm" onClick=\{\(\) => setCollapsed\(!collapsed\)\}/);
   expect(panel).not.toContain('is-collapsed');
-  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.layers-panel\.is-peek \{ position: absolute; z-index: 30; top: 12px; right: calc\(12px \+ var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 2px \+ var\(--canvas-pop-gap\)\);[^}]*width: var\(--layers-peek-w, 260px\);/);
+  expect(readFileSync('src/styles/layers-peek.css', 'utf8')).toMatch(/\.layers-panel\.is-peek \{ position: absolute; z-index: 30; top: 0\.75rem; right: calc\(0\.75rem \+ var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 0\.125rem \+ var\(--canvas-pop-gap\)\);[^}]*width: var\(--layers-peek-w, 16\.25rem\);/);
 });
 
 it('pinning or unpinning the panel keeps the user\'s view: only a new document or an untouched view refits', () => {

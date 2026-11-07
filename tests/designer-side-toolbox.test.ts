@@ -85,7 +85,7 @@ it('the toolbox is always upright at the left; the bottom holds the active tool\
   expect(readFileSync('src/components/node/NodeSide.tsx', 'utf8')).toMatch(/if \(v === 'chat'\) setUi\(\{ designerDock: open && view === 'chat' \? 'tools' : 'prompt' \}\);/);
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
   expect(css).toMatch(/\.designer:has\(\.designer-side\) \.document-picker \{ display: none; \}/);
-  expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) \{ --designer-dock-left: max\(84px/);
+  expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) \{ --designer-dock-left: max\(5\.25rem/);
 });
 
 it('side toolbox, one popup at a time: another popup closes the tool\'s; a family announces its own; the flat strip ignores it', async () => {

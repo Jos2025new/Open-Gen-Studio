@@ -25,5 +25,5 @@
 .path-nodes .path-node.is-dim { opacity: 0.75; }
 .path-nodes.is-sel .path-node { pointer-events: none; }
 .path-nodes.is-sel .sel-hit { cursor: pointer; }
-.node-select { display: inline-flex; gap: 2px; }
-.node-select .opt { padding-inline: 6px; }
+.node-select { display: inline-flex; gap: 0.125rem; }
+.node-select .opt { padding-inline: 0.375rem; }

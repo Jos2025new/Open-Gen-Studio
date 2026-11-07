@@ -82,7 +82,7 @@ describe('quick mode of the subtoolbox', () => {
     const css = readFileSync('src/styles/tool-dock.css', 'utf8');
     expect(css).toMatch(/\.tool-dock-stack\.is-fixed \{ align-items: center;/);
     expect(css).toMatch(/> \.tool-dock-variants\.is-fixed \{ width: 100%;/);
-    expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.icon-btn \{ width: 36px; height: 36px; \}/);
+    expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.icon-btn \{ width: 2\.25rem; height: 2\.25rem; \}/);
     expect(css).not.toMatch(/right: -46px/);
   });
 
@@ -99,7 +99,7 @@ describe('quick mode of the subtoolbox', () => {
     expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/showTools && promptHidden \? ' is-prompt-hidden'/);
     const css = readFileSync('src/styles/tool-dock.css', 'utf8');
     expect(css).toMatch(/\.composer\.is-prompt-hidden \.composer-tools-bar > \* \{ transform: translateY\(/);
-    expect(css).toMatch(/\.tool-dock-hide-prompt\.is-pill \{ position: absolute;[^}]*bottom: 8px;/);
+    expect(css).toMatch(/\.tool-dock-hide-prompt\.is-pill \{ position: absolute;[^}]*bottom: 0\.5rem;/);
     expect(css).toMatch(/transition: transform \.22s/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\)[^}]*transition: none/);
   });
@@ -109,7 +109,7 @@ it('the quick colour sits on a light disc and the tools-dock frame is thin', asy
   const { readFileSync } = await import('node:fs');
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
   expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.opt-color\.is-icon \{ background: var\(--text-3\)/);
-  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-designer::before \{ inset: -4px -100vw -40px;/);
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-designer::before \{ inset: -0\.25rem -100vw -2\.5rem;/);
 });
 
 describe('hide button placement', () => {

@@ -1,7 +1,7 @@
 /* Studio: the chat workspace as chat (left) + a Generations board (right), closable and resizable. Tokens only. */
 .workspace.ws-chat.has-studio-board { padding-right: var(--studio-w); }
-.workspace.ws-chat.has-studio-board .composer-dock { left: calc((100% - var(--studio-w)) / 2); width: min(800px, calc(100% - var(--studio-w) - 192px)); }
-.workspace.ws-chat.has-studio-board:has(.chat-empty) .composer-dock { left: auto; width: min(800px, calc(100% - 192px)); }
+.workspace.ws-chat.has-studio-board .composer-dock { left: calc((100% - var(--studio-w)) / 2); width: min(50rem, calc(100% - var(--studio-w) - 12rem)); }
+.workspace.ws-chat.has-studio-board:has(.chat-empty) .composer-dock { left: auto; width: min(50rem, calc(100% - 12rem)); }
 .workspace.ws-chat.has-studio-board > .chat { height: 100%; }
 .workspace.is-home > .studio-board, .workspace.is-space > .studio-board { visibility: hidden; }
 .studio-board { position: absolute; top: 0; right: 0; bottom: 0; z-index: 13; display: flex; min-width: 0; border-left: 1px solid var(--frame-border); background: var(--surface); }
@@ -20,9 +20,9 @@
 /* Generations in Studio's chat: small inline results, not cards. */
 .studio-gen { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
 /* Consecutive results sit three to a row at their usual size (narrower when the chat is); each row folds as a whole. */
-.feed-gen-run { display: flex; flex-direction: column; gap: 22px; }
+.feed-gen-run { display: flex; flex-direction: column; gap: 1.375rem; }
 .feed-gen-row { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
-.feed-gen-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); gap: var(--sp-3); align-items: start; width: 100%; }
+.feed-gen-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 12.5rem)); gap: var(--sp-3); align-items: start; width: 100%; }
 .feed-gen-grid > .studio-gen { min-width: 0; }
 /* A failed or canceled result in a row keeps its column (it once kept 300px and slid under the next image); long provider ids wrap. */
 .feed-gen-grid .gen-card { width: 100%; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
@@ -31,7 +31,7 @@
 .studio-gen-head:hover { color: var(--text); }
 .studio-gen-head svg.is-closed { transform: rotate(-90deg); }
 .studio-gen-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-.studio-thumb { position: relative; width: 200px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg); }
+.studio-thumb { position: relative; width: 12.5rem; max-width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg); }
 .studio-thumb:hover { border-color: var(--border-strong); }
 .studio-thumb > .media { position: relative; width: 100%; height: 100%; object-fit: contain; }
 .studio-thumb-play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text); pointer-events: none; }
@@ -39,7 +39,7 @@
 .studio-gen-actions { display: flex; align-items: center; gap: var(--sp-1); }
 .studio-gen-head .spin { animation: studio-spin 1s linear infinite; }
 @keyframes studio-spin { to { transform: rotate(360deg); } }
-@media (max-width: 760px) { .studio-board, .studio-reopen-btn { display: none; } .workspace.ws-chat.has-studio-board { padding-right: 0; } .workspace.ws-chat.has-studio-board .composer-dock { left: 50%; width: calc(100% - 20px); } }
+@media (max-width: 760px) { .studio-board, .studio-reopen-btn { display: none; } .workspace.ws-chat.has-studio-board { padding-right: 0; } .workspace.ws-chat.has-studio-board .composer-dock { left: 50%; width: calc(100% - 1.25rem); } }
 .studio-thumb .shimmer { position: absolute; inset: 0; }
 
 /* The tinted kind icon behind a picture (shared by board tiles and chat thumbnails). */
@@ -51,7 +51,7 @@
 .studio-board-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .studio-board-main > .space-board, .studio-board-main > .node-canvas { flex: 1; min-height: 0; }
 .studio-views { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); }
-.studio-view { height: calc(28px*var(--text-scale)); padding: 0 var(--sp-3); border-radius: var(--r-s); color: var(--text-3); font-size: var(--fs-s); font-weight: 500; }
+.studio-view { height: 1.75rem; padding: 0 var(--sp-3); border-radius: var(--r-s); color: var(--text-3); font-size: var(--fs-s); font-weight: 500; }
 .studio-view:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
 .studio-view.is-active { background: var(--active-bg); color: var(--active-text); }
 .studio-view:disabled { opacity: .45; cursor: default; }
@@ -67,7 +67,7 @@
 .studio-designer-none { margin: auto; padding: var(--sp-4); text-align: center; font-size: var(--fs-s); }
 .studio-designer-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); flex-shrink: 0; min-width: 0; }
 .studio-designer-bar select, .studio-designer-name { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
-.studio-designer-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.studio-designer-tools { display: flex; align-items: center; gap: 0.125rem; margin-left: auto; flex-shrink: 0; }
 .studio-designer-zoom { min-width: 3.2em; text-align: center; font-size: var(--fs-s); color: var(--text-2); }
 .designer.studio-designer .stage { flex: 1 1 0; height: auto; min-height: 0; }
 .studio-layers { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow: auto; }
@@ -78,18 +78,18 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-layer-name { flex: 1; min-width: 0; text-align: left; padding: var(--sp-1) 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
 .studio-board-main > .studio-designer { flex: 1; min-height: 0; }
 .studio-gen.is-flash { animation: gen-flash 1.6s ease-out; }
-.studio-gen-row > .attach-host { width: 200px; max-width: 100%; }
-.studio-pending-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: var(--fs-s); color: var(--text-2); text-align: center; padding: var(--sp-2); }
+.studio-gen-row > .attach-host { width: 12.5rem; max-width: 100%; }
+.studio-pending-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.125rem; font-size: var(--fs-s); color: var(--text-2); text-align: center; padding: var(--sp-2); }
 .studio-thumb > .space-run-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0; }
 .studio-pick-hint { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-full); background: var(--surface-2); font-size: var(--fs-xs); color: var(--text-2); }
-.studio-pick-go { font-size: var(--fs-xs); font-weight: 600; margin: -2px 0; }
-.studio-pick-box { position: absolute; top: 8px; left: 8px; z-index: 3; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 5px; background: rgba(6, 6, 8, .4); font-size: calc(10px * var(--text-scale, 1)); font-weight: 600; color: var(--accent-ink); cursor: pointer; }
+.studio-pick-go { font-size: var(--fs-xs); font-weight: 600; margin: -0.125rem 0; }
+.studio-pick-box { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 3; width: 1.25rem; height: 1.25rem; display: grid; place-items: center; border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 5px; background: rgba(6, 6, 8, .4); font-size: 0.625rem; font-weight: 600; color: var(--accent-ink); cursor: pointer; }
 .studio-pick-box.is-on { background: var(--accent); border-color: transparent; }
 .studio-gen-actions { flex-wrap: wrap; }
-.studio-spinner { width: 16px; height: 16px; border: 2px solid var(--border-strong); border-top-color: var(--text-2); border-radius: 50%; animation: studio-spin 0.9s linear infinite; }
+.studio-spinner { width: 1rem; height: 1rem; border: 2px solid var(--border-strong); border-top-color: var(--text-2); border-radius: 50%; animation: studio-spin 0.9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .studio-spinner { animation: none; } }
 /* A new pending tile gets a light sheen sweeping along its border: 3 passes (~2 s), then stops; plays once per mount. */
-.space-board.is-studio .space-tile.is-pending::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none; background: linear-gradient(100deg, transparent 35%, var(--accent) 50%, transparent 65%) 200% 0 / 300% 100% no-repeat; -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); animation: tile-sheen 5s ease-in-out infinite both; }
+.space-board.is-studio .space-tile.is-pending::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 0.125rem; pointer-events: none; background: linear-gradient(100deg, transparent 35%, var(--accent) 50%, transparent 65%) 200% 0 / 300% 100% no-repeat; -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); animation: tile-sheen 5s ease-in-out infinite both; }
 /* Board tile: three sweeps in the first 3 s of every 5 s (the board's Ongoing is the one placeholder that calls for attention). */
 @keyframes tile-sheen { 0%, 20%, 40% { background-position: 100% 0; opacity: 1; } 19.99%, 39.99%, 59.99% { background-position: 0 0; opacity: 1; } 60%, 100% { background-position: 0 0; opacity: 0; } }
 /* Chat placeholder: the quietest, a flat tile with the kind icon; the label sits under the icon. */
@@ -97,8 +97,8 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-thumb.is-pending { background: linear-gradient(145deg, var(--surface-3), var(--surface) 75%); }
 .space-board.is-studio .space-tile.is-pending .shimmer { opacity: .35; }
 .space-board.is-studio .space-tile.is-pending::after { display: none; }
-.space-board.is-studio .space-tile.is-pending .studio-pending-text { gap: 4px; }
-.space-board.is-studio .space-tile.is-pending .studio-spinner { width: 24px; height: 24px; margin-bottom: 4px; }
+.space-board.is-studio .space-tile.is-pending .studio-pending-text { gap: 0.25rem; }
+.space-board.is-studio .space-tile.is-pending .studio-spinner { width: 1.5rem; height: 1.5rem; margin-bottom: 0.25rem; }
 .space-board.is-studio .space-tile.is-pending .studio-pending-label { color: var(--text); font-size: var(--fs-l); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .space-board.is-studio .space-tile.is-pending::after { animation: none; display: none; } }
 .studio-size-pop { padding: var(--sp-2); }

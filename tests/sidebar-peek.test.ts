@@ -49,5 +49,5 @@ it('only the icon peeks, not the left edge, and clicking the icon pins the bar',
 
 it('the peeking frame reaches the top, covering the top bar beside the logo', async () => {
   const { readFileSync } = await import('node:fs');
-  expect(readFileSync('src/styles/sidebar-peek.css', 'utf8')).toMatch(/\.sidebar\.is-peek::before \{ top: 6px;/);
+  expect(readFileSync('src/styles/sidebar-peek.css', 'utf8')).toMatch(/\.sidebar\.is-peek::before \{ top: 0\.375rem;/);
 });

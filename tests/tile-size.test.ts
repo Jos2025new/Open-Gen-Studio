@@ -80,7 +80,7 @@ describe('Library grid size drives the row height', () => {
   it('card layout is justified rows and the bar keeps the app own icon sizes', () => {
     expect(readFileSync('src/components/gallery/GalleryLayout.css', 'utf8')).toMatch(/\.gallery-grid\.jg \{ display: flex; flex-direction: column/);
     expect(readFileSync('src/components/ui/PanelControls.css', 'utf8')).not.toMatch(/\.pc-bar \.icon-btn \{[^}]*width/); // no forced box size
-    expect(readFileSync('src/styles/designer-connected.css', 'utf8')).toMatch(/height: calc\(36px\*var\(--text-scale\)\); min-width: 0; padding: 0 12px/); // the slider stays at its standard 36px
+    expect(readFileSync('src/styles/designer-connected.css', 'utf8')).toMatch(/height: 2\.25rem; min-width: 0; padding: 0 0\.75rem/); // the slider stays at its standard 2\.25rem
   });
 });
 

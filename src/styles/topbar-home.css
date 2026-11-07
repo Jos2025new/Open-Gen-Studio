@@ -1,12 +1,12 @@
 /* Top bar on Home: the Connected status as a dot pill. The label sits left of the dot, so it opens leftwards on hover and focus (touch and keyboard included). */
-.topbar-pill { gap: 0; padding: 6px; }
+.topbar-pill { gap: 0; padding: 0.375rem; }
 .topbar-pill-label { display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0; transition: max-width .18s var(--ease), opacity .12s, margin .18s var(--ease); margin-right: 0; }
-.topbar-pill:hover .topbar-pill-label, .topbar-pill:focus-visible .topbar-pill-label, .topbar-pill:focus .topbar-pill-label, .topbar-pill.is-open .topbar-pill-label { max-width: 120px; opacity: 1; margin-right: 6px; }
+.topbar-pill:hover .topbar-pill-label, .topbar-pill:focus-visible .topbar-pill-label, .topbar-pill:focus .topbar-pill-label, .topbar-pill.is-open .topbar-pill-label { max-width: 7.5rem; opacity: 1; margin-right: 0.375rem; }
 .topbar-pill { border: 1px solid var(--border); border-radius: var(--r-full); }
 .topbar-pill:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .topbar-pill-label { transition: none; } }
 /* Outside Home: the house button before the breadcrumb, muted like the other top-bar icons. */
-.topbar-home { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--text-3); }
+.topbar-home { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 6px; color: var(--text-3); }
 .topbar-home:hover { color: var(--text); background: var(--surface-2); }
 .topbar-home:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 /* On Home the top bar takes the Home page's background, so the two read as one surface; its bottom border stays as it is. */
@@ -15,11 +15,11 @@
 .topbar.is-home .topbar-slot { display: none; }
 /* Home's tabs ride in the bar, on the back pill's row, at the bar's control height. */
 .topbar-home-tabs { display: flex; align-items: center; margin-left: var(--sp-3); }
-.topbar-home-tabs .home-tabs { flex-wrap: nowrap; gap: 6px; }
-.topbar-home-tabs .home-tab { height: calc(28px*var(--text-scale)); padding: 0 12px; font-size: var(--fs-m); }
-.topbar-back { display: inline-flex; align-items: center; gap: 6px; max-width: 240px; height: calc(28px*var(--text-scale)); padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-full); color: var(--text-3); font-size: var(--fs-s); white-space: nowrap; }
+.topbar-home-tabs .home-tabs { flex-wrap: nowrap; gap: 0.375rem; }
+.topbar-home-tabs .home-tab { height: 1.75rem; padding: 0 0.75rem; font-size: var(--fs-m); }
+.topbar-back { display: inline-flex; align-items: center; gap: 0.375rem; max-width: 15rem; height: 1.75rem; padding: 0 0.625rem; border: 1px solid var(--border); border-radius: var(--r-full); color: var(--text-3); font-size: var(--fs-s); white-space: nowrap; }
 .topbar-back span { overflow: hidden; text-overflow: ellipsis; }
 .topbar-back:hover { color: var(--text); background: var(--surface-2); }
 .topbar-back:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 /* The open sidebar's 6px margin would drop the brand row below the topbar's centre line; lift it by the same amount (the folded one has no margin). */
-.sidebar:not(.is-folded) .brand { top: -6px; }
+.sidebar:not(.is-folded) .brand { top: -0.375rem; }

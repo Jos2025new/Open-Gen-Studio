@@ -43,5 +43,5 @@ it('expanded, the drawer has no resize handle', () => {
 });
 
 it('the Sessions grid keeps cards at least 150px wide, so a narrow drawer shows fewer columns', () => {
-  expect(readFileSync('src/components/shell/SessionsLayout.css', 'utf8')).toMatch(/\.sessions\.layout-card \.session-list \{ grid-template-columns: repeat\(auto-fill, minmax\(max\(150px,/);
+  expect(readFileSync('src/components/shell/SessionsLayout.css', 'utf8')).toMatch(/\.sessions\.layout-card \.session-list \{ grid-template-columns: repeat\(auto-fill, minmax\(max\(9\.375rem,/);
 });

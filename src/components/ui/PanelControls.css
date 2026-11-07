@@ -1,31 +1,31 @@
 /* Shared by Library and Sessions: the one-row top bar, the category rail and the image-first cards. */
-.pc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.pc-grp { display: flex; flex: 1 1 0; min-width: max-content; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.pc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 0.75rem; }
+.pc-grp { display: flex; flex: 1 1 0; min-width: max-content; flex-wrap: wrap; align-items: center; gap: 0.125rem 0.375rem; }
 .pc-grp.pc-center { flex: 0 0 auto; justify-content: center; }
 .pc-bar > .pc-left { flex: 0 1 auto; }
 .pc-grp.pc-right { flex: 1 1 auto; justify-content: flex-end; }
-.pc-icons { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 6px; }
+.pc-icons { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.125rem 0.375rem; }
 .pc-pop { position: relative; display: inline-flex; }
-.pc-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); pointer-events: none; }
-.pc-source { gap: 6px; }
+.pc-dot { position: absolute; top: 0.1875rem; right: 0.1875rem; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--accent); pointer-events: none; }
+.pc-source { gap: 0.375rem; }
 
 .pc-split { display: flex; flex: 1; min-height: 0; }
 .pc-main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
 
 /* Menus read like a native context menu: roomy rows, 16px icons, groups split by hairlines, the destructive action last and red. */
 .pc-menu { display: flex; flex-direction: column; gap: 1px; }
-.popover.pc-menu-pop { padding: 6px; border-radius: 14px; }
-.pc-menu-item { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 11px; border-radius: 8px; color: var(--text); font-size: var(--fs-m); text-align: left; }
+.popover.pc-menu-pop { padding: 0.375rem; border-radius: 14px; }
+.pc-menu-item { position: relative; display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.5625rem 0.6875rem; border-radius: 8px; color: var(--text); font-size: var(--fs-m); text-align: left; }
 .pc-menu-item svg { flex: none; color: var(--text-2); }
 .pc-menu-item:hover:not(:disabled) { background: var(--surface-3); }
 .pc-menu-item:hover:not(:disabled) svg { color: var(--text); }
 .pc-menu-item.tone-danger, .pc-menu-item.tone-danger svg { color: var(--danger); }
-.pc-menu > .pc-menu-item.tone-danger:not(:first-child) { margin-top: 9px; }
-.pc-menu > .pc-menu-item.tone-danger:not(:first-child)::before { content: ''; position: absolute; top: -5px; left: 6px; right: 6px; border-top: 1px solid var(--border); }
+.pc-menu > .pc-menu-item.tone-danger:not(:first-child) { margin-top: 0.5625rem; }
+.pc-menu > .pc-menu-item.tone-danger:not(:first-child)::before { content: ''; position: absolute; top: -0.3125rem; left: 0.375rem; right: 0.375rem; border-top: 1px solid var(--border); }
 .pc-menu-item:disabled { opacity: .45; }
 .pc-menu-item.is-on { color: var(--text); background: var(--surface-2); }
 .pc-menu-item .pc-count { margin-left: auto; color: var(--text-3); font-size: var(--fs-xs); }
-.pc-menu-sep { width: calc(100% - 12px); margin: 4px 6px; border: 0; border-top: 1px solid var(--border); }
+.pc-menu-sep { width: calc(100% - 0.75rem); margin: 0.25rem 0.375rem; border: 0; border-top: 1px solid var(--border); }
 
 /* Image-first card: the media fills it; controls and details show on hover, focus or first tap. */
 .pc-card, .pc-inked {
@@ -48,43 +48,43 @@
 .pc-card:hover .pc-hover, .pc-card:focus-within .pc-hover, .pc-card.is-armed .pc-hover, .pc-card.is-selecting .pc-check, .pc-card .pc-check.is-on, .pc-card .pc-hover.is-on, .pc-hover[aria-expanded="true"] { opacity: 1; }
 /* Every overlay control on a card shares one look: a 26px smoked-glass rounded rectangle, borderless, with a white
    glyph, so it stays readable on light and dark images alike and matches the app's square-cornered controls. */
-.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: calc(26px * var(--text-scale, 1)); height: calc(26px * var(--text-scale, 1)); padding: 0; border: 0; border-radius: 7px; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: none; }
+.pc-card .pc-check, .pc-card .attach-toggle, .pc-card .pc-tools .icon-btn { display: grid; place-items: center; width: 1.625rem; height: 1.625rem; padding: 0; border: 0; border-radius: 7px; background: var(--pc-btn-bg); color: var(--pc-btn-fg); backdrop-filter: blur(10px); box-shadow: none; }
 .pc-card .pc-check:hover, .pc-card .attach-toggle:hover, .pc-card .pc-tools .icon-btn:hover { background: var(--pc-btn-bg-hover); }
-.pc-card .pc-tools .icon-btn svg { width: calc(15px * var(--text-scale, 1)); height: calc(15px * var(--text-scale, 1)); }
-.pc-card .pc-box { width: 14px; height: 14px; border-width: 1.5px; border-radius: 4px; }
-.pc-check { position: absolute; top: 6px; left: 6px; z-index: 2; padding: 0; }
-.pc-box { display: grid; place-items: center; width: 18px; height: 18px; border: 2px solid currentColor; border-radius: 5px; }
+.pc-card .pc-tools .icon-btn svg { width: 0.9375rem; height: 0.9375rem; }
+.pc-card .pc-box { width: 0.875rem; height: 0.875rem; border-width: 1.5px; border-radius: 4px; }
+.pc-check { position: absolute; top: 0.375rem; left: 0.375rem; z-index: 2; padding: 0; }
+.pc-box { display: grid; place-items: center; width: 1.125rem; height: 1.125rem; border: 2px solid currentColor; border-radius: 5px; }
 .pc-check.is-on .pc-box { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
-.pc-card > .attach-toggle { top: 6px; left: 38px; z-index: 2; }
-.pc-card > .attach-toggle .attach-toggle-box { width: 22px; height: 22px; border: 0; background: none; font-size: var(--fs-s); color: var(--pc-btn-fg); }
-.pc-card > .attach-toggle.is-on .attach-toggle-box { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); }
-.pc-tools { position: absolute; top: 6px; right: 6px; z-index: 2; display: flex; gap: 4px; }
+.pc-card > .attach-toggle { top: 0.375rem; left: 2.375rem; z-index: 2; }
+.pc-card > .attach-toggle .attach-toggle-box { width: 1.375rem; height: 1.375rem; border: 0; background: none; font-size: var(--fs-s); color: var(--pc-btn-fg); }
+.pc-card > .attach-toggle.is-on .attach-toggle-box { width: 1.375rem; height: 1.375rem; border-radius: 50%; background: var(--accent); color: var(--accent-ink); }
+.pc-tools { position: absolute; top: 0.375rem; right: 0.375rem; z-index: 2; display: flex; gap: 0.25rem; }
 .pc-tools .icon-btn.pc-fav.is-on { color: #ffd34d; }
 .pc-tools .icon-btn.pc-fav.is-on svg { fill: currentColor; }
 /* Details sit on a soft veil: a gentle tint plus a blur that fades in from the top, like frosted glass rising from the edge. */
-.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 3px; padding: 44px 12px 11px; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 24%, transparent) 38%, color-mix(in srgb, var(--pc-ink) 64%, transparent)); color: var(--pc-on-ink); pointer-events: none; text-shadow: 0 1px 2px color-mix(in srgb, var(--pc-ink) 35%, transparent); }
-.pc-info::before { content: ''; position: absolute; inset: 0; z-index: -1; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); mask-image: linear-gradient(transparent, #000 55%); -webkit-mask-image: linear-gradient(transparent, #000 55%); }
+.pc-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 0.1875rem; padding: 2.75rem 0.75rem 0.6875rem; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 24%, transparent) 38%, color-mix(in srgb, var(--pc-ink) 64%, transparent)); color: var(--pc-on-ink); pointer-events: none; text-shadow: 0 1px 2px color-mix(in srgb, var(--pc-ink) 35%, transparent); }
+.pc-info::before { content: ''; position: absolute; inset: 0; z-index: -1; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(0.75rem); mask-image: linear-gradient(transparent, #000 55%); -webkit-mask-image: linear-gradient(transparent, #000 55%); }
 .pc-info .pc-info-title { font-size: var(--fs-m); font-weight: 600; }
-.pc-info .pc-info-sub { color: color-mix(in srgb, var(--pc-on-ink) 84%, transparent); font-size: calc(11.5px * var(--text-scale, 1)); }
+.pc-info .pc-info-sub { color: color-mix(in srgb, var(--pc-on-ink) 84%, transparent); font-size: 0.7188rem; }
 .pc-info-meta { color: color-mix(in srgb, var(--pc-on-ink) 70%, transparent); font-size: var(--fs-xs); }
 .pc-info-title { overflow: hidden; font-size: var(--fs-m); font-weight: 650; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .pc-info-sub { overflow: hidden; color: color-mix(in srgb, var(--pc-on-ink) 88%, transparent); font-size: var(--fs-s); text-overflow: ellipsis; white-space: nowrap; }
-.pc-badge { position: absolute; left: 6px; bottom: 6px; z-index: 2; }
+.pc-badge { position: absolute; left: 0.375rem; bottom: 0.375rem; z-index: 2; }
 .pc-card:hover .pc-badge, .pc-card:focus-within .pc-badge, .pc-card.is-armed .pc-badge { opacity: 0; }
-.pc-hidden-badge { position: absolute; right: 28px; bottom: 6px; z-index: 2; display: grid; place-items: center; width: 20px; height: calc(20px*var(--text-scale)); border-radius: 10px; background: var(--overlay); color: var(--text); pointer-events: none; }
+.pc-hidden-badge { position: absolute; right: 1.75rem; bottom: 0.375rem; z-index: 2; display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 10px; background: var(--overlay); color: var(--text); pointer-events: none; }
 .pc-row .pc-hidden-badge { position: static; flex: none; color: var(--text-3); background: none; }
 
 /* Compact row: thumbnail, title, details, date and the same actions. */
-.pc-row { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border: 0; border-radius: 6px; background: var(--surface-2); }
+.pc-row { position: relative; display: flex; align-items: center; gap: 0.625rem; min-width: 0; padding: 0.375rem 0.5rem; border: 0; border-radius: 6px; background: var(--surface-2); }
 .pc-row:hover { background: var(--surface-hover); }
 .pc-row.is-selected { box-shadow: inset 0 0 0 2px var(--accent); }
 .pc-row.is-active { box-shadow: inset 0 0 0 1px var(--border-strong); }
-.pc-row .pc-check { position: static; flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: 0; background: none; color: var(--text-2); }
+.pc-row .pc-check { position: static; flex: none; display: grid; place-items: center; width: 1.375rem; height: 1.375rem; border: 0; background: none; color: var(--text-2); }
 .pc-row.is-hidden-item { opacity: .55; }
 .pc-row .pc-info-title { color: var(--text); }
 .pc-row .pc-info-sub { color: var(--text-2); font-size: var(--fs-xs); text-shadow: none; }
 .pc-row .pc-tools .icon-btn.pc-fav.is-on { color: var(--accent); }
-.pc-row .pc-thumb { position: relative; flex: none; width: 36px; height: 36px; overflow: hidden; border-radius: 7px; background: var(--surface-3); }
+.pc-row .pc-thumb { position: relative; flex: none; width: 2.25rem; height: 2.25rem; overflow: hidden; border-radius: 7px; background: var(--surface-3); }
 .pc-row .pc-thumb .media { width: 100%; height: 100%; object-fit: cover; }
 .pc-row .pc-text { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: left; }
 .pc-row .pc-when { flex: none; color: var(--text-3); font-size: var(--fs-xs); white-space: nowrap; }
@@ -95,7 +95,7 @@
 /* List: light rows like a file list — no filled blocks; the checkbox shows on hover, focus or while selecting. */
 /* Each row is a soft framed strip, as in a file manager: the checkbox stays faintly present, the title leads, the
    first column (model or mode) comes next, and dates and counts stay quiet. Library and Sessions share it. */
-.pc-row { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: none; }
+.pc-row { padding: 0.375rem 0.625rem; border: 1px solid var(--border); border-radius: 8px; background: none; }
 .pc-row:hover, .pc-row:focus-within { background: var(--surface-2); }
 .pc-row.is-selected { background: var(--surface-2); border-color: var(--accent); box-shadow: none; }
 .pc-row.is-active { border-color: var(--border-strong); box-shadow: none; }
@@ -103,21 +103,21 @@
 .pc-row:hover .pc-check, .pc-row:focus-within .pc-check, .pc-row.is-selecting .pc-check, .pc-row.is-selected .pc-check { opacity: 1; }
 .pc-row .pc-info-title { overflow: hidden; font-size: var(--fs-m); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .pc-row .pc-info-sub { color: var(--text-3); }
-.pc-title-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.pc-open-tag { flex: none; color: var(--accent); font-size: calc(11.5px * var(--text-scale, 1)); font-weight: 500; }
-.pc-mode { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.pc-title-line { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.pc-open-tag { flex: none; color: var(--accent); font-size: 0.7188rem; font-weight: 500; }
+.pc-mode { display: inline-flex; align-items: center; gap: 0.3125rem; min-width: 0; }
 .pc-mode svg { flex: none; }
-.sess-card .pc-hidden-badge { right: 52px; }
-.pc-group-check { display: grid; flex: none; place-items: center; width: 16px; height: 16px; padding: 0; border: 1.5px solid var(--border-strong); border-radius: 4px; color: var(--accent-ink); }
+.sess-card .pc-hidden-badge { right: 3.25rem; }
+.pc-group-check { display: grid; flex: none; place-items: center; width: 1rem; height: 1rem; padding: 0; border: 1.5px solid var(--border-strong); border-radius: 4px; color: var(--accent-ink); }
 .pc-group-check.is-on { border-color: transparent; background: var(--accent); }
 .pc-group-check.is-mixed { color: var(--text); }
-.pc-dash { width: 8px; border-top: 2px solid currentColor; }
-.date-head .pc-group-check { margin-right: 2px; align-self: center; }
+.pc-dash { width: 0.5rem; border-top: 2px solid currentColor; }
+.date-head .pc-group-check { margin-right: 0.125rem; align-self: center; }
 
 
-.gallery .date-head, .sessions .date-head { padding: 10px 12px 4px; font-size: var(--fs-xs); font-weight: 500; color: var(--text-2); }
+.gallery .date-head, .sessions .date-head { padding: 0.625rem 0.75rem 0.25rem; font-size: var(--fs-xs); font-weight: 500; color: var(--text-2); }
 .gallery .date-head .faint, .sessions .date-head .faint { color: var(--text-3); }
-.date-head .pc-group-check, .sessions .date-head .group-check { width: 14px; height: 14px; opacity: .4; transition: opacity .12s; }
+.date-head .pc-group-check, .sessions .date-head .group-check { width: 0.875rem; height: 0.875rem; opacity: .4; transition: opacity .12s; }
 .date-head:hover .pc-group-check, .date-head:hover .group-check, .date-head .pc-group-check:is(.is-on, .is-mixed), .sessions .date-head .group-check:is(.is-on, [aria-checked="mixed"]) { opacity: 1; }
 
 
@@ -126,22 +126,22 @@
 .side-panel.panel-gallery, .side-panel.panel-sessions { background: var(--bg-canvas); }
 .pc-bar { gap: var(--sp-1) var(--sp-3); }
 .pc-bar .results-controls { display: contents; }
-.pc-bar .search-input { flex: 1 1 140px; min-width: 110px; max-width: 340px; }
-.pc-search { flex: 0 1 220px; }
+.pc-bar .search-input { flex: 1 1 8.75rem; min-width: 6.875rem; max-width: 21.25rem; }
+.pc-search { flex: 0 1 13.75rem; }
 .pc-icons, .pc-chrome, .pc-flags { display: flex; align-items: center; gap: var(--sp-1); }
 /* As in Generations: the tools sit beside the title; the right holds the quick toggles, then the panel chrome after a hairline. */
 .pc-bar > .pc-left { gap: var(--sp-1) var(--sp-2); }
 .pc-bar .pc-chrome { margin-left: var(--sp-1); padding-left: var(--sp-2); border-left: 1px solid var(--border); }
-.pc-bar .pc-source { height: calc(28px*var(--text-scale)); gap: 6px; padding: 0 8px 0 6px; border: 0; border-radius: var(--radius-s); background: none; color: var(--text); font-size: var(--fs-l); font-weight: 600; }
+.pc-bar .pc-source { height: 1.75rem; gap: 0.375rem; padding: 0 0.5rem 0 0.375rem; border: 0; border-radius: var(--radius-s); background: none; color: var(--text); font-size: var(--fs-l); font-weight: 600; }
 .pc-bar .pc-source:hover, .pc-bar .pc-source[aria-expanded="true"] { background: var(--surface-2); }
 .pc-bar .pc-source svg { color: var(--text-2); }
-.pc-grp.pc-center { flex-wrap: nowrap; gap: 2px; padding: 3px; border-radius: var(--radius); background: var(--surface); }
+.pc-grp.pc-center { flex-wrap: nowrap; gap: 0.125rem; padding: 0.1875rem; border-radius: var(--radius); background: var(--surface); }
 .pc-center .canvas-tab { height: 24px; padding: 0 9px; border: 0; border-radius: var(--radius-s); background: none; }
 .pc-center .canvas-tab.is-on { background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
 .pc-center .icon-btn.is-active { box-shadow: inset 0 0 0 1px var(--border-strong); }
 
 /* Wide: one row — source on the left, controls on the right. Narrow: row 1 is the source and the chrome; row 2 the types at the start and the icons at the end. */
-.pc-chrome { display: flex; flex: none; align-items: center; gap: 2px; }
+.pc-chrome { display: flex; flex: none; align-items: center; gap: 0.125rem; }
 .gallery, .sessions { container: pc-panel / inline-size; }
 @container pc-panel (max-width: 640px) {
   .pc-bar { row-gap: var(--sp-2); }
@@ -162,29 +162,29 @@
 .pc-cols .pc-row .pc-when, .pc-list-head .pc-col-date { width: var(--pc-w-date); flex: none; }
 .pc-cols .pc-row .pc-tools, .pc-list-head .pc-col-tools { display: flex; flex: none; justify-content: flex-end; width: var(--pc-w-tools); }
 .pc-cols .pc-cols-alt { display: none; }
-.pc-list-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 8px 23px 6px; background: var(--bg-canvas); border-bottom: 1px solid var(--border); }
+.pc-list-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 1.4375rem 0.375rem; background: var(--bg-canvas); border-bottom: 1px solid var(--border); }
 .pc-head-cell { position: relative; display: flex; align-items: center; overflow: visible; }
-.pc-head-cell > button { display: inline-flex; align-items: center; gap: 4px; min-width: 0; height: calc(22px*var(--text-scale)); padding: 0; overflow: hidden; color: var(--text-3); font-size: var(--fs-xs); font-weight: 500; text-align: left; white-space: nowrap; }
+.pc-head-cell > button { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; height: 1.375rem; padding: 0; overflow: hidden; color: var(--text-3); font-size: var(--fs-xs); font-weight: 500; text-align: left; white-space: nowrap; }
 .pc-head-cell > button:hover, .pc-head-cell > button.is-on { color: var(--text); }
 /* Card grid: the same sort labels as the list header, in one compact row that scrolls sideways if it must. */
-.pc-sort-strip { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 16px; padding: 8px 12px 4px; overflow-x: auto; background: var(--bg-canvas); scrollbar-width: none; }
+.pc-sort-strip { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0.75rem 0.25rem; overflow-x: auto; background: var(--bg-canvas); scrollbar-width: none; }
 .pc-sort-strip::-webkit-scrollbar { display: none; }
 .pc-sort-strip .pc-head-cell { flex: none; }
 /* The far end of the sort row holds Show hidden and Show archived; it stays in view when the labels scroll. */
 .pc-strip-end { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-1); }
 .pc-sort-strip .pc-strip-end { position: sticky; right: 0; margin-left: auto; padding-left: var(--sp-2); background: var(--bg-canvas); }
-.pc-list-head .pc-strip-end .icon-btn, .pc-sort-strip .pc-strip-end .icon-btn { width: 24px; height: 24px; }
+.pc-list-head .pc-strip-end .icon-btn, .pc-sort-strip .pc-strip-end .icon-btn { width: 1.5rem; height: 1.5rem; }
 /* Resize handle in the gap before each column: a hairline that shows on hover, focus or drag. */
-.pc-col-resize { position: absolute; top: -4px; bottom: -4px; left: -9px; width: 8px; cursor: col-resize; touch-action: none; }
-.pc-col-resize::after { content: ''; position: absolute; top: 4px; bottom: 4px; left: 3px; width: 2px; border-radius: 1px; background: transparent; }
+.pc-col-resize { position: absolute; top: -0.25rem; bottom: -0.25rem; left: -0.5625rem; width: 0.5rem; cursor: col-resize; touch-action: none; }
+.pc-col-resize::after { content: ''; position: absolute; top: 0.25rem; bottom: 0.25rem; left: 0.1875rem; width: 0.125rem; border-radius: 1px; background: transparent; }
 .pc-col-resize:hover::after, .pc-col-resize:focus-visible::after, .pc-col-resize.is-dragging::after { background: var(--border-strong); }
 .pc-col-resize:focus-visible { outline: none; }
-.pc-list-head .pc-col-name { flex: 1; min-width: 0; padding-left: 86px; }
+.pc-list-head .pc-col-name { flex: 1; min-width: 0; padding-left: 5.375rem; }
 .pc-list-head .pc-col-date { flex: none; }
 @container pc-panel (max-width: 640px) {
   .pc-cols .pc-row .pc-col { display: none; }
   /* The list header turns into the compact sort row: labels at their own width, toggles kept at the end. */
-  .pc-list-head { gap: 16px; padding: 8px 12px 4px; overflow-x: auto; border-bottom: 0; scrollbar-width: none; }
+  .pc-list-head { gap: 1rem; padding: 0.5rem 0.75rem 0.25rem; overflow-x: auto; border-bottom: 0; scrollbar-width: none; }
   .pc-list-head .pc-head-cell { flex: none; width: auto; }
   .pc-list-head .pc-col-name { padding-left: 0; }
   .pc-list-head .pc-col-resize { display: none; }
@@ -201,57 +201,57 @@
 /* One frame only: the open and selected states recolour the border instead of adding a ring around it. */
 .pc-card.pc-fade.is-active, .pc-card.pc-tile.is-active { border-color: var(--border-strong); box-shadow: none; }
 .pc-card.pc-fade.is-selected, .pc-card.pc-tile.is-selected { border-color: var(--accent); box-shadow: none; }
-.pc-fade .pc-info { gap: 6px; padding: 72px 14px 14px; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 62%, transparent) 34%, color-mix(in srgb, var(--pc-ink) 90%, transparent) 70%); pointer-events: none; }
+.pc-fade .pc-info { gap: 0.375rem; padding: 4.5rem 0.875rem 0.875rem; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 62%, transparent) 34%, color-mix(in srgb, var(--pc-ink) 90%, transparent) 70%); pointer-events: none; }
 .pc-fade .pc-info::before { mask-image: linear-gradient(transparent, #000 40%); -webkit-mask-image: linear-gradient(transparent, #000 40%); }
 .pc-fade .pc-info > * { pointer-events: auto; }
-.pc-fade .pc-info .pc-info-title { display: -webkit-box; font-size: calc(16px * var(--text-scale, 1)); font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.pc-fade .pc-info .pc-info-title { display: -webkit-box; font-size: 1rem; font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .pc-fade .pc-info .pc-info-sub { color: color-mix(in srgb, var(--pc-on-ink) 78%, transparent); }
 /* Three figures, value over label, split by hairlines. */
-.pc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 4px 0 2px; }
+.pc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0.25rem 0 0.125rem; }
 .pc-stat { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
 .pc-stat + .pc-stat { border-left: 1px solid color-mix(in srgb, var(--pc-on-ink) 18%, transparent); }
 .pc-stat b { font-size: var(--fs-l); font-weight: 600; }
 .pc-stat small { overflow: hidden; color: color-mix(in srgb, var(--pc-on-ink) 72%, transparent); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; }
 /* Actions: the main one stretches; pin and menu keep the cards' glass buttons. */
-.pc-card-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.pc-card-actions { display: flex; align-items: center; gap: 0.375rem; margin-top: 0.25rem; }
 .pc-card-actions .btn { flex: 1; justify-content: center; border: 0; background: color-mix(in srgb, var(--pc-on-ink) 14%, transparent); color: var(--pc-on-ink); backdrop-filter: blur(10px); }
 .pc-card-actions .btn:not(:disabled):hover { background: color-mix(in srgb, var(--pc-on-ink) 22%, transparent); }
 .pc-card-actions .btn:disabled { background: color-mix(in srgb, var(--pc-on-ink) 6%, transparent); color: color-mix(in srgb, var(--pc-on-ink) 60%, transparent); opacity: 1; }
-.pc-card-actions .pc-tools { position: static; gap: 6px; }
-.pc-card-actions .pc-tools .icon-btn { width: 30px; height: 30px; }
+.pc-card-actions .pc-tools { position: static; gap: 0.375rem; }
+.pc-card-actions .pc-tools .icon-btn { width: 1.875rem; height: 1.875rem; }
 /* The checkbox is the quietest control: a bare 14px outline with the same 1.5px stroke as the group checkbox, no glass
    behind it (a faint shadow keeps it legible on light covers), shown only on hover or focus, while selecting, or when checked. */
-.pc-fade .pc-check, .pc-tile .pc-check { top: 8px; left: 8px; width: 20px; height: 20px; border-radius: 0; background: none; backdrop-filter: none; opacity: 0; }
-.pc-fade .pc-check .pc-box, .pc-tile .pc-check .pc-box { width: 14px; height: 14px; border: 1.5px solid color-mix(in srgb, var(--pc-on-ink) 90%, transparent); border-radius: 4px; background: none; filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--pc-ink) 35%, transparent)); }
+.pc-fade .pc-check, .pc-tile .pc-check { top: 0.5rem; left: 0.5rem; width: 1.25rem; height: 1.25rem; border-radius: 0; background: none; backdrop-filter: none; opacity: 0; }
+.pc-fade .pc-check .pc-box, .pc-tile .pc-check .pc-box { width: 0.875rem; height: 0.875rem; border: 1.5px solid color-mix(in srgb, var(--pc-on-ink) 90%, transparent); border-radius: 4px; background: none; filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--pc-ink) 35%, transparent)); }
 .pc-fade .pc-check.is-on .pc-box, .pc-tile .pc-check.is-on .pc-box { border-color: transparent; background: var(--accent); }
 .pc-fade:is(:hover, :focus-within, .is-selecting) .pc-check, .pc-tile:is(:hover, :focus-within, .is-selecting) .pc-check, .pc-fade .pc-check.is-on, .pc-tile .pc-check.is-on { opacity: 1; }
-.pc-fade .pc-info-sub, .pc-tile .pc-info-sub { display: flex; align-items: center; gap: 5px; font-size: var(--fs-s); }
-.pc-fade .pc-hidden-badge { top: 9px; right: auto; bottom: auto; left: 36px; }
+.pc-fade .pc-info-sub, .pc-tile .pc-info-sub { display: flex; align-items: center; gap: 0.3125rem; font-size: var(--fs-s); }
+.pc-fade .pc-hidden-badge { top: 0.5625rem; right: auto; bottom: auto; left: 2.25rem; }
 /* Tile (the Cards view): the cover fills the left side and fades into the right side, which carries the same details.
    Like the Grid fade, the cover runs long (60%) and eases into the card's own ink over a wide stretch, so the details
    sit on a soft fade rather than a band; it reaches the full ink just before the cover ends, so no edge shows. */
-.pc-card.pc-tile { position: relative; display: flex; min-height: 168px; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--pc-ink); }
+.pc-card.pc-tile { position: relative; display: flex; min-height: 10.5rem; aspect-ratio: auto; padding: 0; border: 1px solid var(--border); background: var(--pc-ink); }
 .pc-tile .pc-open { position: absolute; inset: 0 auto 0 0; width: 60%; height: 100%; }
-.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 6px; padding: 14px 14px 14px 40%; background: linear-gradient(90deg, transparent 14%, color-mix(in srgb, var(--pc-ink) 8%, transparent) 21%, color-mix(in srgb, var(--pc-ink) 22%, transparent) 28%, color-mix(in srgb, var(--pc-ink) 42%, transparent) 35%, color-mix(in srgb, var(--pc-ink) 64%, transparent) 42%, color-mix(in srgb, var(--pc-ink) 82%, transparent) 49%, color-mix(in srgb, var(--pc-ink) 94%, transparent) 55%, var(--pc-ink) 59%); pointer-events: none; }
+.pc-tile .pc-info { position: relative; inset: auto; flex: 1; justify-content: center; gap: 0.375rem; padding: 0.875rem 0.875rem 0.875rem 40%; background: linear-gradient(90deg, transparent 14%, color-mix(in srgb, var(--pc-ink) 8%, transparent) 21%, color-mix(in srgb, var(--pc-ink) 22%, transparent) 28%, color-mix(in srgb, var(--pc-ink) 42%, transparent) 35%, color-mix(in srgb, var(--pc-ink) 64%, transparent) 42%, color-mix(in srgb, var(--pc-ink) 82%, transparent) 49%, color-mix(in srgb, var(--pc-ink) 94%, transparent) 55%, var(--pc-ink) 59%); pointer-events: none; }
 .pc-tile .pc-info::before { display: none; }
 .pc-tile .pc-info > * { pointer-events: auto; }
 .pc-tile .pc-info .pc-info-title { display: -webkit-box; font-size: var(--fs-l); font-weight: 600; line-height: 1.25; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .pc-tile .pc-info .pc-info-sub { color: color-mix(in srgb, var(--pc-on-ink) 78%, transparent); }
 .pc-tile .pc-hover { opacity: 1; }
-.pc-tile .pc-stat b { font-size: calc(14px * var(--text-scale, 1)); }
-.pc-tile .pc-stat small { font-size: calc(10.5px * var(--text-scale, 1)); }
+.pc-tile .pc-stat b { font-size: 0.875rem; }
+.pc-tile .pc-stat small { font-size: 0.6563rem; }
 .pc-fade.is-hidden-item .pc-info, .pc-tile.is-hidden-item .pc-info { opacity: .55; }
-.pc-row .pc-go { height: calc(26px*var(--text-scale)); margin-right: 4px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-3); font-size: var(--fs-s); opacity: 0; transition: opacity .12s; }
+.pc-row .pc-go { height: 1.625rem; margin-right: 0.25rem; padding: 0 0.875rem; border: 0; border-radius: 999px; background: var(--surface-3); font-size: var(--fs-s); opacity: 0; transition: opacity .12s; }
 .pc-row:is(:hover, :focus-within) .pc-go { opacity: 1; }
 .pc-row .pc-go:hover { background: var(--surface-hover); }
 /* Rows borrow the cards' hierarchy without their fade: a larger cover, a bolder title and the main action as a pill on hover. */
-.pc-cols .pc-row { padding-top: 7px; padding-bottom: 7px; }
-.pc-cols .pc-row .pc-thumb { width: 44px; height: 44px; border-radius: 8px; }
+.pc-cols .pc-row { padding-top: 0.4375rem; padding-bottom: 0.4375rem; }
+.pc-cols .pc-row .pc-thumb { width: 2.75rem; height: 2.75rem; border-radius: 8px; }
 .pc-cols .pc-row .pc-info-title { font-weight: 600; }
 /* The sort strip scrolls under its end (show hidden, show archived): the strip has no right padding, so nothing shows
    past the end, and the end fades the labels that slide beneath it. */
 .pc-sort-strip { padding-right: 0; }
-.pc-sort-strip .pc-strip-end { padding-right: 12px; box-shadow: -14px 0 10px -4px var(--bg-canvas); }
+.pc-sort-strip .pc-strip-end { padding-right: 0.75rem; box-shadow: -14px 0 10px -4px var(--bg-canvas); }
 /* Drawer resize: a thin handle on the right edge (not while expanded). */
-.side-panel-resize { position: absolute; top: 0; bottom: 0; right: -3px; width: 6px; cursor: col-resize; z-index: 6; touch-action: none; }
+.side-panel-resize { position: absolute; top: 0; bottom: 0; right: -0.1875rem; width: 0.375rem; cursor: col-resize; z-index: 6; touch-action: none; }
 .side-panel-resize:hover, .side-panel-resize.is-dragging, .side-panel-resize:focus-visible { background: var(--accent-line); outline: none; }

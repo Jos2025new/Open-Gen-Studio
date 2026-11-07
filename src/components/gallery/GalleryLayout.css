@@ -1,61 +1,61 @@
-.generated-controls, .side-panel.is-expanded .generated-controls { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; }
+.generated-controls, .side-panel.is-expanded .generated-controls { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0.5rem; }
 .generated-controls > .pc-bar { width: 100%; box-sizing: border-box; }
-.pc-sub { display: flex; flex-direction: column; gap: 6px; padding: 6px 12px 0; }
+.pc-sub { display: flex; flex-direction: column; gap: 0.375rem; padding: 0.375rem 0.75rem 0; }
 .pc-sub:empty { display: none; }
-.pc-sub .gallery-bulk { padding-bottom: 4px; }
+.pc-sub .gallery-bulk { padding-bottom: 0.25rem; }
 .side-panel.panel-gallery { border-color: var(--border); box-shadow: 0 12px 32px rgba(0, 0, 0, .225), 0 2px 8px rgba(0, 0, 0, .15); }
 [data-base="claro"] .side-panel.panel-gallery, [data-base="blanco"] .side-panel.panel-gallery { box-shadow: 0 6px 18px rgba(60, 64, 67, .06), 0 2px 6px rgba(60, 64, 67, .0375); }
-.gallery-grid.pc-cols { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.gallery-grid.pc-cols { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
 .g-tile.pc-row { aspect-ratio: auto; overflow: visible; }
 .g-tile.pc-row .g-open { position: relative; }
 .g-tile.pc-row .g-remote { position: static; flex: none; }
-.pc-text-card { padding: 10px; }
+.pc-text-card { padding: 0.625rem; }
 .pc-text-card .gen-text { height: 100%; overflow: hidden; }
 .pc-text-card .gen-text-actions { position: relative; z-index: 2; opacity: 0; transition: opacity .12s; }
 .pc-text-card:hover .gen-text-actions, .pc-text-card:focus-within .gen-text-actions, .pc-text-card.is-armed .gen-text-actions { opacity: 1; }
 .pc-row .pc-text { background: none; padding: 0; border: 0; }
 /* The agent-context box sits beside the select checkbox; it is always visible once the asset is in the context. */
-.pc-row .pc-tools .attach-toggle { position: static; flex: none; width: 27px; height: 27px; border-radius: 6px; background: none; backdrop-filter: none; opacity: 1; color: var(--text-3); }
+.pc-row .pc-tools .attach-toggle { position: static; flex: none; width: 1.6875rem; height: 1.6875rem; border-radius: 6px; background: none; backdrop-filter: none; opacity: 1; color: var(--text-3); }
 .pc-row .pc-tools .attach-toggle:hover, .pc-row .pc-tools .attach-toggle:focus-visible { background: none; color: var(--text); }
 .pc-row .pc-tools .attach-toggle-box.is-glyph { width: auto; height: auto; border: 0; color: inherit; }
-.pc-row .pc-tools .attach-toggle-box.is-glyph svg { width: calc(16px * var(--text-scale, 1)); height: calc(16px * var(--text-scale, 1)); stroke-width: 1.75; }
-.pc-row .pc-tools .attach-toggle.is-on .attach-toggle-box { width: 18px; height: 18px; border-radius: 50%; font-size: calc(10px * var(--text-scale, 1)); }
+.pc-row .pc-tools .attach-toggle-box.is-glyph svg { width: 1rem; height: 1rem; stroke-width: 1.75; }
+.pc-row .pc-tools .attach-toggle.is-on .attach-toggle-box { width: 1.125rem; height: 1.125rem; border-radius: 50%; font-size: 0.625rem; }
 /* Card view: justified rows (equal row height, widths follow each tile's ratio). */
-.gallery-grid.jg { display: flex; flex-direction: column; grid-template-columns: none; padding: 12px; }
+.gallery-grid.jg { display: flex; flex-direction: column; grid-template-columns: none; padding: 0.75rem; }
 .jg-row { display: flex; flex: none; }
 .jg-cell { flex: none; min-width: 0; }
 .jg-cell > .g-tile, .jg-cell > .text-result-tile { width: 100%; height: 100%; aspect-ratio: auto; }
 
 /* List columns: model and parameters beside the name, sortable from the header. A narrow panel folds them back under the title. */
-.gallery { --pc-w-model: 170px; --pc-w-aspect: 64px; --pc-w-resolution: 84px; --pc-w-duration: 64px; --pc-w-date: 84px; --pc-w-tools: 150px; }
+.gallery { --pc-w-model: 10.625rem; --pc-w-aspect: 4rem; --pc-w-resolution: 5.25rem; --pc-w-duration: 4rem; --pc-w-date: 5.25rem; --pc-w-tools: 9.375rem; }
 .pc-col-model { width: var(--pc-w-model); }
 .pc-col-aspect { width: var(--pc-w-aspect); }
 .pc-col-resolution { width: var(--pc-w-resolution); }
 .pc-col-duration { width: var(--pc-w-duration); }
 
 /* Cards view: horizontal tiles in automatic columns, as in Sessions. */
-.gallery-grid.library-layout-tile { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
+.gallery-grid.library-layout-tile { grid-template-columns: repeat(auto-fill, minmax(22.5rem, 1fr)); gap: 0.625rem; }
 .library-layout-tile > .g-tile, .library-layout-tile > .text-result-tile { aspect-ratio: auto; }
 /* Grid cards keep the justified rows and give the image room: on hover, focus or first tap a short fade holds a one-line
    title, the model and parameters on one line and a compact action row; narrow cards keep only the icon buttons. */
 .jg-cell > .pc-fade { container-type: inline-size; }
-.jg-cell > .pc-fade .pc-info { gap: 3px; padding: 40px 10px 10px; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 55%, transparent) 40%, color-mix(in srgb, var(--pc-ink) 85%, transparent)); }
+.jg-cell > .pc-fade .pc-info { gap: 0.1875rem; padding: 2.5rem 0.625rem 0.625rem; background: linear-gradient(transparent, color-mix(in srgb, var(--pc-ink) 55%, transparent) 40%, color-mix(in srgb, var(--pc-ink) 85%, transparent)); }
 .jg-cell > .pc-fade .pc-info .pc-info-title { display: block; font-size: var(--fs-m); -webkit-line-clamp: unset; white-space: nowrap; }
 .jg-cell > .pc-fade .pc-info-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jg-cell > .pc-fade .pc-card-actions { gap: 4px; margin-top: 5px; }
-.jg-cell > .pc-fade .pc-card-actions .btn { height: calc(26px*var(--text-scale)); padding: 0 10px; font-size: var(--fs-s); white-space: nowrap; }
-.jg-cell > .pc-fade .pc-card-actions .pc-tools { gap: 4px; }
-.jg-cell > .pc-fade .pc-card-actions .icon-btn, .jg-cell > .pc-fade .pc-card-actions .attach-toggle { width: 26px; height: 26px; }
+.jg-cell > .pc-fade .pc-card-actions { gap: 0.25rem; margin-top: 0.3125rem; }
+.jg-cell > .pc-fade .pc-card-actions .btn { height: 1.625rem; padding: 0 0.625rem; font-size: var(--fs-s); white-space: nowrap; }
+.jg-cell > .pc-fade .pc-card-actions .pc-tools { gap: 0.25rem; }
+.jg-cell > .pc-fade .pc-card-actions .icon-btn, .jg-cell > .pc-fade .pc-card-actions .attach-toggle { width: 1.625rem; height: 1.625rem; }
 /* Narrow cards keep every action: Use as reference shrinks to its icon. */
 @container (max-width: 230px) {
-  .pc-card-actions .btn { flex: none; width: 26px; padding: 0; }
+  .pc-card-actions .btn { flex: none; width: 1.625rem; padding: 0; }
   .pc-card-actions .btn .btn-label { display: none; }
   .pc-card-actions .pc-tools { margin-left: auto; }
 }
 /* The agent-context toggle in a card's action row shows its paperclip like the other icons, not a box. */
 .pc-card-actions .attach-toggle-box.is-glyph { width: auto; height: auto; border: 0; color: var(--pc-btn-fg); }
-.pc-card-actions .attach-toggle-box.is-glyph svg { width: calc(15px * var(--text-scale, 1)); height: calc(15px * var(--text-scale, 1)); stroke-width: 1.75; }
-.pc-card-actions .attach-toggle { position: static; display: grid; place-items: center; width: 30px; height: 30px; opacity: 1; }
+.pc-card-actions .attach-toggle-box.is-glyph svg { width: 0.9375rem; height: 0.9375rem; stroke-width: 1.75; }
+.pc-card-actions .attach-toggle { position: static; display: grid; place-items: center; width: 1.875rem; height: 1.875rem; opacity: 1; }
 .pc-card-actions .btn .btn-label { overflow: hidden; text-overflow: ellipsis; }
 /* A text result's tile has no image: its glyph stands in for the cover. */
 .pc-tile .pc-glyph-cover { display: grid; place-items: center; color: var(--text-3); background: var(--surface-3); }

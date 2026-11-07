@@ -7,7 +7,7 @@ const chat = readFileSync('src/styles/chat.css', 'utf8');
 
 describe('a failed result in a row of results', () => {
   it('fits its column and wraps long provider ids', () => {
-    expect(chat).toMatch(/\.gen-card\.status-error, \.gen-card\.status-canceled \{[^}]*min-width: 300px/);
+    expect(chat).toMatch(/\.gen-card\.status-error, \.gen-card\.status-canceled \{[^}]*min-width: 18\.75rem/);
     expect(studio).toMatch(/\.feed-gen-grid \.gen-card \{ width: 100%; min-width: 0; max-width: 100%; overflow-wrap: anywhere; \}/);
   });
 });

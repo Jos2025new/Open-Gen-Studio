@@ -31,7 +31,7 @@ it('the prompt box is centered on that same line, narrowing to clear the panel',
   expect(readFileSync('src/components/designer/LayersPanel.tsx', 'utf8')).toContain("root.setProperty('--layers-w', collapsed ? '0px' : `${width}px`);");
   // The bar takes the prompt box's width: no jump when one replaces the other.
   expect(css).toContain('.composer-dock .composer:has(.composer-tools-bar) { width: 100%; }');
-  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(800px, calc(100% - 48px)); }');
-  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock:is\(\.dock-chat, \.dock-node\), [^{]*\{ width: min\(800px, calc\(100% - 192px\)\); \}/);
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(50rem, calc(100% - 3rem)); }');
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock:is\(\.dock-chat, \.dock-node\), [^{]*\{ width: min\(50rem, calc\(100% - 12rem\)\); \}/);
   expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).toContain('fitView(size, doc, board)');
 });

@@ -65,7 +65,7 @@ describe('C7b plan card (awaiting)', () => {
     await mount(createElement(PlanCard, { item: plan(), sessionId: sid() }));
     expect(host.querySelector('article')?.classList.contains('cc-w')).toBe(true);
     const css = readFileSync('src/styles/chat-cards.css', 'utf8');
-    expect(css).toMatch(/\.cc-w \{ width: min\(620px, 100%\); margin-right: auto; \}/);
+    expect(css).toMatch(/\.cc-w \{ width: min\(38\.75rem, 100%\); margin-right: auto; \}/);
     const items = [...host.querySelectorAll('.cc-var .cc-coll')];
     expect(items).toHaveLength(2);
     expect(items.every((c) => c.querySelector('.cc-ctext.is-clamped'))).toBe(true);

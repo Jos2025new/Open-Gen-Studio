@@ -96,14 +96,14 @@ it('Nodes keeps the floating prompt box; Create attaches through its picker; the
   expect(readFileSync('src/components/node/NodeSide.tsx', 'utf8')).toMatch(/window\.dispatchEvent\(new Event\('ogs:attach'\)\)/);
   expect(readFileSync('src/components/node/SelectionPanel.tsx', 'utf8')).toMatch(/<NodeSide sessionId=\{sessionId\} \/>/);
   const css = readFileSync('src/styles/node-side.css', 'utf8');
-  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-node::before, \.composer-dock\.dock-designer::before \{ content: ''[^}]*inset: -12px -100vw -40px; background: var\(--bg-canvas\); pointer-events: none; \}/);
+  expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-node::before, \.composer-dock\.dock-designer::before \{ content: ''[^}]*inset: -0\.75rem -100vw -2\.5rem; background: var\(--bg-canvas\); pointer-events: none; \}/);
   expect(readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8')).toMatch(/\{add\}\s*<CornerButtons sessionId=\{sessionId\} \/>\s*<span className="canvas-nav-sep" \/>/);
   expect(css).toMatch(/body:has\(\.canvas-nav-pop, \.node-lib-pop\) \.react-flow__panel\.node-side, \.react-flow:has\(\.canvas-map\) \.react-flow__panel\.node-side \{ display: none; \}/);
   const node = readFileSync('src/styles/node.css', 'utf8');
-  expect(node).toMatch(/:root \{ --canvas-pop-gap: 6px; \}/);
+  expect(node).toMatch(/:root \{ --canvas-pop-gap: 0\.375rem; \}/);
   expect(node).toMatch(/\.popover\.node-lib-pop, \.popover\.canvas-nav-pop, \.popover\.designs-pop \{ margin-left: calc\(var\(--canvas-pop-gap\) - 1px\); border-color: var\(--panel-line\); border-radius: var\(--toolbar-radius\); \}/);
-  expect(css).toMatch(/\.react-flow__panel\.node-side \{ left: calc\(var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 2px \+ var\(--canvas-pop-gap\)\);/);
-  expect(css).toMatch(/\.react-flow__panel\.node-side \{[^}]*max-height: calc\(100% - var\(--composer-height, 120px\) - 60px\);[^}]*border: 1px solid var\(--bar-line\); border-radius: var\(--toolbar-radius\)/);
+  expect(css).toMatch(/\.react-flow__panel\.node-side \{ left: calc\(var\(--control-h\) \+ 2 \* var\(--toolbar-padding\) \+ 0\.125rem \+ var\(--canvas-pop-gap\)\);/);
+  expect(css).toMatch(/\.react-flow__panel\.node-side \{[^}]*max-height: calc\(100% - var\(--composer-height, 7\.5rem\) - 3\.75rem\);[^}]*border: 1px solid var\(--bar-line\); border-radius: var\(--toolbar-radius\)/);
 });
 
 it('the selected result is a compact card: model, prompt, inputs, settings chips, then Reusar · Copy · All details on one line', () => {
@@ -112,7 +112,7 @@ it('the selected result is a compact card: model, prompt, inputs, settings chips
   expect(order.every((i) => i > 0)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   expect(src).toContain('className="cc-mini num"');
-  expect(readFileSync('src/styles/node-side.css', 'utf8')).toMatch(/\.react-flow__panel\.node-side\.has-result \{ width: min\(280px/);
+  expect(readFileSync('src/styles/node-side.css', 'utf8')).toMatch(/\.react-flow__panel\.node-side\.has-result \{ width: min\(17\.5rem/);
 });
 
 it('Create uses the grid icon; Auto layout in the toolbox uses the tidy-blocks icon (not the Nodes icon), so the two never look alike', () => {

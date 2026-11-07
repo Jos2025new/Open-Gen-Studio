@@ -85,7 +85,7 @@ it('the CSS: High is the inverse of Soft on text and lines, and the text scale m
   expect(high).toMatch(/--border: color-mix\(in oklab, var\(--hc-ink\)/);
   expect(high).toMatch(/\[data-base="claro"\][^{]*\{ --hc-ink: #000/);
   const acc = readFileSync('src/styles/accessibility.css', 'utf8');
-  expect(acc).toMatch(/--fs-m: calc\(13px \* var\(--text-scale\)\)/);
+  expect(acc).toMatch(/html \{ font-size: calc\(16px \* var\(--text-scale, 1\)\); \}/);
   expect(acc).toMatch(/html\.focus-strong :focus-visible \{[^}]*var\(--accent\)/);
   expect(acc).toMatch(/html\.reduce-motion \*/);
 });
@@ -147,8 +147,8 @@ it('a storage event from another tab updates contrast, text size, motion, focus 
 });
 
 it('the CSS: icon and control tokens follow Text size too', () => {
-  const acc = readFileSync('src/styles/accessibility.css', 'utf8');
-  for (const t of ['--control-h', '--control-icon', '--feed-icon', '--topbar-h']) expect(acc).toMatch(new RegExp(`${t}: calc\\(\\d+px \\* var\\(--text-scale\\)\\)`));
+  const tokens = readFileSync('src/styles/tokens.css', 'utf8');
+  for (const t of ['--control-h', '--control-icon', '--feed-icon', '--topbar-h']) expect(tokens).toMatch(new RegExp(`${t}: [\\d.]+rem`));
 });
 
 it('text size keeps stepping when storage is full (setItem throws, getItem still returns the old value)', () => {

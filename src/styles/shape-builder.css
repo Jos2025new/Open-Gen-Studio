@@ -1,8 +1,8 @@
 /* Combine shapes (BooleanOps.tsx) and the Shape Builder overlay (ShapeBuilder.tsx). Cards and themes are untouched: only existing tokens. */
-.boolean-ops { display: inline-flex; align-items: center; gap: 2px; }
-.boolean-ops .boolean-more { padding: 0 4px; min-width: 0; }
+.boolean-ops { display: inline-flex; align-items: center; gap: 0.125rem; }
+.boolean-ops .boolean-more { padding: 0 0.25rem; min-width: 0; }
 .boolean-ops .icon-btn:disabled { opacity: .45; }
-.edit-card .boolean-ops { margin-top: 4px; }
+.edit-card .boolean-ops { margin-top: 0.25rem; }
 .shape-builder { pointer-events: auto; cursor: crosshair; touch-action: none; }
 .shape-builder .sb-face { fill: url(#sb-hatch); stroke: var(--accent); stroke-width: 1.5; pointer-events: none; }
 .shape-builder .sb-face.is-touched { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -12,8 +12,8 @@
 .shape-builder line.sb-hatch-del { stroke: var(--danger); stroke-width: 1; opacity: .75; }
 .shape-builder .sb-trail { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .shape-builder .sb-trail.is-delete { stroke: var(--danger); }
-.shape-builder-mode { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); background: var(--surface); border-radius: 5px; }
-.shape-builder-mode .sb-mode { height: calc(24px*var(--text-scale)); padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--text-2); font-size: var(--fs-s); cursor: pointer; }
+.shape-builder-mode { position: absolute; left: 50%; bottom: 0.75rem; transform: translateX(-50%); display: inline-flex; gap: 0.125rem; padding: 0.125rem; border: 1px solid var(--border); background: var(--surface); border-radius: 5px; }
+.shape-builder-mode .sb-mode { height: 1.5rem; padding: 0 0.625rem; border: 0; border-radius: 4px; background: transparent; color: var(--text-2); font-size: var(--fs-s); cursor: pointer; }
 .shape-builder-mode .sb-mode:hover { color: var(--text); }
 .shape-builder-mode .sb-mode.is-on { background: var(--surface-3); color: var(--text); }
 .shape-builder-mode .sb-mode.is-on.is-delete { color: var(--danger); }

@@ -8,28 +8,9 @@
   height: calc(var(--icon-size) * var(--text-scale, 1));
 }
 
-/* Text size: the app sets its sizes in px, so html[data-text-scale] (with --text-scale on <html>) multiplies the font-size
-   tokens and the body size instead of zooming; sizes written as literal px in a component rule do not follow it. */
-html[data-text-scale] {
-  --fs-xs: calc(11px * var(--text-scale));
-  --fs-s: calc(12px * var(--text-scale));
-  --fs-m: calc(13px * var(--text-scale));
-  --fs-l: calc(15px * var(--text-scale));
-  --fs-xl: calc(20px * var(--text-scale));
-  --fs-title: calc(16px * var(--text-scale));
-  --fs-chat: calc(15px * var(--text-scale));
-  /* Icon and control/bar sizes follow Text size too (tokens.css values), so icons and fixed-height rows keep up with the text. */
-  --control-h: calc(32px * var(--text-scale));
-  --control-icon: calc(18px * var(--text-scale));
-  --feed-icon: calc(13px * var(--text-scale));
-  --slider-thumb: calc(14px * var(--text-scale));
-  --topbar-h: calc(48px * var(--text-scale));
-}
-html[data-text-scale] .icon-btn-sm { width: calc(27px * var(--text-scale)); height: calc(27px * var(--text-scale)); }
-html[data-text-scale] .icon-btn-lg { width: calc(38px * var(--text-scale)); height: calc(38px * var(--text-scale)); }
-
-/* Fixed px heights on text controls are written as calc(Npx * var(--text-scale, 1)) in each stylesheet (scripts/find-fixed-text-heights.mjs
-   lists any that don't), so rows grow with the text from 112.5 % on. */
+/* Text size: interface lengths are in rem (scripts/px-to-rem.mjs), so one root font-size scales text, icons, controls and
+   spacing together, like Dynamic Type. The canvas draws in px from JS and does not follow it. */
+html { font-size: calc(16px * var(--text-scale, 1)); }
 
 /* Reduce motion: on by default when the OS asks for it (base.css), or when the user switches it on. */
 html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after {

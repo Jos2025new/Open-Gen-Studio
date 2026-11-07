@@ -1,17 +1,17 @@
 /* Compact the top-bar panels without removing their controls. */
-.generations-popover .generations-panel { max-height: min(600px, calc(100dvh - var(--topbar-h) - 24px)); }
-.generations-popover .panel-head { padding: 10px 12px; }
-.generations-popover .sessions-controls { padding: 8px 10px; }
-.generations-popover .generations-list { padding: 4px 6px 8px; }
-.generations-popover .gen-row { gap: 9px; padding: 6px 8px; }
-.generations-popover .gen-row-thumb { flex-basis: 44px; width: 44px; height: 44px; }
+.generations-popover .generations-panel { max-height: min(37.5rem, calc(100dvh - var(--topbar-h) - 1.5rem)); }
+.generations-popover .panel-head { padding: 0.625rem 0.75rem; }
+.generations-popover .sessions-controls { padding: 0.5rem 0.625rem; }
+.generations-popover .generations-list { padding: 0.25rem 0.375rem 0.5rem; }
+.generations-popover .gen-row { gap: 0.5625rem; padding: 0.375rem 0.5rem; }
+.generations-popover .gen-row-thumb { flex-basis: 2.75rem; width: 2.75rem; height: 2.75rem; }
 .generations-popover .gen-row-error { white-space: normal; overflow-wrap: anywhere; }
-.settings-popover .settings { max-height: min(620px, calc(100dvh - var(--topbar-h) - 32px)); overflow-y: auto; }
-.settings-popover .pop-head { padding: 8px 10px; }
-.settings-popover .set-section { padding: 10px; }
-.settings-popover .settings .set-row { margin: 7px 0; }
-.settings-popover .settings .prov-row { padding: 6px 0; }
+.settings-popover .settings { max-height: min(38.75rem, calc(100dvh - var(--topbar-h) - 2rem)); overflow-y: auto; }
+.settings-popover .pop-head { padding: 0.5rem 0.625rem; }
+.settings-popover .set-section { padding: 0.625rem; }
+.settings-popover .settings .set-row { margin: 0.4375rem 0; }
+.settings-popover .settings .prov-row { padding: 0.375rem 0; }
 /* Generations from the top bar: a narrower list with smaller thumbnails (it shows one line of facts per run). */
-.generations-popover .gen-row { gap: 8px; padding: 5px 8px; }
-.generations-popover .gen-row-thumb { flex-basis: 34px; width: 34px; height: 34px; }
-.generations-popover .panel-head { padding: 8px 12px; }
+.generations-popover .gen-row { gap: 0.5rem; padding: 0.3125rem 0.5rem; }
+.generations-popover .gen-row-thumb { flex-basis: 2.125rem; width: 2.125rem; height: 2.125rem; }
+.generations-popover .panel-head { padding: 0.5rem 0.75rem; }

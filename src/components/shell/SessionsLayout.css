@@ -1,10 +1,10 @@
-.sessions-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.sessions-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.375rem; }
 .sessions .date-head { align-items: center; }
 
 /* Card view: a grid of image-first cards; list view: compact rows. */
-.sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; padding: 4px 12px 8px; }
-.sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 10px; }
+.sessions .session-list { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 0.375rem; padding: 0.25rem 0.75rem 0.5rem; }
+.sessions.layout-list .session-list { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+.sessions.layout-tile .session-list { grid-template-columns: repeat(auto-fill, minmax(22.5rem, 1fr)); gap: 0.625rem; }
 .sess-card.pc-card { aspect-ratio: 3 / 4; }
 .sess-card .pc-hover { opacity: 1; }
 .pc-card .pc-open-tag { color: var(--accent); }
@@ -17,7 +17,7 @@
 .sess-row .pc-text { cursor: pointer; }
 .sess-row .sess-cover { border-radius: 7px; }
 /* List columns: mode, counts and spend beside the name, sortable and resizable from the header. */
-.sessions { --pc-w-mode: 72px; --pc-w-gens: 84px; --pc-w-nodes: 56px; --pc-w-designs: 64px; --pc-w-spend: 64px; --pc-w-date: 64px; --pc-w-tools: 210px; }
+.sessions { --pc-w-mode: 4.5rem; --pc-w-gens: 5.25rem; --pc-w-nodes: 3.5rem; --pc-w-designs: 4rem; --pc-w-spend: 4rem; --pc-w-date: 4rem; --pc-w-tools: 13.125rem; }
 /* Sessions rows: figures that read as figures. */(shown on hover or focus; the open session keeps its Open tag). */
 .sess-row .pc-col.num { color: var(--text); font-size: var(--fs-m); font-weight: 600; }
 .pc-col-mode { width: var(--pc-w-mode); }
@@ -32,4 +32,4 @@
 [data-base="claro"] .side-panel.panel-sessions, [data-base="blanco"] .side-panel.panel-sessions { box-shadow: 0 6px 18px rgba(60, 64, 67, .06), 0 2px 6px rgba(60, 64, 67, .0375); }
 
 /* Grid: the size slider sets the most columns; a card never gets narrower than 150px, so a narrow drawer shows fewer. */
-.sessions.layout-card .session-list { grid-template-columns: repeat(auto-fill, minmax(max(150px, calc((100% - (var(--cols, 3) - 1) * 6px) / var(--cols, 3))), 1fr)); }
+.sessions.layout-card .session-list { grid-template-columns: repeat(auto-fill, minmax(max(9.375rem, calc((100% - (var(--cols, 3) - 1) * 0.375rem) / var(--cols, 3))), 1fr)); }

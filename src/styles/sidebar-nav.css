@@ -1,30 +1,30 @@
 /* Sidebar destinations (SidebarNav.tsx) and the narrow bar's icon-only rule. Tokens only. */
 .side-scroll { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: var(--sp-1); scrollbar-width: thin; }
 .sidebar:not(.is-wide) .side-label { display: none; }
-.sidebar:not(.is-wide) .side-btn { height: calc(36px*var(--text-scale)); }
+.sidebar:not(.is-wide) .side-btn { height: 2.25rem; }
 /* Narrow bar: a hairline between the spaces and the Create and Tools flyouts. */
-.sidebar:not(.is-wide) .side-scroll .side-sep { width: 20px; margin: var(--sp-1) auto; }
+.sidebar:not(.is-wide) .side-scroll .side-sep { width: 1.25rem; margin: var(--sp-1) auto; }
 .nav-section { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-2); }
 .nav-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-1) var(--sp-2); color: var(--text-3); font-size: var(--fs-s); }
 .nav-head:hover { color: var(--text-2); }
 .nav-head svg { transition: transform .12s; }
 .nav-head svg.is-closed { transform: rotate(-90deg); }
-.nav-list { display: flex; flex-direction: column; gap: 2px; }
+.nav-list { display: flex; flex-direction: column; gap: 0.125rem; }
 .nav-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-1); }
 .nav-item { display: flex; align-items: center; gap: var(--sp-2); border-radius: var(--r-s); color: var(--text-2); font-size: var(--fs-m); text-align: left; }
 .nav-item:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
 .nav-item:disabled { opacity: .5; cursor: default; }
 .nav-item.is-active { color: var(--active-text); background: var(--active-bg); }
-.nav-item.is-row { height: calc(30px*var(--text-scale)); padding: 0 var(--sp-2); }
-.nav-list.is-tall .nav-item.is-row { height: calc(38px*var(--text-scale)); }
-.nav-item.is-tile { flex-direction: column; justify-content: center; gap: var(--sp-1); height: 56px; padding: var(--sp-1); font-size: var(--fs-s); border: 1px solid var(--border); border-radius: var(--r-m); }
+.nav-item.is-row { height: 1.875rem; padding: 0 var(--sp-2); }
+.nav-list.is-tall .nav-item.is-row { height: 2.375rem; }
+.nav-item.is-tile { flex-direction: column; justify-content: center; gap: var(--sp-1); height: 3.5rem; padding: var(--sp-1); font-size: var(--fs-s); border: 1px solid var(--border); border-radius: var(--r-m); }
 .nav-soon { margin-left: auto; font-size: var(--fs-xs); color: var(--text-4); }
 .nav-more { color: var(--text-3); font-size: var(--fs-s); }
 .nav-flyout-title { padding: var(--sp-3) var(--sp-3) var(--sp-2); font-size: var(--fs-m); font-weight: 600; color: var(--text); }
 .nav-flyout { display: grid; gap: var(--sp-2); padding: 0 var(--sp-3) var(--sp-3); }
-.nav-flyout .nav-item.is-tile { height: 84px; gap: var(--sp-2); text-align: center; line-height: 1.25; background: var(--surface-3); border-color: var(--border); font-size: var(--fs-s); color: var(--text); }
+.nav-flyout .nav-item.is-tile { height: 5.25rem; gap: var(--sp-2); text-align: center; line-height: 1.25; background: var(--surface-3); border-color: var(--border); font-size: var(--fs-s); color: var(--text); }
 .nav-flyout .nav-item.is-tile:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
-.nav-flyout .nav-item.is-tile svg { width: calc(20px * var(--text-scale, 1)); height: calc(20px * var(--text-scale, 1)); }
+.nav-flyout .nav-item.is-tile svg { width: 1.25rem; height: 1.25rem; }
 .popover:has(.nav-flyout) { padding: 0; border-radius: var(--r-m); }
 /* The narrow bar is 48px (the theme token keeps 56px; this layout rule wins over it). */
-html:root:not(.sidebar-wide), html:root.sidebar-folded { --sidebar-w: 48px; }
+html:root:not(.sidebar-wide), html:root.sidebar-folded { --sidebar-w: 3rem; }

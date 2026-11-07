@@ -25,6 +25,7 @@ import './styles/node.css';
 import './styles/designer.css';
 import './styles/prompt-box.css';
 import './styles/designer-connected.css';
+import './styles/designer-connected-2.css';
 import './styles/sidebar-nav.css';
 import './styles/home.css';
 import './styles/space.css';

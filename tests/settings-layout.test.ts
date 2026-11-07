@@ -80,7 +80,7 @@ it('the soft rule only moves surfaces, borders and what derives from them: never
 
 it('the brightness hierarchy dims and shrinks the frame icons, steps the composer and bubble up, and lifts conversation text', () => {
   const css = readFileSync('src/styles/hierarchy.css', 'utf8');
-  expect(css).toMatch(/\.side-btn svg \{ width: calc\(16px \* var\(--text-scale, 1\)\); height: calc\(16px \* var\(--text-scale, 1\)\); \}/);
+  expect(css).toMatch(/\.side-btn svg \{ width: 1rem; height: 1rem; \}/);
   expect(css).toMatch(/:not\(:hover\)[^{]*svg \{ color: var\(--text-3\); \}/);
   expect(css).toMatch(/:root \.composer \{ background: var\(--bar-bg\); \}/);
   expect(css).toMatch(/:root \.bubble \{ background: var\(--surface-2\); \}/);
@@ -90,7 +90,7 @@ it('the brightness hierarchy dims and shrinks the frame icons, steps the compose
 
 it('the top bar follows the same hierarchy: a brighter, larger title, one icon size, dimmed icons', () => {
   const css = readFileSync('src/styles/hierarchy.css', 'utf8');
-  expect(css).toMatch(/\.session-title-btn \{ color: var\(--text\); font-size: calc\(14px \* var\(--text-scale, 1\)\)/);
-  expect(css).toMatch(/\.topbar-right > \.icon-btn \{ width: calc\(30px \* var\(--text-scale, 1\)\); height: calc\(30px \* var\(--text-scale, 1\)\); color: var\(--text-3\); \}/);
-  expect(css).toMatch(/\.topbar-menu \{ height: calc\(30px\*var\(--text-scale\)\); padding: 0 10px; font-size: var\(--fs-m\)/);
+  expect(css).toMatch(/\.session-title-btn \{ color: var\(--text\); font-size: 0\.875rem/);
+  expect(css).toMatch(/\.topbar-right > \.icon-btn \{ width: 1\.875rem; height: 1\.875rem; color: var\(--text-3\); \}/);
+  expect(css).toMatch(/\.topbar-menu \{ height: 1\.875rem; padding: 0 0\.625rem; font-size: var\(--fs-m\)/);
 });

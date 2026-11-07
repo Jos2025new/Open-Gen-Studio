@@ -8,10 +8,10 @@ const chip = readFileSync('src/components/chat/ChipPop.tsx', 'utf8');
 
 describe('the plan card chip popovers', () => {
   it('size to their content with moderate padding and the popover radius', () => {
-    expect(cards).toMatch(/\.cc-pop-plan \{ width: max-content; padding: 10px; border-radius: var\(--pop-radius\); \}/);
+    expect(cards).toMatch(/\.cc-pop-plan \{ width: max-content; padding: 0\.625rem; border-radius: var\(--pop-radius\); \}/);
   });
   it('keep the shared .cc-pop look for every other popover', () => {
-    expect(cards).toMatch(/\.cc-pop \{ background: var\(--surface-3\); border-radius: 16px; padding: 14px;/);
+    expect(cards).toMatch(/\.cc-pop \{ background: var\(--surface-3\); border-radius: 16px; padding: 0\.875rem;/);
   });
   it('are marked only when the chip sits inside the plan card', () => {
     expect(chip).toMatch(/closest\('\.plan-card'\)/);

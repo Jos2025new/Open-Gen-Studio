@@ -1,9 +1,9 @@
-.switch-head { display: flex; align-items: center; gap: 6px; margin: 7px; }
+.switch-head { display: flex; align-items: center; gap: 0.375rem; margin: 0.4375rem; }
 .switch-head .ml-search { flex: 1; min-width: 0; margin: 0; }
 .switch-head .session-new { flex-shrink: 0; }
-.switch-row.is-selecting .session-check { width: 18px; opacity: 1; margin-right: 0; border-width: 1px; }
+.switch-row.is-selecting .session-check { width: 1.125rem; opacity: 1; margin-right: 0; border-width: 1px; }
 /* A short search, then the actions on the same row: the workspace's (Import from Chat…), select several, new session. */
-.switch-head { gap: 2px; }
-.switch-head .ml-search { padding: 3px 8px; margin-right: 4px; font-size: var(--fs-s); }
+.switch-head { gap: 0.125rem; }
+.switch-head .ml-search { padding: 0.1875rem 0.5rem; margin-right: 0.25rem; font-size: var(--fs-s); }
 .switch-head .ml-search input { font-size: var(--fs-s); }
 .switch-actions { display: contents; }

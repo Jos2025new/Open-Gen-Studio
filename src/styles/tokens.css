@@ -47,26 +47,26 @@
   /* Buttons and chips: pill in every base but Original, which keeps today's corners. */
   --btn-radius: 999px;
   --chip-radius: 999px;
-  --fs-xs: 11px;
-  --fs-s: 12px;
-  --fs-m: 13px;
-  --fs-l: 15px;
-  --fs-xl: 20px;
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
+  --fs-xs: 0.6875rem;
+  --fs-s: 0.75rem;
+  --fs-m: 0.8125rem;
+  --fs-l: 0.9375rem;
+  --fs-xl: 1.25rem;
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
 
-  --control-h: 32px;
-  --control-icon: 18px;
-  --control-gap: 6px;
-  --toolbar-padding: 6px;
+  --control-h: 2rem;
+  --control-icon: 1.125rem;
+  --control-gap: 0.375rem;
+  --toolbar-padding: 0.375rem;
   /* Every floating bar and panel docked to one: main bar, toolboxes, prompt box, top bar groups, right bar. Change them here. */
   --bar-bg: var(--surface); --bar-line: var(--frame-border); --bar-shadow: none;
   --toolbar-radius: var(--r-m);
-  --slider-track-h: 4px;
-  --slider-thumb: 14px;
+  --slider-track-h: 0.25rem;
+  --slider-thumb: 0.875rem;
 
   --shadow-pop: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -87,11 +87,11 @@
   --card-pad-m: var(--sp-4);
   --card-pad-l: var(--sp-4);
   --card-radius: var(--r-m);
-  --fs-title: 16px;
+  --fs-title: 1rem;
   /* Popovers (same shape as .cc-pop today; unused until the card migration). */
   --pop-bg: var(--surface-3);
   --pop-radius: var(--r-m);
-  --pop-pad: 14px;
+  --pop-pad: 0.875rem;
   --pop-shadow: var(--shadow-pop);
 
   /* Calm frame (ADR 0024 M): the accent is for the primary action, the brand and selection inside cards.
@@ -119,13 +119,13 @@
   /* The chosen option inside a field (InlineChoice, a Segmented in a field): a raised step, never the field's hover. */
   --field-on: var(--surface-3);
   /* Feed lines (agent turns, resolved cards): one left edge, icons in a 13px column, text after a 7px gap. */
-  --feed-icon: 13px;
-  --feed-gap: 7px;
+  --feed-icon: 0.8125rem;
+  --feed-gap: 0.4375rem;
   /* Conversation text: agent replies and the user's bubble. */
-  --fs-chat: 15px;
+  --fs-chat: 0.9375rem;
 
-  --sidebar-w: 56px;
-  --topbar-h: 48px;
+  --sidebar-w: 3.5rem;
+  --topbar-h: 3rem;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 

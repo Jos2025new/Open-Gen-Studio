@@ -143,13 +143,13 @@ const TODAY: Record<string, string> = {
   '--type-text': '#c3c3cb', '--type-image': '#9cc4ff', '--type-video': '#d2b4ff', '--type-audio': '#8ce6c4',
   '--radius-xs': '5px', '--radius-s': '7px', '--radius': '10px', '--radius-l': '14px', '--radius-xl': '18px',
   '--r-s': '6px', '--r-m': '16px', '--r-l': '24px', '--r-full': '999px',
-  '--fs-xs': '11px', '--fs-s': '12px', '--fs-m': '13px', '--fs-l': '15px', '--fs-xl': '20px',
-  '--sp-1': '4px', '--sp-2': '8px', '--sp-3': '12px', '--sp-4': '16px', '--sp-5': '24px',
-  '--control-h': '32px', '--control-icon': '18px', '--control-gap': '6px', '--toolbar-padding': '6px', '--toolbar-radius': '16px',
-  '--slider-track-h': '4px', '--slider-thumb': '14px',
+  '--fs-xs': '0.6875rem', '--fs-s': '0.75rem', '--fs-m': '0.8125rem', '--fs-l': '0.9375rem', '--fs-xl': '1.25rem',
+  '--sp-1': '0.25rem', '--sp-2': '0.5rem', '--sp-3': '0.75rem', '--sp-4': '1rem', '--sp-5': '1.5rem',
+  '--control-h': '2rem', '--control-icon': '1.125rem', '--control-gap': '0.375rem', '--toolbar-padding': '0.375rem', '--toolbar-radius': '16px',
+  '--slider-track-h': '0.25rem', '--slider-thumb': '0.875rem',
   '--shadow-pop': '0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35)',
   '--shadow-card': '0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.25)',
-  '--sidebar-w': '56px', '--topbar-h': '48px', '--ease': 'cubic-bezier(0.2, 0.7, 0.2, 1)',
+  '--sidebar-w': '3.5rem', '--topbar-h': '3rem', '--ease': 'cubic-bezier(0.2, 0.7, 0.2, 1)',
 };
 describe('theme tokens: Original is today', () => {
   it('resolves every token the app had to the same value (with the lima accent)', () => {
