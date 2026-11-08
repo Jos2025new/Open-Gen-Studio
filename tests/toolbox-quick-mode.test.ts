@@ -37,16 +37,18 @@ const grid = async (label: string) => { // the Tools button opens the popup grid
 const enter = async () => grid('Brush');
 
 describe('quick settings above the toolbox', () => {
-  it('the row is always there for a tool with settings: the tool icon, Size, Opacity, Flow, Color, Eraser and Settings in that order; the main toolbox keeps its buttons', async () => {
+  it('the row is always there for a tool with settings: the tool icon, Size, Opacity, Flow, Color and Eraser in that order; Settings is in the main toolbox, not the row', async () => {
     await enter();
     expect(quick()).toBeTruthy();
     expect(quick()!.classList.contains('tool-dock-variants')).toBe(true);
     expect(host.querySelector('[aria-label="Tools"] [aria-label="Text"]')).toBeTruthy();
     const parts = [...quick()!.querySelectorAll('button, .opt-label')].map((e) => e.getAttribute('aria-label') ?? e.textContent);
     const at = (name: string) => parts.findIndex((p) => p === name || p?.startsWith(name));
-    const order = ['Brush tool', 'Size', 'Opacity', 'Flow', 'Color', 'Eraser', 'Settings'].map(at);
+    const order = ['Brush tool', 'Size', 'Opacity', 'Flow', 'Color', 'Eraser'].map(at);
     expect(order.every((i) => i >= 0), JSON.stringify(parts)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(parts).not.toContain('Settings');
+    expect(host.querySelector('[aria-label="Tools"] button[aria-label="Settings"]')).toBeTruthy();
   });
 
   it('there is no toggle between the row and the variants: no « button, and the row stays after choosing any tool of the grid', async () => {
@@ -151,31 +153,32 @@ describe('subtoolbox row for every tool', () => {
   const row = () => host.querySelector('.tool-dock-variants.is-quick');
   const labels = (el: Element | null) => [...(el?.querySelectorAll('button, .opt-label') ?? [])].map((e) => e.getAttribute('aria-label') ?? e.textContent);
 
-  it('Eraser (a single tool) starts with its quick settings: no chevron; Size, Opacity, toggle and gear', async () => {
+  it('Eraser (a single tool) starts with its quick settings: no chevron; Size, Opacity and toggle', async () => {
     await grid('Eraser');
     const l = labels(row());
     expect(l.slice(0, 2)).toEqual(['Size', expect.anything()]);
-    expect(l).toEqual(expect.arrayContaining(['Size', 'Opacity', 'Eraser', 'Settings']));
+    expect(l).toEqual(expect.arrayContaining(['Size', 'Opacity', 'Eraser']));
     expect(l).not.toContain('Hide tool settings'); expect(l).not.toContain('Show tool settings');
     expect(row()!.querySelectorAll('button[aria-label="Eraser"]').length).toBe(1);
   });
 
-  it('Ruler keeps its three subtools in the Tools grid and its quick settings (Snap, Clear) and the gear in the quick row', async () => {
+  it('Ruler keeps its three subtools in the Tools grid and its quick settings (Snap, Clear) in the quick row', async () => {
     await grid('Straight ruler');
     await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
     const cells = [...document.querySelectorAll('.tools-grid-pop .menu-item')].map((b) => b.textContent);
     expect(cells).toEqual(expect.arrayContaining(['Straight ruler', 'Ellipse ruler', 'Perspective ruler']));
     await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
-    expect(labels(row())).toEqual(expect.arrayContaining(['Snap', 'Clear', 'Settings']));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Snap', 'Clear']));
   });
 
-  it('Text row comes from the mapping: font size and color, then the gear that toggles its card', async () => {
+  it('Text row comes from the mapping: font size and color; the toolbox Settings button opens the card alone and closes it', async () => {
     await click('Text');
-    expect(labels(row())).toEqual(expect.arrayContaining(['Size', expect.stringMatching(/^Color/), 'Settings']));
+    expect(labels(row())).toEqual(expect.arrayContaining(['Size', expect.stringMatching(/^Color/)]));
     expect(host.querySelector('.tool-dock-card')).toBeNull();
-    await act(async () => row()!.querySelector<HTMLButtonElement>('button[aria-label="Settings"]')!.click());
+    await click('Settings');
     expect(host.querySelector('[aria-label="Text settings"]')).toBeTruthy();
-    await act(async () => row()!.querySelector<HTMLButtonElement>('button[aria-label="Settings"]')!.click());
+    expect(quick()).toBeNull(); // the card shows alone
+    await click('Settings');
     expect(host.querySelector('.tool-dock-card')).toBeNull();
   });
 

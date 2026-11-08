@@ -157,7 +157,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     event.preventDefault();
   };
 
-  // The Designer's bottom toolbox has two rows above it. Quick settings (the tool's icon where the Tools grid holds its variants, its sliders and colors, Eraser toggle, gear) are always there, as wide as their content.
+  // The Designer's bottom toolbox has two rows above it. Quick settings (the tool's icon where the Tools grid holds its variants, its sliders and colors, Eraser toggle; the gear lives in the toolbox as Settings) are always there, as wide as their content.
   // The variants row sits above them for the families the Tools grid does not hold (Edit, Layout).
   const inGrid = designer && TOOLS_GRID_FAMILIES.includes(selectedFamily?.id ?? '');
   const subtools = (selectedFamily?.variants.length ?? 0) > 1;
@@ -170,17 +170,18 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   useEffect(() => { setEyeSlot(optionsSlot ? document.querySelector<HTMLElement>('.composer-tools-bar > .tool-dock-eye-slot') : null); }, [optionsSlot]);
   const hideButton = <button type="button" className={`tool-dock-hide-prompt${promptHidden ? ' is-pill' : ''}`} aria-label="Hide prompt box" aria-pressed={promptHidden} data-tip={promptHidden ? 'Show the prompt box' : 'Hide the prompt box'} onClick={() => setUi({ promptHidden: !promptHidden })}><EyeOff size={16} /></button>;
   const gear = showGear && <button type="button" className={`icon-btn icon-btn-md tone-default ${depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={depth === 'open'} data-tip="Advanced settings" onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button>;
+  const cardOpen = depth === 'open' && !!selectedVariant && !selectedVariant.soon && !noCard;
   const variantsRow = bottom && selectedFamily && !stripShown && subtools && !inGrid && <div className="tool-dock-variants is-fixed" role="toolbar" aria-label={`${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
     {selectedFamily.variants.map((variant) => {
       const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
       return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); else if (!noCard) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
     })}
   </div>;
-  const quickRow = bottom && selectedFamily && !stripShown && (hasQuick || showGear) && <div className="tool-dock-variants is-fixed is-quick" role="toolbar" aria-label="Quick settings" onKeyDown={moveToolbarFocus}>
+  const quickRow = bottom && selectedFamily && !stripShown && (hasQuick || (!designer && showGear)) && <div className="tool-dock-variants is-fixed is-quick" role="toolbar" aria-label="Quick settings" onKeyDown={moveToolbarFocus}>
     {inGrid && subtools && <>{iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}{hasQuick && <span className="tool-dock-separator" aria-hidden="true" />}</>}
     {hasQuick && <QuickControls tool={currentTool} sessionId={sessionId} doc={doc} />}
     {hasQuick && (currentTool === 'brush' || currentTool === 'eraser') && iconButton('eraser', 'Eraser', currentTool === 'eraser', () => { setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }); }, false, undefined, toolKey('eraser'))}
-    {gear}
+    {!designer && gear}
   </div>;
 
   // The Tools button stands where the first of Select, Ruler, Pen, Brush and Eraser would; the others take no slot of their own.
@@ -213,8 +214,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     if (familyId) familyButtons.current.get(familyId)?.focus();
   }}>
     {placeStack(<div className={`tool-dock-stack${bottom ? ' is-fixed' : ''}`} style={{ '--tool-dock-card-height': `${height}px` } as CSSProperties}>
-      {variantsRow}
-      {quickRow}
+      {/* Designer: the advanced settings show alone while open, never stacked over the variants and quick rows. */}
+      {!(designer && cardOpen) && variantsRow}
+      {!(designer && cardOpen) && quickRow}
       {!bottom && depth !== 'closed' && selectedFamily && !stripShown && <div className={`tool-dock-variants${bottom ? ' is-fixed' : ''}`} role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
@@ -246,6 +248,10 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     {bottom && promptHidden && pillHome && createPortal(hideButton, pillHome)}
     <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family) => {
+        // Designer: the toolbox's Settings button is the active tool's advanced settings (the card the gear opened).
+        if (designer && family.id === 'settings') {
+          return <span key="settings"><button type="button" className={`icon-btn icon-btn-md tone-default ${showGear && depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={showGear && depth === 'open'} disabled={!showGear} data-tip={showGear ? 'Advanced settings of the active tool' : 'This tool has no advanced settings'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button></span>;
+        }
         if (gridFamilies.some((f) => f.id === family.id)) {
           return family.id === gridFamilies[0].id ? <span key="tools-grid"><ToolsGridButton icon={gridIcon.icon} label={gridIcon.label} families={gridFamilies} isActive={gridActive} blockedReason={disabledReason} vertical={vertical} onPick={(owner, variant) => { setUi({ designerDock: 'tools' }); chooseVariant(variant, owner.id); if (!variant.soon && variant.tool) dispatch({ type: 'variant', familyId: owner.id, variantId: variant.id }); }} /></span> : null;
         }
