@@ -149,7 +149,6 @@ describe('hide button placement', () => {
 
 describe('subtoolbox row for every tool', () => {
   const row = () => host.querySelector('.tool-dock-variants.is-quick');
-  const variants = (label: string) => host.querySelector(`[aria-label="${label} variants"]`);
   const labels = (el: Element | null) => [...(el?.querySelectorAll('button, .opt-label') ?? [])].map((e) => e.getAttribute('aria-label') ?? e.textContent);
 
   it('Eraser (a single tool) starts with its quick settings: no chevron; Size, Opacity, toggle and gear', async () => {
