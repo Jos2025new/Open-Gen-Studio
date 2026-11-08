@@ -23,6 +23,7 @@ import './styles/chat.css';
 import './styles/chat-cards.css';
 import './styles/node.css';
 import './styles/designer.css';
+import './styles/designer-export.css';
 import './styles/prompt-box.css';
 import './styles/designer-connected.css';
 import './styles/designer-connected-2.css';

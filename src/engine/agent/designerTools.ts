@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BUILTIN_EXPORTS, EXPORT_FORMATS } from '../design/exportSettings';
 import type { ToolSpec } from '../providers/llm';
 import { FX_DEFS, FX_KINDS } from '../fx/defs';
 
@@ -10,6 +11,22 @@ const kindsLine = FX_KINDS.map((k) => {
 }).join(', ');
 
 export const DESIGNER_TOOLS: ToolSpec[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'export_design',
+      description: 'Designer only, free and local. Use only when the user asks to download an export. Exports the requested area of the active document and requests a browser download. Defaults to the canvas. Choose a format or a built-in preset; Logo / brand produces one ZIP.',
+      parameters: {
+        type: 'object',
+        properties: {
+          format: { type: 'string', enum: EXPORT_FORMATS },
+          preset: { type: 'string', enum: BUILTIN_EXPORTS.map((preset) => preset.id) },
+          area: { type: 'string', enum: ['canvas', 'selection', 'layer'], description: 'Selection means the current pixel selection.' },
+          layer_id: { type: 'string', description: 'For a layer export, use its id or omit for the active layer.' },
+        },
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -75,3 +92,11 @@ const commandSchema = z.discriminatedUnion('do', [
   z.object({ do: z.literal('delete'), layer: layerRef }),
 ]);
 export const designerFxSchema = z.object({ commands: z.array(commandSchema).min(1).max(20) });
+
+export const exportDesignSchema = z.object({
+  format: z.enum(EXPORT_FORMATS).optional(),
+  preset: z.enum(BUILTIN_EXPORTS.map((option) => option.id)).optional(),
+  area: z.enum(['canvas', 'selection', 'layer']).optional(),
+  layer_id: z.string().min(1).max(80).optional(),
+}).strict().refine(({ layer_id, area }) => !layer_id || area === 'layer', 'Use layer_id only for a layer export.')
+  .refine(({ format, preset }) => !preset || !format, 'Choose one available preset or a format.');

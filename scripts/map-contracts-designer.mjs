@@ -24,8 +24,7 @@ export default [{
     ['src/styles/designer.css', '.align-panel-controls'],
   ],
   tests: ['tests/marquee.test.ts', 'tests/layer-transform.test.ts', 'tests/object-ops.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
-},
-{
+}, {
   id: 'node-select-modes',
   what: 'Selección por nodo, segmento o cara en la edición de nodos (teclas 1/2/3): la selección sigue siendo índices de nodo; segs/faces solo dicen qué elementos son y valen mientras coincidan con los nodos.',
   sides: [
@@ -41,8 +40,7 @@ export default [{
     ['src/styles/path-tools.css', '.sel-face'],
   ],
   tests: ['tests/select-mode.test.ts'],
-},
-{
+}, {
   id: 'designer-toolbox-dock',
   what: 'Dock por modo; Edit sigue la selección.',
   sides: [
@@ -54,8 +52,7 @@ export default [{
     ['src/components/designer/EditCard.tsx', 'export function EditCard'],
   ],
   tests: ['tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-keys.test.ts'],
-},
-{
+}, {
   id: 'designer-select-family',
   what: 'Familia Select: formas, Mode con Intersect, insignia del cursor y gestos.',
   sides: [
@@ -68,8 +65,7 @@ export default [{
     ['src/components/designer/Stage.tsx', '<SelectCursor '],
   ],
   tests: ['tests/toolbox-model.test.ts', 'tests/select-cursor.test.ts', 'tests/select-polygon.test.ts'],
-},
-{
+}, {
   id: 'color-pair',
   what: 'Color secundario: una fuente para X / D, el par de colores, Fill con Ctrl y el degradado.',
   sides: [
@@ -82,8 +78,7 @@ export default [{
     ['src/components/designer/Stage.tsx', 'color2: secondaryOf(brush, gradientUi)'],
   ],
   tests: ['tests/color-keys.test.ts', 'tests/designer-keys.test.ts'],
-},
-{
+}, {
   id: 'sample-source',
   what: 'Origen del muestreo (todas las capas o la activa) común a Fill y al Cuentagotas; el gesto de muestreo vive en StageSample.',
   sides: [
@@ -95,8 +90,7 @@ export default [{
     ['src/components/designer/Stage.tsx', 'runFill(sessionId'],
   ],
   tests: ['tests/sample-radius.test.ts', 'tests/stage-sample.test.ts', 'tests/fill-source.test.ts'],
-},
-{
+}, {
   id: 'designer-shape-booleans',
   what: 'Union, Subtract, Intersect, Exclude y Divide visibles con 2+ formas elegidas (atajos Ctrl+Alt+U/S/I/E); Shape Builder (Shift+M) fusiona o borra caras con Alt.',
   sides: [
@@ -114,4 +108,28 @@ export default [{
     ['src/components/designer/toolboxModel.ts', "'shape-builder'"],
   ],
   tests: ['tests/shape-boolean.test.ts', 'tests/path-boolean.test.ts', 'tests/designer-keys.test.ts', 'tests/shape-kinds.test.ts'],
+}, {
+  id: 'raster-export-resolution',
+  what: 'Raster y galería conservan el plan FX, respetan los límites y muestran errores sin reducir la escala solicitada.',
+  sides: [
+    ['src/engine/design/exportRaster.ts', "resolution: 'document'"],
+    ['src/engine/design/exportLimits.ts', 'export function checkExportSize'],
+    ['src/engine/design/actions.ts', 'const blob = await exportDoc(doc)'],
+    ['src/components/designer/ExportPanel.tsx', 'validateExport(doc, settings, target)'],
+    ['docs/features/designer.md', '33.554.432'],
+  ],
+  tests: ['tests/fx-render.test.ts', 'tests/design-export-job.test.ts'],
+}, {
+  id: 'designer-export-panel',
+  what: 'Designer y Studio comparten el panel y el motor prepara los archivos antes de la descarga.',
+  sides: [
+    ['src/components/designer/DesignerWorkspace.tsx', '<ExportPanel'],
+    ['src/components/studio/EmbeddedFileMenu.tsx', '<ExportPanel'],
+    ['src/components/designer/ExportPanel.tsx', 'prepareDesignExport('],
+    ['src/engine/design/exportDesign.ts', 'await exportPlan('],
+    ['src/engine/design/actions.ts', 'await prepareDesignExport('],
+    ['src/engine/agent/canvasCalls.ts', 'until(prepareDesignExport('],
+    ['docs/designer-controles/documentos.md', '## Exportación de fase 1'],
+  ],
+  tests: ['tests/design-export-job.test.ts', 'tests/studio-designer.test.ts'],
 }];

@@ -13,6 +13,18 @@ const keys = vi.hoisted(() => ({ designerKey: vi.fn() }));
 vi.mock('../src/components/designer/designerKeys', async (orig) => ({ ...(await orig<typeof import('../src/components/designer/designerKeys')>()), designerKey: keys.designerKey }));
 const file = vi.hoisted(() => ({ importDesignFiles: vi.fn(async () => undefined), runDesignOutput: vi.fn(async () => undefined) }));
 vi.mock('../src/components/designer/designerFile', async (orig) => ({ ...(await orig<typeof import('../src/components/designer/designerFile')>()), ...file }));
+const download = vi.hoisted(() => ({
+  prepare: vi.fn(async () => ({
+    files: [{ name: 'design.jpg', mime: 'image/jpeg', bytes: new Blob(['jpeg'], { type: 'image/jpeg' }) }],
+    notices: [],
+  })),
+  deliver: vi.fn(() => 'design.jpg'),
+}));
+vi.mock('../src/engine/design/exportDesign', async (original) => ({
+  ...await original<typeof import('../src/engine/design/exportDesign')>(),
+  prepareDesignExport: download.prepare,
+  deliverDesignExport: download.deliver,
+}));
 const upload = vi.hoisted(() => ({ uploadFiles: vi.fn(async () => [] as string[]) }));
 vi.mock('../src/engine/actions', async (orig) => ({ ...(await orig<typeof import('../src/engine/actions')>()), ...upload }));
 
@@ -23,7 +35,7 @@ import { EMBEDDED_TOOLS } from '../src/components/studio/EmbeddedDesigner';
 import { Stage } from '../src/components/designer/Stage';
 import { getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
 import { addEmptyLayer, newBlankDoc } from '../src/engine/design/actions';
-import { setUi, useStore } from '../src/store/store';
+import { setDoc, setUi, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -232,17 +244,68 @@ describe('file menu', () => {
     act(() => choices[0].click());
     expect(useStore.getState().sessions[sid].activeDocId).toBe(first);
   });
-  it('Export and Save to gallery call the existing action; Import hands the files to the existing import', async () => {
+  it('opens the shared Export panel and changes options with the preset and format', () => {
     render(createElement(StudioBoard));
     act(() => q('[aria-label="File"]')!.click());
     act(() => item('Export')!.click());
-    act(() => item('PNG')!.click());
-    expect(file.runDesignOutput).toHaveBeenCalledWith(sid, doc().id, false, 'png');
-    await act(async () => { await Promise.resolve(); });
+    const panel = document.querySelector('.design-export')!;
+    const [preset, format] = panel.querySelectorAll('select');
+    expect(format.value).toBe('png');
+    act(() => { preset.value = 'whatsapp'; preset.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(format.value).toBe('jpg');
+    expect(panel.querySelector('input[type="number"]')).toHaveProperty('value', '1600');
+    expect(panel.textContent).toContain('Quality (85%)');
+    act(() => { format.value = 'pdf'; format.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(panel.textContent).toContain('Home printing · A4');
+    expect(panel.textContent).not.toContain('Quality (85%)');
+  });
+  it('remembers a successful download request and saves a custom preset in app settings', async () => {
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:test', revokeObjectURL: () => undefined });
+    try {
+      render(createElement(StudioBoard));
+      act(() => q('[aria-label="File"]')!.click());
+      act(() => item('Export')!.click());
+      const panel = document.querySelector('.design-export')!;
+      const preset = panel.querySelector('select')!;
+      act(() => { preset.value = 'whatsapp'; preset.dispatchEvent(new Event('change', { bubbles: true })); });
+      await act(async () => item('Export')!.click());
+      expect(download.deliver).toHaveBeenCalledWith(expect.objectContaining({ name: 'design.jpg' }));
+      expect(doc().lastExport?.settings).toMatchObject({ format: 'jpg', pixels: 1600, quality: 85 });
+      act(() => item('Save as preset')!.click());
+      const name = panel.querySelector<HTMLInputElement>('input[maxlength="60"]')!;
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(name, 'Small JPG');
+        name.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      act(() => item('Save preset')!.click());
+      expect(useStore.getState().settings.designExportPresets).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'Small JPG', settings: expect.objectContaining({ format: 'jpg', pixels: 1600 }) }),
+      ]));
+      act(() => item('Back to File')!.click());
+      act(() => item('Export')!.click());
+      expect(document.querySelector<HTMLSelectElement>('.design-export select')!.value).toBe('whatsapp');
+      act(() => item('Back to File')!.click());
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it('recovers saved export settings and blocks a missing layer', () => {
+    setDoc(sid, doc().id, (d) => ({ ...d, lastExport: { settings: { format: 'webp', size: 2, area: 'layer' }, target: 'missing' } }));
+    render(createElement(StudioBoard));
+    act(() => q('[aria-label="File"]')!.click());
+    act(() => item('Export')!.click());
+    const panel = document.querySelector('.design-export')!;
+    expect(panel.querySelectorAll('select')[1].value).toBe('webp');
+    expect(panel.querySelectorAll('select')[3].value).toBe('2');
+    expect(panel.querySelector('[role="alert"]')?.textContent).toContain('layer is unavailable');
+    expect(item('Export')).toHaveProperty('disabled', true);
+  });
+  it('Save to gallery and Import still call their existing actions', async () => {
+    render(createElement(StudioBoard));
     act(() => q('[aria-label="File"]')!.click());
     act(() => item('Save to gallery')!.click());
-    expect(file.runDesignOutput).toHaveBeenCalledTimes(1);
-    act(() => [...document.querySelectorAll<HTMLElement>('.popover button')].find((b) => b.textContent === 'Save')!.click());
+    expect(file.runDesignOutput).not.toHaveBeenCalled();
+    await act(async () => { [...document.querySelectorAll<HTMLElement>('.popover button')].find((b) => b.textContent === 'Save')!.click(); });
     expect(file.runDesignOutput).toHaveBeenLastCalledWith(sid, doc().id, true, undefined);
     const input = q('input[type="file"]') as HTMLInputElement;
     const f = new File(['x'], 'a.png', { type: 'image/png' });

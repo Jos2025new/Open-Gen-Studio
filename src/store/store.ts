@@ -1,3 +1,4 @@
+import type { CustomExportPreset } from '../engine/design/exportSettings';
 import { finishSpaceUi } from './spaceUi';
 import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
 import { reportSave } from './saveReport';
@@ -55,6 +56,7 @@ import type {
 // State shape
 
 export interface Settings {
+  designExportPresets?: CustomExportPreset[];
   keys: Record<RemoteProviderId, string>;
   agent: { provider: LlmProviderId | 'offline'; model: string; /** True only when the user pinned this exact director model. */ modelPinned?: boolean; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; showThinking?: boolean; updateComposerDefaults?: boolean };
   guidedRounds: number;

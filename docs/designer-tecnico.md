@@ -154,14 +154,14 @@ Las reglas de guardado están en [persistencia-protegida.md](persistencia-proteg
 
 ## Importar y exportar
 
-Todo en `designerFile.ts` y `ENG/actions.ts`.
+Importación y galería en `designerFile.ts` y `ENG/actions.ts`. La descarga usa el motor compartido.
 
 | Acción | Código |
 |---|---|
 | Importar imagen | `importDesignFiles` (`designerFile.ts:19`); acepta PNG, JPEG, WebP, GIF, SVG, HEIC/HEIF y EPS (`IMPORT_ACCEPT`, línea 17). HEIC y EPS pasan antes por conversión a PNG; lo que no se puede leer dice por qué en un aviso. Las imágenes se colocan con `placeImportedImages` (`importImages.ts`) |
 | Importar SVG | Un SVG se convierte en un diseño propio con carpetas, formas editables e imágenes para lo que no se puede editar (`importSvgFile`, `svgImport/apply.ts:7`; sanea antes, contrato `svg-import`) |
 | Traer desde el chat | `chatToDesigner` y `chatImagesNotInDesigner` (`fromChat.ts`), con el selector "As layers of one" o "Each as a design" (`DesignerWorkspace.tsx`) |
-| Exportar a archivo | `exportDocFile` (`actions.ts:440`): PNG y JPG por `exportDoc`; SVG por `docToSvg` (`export.ts:107`); PDF por `svgToPdf` (`export.ts:174`, vectorial, texto en fuentes estándar). Formatos y etiquetas en `EXPORT_FORMATS` (`designerFile.ts:11`) |
+| Exportar a archivo | [exportJob.ts](../src/engine/design/exportJob.ts) prepara PNG, JPG, WebP, SVG o PDF y empaqueta el preset de marca. [exportDesign.ts](../src/engine/design/exportDesign.ts) carga píxeles, entrega el archivo y recuerda la configuración con el guardado existente. Designer y Studio abren el mismo [panel](../src/components/designer/ExportPanel.tsx). |
 | Guardar en la galería | `saveDocToGallery` (`actions.ts:467`): exporta PNG y lo guarda como asset de origen `design` |
 | Límites al exportar | `checkExportSize` (`exportLimits.ts:5`): el tope de píxeles solo limita cuando hay FX efectivos |
 | Copiar y pegar | `designerClipboard` (`designerClipboard.ts:14`): copia los píxeles de la capa y pega imágenes |

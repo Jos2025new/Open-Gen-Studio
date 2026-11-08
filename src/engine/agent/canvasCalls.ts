@@ -1,6 +1,11 @@
 import type { ChatResult } from '../providers/llm';
 import type { LlmMessage, Workspace } from '../types';
 import { editGraphTool } from './nodeTools';
+import { activeDoc } from '../design/actions';
+import { currentExportTarget, deliverDesignExport, prepareDesignExport, rememberDesignExport, resolveExportTarget } from '../design/exportDesign';
+import { exportDownloadFile } from '../design/exportJob';
+import { BUILTIN_EXPORTS, DEFAULT_EXPORT } from '../design/exportSettings';
+import { exportDesignSchema } from './designerTools';
 import { designerFxTool } from './designerFx';
 import { nodeIdsSchema } from './tools';
 import { isAbort } from '../../lib/http';
@@ -85,6 +90,29 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); return { handled: true, workspace: c.workspace }; }
   log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
   ignoreRest(index); flushToolResults(sessionId, toolResults); return { handled: true, stop: true, workspace: c.workspace };
+          }
+          if (call.name === 'export_design') {
+  const doc = c.workspace === 'designer' ? activeDoc(sessionId) : null;
+  const input = exportDesignSchema.safeParse(parsed.value);
+  if (!doc) respond('Open a design on the Designer canvas before exporting.');
+  else if (!input.success) respond(formatZodError(input.error));
+  else {
+    const base = BUILTIN_EXPORTS.find((preset) => preset.id === input.data.preset)?.settings
+      ?? { ...DEFAULT_EXPORT, format: input.data.format ?? DEFAULT_EXPORT.format };
+    const settings = { ...base, area: input.data.area ?? base.area };
+    const draft = { settings, target: input.data.layer_id ?? currentExportTarget(doc, settings) };
+    try {
+      const { files, notices } = await until(prepareDesignExport(doc, settings, resolveExportTarget(doc, draft)));
+      const file = await until(exportDownloadFile(doc, files));
+      const name = deliverDesignExport(file);
+      rememberDesignExport(sessionId, doc.id, draft);
+      respond([`Browser download requested for ${name}.`, ...notices].join(' '));
+    } catch (error) {
+      if (isAbort(error)) throw error;
+      respond(error instanceof Error ? error.message : 'Export failed. Try a smaller size or another format.');
+    }
+  }
+  return { handled: true, workspace: c.workspace };
           }
           if (call.name === 'designer_fx') {
   const r = c.workspace === 'designer' ? designerFxTool(sessionId, parsed.value) : { text: 'designer_fx works only in the Designer.', done: false };

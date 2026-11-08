@@ -8,7 +8,7 @@ related: [barra-superior, tamanos, capas, atajos, estudio-embebido]
 ---
 # Documentos, importar y exportar
 
-Las acciones de archivo del Designer están repartidas entre la barra superior (`DesignerWorkspace.tsx:84`), el selector de documentos, atajos de teclado y gestos sobre el lienzo. Los presets salen de `DOC_PRESETS` (`doc.ts:35`) y los formatos de exportación de `EXPORT_FORMATS` (`designerFile.ts:10`). El Studio embebido repite el menú de archivo en uno solo ([[estudio-embebido]]).
+Las acciones de archivo del Designer están repartidas entre la barra superior (`DesignerWorkspace.tsx:84`), el selector de documentos, atajos de teclado y gestos sobre el lienzo. Los presets de documento salen de `DOC_PRESETS` y los de exportación de [exportSettings.ts](../../src/engine/design/exportSettings.ts). El Studio embebido repite el menú de archivo en uno solo ([[estudio-embebido]]).
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -24,11 +24,11 @@ Las acciones de archivo del Designer están repartidas entre la barra superior (
 | Import image (botón) | Barra superior (`DesignerWorkspace.tsx:95`) | `importDesignFiles` | Hay documento | Acepta PNG, JPEG, WebP, GIF, SVG, HEIC/HEIF y EPS (`designerFile.ts:17`); varios archivos a la vez | Igual que hoy | se conserva | no dibujado |
 | Import from chat (botón + popover) | Barra superior izquierda (`ImportFromChat.tsx:64`) | `chatToDesigner` como capas de un diseño o un diseño por imagen | Imágenes del chat sin usar | Opciones «As layers of one» y «Each as a design» (`DesignerWorkspace.tsx:124`) | Igual que hoy | se conserva | no dibujado |
 | Save to gallery (botón + «Cancel / Save») | Barra superior (`DesignerWorkspace.tsx:103`) | `runDesignOutput(…, gallery = true)` | Hay documento | Confirma con un popover | Igual que hoy | se conserva | no dibujado |
-| Export (botón + menú) | Barra superior (`DesignerWorkspace.tsx:113`) | Abre el menú | Hay documento | Cuatro formatos, sin confirmación | Igual que hoy | se conserva | no dibujado |
-| Export › PNG | Menú Export (`designerFile.ts:11`) | `runDesignOutput(…, 'png')` | Menú abierto | «Image, keeps transparency» | Igual que hoy | se conserva | no dibujado |
-| Export › JPG | Menú Export (`designerFile.ts:12`) | `runDesignOutput(…, 'jpg')` | Menú abierto | «Image, white background» | Igual que hoy | se conserva | no dibujado |
-| Export › SVG | Menú Export (`designerFile.ts:13`) | `runDesignOutput(…, 'svg')` | Menú abierto | «Editable layers, text and shapes» | Igual que hoy | se conserva | no dibujado |
-| Export › PDF | Menú Export (`designerFile.ts:14`) | `runDesignOutput(…, 'pdf')` | Menú abierto | «Vector; text in standard fonts» | Igual que hoy | se conserva | no dibujado |
+| Export (botón + panel) | Barra superior ([DesignerWorkspace.tsx](../../src/components/designer/DesignerWorkspace.tsx)) | Abre el panel y recupera la última exportación | Hay documento | PNG, JPG, WebP, SVG y PDF | Panel compartido | implementado | sandbox pendiente |
+| Export › What is it for? | [ExportPanel.tsx](../../src/components/designer/ExportPanel.tsx) | Aplica un preset de serie o propio | Panel abierto | Logo / brand prepara un ZIP con SVG, PNG y PNG @2x | Ajuste superior | implementado | sandbox pendiente |
+| Export › Format, What to export, Size | [ExportPanel.tsx](../../src/components/designer/ExportPanel.tsx) | Cambia formato, área y escala | Panel abierto | Lienzo, selección de píxeles o una capa visible. La miniatura usa un archivo preparado | Ajuste rápido | implementado | sandbox pendiente |
+| Export › More options | [ExportOptions.tsx](../../src/components/designer/ExportOptions.tsx) | Ajusta fondo, compresión, A4 o guarda un preset propio | Panel abierto | Los presets de serie se conservan | Plegado | implementado | sandbox pendiente |
+| Export › Export / Cancel | [ExportPanel.tsx](../../src/components/designer/ExportPanel.tsx) | Solicita la descarga o cancela la preparación | Panel abierto | Una capa o selección desaparecida bloquea Export. La app recuerda los ajustes tras solicitar la descarga | Al pie del panel | implementado | sandbox pendiente |
 | Ctrl+S | Teclado (`designerKeys.ts:32`) | `saveNow` (estado y píxeles pendientes) | Siempre | No exporta; guarda el estado de la app | Igual que hoy | se conserva | no dibujado |
 | Undo / Redo (botones) | Barra superior (`DesignerWorkspace.tsx:91`) | `undoDoc` / `redoDoc` | Hay documento | Atajos Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y | Igual que hoy | se conserva | no dibujado |
 | Copiar / cortar / pegar imagen (Ctrl+C, Ctrl+X, Ctrl+V) | Documento (`designerClipboard.ts:68`) | Con selección de píxeles copia solo esos píxeles (cortar los borra); pegar crea capa | Siempre en el Designer completo | Mensajes de error si el navegador no escribe imágenes en el portapapeles | Igual que hoy | se conserva | no dibujado |
@@ -43,3 +43,11 @@ Las acciones de archivo del Designer están repartidas entre la barra superior (
 - [[atajos]] · [atajos.md](atajos.md)
 - [[estudio-embebido]] · [estudio-embebido.md](estudio-embebido.md)
 - [[README]] · [Índice](README.md)
+
+## Exportación de fase 1
+
+Designer y Studio abren el mismo panel. La preparación se comparte con `exportDocFile` y la herramienta local `export_design` del agente. La selección de píxeles conserva su máscara como imagen incrustada en SVG/PDF. En el lienzo o una capa, SVG mantiene sus objetos editables y PDF puede usar fuentes estándar. El PDF de imprenta con sangrado y marcas, y la conversión de texto a contornos quedan pendientes.
+
+El navegador recibe el archivo ya preparado y un nombre sugerido. En la misma instancia de la app los nombres repetidos llevan sufijo numérico. Cancelar impide solicitar una descarga pendiente. Si la preparación de un archivo del lote de marca falla, el ZIP no se genera.
+
+[Motor de exportación](../../src/engine/design/exportJob.ts) · [Pruebas del motor](../../tests/design-export-job.test.ts) · [Pruebas del panel en Studio](../../tests/studio-designer.test.ts). Prueba visual y descarga real en sandbox pendientes.

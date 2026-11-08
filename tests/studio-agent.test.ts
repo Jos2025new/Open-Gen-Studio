@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener() {} }, document: { addEventListener() {}, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
+const delivery = vi.hoisted(() => vi.fn((file: { name: string }) => file.name));
+vi.mock('../src/engine/design/exportDesign', async (original) => ({
+  ...await original<typeof import('../src/engine/design/exportDesign')>(),
+  deliverDesignExport: delivery,
+}));
+import { createDoc } from '../src/engine/design/doc';
 import { useStore } from '../src/store/store';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { agentCanvas, moveToCanvas, studioLine } from '../src/engine/agent/agentCanvas';
@@ -169,6 +175,24 @@ describe('open_board', () => {
     expect(results).not.toContain('designer_fx works only in the Designer');
     expect(buildContext(session(), { workspace: 'designer', style: 'auto', round: 1, maxRounds: 5, attachments: [] })).toContain('The board shows: the Designer');
     expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'node', 'designer']);
+  });
+});
+
+describe('agent export', () => {
+  it('uses the export engine on the Designer board and delivers a prepared SVG', async () => {
+    goLive('chat');
+    delivery.mockClear();
+    const doc = createDoc('Agent design', 320, 240);
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], docs: [doc], activeDocId: doc.id } } }));
+    script([{ name: 'open_board', args: { view: 'designer' } }, { name: 'export_design', args: { format: 'svg' } }]);
+    await sendAgentMessage('Download this design as SVG');
+    expect(delivery).toHaveBeenCalledOnce();
+    const file = delivery.mock.calls[0][0] as { name: string; mime: string; bytes: Blob };
+    expect(file.name).toBe('Agent-design.svg');
+    expect(file.mime).toBe('image/svg+xml');
+    expect(await file.bytes.text()).toContain('viewBox="0 0 320 240"');
+    expect(session().docs[0].lastExport?.settings.format).toBe('svg');
+    expect(toolResults().join(' ')).toContain('Browser download requested');
   });
 });
 

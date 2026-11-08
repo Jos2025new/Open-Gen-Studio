@@ -22,7 +22,7 @@ import type { FxLayer } from '../fx/types';
  * FX layers become SVG filters (fx/svg.ts).
  */
 
-export type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf';
+export type { ExportFormat } from './exportSettings';
 
 export interface SvgDeps {
   /** Data URL of a raster layer's pixels (as displayed). Null when they could not be read (an empty layer still has a
@@ -132,7 +132,14 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
   return bars ? `<g>${el}${bars}</g>` : el;
 }
 
-export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
+export interface SvgViewport {
+  width: number;
+  height: number;
+  box: { x: number; y: number; w: number; h: number };
+}
+
+export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport): Promise<string> {
+  const { width, height, box } = viewport ?? { width: doc.width, height: doc.height, box: { x: 0, y: 0, w: doc.width, h: doc.height } };
   const body: string[] = [], defs: string[] = [], skipped = new Set<string>(), unread: string[] = [];
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
   // FX (ADR 0011): the same plan as the canvas. 'below' wraps everything before it, 'layer' wraps its target's content.
@@ -186,7 +193,7 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
   if (unread.length) deps.notice?.(`The pixels of ${unread.join(', ')} could not be read: left out of this file.`);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="${width}" height="${height}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}">`,
     `<title>${xmlEscape(doc.name)}</title>`,
     // Content outside the page is cut, as in the editor.
     `<defs><clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath>${defs.join('')}</defs>`,
@@ -199,17 +206,20 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
  * PDF from the same SVG (jsPDF + svg2pdf.js, loaded only when used). Shapes and images stay vector/embedded;
  * text uses the PDF standard fonts unless the family is embedded, so it may not match the design fonts.
  */
-export async function svgToPdf(svg: string, width: number, height: number): Promise<Blob> {
+export async function svgToPdf(svg: string, width: number, height: number, a4 = false): Promise<Blob> {
   const [{ jsPDF }, { svg2pdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const el = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
-  const pdf = new jsPDF({ unit: 'px', format: [width, height], orientation: width >= height ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
+  const pdf = new jsPDF({ unit: 'px', format: a4 ? 'a4' : [width, height], orientation: width >= height ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
+  const pageWidth = pdf.internal.pageSize.getWidth(), pageHeight = pdf.internal.pageSize.getHeight();
+  const scale = a4 ? Math.min(pageWidth / width, pageHeight / height) : 1;
+  const fittedWidth = width * scale, fittedHeight = height * scale;
   // svg2pdf reads computed styles: the SVG must be in the document while it converts.
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden';
   host.appendChild(el);
   document.body.appendChild(host);
   try {
-    await svg2pdf(el, pdf, { x: 0, y: 0, width, height });
+    await svg2pdf(el, pdf, { x: (pageWidth - fittedWidth) / 2, y: (pageHeight - fittedHeight) / 2, width: fittedWidth, height: fittedHeight });
   } finally {
     host.remove();
   }

@@ -8,7 +8,6 @@ import { ImportFromChat } from '../ui/ImportFromChat';
 import { AspectGlyph } from '../composer/MediaControls';
 import { ArrowUpFromLine, Images, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from '../ui/icons';
 import { useStore } from '../../store/store';
-import type { ExportFormat } from '../../engine/design/export';
 import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
 import { DOC_PRESETS } from '../../engine/design/doc';
 import { DocBackgroundChoice } from './DocBackgroundChoice';
@@ -16,10 +15,11 @@ import { canRedo, canUndo, historyDepth, subscribeHistory } from '../../engine/d
 import { designerKey } from './designerKeys';
 import { ValueNotice } from './ValueNotice';
 import { designerClipboard } from './designerClipboard';
-import { EXPORT_FORMATS, IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from './designerFile';
+import { IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from './designerFile';
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
+import { ExportPanel } from './ExportPanel';
 import { Stage } from './Stage';
 import { ToolPalette } from './ToolPalette';
 import { DocumentPicker } from './DocumentPicker';
@@ -66,10 +66,10 @@ export function DesignerWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, [doc, session.id]);
 
-  const output = async (gallery: boolean, format: ExportFormat = 'png') => {
+  const saveToGallery = async () => {
     if (!doc || busy) return;
     setBusy(true);
-    try { await runDesignOutput(session.id, doc.id, gallery, format); } finally { setBusy(false); }
+    try { await runDesignOutput(session.id, doc.id, true); } finally { setBusy(false); }
   };
 
   const importRef = useRef<HTMLInputElement>(null);
@@ -112,13 +112,13 @@ export function DesignerWorkspace() {
             <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>
             <div className="confirm-pop-actions">
               <Button size="sm" variant="ghost" onClick={saveConfirm.close}>Cancel</Button>
-              <Button size="sm" variant="primary" icon={Images} onClick={() => { saveConfirm.close(); void output(true); }}>Save</Button>
+              <Button size="sm" variant="primary" icon={Images} onClick={() => { saveConfirm.close(); void saveToGallery(); }}>Save</Button>
             </div>
           </div>
         </Popover>
-        <Button ref={exportMenu.ref} className="topbar-export" variant="primary" icon={ArrowUpFromLine} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
-        <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} label="Export format">
-          {EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => { exportMenu.close(); void output(false, f.id); }} />)}
+        <Button ref={exportMenu.ref} className="topbar-export" variant="primary" icon={ArrowUpFromLine} size="sm" disabled={busy} aria-haspopup="dialog" aria-expanded={exportMenu.open} onClick={exportMenu.toggle}>Export</Button>
+        <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} width={350} label="Export design">
+          <ExportPanel key={doc.id} sessionId={session.id} doc={doc} />
         </Popover>
       </>}
     </TopbarActions>

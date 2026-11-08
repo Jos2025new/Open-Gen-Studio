@@ -1,4 +1,3 @@
-import { checkExportSize } from './exportLimits';
 import { drawMaskedVector, maskContains, maskBounds } from './vectorMask';
 import { apply, invert, mapBox } from './matrix';
 import { pathTransform } from './path';
@@ -251,7 +250,7 @@ function drawGrouped(ctx: CanvasRenderingContext2D, l: VectorLayer, paint: (c: C
 }
 
 /** Draw the document in doc coordinates (caller sets the transform). */
-export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { hideLayerId?: string; origin?: RenderOrigin; resolution?: 'preview' | 'document' } = {}): void {
+export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { hideLayerId?: string; origin?: RenderOrigin; resolution?: 'preview' | 'document'; exportScale?: number } = {}): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, doc.width, doc.height);
@@ -269,7 +268,7 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
       ctx.fillRect(0, 0, doc.width, doc.height);
     }
     for (const s of steps) drawLayer(ctx, s.layer);
-  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context, !!(ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas'), !!opts.hideLayerId);
+  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context, !!(ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas'), !!opts.hideLayerId, opts.exportScale);
   ctx.restore();
   end?.(stage ? takeCanvasCount() : undefined);
   if (stage) frameShown();
@@ -333,10 +332,7 @@ export function endDragPreview(): void { if (dragPreview) { dragPreview = false;
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */
 const FX_MAX_PX = 16_000_000;
 
-/*
- * With FX the page is composed off screen at the view's scale, so 'below' FX see everything under them.
- * Delivery uses scale 1 with the same plan. FX lengths are document px.
- */
+/* FX compose off screen at the view or delivery scale. FX lengths are document px. */
 const retained = new RetainedPage<HTMLCanvasElement>();
 const fullRect = (W: number, H: number): Rect => ({ x0: 0, y0: 0, x1: W, y1: H });
 const versionsOf = (l: Layer): unknown[] => rasterBufferIds([l]).map(bufferVersion);
@@ -446,9 +442,9 @@ function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: 
   return page;
 }
 
-function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false, hidden = false): void {
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false, hidden = false, exportScale = 1): void {
   const m = ctx.getTransform();
-  const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
+  const scale = fullResolution ? exportScale : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
   const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
   const retainedPath = editor && !fullResolution && !dragPreview;
   const page = retainedPath ? retainedFrame(doc, steps, scale, W, H, trace) : composeFx(doc, steps, scale, W, H, fullRect(W, H), editor, trace);
@@ -466,22 +462,7 @@ export function composeFrame(doc: DesignDoc, scale: number, retainedPath: boolea
 export const resetRetainedPage = (): void => retained.reset();
 export const retainedStats = () => ({ ...retained.stats, fullWhy: { ...retained.stats.fullWhy }, lastPlan: retained.lastPlan });
 
-export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg' = 'image/png'): Promise<Blob> {
-  checkExportSize(doc.width, doc.height, fxPlan(doc.layers).some((step) => step.t !== 'draw'));
-  try {
-    const c = createCanvas(doc.width, doc.height);
-    const ctx = ctx2d(c);
-    if (type === 'image/jpeg' && !doc.background) {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, doc.width, doc.height);
-    }
-    drawDoc(ctx, doc, { origin: 'export', resolution: 'document' });
-    if (ctx.isContextLost?.()) throw new Error('The browser lost the canvas context.');
-    return await canvasToBlob(c, type, type === 'image/jpeg' ? 0.92 : undefined);
-  } catch (error) {
-    throw new Error(`Export failed at full resolution (${doc.width} × ${doc.height}). No file was created. Try a smaller document or fewer FX layers. ${error instanceof Error ? error.message : ''}`);
-  }
-}
+export { exportDoc } from './exportRaster';
 
 /** Render a single raster layer's pixels (as displayed) into a standalone image, for ops. */
 export async function rasterLayerBlob(l: Layer): Promise<Blob | null> {

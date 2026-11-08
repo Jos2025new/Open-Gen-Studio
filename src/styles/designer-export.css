@@ -1,0 +1,62 @@
+.design-export {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  font-size: var(--fs-s);
+}
+.design-export fieldset {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--sp-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.design-export label {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--sp-1);
+  color: var(--text-2);
+}
+.design-export select,
+.design-export input:not([type="range"]) {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 2rem;
+  padding-inline: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--field-bg);
+  color: var(--text);
+}
+.design-export-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+.design-export-hint {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.design-export p { margin: 0; }
+.design-export-preview {
+  display: block;
+  inline-size: 100%;
+  block-size: 9rem;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.design-export-options {
+  border-block-start: 1px solid var(--border);
+  padding-block-start: var(--sp-2);
+}
+.design-export-options summary { cursor: pointer; }
+.design-export-options > :not(summary) { margin-block-start: var(--sp-2); }
+.design-export-buttons {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}

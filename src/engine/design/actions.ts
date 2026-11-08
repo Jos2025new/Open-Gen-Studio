@@ -1,6 +1,6 @@
 import { uid } from '../../lib/id';
 import { getAssetBlob, putAssetBlob } from '../../lib/idb';
-import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, downloadBlob, fetchBlob } from '../../lib/media';
+import { blobToCanvas, createCanvas, ctx2d, fetchBlob } from '../../lib/media';
 import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
@@ -13,8 +13,10 @@ import { placeFor } from '../place';
 import {rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, releaseBuffers, setBuffer} from './raster';
 import {composeRaster} from './rasterCompose';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
-import { drawDoc, exportDoc, layoutText, textAscent } from './render';
-import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
+import { drawDoc, exportDoc } from './render';
+import { exportDownloadFile } from './exportJob';
+import { DEFAULT_EXPORT, type ExportFormat } from './exportSettings';
+import { deliverDesignExport, prepareDesignExport, rememberDesignExport } from './exportDesign';
 import { isProtectedImage, placementError } from './rules';
 import { rebasePaintPixels } from './paintBounds';
 import { paintModeOf, pinPaintMode } from './paintMode';
@@ -354,7 +356,7 @@ export function undoDoc(sessionId: string, docId: string): void {
   if (!doc) return;
   const prev = undo(doc);
   if (prev) {
-    const restored = { ...prev, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };
+    const restored = { ...prev, lastExport: doc.lastExport, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };
     (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored), releaseUnused(rasterBufferIds(doc.layers)));
   }
 }
@@ -364,7 +366,7 @@ export function redoDoc(sessionId: string, docId: string): void {
   if (!doc) return;
   const next = redo(doc);
   if (next) {
-    const restored = { ...next, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };
+    const restored = { ...next, lastExport: doc.lastExport, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };
     (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored), releaseUnused(rasterBufferIds(doc.layers)));
   }
 }
@@ -453,32 +455,14 @@ export async function placeAboveLayer(sessionId: string, docId: string, layerId:
   return layer.id;
 }
 
-/** PNG/JPG through the editor renderer; SVG/PDF keep layers as vector objects (design/export.ts). */
 export async function exportDocFile(sessionId: string, docId: string, format: ExportFormat = 'png'): Promise<void> {
   const doc = getDoc(sessionId, docId);
-  if (!doc) return;
-  await ensureBuffers(doc.layers);
-  const base = doc.name.replace(/[^\w-]+/g, '_') || 'design';
-  if (format === 'png' || format === 'jpg') {
-    downloadBlob(await exportDoc(doc, format === 'jpg' ? 'image/jpeg' : 'image/png'), `${base}.${format}`);
-    return;
-  }
-  const svg = await docToSvg(doc, svgDeps());
-  if (format === 'svg') downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `${base}.svg`);
-  else downloadBlob(await svgToPdf(svg, doc.width, doc.height), `${base}.pdf`);
-}
-
-function svgDeps(): SvgDeps {
-  return {
-    rasterHref: async (l) => {
-      const buf = getBuffer(l.id);
-      return buf ? blobToDataUrl(await canvasToBlob(buf, 'image/png')) : null;
-    },
-    layout: layoutText,
-    ascent: textAscent,
-    // What the file could not keep is said, not dropped silently.
-    notice: (message) => toast(message, 'info', 8000),
-  };
+  if (!doc) throw new Error('Open a document before exporting.');
+  const settings = { ...DEFAULT_EXPORT, format };
+  const { files, notices } = await prepareDesignExport(doc, settings, {});
+  deliverDesignExport(await exportDownloadFile(doc, files));
+  rememberDesignExport(sessionId, docId, { settings });
+  for (const notice of notices) toast(notice, 'info', 8000);
 }
 
 export async function saveDocToGallery(sessionId: string, docId: string): Promise<Asset | null> {

@@ -7,8 +7,9 @@ import { AspectGlyph } from '../composer/MediaControls';
 import { DOC_PRESETS } from '../../engine/design/doc';
 import { DocBackgroundChoice } from '../designer/DocBackgroundChoice';
 import { newBlankDoc } from '../../engine/design/actions';
+import { ExportPanel } from '../designer/ExportPanel';
 import { DocumentChoices } from '../designer/DocumentPicker';
-import { EXPORT_FORMATS, IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from '../designer/designerFile';
+import { IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from '../designer/designerFile';
 
 type View = 'menu' | 'new' | 'open' | 'export' | 'save';
 const TITLES: Record<View, string> = { menu: 'File', new: 'New design', open: 'Open design', export: 'Export', save: 'Save to gallery' };
@@ -21,17 +22,17 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
   const input = useRef<HTMLInputElement>(null);
   const go = (v: View) => setView(v);
   const close = () => { pop.close(); setView('menu'); };
-  const output = async (gallery: boolean, format?: Parameters<typeof runDesignOutput>[3]) => {
+  const saveToGallery = async () => {
     if (!doc || busy) return;
     close();
     setBusy(true);
-    try { await runDesignOutput(sessionId, doc.id, gallery, format); } finally { setBusy(false); }
+    try { await runDesignOutput(sessionId, doc.id, true, undefined); } finally { setBusy(false); }
   };
   return <>
     <input ref={input} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; if (doc) void importDesignFiles(sessionId, doc.id, files); }} />
     <IconButton ref={pop.ref} icon={FileText} label="File" size="sm" active={pop.open} aria-haspopup="menu" aria-expanded={pop.open} onClick={() => { setView('menu'); pop.toggle(); }} />
-    <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={view === 'open' ? 220 : 240} label={TITLES[view]}>
-      <div className="menu" role="menu">
+    <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" edge={view === 'export' ? 'slide' : 'narrow'} align={view === 'export' ? 'start' : 'end'} width={view === 'export' ? 350 : view === 'open' ? 220 : 240} label={TITLES[view]}>
+      {view === 'export' && doc ? <ExportPanel key={doc.id} sessionId={sessionId} doc={doc} onBack={() => go('menu')} /> : <div className="menu" role="menu">
         {view !== 'menu' && <MenuItem icon={ChevronLeft} label={TITLES[view]} onClick={() => go('menu')} />}
         {view === 'menu' && <>
           <MenuItem icon={FilePlus2} label="New…" onClick={() => go('new')} />
@@ -43,15 +44,14 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
         {view === 'new' && <DocBackgroundChoice />}
         {view === 'new' && DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(sessionId, p); close(); }} />)}
         {view === 'open' && doc && <DocumentChoices sessionId={sessionId} docs={docs} active={doc} />}
-        {view === 'export' && EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => void output(false, f.id)} />)}
         {view === 'save' && doc && <div className="confirm-pop">
           <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>
           <div className="confirm-pop-actions">
             <Button size="sm" variant="ghost" onClick={() => go('menu')}>Cancel</Button>
-            <Button size="sm" variant="primary" icon={Images} onClick={() => void output(true)}>Save</Button>
+            <Button size="sm" variant="primary" icon={Images} onClick={() => void saveToGallery()}>Save</Button>
           </div>
         </div>}
-      </div>
+      </div>}
     </Popover>
   </>;
 }
