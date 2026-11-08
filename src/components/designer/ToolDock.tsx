@@ -57,7 +57,7 @@ function ToolsGridButton({ icon, label, families, isActive, blockedReason, onPic
   useSidePopup('tools', pop.close);
   const active = families.some((family) => family.variants.some((variant) => isActive(family, variant)));
   return <>
-    {iconButton(icon, `Tools · ${label}`, active || pop.open, () => { if (!pop.open) announceSidePopup('tools'); pop.toggle(); }, false, pop.ref)}
+    {iconButton(icon, `Tools · ${label}`, active, () => { if (!pop.open) announceSidePopup('tools'); pop.toggle(); }, false, pop.ref)}
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement={vertical ? 'right-start' : 'top-start'} align="start" width="content" label="Tools" className="tools-grid-pop">
       <PopoverHeader title="Tools" />
       <div className="menu tool-grid">
