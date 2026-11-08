@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DEFAULT_JPEG_QUALITY, type ExportSettings } from '../../engine/design/exportSettings';
 import { Button } from '../ui/primitives';
+import { InlineColor, InlineSlider } from './InlineControls';
 
 export function ExportOptions({ settings, patch, savePreset }: {
   settings: ExportSettings;
@@ -22,9 +23,7 @@ export function ExportOptions({ settings, patch, savePreset }: {
         <option value="color">Solid color</option>
       </select>
     </label>}
-    {alpha && settings.background && <label>Background color
-      <input type="color" value={settings.background} onChange={(e) => patch({ background: e.target.value })} />
-    </label>}
+    {alpha && settings.background && <InlineColor label="Background color" value={settings.background} onChange={(background) => patch({ background })} showValue />}
     {lossy && <>
       <label>Compression
         <select value={settings.maxKb === undefined ? 'quality' : 'limit'} onChange={(e) => patch({ maxKb: e.target.value === 'limit' ? 500 : undefined })}>
@@ -33,9 +32,7 @@ export function ExportOptions({ settings, patch, savePreset }: {
       </label>
       {settings.maxKb !== undefined
         ? <label>Maximum KB<input type="number" min={1} step={1} value={settings.maxKb || ''} onChange={(e) => patch({ maxKb: Number(e.target.value) })} /></label>
-        : <label>Quality ({settings.quality ?? DEFAULT_JPEG_QUALITY}%)
-          <input type="range" min={0} max={100} value={settings.quality ?? DEFAULT_JPEG_QUALITY} onChange={(e) => patch({ quality: Number(e.target.value) })} />
-        </label>}
+        : <InlineSlider label="Quality" value={settings.quality ?? DEFAULT_JPEG_QUALITY} min={0} max={100} unit="%" onChange={(quality) => patch({ quality })} />}
     </>}
     {settings.format === 'pdf' && <label>PDF for
       <select value={settings.pdf ?? 'screen'} onChange={(e) => patch({ pdf: e.target.value === 'a4' ? 'a4' : 'screen' })}>

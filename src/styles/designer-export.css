@@ -12,20 +12,20 @@
   padding: 0;
   margin: 0;
 }
-.design-export label {
+.design-export label:not(.opt) {
   display: grid;
   min-inline-size: 0;
   gap: var(--sp-1);
   color: var(--text-2);
 }
 .design-export select,
-.design-export input:not([type="range"]) {
+.design-export label:not(.opt) > input {
   inline-size: 100%;
   min-inline-size: 0;
   min-block-size: 2rem;
   padding-inline: var(--sp-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
   background: var(--field-bg);
   color: var(--text);
 }
@@ -54,6 +54,7 @@
 }
 .design-export-options summary { cursor: pointer; }
 .design-export-options > :not(summary) { margin-block-start: var(--sp-2); }
+.design-export-options .opt { inline-size: 100%; }
 .design-export-buttons {
   display: flex;
   justify-content: flex-end;

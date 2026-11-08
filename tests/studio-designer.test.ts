@@ -254,10 +254,10 @@ describe('file menu', () => {
     act(() => { preset.value = 'whatsapp'; preset.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(format.value).toBe('jpg');
     expect(panel.querySelector('input[type="number"]')).toHaveProperty('value', '1600');
-    expect(panel.textContent).toContain('Quality (85%)');
+    expect(panel.querySelector('[aria-label="Quality value"]')).toHaveProperty('value', '85');
     act(() => { format.value = 'pdf'; format.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(panel.textContent).toContain('Home printing · A4');
-    expect(panel.textContent).not.toContain('Quality (85%)');
+    expect(panel.querySelector('[aria-label="Quality value"]')).toBeNull();
   });
   it('remembers a successful download request and saves a custom preset in app settings', async () => {
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:test', revokeObjectURL: () => undefined });
