@@ -51,7 +51,7 @@ function iconButton(name: string, label: string, active: boolean, onClick: () =>
   return <button ref={ref} type="button" className={`icon-btn icon-btn-md tone-default ${active ? 'is-active' : ''}`} aria-label={label} aria-pressed={active} aria-disabled={label.includes('Soon:') || undefined} title={label.includes('Soon:') ? label : undefined} disabled={disabled} data-tip={withKey(label, key)} onClick={onClick}><Icon size={16} strokeWidth={1.75} /></button>;
 }
 
-/** The Tools button (Designer): the active one of Pen, Brush and Eraser as its icon, and a popup grid with every variant of those families. */
+/** The Tools button (Designer): the active one of Select, Ruler, Pen, Brush and Eraser as its icon, and a popup grid with every variant of those families. */
 function ToolsGridButton({ icon, label, families, isActive, blockedReason, onPick, vertical }: { icon: string; label: string; families: ToolboxFamily[]; isActive: (family: ToolboxFamily, variant: ToolboxVariant) => boolean; blockedReason: (variant: ToolboxVariant) => string | null | undefined; onPick: (family: ToolboxFamily, variant: ToolboxVariant) => void; vertical: boolean }) {
   const pop = usePopover();
   useSidePopup('tools', pop.close);
@@ -159,7 +159,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   };
 
   // The Designer's bottom toolbox has two rows above it. Quick settings (the tool's icon where the Tools grid holds its variants, its sliders and colors, Eraser toggle, gear) are always there, as wide as their content.
-  // The variants row sits above them for the families the Tools grid does not hold (Edit, Select, Ruler, Layout).
+  // The variants row sits above them for the families the Tools grid does not hold (Edit, Layout).
   const inGrid = designer && TOOLS_GRID_FAMILIES.includes(selectedFamily?.id ?? '');
   const subtools = (selectedFamily?.variants.length ?? 0) > 1;
   const hasQuick = !!QUICK[currentTool];
@@ -184,7 +184,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     {gear}
   </div>;
 
-  // The Tools button stands where the first of Pen, Brush and Eraser would; the others take no slot of their own.
+  // The Tools button stands where the first of Select, Ruler, Pen, Brush and Eraser would; the others take no slot of their own.
   const gridFamilies = designer ? shownFamilies.filter((family) => TOOLS_GRID_FAMILIES.includes(family.id)) : [];
   const gridIcon = (() => {
     const family = gridFamilies.find((f) => f.id === currentFamily?.id);

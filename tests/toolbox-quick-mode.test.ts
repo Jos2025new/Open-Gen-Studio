@@ -59,19 +59,19 @@ describe('quick settings above the toolbox', () => {
     expect(host.querySelector('[aria-label="Brush variants"]')).toBeNull();
   });
 
-  it('the Tools grid holds Pen, Brush and Eraser with their variants, and those three have no button of their own', async () => {
+  it('the Tools grid holds Select, Ruler, Pen, Brush and Eraser with their variants, and those have no button of their own', async () => {
     const bar = [...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'));
-    for (const own of ['Pen', 'Brush', 'Eraser']) expect(bar, own).not.toContain(own);
+    for (const own of ['Select', 'Ruler', 'Pen', 'Brush', 'Eraser']) expect(bar, own).not.toContain(own);
     expect(bar.filter((l) => l?.startsWith('Tools · '))).toHaveLength(1);
     await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
     const cells = [...document.querySelectorAll('.tools-grid-pop .menu-item')].map((b) => b.textContent);
-    expect(cells).toEqual(expect.arrayContaining(['Lineart', 'Curve', 'Bezier pen', 'Cutter', 'Brush', 'Pencil', 'Airbrush', 'Eraser']));
+    expect(cells).toEqual(expect.arrayContaining(['Rectangular selection', 'Lasso', 'Magic wand', 'Straight ruler', 'Lineart', 'Curve', 'Bezier pen', 'Cutter', 'Brush', 'Pencil', 'Airbrush', 'Eraser']));
   });
 
-  it('the toolbox order is Tools, tool settings, Text, Layout, then the Layers button; Edit, Select and Ruler keep their places', () => {
+  it('the toolbox order is Tools, tool settings, Text, Layout, then the Layers button; Edit keeps its place before Tools', () => {
     const labels = [...host.querySelectorAll('[aria-label="Tools"] button')].map((b) => b.getAttribute('aria-label')!);
     const at = (name: string) => labels.findIndex((l) => l === name || l.startsWith(name));
-    const order = ['Edit', 'Select', 'Ruler', 'Tools · ', 'Settings', 'Text', 'Layout', 'Show or hide right panel'].map(at);
+    const order = ['Edit', 'Tools · ', 'Settings', 'Text', 'Layout', 'Show or hide right panel'].map(at);
     expect(order.every((i) => i >= 0), JSON.stringify(labels)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
@@ -161,9 +161,12 @@ describe('subtoolbox row for every tool', () => {
     expect(row()!.querySelectorAll('button[aria-label="Eraser"]').length).toBe(1);
   });
 
-  it('Ruler shows its three subtools in their own row and its quick settings (Snap, Clear) and the gear in the quick row', async () => {
-    await click('Ruler');
-    expect(labels(variants('Ruler')).slice(0, 3)).toEqual(['Straight ruler', 'Ellipse ruler', 'Perspective ruler']);
+  it('Ruler keeps its three subtools in the Tools grid and its quick settings (Snap, Clear) and the gear in the quick row', async () => {
+    await grid('Straight ruler');
+    await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
+    const cells = [...document.querySelectorAll('.tools-grid-pop .menu-item')].map((b) => b.textContent);
+    expect(cells).toEqual(expect.arrayContaining(['Straight ruler', 'Ellipse ruler', 'Perspective ruler']));
+    await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
     expect(labels(row())).toEqual(expect.arrayContaining(['Snap', 'Clear', 'Settings']));
   });
 
@@ -185,11 +188,8 @@ describe('subtoolbox row for every tool', () => {
   });
 
   it('every tool with settings has essentials: the selection acts, the gradient shows its opacity without a saved gradient, the eyedropper leaves no empty slider slot', async () => {
-    await click('Select');
-    await act(async () => { setUi({ tool: 'select', selectShape: 'rect' }); });
-    await act(async () => [...variants('Select')!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
+    await grid('Rectangular selection');
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'All', 'Invert']));
-    expect(labels(variants('Select'))).toEqual(expect.arrayContaining(['Rectangular selection', 'Elliptical selection', 'Lasso']));
     await act(async () => setUi({ selectShape: 'wand' }));
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'Tolerance', 'Grow / shrink']));
     expect(labels(row())).not.toContain('All');

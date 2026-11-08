@@ -38,7 +38,7 @@ export const TOOLBOX: ToolboxFamily[] = [
 ];
 
 /** In the Designer, these families share one button (Tools) whose popup grid holds all their variants; the button stands where the first of them is. */
-export const TOOLS_GRID_FAMILIES: readonly string[] = ['pen', 'brush', 'eraser'];
+export const TOOLS_GRID_FAMILIES: readonly string[] = ['select', 'ruler', 'pen', 'brush', 'eraser'];
 
 /** The key of a variant's tool; none for variants that are only one flavour of a shared key (Pencil, Airbrush, Lasso, Wand, ellipse and perspective rulers). */
 export function variantKey(variant: ToolboxVariant): string | undefined {
