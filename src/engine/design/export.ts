@@ -1,4 +1,4 @@
-import { MARK_SLUG_MM, PX_PER_MM, pageLayout, type PdfPage, type PrintOptions, type SvgOptions } from './exportSettings';
+import { MARK_LENGTH_MM, MARK_OFFSET_MM, PX_PER_MM, pageLayout, type PdfPage, type PrintOptions, type SvgOptions } from './exportSettings';
 import { pathTransform } from './path';
 import { markerSvg } from './markers';
 import { gradientSvg } from './gradientPaint';
@@ -8,6 +8,7 @@ import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
 import { inkscapePrimAttrs } from './inkscapeShape';
 import { decorationRects } from './textLayout';
+import { base64, textPathData } from './exportText';
 import { blurFilterSvg, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox } from './doc';
@@ -34,6 +35,10 @@ export interface SvgDeps {
   layout: (layer: TextLayer) => { lines: string[]; width: number; lineHeightPx: number };
   /** Distance from the top of the em box to the baseline, in px (canvas 'top' baseline → SVG alphabetic). */
   ascent: (layer: TextLayer) => number;
+  /** WOFF bytes of the bundled font for a family and weight; null when the app has none (system fonts). */
+  fontFile?: (family: string, weight: number) => Promise<Uint8Array | null>;
+  /** Pixel size of a raster layer's buffer (for the print preflight). */
+  rasterSize?: (layer: Extract<Layer, { type: 'raster' }>) => { w: number; h: number } | null;
   /** What the SVG could not keep (an FX with no SVG equivalent, unreadable pixels), said once per export. */
   notice?: (message: string) => void;
 }
@@ -122,7 +127,7 @@ function shapeBody(s: VectorShape): string {
   return `<line x1="${n(s.x)}" y1="${n(s.y)}" x2="${n(s.x + s.w)}" y2="${n(s.y + s.h)}" ${paint(s, s.strokeWidth, null)}/>`;
 }
 
-export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineHeightPx: number }, ascent: number): string {
+export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineHeightPx: number }, ascent: number, paths?: string[]): string {
   const anchor = l.align === 'center' ? 'middle' : l.align === 'right' ? 'end' : 'start';
   const ax = l.align === 'center' ? l.x + t.width / 2 : l.align === 'right' ? l.x + t.width : l.x;
   // Same vertical placement as the canvas renderer: glyphs centered in each line box.
@@ -130,7 +135,7 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
   const spans = t.lines.map((line, i) => `<tspan x="${n(ax)}" y="${n(l.y + i * t.lineHeightPx + pad + ascent)}">${xmlEscape(line)}</tspan>`).join('');
   const spacing = l.letterSpacing ? ` letter-spacing="${n(l.letterSpacing)}"` : '';
   const bars = decorationRects(l, t, ascent).map((r) => `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" fill="${xmlEscape(l.color)}"/>`).join('');
-  const el = `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}" fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
+  const el = paths ? `<g fill="${xmlEscape(l.color)}">${paths.map((d) => `<path d="${d}"/>`).join('')}</g>` : `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}" fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
   return bars ? `<g>${el}${bars}</g>` : el;
 }
 
@@ -152,13 +157,20 @@ export function minifySvg(svg: string): string {
     .replace(/>\s+</g, '><').replace(/\n/g, '');
 }
 
-export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport, options: SvgOptions = {}): Promise<string> {
-  let svg = await buildSvg(doc, deps, viewport, options.metadata !== false);
+export interface SvgBuildOptions extends SvgOptions {
+  /** 'paths' draws text as outlines; fontFaces is the embedded @font-face CSS. */
+  text?: 'fonts' | 'paths';
+  fontFaces?: string;
+}
+
+export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport, options: SvgBuildOptions = {}): Promise<string> {
+  let svg = await buildSvg(doc, deps, viewport, options);
   if (options.decimals !== undefined) svg = roundSvgNumbers(svg, Math.max(0, Math.min(6, Math.round(options.decimals))));
   return options.minify ? minifySvg(svg) : svg;
 }
 
-async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | undefined, title: boolean): Promise<string> {
+async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | undefined, build: SvgBuildOptions): Promise<string> {
+  const title = build.metadata !== false;
   const { width, height, box } = viewport ?? { width: doc.width, height: doc.height, box: { x: 0, y: 0, w: doc.width, h: doc.height } };
   const body: string[] = [], defs: string[] = [], skipped = new Set<string>(), unread: string[] = [];
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
@@ -199,7 +211,14 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
         inner = `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000" style="mask-type:alpha"><image x="${n(mask.x)}" y="${n(mask.y)}" width="${n(mask.width)}" height="${n(mask.height)}" preserveAspectRatio="none" href="${href}"${transform}/></mask></defs><g mask="url(#${id})">${inner}</g>`;
       }
     } else {
-      inner = textSvg(l, deps.layout(l), deps.ascent(l));
+      const t = deps.layout(l);
+      let paths: string[] | undefined;
+      if (build.text === 'paths') {
+        const woff = await deps.fontFile?.(l.fontFamily, l.fontWeight);
+        if (woff) paths = await textPathData(woff, l, t, deps.ascent(l));
+        else deps.notice?.(`“${l.fontFamily}” is a system font the app cannot read, so its text stays live text instead of paths.`);
+      }
+      inner = textSvg(l, t, deps.ascent(l), paths);
     }
     const style = l.blend !== 'normal' ? ` style="mix-blend-mode:${l.blend}"` : '';
     const opacity = l.opacity < 1 ? ` opacity="${n(l.opacity)}"` : '';
@@ -216,7 +235,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="${width}" height="${height}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}">`,
     ...(title ? [`<title>${xmlEscape(doc.name)}</title>`] : []),
     // Content outside the page is cut, as in the editor.
-    `<defs><clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath>${defs.join('')}</defs>`,
+    `<defs>${build.fontFaces ? `<style>${build.fontFaces}</style>` : ''}<clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath>${defs.join('')}</defs>`,
     `<g clip-path="url(#page)">${body.join('')}</g>`,
     '</svg>',
   ].join('\n');
@@ -226,7 +245,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
  * PDF from the same SVG (jsPDF + svg2pdf.js, loaded only when used). Shapes and images stay vector/embedded;
  * text uses the PDF standard fonts unless the family is embedded, so it may not match the design fonts.
  */
-export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage, print?: PrintOptions): Promise<Blob> {
+export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage, print?: PrintOptions, fonts: { family: string; weight: number; sfnt: Uint8Array }[] = []): Promise<Blob> {
   const [{ jsPDF }, { svg2pdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const el = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
   const layout = page ? pageLayout(page, width, height, print) : undefined;
@@ -234,6 +253,15 @@ export async function svgToPdf(svg: string, width: number, height: number, page?
     unit: 'px', format: layout ? [layout.pageWidth, layout.pageHeight] : [width, height],
     orientation: layout ? (layout.pageWidth >= layout.pageHeight ? 'landscape' : 'portrait') : width >= height ? 'landscape' : 'portrait', hotfixes: ['px_scaling'],
   });
+  // Embedded fonts: one regular and one bold file per family (jsPDF knows two weights).
+  const registered = new Set<string>();
+  for (const f of fonts) {
+    const style = f.weight >= 600 ? 'bold' : 'normal', key = `${f.family}|${style}`;
+    if (registered.has(key)) continue;
+    registered.add(key);
+    pdf.addFileToVFS(`${key}.ttf`, base64(f.sfnt));
+    pdf.addFont(`${key}.ttf`, f.family, style);
+  }
   // svg2pdf reads computed styles: the SVG must be in the document while it converts.
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden';
@@ -259,11 +287,11 @@ export async function svgToPdf(svg: string, width: number, height: number, page?
   return pdf.output('blob');
 }
 
-/** Thin registration-black lines at the trim corners, starting beyond the bleed so they never print on the artwork. */
+/** Registration-black lines (0.25 pt) at the trim corners, starting 2 mm beyond the bleed so they never print on the artwork. */
 function cropMarks(pdf: { setDrawColor(c: number): void; setLineWidth(w: number): void; line(a: number, b: number, c: number, d: number): void }, trim: { x: number; y: number; w: number; h: number }, bleed: number) {
-  const gap = bleed + 0.5 * PX_PER_MM, len = (MARK_SLUG_MM - 0.5) * PX_PER_MM;
+  const gap = bleed + MARK_OFFSET_MM * PX_PER_MM, len = MARK_LENGTH_MM * PX_PER_MM;
   pdf.setDrawColor(0);
-  pdf.setLineWidth(0.33);
+  pdf.setLineWidth(0.25 * 96 / 72);
   for (const x of [trim.x, trim.x + trim.w]) for (const [y, dir] of [[trim.y, -1], [trim.y + trim.h, 1]] as const) {
     const out = x === trim.x ? -1 : 1;
     pdf.line(x, y + dir * gap, x, y + dir * (gap + len));

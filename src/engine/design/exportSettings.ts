@@ -32,7 +32,10 @@ export interface ExportRow { scale: number; suffix: string; format: ExportFormat
 export interface SvgOptions { decimals?: number; minify?: boolean; metadata?: boolean }
 /** Print shop PDF: the paper is the trim size; bleed is added on every side, marks need a slug outside it. */
 export interface PrintOptions { bleedMm: number; marks: boolean }
-export const MARK_SLUG_MM = 5;
+/** Crop marks start this far beyond the bleed edge and are this long; the page grows by both. */
+export const MARK_OFFSET_MM = 2;
+export const MARK_LENGTH_MM = 5;
+export const MARK_SLUG_MM = MARK_OFFSET_MM + MARK_LENGTH_MM;
 
 export const row = (scale: number, format: ExportFormat, suffix = ''): ExportRow => ({ scale, suffix, format });
 /** The suffix a plain scale gets when the user did not write one (2 gives @2x). */
@@ -70,6 +73,10 @@ export interface ExportSettings {
   prefix?: string;
   /** Settings that apply when SVG is among the outputs. */
   svg?: SvgOptions;
+  /** SVG and PDF text: keep it live with embedded fonts, or draw the letters as paths. */
+  text?: 'fonts' | 'paths';
+  /** PDF on paper: resolution of what becomes an image at the printed size (default 300). */
+  ppi?: number;
   /** Put the files in subfolders by format when saving to a chosen folder. */
   subfolders?: boolean;
   /** Inside one output of `outputs`: the text added to that file's name. */
@@ -102,11 +109,11 @@ export const BUILTIN_EXPORTS = [
   { id: 'web', name: 'Lightweight web', group: 'Share', settings: defaults('web', { format: 'webp', quality: 80 }) },
   { id: 'home-print', name: 'Print at home', group: 'Print', settings: defaults('home-print', { format: 'pdf', pdf: DEFAULT_PDF_PAGE }) },
   { id: 'portfolio', name: 'Portfolio', group: 'Work', settings: defaults('portfolio', { size: 2 }) },
-  { id: 'brand', name: 'Logo / brand', group: 'Work', settings: defaults('brand', { format: 'svg', outputs: [row(1, 'svg'), row(1, 'png'), row(2, 'png', '@2x')] }) },
+  { id: 'brand', name: 'Logo / brand', group: 'Work', settings: defaults('brand', { format: 'svg', text: 'paths', outputs: [row(1, 'svg'), row(1, 'png'), row(2, 'png', '@2x')] }) },
   { id: 'ios', name: 'iOS', group: 'Apps', settings: defaults('ios', { outputs: [row(1, 'png'), row(2, 'png', '@2x'), row(3, 'png', '@3x')] }) },
   { id: 'android', name: 'Android', group: 'Apps', settings: defaults('android', { outputs: [
     row(0.75, 'png', '-ldpi'), row(1, 'png', '-mdpi'), row(1.5, 'png', '-hdpi'), row(2, 'png', '-xhdpi'), row(3, 'png', '-xxhdpi'), row(4, 'png', '-xxxhdpi')] }) },
-  { id: 'print-shop', name: 'Print shop', group: 'Print', settings: defaults('print-shop', { format: 'pdf', pdf: DEFAULT_PDF_PAGE, print: { bleedMm: 3, marks: true } }) },
+  { id: 'print-shop', name: 'Print shop', group: 'Print', settings: defaults('print-shop', { format: 'pdf', pdf: DEFAULT_PDF_PAGE, print: { bleedMm: 3, marks: false }, text: 'paths' }) },
 ] as const;
 
 export const DEFAULT_JPEG_QUALITY = 92;

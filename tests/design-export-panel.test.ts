@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportPanel } from '../src/components/designer/ExportPanel';
-import { createDoc, newVectorLayer } from '../src/engine/design/doc';
+import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
 import { DEFAULT_EXPORT } from '../src/engine/design/exportSettings';
 import { setSettings, useStore } from '../src/store/store';
 
@@ -21,6 +21,7 @@ let host: HTMLDivElement, root: Root;
 const mount = (doc = base) => act(() => { root.render(createElement(ExportPanel, { sessionId: 's', doc })); });
 const text = () => document.body.textContent ?? '';
 const click = (el: Element | null | undefined) => { expect(el).toBeTruthy(); act(() => { (el as HTMLElement).click(); }); };
+const gear = () => { if (!document.querySelector('.design-export-pop')) click(document.querySelector('[aria-label="Format options"]')); };
 const byText = (label: string, selector = 'button') => [...document.body.querySelectorAll(selector)].find((e) => e.textContent?.includes(label));
 
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
@@ -54,26 +55,69 @@ describe('export panel', () => {
     expect(document.querySelector('.design-export-footer .design-export-buttons')).not.toBeNull();
   });
 
+  it('links width, height and DPI', () => {
+    mount();
+    const [w, h, dpi] = [...document.querySelectorAll<HTMLInputElement>('.design-export-size input')];
+    expect([w.value, h.value, dpi.value]).toEqual(['120', '80', '96']);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(dpi, '192');
+      dpi.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const [w2, h2] = [...document.querySelectorAll<HTMLInputElement>('.design-export-size input')];
+    expect([w2.value, h2.value, dpi.value, document.querySelector('[role=alert]')?.textContent]).toEqual(['240', '160', '192', undefined]);
+  });
+
+  it('groups the area as one row with a Selection sub-choice', () => {
+    mount();
+    const row = document.querySelector('[aria-label="Export area"]')!;
+    expect([...row.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Selection', 'Layer']);
+    click(byText('Selection', '[role="radio"]'));
+    expect(text()).toContain('Selection of');
+  });
+
   it('shows the scale unit in rows', () => {
     mount();
     click(byText('+ Add scale'));
     expect(document.querySelector('.design-export-scale')?.textContent).toContain('×');
   });
 
+  it('offers the text choice only for SVG or PDF of a document with text', () => {
+    const toSvg = () => { click(byText('Format')); click(byText('SVG', '.menu-item')); };
+    mount();
+    toSvg();
+    gear();
+    expect(text()).not.toContain('Convert to paths');
+    act(() => root.unmount());
+    document.body.innerHTML = '';
+    host = document.createElement('div'); document.body.append(host);
+    root = createRoot(host);
+    mount({ ...base, layers: [layer, newTextLayer('T', 'Hi', { x: 1, y: 1, width: 10 })] as never });
+    gear();
+    expect(text()).not.toContain('Convert to paths');
+    toSvg();
+    gear();
+    expect(text()).toContain('Embed fonts');
+    expect(text()).toContain('Convert to paths');
+  });
+
   it('shows only the fields that apply', () => {
     mount();
-    expect(text()).toContain('Transparent background');
+    expect(text()).toContain('Transparent');
+    gear();
     expect(text()).not.toContain('Limit size');
     click(byText('Format'));
     click(byText('JPG', '.menu-item'));
+    gear();
     expect(text()).toContain('Limit size');
-    expect(text()).not.toContain('Transparent background');
+    expect(text()).not.toContain('Transparent');
     click(byText('Format'));
     click(byText('PDF', '.menu-item'));
+    gear();
     click(byText('Paper', '[role="radio"]'));
-    expect(text()).not.toContain('Scale');
+    expect(text()).not.toContain('Width (px)');
     expect(text()).toContain('Orientation');
     expect(text()).toContain('Print shop');
+    expect(text()).toContain('Raster resolution');
   });
 
   it('adds and removes scale rows and counts the files', () => {
@@ -87,6 +131,7 @@ describe('export panel', () => {
     expect(text()).not.toContain('files ·');
     click(byText('Format'));
     click(byText('PDF', '.menu-item'));
+    gear();
     click(byText('Paper', '[role="radio"]'));
     expect(byText('Add scale')).toBeUndefined();
     expect(document.querySelectorAll('select').length).toBe(0);

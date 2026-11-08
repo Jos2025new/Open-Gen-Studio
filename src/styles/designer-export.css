@@ -115,6 +115,22 @@
 .design-export-scale { position: relative; display: block; }
 .design-export-scale > input { padding-inline-end: 1.4rem; }
 .design-export-scale > span { position: absolute; inset-block: 0; inset-inline-end: .5rem; display: grid; align-items: center; color: var(--text-2); pointer-events: none; }
-.design-export .opt-choice { display: grid; gap: var(--sp-1); block-size: auto; align-items: stretch; }
-.design-export .opt-choice .opt-choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-.design-export .opt-choice .opt-choices button { inline-size: auto; padding-inline: var(--sp-2); white-space: nowrap; overflow: visible; text-overflow: clip; }
+:is(.design-export, .design-export-pop) .opt-choice { display: grid; gap: var(--sp-1); block-size: auto; align-items: stretch; }
+:is(.design-export, .design-export-pop) .opt-choice .opt-choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+:is(.design-export, .design-export-pop) .opt-choice .opt-choices button { inline-size: auto; padding-inline: var(--sp-2); white-space: nowrap; overflow: visible; text-overflow: clip; }
+.design-export-size { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); }
+.design-export-formatrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-1); align-items: center; }
+.design-export-gear {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.design-export-gear:hover { color: var(--text); }
+.design-export-pop .design-export-fields { padding: var(--sp-1); }
+.design-export-pop .design-export-hint { margin: 0; color: var(--text-2); font-size: var(--fs-s); }

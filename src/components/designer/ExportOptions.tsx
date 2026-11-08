@@ -1,73 +1,72 @@
 import { useState } from 'react';
-import { DEFAULT_JPEG_QUALITY, DEFAULT_PDF_PAGE, exportRows, PDF_PAPERS, pdfPage, row, type ExportSettings, type PdfPage, type PdfPaper } from '../../engine/design/exportSettings';
+import { exportRows, row, type ExportSettings } from '../../engine/design/exportSettings';
 import { Button } from '../ui/primitives';
-import { ExportMenu, ExportRows, formatOptions, Hint, withRows } from './ExportFields';
-import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
+import { ExportMenu, ExportRows, formatOptions, withRows } from './ExportFields';
+import { FormatGear } from './ExportFormatOptions';
+import { InlineChoice, InlineColor, InlineToggle } from './InlineControls';
 
-const quality = { compress: 75, high: DEFAULT_JPEG_QUALITY };
+type Patch = (options: Partial<ExportSettings>) => void;
+const group = (area: ExportSettings['area']) => (area === 'objects' || area === 'selection' ? 'selection' : area);
 
-/** Only the fields that apply to what is being exported. */
-export function ExportOptions({ settings, patch, geometry, areaOptions, docBackground }: {
-  docBackground: string;
-  settings: ExportSettings;
-  patch: (options: Partial<ExportSettings>) => void;
-  geometry?: { width: number; height: number };
-  areaOptions: { value: ExportSettings['area']; label: string }[];
-}) {
+/** What to export, as one row: Canvas · Drawing · Selection (objects or pixels) · Layer. */
+export function AreaRow({ settings, patch, picked, pixels }: { settings: ExportSettings; patch: Patch; picked: boolean; pixels: boolean }) {
+  const current = group(settings.area);
+  return <>
+    <InlineChoice label="Export area" value={current} options={[{ value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing' }, { value: 'selection', label: 'Selection' }, { value: 'layer', label: 'Layer' }]}
+      onChange={(g) => patch({ area: g === 'selection' ? (pixels && !picked ? 'selection' : 'objects') : g })} />
+    {current === 'selection' && <InlineChoice label="Selection of" value={settings.area} options={[{ value: 'objects', label: 'Objects' }, { value: 'selection', label: 'Pixels' }]} onChange={(area) => patch({ area })} />}
+  </>;
+}
+
+/** Width, height and DPI, linked: DPI is the pixels per inch of the design at its 96-dpi size. */
+export function ExportSize({ settings, patch, geometry }: { settings: ExportSettings; patch: Patch; geometry: { width: number; height: number; box: { w: number; h: number } } }) {
+  const [draft, setDraft] = useState<{ key: string; text: string }>();
+  const { box } = geometry;
+  const fields = [
+    { key: 'w', label: 'Width (px)', value: geometry.width, toWidth: (v: number) => v },
+    { key: 'h', label: 'Height (px)', value: geometry.height, toWidth: (v: number) => v * box.w / box.h },
+    { key: 'dpi', label: 'DPI', value: Math.round(96 * geometry.width / box.w), toWidth: (v: number) => v * box.w / 96 },
+  ];
+  void settings;
+  return <div className="design-export-size">
+    {fields.map((f) => <label key={f.key}>{f.label}
+      <input type="number" min={1} step={1} value={draft?.key === f.key ? draft.text : f.value}
+        onChange={(e) => {
+          setDraft({ key: f.key, text: e.target.value });
+          const v = Number(e.target.value);
+          if (e.target.value && v > 0) patch({ size: 'width', pixels: Math.max(1, Math.round(f.toWidth(v))) });
+        }}
+        onBlur={() => setDraft(undefined)} />
+    </label>)}
+  </div>;
+}
+
+/** One row: the background color and a Transparent switch (PNG and WebP only). */
+export function BackgroundRow({ settings, patch, docBackground }: { settings: ExportSettings; patch: Patch; docBackground: string }) {
+  const alpha = exportRows(settings).some((r) => r.format === 'png' || r.format === 'webp');
+  return <div className="design-export-row">
+    <InlineColor label="Background" value={settings.background ?? docBackground} onChange={(background) => patch({ background })} showValue />
+    {alpha && <InlineToggle label="Transparent" checked={settings.background === null} onChange={(on) => patch({ background: on ? null : undefined })} />}
+  </div>;
+}
+
+/** Format menu with its gear, or the list of files when several scales are exported. */
+export function FormatRow({ settings, patch, hasText }: { settings: ExportSettings; patch: Patch; hasText: boolean }) {
   const rows = exportRows(settings), multi = !!settings.outputs?.length;
-  const has = (...formats: string[]) => rows.some((r) => formats.includes(r.format));
-  const page = has('pdf') ? pdfPage(settings.pdf) : undefined;
-  const pdfMode = !page ? 'screen' : settings.print ? 'print' : 'paper';
-  const lossy = has('jpg', 'webp');
-  const mode = settings.size === 'width' ? 'width' : settings.size === 'long-side' ? 'long-side' : 'scale';
-  const level = settings.maxKb !== undefined ? 'limit' : (settings.quality ?? DEFAULT_JPEG_QUALITY) < 90 ? 'compress' : 'high';
-  const svg = settings.svg ?? {};
-  const showSize = !multi && !page;
-  return <div className="design-export-fields">
-    {!multi ? <ExportMenu label="Format" value={settings.format} options={formatOptions}
-      onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />
-      : <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />}
+  const page = rows.some((r) => r.format === 'pdf') && settings.pdf && settings.pdf !== 'screen';
+  return <>
+    <div className="design-export-formatrow">
+      {!multi ? <ExportMenu label="Format" value={settings.format} options={formatOptions}
+        onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />
+        : <span className="design-export-hint">Files</span>}
+      <FormatGear settings={settings} patch={patch} hasText={hasText} />
+    </div>
+    {multi && <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />}
+    {multi && <p className="design-export-hint">{rows.length} files · packed in one ZIP</p>}
     {!multi && !page && <button type="button" className="opt opt-pick" onClick={() => patch({ outputs: [row(typeof settings.size === 'number' ? settings.size : 1, settings.format), row(2, settings.format, '@2x')], preset: undefined })}>
       <span className="opt-label">+ Add scale</span>
     </button>}
-    {multi && <Hint>{rows.length} files · packed in one ZIP</Hint>}
-    <InlineSelect label="What to export" value={settings.area} options={areaOptions} onChange={(area) => patch({ area })} />
-    {showSize && <>
-      <InlineChoice label="Size by" value={mode} options={[{ value: 'scale', label: 'Scale' }, { value: 'width', label: 'Width' }, { value: 'long-side', label: 'Long side' }]}
-        onChange={(m) => patch(m === 'scale' ? { size: 1 } : { size: m, pixels: settings.pixels ?? geometry?.width ?? 1000 })} />
-      {mode === 'scale'
-        ? <InlineSlider label="Scale" value={typeof settings.size === 'number' ? settings.size : 1} min={0.25} max={4} step={0.25} unit="×" typedRange={[0.1, 8]} onChange={(size) => patch({ size })} />
-        : <InlineSlider label={mode === 'width' ? 'Width' : 'Long side'} value={settings.pixels ?? 1000} min={16} max={4096} step={1} unit="px" allowManualOverflow onChange={(pixels) => patch({ pixels: Math.round(pixels) })} />}
-    </>}
-    {lossy && <>
-      <InlineChoice label="Quality" value={level} options={[{ value: 'compress', label: 'Compress' }, { value: 'high', label: 'High' }, { value: 'limit', label: 'Limit size' }]}
-        onChange={(l) => patch(l === 'limit' ? { maxKb: settings.maxKb ?? 500 } : { maxKb: undefined, quality: quality[l] })} />
-      {level === 'limit' && <InlineSlider label="Maximum" value={settings.maxKb ?? 500} min={10} max={2000} step={10} unit="KB" allowManualOverflow onChange={(maxKb) => patch({ maxKb: Math.round(maxKb) })} />}
-    </>}
-    {has('png', 'webp') && <>
-      <InlineToggle label="Transparent background" checked={settings.background === null} onChange={(on) => patch({ background: on ? null : undefined })} />
-      {settings.background !== null && <InlineColor label="Background color" value={settings.background ?? docBackground} onChange={(background) => patch({ background })} showValue />}
-    </>}
-    {has('pdf') && <>
-      <InlineChoice label="PDF page" value={pdfMode} options={[{ value: 'screen', label: 'Screen' }, { value: 'paper', label: 'Paper' }, { value: 'print', label: 'Print shop' }]}
-        onChange={(m) => patch({ pdf: m === 'screen' ? 'screen' : page ?? DEFAULT_PDF_PAGE, print: m === 'print' ? { bleedMm: 3, marks: true } : undefined })} />
-      {page && <>
-        <InlineSelect label="Paper" value={page.paper} options={Object.entries(PDF_PAPERS).map(([paper, { label }]) => ({ value: paper as PdfPaper, label }))} onChange={(paper) => patch({ pdf: { ...page, paper } })} />
-        <InlineChoice label="Orientation" value={page.orientation} options={[{ value: 'portrait', label: 'Portrait' }, { value: 'landscape', label: 'Landscape' }] as { value: PdfPage['orientation']; label: string }[]}
-          onChange={(orientation) => patch({ pdf: { ...page, orientation } })} />
-      </>}
-      {settings.print && <>
-        <InlineSlider label="Bleed" value={settings.print.bleedMm} min={0} max={10} step={0.5} unit="mm" onChange={(bleedMm) => patch({ print: { ...settings.print!, bleedMm } })} />
-        <InlineToggle label="Crop marks" checked={settings.print.marks} onChange={(marks) => patch({ print: { ...settings.print!, marks } })} />
-      </>}
-    </>}
-    {has('svg') && <>
-      <InlineSlider label="SVG decimals" value={svg.decimals ?? 3} min={0} max={6} step={1} onChange={(decimals) => patch({ svg: { ...svg, decimals } })} />
-      <InlineToggle label="Minify SVG" checked={!!svg.minify} onChange={(minify) => patch({ svg: { ...svg, minify } })} />
-      <InlineToggle label="Include title" checked={svg.metadata !== false} onChange={(metadata) => patch({ svg: { ...svg, metadata } })} />
-      <Hint>Fonts are not embedded in SVG: text keeps the font name.</Hint>
-    </>}
-  </div>;
+  </>;
 }
 
 /** Save the current settings as a preset; delete one of your own after an inline confirmation. */

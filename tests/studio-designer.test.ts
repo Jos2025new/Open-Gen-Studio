@@ -263,12 +263,13 @@ describe('file menu', () => {
     expect(panel.textContent).toContain('PNG');
     pick(panel, 'What is it for?', 'WhatsApp');
     expect(panel.textContent).toContain('JPG');
-    expect(panel.querySelector('[aria-label="Long side value"]')).toHaveProperty('value', '1600');
-    expect(panel.querySelector('[aria-label="Compress"]')?.getAttribute('aria-checked')).toBe('true');
+    expect(panel.querySelector<HTMLInputElement>('.design-export-size input')?.value).toBe('1600');
+    act(() => panel.querySelector<HTMLElement>('[aria-label="Format options"]')!.click());
+    expect(document.querySelector('.design-export-pop [aria-label="Compress"]')?.getAttribute('aria-checked')).toBe('true');
     pick(panel, 'Format', 'PDF');
-    act(() => panel.querySelector<HTMLElement>('[aria-label="Paper"]')!.click());
-    expect(panel.textContent).toContain('Orientation');
-    expect(panel.querySelector('[aria-label="Compress"]')).toBeNull();
+    act(() => document.querySelector<HTMLElement>('.design-export-pop [aria-label="Paper"]')!.click());
+    expect(document.body.textContent).toContain('Orientation');
+    expect(document.querySelector('.design-export-pop [aria-label="Compress"]')).toBeNull();
   });
   it('debounces a 3× thumbnail and prepares the named file only after Export', async () => {
     vi.useFakeTimers();
@@ -280,7 +281,7 @@ describe('file menu', () => {
       act(() => q('[aria-label="File"]')!.click());
       act(() => item('Export')!.click());
       const panel = document.querySelector('.design-export')!;
-      typeInto(panel.querySelector('[aria-label="Scale value"]')!, '3');
+      typeInto(panel.querySelector('.design-export-size input')!, '360');
       const filename = [...panel.querySelectorAll<HTMLInputElement>('input[placeholder]')].find((i) => i.placeholder === doc().name)!;
       expect(filename.value).toBe(doc().name);
       act(() => {
@@ -289,10 +290,10 @@ describe('file menu', () => {
       });
       await act(async () => { await vi.advanceTimersByTimeAsync(500); });
       expect(download.preview).toHaveBeenCalledOnce();
-      expect(download.preview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ size: 3 }), {}, expect.anything());
+      expect(download.preview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ size: 'width', pixels: 360 }), {}, expect.anything());
       expect(download.prepare).not.toHaveBeenCalled();
       await act(async () => item('Export')!.click());
-      expect(download.prepare).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ size: 3 }), {}, expect.anything(), expect.anything(), 'Named export');
+      expect(download.prepare).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ size: 'width', pixels: 360 }), {}, expect.anything(), expect.anything(), 'Named export');
       expect(panel.textContent).toContain('KB');
       act(() => item('Back to File')!.click());
     } finally {
@@ -346,7 +347,6 @@ describe('file menu', () => {
     act(() => item('Export')!.click());
     const panel = document.querySelector('.design-export')!;
     expect(panel.textContent).toContain('WebP');
-    expect(panel.querySelector('[aria-label="Scale value"]')).toHaveProperty('value', '2');
     expect(panel.querySelector('[role="alert"]')?.textContent).toContain('layer is unavailable');
     expect(item('Export')).toHaveProperty('disabled', true);
   });

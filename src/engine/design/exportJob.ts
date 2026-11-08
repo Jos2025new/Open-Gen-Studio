@@ -6,6 +6,8 @@ import { unionBox, type Box } from './doc';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
 import { checkRasterExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
+import { collectFonts, fontFaceCss, woffToSfnt } from './exportText';
+import { printPixelRatio, printPreflight } from './exportPrint';
 import { autoSuffix, DEFAULT_JPEG_QUALITY, pageLayout, pdfPage, type ExportSettings } from './exportSettings';
 import type { ObjectPick } from './objectSelection';
 import { selectionBox, selectionPath, type PixelSelection } from './pixelSelection';
@@ -201,9 +203,21 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     });
   } else {
     // Pixel selections can have arbitrary alpha. Preserve their exact shape in SVG and PDF as an embedded image.
-    const svg = selection ? await maskedSvg(renderDoc, options) : await docToSvg(renderDoc, deps, options, settings.svg);
+    const page = format === 'pdf' ? pdfPage(settings.pdf) : undefined;
+    const layout = page && pageLayout(page, options.width, options.height, settings.print);
+    // On paper: pixels the SVG turns into an image are made at the chosen ppi (300) for the printed size; layers keep their own pixels.
+    const ppi = settings.ppi ?? 300, ratio = layout ? printPixelRatio(layout.scale, ppi) : 1;
+    if (layout) printPreflight(renderDoc, options.scale * layout.scale, deps.rasterSize ?? (() => null), ppi).forEach((m) => deps.notice?.(m));
+    const texts = renderDoc.layers.filter((l): l is Extract<typeof l, { type: 'text' }> => l.type === 'text' && l.visible);
+    const live = (settings.text ?? 'fonts') === 'fonts' && texts.length > 0;
+    const { found, missing } = live ? await collectFonts(texts, deps.fontFile) : { found: new Map(), missing: [] as string[] };
+    missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
+    const svg = selection ? await maskedSvg(renderDoc, options, ratio) : await docToSvg(renderDoc, deps, options, {
+      ...settings.svg, text: settings.text ?? 'fonts', fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
+    });
     signal?.throwIfAborted();
-    bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, pdfPage(settings.pdf), settings.print) : new Blob([svg], { type: 'image/svg+xml' });
+    bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, page, settings.print,
+      [...found.values()].map((f) => ({ family: f.family, weight: f.weight, sfnt: woffToSfnt(f.woff) }))) : new Blob([svg], { type: 'image/svg+xml' });
   }
   signal?.throwIfAborted();
   const extension = bytes.type === 'image/jpeg' ? 'jpg' : format;
@@ -211,9 +225,11 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
   return { name: `${base}${suffix}.${extension}`, mime: bytes.type, bytes };
 }
 
-async function maskedSvg(doc: DesignDoc, options: RasterExport): Promise<string> {
+async function maskedSvg(doc: DesignDoc, options: RasterExport, ratio = 1): Promise<string> {
   const { width, height } = options;
-  const href = await blobToDataUrl(await exportDoc(doc, 'image/png', options));
+  const big = ratio === 1 ? options : { ...options, width: Math.round(width * ratio), height: Math.round(height * ratio), scale: options.scale * ratio,
+    offsetX: (options.offsetX ?? 0) * ratio, offsetY: (options.offsetY ?? 0) * ratio };
+  const href = await blobToDataUrl(await exportDoc(doc, 'image/png', big));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><title>${xmlEscape(doc.name)}</title><image width="${width}" height="${height}" href="${href}"/></svg>`;
 }
 

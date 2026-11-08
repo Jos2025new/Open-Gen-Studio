@@ -89,8 +89,8 @@ Hecho en `task/export`; motor en `exportSettings.ts`/`exportJob.ts`, campos en `
 - **Varias salidas**: `settings.outputs` = filas `{scale, suffix, format}`; Logo/brand, iOS y Android son listas de filas de serie. Más de un archivo → un ZIP todo o nada. Nombres repetidos se numeran (`-2`).
 - **Presets**: iOS, Android, Print shop; los propios guardan filas y se borran con confirmación en línea.
 - **Qué exportar**: Canvas, Drawing only (recorte al contenido), Selected objects (unión con trazo y desenfoque; solo esos objetos), Pixel selection, Layer. Prefijo de nombre.
-- **SVG**: decimales, minificar, título; sin fuentes incrustadas (el motor no las tiene) y el panel lo avisa.
-- **Imprenta (fase 3)**: PDF con papel = tamaño final, sangrado configurable (3 mm), arte escalado para cubrirlo y recortado ahí, marcas de corte en un margen extra de 5 mm. Las capas ráster se incrustan con sus píxeles nativos; no hay remuestreo a 300 ppp.
+- **SVG/PDF y texto**: opción «Text: Embed fonts / Convert to paths» (solo si hay texto; Logo/brand y Print shop usan trazados). Incrusta la Inter que trae la app (`@fontsource/inter`, WOFF; en PDF vía jsPDF) o dibuja las letras con `opentype.js` con el mismo `layoutText`/`textAscent`. Las fuentes del sistema no se pueden leer: aviso con su nombre y el texto queda vivo. SVG: decimales, minificar, título.
+- **Imprenta (fase 3)**: PDF con papel = tamaño final, sangrado configurable (3 mm), arte escalado para cubrirlo y recortado ahí,  Marcas de corte opcionales (desactivadas por defecto): empiezan 2 mm tras el sangrado, 5 mm de largo, 0,25 pt; la página solo crece lo que piden. Lo que el SVG convierte en imagen (selección de píxeles) se genera a 300 ppp al tamaño impreso; las capas ráster conservan sus píxeles (nunca se amplían) y un aviso indica las que quedan por debajo de 300 ppp. Sin reducción de >450 ppp.
 - **Carpeta (fase 3)**: con `showDirectoryPicker` (Chromium) se elige carpeta y «Subfolders by format»; sin API sigue la descarga. No sobrescribe: añade `-2`.
 
 ## Pruebas (vitest; solo las afectadas mientras trabajas, `npm test` una vez al entregar)
@@ -107,3 +107,5 @@ Hecho en `task/export`; motor en `exportSettings.ts`/`exportJob.ts`, campos en `
 - Actualiza `docs/designer-controles/` (la página que describa Export), el [índice](README.md) y los contratos de `scripts/map-contracts*.mjs` si cambian; `node scripts/map.mjs --write`.
 - Prueba visual solo en el sandbox (`npm run dev:sandbox`, puerto 5183, `.sandbox/data`); nunca `data/`. Detenlo al acabar.
 - Informe final: qué hiciste, qué quedó fuera y por qué, decisiones tomadas, resultados de pruebas exactos.
+
+- **Disposición (2026-11-08)**: orden preset · área (una fila) · vista previa · tamaño An/Al/DPI enlazados · fondo + Transparent · nombre/prefijo · formato + engranaje (opciones por formato en un popover). PNG sin profundidad de bits ni antialias: el renderizador compartido no los admite sin tocarlo.

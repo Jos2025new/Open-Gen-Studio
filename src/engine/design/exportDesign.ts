@@ -3,6 +3,7 @@ import { blobToDataUrl, canvasToBlob, downloadBlob } from '../../lib/media';
 import { setDoc } from '../../store/store';
 import type { DesignDoc } from '../types';
 import { ExportError, exportError } from './exportErrors';
+import { loadBundledFont } from './exportFontFiles';
 import { exportPlan, exportPreview, type ExportFile, type ExportTarget } from './exportJob';
 import type { ExportSettings, RememberedExport } from './exportSettings';
 import { objectPicks } from './objectSelection';
@@ -63,6 +64,8 @@ export async function prepareDesignExport(doc: DesignDoc, settings: ExportSettin
       const buf = getBuffer(layer.id);
       return buf ? blobToDataUrl(await canvasToBlob(buf)) : null;
     },
+    fontFile: loadBundledFont,
+    rasterSize: (layer) => { const buf = getBuffer(layer.id); return buf ? { w: buf.width, h: buf.height } : null; },
     layout: layoutText,
     ascent: textAscent,
     notice: (message) => notices.add(message),

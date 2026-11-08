@@ -6,21 +6,17 @@ import { exportDownloadFile, exportGeometry, validateExport } from '../../engine
 import { canChooseFolder, chooseFolder, writeFilesToFolder, type FolderHandle } from '../../engine/design/exportFolder';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { BUILTIN_EXPORTS, DEFAULT_EXPORT, exportRows, pageLayout, PDF_PAPERS, pdfPage, type ExportSettings, type RememberedExport } from '../../engine/design/exportSettings';
-import { useSelectionVersion } from '../../engine/design/pixelSelection';
+import { getSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
-import { ExportOptions, PresetActions } from './ExportOptions';
+import { AreaRow, BackgroundRow, ExportSize, FormatRow, PresetActions } from './ExportOptions';
 import { ExportMenu } from './ExportFields';
 import { InlineToggle } from './InlineControls';
 import { Folder } from '../ui/icons';
 
 import { exportError } from '../../engine/design/exportErrors';
 const groups = ['Share', 'Print', 'Work', 'Apps'];
-const areaOptions = [
-  { value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing only' }, { value: 'objects', label: 'Selected objects' },
-  { value: 'selection', label: 'Pixel selection' }, { value: 'layer', label: 'Layer' },
-] as const satisfies readonly { value: ExportSettings['area']; label: string }[];
 const stable = (value: unknown): string => JSON.stringify(value, (_k, v) => v && typeof v === 'object' && !Array.isArray(v)
   ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => (a < b ? -1 : 1))) : v);
 const sameSettings = (a: ExportSettings, b: ExportSettings) => {
@@ -59,7 +55,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
     try {
       validateExport(doc, settings, target);
       const first = exportRows(settings)[0];
-      return { geometry: exportGeometry(doc, { ...settings, size: first.scale, format: first.format }, target), invalid: undefined };
+      return { geometry: exportGeometry(doc, { ...settings, size: settings.outputs?.length ? first.scale : settings.size, format: first.format }, target), invalid: undefined };
     } catch (error) { return { geometry: undefined, invalid: message(error) }; }
   }, [doc, settings, target]);
 
@@ -179,18 +175,20 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
         const preset = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === id);
         apply(preset?.settings ?? { ...settings, preset: undefined, fitInstagram: undefined }, id);
       }} />
-      <ExportPreview image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
-      {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
-      {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
-      <ExportOptions settings={settings} patch={patch} geometry={geometry} docBackground={doc.background ?? '#ffffff'} areaOptions={[...areaOptions]} />
+      <AreaRow settings={settings} patch={patch} picked={!!objectPicks?.length} pixels={!!getSelection(doc.id)} />
       {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <Button size="sm" onClick={() => patch({ area: settings.area })}>
         Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}
       </Button>}
+      <ExportPreview image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
+      {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
+      {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
+      {geometry && !paper && !settings.outputs?.length && <ExportSize settings={settings} patch={patch} geometry={geometry} />}
       {instagramFit && <div className="design-export-hint">
         <span>This ratio differs from 4:5 or square.</span>
         <Button size="sm" onClick={() => patch({ fitInstagram: true })}>Fit to 4:5</Button>
       </div>}
       {settings.preset === 'instagram' && settings.fitInstagram && <Button size="sm" variant="ghost" onClick={() => patch({ fitInstagram: false })}>Use original ratio</Button>}
+      <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? '#ffffff'} />
       <div className="design-export-row">
         <label>Name prefix
           <input value={settings.prefix ?? ''} maxLength={40} placeholder="optional" onChange={(e) => patch({ prefix: e.target.value || undefined })} />
@@ -199,6 +197,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
           <input value={filename} placeholder={doc.name} onChange={(e) => { setFilename(e.target.value); setStatus(undefined); }} />
         </label>
       </div>
+      <FormatRow settings={settings} patch={patch} hasText={doc.layers.some((l) => l.type === 'text' && l.visible)} />
       {canChooseFolder() && <div className="design-export-folder">
         <Button size="sm" icon={Folder} onClick={() => void chooseFolder().then((dir) => dir && setFolder(dir)).catch((e) => setError(message(e)))}>
           {folder ? `Folder: ${folder.name}` : 'Choose folder'}

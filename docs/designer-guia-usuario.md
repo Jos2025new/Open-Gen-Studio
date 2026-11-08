@@ -229,7 +229,7 @@ Técnico: [[designer-tecnico#Límites de recursos]]; [[designer-tecnico-2#Popove
 
 - `Save to gallery`: guarda el diseño como imagen PNG en la galería de la app, tras una confirmación (`Save` o `Cancel`).
 - `Export` o Ctrl/Cmd+Shift+E abre el panel. Elige para qué lo quieres o ajusta formato, área, tamaño y nombre. Puedes exportar PNG, JPG, WebP, SVG o PDF. «Logo / brand», iOS y Android descargan un ZIP con varios tamaños; «Add scale» crea tu propia lista (escala, sufijo y formato por archivo). «What to export» admite Canvas, Drawing only, Selected objects, Pixel selection y Layer.
-- El panel muestra solo los ajustes del formato elegido (calidad, transparencia, papel y sangrado, opciones SVG). «Print shop» añade sangrado y marcas de corte. En Chromium puedes elegir una carpeta de destino. Puedes guardar presets propios y borrarlos. El documento recuerda la última exportación y avisa si falta la capa o selección elegida.
+- El panel va de arriba abajo: para qué, área (Canvas · Drawing · Selection · Layer), vista previa, tamaño (ancho, alto y DPI enlazados), fondo con «Transparent», nombre y formato. El engranaje junto a Format abre las opciones de ese formato: calidad (JPG/WebP), decimales/minificar/título (SVG), texto «Embed fonts / Convert to paths», papel, resolución de ráster y, en «Print shop», sangrado y marcas de corte (apagadas por defecto). En Chromium puedes elegir una carpeta de destino. Puedes guardar presets propios y borrarlos. El documento recuerda la última exportación y avisa si falta la capa o selección elegida.
 - Si el archivo vectorial pierde algún efecto o supera un límite, revisa el aviso del panel. La selección de píxeles se conserva como imagen incrustada en SVG y PDF.
 
 Técnico: [[designer-tecnico#Importar y exportar]].

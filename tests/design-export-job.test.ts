@@ -4,6 +4,8 @@ import { svg2pdf } from 'svg2pdf.js';
 import { unzipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
+import { readFileSync } from 'node:fs';
+import { printPixelRatio, printPreflight } from '../src/engine/design/exportPrint';
 import { writeFilesToFolder, type FolderHandle } from '../src/engine/design/exportFolder';
 import { currentExportTarget, deliverDesignExport, resolveExportTarget } from '../src/engine/design/exportDesign';
 import { exportDownloadFile, exportGeometry, exportPlan, exportPreview, validateExport } from '../src/engine/design/exportJob';
@@ -289,10 +291,11 @@ describe('rows, areas, options and print', () => {
       const [, w, h] = /\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/.exec(await file.bytes.text()) ?? [];
       return [Number(w) * 25.4 / 72, Number(h) * 25.4 / 72];
     };
+    expect(settings('print-shop').print).toEqual({ bleedMm: 3, marks: false });
     const [w, h] = await mm({ bleedMm: 3, marks: false });
     expect([w, h].map((v) => Math.round(v * 10) / 10)).toEqual([216, 303]);
     const [mw, mh] = await mm({ bleedMm: 3, marks: true });
-    expect([mw, mh].map((v) => Math.round(v * 10) / 10)).toEqual([226, 313]);
+    expect([mw, mh].map((v) => Math.round(v * 10) / 10)).toEqual([230, 317]);
   });
 
   it('writes into a chosen folder, optionally by format, without overwriting', async () => {
@@ -310,5 +313,58 @@ describe('rows, areas, options and print', () => {
     expect(await writeFilesToFolder(handle(''), files, true)).toEqual(['svg/My-design.svg', 'png/My-design.png', 'png/My-design@2x.png']);
     expect(await writeFilesToFolder(handle(''), files.slice(1, 2), false)).toEqual(['My-design.png']);
     expect((await writeFilesToFolder(handle(''), files.slice(1, 2), true))[0]).toBe('png/My-design-2.png');
+  });
+});
+
+describe('text output and print resolution', () => {
+  const woff = new Uint8Array(readFileSync('node_modules/@fontsource/inter/files/inter-latin-400-normal.woff'));
+  const withFont = { ...layout, fontFile: async (family: string) => (family === 'Inter' ? woff : null) };
+  const textDoc = { ...design, layers: [newTextLayer('Text', 'Hello', { x: 25, y: 30, width: 60 })] };
+  const svgOf = async (options: Partial<ExportSettings>, deps: SvgDeps = withFont) => (await exportPlan(textDoc, { ...DEFAULT_EXPORT, ...options, format: 'svg' }, {}, deps))[0].bytes.text();
+
+  it('converts text to paths with the same position, or embeds the font', async () => {
+    const paths = await svgOf({ text: 'paths' });
+    expect(paths).not.toContain('<text');
+    expect(paths).toMatch(/<path d="M[\d.]+/);
+    const live = await svgOf({});
+    expect(live).toContain('<text');
+    expect(live).toMatch(/@font-face\{font-family:'Inter';font-weight:\d+;src:url\(data:font\/woff;base64,/);
+  });
+
+  it('falls back to live text and names the system font', async () => {
+    const notices: string[] = [];
+    const svg = await svgOf({ text: 'paths' }, { ...layout, notice: (m) => notices.push(m) });
+    expect(svg).toContain('<text');
+    expect(notices.join(' ')).toContain('system font');
+    notices.length = 0;
+    await svgOf({}, { ...layout, notice: (m) => notices.push(m) });
+    expect(notices.join(' ')).toContain('“Inter”');
+  });
+
+  it('defaults Logo/brand and Print shop to paths and embeds fonts in a PDF otherwise', async () => {
+    expect(settings('brand').text).toBe('paths');
+    expect(settings('print-shop').text).toBe('paths');
+    const [pdf] = await exportPlan(textDoc, { ...DEFAULT_EXPORT, format: 'pdf' }, {}, withFont);
+    expect(await pdf.bytes.text()).toContain('Inter');
+  });
+
+  it('reports ppi below 300 at the printed size and never blocks', () => {
+    const photo = { id: 'p', name: 'Photo', type: 'raster', visible: true, x: 0, y: 0, width: 1000, height: 500 } as never;
+    const doc = { ...design, layers: [photo] };
+    // 1000 px over 10.4 in (1000 doc px at 1 printed px each... 1000 px / 96 in) is 96 ppi.
+    expect(printPreflight(doc, 1, () => ({ w: 1000, h: 500 }))).toEqual(['“Photo” will print at 96 ppi (300 recommended).']);
+    expect(printPreflight(doc, 1, () => ({ w: 4000, h: 2000 }))).toEqual([]);
+  });
+
+  it('asks for 300 ppi raster for the printed size, never below 1:1', () => {
+    expect(printPixelRatio(6.7)).toBeCloseTo(20.9, 1);
+    expect(printPixelRatio(0.1)).toBe(1);
+  });
+
+  it('draws crop marks 2 mm beyond the bleed only when asked', async () => {
+    const page = async (marks: boolean) => (await (await exportPlan(design, { ...settings('print-shop'), print: { bleedMm: 3, marks } }, {}, layout))[0].bytes.text());
+    const withMarks = await page(true), without = await page(false);
+    expect(withMarks.length).toBeGreaterThan(without.length);
+    expect(withMarks).toMatch(/0\.1875 w|0\.25 w|0\.33/);
   });
 });
