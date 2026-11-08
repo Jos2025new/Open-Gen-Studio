@@ -185,7 +185,7 @@ describe('subtoolbox row for every tool', () => {
   it('a tool with neither subtools nor settings shows no row at all', async () => {
     const tools = new Set(['hand']) as unknown as ReadonlySet<never>;
     await act(async () => { setUi({ tool: 'hand' }); root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, designer: true, optionsSlot, tools })); });
-    await click('Edit');
+    await click('Pan');
     expect(row()).toBeNull();
   });
 
