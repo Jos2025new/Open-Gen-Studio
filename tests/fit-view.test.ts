@@ -32,8 +32,8 @@ it('the prompt box is centered on that same line, narrowing to clear the panel',
   // The toolbox bar is as wide as the prompt box in the other spaces, centered on the same line.
   expect(css).toContain('.ws-designer .dock-designer:has(.composer-tools-bar) { width: min(50rem, calc(100% - 2 * var(--layers-w, 0px) - 3rem)); }');
   expect(css).toContain('.composer-dock:has(.composer-tools-bar) { width: min(50rem, calc(100% - 3rem)); }');
-  // The bar takes the prompt box's width: no jump when one replaces the other.
-  expect(css).toContain('.composer-dock .composer:has(.composer-tools-bar) { width: 100%; }');
+  // The toolbox bar is as wide as its contents, centred in the dock (no empty stretch between its groups).
+  expect(css).toContain('.composer-dock .composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; margin-inline: auto; }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(50rem, calc(100% - 3rem)); }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock:is\(\.dock-chat, \.dock-node\), [^{]*\{ width: min\(50rem, calc\(100% - 12rem\)\); \}/);
   expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).toContain('fitView(size, doc, board)');

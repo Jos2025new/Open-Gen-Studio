@@ -167,7 +167,7 @@ body:has(:is(.designs-pop, .tools-grid-pop)) :is(.designer-side, .designer-dock-
 .ws-designer:has(.designer-side) { --designer-dock-left: max(5.25rem, calc(var(--layers-w, 0px) + 1.5rem), calc(50% - 25rem)); }
 /* Designer, toolbox in the prompt box: Designs, Create and Conversation before the tools and the canvas view after them,
    in the bar's own size (ToolPalette portals them into the bar's slot). */
-.designer-dock-bar { display: flex; flex: 1 0 auto; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.designer-dock-bar { display: flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; }
 .designer-dock-bar > .designer-palette.is-docked { display: flex; flex: 1 0 auto; min-width: 0; }
 .designer-dock-start, .designer-dock-end { display: flex; align-items: center; gap: 0.1875rem; flex: none; }
 .composer-tools-bar :is(.designer-dock-start, .designer-dock-end) .tool-dock-separator { height: 1.5rem; }
@@ -177,12 +177,12 @@ body:has(:is(.designs-pop, .tools-grid-pop)) :is(.designer-side, .designer-dock-
 .composer-tools-bar .designer-view .zoom-value { height: 2.125rem; min-height: 0; }
 .ws-designer:has(.designer-dock-start) .document-picker { display: none; }
 /* Under the prompt box, opposite the workspace menu: tool help and where the toolbox sits. */
-/* The bar is as wide as the prompt box in every space (800 px), so nothing changes width when switching spaces or the toolbox's place;
-   its three groups spread across it (Designs and the panels' buttons, tools, view), and the footer ends at its edge. */
+/* The dock keeps the prompt box's width and centre; the toolbox bar inside it is as wide as its contents, centred, its groups side by side
+   (Designs and the panels' buttons, tools, view) with no empty stretch between them. */
 .composer-dock:has(.composer-tools-bar) { width: min(50rem, calc(100% - 3rem)); }
 .composer-dock:has(.composer-tools-bar) { bottom: 1.75rem; } /* the Designer bar sits a little higher than the prompt box */
-.composer-dock .composer:has(.composer-tools-bar) { width: 100%; }
-.composer-tools-bar { justify-content: space-between; }
+.composer-dock .composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; margin-inline: auto; }
+.composer-tools-bar { justify-content: center; }
 /* The prompt box is centered in the window, and Fit canvas centers there too (fitView): pinning the right panel moves neither.
    The panel floats, so a short window narrows the box by the panel's width on both sides, to clear it and stay centered. */
 @media (min-width: 541px) {
