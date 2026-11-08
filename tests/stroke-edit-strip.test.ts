@@ -68,10 +68,10 @@ it('Cut and Erase on the picked strokes: both pieces stay picked, a miss records
   expect(t.strokes()).toBe(before);
   expect(cutPickedStrokes(t.sid, t.doc.id, t.layer.id, 25, 1, 5)).toBe(true);
   expect(t.strokes()).toHaveLength(2);
-  expect(useObjectSelection.getState().byDoc[t.doc.id]!.ids).toEqual(t.strokes().map((s) => s.id));
+  expect(useObjectSelection.getState().byDoc[t.doc.id]![0].ids).toEqual(t.strokes().map((s) => s.id));
   expect(useShapeEdit.getState().byDoc[t.doc.id]?.strokes).toBe(true);
   expect(erasePickedStrokes(t.sid, t.doc.id, t.layer.id, [0, 90], 5, true)).toBe(false);
   expect(erasePickedStrokes(t.sid, t.doc.id, t.layer.id, [75, 0], 10, true)).toBe(true);
   expect(t.strokes()).toHaveLength(3);
-  expect(useObjectSelection.getState().byDoc[t.doc.id]!.ids).toHaveLength(3);
+  expect(useObjectSelection.getState().byDoc[t.doc.id]![0].ids).toHaveLength(3);
 });

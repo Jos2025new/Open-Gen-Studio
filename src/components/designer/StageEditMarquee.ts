@@ -5,7 +5,7 @@ import { objectAt } from '../../engine/design/objectOps';
 import { marqueeBounds } from '../../engine/design/marquee';
 import { marqueeFind } from '../../engine/design/marqueePick';
 import { layerSelection, setLayerPicks } from '../../engine/design/selection';
-import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
+import { objectPicks, pickedIn, setObjectPick, setObjectPicks } from '../../engine/design/objectSelection';
 import { setActiveLayer, getDoc } from '../../engine/design/actions';
 
 export interface EditMarqueeDrag {
@@ -72,20 +72,19 @@ export function finishEditMarquee(args: {
   const current = getDoc(sessionId, doc.id) ?? doc;
   const find = marqueeFind(current, drag.startX, drag.startY, drag.x, drag.y);
   const activeId = current.activeLayerId;
-  // Objects mode: a rectangle that reaches only the active layer's objects picks those objects; one that reaches
-  // other layers or painted pixels (a baked drawing has no objects) picks whole layers, as Layers mode does.
-  const onlyActive = drag.mode === 'objects' && activeId != null && find.layers.length > 0 && find.layers.every((id) => id === activeId) && find.objects.has(activeId);
-  if (onlyActive) {
-    const cur = objectPick(doc.id);
-    const base = cur?.layerId === activeId ? cur.ids : [];
-    const ids = combineSelection(base, find.objects.get(activeId!)!, drag.combine);
+  // Objects mode: a rectangle that reaches only objects (of any layer) picks those objects; one that also reaches
+  // painted pixels or a layer with no objects (a baked drawing, an image) picks whole layers, as Layers mode does.
+  const onlyObjects = drag.mode === 'objects' && find.layers.length > 0 && find.layers.every((id) => find.objects.has(id));
+  if (onlyObjects) {
+    const cur = objectPicks(doc.id);
+    const layerIds = [...new Set([...cur.map((p) => p.layerId), ...find.objects.keys()])];
     setLayerPicks(doc.id, []);
-    setObjectPick(doc.id, ids.length ? { layerId: activeId!, ids } : null);
+    setObjectPicks(doc.id, layerIds.map((layerId) => ({ layerId, ids: combineSelection(pickedIn(cur, layerId), find.objects.get(layerId) ?? [], drag.combine) })));
   } else if (find.layers.length === 0 && drag.combine !== 'replace') {
     return;
   } else {
-    const cur = objectPick(doc.id);
-    const base = cur ? [cur.layerId] : layerSelection(doc.id, activeId, current.layers.map((l) => l.id));
+    const cur = objectPicks(doc.id);
+    const base = cur.length ? cur.map((p) => p.layerId) : layerSelection(doc.id, activeId, current.layers.map((l) => l.id));
     const ids = combineSelection(base, find.layers, drag.combine);
     setObjectPick(doc.id, null);
     setLayerPicks(doc.id, ids);

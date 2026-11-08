@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layerSelection, pickLayer, pickedLayers } from '../src/engine/design/selection';
-import { objectPick, pickObject } from '../src/engine/design/objectSelection';
+import { objectPicks, pickObject } from '../src/engine/design/objectSelection';
 
 // Photoshop, Inkscape, Figma: a plain click selects only what was clicked; Shift toggles; a click on empty clears;
 // dragging a member of a multiple selection moves the whole selection without changing it.
@@ -45,7 +45,7 @@ describe('objects: a plain click replaces the object pick', () => {
   it('a plain pick in another layer leaves only that object', () => {
     pickObject('d6', 'A', 'o1', false);
     pickObject('d6', 'B', 'o2', false);
-    expect(objectPick('d6')).toEqual({ layerId: 'B', ids: ['o2'] });
+    expect(objectPicks('d6')[0]).toEqual({ layerId: 'B', ids: ['o2'] });
   });
 });
 

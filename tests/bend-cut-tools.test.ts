@@ -54,7 +54,7 @@ describe('Lineart cut across', () => {
     expect(strokes()).toHaveLength(1);
     expect(cutPickedStrokesAcross(sid, doc.id, layer.id, [30, -9], [30, 9])).toBe(true);
     expect(strokes()).toHaveLength(2);
-    expect(useObjectSelection.getState().byDoc[doc.id]!.ids).toEqual(strokes().map((s) => s.id));
+    expect(useObjectSelection.getState().byDoc[doc.id]![0].ids).toEqual(strokes().map((s) => s.id));
     undoDoc(sid, doc.id);
     expect(strokes()).toHaveLength(1);
   });

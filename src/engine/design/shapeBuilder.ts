@@ -1,14 +1,14 @@
 import type { DesignDoc, VectorShape } from '../types';
 import { toast } from '../../store/store';
 import { getDoc, patchLayer } from './actions';
-import { objectPick, setObjectPick } from './objectSelection';
+import { objectPicks, onlyPick, setObjectPick } from './objectSelection';
 import { faces as planarFaces, flatten, mergeFaces } from './pathBoolean';
 import type { Pt, Seg } from './pathNodes';
 import { areaOf, booleanShapes, isFillable, restyle, type BoolOp } from './shapeBoolean';
 
 /*
- * Applying booleans and the Shape Builder to the document. Both read the shapes picked in one vector layer (picks never
- * span layers in Objects mode, so the result always stays in the layer of the picks), replace them in one undo step and
+ * Applying booleans and the Shape Builder to the document. Both read the shapes picked in one vector layer (picks that
+ * span several layers are refused (stacking is per layer), so the result always stays in the layer of the picks), replace them in one undo step and
  * leave the results picked. The builder follows Illustrator / vectorcraft (crates/engine/src/cmd/buildcmds/
  * shape_builder.rs; MIT OR Apache-2.0): faces are computed once per set of shapes, a gesture merges (or deletes) the
  * faces it touched, and every original keeps the faces that were not touched as its remaining part.
@@ -40,7 +40,9 @@ function replaceShapes(sessionId: string, docId: string, layerId: string, inputs
 }
 
 /** Why the picks cannot be combined: says what is wrong (locked or hidden layer, not vector, too few shapes). */
-function refusal(doc: DesignDoc | undefined, pick: { layerId: string; ids: string[] } | null | undefined): string {
+function refusal(doc: DesignDoc | undefined, picks: readonly { layerId: string; ids: string[] }[]): string {
+  if (picks.length > 1) return 'Combining works inside one layer: pick shapes of a single layer.';
+  const pick = picks[0];
   const layer = pick && doc?.layers.find((l) => l.id === pick.layerId);
   if (!layer) return 'Pick two or more shapes (Edit tool, Shift-click) in an unlocked vector layer.';
   if (layer.type !== 'vector') return 'Combining works on vector shapes only: this layer is not a vector layer.';
@@ -51,8 +53,8 @@ function refusal(doc: DesignDoc | undefined, pick: { layerId: string; ids: strin
 /** Run a boolean operation on the picked shapes. Returns the message shown to the user when nothing was done. */
 export function applyBoolean(sessionId: string, docId: string, op: BoolOp): string | null {
   const doc = getDoc(sessionId, docId);
-  const got = doc && pickedShapes(doc, objectPick(docId));
-  if (!got) { const why = refusal(doc, objectPick(docId)); toast(why, 'info', 5000); return why; }
+  const got = doc && pickedShapes(doc, onlyPick(objectPicks(docId)));
+  if (!got) { const why = refusal(doc, objectPicks(docId)); toast(why, 'info', 5000); return why; }
   const out = booleanShapes(op, got.shapes);
   if (typeof out === 'string') { toast(out, 'info', 5000); return out; }
   // Ignored shapes (open paths with no fill) stay where they were.

@@ -23,7 +23,7 @@ describe('multi-path node editing', () => {
       layer('hidden', [path('p3')], { visible: false }),
       layer('locked', [path('p4')], { locked: true }),
     ]);
-    expect(multiPathTargets(d, 'objects', { layerId: 'a', ids: ['p1', 'r'] }, []).map(({ layerId, shapeId }) => ({ layerId, shapeId }))).toEqual([
+    expect(multiPathTargets(d, 'objects', [{ layerId: 'a', ids: ['p1', 'r'] }], []).map(({ layerId, shapeId }) => ({ layerId, shapeId }))).toEqual([
       { layerId: 'a', shapeId: 'p1' }, { layerId: 'a', shapeId: 'r' },
     ]);
     expect(multiPathTargets(d, 'layers', null, ['a', 'b', 'hidden', 'locked']).map(({ layerId, shapeId }) => ({ layerId, shapeId }))).toEqual([

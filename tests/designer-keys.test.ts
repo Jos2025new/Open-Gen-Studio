@@ -5,9 +5,9 @@ const fx = vi.hoisted(() => ({
   ui: { rulers: false }, setUi: vi.fn(), deleteLayers: vi.fn(() => 0),
 }));
 vi.mock('../src/store/store', () => ({ toast: vi.fn(), saveNow: vi.fn(), setUi: fx.setUi, useStore: { getState: () => ({ ui: fx.ui }) } }));
-vi.mock('../src/engine/design/objectOps', () => ({ deletePickedObjects: vi.fn(), layerObjects: () => [] }));
-vi.mock('../src/engine/design/objectSelection', () => ({ objectPick: () => null, setObjectPick: vi.fn(), useShapeEdit: { getState: () => ({ byDoc: {} }) } }));
-vi.mock('../src/engine/design/nudge', () => ({ nudgeObjects: vi.fn() }));
+vi.mock('../src/engine/design/multiObjectOps', () => ({ deletePicks: vi.fn(), lockedPickLayer: () => undefined, pickGroups: () => [] }));
+vi.mock('../src/engine/design/objectSelection', () => ({ objectPicks: () => [], setObjectPick: vi.fn(), useShapeEdit: { getState: () => ({ byDoc: {} }) } }));
+vi.mock('../src/engine/design/nudge', () => ({ nudgePicks: vi.fn() }));
 vi.mock('../src/engine/design/groups', () => ({ groupLayers: vi.fn() }));
 vi.mock('../src/engine/design/selection', () => ({ layerSelection: () => ['layer'] }));
 vi.mock('../src/engine/design/pixelSelection', () => ({ clearSelected: vi.fn(), getSelection: () => null, invertSelection: vi.fn(), selectAll: vi.fn(), selectionToLayer: vi.fn(), setSelection: vi.fn() }));

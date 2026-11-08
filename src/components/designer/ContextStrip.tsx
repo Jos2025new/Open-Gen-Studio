@@ -21,6 +21,9 @@ import { multiLayerRectangles } from '../../engine/design/multiRectEdit';
 import { multiPathTargets } from '../../engine/design/multiPathEdit';
 import { layerSelection } from '../../engine/design/selection';
 import { BooleanOps } from './BooleanOps';
+import { MultiShapeLook } from './MultiShapeLook';
+import { SelectSameLook } from './SelectSameLook';
+import { pickGroups } from '../../engine/design/multiObjectOps';
 import { MultiRectangleRadii } from './MultiRectangleRadii';
 import { useEffect } from 'react';
 import { usePickedStrokes } from '../../engine/design/strokeEdit';
@@ -75,6 +78,9 @@ export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: 
   const editing = !!selectedShape && edit?.shapeId === selectedShape.shape.id;
   const strokePick = usePickedStrokes(doc), strokes = tool === 'move' && mode === 'objects' && !selectedText && !selectedShape && strokePick && (variant === 'strip' || edit?.strokes) ? strokePick : null, strokeEditing = !!strokes && !!edit?.strokes;
   const isPath = selectedShape?.shape.type === 'path';
+  // Several picked shapes, in one layer or many: their look is edited together (MultiShapeLook).
+  const pickedShapes = tool === 'move' && mode === 'objects' && !selectedText && !selectedShape ? pickGroups(doc, objectSelection ?? []).flatMap((g) => g.layer.type === 'vector' ? g.layer.shapes.filter((s) => g.ids.includes(s.id)) : []) : [];
+  const multiShapes = pickedShapes.length > 1 ? pickedShapes : null;
   const editShapeButton = selectedShape && (selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse' || isPath) ? <button type="button" className="opt" data-tip={isPath ? 'Its nodes and curve handles (or double-click the path)' : 'Corner radius and blur handles (or double-click the shape)'} onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>{isPath ? 'Edit nodes' : 'Edit shape'}</button> : null;
   const row = variant === 'strip' || strokeEditing || (editing && !multiNodeEdit);
   const objectName = ((selectedShape || strokes) && doc.layers.find((l) => l.id === (selectedShape?.layerId ?? strokes!.layerId))?.name) || target || 'Selection';
@@ -101,6 +107,7 @@ export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: 
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="fill" />
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="stroke" />
         {editShapeButton}
+        <SelectSameLook doc={doc} />
         <ShapeMoreMenu sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape as VectorShape} />
       </> : <>
         <ShapeParams sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
@@ -108,7 +115,11 @@ export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: 
         <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="stroke" />
         <ShapeLookFields value={selectedShape.shape} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {editShapeButton}
+        <SelectSameLook doc={doc} />
       </>}
+    </div> : multiShapes ? <div className="tool-settings" role="group" aria-label="Selected shapes">
+      <MultiShapeLook sessionId={sessionId} doc={doc} first={multiShapes[0]} count={multiShapes.length} />
+      {variant === 'strip' && <EditOps sessionId={sessionId} doc={doc} alignOnly />}
     </div> : strokes ? <div className="tool-settings" role="group" aria-label={strokeEditing ? 'Editing strokes' : 'Selected strokes'}>
       {strokeEditing ? <><NodeModeButtons modes={[...STROKE_MODES]} /><NodeDoneButton docId={doc.id} /></> : <StrokeStripFields sessionId={sessionId} doc={doc} layerId={strokes.layerId} strokes={strokes.strokes} />}
     </div> : variant === 'strip' ? (editCount > 1 ? <EditOps sessionId={sessionId} doc={doc} alignOnly /> : null) : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}

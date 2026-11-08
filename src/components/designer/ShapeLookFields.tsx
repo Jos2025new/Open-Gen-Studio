@@ -1,6 +1,6 @@
 import type { DesignDoc, ShapeSpec, VectorShape } from '../../engine/types';
 import { blurPercent, blurSigma, cornerRadii, MITER_DEFAULT, SHARP } from '../../engine/design/shapeLook';
-import { useObjectSelection } from '../../engine/design/objectSelection';
+import { onlyPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { shapeToPath } from '../../engine/design/affine';
 import { primToPath } from '../../engine/design/primitives';
 import { getDoc, patchLayer } from '../../engine/design/actions';
@@ -45,7 +45,7 @@ export function ShapeLookFields({ value, onChange, corners, smoothing, stroke = 
 
 /** The one shape picked with Edit → Objects, if exactly one is (and its layer can change). */
 export function usePickedShape(doc: DesignDoc): { layerId: string; shape: VectorShape } | null {
-  const pick = useObjectSelection((st) => st.byDoc[doc.id]);
+  const pick = onlyPick(useObjectSelection((st) => st.byDoc[doc.id]));
   if (!pick || pick.ids.length !== 1) return null;
   const l = doc.layers.find((x) => x.id === pick.layerId);
   if (!l || l.type !== 'vector' || l.locked) return null;
@@ -78,9 +78,9 @@ export function convertToPath(sessionId: string, docId: string, layerId: string,
 
 /* Join and cap drawn as what they do (Inkscape's Stroke style icons), so the choices fit one row; the name stays
    as the button's accessible label and tooltip. */
-function JoinIcon({ j }: { j: 'miter' | 'round' | 'bevel' }) {
+export function JoinIcon({ j }: { j: 'miter' | 'round' | 'bevel' }) {
   return <svg style={{ width: `calc(18px * var(--text-scale, 1))`, height: `calc(14px * var(--text-scale, 1))` }} viewBox="0 0 18 14" aria-hidden="true"><path d="M3 13 V5 H15" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin={j} strokeLinecap="butt" /></svg>;
 }
-function CapIcon({ c }: { c: 'butt' | 'round' | 'square' }) {
+export function CapIcon({ c }: { c: 'butt' | 'round' | 'square' }) {
   return <svg style={{ width: `calc(18px * var(--text-scale, 1))`, height: `calc(14px * var(--text-scale, 1))` }} viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7 H11" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap={c} /><path d="M2 7 H11" stroke="var(--bg, #000)" strokeWidth="1" /></svg>;
 }

@@ -94,7 +94,7 @@ describe('applying a boolean', () => {
     const other = rect('z', 300, 300, 10, 10, '#000'), { sid, doc, shapesNow } = setup([A, other, B], ['a', 'b']);
     expect(applyBoolean(sid, doc.id, 'union')).toBeNull();
     expect(shapesNow().map((s) => s.type)).toEqual(['rect', 'path']);
-    expect(useObjectSelection.getState().byDoc[doc.id]!.ids).toEqual([shapesNow()[1].id]);
+    expect(useObjectSelection.getState().byDoc[doc.id]![0].ids).toEqual([shapesNow()[1].id]);
     near(area(shapesNow()[1]), 17500);
     undoDoc(sid, doc.id);
     expect(shapesNow().map((s) => s.id)).toEqual(['a', 'z', 'b']);
@@ -103,7 +103,7 @@ describe('applying a boolean', () => {
     const { sid, doc, shapesNow } = setup([A, B]);
     applyBoolean(sid, doc.id, 'divide');
     expect(shapesNow()).toHaveLength(3);
-    expect(useObjectSelection.getState().byDoc[doc.id]!.ids).toHaveLength(3);
+    expect(useObjectSelection.getState().byDoc[doc.id]![0].ids).toHaveLength(3);
     const one = setup([A, B], ['a']);
     expect(applyBoolean(one.sid, one.doc.id, 'union')).toMatch(/two or more/);
     expect(one.shapesNow()).toHaveLength(2);
@@ -267,11 +267,11 @@ describe('review fixes: refusals, gradients, builder edge cases', () => {
     const { sid, doc, shapesNow } = setup([c1, c2, line]);
     const model = builderModel([c1, c2]);
     applyBuilder(sid, doc.id, doc.layers[0].id, ['c1', 'c2', 'ln'], [faceAt(model, [60, 100]), faceAt(model, [125, 100])], 'merge');
-    const ids = useObjectSelection.getState().byDoc[doc.id]!.ids, have = shapesNow().map((s) => s.id);
+    const ids = useObjectSelection.getState().byDoc[doc.id]![0].ids, have = shapesNow().map((s) => s.id);
     expect(ids).toEqual(expect.arrayContaining(['ln', 'c2']));
     expect(ids.every((id) => have.includes(id))).toBe(true);
     undoDoc(sid, doc.id);
-    const now = shapesNow().map((s) => s.id), after = useObjectSelection.getState().byDoc[doc.id]?.ids ?? [];
+    const now = shapesNow().map((s) => s.id), after = useObjectSelection.getState().byDoc[doc.id]?.[0]?.ids ?? [];
     expect(after.every((id) => now.includes(id))).toBe(true);
   });
   it('the toggle switches Merge / Delete, Alt flips it while held and blur drops a stuck Alt; pan presses go to the Stage canvas', async () => {

@@ -17,7 +17,7 @@ async function setup(tab: string, selected: string[], tool = 'move') {
   // `sel` are picked objects; `layers` the layer selection (the active layer alone is always there).
   const Probe = (p: { tab: string; layers: string[] }) => { usePropsOnPick(p.tab, setTab, p.layers, 'd'); return null; };
   const show = (sel: string[], t = tab, layers = ['layer']) => act(async () => {
-    useObjectSelection.setState({ byDoc: sel.length ? { d: { layerId: 'layer', ids: sel } } : {} });
+    useObjectSelection.setState({ byDoc: sel.length ? { d: [{ layerId: 'layer', ids: sel }] } : {} });
     root.render(createElement(Probe, { tab: t, layers }));
   });
   await show(selected);

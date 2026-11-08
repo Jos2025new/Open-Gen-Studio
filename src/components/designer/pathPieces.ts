@@ -1,7 +1,7 @@
 import type { VectorShape } from '../../engine/types';
 import { withSegs, type Seg } from '../../engine/design/pathNodes';
 import { getDoc, patchLayer } from '../../engine/design/actions';
-import { objectPick, onShapeEditLeave, setObjectPick, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
+import { objectPicks, onlyPick, onShapeEditLeave, setObjectPick, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { markNodeEditSplit, useNodeEditMode } from '../../engine/design/nodeEditMode';
 import { pageSegs } from '../../engine/design/pathNodes';
 import { splitComponents } from '../../engine/design/pathBoolean';
@@ -71,7 +71,7 @@ onShapeEditLeave((docId, prev) => {
   if (pieces.length < 2 || pieces.length <= split.before) return;
   const ids = replaceWithPieces(split.sessionId, docId, layer.id, layer.shapes, shape, pieces, { edit: false });
   // Done, Esc or a tool change keep the pick on the shape: it becomes all its pieces. A click elsewhere keeps its own pick.
-  const pick = objectPick(docId);
+  const pick = onlyPick(objectPicks(docId));
   if (pick?.layerId === layer.id && pick.ids.length === 1 && pick.ids[0] === shape.id) setObjectPick(docId, { layerId: layer.id, ids });
 });
 

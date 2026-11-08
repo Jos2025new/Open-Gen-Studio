@@ -11,7 +11,7 @@ vi.mock('../src/lib/idb', () => ({
 import { cutShape, EraseSession } from '../src/components/designer/PathNodeTools';
 import { addDoc, getDoc, patchLayer, undoDoc } from '../src/engine/design/actions';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
-import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from '../src/engine/design/objectSelection';
+import { objectPicks, setObjectPick, setShapeEdit, useShapeEdit } from '../src/engine/design/objectSelection';
 import { nodesInLasso } from '../src/engine/design/lassoNodes';
 import { NODE_EDIT_MODES, NODE_EDIT_MODES_READY, setEraseRadius, setNodeEditMode, useNodeEditMode } from '../src/engine/design/nodeEditMode';
 import { parseSegs } from '../src/engine/design/pathNodes';
@@ -52,7 +52,7 @@ describe('node tools', () => {
     const now = shapes();
     expect(now).toHaveLength(2);
     for (const s of now) expect(s).toMatchObject({ stroke: '#ff0000', strokeWidth: 4 });
-    expect(objectPick(id)?.ids).toEqual(now.map((s) => s.id));
+    expect(objectPicks(id)[0]?.ids).toEqual(now.map((s) => s.id));
     undoDoc(sid, id);
     expect(shapes()).toHaveLength(1);
   });

@@ -3,7 +3,7 @@ import { createDoc, newRasterLayer } from '../engine/design/doc';
 import {ensureBuffers, getBuffer, setBuffer} from '../engine/design/raster';
 import {composeRaster} from '../engine/design/rasterCompose';
 import { activeDoc } from '../engine/design/actions';
-import { objectPick } from '../engine/design/objectSelection';
+import { objectPicks } from '../engine/design/objectSelection';
 import { appendBenchSessions, intervalWork, longBenchStrokes, sandboxBenchAllowed } from './designerBenchFixtures';
 import { setCpuCanvases } from './media';
 import { addSyntheticSessions, prepareProfessional, pruneProfessionalSessions, rendererInfo, runProfessional } from './designerBenchProfessionalRun';
@@ -107,7 +107,7 @@ async function run() {
     const hit = point(doc.width * .4, doc.height * .5);
     await send('pointerdown', hit, at, 'select'); await send('pointerup', hit, at + PERIOD, 'select');
     gestures.push({ phase: 'select', start: at, end: performance.now() });
-    const picked = objectPick(doc.id);
+    const picked = objectPicks(doc.id)[0];
     if (!picked?.ids.length) throw new Error('Gesture did not hit an editable stroke; invalid benchmark');
     await delay(1000);
     at = performance.now(); await send('pointerdown', hit, at, 'drag');

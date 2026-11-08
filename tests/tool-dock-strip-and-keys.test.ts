@@ -22,7 +22,7 @@ async function render(vertical: boolean, selected: boolean) {
   const doc = createDoc('Dock', 100, 100);
   // The active layer alone is always set and is not a pick: only a picked object shows the strip.
   const layer = newRasterLayer('Layer 1', { x: 0, y: 0, width: 100, height: 100 }, { width: 100, height: 100 }); doc.layers = [layer]; doc.activeLayerId = layer.id;
-  useObjectSelection.setState({ byDoc: selected ? { [doc.id]: { layerId: layer.id, ids: ['shape-1'] } } : {} });
+  useObjectSelection.setState({ byDoc: selected ? { [doc.id]: [{ layerId: layer.id, ids: ['shape-1'] }] } : {} });
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
   await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc, vertical })));

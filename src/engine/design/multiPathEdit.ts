@@ -11,16 +11,21 @@ export function editablePageSegs(shape: VectorShape) {
 }
 
 /** Paths in the explicit Object or Layer selection. Primitives and non-path objects are never converted. */
-export function multiPathTargets(doc: DesignDoc, mode: 'objects' | 'layers', objectPick: { layerId: string; ids: string[] } | null, layerIds: string[]): MultiPathTarget[] {
+export function multiPathTargets(doc: DesignDoc, mode: 'objects' | 'layers', picks: readonly { layerId: string; ids: string[] }[] | null, layerIds: string[]): MultiPathTarget[] {
   const targets: MultiPathTarget[] = [];
   if (mode === 'objects') {
-    const layer = doc.layers.find((item) => item.id === objectPick?.layerId);
-    if (layer?.type !== 'vector' || !layer.visible || layer.locked || !objectPick) return targets;
-    for (const id of objectPick.ids) {
-      const shape = layer.shapes.find((item) => item.id === id);
-      if (shape?.type === 'path') targets.push({ layerId: layer.id, shapeId: shape.id, shape });
+    // Objects of any layer: every picked object must be a path of a visible, unlocked vector layer, or nothing is targeted.
+    let wanted = 0;
+    for (const pick of picks ?? []) {
+      const layer = doc.layers.find((item) => item.id === pick.layerId);
+      if (layer?.type !== 'vector' || !layer.visible || layer.locked) return [];
+      for (const id of pick.ids) {
+        wanted++;
+        const shape = layer.shapes.find((item) => item.id === id);
+        if (shape?.type === 'path') targets.push({ layerId: layer.id, shapeId: shape.id, shape });
+      }
     }
-    return targets.length === objectPick.ids.length ? targets : [];
+    return targets.length === wanted ? targets : [];
   }
   for (const id of layerIds) {
     const layer = doc.layers.find((item) => item.id === id);

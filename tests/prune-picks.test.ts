@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { prunePicks } from '../src/engine/design/actions';
 import { useLayerSelection } from '../src/engine/design/selection';
-import { objectPick, setObjectPick } from '../src/engine/design/objectSelection';
+import { objectPicks, setObjectPick } from '../src/engine/design/objectSelection';
 import type { DesignDoc } from '../src/engine/types';
 
 describe('undo/redo prune stale picks (monkey seed 303)', () => {
@@ -11,6 +11,6 @@ describe('undo/redo prune stale picks (monkey seed 303)', () => {
     setObjectPick('d1', { layerId: 'gone', ids: ['rst_x'] });
     prunePicks(doc);
     expect(useLayerSelection.getState().byDoc.d1).toEqual(['keep']);
-    expect(objectPick('d1')).toBeNull();
+    expect(objectPicks('d1')).toEqual([]);
   });
 });

@@ -6,7 +6,8 @@ import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type 
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
-import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
+import { layerObjects } from '../../engine/design/objectOps';
+import { alignPicks, distributePicks, pickGroups, turnPicks } from '../../engine/design/multiObjectOps';
 import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
@@ -88,13 +89,15 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false, p
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
   const layerIds = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
   // A cross-layer group picked on the canvas in Objects mode remains the effective target set.
-  const layerGroup = mode === 'layers' || (!objPickNow && layerIds.length > 1);
+  const layerGroup = mode === 'layers' || (!objPickNow?.length && layerIds.length > 1);
   const active = doc.layers.find((l) => l.id === doc.activeLayerId);
   // Objects mode: the objects picked inside the active layer. A layer with no parts (an image, a text) is its own
   // object, so it acts on that layer; a layer with parts and none picked acts on nothing (it says so).
-  const objLayer = objPickNow && doc.layers.find((l) => l.id === objPickNow.layerId);
-  const objIds = objLayer ? objPickNow!.ids.filter((id) => layerObjects(objLayer).some((o) => o.id === id)) : [];
-  const onObjects = mode === 'objects' && Boolean(objLayer && objIds.length);
+  // The pick may span layers: each object is edited in its own layer, in one undo step.
+  const objGroups = pickGroups(doc, objPickNow ?? []);
+  const objIds = objGroups.flatMap((g) => g.ids);
+  const objLayer = objGroups[0]?.layer;
+  const onObjects = mode === 'objects' && objIds.length > 0;
   const noParts = !layerGroup && !onObjects && active && !layerObjects(active).length && active.type !== 'vector';
   const ids = layerGroup ? layerIds : noParts ? [active!.id] : [];
   const layers = ids.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
@@ -109,14 +112,14 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false, p
   const alignReason = alignAsGroup && relativeTo === 'selection' ? groupReason : undefined;
   const anchorEdgeNeedsPair = count < 2 && ['first', 'last', 'biggest', 'smallest'].includes(relativeTo);
   const one = layers[0];
-  const locked = onObjects ? Boolean(objLayer?.locked) : layers.some((l) => l.locked);
+  const locked = onObjects ? objGroups.some((g) => g.layer.locked) : layers.some((l) => l.locked);
   const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
   // What the menus act on, said at the top of each menu (not on the buttons).
-  const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
+  const target = `On ${count} ${noun}${onObjects ? (objGroups.length > 1 ? ` in ${objGroups.length} layers` : ` of ${objLayer!.name}`) : ''}`;
   const why = !emptyPick ? undefined : !layerGroup ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
-  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo, alignAsGroup) : alignLayers(sessionId, doc.id, ids, to, relativeTo, alignAsGroup));
-  const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
-  const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
+  const doAlign = (to: AlignTo) => (onObjects ? alignPicks(sessionId, doc.id, doc, objPickNow!, to, relativeTo, alignAsGroup) : alignLayers(sessionId, doc.id, ids, to, relativeTo, alignAsGroup));
+  const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePicks(sessionId, doc.id, doc, objPickNow!, axis) : distributeLayers(sessionId, doc.id, ids, axis));
+  const doTurn = (t: Turn) => (onObjects ? turnPicks(sessionId, doc.id, doc, objPickNow!, t) : turnLayers(sessionId, doc.id, ids, t));
   if (panelOnly) {
     if (!alignPanel) return null;
     return <AlignControls target={target} count={count} relativeTo={relativeTo} setRelativeTo={alignPanel.setRelativeTo} alignAsGroup={alignAsGroup}

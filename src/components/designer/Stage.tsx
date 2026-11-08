@@ -4,7 +4,7 @@ import { useBoardFocus } from '../studio/useBoardFocus';
 import { canDragGuides, drawGuides } from './drawGuides';
 import { sameGuides, type GuideLines } from './guideLines';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
+import type { DesignDoc, Layer, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
 import { brushPoint } from '../../engine/design/brushControl';
 import { drawStroke } from '../../engine/design/brushTextures';
@@ -32,7 +32,7 @@ import { GradientKnots } from './ShapeHandles';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
 import {withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface} from '../../engine/design/raster';
-import {composeMoving} from '../../engine/design/rasterCompose';
+import { commitPaintedMove, dragGroups, moveGroups, otherGroups, outlinePicked, pickedTargets, snapBox, topObjectLayer, type ObjGroup } from './stageObjMove';
 import { record, unrecord } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -47,8 +47,8 @@ import { boxShape } from '../../engine/design/shapeDraw';
 import { gestureBuffers, transformLayer } from '../../engine/design/affine';
 import { type Mat } from '../../engine/design/matrix';
 import { applyGradient, GRADIENT_DEFAULT, paintGradient, type GradientSpec } from '../../engine/design/gradient';
-import { editShape, objectPick, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
-import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
+import { editShape, isPicked, objectPicks, pickedIn, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
+import { layerObjects, objectAt, objectsBox } from '../../engine/design/objectOps';
 import { getSelection, selectionClipFor, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { drawSelect, selectIdle, selectMove, selectPress, selectUp, useSelectSession, type SelectGesture } from './StageSelect';
 import { SelectCursor } from './SelectCursor';
@@ -74,7 +74,7 @@ type Drag =
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer; startX: number; startY: number; pre: DesignDoc; moved?: boolean }
-  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; compose?: (moved: RasterLayer) => void }
+  | ({ kind: 'objMove'; startX: number; startY: number; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; others?: ObjGroup[] } & ObjGroup)
   | EditMarqueeDrag
   | StagePaintGesture
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
@@ -247,9 +247,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const xformTargets = (d0: DesignDoc): Array<{ layer: Layer; ids: string[] | null }> => {
     const ok = (l: Layer | undefined | null): l is Layer => Boolean(l?.visible && !l.locked && l.type !== 'fx');
     if (!editLayers) {
-      const pk = objectPick(d0.id);
-      const pl = pk ? d0.layers.find((l) => l.id === pk.layerId) : null;
-      if (ok(pl) && pk!.ids.length) return [{ layer: pl, ids: pk!.ids }];
+      const objs = pickedTargets(d0, objectPicks(d0.id), ok);
+      if (objs.length) return objs;
       // Several layers picked (Ctrl/Shift-click), no objects: transform them all.
       const picked = layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id));
       if (picked.length > 1) return picked.map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
@@ -404,7 +403,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const objects = objectsMode ? layerObjects(active) : [];
       if (objectsMode && objects.length) {
         // Objects mode: every object of the active layer faintly, the picked ones in the accent; no layer handles.
-        const ids = objPick?.layerId === active.id ? objPick.ids : [];
+        const ids = pickedIn(objPick, active.id);
         ctx.save();
         ctx.lineWidth = 1;
         for (const o of objects) {
@@ -428,6 +427,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         }
       }
     }
+    if (tool === 'move' && !editLayers && !shiftDown && !editingText) outlinePicked(ctx, doc, objPick, active?.id, accentA(), (b) => [sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom]);
     // Transform handles around what Edit acts on: squares to scale; in rotate mode, round corners to rotate,
     // diamonds on the sides to skew, and the rotation center (drag it to move it).
     const xformLive = drag.current?.kind === 'xform' && drag.current.op !== 'pivot' ? drag.current : null;
@@ -650,22 +650,20 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
         const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => !!objectAt(l, p.x, p.y));
         let layer: Layer | null = null;
-        const currentObject = objectPick(doc.id);
+        const picks = objectPicks(doc.id);
         const pickedLayerIds = pickedLayers(doc.id, current.layers.map((l) => l.id));
         if (additive) {
-          if (pickedLayerIds.length < 2 && owner(act) && objectAt(act!, p.x, p.y) && (!currentObject || currentObject.layerId === act!.id)) layer = act!;
+          if (pickedLayerIds.length < 2) layer = topObjectLayer(current, p.x, p.y);
         } else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
           if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast(pixelsNotReady([layer.paintBaseId]), 'error');
-          const cur = currentObject;
           if (additive) {
-            // A modifier toggles an object; dragging an existing pick still moves the whole group.
-            const had = cur?.layerId === layer.id && cur.ids.includes(id);
+            const had = isPicked(picks, layer.id, id);
             if (!had) pickObject(doc.id, layer.id, id, true);
             setLayerPicks(doc.id, []);
-            const ids = objectPick(doc.id)?.ids ?? [id];
-            drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, ctrlToggle: had ? id : undefined, pre: current };
+            const now = objectPicks(doc.id);
+            drag.current = { kind: 'objMove', layerId: layer.id, ids: pickedIn(now, layer.id), startX: p.x, startY: p.y, base: layer, others: otherGroups(current, now, layer.id), ctrlToggle: had ? id : undefined, pre: current };
             return;
           }
           setActiveLayer(sessionId, doc.id, layer.id);
@@ -674,18 +672,18 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           if (grp.length > 1 && grp.includes(layer.id)) return void (drag.current = { kind: 'move', layerId: layer.id, startX: p.x, startY: p.y, base: layer, others: otherPickedLayers(current, layer.id), pre: current });
           setLayerPicks(doc.id, []);
           // Dragging one of several picked objects moves them all; another object starts a new pick.
-          const again = cur?.layerId === layer.id && cur.ids.includes(id);
-          const ids = again ? cur!.ids : [id];
-          setObjectPick(doc.id, { layerId: layer.id, ids });
-          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, again, pre: current };
+          const again = isPicked(picks, layer.id, id);
+          const ids = again ? pickedIn(picks, layer.id) : [id];
+          if (!again) setObjectPick(doc.id, { layerId: layer.id, ids });
+          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, others: again ? otherGroups(current, picks, layer.id) : undefined, again, pre: current };
           return;
         }
         if (additive) {
           const hit = hitTestPixel(current, p.x, p.y);
           if (hit && hit.visible && !hit.locked) {
-            const cur = objectPick(doc.id);
-            const ids = cur ? [cur.layerId] : layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-            if (cur) setObjectPick(doc.id, null);
+            const cur = objectPicks(doc.id);
+            const ids = cur.length ? cur.map((p) => p.layerId) : layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
+            if (cur.length) setObjectPick(doc.id, null);
             const had = ids.length > 1 && ids.includes(hit.id);
             if (!had) pickLayer(doc.id, hit.id, true, ids);
             setActiveLayer(sessionId, doc.id, had ? ids.find((id) => id !== hit.id) ?? current.activeLayerId : hit.id);
@@ -872,13 +870,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     rasterMoveAt.current = null;
     if (!at) return;
     const { d } = at;
-    const moved = translateObjects(d.base, d.ids, at.x - d.startX, at.y - d.startY);
-    // A painted layer is recomposed once a frame, from the first moving stroke up.
-    if (moved.type === 'raster' && d.base.type === 'raster') {
-      if (!(d.compose ??= composeMoving(d.base, d.ids) ?? undefined)) return;
-      d.compose(moved);
-    }
-    setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
+    const moved = moveGroups(dragGroups(d), at.x - d.startX, at.y - d.startY);
+    if (!moved) return;
+    setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));
   };
 
   /** Lay the latest handle transform onto the layers as they were when the drag began (once a frame). */
@@ -947,16 +941,16 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       let { x: ox, y: oy } = lockedPoint(p, { x: d.startX, y: d.startY }, e);
       const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       // Raster strokes are painted, never snapped (Drawing); the switch applies to vector objects and layers.
-      const b0 = snap.on && !e.altKey && d.base.type !== 'raster' ? objectsBox(d.base, d.ids) : null;
+      const groups = dragGroups(d), b0 = snap.on && !e.altKey ? snapBox(groups) : null;
       if (b0) {
         const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
-        const s = snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
+        const s = snapSessionOf(d, doc, new Set(groups.map((g) => g.layerId)), d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         ox += s.dx; oy += s.dy;
         const k = keepAxis({ dx: ox - d.startX, dy: oy - d.startY }, ax);
         ox = d.startX + k.dx; oy = d.startY + k.dy;
         showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
       } else {
-        snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).clear();
+        snapSessionOf(d, doc, new Set(groups.map((g) => g.layerId)), d.layerId, snap, view, size).clear();
         showGuides({});
       }
       rasterMoveAt.current = { d, x: ox, y: oy };
@@ -1093,9 +1087,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (d.kind === 'objMove') {
       applyRasterMove();
       // A click without moving changes nothing.
-      if (d.base.type !== 'raster' || !d.moved) return;
-      commitEdit(d.layerId);
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
+      if (d.moved) commitPaintedMove(sessionId, doc.id, dragGroups(d));
     }
     if (d.kind === 'paint') commitStagePaintGesture({ sessionId, docId: doc.id, gesture: d, brush, clipped: !!d.live.clip, flushFrame: flushPaintFrame });
     if (d.kind === 'stroke') {

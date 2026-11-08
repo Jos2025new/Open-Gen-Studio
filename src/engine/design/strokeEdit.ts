@@ -1,5 +1,5 @@
 import { getDoc, patchLayer } from './actions';
-import { objectPick, setObjectPick, setShapeEdit, useObjectSelection } from './objectSelection';
+import { objectPicks, onlyPick, setObjectPick, setShapeEdit, useObjectSelection } from './objectSelection';
 import type { DesignDoc, Layer } from '../types';
 import type { Stroke } from '../strokeTypes';
 import { cutStroke, cutStrokeAcross, eraseStroke, nearestOnStroke } from './strokeCut';
@@ -16,7 +16,7 @@ export function pickedStrokes(doc: DesignDoc, pick: { layerId: string; ids: stri
 }
 
 export function usePickedStrokes(doc: DesignDoc) {
-  return pickedStrokes(doc, useObjectSelection((st) => st.byDoc[doc.id]));
+  return pickedStrokes(doc, onlyPick(useObjectSelection((st) => st.byDoc[doc.id])));
 }
 
 export function editStrokes(docId: string, layerId: string, ids: string[]): void {
@@ -26,7 +26,7 @@ export function editStrokes(docId: string, layerId: string, ids: string[]): void
 
 /** Replace some strokes of a layer by their pieces (in place) and keep every piece picked. `record: false` continues the undo step of an earlier call. */
 function replace(sessionId: string, docId: string, layerId: string, map: (s: Stroke) => Stroke[], opts: { record?: boolean }): boolean {
-  const doc = getDoc(sessionId, docId), pick = doc && pickedStrokes(doc, objectPick(docId));
+  const doc = getDoc(sessionId, docId), pick = doc && pickedStrokes(doc, onlyPick(objectPicks(docId)));
   const layer = doc?.layers.find((l) => l.id === layerId);
   if (!doc || !pick || pick.layerId !== layerId || layer?.type !== 'vector') return false;
   const picked = new Set(pick.strokes.map((s) => s.id)), ids: string[] = [];
@@ -47,7 +47,7 @@ function replace(sessionId: string, docId: string, layerId: string, map: (s: Str
 
 /** Cut the picked stroke nearest to the click (page px, `reach` beyond half its width); false when it misses (no undo step). */
 export function cutPickedStrokes(sessionId: string, docId: string, layerId: string, x: number, y: number, reach: number): boolean {
-  const doc = getDoc(sessionId, docId), pick = doc && pickedStrokes(doc, objectPick(docId));
+  const doc = getDoc(sessionId, docId), pick = doc && pickedStrokes(doc, onlyPick(objectPicks(docId)));
   if (!pick) return false;
   let target: Stroke | null = null, best = Infinity;
   for (const s of pick.strokes) {

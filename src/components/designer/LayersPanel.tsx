@@ -23,7 +23,7 @@ import { LayerUnreadable } from './LayerUnreadable';
 import { EditOps, ToolSettings } from './ToolSettings';
 import { ShapeLookFields } from './ShapeLookFields';
 import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
-import { useObjectSelection } from '../../engine/design/objectSelection';
+import { pickedIn, useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
 import { fxTarget } from '../../engine/fx/plan';
@@ -279,7 +279,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </>}
         {layer.type === 'vector' && layer.strokes?.length ? (() => {
           // The strokes picked on the canvas (Edit, Objects mode) are the ones restyled; with none picked, all of them.
-          const pickedHere = objPick?.layerId === layer.id ? layer.strokes.filter((st) => objPick.ids.includes(st.id)) : [];
+          const pickedHere = layer.strokes.filter((st) => pickedIn(objPick, layer.id).includes(st.id));
           const targets = pickedHere.length ? pickedHere : layer.strokes;
           const ids = new Set(targets.map((st) => st.id));
           return <>
@@ -291,7 +291,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         })() : null}
         {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && (() => {
           // A shape picked with Edit: only its section, so its fields fit without scrolling (docs/plan-edicion-formas.md).
-          const pickedShapes = objPick?.layerId === layer.id ? layer.shapes.filter((s) => objPick.ids.includes(s.id)) : [];
+          const pickedShapes = layer.shapes.filter((s) => pickedIn(objPick, layer.id).includes(s.id));
           const set = (id: string, p: Partial<VectorShape>) => patch({ shapes: layer.shapes.map((x) => (x.id === id ? { ...x, ...p } : x)) });
           return <><p className="muted">{pickedShapes.length ? `Picked shape ${pickedShapes.length === 1 ? '' : `(${pickedShapes.length}) `}of ${layer.shapes.length}.` : `${layer.shapes.length} shapes · draw on the canvas to add more.`}</p>{(pickedShapes.length ? pickedShapes : layer.shapes).map((s) => <div className="shape-properties" key={s.id}><strong>{s.type} {layer.shapes.indexOf(s) + 1}</strong>
             <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => set(s.id, { fill })} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />

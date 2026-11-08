@@ -92,7 +92,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
   // A real pick (objects, or several layers): the active layer alone is always set, so it does not count.
-  const editCount = useEditCount(doc), picked = useObjectSelection((st) => !!st.byDoc[doc.id]?.ids.length) || editCount > 1;
+  const editCount = useEditCount(doc), picked = useObjectSelection((st) => !!st.byDoc[doc.id]?.length) || editCount > 1;
   // Edit with a selection: one compact strip takes the variant row's place. The Edit button brings the variants back (and hides the strip); opening the Edit card, or picking something else, returns to the strip.
   const [variantsAsked, setVariantsAsked] = useState(false);
   useEffect(() => { setVariantsAsked(false); }, [picked, currentTool, doc.id]);

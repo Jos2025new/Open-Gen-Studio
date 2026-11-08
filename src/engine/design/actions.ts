@@ -6,7 +6,7 @@ import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../s
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
 import { useLayerSelection } from './selection';
-import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from './objectSelection';
+import { objectPicks, setObjectPicks, setShapeEdit, useShapeEdit } from './objectSelection';
 import { layerObjects } from './objectOps';
 import { nodeSegs, pageSegs } from './pathNodes';
 import { placeFor } from '../place';
@@ -371,12 +371,14 @@ export function prunePicks(doc: DesignDoc): void {
   const ids = new Set(doc.layers.map((l) => l.id));
   const layers = useLayerSelection.getState().byDoc[doc.id];
   if (layers?.some((id) => !ids.has(id))) useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [doc.id]: layers.filter((id) => ids.has(id)) } }));
-  const pick = objectPick(doc.id);
-  if (!pick) return;
-  const layer = doc.layers.find((l) => l.id === pick.layerId);
-  const alive = new Set(layer ? layerObjects(layer).map((o) => o.id) : []);
-  const kept = pick.ids.filter((id) => alive.has(id));
-  if (kept.length !== pick.ids.length) setObjectPick(doc.id, kept.length ? { layerId: pick.layerId, ids: kept } : null);
+  const picks = objectPicks(doc.id);
+  if (!picks.length) return;
+  const kept = picks.map((pick) => {
+    const layer = doc.layers.find((l) => l.id === pick.layerId);
+    const alive = new Set(layer ? layerObjects(layer).map((o) => o.id) : []);
+    return { layerId: pick.layerId, ids: pick.ids.filter((id) => alive.has(id)) };
+  });
+  if (kept.some((k, i) => k.ids.length !== picks[i].ids.length)) setObjectPicks(doc.id, kept);
 }
 
 async function storeDesignAsset(sessionId: string, blob: Blob, width: number, height: number, origin: Asset['origin']): Promise<Asset> {

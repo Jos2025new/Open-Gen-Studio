@@ -116,7 +116,11 @@ export function turnObjects(layer: Layer, ids: string[], turn: Turn): Layer {
 /** Align picked objects, or preserve their spacing while moving them as one group. */
 export function alignObjectDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, layer: Layer, ids: string[], to: AlignTo, rel: RelativeTo, asGroup = false): Map<string, { dx: number; dy: number }> {
   const byId = new Map(layerObjects(layer).map((o) => [o.id, o]));
-  const objs = ids.map((id) => byId.get(id)).filter((o): o is { id: string; box: Box } => Boolean(o));
+  return alignBoxes(doc, ids.map((id) => byId.get(id)).filter((o): o is { id: string; box: Box } => Boolean(o)), to, rel, asGroup);
+}
+
+/** The same for boxes that may come from several layers (the ids must be unique among them). */
+export function alignBoxes(doc: Pick<DesignDoc, 'width' | 'height'>, objs: Array<{ id: string; box: Box }>, to: AlignTo, rel: RelativeTo, asGroup = false): Map<string, { dx: number; dy: number }> {
   const out = new Map<string, { dx: number; dy: number }>();
   if (!objs.length) return out;
   const boxes = objs.map((o) => o.box);
@@ -145,7 +149,11 @@ export function alignObjectDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, laye
 
 /** Even gaps between 3+ picked objects, the outer two staying put. */
 export function distributeObjectDeltas(layer: Layer, ids: string[], axis: 'h' | 'v'): Map<string, { dx: number; dy: number }> {
-  const items = layerObjects(layer).filter((o) => ids.includes(o.id));
+  return distributeBoxes(layerObjects(layer).filter((o) => ids.includes(o.id)), axis);
+}
+
+/** The same for boxes that may come from several layers (the ids must be unique among them). */
+export function distributeBoxes(items: Array<{ id: string; box: Box }>, axis: 'h' | 'v'): Map<string, { dx: number; dy: number }> {
   const out = new Map<string, { dx: number; dy: number }>();
   if (items.length < 3) return out;
   const h = axis === 'h';
@@ -170,12 +178,19 @@ const docOf = (sessionId: string, docId: string) => useStore.getState().sessions
 
 /** Replace the layer; a painted layer is recomposed from its base and strokes (they stay editable). */
 export function commitObjects(sessionId: string, docId: string, next: Layer, recordFirst = true): void {
+  commitLayers(sessionId, docId, [next], recordFirst);
+}
+
+/** Replace several layers in one undo step (objects picked in more than one layer); nothing changes if one is locked or not ready. */
+export function commitLayers(sessionId: string, docId: string, nexts: Layer[], recordFirst = true): void {
   const doc = docOf(sessionId, docId);
-  if (!doc) return;
-  if (next.locked) return void toast(`"${next.name}" is locked.`, 'error');
-  if (next.type === 'raster' && !composeRaster(next)) return void toast(pixelsNotReady([next.id, next.paintBaseId]), 'error');
+  if (!doc || !nexts.length) return;
+  const locked = nexts.find((n) => n.locked);
+  if (locked) return void toast(`"${locked.name}" is locked.`, 'error');
+  for (const next of nexts) if (next.type === 'raster' && !composeRaster(next)) return void toast(pixelsNotReady([next.id, next.paintBaseId]), 'error');
   if (recordFirst) record(doc);
-  setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.id === next.id ? (next.type === 'raster' ? { ...next, rev: next.rev + 1 } : next) : l)) }));
+  const by = new Map(nexts.map((n) => [n.id, n.type === 'raster' ? { ...n, rev: n.rev + 1 } : n] as const));
+  setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => by.get(l.id) ?? l) }));
 }
 
 function picked(sessionId: string, docId: string, layerId: string): Layer | null {
@@ -190,7 +205,7 @@ export function turnPickedObjects(sessionId: string, docId: string, layerId: str
   if (looksUnchanged(l, next, ids)) toast(noChangeNote(ids.length === 1 && l.type === 'vector' ? l.name : 'the selection', turn), 'info', 5000);
 }
 
-function moveEach(layer: Layer, deltas: Map<string, { dx: number; dy: number }>): Layer {
+export function moveEach(layer: Layer, deltas: Map<string, { dx: number; dy: number }>): Layer {
   let out = layer;
   for (const [id, m] of deltas) out = translateObjects(out, [id], m.dx, m.dy);
   return out;
@@ -214,12 +229,17 @@ export function distributePickedObjects(sessionId: string, docId: string, layerI
 export function deletePickedObjects(sessionId: string, docId: string, layerId: string, ids: string[]): void {
   const l = picked(sessionId, docId, layerId);
   if (!l || !ids.length) return;
+  const next = withoutObjects(l, ids);
+  if (next === l) return;
+  commitObjects(sessionId, docId, next);
+}
+
+/** The layer without those objects (pure; the same layer when it has none of them). */
+export function withoutObjects(l: Layer, ids: readonly string[]): Layer {
   const gone = new Set(ids);
-  const next: Layer = l.type === 'raster'
+  return l.type === 'raster'
     ? { ...l, paintStrokes: (l.paintStrokes ?? []).filter((s) => !gone.has(s.id)) }
     : l.type === 'vector'
       ? { ...l, shapes: l.shapes.filter((s) => !gone.has(s.id)), ...(l.strokes ? { strokes: l.strokes.filter((s) => !gone.has(s.id)) } : {}) }
       : l;
-  if (next === l) return;
-  commitObjects(sessionId, docId, next);
 }

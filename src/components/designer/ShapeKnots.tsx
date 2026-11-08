@@ -38,7 +38,7 @@ export function ShapeKnots(props: { view: View; sessionId: string; doc: DesignDo
 function EditKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
   const picked = usePickedShape(doc);
   const edit = useShapeEdit((st) => st.byDoc[doc.id]);
-  const objectPick = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
+  const objectPick = useObjectSelection((st) => st.byDoc[doc.id]);
   const layerPicks = useLayerSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
   const ref = useRef<SVGSVGElement>(null);
@@ -54,8 +54,8 @@ function EditKnots({ view, sessionId, doc }: { view: View; sessionId: string; do
   if (edit?.paths && edit.paths.length > 1) {
     const layers = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
     const pickedLayers = layerPicks ?? [];
-    const layerGroup = mode === 'layers' || (!objectPick && pickedLayers.filter((id) => doc.layers.some((l) => l.id === id)).length > 1);
-    const targets = multiPathTargets(doc, layerGroup ? 'layers' : 'objects', objectPick, layerGroup ? (pickedLayers.length ? pickedLayers : layers) : []);
+    const layerGroup = mode === 'layers' || (!objectPick?.length && pickedLayers.filter((id) => doc.layers.some((l) => l.id === id)).length > 1);
+    const targets = multiPathTargets(doc, layerGroup ? 'layers' : 'objects', objectPick ?? null, layerGroup ? (pickedLayers.length ? pickedLayers : layers) : []);
     const same = targets.length === edit.paths.length && targets.every((t, i) => t.layerId === edit.paths![i].layerId && t.shapeId === edit.paths![i].shapeId);
     return same ? <MultiPathNodes view={view} sessionId={sessionId} docId={doc.id} targets={targets} /> : null;
   }

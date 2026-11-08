@@ -9,7 +9,7 @@ import type { SelectShape } from '../engine/design/selectShape';
 import type { SelectCombine } from '../engine/design/pixelSelection';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
-import { objectPick } from '../engine/design/objectSelection';
+import { objectPicks } from '../engine/design/objectSelection';
 import { recordGraph } from '../engine/flow/history';
 import { graphEditProblem } from '../engine/flow/locks';
 import { create } from 'zustand';
@@ -692,7 +692,7 @@ if (typeof window !== 'undefined' && window.location?.port === '5183') {
       sessionId: session?.id,
       document: doc ? { id: doc.id, width: doc.width, height: doc.height, background: doc.background,
         layers: doc.layers, groups: doc.groups ?? [], activeLayerId: doc.activeLayerId } : null,
-      selection: { layers: doc ? useLayerSelection.getState().byDoc[doc.id] ?? [] : [], objects: doc ? objectPick(doc.id) : null },
+      selection: { layers: doc ? useLayerSelection.getState().byDoc[doc.id] ?? [] : [], objects: doc ? objectPicks(doc.id) : [] },
       history: doc ? historyDepth(doc.id) : { undo: 0, redo: 0 },
       saving: { state: Boolean(pendingWrite), raster: pendingRaster() },
     }));

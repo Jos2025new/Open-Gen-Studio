@@ -1,5 +1,7 @@
 import { getDoc } from './actions';
-import { commitObjects, translateObjects } from './objectOps';
+import { commitLayers } from './objectOps';
+import { pickGroups, translatePicks } from './multiObjectOps';
+import type { ObjectPick } from './objectSelection';
 
 /*
  * Arrow keys move the picked objects (strokes, shapes) by one document pixel (Shift: ten); with nothing picked they pan
@@ -11,14 +13,18 @@ let last = { doc: '', at: 0 };
 
 /** The picked objects of one layer (strokes, shapes) move with the same burst rule; the layer itself does not. */
 export function nudgeObjects(sessionId: string, docId: string, layerId: string, ids: readonly string[], dx: number, dy: number): boolean {
+  return nudgePicks(sessionId, docId, [{ layerId, ids: [...ids] }], dx, dy);
+}
+
+/** The picked objects of every layer move together, in one undo step per burst; false when nothing moved (a locked layer stops it). */
+export function nudgePicks(sessionId: string, docId: string, picks: readonly ObjectPick[], dx: number, dy: number): boolean {
   const doc = getDoc(sessionId, docId);
-  const layer = doc?.layers.find((l) => l.id === layerId);
-  if (!doc || !layer || !ids.length) return false;
-  if (layer.locked) return false;
+  const groups = doc ? pickGroups(doc, picks) : [];
+  if (!doc || !groups.length || groups.some((g) => g.layer.locked)) return false;
   const now = Date.now();
   const first = last.doc !== docId || now - last.at > BURST_MS;
   last = { doc: docId, at: now };
-  commitObjects(sessionId, docId, translateObjects(layer, [...ids], dx, dy), first);
+  commitLayers(sessionId, docId, translatePicks(groups, dx, dy), first);
   return true;
 }
 

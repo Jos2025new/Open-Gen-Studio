@@ -15,14 +15,18 @@ export function mixedRectangleRadii(doc: DesignDoc, targets: RectangleTarget[]):
 }
 
 /** The shared corner editor only targets a complete Object pick or rectangles in explicitly picked Layers. */
-export function multiLayerRectangles(doc: DesignDoc, mode: 'objects' | 'layers', objectPick: ObjectPick | null, layerIds: string[]): RectangleTarget[] {
+export function multiLayerRectangles(doc: DesignDoc, mode: 'objects' | 'layers', picks: readonly ObjectPick[] | null, layerIds: string[]): RectangleTarget[] {
   if (mode === 'objects') {
-    if (!objectPick || objectPick.ids.length < 2) return [];
-    const layer = doc.layers.find((item) => item.id === objectPick.layerId);
-    if (layer?.type !== 'vector' || !layer.visible || layer.locked) return [];
-    const selected = objectPick.ids.map((id) => layer.shapes.find((shape) => shape.id === id));
-    if (selected.some((shape) => shape?.type !== 'rect')) return [];
-    return selected.map((shape) => ({ layerId: layer.id, shapeId: shape!.id }));
+    if (!picks || picks.reduce((n, p) => n + p.ids.length, 0) < 2) return [];
+    const out: RectangleTarget[] = [];
+    for (const pick of picks) {
+      const layer = doc.layers.find((item) => item.id === pick.layerId);
+      if (layer?.type !== 'vector' || !layer.visible || layer.locked) return [];
+      const selected = pick.ids.map((id) => layer.shapes.find((shape) => shape.id === id));
+      if (selected.some((shape) => shape?.type !== 'rect')) return [];
+      out.push(...selected.map((shape) => ({ layerId: layer.id, shapeId: shape!.id })));
+    }
+    return out;
   }
   if (layerIds.length < 2) return [];
   return doc.layers.filter((layer) => layerIds.includes(layer.id) && layer.type === 'vector' && layer.visible && !layer.locked)

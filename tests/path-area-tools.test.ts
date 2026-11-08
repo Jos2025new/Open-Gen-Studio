@@ -12,7 +12,7 @@ import { cutShape } from '../src/components/designer/PathNodeTools';
 import { bandScreenPoints, eraseFilled, isFilledArea } from '../src/components/designer/areaTools';
 import { addDoc, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
-import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from '../src/engine/design/objectSelection';
+import { objectPicks, setObjectPick, setShapeEdit, useShapeEdit } from '../src/engine/design/objectSelection';
 import { useNodeEditMode } from '../src/engine/design/nodeEditMode';
 import { pageSegs } from '../src/engine/design/pathNodes';
 import { gradientSvg, elementMatrix } from '../src/engine/design/gradientPaint';
@@ -51,7 +51,7 @@ describe('area knife and area eraser on filled closed paths', () => {
     const now = t.shapes();
     expect(now).toHaveLength(3);
     for (const s of now) { expect(s.fill).toBe('#00aa00'); expect(closed(s.d)).toBe(1); }
-    expect(objectPick(t.id)?.ids).toEqual(now.map((s) => s.id));
+    expect(objectPicks(t.id)[0]?.ids).toEqual(now.map((s) => s.id));
     undoDoc(t.sid, t.id);
     expect(t.shapes()).toHaveLength(1);
   });
@@ -90,7 +90,7 @@ describe('area knife and area eraser on filled closed paths', () => {
     const now = t.shapes();
     expect(now).toHaveLength(2);
     expect(now.map((s) => closed(s.d)).sort()).toEqual([1, 2]);
-    expect(objectPick(t.id)?.ids).toEqual(now.map((s) => s.id));
+    expect(objectPicks(t.id)[0]?.ids).toEqual(now.map((s) => s.id));
     undoDoc(t.sid, t.id);
     expect(t.shapes()).toHaveLength(1);
   });

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import type { RelativeTo } from '../../engine/design/transform';
 import { layerObjects } from '../../engine/design/objectOps';
+import { pickGroups } from '../../engine/design/multiObjectOps';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { useStore } from '../../store/store';
@@ -13,13 +14,13 @@ import { BooleanOps } from './BooleanOps';
 /** How many objects (or layers, in Layer mode) the Edit tool would act on, read the way EditOps reads them. */
 export function useEditCount(doc: DesignDoc): number {
   const mode = useStore((s) => s.ui.selectMode ?? 'objects');
-  const objectPick = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
+  const objectPick = useObjectSelection((st) => st.byDoc[doc.id]);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const layerIds = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
-  const layerGroup = mode === 'layers' || (!objectPick && layerIds.length > 1);
+  const layerGroup = mode === 'layers' || (!objectPick?.length && layerIds.length > 1);
   if (layerGroup) return layerIds.length;
-  const layer = objectPick && doc.layers.find((l) => l.id === objectPick.layerId);
-  if (layer) { const own = new Set(layerObjects(layer).map((o) => o.id)); const ids = objectPick!.ids.filter((id) => own.has(id)); if (ids.length) return ids.length; }
+  const picked = pickGroups(doc, objectPick ?? []).reduce((n, g) => n + g.ids.length, 0);
+  if (picked) return picked;
   const active = doc.layers.find((l) => l.id === doc.activeLayerId);
   return active && !layerObjects(active).length && active.type !== 'vector' ? 1 : 0;
 }

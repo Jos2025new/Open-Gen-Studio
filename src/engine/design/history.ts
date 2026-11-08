@@ -4,7 +4,7 @@ import { rasterBufferIds, restoreHistoryBuffers, snapshotHistoryBuffers } from '
 import { takeRasterHistoryCopiedPixels, type RasterHistorySnapshot } from './rasterHistoryTiles';
 import { getSelection, setSelection, type PixelSelection } from './pixelSelection';
 import { useLayerSelection } from './selection';
-import { objectPick, setObjectPick, type ObjectPick } from './objectSelection';
+import { objectPicks, setObjectPicks, type ObjectPick } from './objectSelection';
 
 /* Undo/redo for Designer documents. Raster pixels are captured by reference (copy-on-write buffers). */
 
@@ -15,7 +15,7 @@ interface Snapshot {
   sel: PixelSelection | null;
   /** The picked layers and objects then: redo brings back what the change had selected (a duplicate stays picked). */
   layers: string[] | undefined;
-  objects: ObjectPick | null;
+  objects: ObjectPick[];
 }
 
 interface Stack {
@@ -44,7 +44,7 @@ function stack(docId: string): Stack {
 function restorePicks(docId: string, snap: Snapshot): void {
   setSelection(docId, snap.sel);
   useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: snap.layers ?? [] } }));
-  setObjectPick(docId, snap.objects);
+  setObjectPicks(docId, snap.objects);
 }
 
 function capture(doc: DesignDoc): Snapshot {
@@ -52,7 +52,7 @@ function capture(doc: DesignDoc): Snapshot {
   // Tile copies committed by the preceding edit belong to that edit, not to this capture span.
   takeRasterHistoryCopiedPixels();
   const rasterIds = rasterBufferIds(doc.layers);
-  const snap = { doc, buffers: snapshotHistoryBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
+  const snap = { doc, buffers: snapshotHistoryBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPicks(doc.id) };
   end({ buffers: snap.buffers.size, tiles: [...snap.buffers.values()].reduce((n, grid) => n + grid.tiles.size, 0), copiedPixels: takeRasterHistoryCopiedPixels() });
   return snap;
 }

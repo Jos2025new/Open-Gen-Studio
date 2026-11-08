@@ -1,9 +1,9 @@
 import { toast, saveNow, setUi, useStore } from '../../store/store';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
-import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
-import { objectPick, setObjectPick, useShapeEdit } from '../../engine/design/objectSelection';
-import { nudgeObjects } from '../../engine/design/nudge';
+import { deletePicks, lockedPickLayer, pickGroups } from '../../engine/design/multiObjectOps';
+import { objectPicks, setObjectPick, useShapeEdit } from '../../engine/design/objectSelection';
+import { nudgePicks } from '../../engine/design/nudge';
 import { groupLayers } from '../../engine/design/groups';
 import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
@@ -30,9 +30,7 @@ const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], Arrow
 
 /** Objects picked on the canvas in a layer that still has them. */
 function pickedHere(doc: DesignDoc): boolean {
-  const pk = objectPick(doc.id);
-  const l = pk && doc.layers.find((x) => x.id === pk.layerId);
-  return Boolean(pk && l && pk.ids.length && layerObjects(l).some((o) => pk.ids.includes(o.id)));
+  return pickGroups(doc, objectPicks(doc.id)).length > 0;
 }
 
 /**
@@ -109,8 +107,8 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
   } else if (!e.altKey && ((!mod && (e.key === 'Delete' || e.key === 'Backspace')) || (mod && k === 'x')) && pickedHere(doc)) {
     // Objects picked on the canvas (strokes, shapes): Delete, Backspace or Ctrl+X remove just them, not the layer.
     e.preventDefault();
-    const pk = objectPick(doc.id)!;
-    deletePickedObjects(sessionId, doc.id, pk.layerId, pk.ids);
+    // Picks may span layers: each object goes from its own layer, in one undo step.
+    deletePicks(sessionId, doc.id, doc, objectPicks(doc.id));
     setObjectPick(doc.id, null);
   } else if (!mod && !e.altKey && ARROW_STEP[e.key] && !useShapeEdit.getState().byDoc[doc.id] && layer) {
     // Arrow keys move the picked objects (strokes, shapes; 1 px, Shift 10 px). Nothing picked: they pan the view.
@@ -118,8 +116,7 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
     e.preventDefault();
     const [ux, uy] = ARROW_STEP[e.key];
     const k = e.shiftKey ? 10 : 1;
-    const pk = objectPick(doc.id);
-    if (pk && pickedHere(doc)) { if (!nudgeObjects(sessionId, doc.id, pk.layerId, pk.ids, ux * k, uy * k)) toast(`"${layer.name}" is locked. Unlock it to move it.`, 'info'); }
+    if (pickedHere(doc)) { if (!nudgePicks(sessionId, doc.id, objectPicks(doc.id), ux * k, uy * k)) toast(`"${lockedPickLayer(doc, objectPicks(doc.id))?.name ?? layer.name}" is locked. Unlock it to move it.`, 'info'); }
     else window.dispatchEvent(new CustomEvent('ogs:pan', { detail: { ux, uy, shift: e.shiftKey } }));
   } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && layer) {
     // Delete or Backspace: every picked layer at once (one undo step); locked ones stay. Holding the key does not

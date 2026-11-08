@@ -7,8 +7,11 @@ vi.mock('../src/store/store', () => ({ setDoc: () => undefined }));
 vi.mock('../src/engine/design/actions', () => ({ getDoc: () => fx.doc }));
 vi.mock('../src/engine/design/history', () => ({ record: () => { fx.recorded++; } }));
 vi.mock('../src/engine/design/objectOps', () => ({
-  translateObjects: (l: Layer, _ids: string[], dx: number) => ({ ...l, dx }),
-  commitObjects: (_s: string, _d: string, _next: Layer, first: boolean) => { fx.committed.push({ first, dx: 0 }); if (first) fx.recorded++; },
+  commitLayers: (_s: string, _d: string, _next: Layer[], first: boolean) => { fx.committed.push({ first, dx: 0 }); if (first) fx.recorded++; },
+}));
+vi.mock('../src/engine/design/multiObjectOps', () => ({
+  pickGroups: (doc: DesignDoc, picks: Array<{ layerId: string; ids: string[] }>) => picks.flatMap((p) => { const layer = doc.layers.find((l) => l.id === p.layerId); return layer ? [{ layer, ids: p.ids }] : []; }),
+  translatePicks: (groups: Array<{ layer: Layer }>, dx: number) => groups.map((g) => ({ ...g.layer, dx })),
 }));
 
 import { nudgeObjects, panOffset } from '../src/engine/design/nudge';

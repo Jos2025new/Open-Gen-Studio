@@ -1,7 +1,7 @@
 import { ChevronDown, Scissors, SquaresExclude, SquaresIntersect, SquaresSubtract, SquaresUnite, type LucideIcon } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import { setUi } from '../../store/store';
-import { useObjectSelection } from '../../engine/design/objectSelection';
+import { onlyPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { BOOL_OPS, isFillable, type BoolOp } from '../../engine/design/shapeBoolean';
 import { applyBoolean, pickedShapes } from '../../engine/design/shapeBuilder';
 import { IconButton } from '../ui/primitives';
@@ -15,7 +15,8 @@ const ICONS: Partial<Record<BoolOp, LucideIcon>> = { union: SquaresUnite, subtra
  * the Shape Builder sit behind the chevron. Shown only while two or more shapes of one unlocked vector layer are picked.
  */
 export function BooleanOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
-  const pick = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
+  // Booleans stack shapes inside one layer: a pick that spans layers shows no combine buttons.
+  const pick = onlyPick(useObjectSelection((st) => st.byDoc[doc.id]));
   const pop = usePopover();
   const got = pickedShapes(doc, pick);
   if (!got) return null;

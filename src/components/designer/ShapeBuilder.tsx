@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { setUi } from '../../store/store';
-import { useObjectSelection } from '../../engine/design/objectSelection';
+import { onlyPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { serializeSegs, type Pt } from '../../engine/design/pathNodes';
 import { applyBuilder, builderModel, faceAt, pickedShapes } from '../../engine/design/shapeBuilder';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
@@ -17,7 +17,7 @@ import '../../styles/shape-builder.css';
 type Gesture = { start: Pt; startFace: number; touched: number[]; last: Pt; trail: Pt[]; layerId: string; ids: string[] };
 
 export function ShapeBuilder({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
-  const pick = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
+  const pick = onlyPick(useObjectSelection((st) => st.byDoc[doc.id]));
   const got = pickedShapes(doc, pick);
   const model = got ? builderModel(got.shapes) : null;
   const ref = useRef<SVGSVGElement>(null);

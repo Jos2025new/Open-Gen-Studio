@@ -24,10 +24,10 @@ describe('rounding selected rectangles across layers', () => {
 
   it('targets every picked rectangle in Objects on one layer, but rejects a mixed object pick', () => {
     const d = doc([vector('a', [rect('a1'), rect('a2'), ellipse])]);
-    expect(multiLayerRectangles(d, 'objects', { layerId: 'a', ids: ['a1', 'a2'] }, [])).toEqual([
+    expect(multiLayerRectangles(d, 'objects', [{ layerId: 'a', ids: ['a1', 'a2'] }], [])).toEqual([
       { layerId: 'a', shapeId: 'a1' }, { layerId: 'a', shapeId: 'a2' },
     ]);
-    expect(multiLayerRectangles(d, 'objects', { layerId: 'a', ids: ['a1', 'oval'] }, [])).toEqual([]);
+    expect(multiLayerRectangles(d, 'objects', [{ layerId: 'a', ids: ['a1', 'oval'] }], [])).toEqual([]);
   });
 
   it('applies one radius patch to the explicit targets and preserves other shapes/layers', () => {
@@ -45,7 +45,7 @@ describe('rounding selected rectangles across layers', () => {
     const first = { ...rect('a1', 12), ry: 6, fill: '#e33', stroke: '#123', strokeWidth: 4, rot: [0, 1, -1, 0] as [number, number, number, number] } as ShapeSpec;
     const second = rect('a2', 4) as ShapeSpec;
     const other = doc([vector('a', [first, ellipse, second]), vector('b', [rect('outside')])]);
-    const targets = multiLayerRectangles(other, 'objects', { layerId: 'a', ids: ['a1', 'a2'] }, []);
+    const targets = multiLayerRectangles(other, 'objects', [{ layerId: 'a', ids: ['a1', 'a2'] }], []);
     const next = convertMultiRectanglesToPaths(other, targets);
     const shapes = next.layers[0].type === 'vector' ? next.layers[0].shapes : [];
     expect(shapes[0]).toMatchObject({ id: 'a1', type: 'path', x: 0, y: 0, w: 80, h: 40, fill: '#e33', stroke: '#123', strokeWidth: 4, rx: undefined, ry: undefined, radius: 0, rot: first.rot });

@@ -4,7 +4,7 @@ import { activeDoc, setActiveLayer } from '../engine/design/actions';
 import {setBuffer} from '../engine/design/raster';
 import {composeRaster} from '../engine/design/rasterCompose';
 import { hitTestPixel } from '../engine/design/render';
-import { objectPick } from '../engine/design/objectSelection';
+import { objectPicks } from '../engine/design/objectSelection';
 import { runFx } from '../engine/design/fx';
 import type { DesignDoc, RasterLayer, VectorLayer } from '../engine/types';
 import { intervalWork } from './designerBenchFixtures';
@@ -115,7 +115,7 @@ async function moveEarlyStroke(rep: number, canvasInfo: ReturnType<typeof stage>
   if (hitTestPixel(doc, seg[0], seg[1])?.id !== PROFESSIONAL_IDS.longLayer) throw new Error(`Point of ${strokeId} is not on top; invalid benchmark`);
   const at = performance.now();
   await ctx.send('pointerdown', hit, at);
-  if (!objectPick(doc.id)?.ids.includes(strokeId)) throw new Error(`Press did not pick ${strokeId}; invalid benchmark`);
+  if (!objectPicks(doc.id).some((p) => p.ids.includes(strokeId))) throw new Error(`Press did not pick ${strokeId}; invalid benchmark`);
   for (let i = 1; i <= dragMoves; i++) await ctx.send('pointermove', { x: hit.x + i, y: hit.y + i / 2 }, at + PERIOD * i);
   await ctx.send('pointerup', { x: hit.x + dragMoves, y: hit.y + dragMoves / 2 }, at + PERIOD * (dragMoves + 1));
 }
