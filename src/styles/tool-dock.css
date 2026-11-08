@@ -162,6 +162,8 @@
 body:has(:is(.designs-pop, .tools-grid-pop)) :is(.designer-side, .designer-dock-options) .tool-dock-stack { display: none; }
 /* The Tools popup: Select, Ruler, Pen, Brush and Eraser variants in three columns of cells, the same menu items as every popup. */
 .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.1875rem; }
+/* The Tools popup wears the toolbox's own frame (bar background, line, radius, shadow), centred over its button, so it reads as part of the bar. */
+.popover.tools-grid-pop { padding: var(--toolbar-padding); background: var(--bar-bg); border-color: var(--bar-line); border-radius: var(--toolbar-radius); box-shadow: var(--bar-shadow); }
 /* Each cell is a small tile, icon over its name (as ibisPaint's tool panel), in the app's menu-item colours. */
 .tool-grid .menu-item { flex-direction: column; justify-content: center; gap: 0.25rem; width: 4.5rem; padding: 0.4375rem 0.25rem; text-align: center; }
 .tool-grid .menu-icon { width: 1.25rem; height: 1.25rem; }

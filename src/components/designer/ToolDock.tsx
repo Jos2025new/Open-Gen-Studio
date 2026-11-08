@@ -8,7 +8,7 @@ import { activeLayer } from '../../engine/design/doc';
 import { createPortal } from 'react-dom';
 import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
-import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
+import { Popover, usePopover } from '../ui/Popover';
 import { QUICK, QuickControls } from './QuickSettings';
 import { ToolSettings } from './ToolSettings';
 import { CanvasSize } from './CanvasSize';
@@ -58,8 +58,7 @@ function ToolsGridButton({ icon, label, families, isActive, blockedReason, onPic
   const active = families.some((family) => family.variants.some((variant) => isActive(family, variant)));
   return <>
     {iconButton(icon, `Tools · ${label}`, active, () => { if (!pop.open) announceSidePopup('tools'); pop.toggle(); }, false, pop.ref)}
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement={vertical ? 'right-start' : 'top-start'} align="start" width="content" label="Tools" className="tools-grid-pop">
-      <PopoverHeader title="Tools" />
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement={vertical ? 'right-start' : 'top-center'} align="start" width="content" label="Tools" className="tools-grid-pop">
       <div className="menu tool-grid">
         {families.flatMap((family) => family.variants.map((variant) => <MenuItem key={`${family.id}-${variant.id}`} icon={iconFor(variant.icon)} label={variant.label} active={isActive(family, variant)} disabled={!!variant.soon || (family.variants.length > 1 && !!blockedReason(variant))} tip={variant.soon ? `Soon: ${variant.soon}` : withKey(variant.label, variantKey(variant))} onClick={() => { pop.close(); onPick(family, variant); }} />))}
       </div>
