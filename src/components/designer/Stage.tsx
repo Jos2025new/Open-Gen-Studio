@@ -819,8 +819,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         setSelectedCurve(null);
         return;
       }
-      // Strokes go to the active Lineart layer (a vector layer without shapes), else to a new one.
-      const target = act && act.type === 'vector' && !act.locked && !act.shapes.length ? act : null;
+      // Strokes go to the active Lineart layer (a visible vector layer without shapes), else to a new one: a stroke drawn into a hidden layer would vanish on release.
+      const target = act && act.type === 'vector' && !act.locked && act.visible && !act.shapes.length ? act : null;
       // Alt-drag near a point bends that stroke; its neighbours follow smoothly.
       if (e.altKey && target?.strokes?.length) {
         const hit = nearestPoint(target.strokes, p.x, p.y, 12 / view.zoom);
@@ -1154,7 +1154,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const act = activeLayer(current);
       record(current);
       // Each shape gets its own layer; only an empty vector layer is filled in place.
-      if (act && act.type === 'vector' && !act.locked && !act.shapes.length && !act.strokes?.length) {
+      if (act && act.type === 'vector' && !act.locked && act.visible && !act.shapes.length && !act.strokes?.length) {
         setDoc(sessionId, doc.id, (dd) => updateLayer(dd, act.id, { shapes: [shape] })); // D22: in its place, not moved to the top
       } else {
         const layer = newVectorLayer(`${SHAPE_NAMES[d.tool]} ${current.layers.length + 1}`);
