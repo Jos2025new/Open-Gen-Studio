@@ -99,6 +99,7 @@ describe('quick mode of the subtoolbox', () => {
     expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/showTools && promptHidden \? ' is-prompt-hidden'/);
     const css = readFileSync('src/styles/tool-dock.css', 'utf8');
     expect(css).toMatch(/\.composer\.is-prompt-hidden \.composer-tools-bar > \* \{ transform: translateY\(/);
+    expect(css).toMatch(/\.composer\.is-prompt-hidden \.tool-dock-stack\.is-fixed \{ bottom: 0\.5rem; right: 2\.9375rem; \}/);
     expect(css).toMatch(/\.tool-dock-hide-prompt\.is-pill \{ position: absolute;[^}]*bottom: 0\.5rem;/);
     expect(css).toMatch(/transition: transform \.22s/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\)[^}]*transition: none/);
@@ -202,6 +203,6 @@ describe('subtoolbox row for every tool', () => {
 
 it('the eye goes to the bar end slot after the zoom rail, not inside the scrolling tool list', async () => {
   const { readFileSync } = await import('node:fs');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
+  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot at="bar" \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
   expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).toMatch(/createPortal\([^;]*hideButton[^;]*eyeSlot\)/);
 });

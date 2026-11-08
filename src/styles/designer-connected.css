@@ -173,6 +173,8 @@
 
 /* Designer: the toolbox lives in the prompt dock (the "+" menu switches it to the prompt box). */
 .composer-tools-bar { flex-wrap: nowrap; align-items: center; min-width: 0; }
+.composer-tools-bar .designer-palette.is-docked { position: static; top: auto; left: auto; flex: 1 1 auto; min-width: 0; max-width: none; }
+.composer-tools-bar .designer-palette.is-docked .icon-btn.is-active::after { top: auto; bottom: -0.3125rem; }
 .composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; }
 
 /*

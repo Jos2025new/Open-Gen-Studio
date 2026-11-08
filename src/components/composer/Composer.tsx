@@ -495,10 +495,12 @@ export function Composer() {
             e.target.value = '';
           }}
         />
-        {showTools && designDoc ? <div className="composer-bar composer-tools-bar">
+        {showTools && designDoc ? <>
+        <DockSlot at="options" />
+        <div className="composer-bar composer-tools-bar">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
-          <ScrollRail className="composer-tools-rail" backLabel="Previous options" onLabel="More options"><DockSlot /></ScrollRail><span className="tool-dock-eye-slot" />
-        </div> : <>
+          <ScrollRail className="composer-tools-rail" backLabel="Previous tools" onLabel="More tools"><DockSlot at="bar" /></ScrollRail><span className="tool-dock-eye-slot" />
+        </div></> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row is-compact">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />

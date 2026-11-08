@@ -142,11 +142,14 @@ it('the Designer side toolbox opens the same panel: Create offers only Image (wi
   act(() => root.unmount());
 });
 
-it('in the Designer the panel lives in the side toolbox, gives way to its popups and replaces the Conversation card', () => {
+it('in the Designer the panel lives in the toolbox (bar or side), gives way to its popups and replaces the Conversation card', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
   expect(palette).toMatch(/<DesignsButton [^>]*\/>\s*<CornerButtons sessionId=\{settings\.sessionId\} space="designer" \/>/);
-  expect(palette).toMatch(/<\/div>\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>/);
+  expect(palette).toMatch(/\{viewBar\}\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>/);
   const css = readFileSync('src/styles/node-side.css', 'utf8');
-  expect(css).toMatch(/body:has\(\.designs-pop\) \.designer-corner \{ display: none; \}/);
-  expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) :is\(\.thread-peek, \.thread-peek-folded\) \{ display: none; \}/);
+  // In the bar the panel opens above it, at its left, and the tool options give way; at the side it gives way to the tool cards.
+  expect(css).toMatch(/\.composer-tools-bar \.node-side\.designer-corner \{ left: 0; top: auto; bottom: calc\(100% \+ var\(--canvas-pop-gap\)\); \}/);
+  expect(css).toMatch(/\.composer:has\(\.designer-corner\) \.designer-dock-options \.tool-dock-stack \{ display: none; \}/);
+  expect(css).toMatch(/\.designer-side:has\(\.tool-dock-stack > \*\) \.designer-corner, body:has\(\.designs-pop\) \.designer-corner \{ display: none; \}/);
+  expect(css).toMatch(/\.ws-designer:has\(\.designer-side, \.designer-dock-start\) :is\(\.thread-peek, \.thread-peek-folded\) \{ display: none; \}/);
 });

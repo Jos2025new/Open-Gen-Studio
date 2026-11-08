@@ -74,16 +74,26 @@ it('the tool help sits in the right panel and its handle; neither the bar nor th
   expect(readFileSync('src/components/studio/EmbeddedDesignerBar.tsx', 'utf8')).not.toMatch(/<ToolDock[^>]* designer[ />]/);
 });
 
-it('the toolbox is always upright at the left; the bottom holds the active tool\'s options or the prompt box', () => {
+it('the toolbox is one row in the bar and its options sit directly above; the prompt box swaps the bar and the toolbox stands at the side', () => {
   const palette = readFileSync('src/components/designer/ToolPalette.tsx', 'utf8');
-  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<CornerButtons [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical designer optionsSlot=\{slot\} \/>\s*<\/div>\s*<div className="designer-view"/);
-  expect(palette).not.toContain('createPortal');
-  expect(readFileSync('src/components/composer/Composer.tsx', 'utf8')).toMatch(/<DockSlot \/><\/ScrollRail>/);
+  // Docked: Designs (popup above), Create and Conversation and their panel, the tools, the canvas view, all portaled into the bar's slot; the options go to the slot above it.
+  expect(palette).toMatch(/if \(docked\) return slot\.bar && slot\.options \? createPortal\(<>\s*<div className="designer-dock-start">\s*<DesignsButton [^>]*up \/>\s*<CornerButtons sessionId=\{settings\.sessionId\} space="designer" \/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<DesignerCorner sessionId=\{settings\.sessionId\} \/>\s*<\/div>\s*<div className="designer-palette is-docked">\s*<ToolDock [^>]*designer optionsSlot=\{slot\.options\} \/>\s*<\/div>\s*<div className="designer-dock-end"><span className="tool-dock-separator" aria-hidden="true" \/>\{viewBar\}<\/div>\s*<\/>, slot\.bar\) : null;/);
+  // With the prompt box in the bar, the same pieces stand upright at the left, and choosing a tool there brings the bar back.
+  expect(palette).toMatch(/<div className="designer-side">\s*<DesignsButton [^>]*\/>\s*<CornerButtons [^>]*\/>\s*<span className="tool-dock-separator" aria-hidden="true" \/>\s*<div className="designer-palette is-side">\s*<ToolDock [^>]*vertical \/>\s*<\/div>\s*\{viewBar\}\s*<DesignerCorner /);
+  expect(palette).toMatch(/placement=\{up \? 'top-start' : 'right-start'\} align="start"[^>]*className=\{up \? 'designs-pop is-up' : 'designs-pop'\}>/);
+  const composer = readFileSync('src/components/composer/Composer.tsx', 'utf8');
+  expect(composer).toMatch(/<DockSlot at="options" \/>\s*<div className="composer-bar composer-tools-bar">/);
+  expect(composer).toMatch(/<DockSlot at="bar" \/><\/ScrollRail><span className="tool-dock-eye-slot" \/>/);
   const dock = readFileSync('src/components/designer/ToolDock.tsx', 'utf8');
   expect(dock).toMatch(/const placeStack = [^\n]*optionsSlot \? createPortal\(stack, optionsSlot\) : null;/);
   expect(dock).toMatch(/if \(designer\) \{ announceSidePopup\('tools'\); setUi\(\{ designerDock: 'tools' \}\); \}/);
   expect(readFileSync('src/components/node/NodeSide.tsx', 'utf8')).toMatch(/if \(v === 'chat'\) setUi\(\{ designerDock: open && view === 'chat' \? 'tools' : 'prompt' \}\);/);
   const css = readFileSync('src/styles/tool-dock.css', 'utf8');
+  expect(css).toMatch(/\.designer-side \.designer-palette\.is-side \.tool-dock-stack \{ left: calc\(100% \+ var\(--toolbar-padding\) \+ 1px \+ var\(--canvas-pop-gap\)\);[^}]*flex-direction: row;/);
+  expect(css).toMatch(/\.designer-dock-options\.tool-dock \{ display: contents; \}/);
+  expect(css).toMatch(/\.popover\.designs-pop\.is-up \{ margin: 0; translate: 0 calc\(-1 \* var\(--toolbar-padding\)\); \}/);
+  expect(css).toMatch(/body:has\(\.designs-pop\) :is\(\.designer-side, \.designer-dock-options\) \.tool-dock-stack \{ display: none; \}/);
+  expect(css).toMatch(/\.ws-designer:has\(\.designer-dock-start\) \.document-picker \{ display: none; \}/);
   expect(css).toMatch(/\.designer:has\(\.designer-side\) \.document-picker \{ display: none; \}/);
   expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) \{ --designer-dock-left: max\(5\.25rem/);
 });

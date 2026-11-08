@@ -29,6 +29,9 @@ it('the prompt box is centered on that same line, narrowing to clear the panel',
   expect(css).toMatch(/\.ws-designer \.dock-designer \{ left: 50%; transform: translateX\(-50%\);/);
   // A peeking panel floats over: only a pinned panel sets the width the box centers against.
   expect(readFileSync('src/components/designer/LayersPanel.tsx', 'utf8')).toContain("root.setProperty('--layers-w', collapsed ? '0px' : `${width}px`);");
+  // The toolbox bar is as wide as the prompt box in the other spaces, centered on the same line.
+  expect(css).toContain('.ws-designer .dock-designer:has(.composer-tools-bar) { width: min(50rem, calc(100% - 2 * var(--layers-w, 0px) - 3rem)); }');
+  expect(css).toContain('.composer-dock:has(.composer-tools-bar) { width: min(50rem, calc(100% - 3rem)); }');
   // The bar takes the prompt box's width: no jump when one replaces the other.
   expect(css).toContain('.composer-dock .composer:has(.composer-tools-bar) { width: 100%; }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(50rem, calc(100% - 3rem)); }');
