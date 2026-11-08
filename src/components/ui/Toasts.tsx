@@ -12,6 +12,7 @@ export function Toasts() {
           <div key={t.id} className={`toast toast-${t.level}`}>
             <Icon size={15} strokeWidth={1.9} />
             <span>{t.text}</span>
+            {t.action && <button type="button" className="toast-action" onClick={() => { t.action!.run(); dismissToast(t.id); }}>{t.action.label}</button>}
             <button type="button" aria-label="Dismiss" onClick={() => dismissToast(t.id)}>
               <X size={13} />
             </button>

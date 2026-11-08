@@ -238,6 +238,19 @@ export function addEmptyLayer(sessionId: string, docId: string, type: Layer['typ
  * else the unlocked paint layer right above it, else a new doc-sized "Paint" layer.
  * The caller records history, so the new layer and its first stroke undo together.
  */
+/**
+ * Drawing on a hidden or locked active layer goes to a new layer (as Graphite does); this says so where it can be seen and offers
+ * to show or unlock the skipped layer. Inkscape blocks the stroke with a status-bar message instead; we keep the stroke.
+ */
+export function noticeSkippedLayer(sessionId: string, docId: string, skipped: Layer | null | undefined): void {
+  if (!skipped || (skipped.visible && !skipped.locked)) return;
+  const hidden = !skipped.visible;
+  toast(`“${skipped.name}” is ${hidden ? 'hidden' : 'locked'}: you drew on another layer.`, 'info', 6000, {
+    label: hidden ? 'Show layer' : 'Unlock',
+    run: () => patchLayer(sessionId, docId, skipped.id, hidden ? { visible: true } : { locked: false }, { record: true }),
+  });
+}
+
 export function ensurePaintLayer(sessionId: string, docId: string): RasterLayer | null {
   const doc = getDoc(sessionId, docId);
   if (!doc) return null;
@@ -247,12 +260,14 @@ export function ensurePaintLayer(sessionId: string, docId: string): RasterLayer 
   const above = act ? doc.layers[doc.layers.indexOf(act) + 1] : undefined;
   if (paintable(above) && !above.sourceAssetId) {
     setActiveLayer(sessionId, docId, above.id);
+    noticeSkippedLayer(sessionId, docId, act);
     return above;
   }
   const n = doc.layers.filter((l) => l.type === 'raster' && !l.sourceAssetId).length + 1;
   const layer = D.newRasterLayer(`Paint ${n}`, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height });
   setBuffer(layer.id, createCanvas(doc.width, doc.height));
   setDoc(sessionId, docId, (d) => D.insertLayer(d, layer, 'above'));
+  noticeSkippedLayer(sessionId, docId, act);
   return layer;
 }
 

@@ -35,7 +35,7 @@ import {withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subs
 import { commitPaintedMove, dragGroups, moveGroups, otherGroups, outlinePicked, pickedTargets, snapBox, topObjectLayer, type ObjGroup } from './stageObjMove';
 import { record, unrecord } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
-import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
+import { addTextLayer, ensurePaintLayer, getDoc, noticeSkippedLayer, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, toast, useStore } from '../../store/store';
 import { secondaryOf } from '../../engine/design/colorPair';
 import { beginSample, moveSample, runFill, sampleUp, samplingGesture, showLoupe, type SampleDrag } from './StageSample';
@@ -1105,6 +1105,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         const layer = newVectorLayer(`Lineart ${current.layers.length + 1}`);
         layer.strokes = [stroke];
         setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'top'));
+        noticeSkippedLayer(sessionId, doc.id, activeLayer(current));
       }
       return;
     }
@@ -1160,6 +1161,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         const layer = newVectorLayer(`${SHAPE_NAMES[d.tool]} ${current.layers.length + 1}`);
         layer.shapes = [shape];
         setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'top'));
+        noticeSkippedLayer(sessionId, doc.id, act);
       }
     }
   };

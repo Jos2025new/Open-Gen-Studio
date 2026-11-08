@@ -84,5 +84,10 @@ describe('Lineart stroke release', () => {
     expect(drawn.length).toBe(1);
     expect(drawn[0].visible).toBe(true);
     expect(doc().activeLayerId).toBe(drawn[0].id);
+    // The notice says so and its button shows the skipped layer again.
+    const notice = useStore.getState().ui.toasts.find((t) => t.text.includes('is hidden'));
+    expect(notice?.action?.label).toBe('Show layer');
+    act(() => notice!.action!.run());
+    expect(doc().layers.find((l) => l.id === hidden)!.visible).toBe(true);
   });
 });

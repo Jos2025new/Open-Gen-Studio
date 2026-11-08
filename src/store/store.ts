@@ -119,6 +119,7 @@ export interface Toast {
   id: string;
   text: string;
   level: 'info' | 'error' | 'success';
+  action?: { label: string; run: () => void };
 }
 
 export interface UiState extends PageUiPrefs {
@@ -616,16 +617,8 @@ export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): v
   }
 }
 
-export function toast(text: string, level: Toast['level'] = 'info', ms?: number): void {
-  if (get().ui.toasts.some((t) => t.text === text)) return; // the same notice is already on screen
-  const id = uid('tst');
-  set((st) => ({ ui: { ...st.ui, toasts: [...st.ui.toasts.slice(-3), { id, text, level }] } }));
-  window.setTimeout(() => dismissToast(id), ms ?? (level === 'error' ? 6500 : 3200));
-}
-
-export function dismissToast(id: string): void {
-  set((st) => ({ ui: { ...st.ui, toasts: st.ui.toasts.filter((t) => t.id !== id) } }));
-}
+import { toast } from './toasts';
+export { toast, dismissToast } from './toasts';
 
 // ------------------
 // Sessions

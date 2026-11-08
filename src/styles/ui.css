@@ -70,6 +70,9 @@ button[data-popover-open] { background-color: var(--surface-3); }
 .tooltip { position: fixed; z-index: 200; pointer-events: none; padding: 0.375rem 0.5625rem; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface-3); color: var(--text); max-width: 18.75rem; font-size: var(--fs-xs); box-shadow: var(--shadow-card); }
 .toasts { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 150; display: flex; flex-direction: column; gap: 0.5rem; max-width: min(23.75rem, calc(100vw - 2rem)); }
 .toast { display: flex; align-items: center; gap: 0.625rem; padding: 0.75rem 0.875rem; background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: var(--radius-s); box-shadow: var(--shadow-card); }
+.toast-action { flex: none; padding: 0.25rem 0.5rem; border-radius: var(--radius-s); color: var(--accent); font-weight: 600; }
+/* In the Designer the notices sit centered above the bottom bar, where the eye is while drawing. */
+body:has(.ws-designer) .toasts { left: 50%; right: auto; translate: -50% 0; bottom: 9rem; }
 .toast-error { border-color: var(--danger); }.toast-success { border-color: var(--border); }.toast-success > svg:first-child { color: var(--ok); }
 .media { width: 100%; height: 100%; object-fit: cover; }
 .media-loading, .media-missing { min-height: 5rem; display: grid; place-items: center; color: var(--text-3); background: var(--surface-2); }
