@@ -54,8 +54,8 @@ export function ExportRows({ rows, onChange }: { rows: ExportRow[]; onChange: (r
   const add = () => { const scale = Math.min(8, (rows.at(-1)?.scale ?? 1) + 1); onChange([...rows, row(scale, rows.at(-1)?.format ?? 'png', autoSuffix(scale))]); };
   return <div className="design-export-outputs" role="group" aria-label="Files">
     {rows.map((r, i) => <div className="design-export-output" key={i}>
-      <input type="number" min={0.1} max={8} step={0.25} aria-label={`Scale of file ${i + 1}`} value={r.scale || ''}
-        onChange={(e) => { const scale = Number(e.target.value); edit(i, { scale, suffix: r.suffix === autoSuffix(r.scale) ? autoSuffix(scale) : r.suffix }); }} />
+      <span className="design-export-scale"><input type="number" min={0.1} max={8} step={0.25} aria-label={`Scale of file ${i + 1}`} value={r.scale || ''}
+        onChange={(e) => { const scale = Number(e.target.value); edit(i, { scale, suffix: r.suffix === autoSuffix(r.scale) ? autoSuffix(scale) : r.suffix }); }} /><span aria-hidden="true">×</span></span>
       <input aria-label={`Name suffix of file ${i + 1}`} placeholder="suffix" value={r.suffix} onChange={(e) => edit(i, { suffix: e.target.value })} />
       <InlineSelect label={`Format of file ${i + 1}`} value={r.format} options={formatOptions.map((o) => ({ value: o.value, label: o.label }))} onChange={(format) => edit(i, { format })} />
       <button type="button" className="design-export-remove" aria-label={`Remove file ${i + 1}`} disabled={rows.length < 2} onClick={() => onChange(rows.filter((_, at) => at !== i))}><X size={13} /></button>

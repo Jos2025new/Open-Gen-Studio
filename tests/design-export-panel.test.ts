@@ -43,6 +43,23 @@ describe('export panel', () => {
     expect(document.querySelectorAll('select').length).toBe(0);
   });
 
+  it('switches the preset label to Custom when a setting differs, and keeps a stable preview box', () => {
+    mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, format: 'webp', quality: 80, preset: 'web' } } });
+    const label = () => document.querySelector('button.opt-pick')!.textContent;
+    expect(label()).toContain('Lightweight web');
+    click(byText('Format'));
+    click(byText('PNG', '.menu-item'));
+    expect(label()).toContain('Custom');
+    expect(document.querySelector('.design-export-frame')).not.toBeNull();
+    expect(document.querySelector('.design-export-footer .design-export-buttons')).not.toBeNull();
+  });
+
+  it('shows the scale unit in rows', () => {
+    mount();
+    click(byText('+ Add scale'));
+    expect(document.querySelector('.design-export-scale')?.textContent).toContain('×');
+  });
+
   it('shows only the fields that apply', () => {
     mount();
     expect(text()).toContain('Transparent background');

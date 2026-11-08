@@ -21,6 +21,12 @@ const areaOptions = [
   { value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing only' }, { value: 'objects', label: 'Selected objects' },
   { value: 'selection', label: 'Pixel selection' }, { value: 'layer', label: 'Layer' },
 ] as const satisfies readonly { value: ExportSettings['area']; label: string }[];
+const stable = (value: unknown): string => JSON.stringify(value, (_k, v) => v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => (a < b ? -1 : 1))) : v);
+const sameSettings = (a: ExportSettings, b: ExportSettings) => {
+  const strip = ({ preset: _p, fitInstagram: _f, ...rest }: ExportSettings) => rest;
+  return stable(strip(initialExport({ lastExport: { settings: a } } as DesignDoc).settings)) === stable(strip(initialExport({ lastExport: { settings: b } } as DesignDoc).settings));
+};
 const cm = (mm: number) => (Math.round(mm / 10 * 10) / 10).toFixed(1);
 const noPresets = [] as const;
 const message = (error: unknown) => exportError(error, 'The export could not be prepared, so try a smaller size or another format.').message;
@@ -58,6 +64,8 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   }, [doc, settings, target]);
 
   const image = preview?.request === request ? preview.image : undefined;
+  const [lastImage, setLastImage] = useState<Blob>();
+  useEffect(() => { if (image) setLastImage(image); }, [image]);
   const delivered = delivery?.request === request ? delivery : undefined;
   const previewError = preview?.request === request ? preview.error : undefined;
 
@@ -149,7 +157,9 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
     && geometry.box.w !== geometry.box.h && geometry.box.w * 5 !== geometry.box.h * 4;
   const rows = exportRows(settings);
   const paper = rows[0].format === 'pdf' ? pdfPage(settings.pdf) : undefined;
-  const own = custom.find((p) => p.id === choice);
+  const chosen = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === choice);
+  const shownChoice = chosen && sameSettings(settings, chosen.settings) ? choice : '';
+  const own = custom.find((p) => p.id === shownChoice);
   const layout = paper && geometry ? pageLayout(paper, geometry.width, geometry.height, settings.print) : undefined;
   const [short, long] = paper ? PDF_PAPERS[paper.paper].mm : [0, 0];
   const trimMm = paper ? (paper.orientation === 'portrait' ? [short, long] : [long, short]) : [0, 0];
@@ -164,16 +174,15 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
 
   return <div className="design-export">
     {onBack && <Button size="sm" variant="ghost" onClick={onBack}>Back to File</Button>}
-    <fieldset disabled={!!progress}>
-      <ExportMenu autoFocus label="What is it for?" value={choice} options={presetOptions} onChange={(id) => {
+    <div className="design-export-scroll"><fieldset disabled={!!progress}>
+      <ExportMenu autoFocus label="What is it for?" value={shownChoice} options={presetOptions} onChange={(id) => {
         const preset = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === id);
         apply(preset?.settings ?? { ...settings, preset: undefined, fitInstagram: undefined }, id);
       }} />
-      {image && <ExportPreview image={image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />}
-      {!invalid && !previewError && !image && !progress && <p className="design-export-hint">Preparing preview…</p>}
+      <ExportPreview image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
       {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
       {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
-      <ExportOptions settings={settings} patch={patch} geometry={geometry} areaOptions={[...areaOptions]} />
+      <ExportOptions settings={settings} patch={patch} geometry={geometry} docBackground={doc.background ?? '#ffffff'} areaOptions={[...areaOptions]} />
       {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <Button size="sm" onClick={() => patch({ area: settings.area })}>
         Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}
       </Button>}
@@ -201,7 +210,8 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
         setSettings((st) => ({ designExportPresets: (st.designExportPresets ?? []).filter((p) => p.id !== choice) }));
         setChoice('');
       }} />
-    </fieldset>
+    </fieldset></div>
+    <footer className="design-export-footer">
     {(invalid || error || previewError) && <p role="alert">{invalid || error || previewError}</p>}
     <div className="design-export-buttons">
       {progress ? <Button size="sm" onClick={() => {
@@ -212,22 +222,24 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       }}>Cancel</Button> : <Button size="sm" variant="primary" disabled={!!invalid} onClick={() => void run()}>Export</Button>}
     </div>
     {(progress || status) && <p role="status">{progress || status}</p>}
+    </footer>
   </div>;
 }
 
-function ExportPreview({ image, layout, caption }: { image: Blob; layout?: ReturnType<typeof pageLayout>; caption: string }) {
+function ExportPreview({ image, stale, busy, layout, caption }: { image?: Blob; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout>; caption: string }) {
   const [preview, setPreview] = useState<{ image: Blob; url: string }>();
   useEffect(() => {
+    if (!image) return;
     const url = URL.createObjectURL(image);
     setPreview({ image, url });
     return () => URL.revokeObjectURL(url);
   }, [image]);
   const trim = layout?.trim;
   return <figure className="design-export-figure">
-    <div className="design-export-frame"><div className="design-export-page">
+    <div className={`design-export-frame${stale ? ' is-stale' : ''}`}>{image ? <div className="design-export-page">
       {preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
-    </div></div>
-    <figcaption className="design-export-hint">{caption}</figcaption>
+    </div> : <span className="design-export-hint">{busy ? 'Preparing preview…' : 'No preview'}</span>}</div>
+    <figcaption className="design-export-hint">{busy && image ? 'Updating preview…' : caption}</figcaption>
   </figure>;
 }

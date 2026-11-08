@@ -7,9 +7,6 @@
   font-size: var(--fs-s);
 }
 .design-export fieldset {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  min-block-size: 0;
   display: grid;
   min-inline-size: 0;
   gap: var(--sp-2);
@@ -75,7 +72,7 @@
   gap: var(--sp-1);
   align-items: center;
 }
-.design-export-output > input,
+.design-export-output input,
 .design-export-row input {
   inline-size: 100%;
   min-inline-size: 0;
@@ -110,8 +107,14 @@
 .design-export-page { position: relative; display: inline-block; max-inline-size: 100%; line-height: 0; box-shadow: 0 0 0 1px var(--border-strong, var(--border)); }
 .design-export-frame .design-export-preview { border: 0; border-radius: 0; background: none; inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: 12rem; }
 .design-export-trim { position: absolute; border: 1px dashed var(--accent, currentColor); pointer-events: none; }
-.design-export > :not(fieldset) { flex: none; }
+.design-export-scroll { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
+.design-export-footer { flex: none; display: grid; gap: var(--sp-1); padding-block-start: var(--sp-2); border-block-start: 1px solid var(--border); background: var(--surface-2); }
+.design-export-footer > p { margin: 0; }
+.design-export-frame { block-size: 14.5rem; }
+.design-export-frame.is-stale .design-export-page { opacity: .55; }
+.design-export-scale { position: relative; display: block; }
+.design-export-scale > input { padding-inline-end: 1.4rem; }
+.design-export-scale > span { position: absolute; inset-block: 0; inset-inline-end: .5rem; display: grid; align-items: center; color: var(--text-2); pointer-events: none; }
 .design-export .opt-choice { display: grid; gap: var(--sp-1); block-size: auto; align-items: stretch; }
 .design-export .opt-choice .opt-choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .design-export .opt-choice .opt-choices button { inline-size: auto; padding-inline: var(--sp-2); white-space: nowrap; overflow: visible; text-overflow: clip; }
-.design-export > .design-export-buttons { padding-block-start: var(--sp-1); border-block-start: 1px solid var(--border); }

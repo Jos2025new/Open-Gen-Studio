@@ -7,7 +7,8 @@ import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } f
 const quality = { compress: 75, high: DEFAULT_JPEG_QUALITY };
 
 /** Only the fields that apply to what is being exported. */
-export function ExportOptions({ settings, patch, geometry, areaOptions }: {
+export function ExportOptions({ settings, patch, geometry, areaOptions, docBackground }: {
+  docBackground: string;
   settings: ExportSettings;
   patch: (options: Partial<ExportSettings>) => void;
   geometry?: { width: number; height: number };
@@ -45,8 +46,7 @@ export function ExportOptions({ settings, patch, geometry, areaOptions }: {
     </>}
     {has('png', 'webp') && <>
       <InlineToggle label="Transparent background" checked={settings.background === null} onChange={(on) => patch({ background: on ? null : undefined })} />
-      {typeof settings.background === 'string' && <InlineColor label="Background color" value={settings.background} onChange={(background) => patch({ background })} showValue />}
-      {settings.background === undefined && <button type="button" className="opt opt-pick" onClick={() => patch({ background: '#ffffff' })}><span className="opt-label">Solid background color</span></button>}
+      {settings.background !== null && <InlineColor label="Background color" value={settings.background ?? docBackground} onChange={(background) => patch({ background })} showValue />}
     </>}
     {has('pdf') && <>
       <InlineChoice label="PDF page" value={pdfMode} options={[{ value: 'screen', label: 'Screen' }, { value: 'paper', label: 'Paper' }, { value: 'print', label: 'Print shop' }]}
