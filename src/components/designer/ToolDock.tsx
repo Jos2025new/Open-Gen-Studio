@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement, type Ref } from 'react';
 import { applyBrushPreset, PENCIL_PRESETS } from '../../engine/design/brushPresets';
-import { ChevronsLeft, EyeOff, AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleDashed, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, LassoSelect, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from '../ui/icons';
+import { EyeOff, AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleDashed, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, LassoSelect, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, SquaresUnite, type LucideIcon } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
 import { activeLayer } from '../../engine/design/doc';
 import { createPortal } from 'react-dom';
 import { setUi, useStore } from '../../store/store';
-import { IconButton } from '../ui/primitives';
-import { QUICK, QuickControls, rowFits } from './QuickSettings';
+import { IconButton, MenuItem } from '../ui/primitives';
+import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
+import { QUICK, QuickControls } from './QuickSettings';
 import { ToolSettings } from './ToolSettings';
 import { CanvasSize } from './CanvasSize';
 import { GuidesCard } from './GuidesCard';
@@ -17,7 +18,7 @@ import { ContextStrip } from './ContextStrip';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { toolKey } from '../../engine/shortcuts';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
-import { entryVariant, initialToolboxState, reduceToolboxState, TOOLBOX, variantKey, withKey, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
+import { entryVariant, initialToolboxState, reduceToolboxState, TOOLBOX, TOOLS_GRID_FAMILIES, variantKey, withKey, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
 import '../../styles/tool-dock.css';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -29,7 +30,6 @@ const ICONS: Record<string, LucideIcon> = {
   'square-dashed': SquareDashed, star: Star, spline: Spline, type: Type, 'wand-sparkles': WandSparkles,
   'ruler-dimension-line': Ruler, 'squares-unite': SquaresUnite,
 };
-const selectedFamilyLen = (families: ToolboxFamily[], current?: ToolboxFamily) => current?.variants.length ?? families[0]?.variants.length ?? 0;
 const iconFor = (name: string): LucideIcon => ICONS[name] ?? CircleHelp;
 
 /** Designer toolbox (side or in the prompt box): one popup at a time. Opening one (a tool's variants, Create or Conversation, Designs) closes the others. */
@@ -49,6 +49,22 @@ export function useSidePopup(which: SidePopup, close: () => void, active = true)
 function iconButton(name: string, label: string, active: boolean, onClick: () => void, disabled = false, ref?: Ref<HTMLButtonElement>, key?: string) {
   const Icon = iconFor(name);
   return <button ref={ref} type="button" className={`icon-btn icon-btn-md tone-default ${active ? 'is-active' : ''}`} aria-label={label} aria-pressed={active} aria-disabled={label.includes('Soon:') || undefined} title={label.includes('Soon:') ? label : undefined} disabled={disabled} data-tip={withKey(label, key)} onClick={onClick}><Icon size={16} strokeWidth={1.75} /></button>;
+}
+
+/** The Tools button (Designer): the active one of Pen, Brush and Eraser as its icon, and a popup grid with every variant of those families. */
+function ToolsGridButton({ icon, label, families, isActive, blockedReason, onPick, vertical }: { icon: string; label: string; families: ToolboxFamily[]; isActive: (family: ToolboxFamily, variant: ToolboxVariant) => boolean; blockedReason: (variant: ToolboxVariant) => string | null | undefined; onPick: (family: ToolboxFamily, variant: ToolboxVariant) => void; vertical: boolean }) {
+  const pop = usePopover();
+  useSidePopup('tools', pop.close);
+  const active = families.some((family) => family.variants.some((variant) => isActive(family, variant)));
+  return <>
+    {iconButton(icon, `Tools · ${label}`, active || pop.open, () => { if (!pop.open) announceSidePopup('tools'); pop.toggle(); }, false, pop.ref)}
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement={vertical ? 'right-start' : 'top-start'} align="start" width="content" label="Tools" className="tools-grid-pop">
+      <PopoverHeader title="Tools" />
+      <div className="menu tool-grid">
+        {families.flatMap((family) => family.variants.map((variant) => <MenuItem key={`${family.id}-${variant.id}`} icon={iconFor(variant.icon)} label={variant.label} active={isActive(family, variant)} disabled={!!variant.soon || (family.variants.length > 1 && !!blockedReason(variant))} tip={variant.soon ? `Soon: ${variant.soon}` : withKey(variant.label, variantKey(variant))} onClick={() => { pop.close(); onPick(family, variant); }} />))}
+      </div>
+    </Popover>
+  </>;
 }
 
 function toolFor(family: ToolboxFamily, current: DesignTool, shape: string, rulerKind: string, hardness: number): ToolboxVariant | undefined {
@@ -82,12 +98,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
   const { depth, familyId } = dockState;
   const familyButtons = useRef(new Map<string, HTMLButtonElement>());
   const [height, setHeight] = useState(360);
-  // Quick mode (the subtoolbox row): the subtool's icon, Size, Opacity, color, Eraser and Settings replace the variants. Entered by choosing a subtool that has settings; « leaves it.
-  const [quick, setQuick] = useState(false);
   const promptHidden = useStore((state) => state.ui.promptHidden) ?? false;
   const bottom = inDesigner;
-  const hasQuickCollapsible = !!QUICK[currentTool] && (selectedFamilyLen(shownFamilies, currentFamily) > 1) && !rowFits(currentTool, selectedFamilyLen(shownFamilies, currentFamily));
-  const quickShown = bottom && quick && hasQuickCollapsible;
   const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? currentFamily;
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
@@ -109,7 +121,6 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     shownTool.current = currentTool;
   }, [currentTool, inDesigner]);
 
-  useEffect(() => { if (!hasQuickCollapsible) setQuick(false); }, [currentTool]);
   useEffect(() => {
     const desiredId = currentFamily?.id;
     if (desiredId && desiredId !== familyId) dispatch({ type: 'family', familyId: desiredId });
@@ -147,37 +158,42 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     event.preventDefault();
   };
 
-  // Subtoolbox row (the Designer's bottom toolbox): [subtools if several] [quick settings] [grow] [Eraser toggle] [gear]. When subtools and settings do not fit one row, the row collapses to « + icon + settings.
+  // The Designer's bottom toolbox has two rows above it. Quick settings (the tool's icon where the Tools grid holds its variants, its sliders and colors, Eraser toggle, gear) are always there, as wide as their content.
+  // The variants row sits above them for the families the Tools grid does not hold (Edit, Select, Ruler, Layout).
+  const inGrid = designer && TOOLS_GRID_FAMILIES.includes(selectedFamily?.id ?? '');
   const subtools = (selectedFamily?.variants.length ?? 0) > 1;
   const hasQuick = !!QUICK[currentTool];
-  const collapsibleFor = (tool?: DesignTool) => !!tool && !!QUICK[tool] && subtools && !rowFits(tool, selectedFamily?.variants.length ?? 0);
   // The eyedropper's settings (radius, source, colors) all sit in the row: no card to open.
   const noCard = bottom && selectedVariant?.tool === 'eyedropper';
   const showGear = !!selectedVariant && !selectedVariant.soon && currentTool !== 'hand' && !noCard;
-  // A row that does not fit shows either the subtools or the settings, never squeezed together.
-  const quickInline = hasQuick && (quickShown || !hasQuickCollapsible);
-  const enterQuick = () => { setQuick(true); if (depth === 'open') dispatch({ type: 'escape' }); };
   // The eye sits at the bar's very end, after the zoom rail (the composer's slot), not inside the scrolling tool list.
   const [eyeSlot, setEyeSlot] = useState<HTMLElement | null>(null);
   useEffect(() => { setEyeSlot(optionsSlot ? document.querySelector<HTMLElement>('.composer-tools-bar > .tool-dock-eye-slot') : null); }, [optionsSlot]);
   const hideButton = <button type="button" className={`tool-dock-hide-prompt${promptHidden ? ' is-pill' : ''}`} aria-label="Hide prompt box" aria-pressed={promptHidden} data-tip={promptHidden ? 'Show the prompt box' : 'Hide the prompt box'} onClick={() => setUi({ promptHidden: !promptHidden })}><EyeOff size={16} /></button>;
   const gear = showGear && <button type="button" className={`icon-btn icon-btn-md tone-default ${depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={depth === 'open'} data-tip="Advanced settings" onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button>;
-  const bottomRow = bottom && selectedFamily && !stripShown && (subtools || hasQuick || showGear) && <div className={`tool-dock-variants is-fixed${quickShown ? ' is-quick' : ''}`} role="toolbar" aria-label={quickShown || !subtools ? 'Quick settings' : `${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
-    {quickShown ? <>
-      <button type="button" className="icon-btn icon-btn-md tone-default" aria-label="Show all tools" data-tip="Show all tools" onClick={() => { setQuick(false); if (depth === 'open') dispatch({ type: 'escape' }); }}><ChevronsLeft size={16} /></button>
-      {selectedVariant?.sameSettings
-        ? selectedFamily.variants.filter((variant) => variant.sameSettings).map((variant) => <span key={variant.id}>{iconButton(variant.icon, variant.label, variant.id === selectedVariant.id, () => chooseVariant(variant))}</span>)
-        : iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}
-    </> : subtools && selectedFamily.variants.map((variant) => {
+  const variantsRow = bottom && selectedFamily && !stripShown && subtools && !inGrid && <div className="tool-dock-variants is-fixed" role="toolbar" aria-label={`${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
+    {selectedFamily.variants.map((variant) => {
       const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
-      return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); if (collapsibleFor(variant.tool)) enterQuick(); else if (active && !noCard) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
+      return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => { if (!active) chooseVariant(variant); else if (!noCard) dispatch({ type: 'settings', familyId: selectedFamily.id }); }, !variant.soon && !!disabledReason(variant), undefined, variantKey(variant))}</span>;
     })}
-    {!quickShown && subtools && quickInline && <span className="tool-dock-separator" aria-hidden="true" />}
-    {quickInline && <QuickControls tool={currentTool} sessionId={sessionId} doc={doc} />}
-    <span className="tool-dock-grow" />
-    {quickInline && (currentTool === 'brush' || currentTool === 'eraser') && iconButton('eraser', 'Eraser', currentTool === 'eraser', () => { setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }); }, false, undefined, toolKey('eraser'))}
+  </div>;
+  const quickRow = bottom && selectedFamily && !stripShown && (hasQuick || showGear) && <div className="tool-dock-variants is-fixed is-quick" role="toolbar" aria-label="Quick settings" onKeyDown={moveToolbarFocus}>
+    {inGrid && subtools && <>{iconButton(selectedVariant?.icon ?? 'brush', `${selectedVariant?.label ?? 'Brush'} tool`, true, () => undefined)}{hasQuick && <span className="tool-dock-separator" aria-hidden="true" />}</>}
+    {hasQuick && <QuickControls tool={currentTool} sessionId={sessionId} doc={doc} />}
+    {hasQuick && (currentTool === 'brush' || currentTool === 'eraser') && iconButton('eraser', 'Eraser', currentTool === 'eraser', () => { setUi({ tool: currentTool === 'eraser' ? 'brush' : 'eraser' }); }, false, undefined, toolKey('eraser'))}
     {gear}
   </div>;
+
+  // The Tools button stands where the first of Pen, Brush and Eraser would; the others take no slot of their own.
+  const gridFamilies = designer ? shownFamilies.filter((family) => TOOLS_GRID_FAMILIES.includes(family.id)) : [];
+  const gridIcon = (() => {
+    const family = gridFamilies.find((f) => f.id === currentFamily?.id);
+    const variant = family ? toolFor(family, currentTool, currentShape, rulerKind, brushHardness) : undefined;
+    const fallback = gridFamilies.find((f) => lastVariant?.[f.id]) ?? gridFamilies.find((f) => f.id === 'brush') ?? gridFamilies[0];
+    const shown = variant ?? (fallback ? entryVariant(fallback, lastVariant) ?? fallback.variants[0] : undefined);
+    return { icon: shown?.icon ?? 'brush', label: shown?.label ?? 'Brush' };
+  })();
+  const gridActive = (family: ToolboxFamily, variant: ToolboxVariant) => family.id === currentFamily?.id && !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && toolFor(family, currentTool, currentShape, rulerKind, brushHardness)?.id === variant.id;
 
   const placeStack = (stack: ReactElement) => !bottom ? stack : optionsSlot ? createPortal(stack, optionsSlot) : null;
   const pillHome = optionsSlot?.closest('.composer');
@@ -198,7 +214,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     if (familyId) familyButtons.current.get(familyId)?.focus();
   }}>
     {placeStack(<div className={`tool-dock-stack${bottom ? ' is-fixed' : ''}`} style={{ '--tool-dock-card-height': `${height}px` } as CSSProperties}>
-      {bottomRow}
+      {variantsRow}
+      {quickRow}
       {!bottom && depth !== 'closed' && selectedFamily && !stripShown && <div className={`tool-dock-variants${bottom ? ' is-fixed' : ''}`} role="toolbar" aria-label={`${selectedFamily.label} variants`} aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
@@ -230,9 +247,12 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     {bottom && promptHidden && pillHome && createPortal(hideButton, pillHome)}
     <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family) => {
+        if (gridFamilies.some((f) => f.id === family.id)) {
+          return family.id === gridFamilies[0].id ? <span key="tools-grid"><ToolsGridButton icon={gridIcon.icon} label={gridIcon.label} families={gridFamilies} isActive={gridActive} blockedReason={disabledReason} vertical={vertical} onPick={(owner, variant) => { setUi({ designerDock: 'tools' }); chooseVariant(variant, owner.id); if (!variant.soon && variant.tool) dispatch({ type: 'variant', familyId: owner.id, variantId: variant.id }); }} /></span> : null;
+        }
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
         const soonReason = family.variants.every((variant) => variant.soon) ? family.variants.find((variant) => variant.soon)?.soon : undefined;
-        const button = <span key={family.id}>
+        return <span key={family.id}>
           {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
             if (soonReason) return;
             if (designer) { announceSidePopup('tools'); setUi({ designerDock: 'tools' }); }
@@ -244,12 +264,11 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
             dispatch({ type: 'family', familyId: family.id });
           }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); }, variantKey(entryVariant(family, lastVariant) ?? family.variants[0]))}
         </span>;
-        return family.id === 'settings' ? <span key="panels" className="tool-dock-end">
-          <span className="tool-dock-separator" aria-hidden="true" />
-          <IconButton icon={Layers} label="Show or hide right panel" size="md" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
-          {button}
-        </span> : button;
       })}
+      {shownFamilies.some((family) => family.id === 'settings') && <span key="panels" className="tool-dock-end">
+        <span className="tool-dock-separator" aria-hidden="true" />
+        <IconButton icon={Layers} label="Show or hide right panel" size="md" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
+      </span>}
       {!promptHidden && eyeSlot && createPortal(<><span className="tool-dock-separator" aria-hidden="true" />{hideButton}</>, eyeSlot)}
     </div>
   </div>;

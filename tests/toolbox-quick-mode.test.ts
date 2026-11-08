@@ -29,35 +29,54 @@ const btn = (label: string) => [...host.querySelectorAll('button')].filter((b) =
 const click = async (label: string) => { expect(btn(label), label).toBeTruthy(); await act(async () => btn(label).click()); };
 const quick = () => host.querySelector('[aria-label="Quick settings"]');
 
-const sub = async (label: string) => { const b = host.querySelector<HTMLButtonElement>(`[aria-label="Brush variants"] button[aria-label="${label}"]`); expect(b, label).toBeTruthy(); await act(async () => b!.click()); };
-const enter = async () => { await click('Brush'); await sub('Brush'); }; // family button, then the Brush subtool
+const grid = async (label: string) => { // the Tools button opens the popup grid; pick a cell by its label
+  await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
+  const cell = [...document.querySelectorAll<HTMLButtonElement>('.tools-grid-pop .menu-item')].find((b) => b.textContent === label);
+  expect(cell, label).toBeTruthy(); await act(async () => cell!.click());
+};
+const enter = async () => grid('Brush');
 
-describe('quick mode of the subtoolbox', () => {
-  it('choosing the Brush subtool shows « , its icon, Size and Opacity, the color, Eraser and Settings in that order, inside the subtoolbox; the main toolbox keeps every tool', async () => {
+describe('quick settings above the toolbox', () => {
+  it('the row is always there for a tool with settings: the tool icon, Size, Opacity, Flow, Color, Eraser and Settings in that order; the main toolbox keeps its buttons', async () => {
     await enter();
     expect(quick()).toBeTruthy();
     expect(quick()!.classList.contains('tool-dock-variants')).toBe(true);
     expect(host.querySelector('[aria-label="Tools"] [aria-label="Text"]')).toBeTruthy();
-    expect(host.querySelector('[aria-label="Brush variants"]')).toBeNull();
     const parts = [...quick()!.querySelectorAll('button, .opt-label')].map((e) => e.getAttribute('aria-label') ?? e.textContent);
     const at = (name: string) => parts.findIndex((p) => p === name || p?.startsWith(name));
-    const order = ['Show all tools', 'Brush tool', 'Size', 'Opacity', 'Flow', 'Color', 'Eraser', 'Settings'].map(at);
+    const order = ['Brush tool', 'Size', 'Opacity', 'Flow', 'Color', 'Eraser', 'Settings'].map(at);
     expect(order.every((i) => i >= 0), JSON.stringify(parts)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  it('« expands the row back to all the subtools', async () => {
-    await enter(); await click('Show all tools');
-    expect(quick()).toBeNull();
-    expect(host.querySelector('[aria-label="Brush variants"] [aria-label="Pencil"]')).toBeTruthy();
-    // A row that does not fit never squeezes the settings next to the subtools.
-    expect(host.querySelector('[aria-label="Brush variants"] .tool-dock-quick-sliders')).toBeNull();
-    expect(host.querySelector('[aria-label="Brush variants"] [aria-label^="Eraser"]')).toBeNull();
-    await sub('Pencil');
+  it('there is no toggle between the row and the variants: no « button, and the row stays after choosing any tool of the grid', async () => {
+    await enter();
+    expect(host.querySelector('[aria-label="Show all tools"]')).toBeNull();
+    await grid('Pencil');
     expect(quick()).toBeTruthy();
+    await grid('Lineart');
+    expect(quick()).toBeTruthy();
+    expect(host.querySelector('[aria-label="Brush variants"]')).toBeNull();
   });
 
-  it('the advanced card does not open when the subtool is chosen; the gear opens and closes it', async () => {
+  it('the Tools grid holds Pen, Brush and Eraser with their variants, and those three have no button of their own', async () => {
+    const bar = [...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'));
+    for (const own of ['Pen', 'Brush', 'Eraser']) expect(bar, own).not.toContain(own);
+    expect(bar.filter((l) => l?.startsWith('Tools · '))).toHaveLength(1);
+    await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
+    const cells = [...document.querySelectorAll('.tools-grid-pop .menu-item')].map((b) => b.textContent);
+    expect(cells).toEqual(expect.arrayContaining(['Lineart', 'Curve', 'Bezier pen', 'Cutter', 'Brush', 'Pencil', 'Airbrush', 'Eraser']));
+  });
+
+  it('the toolbox order is Tools, tool settings, Text, Layout, then the Layers button; Edit, Select and Ruler keep their places', () => {
+    const labels = [...host.querySelectorAll('[aria-label="Tools"] button')].map((b) => b.getAttribute('aria-label')!);
+    const at = (name: string) => labels.findIndex((l) => l === name || l.startsWith(name));
+    const order = ['Edit', 'Select', 'Ruler', 'Tools · ', 'Settings', 'Text', 'Layout', 'Show or hide right panel'].map(at);
+    expect(order.every((i) => i >= 0), JSON.stringify(labels)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it('the advanced card does not open when the tool is chosen; the gear opens and closes it', async () => {
     await enter();
     expect(host.querySelector('.tool-dock-card')).toBeNull();
     await click('Settings');
@@ -78,15 +97,16 @@ describe('quick mode of the subtoolbox', () => {
     expect(useStore.getState().ui.tool).toBe('brush');
   });
 
-  it('the subtoolbox is as wide as the toolbox and centered, with 36 px buttons and no floating gutter', () => {
+  it('the rows are as wide as their content and centered: no grow spacer, no space-between, no full-width rule', () => {
     const css = readFileSync('src/styles/tool-dock.css', 'utf8');
     expect(css).toMatch(/\.tool-dock-stack\.is-fixed \{ align-items: center;/);
-    expect(css).toMatch(/> \.tool-dock-variants\.is-fixed \{ width: 100%;/);
-    expect(css).toMatch(/\.tool-dock-variants\.is-fixed \.icon-btn \{ width: 2\.25rem; height: 2\.25rem; \}/);
+    expect(css).not.toMatch(/\.designer-dock-options \.tool-dock-variants\.is-fixed \{ justify-content: space-between/);
+    expect(css).not.toMatch(/is-fixed \{ width: 100%/);
+    expect(readFileSync('src/components/designer/ToolDock.tsx', 'utf8')).not.toMatch(/quickShown|enterQuick|collapsibleFor|hasQuickCollapsible|rowFits/);
     expect(css).not.toMatch(/right: -46px/);
   });
 
-  it('the hide-prompt button is labelled, toggles aria-pressed and persists in the ui state', async () => {
+it('the hide-prompt button is labelled, toggles aria-pressed and persists in the ui state', async () => {
     expect(btn('Hide prompt box').getAttribute('aria-pressed')).toBe('false');
     await click('Hide prompt box');
     expect(btn('Hide prompt box').getAttribute('aria-pressed')).toBe('true');
@@ -128,25 +148,23 @@ describe('hide button placement', () => {
 });
 
 describe('subtoolbox row for every tool', () => {
-  const row = () => host.querySelector('.tool-dock-variants');
+  const row = () => host.querySelector('.tool-dock-variants.is-quick');
+  const variants = (label: string) => host.querySelector(`[aria-label="${label} variants"]`);
   const labels = (el: Element | null) => [...(el?.querySelectorAll('button, .opt-label') ?? [])].map((e) => e.getAttribute('aria-label') ?? e.textContent);
 
-  it('Eraser (a single tool) starts with its quick settings: no repeated icon, no chevron; Size, Opacity, toggle and gear', async () => {
-    await click('Eraser');
+  it('Eraser (a single tool) starts with its quick settings: no chevron; Size, Opacity, toggle and gear', async () => {
+    await grid('Eraser');
     const l = labels(row());
     expect(l.slice(0, 2)).toEqual(['Size', expect.anything()]);
     expect(l).toEqual(expect.arrayContaining(['Size', 'Opacity', 'Eraser', 'Settings']));
     expect(l).not.toContain('Hide tool settings'); expect(l).not.toContain('Show tool settings');
     expect(row()!.querySelectorAll('button[aria-label="Eraser"]').length).toBe(1);
-    expect(row()!.querySelector('button[aria-label="Eraser tool"]')).toBeNull();
   });
 
-  it('Ruler shows its three subtools, a divider and its quick settings (Snap, Clear), then the gear', async () => {
+  it('Ruler shows its three subtools in their own row and its quick settings (Snap, Clear) and the gear in the quick row', async () => {
     await click('Ruler');
-    const l = labels(row());
-    expect(l.slice(0, 3)).toEqual(['Straight ruler', 'Ellipse ruler', 'Perspective ruler']);
-    expect(row()!.querySelector('.tool-dock-separator')).toBeTruthy();
-    expect(l).toEqual(expect.arrayContaining(['Snap', 'Clear', 'Settings']));
+    expect(labels(variants('Ruler')).slice(0, 3)).toEqual(['Straight ruler', 'Ellipse ruler', 'Perspective ruler']);
+    expect(labels(row())).toEqual(expect.arrayContaining(['Snap', 'Clear', 'Settings']));
   });
 
   it('Text row comes from the mapping: font size and color, then the gear that toggles its card', async () => {
@@ -169,9 +187,9 @@ describe('subtoolbox row for every tool', () => {
   it('every tool with settings has essentials: the selection acts, the gradient shows its opacity without a saved gradient, the eyedropper leaves no empty slider slot', async () => {
     await click('Select');
     await act(async () => { setUi({ tool: 'select', selectShape: 'rect' }); });
-    await act(async () => [...row()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
+    await act(async () => [...variants('Select')!.querySelectorAll<HTMLButtonElement>('button')].find((b) => /select/i.test(b.getAttribute('aria-label') ?? ''))!.click());
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'All', 'Invert']));
-    expect(labels(row())).toEqual(expect.arrayContaining(['Rectangular selection', 'Elliptical selection', 'Lasso']));
+    expect(labels(variants('Select'))).toEqual(expect.arrayContaining(['Rectangular selection', 'Elliptical selection', 'Lasso']));
     await act(async () => setUi({ selectShape: 'wand' }));
     expect(labels(row())).toEqual(expect.arrayContaining(['Mode', 'Tolerance', 'Grow / shrink']));
     expect(labels(row())).not.toContain('All');
@@ -189,10 +207,9 @@ describe('subtoolbox row for every tool', () => {
     expect(row()!.querySelector('[aria-label="Settings"]')).toBeNull();
   });
 
-  it('the brush row fits its budget: Size, Opacity, Flow and the colors, with Blend and Lock alpha in the card', async () => {
-    const { QUICK, quickWidth, ROW_BUDGET } = await import('../src/components/designer/QuickSettings');
+  it('the brush row keeps Size, Opacity, Flow and the colors, with Blend and Lock alpha in the card', async () => {
+    const { QUICK } = await import('../src/components/designer/QuickSettings');
     expect(QUICK.brush).toEqual(['size', 'opacity', 'flow', 'colorPair']);
-    for (const tool of ['brush', 'fill', 'eyedropper', 'gradient'] as const) expect(quickWidth(tool) + 90, tool).toBeLessThanOrEqual(ROW_BUDGET);
   });
 
   it('QUICK maps every control to at most 2 long sliders', async () => {

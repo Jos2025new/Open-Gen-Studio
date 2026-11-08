@@ -17,8 +17,8 @@ describe('designer inventory', () => {
   it('every tool key leads to a tool in a mode toolbox', () => {
     for (const [key, t] of Object.entries(DESIGN_TOOL_KEYS)) expect(toolboxTools(), `key ${key}`).toContain(t);
   });
-  it('defines one toolbox in the order of the mockup', () => {
-    expect(TOOLBOX.map((f) => f.id)).toEqual(['edit', 'select', 'layout', 'pen', 'brush', 'eraser', 'text', 'ruler', 'settings']);
+  it('defines one toolbox in the agreed order (Layers follows in the Designer)', () => {
+    expect(TOOLBOX.map((f) => f.id)).toEqual(['edit', 'select', 'ruler', 'pen', 'brush', 'eraser', 'settings', 'text', 'layout']);
   });
   it('every tool has a help line', () => {
     for (const t of Object.keys(TOOL_NAMES)) expect((TOOL_HELP as Record<string, string>)[t], `tool "${t}" has no help`).toBeTruthy();

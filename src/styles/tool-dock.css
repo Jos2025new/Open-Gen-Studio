@@ -159,7 +159,9 @@
 /* Side toolbox: the design picker is its first button, a popup at its right (ToolPalette). */
 .designer:has(.designer-side) .document-picker { display: none; }
 .popover.designs-pop { width: 13.25rem; }
-body:has(.designs-pop) :is(.designer-side, .designer-dock-options) .tool-dock-stack { display: none; }
+body:has(:is(.designs-pop, .tools-grid-pop)) :is(.designer-side, .designer-dock-options) .tool-dock-stack { display: none; }
+/* The Tools popup: Pen, Brush and Eraser variants in two columns of cells, the same menu items as every popup. */
+.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.1875rem; }
 .popover.designs-pop.is-up { margin: 0; translate: 0 calc(-1 * var(--toolbar-padding)); }
 .designs-pop .document-picker-panel { width: 100%; max-height: min(70vh, 35rem); margin: 0; padding: 0.375rem; }
 .ws-designer:has(.designer-side) { --designer-dock-left: max(5.25rem, calc(var(--layers-w, 0px) + 1.5rem), calc(50% - 25rem)); }
@@ -202,7 +204,7 @@ body:has(.designs-pop) :is(.designer-side, .designer-dock-options) .tool-dock-st
 .context-strip .node-done { margin-left: auto; position: sticky; right: 0; }
 /* Subtoolbox fixed: as wide as the toolbox and centered on it, directly above it, with 36 px targets and solid contrast. */
 .tool-dock-stack.is-fixed { align-items: center; transition: bottom .22s ease, right .22s ease; }
-.tool-dock .tool-dock-stack > .tool-dock-variants.is-fixed { width: 100%; min-height: 3rem; padding: 0.375rem; background: var(--bar-bg); box-shadow: var(--bar-shadow); }
+.tool-dock .tool-dock-stack > .tool-dock-variants.is-fixed { padding: 0.375rem; background: var(--bar-bg); box-shadow: var(--bar-shadow); }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn { width: 2.25rem; height: 2.25rem; }
 .tool-dock .tool-dock-variants.is-fixed .icon-btn:not(.is-active):not([aria-expanded]) { opacity: .85; }
 .tool-dock:not(.is-vertical) .tool-dock-stack .tool-dock-card { order: -1; }
@@ -216,10 +218,9 @@ body:has(.designs-pop) :is(.designer-side, .designer-dock-options) .tool-dock-st
 .tool-dock-hide-prompt[aria-pressed="true"] { color: var(--active-text); }
 .tool-dock-hide-prompt:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
 .tool-dock-hide-prompt.is-pill { position: absolute; z-index: 7; right: 0; bottom: 0.5rem; width: 2.5rem; height: 3rem; background: var(--bar-bg); border: 1px solid var(--bar-line); box-shadow: var(--bar-shadow); }
-/* Quick mode, in the subtoolbox: «, subtool icon, long Size and Opacity, color circle, Eraser, Settings. */
+/* Quick settings, always above the toolbox: the tool's icon, long Size and Opacity, color circle, Eraser, Settings; as wide as their content. */
 .tool-dock-variants.is-fixed { gap: 0.5rem; }
-.tool-dock-quick-sliders { display: flex; flex: 1 1 auto; gap: 0.75rem; min-width: 0; }
-.tool-dock-quick-sliders > * { flex: 1 1 0; min-width: 7.5rem; }
+.tool-dock-quick-sliders { display: flex; gap: 0.5rem; min-width: 0; }
 /* The colour sits on a light disc so any colour stands out against the dark bar. */
 .tool-dock-variants.is-fixed .opt-color.is-icon { background: var(--text-3); padding: 0.125rem; border-radius: 50%; }
 /* Bar hidden: its contents slide down out of view; the box chrome fades. */
@@ -246,11 +247,8 @@ body:has(.designs-pop) :is(.designer-side, .designer-dock-options) .tool-dock-st
 .composer-tools-rail .tool-dock-family { overflow: visible; }
 /* The active tool's options: their own row directly above the bar (the stack is positioned against the box, so the slot adds no box). */
 .designer-dock-options.tool-dock { display: contents; }
-/* Any tool: the row's items spread across it, with no hole at one end; sliders stop at a handy width. */
-.designer-dock-options .tool-dock-variants.is-fixed { justify-content: space-between; }
-.designer-dock-options .tool-dock-variants.is-fixed .tool-dock-grow { display: none; }
-.designer-dock-options .tool-dock-quick-sliders { flex: 0 1 auto; gap: 0.5rem; }
-.designer-dock-options .tool-dock-quick-sliders > * { flex: 0 1 8.75rem; min-width: 7rem; padding: 0 0.375rem; }
+/* The rows take their content's width; the sliders keep a handy width of their own. */
+.designer-dock-options .tool-dock-quick-sliders > * { flex: 0 1 auto; min-width: 7rem; padding: 0 0.375rem; }
 .designer-dock-options .tool-dock-quick-sliders .opt-readout { margin-inline: auto; }
 .designer-dock-options .tool-dock-variants.is-fixed .opt-color.is-icon { flex: 0 0 1.75rem; width: 1.75rem; height: 1.75rem; align-self: center; }
 .designer-dock-options .tool-dock-variants.is-fixed > .opt:not(.opt-color) { flex: none; height: 2.25rem; white-space: nowrap; }

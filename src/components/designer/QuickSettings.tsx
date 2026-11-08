@@ -32,13 +32,6 @@ const WAND_ONLY = new Set<QuickKind>(['wandTolerance', 'wandExpand']);
 /** Controls that come before the long sliders. */
 const LEADING = new Set<QuickKind>(['selectMode', 'gradientShape']);
 const LONG = new Set<QuickKind>(['wandTolerance', 'wandExpand', 'size', 'opacity', 'threshold', 'gradientOpacity', 'lineartSize', 'lineartOpacity', 'strokeWidth', 'fontSize', 'fillGap', 'sampleRadius']);
-/** Estimated width (px) of a tool's quick settings, and of the row with `subtools` buttons: decides inline or collapsed («). */
-const WIDE: Partial<Record<QuickKind, number>> = { gradientShape: 120, gradientColors: 150, colorPair: 100, flow: 36, blend: 36, lockAlpha: 36, fillSource: 36, sampleSource: 90, selectOps: 110, editMode: 130, autoSelect: 110 };
-export const quickWidth = (tool: DesignTool | undefined) => (tool ? QUICK[tool] ?? [] : []).reduce((w, k) => w + (WIDE[k] ?? (LONG.has(k) ? 150 : 44)), 0);
-
-export const ROW_BUDGET = 560;
-export const rowFits = (tool: DesignTool | undefined, subtools: number) => subtools * 36 + quickWidth(tool) + 90 <= ROW_BUDGET;
-
 /** Rectangle and lasso start from everything or its opposite; the wand starts from its click. */
 function SelectQuick({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   useSelectionVersion();

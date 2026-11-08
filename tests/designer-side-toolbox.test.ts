@@ -17,19 +17,25 @@ beforeEach(() => {
 });
 afterEach(() => { useStore.setState({ ui: initialUi }); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-async function render(vertical: boolean, family?: string) {
+/** `family`: a family button, or Pen/Brush/Eraser, which the Designer's Tools grid holds. `designerFlat`: the horizontal Designer strip instead of Studio's plain one. */
+async function render(vertical: boolean, family?: string, designerFlat = false) {
   useStore.setState({ ui: { ...initialUi, tool: 'move', selectShape: 'rect' } });
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
-  await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, vertical })));
-  if (family) await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === family)?.click());
-  const labels = [...host.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'));
+  const designer = vertical || designerFlat;
+  await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...createDoc('Dock', 100, 100), paintMode: 'drawing' }, vertical, designer: designerFlat })));
+  const inGrid = designer && family && ['Pen', 'Brush', 'Eraser'].includes(family);
+  if (inGrid) {
+    await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label')?.startsWith('Tools · '))!.click());
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('.tools-grid-pop .menu-item')].find((b) => b.textContent === family)!.click());
+  } else if (family) await act(async () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === family)?.click());
+  const labels = [...host.querySelectorAll('[aria-label="Tools"] button')].map((b) => b.getAttribute('aria-label'));
   return { host, labels, done: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 
 it('the side toolbox is the same strip turned upright: every button, in the same order, closed and with a family open', async () => {
   for (const family of [undefined, 'Brush', 'Layout', 'Edit']) {
-    const flat = await render(false, family);
+    const flat = await render(false, family, true);
     const upright = await render(true, family);
     expect(upright.labels.length).toBeGreaterThan(5);
     expect(upright.labels).toEqual(flat.labels);
@@ -92,7 +98,7 @@ it('the toolbox is one row in the bar and its options sit directly above; the pr
   expect(css).toMatch(/\.designer-side \.designer-palette\.is-side \.tool-dock-stack \{ left: calc\(100% \+ var\(--toolbar-padding\) \+ 1px \+ var\(--canvas-pop-gap\)\);[^}]*flex-direction: row;/);
   expect(css).toMatch(/\.designer-dock-options\.tool-dock \{ display: contents; \}/);
   expect(css).toMatch(/\.popover\.designs-pop\.is-up \{ margin: 0; translate: 0 calc\(-1 \* var\(--toolbar-padding\)\); \}/);
-  expect(css).toMatch(/body:has\(\.designs-pop\) :is\(\.designer-side, \.designer-dock-options\) \.tool-dock-stack \{ display: none; \}/);
+  expect(css).toMatch(/body:has\(:is\(\.designs-pop, \.tools-grid-pop\)\) :is\(\.designer-side, \.designer-dock-options\) \.tool-dock-stack \{ display: none; \}/);
   expect(css).toMatch(/\.ws-designer:has\(\.designer-dock-start\) \.document-picker \{ display: none; \}/);
   expect(css).toMatch(/\.designer:has\(\.designer-side\) \.document-picker \{ display: none; \}/);
   expect(css).toMatch(/\.ws-designer:has\(\.designer-side\) \{ --designer-dock-left: max\(5\.25rem/);

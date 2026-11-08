@@ -6,4 +6,7 @@ it('panels above the toolbox are as wide as their content, centered over the bar
   expect(css).toMatch(/\.tool-dock-stack \{[^}]*align-items: center;/);
   expect(css).toMatch(/\.tool-dock \.tool-dock-stack > \* \{ width: fit-content; max-width: 100%; \}/);
   expect(css).toMatch(/\.tool-dock \.tool-dock-strip \.context-strip \{ position: static; width: auto;/);
+  // No leftovers that stretched the quick row: a grow spacer, spread-out items, a fixed full-width row.
+  expect(css).not.toMatch(/is-fixed \{ width: 100%/);
+  expect(css).not.toMatch(/tool-dock-variants\.is-fixed \{ justify-content: space-between/);
 });
