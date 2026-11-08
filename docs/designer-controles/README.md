@@ -53,6 +53,8 @@ Revisión de localización y accesibilidad para hacer en el sandbox: [[revision-
 
 Investigación de disposición de interfaz en Photoshop, Illustrator, Affinity, Photopea, Inkscape, GIMP, Krita, Figma y tabletas (2026-10-29, con fuentes): [[investigacion-disposicion-interfaz]] · [investigacion-disposicion-interfaz.md](investigacion-disposicion-interfaz.md). Referencia de familiaridad, no techo: los ajustes del objeto elegido van en la toolbox (decisión del usuario, 2026-10-29).
 
+Plan para implementar el panel Export, fase 1 (2026-11-08): [[plan-exportacion]] · [plan-exportacion.md](plan-exportacion.md).
+
 Comparación con Krita (2026-11-06) y estado de cada mejora: [[krita-comparacion]] · [krita-comparacion.md](krita-comparacion.md).
 
 Notas de apoyo: [[estado-compartido]] · [estado-compartido.md](estado-compartido.md) (campos de `ui` y del documento con su línea en `store.ts`), [[hallazgos]] · [hallazgos.md](hallazgos.md) (duplicados, controles escondidos y textos desfasados, con los hallazgos del inventario antiguo recomprobados) y [[huecos]] · [huecos.md](huecos.md) (lo que las maquetas pierden o no dibujan, controles nuevos y decisiones abiertas).

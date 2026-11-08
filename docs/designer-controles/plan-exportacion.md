@@ -1,6 +1,16 @@
 # Plan: exportación del Designer, fase 1 (2026-11-08)
 
-Para quien implemente (GPT). Lo revisa Claude después. Base: rama `task/multi-pick`. Trabaja en una rama propia que salga de ella (`git worktree add ../ogs-export -b task/export task/multi-pick`). Lee [AGENTS.md](../AGENTS.md) antes de empezar.
+Para quien implemente (GPT). Lo revisa Claude después. Base: rama `task/multi-pick`. Trabaja en una rama propia que salga de ella (`git worktree add ../ogs-export -b task/export task/multi-pick`). Lee [AGENTS.md](../../AGENTS.md) antes de empezar.
+
+## Reglas de trabajo (léelas primero; son obligatorias)
+
+- **Alcance cerrado.** Haz solo lo de «Fase 1». Lo de «Fuera de la fase 1» no se toca aunque parezca fácil.
+- **Decide lo pequeño, pregunta lo grande.** Detalles internos (nombres de funciones, estructura de módulos): decide y anótalo en el informe. Pregunta antes de: borrar o migrar datos, tocar una zona de [persistencia protegida](../persistencia-protegida.md), cambiar el aspecto de controles fuera del panel Export, o añadir dependencias.
+- **Subagentes: como mucho 3**, de un modelo barato, cada uno con un encargo completo y cerrado. Sin supervisarlos ni preguntarles a mitad; como mucho una pregunta breve si su informe no sirve. Verifica tú en el código lo que te digan.
+- **Pruebas: solo las afectadas** mientras trabajas (`npx vitest run <archivos>` y `npx tsc -b --noEmit`). `npm test` completo **una sola vez**, al final, en segundo plano. Una ejecución a la vez; nada de bucles de espera.
+- **Para cuando** todo lo de la lista «Pruebas» pase y el panel funcione en el sandbox. No pulas más allá.
+- **Si algo falla dos veces igual**, para, escribe la causa que sospechas en el informe y sigue con lo demás.
+- **Informe con nombre fijo:** `../ogs-export-report.md` (si existe, `-2`, `-3`). No le pongas el nombre de tu modelo.
 
 ## Qué queremos
 
@@ -57,7 +67,7 @@ Los valores exactos (1600, 85, 80) son puntos de partida: déjalos en una tabla 
 - El documento recuerda su última exportación válida (campo opcional en el doc; documentos viejos sin él siguen igual). Abrir el panel la recupera; Export repite en un clic.
 - **Nunca cambiar en silencio lo que se exporta**: si la capa o selección recordada ya no existe, o el tamaño supera el límite, el panel lo indica y Export no actúa hasta elegir otra cosa.
 - Presets propios: en la app (ajustes), no en el documento. Los de serie no se tocan.
-- Antes de añadir campos persistidos, consulta [persistencia protegida](persistencia-protegida.md); si toca una zona protegida, para y pregunta.
+- Antes de añadir campos persistidos, consulta [persistencia protegida](../persistencia-protegida.md); si toca una zona protegida, para y pregunta.
 
 ### 5. Solidez
 
