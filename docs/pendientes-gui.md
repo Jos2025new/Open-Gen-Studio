@@ -23,6 +23,7 @@ Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W
 
 ## Sin ver en navegador (solo código y tests)
 
+- [ ] **Selección de objetos en varias capas y «Select same» por extremo y esquina** (`task/multi-pick`, `ceb0a72a`): sin probar en el sandbox. Falta ver Ctrl+clic en formas de dos capas, moverlas, alinearlas y cambiarles el trazo juntas, y «Select same» con su recuento. Tests: `npm test` limpio salvo 3 fallos que ya estaban en `task/plus-center`. El usuario lo medirá junto con otros cambios. `src/engine/design/objectSelection.ts`, `shapeSameLook.ts`, `SelectSameLook.tsx`. **2026-11-08**.
 - [ ] **Sin tests de interacción real sobre los canvases incrustados.** jsdom con canvas simulado cubre render, popovers, foco y teclas, no arrastrar, mover ni ReactFlow con nodos reales; la captura de Nodes tenía el grafo vacío. `tests/studio-layout.test.ts`, `tests/studio-designer.test.ts`.
 - [ ] **Done y Ongoing de Studio con trabajo en curso real** (plegado automático, filas) sin recorrido archivado. El usuario lo ha usado en su propia sesión (2026-10-16), pero no hay captura del sandbox. `boardModel.ts:55` (`doneExpanded`).
 - [ ] **Go → Create y el aviso de adjunto no admitido** no se han visto; solo el mapeo puro está probado. `actionGo.ts`, `tests/action-go.test.ts`.
