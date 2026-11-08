@@ -248,9 +248,10 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools, vertical
     {bottom && promptHidden && pillHome && createPortal(hideButton, pillHome)}
     <div className="tool-dock-family" role="toolbar" aria-label="Tools" aria-orientation={vertical ? 'vertical' : undefined} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family) => {
-        // Designer: the toolbox's Settings button is the active tool's advanced settings (the card the gear opened).
+        // Designer: the toolbox's Settings button is the active tool's advanced settings (the card the gear opened). Open, it is lit, not
+        // selected: only the current tool wears the selected look.
         if (designer && family.id === 'settings') {
-          return <span key="settings"><button type="button" className={`icon-btn icon-btn-md tone-default ${showGear && depth === 'open' ? 'is-active' : ''}`} aria-label="Settings" aria-pressed={showGear && depth === 'open'} disabled={!showGear} data-tip={showGear ? 'Advanced settings of the active tool' : 'This tool has no advanced settings'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button></span>;
+          return <span key="settings"><button type="button" className="icon-btn icon-btn-md tone-default" aria-label="Settings" aria-expanded={showGear && depth === 'open'} disabled={!showGear} data-tip={showGear ? 'Advanced settings of the active tool' : 'This tool has no advanced settings'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily?.id ?? currentFamily?.id ?? '' })}><Settings2 size={16} /></button></span>;
         }
         if (gridFamilies.some((f) => f.id === family.id)) {
           return family.id === gridFamilies[0].id ? <span key="tools-grid"><ToolsGridButton icon={gridIcon.icon} label={gridIcon.label} families={gridFamilies} isActive={gridActive} blockedReason={disabledReason} vertical={vertical} onPick={(owner, variant) => { setUi({ designerDock: 'tools' }); chooseVariant(variant, owner.id); if (!variant.soon && variant.tool) dispatch({ type: 'variant', familyId: owner.id, variantId: variant.id }); }} /></span> : null;

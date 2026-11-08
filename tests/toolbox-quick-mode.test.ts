@@ -83,7 +83,7 @@ describe('quick settings above the toolbox', () => {
     expect(host.querySelector('.tool-dock-card')).toBeNull();
     await click('Settings');
     expect(host.querySelector('[aria-label="Brush settings"]')).toBeTruthy();
-    expect(btn('Settings').getAttribute('aria-pressed')).toBe('true');
+    expect(btn('Settings').getAttribute('aria-expanded')).toBe('true');
     await click('Settings');
     expect(host.querySelector('.tool-dock-card')).toBeNull();
   });
