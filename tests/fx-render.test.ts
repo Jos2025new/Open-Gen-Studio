@@ -157,7 +157,7 @@ describe('full-resolution FX export', () => {
     expect(sizes.slice(1)).toContainEqual([768, 432]);
   });
   it.each([[8192, 8192], [8193, 100], [NaN, 100]])('rejects %s × %s before any allocation or encoding, with an actionable message', async (width, height) => {
-    await expect(exportDoc(largePage(width, height))).rejects.toThrow(/Export cancelled.*33,554,432 pixels.*8,192.*No file/i);
+    await expect(exportDoc(largePage(width, height))).rejects.toThrow(/No file was created.*choose.*33,554,432 pixels.*8,192/i);
     expect(sizes).toEqual([]);
     expect(encoded).toBe(0);
   });
@@ -167,13 +167,13 @@ describe('full-resolution FX export', () => {
     expect(encoded).toBe(1);
   });
   it.each([[8193, 100], [NaN, 100], [0, 100], [100.5, 100]])('rejects invalid dimensions without FX: %s × %s', async (width, height) => {
-    await expect(exportDoc({ ...page(), width, height })).rejects.toThrow(/Export cancelled.*8,192.*No file/i);
+    await expect(exportDoc({ ...page(), width, height })).rejects.toThrow(/No file was created.*choose.*8,192/i);
     expect(sizes).toEqual([]);
     expect(encoded).toBe(0);
   });
   it('reports a lost browser context instead of encoding a broken export', async () => {
     contextLost = true;
-    await expect(exportDoc(largePage(200, 100))).rejects.toThrow(/Export failed.*full resolution.*No file/i);
+    await expect(exportDoc(largePage(200, 100))).rejects.toThrow(/browser lost the canvas.*try a smaller size/i);
     expect(encoded).toBe(0);
   });
 });

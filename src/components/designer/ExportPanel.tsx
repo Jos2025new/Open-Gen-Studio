@@ -1,51 +1,53 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { uid } from '../../lib/id';
 import type { DesignDoc } from '../../engine/types';
-import { currentExportTarget, deliverDesignExport, prepareDesignExport, rememberDesignExport, resolveExportTarget } from '../../engine/design/exportDesign';
-import { exportDownloadFile, exportGeometry, validateExport, type ExportFile } from '../../engine/design/exportJob';
-import { BUILTIN_EXPORTS, DEFAULT_EXPORT, EXPORT_FORMATS, type ExportArea, type ExportSettings, type RememberedExport } from '../../engine/design/exportSettings';
+import { currentExportTarget, deliverDesignExport, prepareDesignExport, prepareDesignPreview, rememberDesignExport, resolveExportTarget } from '../../engine/design/exportDesign';
+import { exportDownloadFile, exportGeometry, validateExport } from '../../engine/design/exportJob';
+import { BUILTIN_EXPORTS, DEFAULT_EXPORT, EXPORT_FORMATS, PDF_PAPERS, pdfPage, type ExportArea, type ExportSettings, type RememberedExport } from '../../engine/design/exportSettings';
 import { useSelectionVersion } from '../../engine/design/pixelSelection';
 import { rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
 import { ExportOptions } from './ExportOptions';
 
-type Prepared = Awaited<ReturnType<typeof prepareDesignExport>>;
+import { exportError } from '../../engine/design/exportErrors';
 const groups = ['Share', 'Print', 'Work'];
 const noPresets = [] as const;
-const message = (error: unknown) => error instanceof Error ? error.message : 'Export failed. Try a smaller size or another format.';
+const message = (error: unknown) => exportError(error, 'The export could not be prepared, so try a smaller size or another format.').message;
 
 function initialExport(doc: DesignDoc): RememberedExport {
-  return doc.lastExport ?? { settings: DEFAULT_EXPORT };
+  const saved = doc.lastExport ?? { settings: DEFAULT_EXPORT };
+  return saved.settings.pdf === 'a4' ? { ...saved, settings: { ...saved.settings, pdf: pdfPage('a4') } } : saved;
 }
 
 export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc: DesignDoc; onBack?: () => void }) {
   const [draft, setDraft] = useState(() => initialExport(doc));
   const [choice, setChoice] = useState(() => draft.settings.preset ?? '');
+  const [filename, setFilename] = useState(doc.name);
   const [progress, setProgress] = useState<string>();
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<string>();
-  const [preview, setPreview] = useState<{ request: object; result?: Prepared; error?: string }>();
+  const [preview, setPreview] = useState<{ request: object; image?: Blob; error?: string }>();
   const running = useRef<AbortController | null>(null);
-  const preparingPreview = useRef<AbortController | null>(null);
+  const [delivery, setDelivery] = useState<{ request: object; kb: number; notices: string[] }>();
   const presetSelect = useRef<HTMLSelectElement>(null);
   const custom = useStore((s) => s.settings.designExportPresets) ?? noPresets;
   const selectionVersion = useSelectionVersion();
   const pixelVersion = useSyncExternalStore(subscribeRaster, rasterVersion);
   const { settings } = draft;
   const target = useMemo(() => resolveExportTarget(doc, draft), [doc.id, draft, selectionVersion]);
-  // Remembering an export changes metadata, so keep the prepared bytes until the artwork or settings change.
+  // Keep the thumbnail when only export metadata changes.
   const request = useMemo(() => ({}), [doc.id, doc.name, doc.width, doc.height, doc.background, doc.layers, settings, target, pixelVersion]);
   const { geometry, invalid } = useMemo(() => {
     try {
       validateExport(doc, settings, target);
       return { geometry: exportGeometry(doc, settings, target), invalid: undefined };
     } catch (error) { return { geometry: undefined, invalid: message(error) }; }
-  }, [doc, settings, target, pixelVersion]);
+  }, [doc, settings, target]);
 
-  const prepared = preview?.request === request ? preview.result : undefined;
+  const image = preview?.request === request ? preview.image : undefined;
+  const delivered = delivery?.request === request ? delivery : undefined;
   const previewError = preview?.request === request ? preview.error : undefined;
-  const sample = prepared?.files.find((f) => f.mime === 'image/png') ?? prepared?.files[0];
 
   useEffect(() => {
     presetSelect.current?.focus();
@@ -53,23 +55,23 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   }, []);
 
   useEffect(() => {
-    if (invalid || running.current) return;
+    if (invalid) return;
     const controller = new AbortController();
-    preparingPreview.current = controller;
     const timer = setTimeout(async () => {
       try {
-        const result = await prepareDesignExport(doc, settings, target, controller.signal);
-        if (!controller.signal.aborted) setPreview({ request, result });
+        const image = await prepareDesignPreview(doc, settings, target, controller.signal);
+        if (!controller.signal.aborted) setPreview({ request, image });
       } catch (error) {
         if (!controller.signal.aborted) setPreview({ request, error: message(error) });
       }
-    }, 180);
+    }, 500);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [request, invalid]);
 
   function apply(next: ExportSettings, name: string) {
     setChoice(name);
-    setDraft({ settings: next, target: currentExportTarget(doc, next) });
+    const settings = next.pdf === 'a4' ? { ...next, pdf: pdfPage('a4') } : next;
+    setDraft({ settings, target: currentExportTarget(doc, settings) });
     setError(undefined);
     setStatus(undefined);
   }
@@ -90,19 +92,18 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
     if (running.current || invalid) return;
     const controller = new AbortController();
     running.current = controller;
-    preparingPreview.current?.abort();
     setError(undefined);
     setStatus(undefined);
     setProgress('Preparing export…');
     try {
-      const result = prepared ?? await prepareDesignExport(doc, settings, target, controller.signal,
-        (done, total) => setProgress(total === 1 ? 'Preparing file…' : `Preparing file ${done + 1} of ${total}…`));
+      const result = await prepareDesignExport(doc, settings, target, controller.signal,
+        (done, total) => setProgress(total === 1 ? 'Preparing file…' : `Preparing file ${done + 1} of ${total}…`), filename);
       controller.signal.throwIfAborted();
-      setPreview({ request, result });
       if (result.files.length > 1) setProgress('Packing ZIP…');
-      const file = await exportDownloadFile(doc, result.files, controller.signal);
+      const file = await exportDownloadFile(filename, result.files, controller.signal);
       controller.signal.throwIfAborted();
       const name = deliverDesignExport(file);
+      setDelivery({ request, kb: Math.max(1, Math.round(file.bytes.size / 1024)), notices: result.notices });
       if (doc.lastExport !== draft) rememberDesignExport(sessionId, doc.id, draft);
       setStatus(`Download requested for ${name}.`);
     } catch (error) {
@@ -127,7 +128,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const areaNames = { canvas: 'Canvas', selection: 'Pixel selection', layer: 'Layer' };
   const instagramFit = settings.preset === 'instagram' && geometry && !settings.fitInstagram
     && geometry.box.w !== geometry.box.h && geometry.box.w * 5 !== geometry.box.h * 4;
-  const totalKb = prepared && Math.max(1, Math.round(prepared.files.reduce((n, file) => n + file.bytes.size, 0) / 1024));
+  const paper = settings.format === 'pdf' ? pdfPage(settings.pdf) : undefined;
 
   return <div className="design-export">
     {onBack && <Button size="sm" variant="ghost" onClick={onBack}>Back to File</Button>}
@@ -182,14 +183,17 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
         <Button size="sm" onClick={() => patch({ fitInstagram: true })}>Fit to 4:5</Button>
       </div>}
       {settings.preset === 'instagram' && settings.fitInstagram && <Button size="sm" variant="ghost" onClick={() => patch({ fitInstagram: false })}>Use original ratio</Button>}
+      <label>Name
+        <input value={filename} placeholder={doc.name} onChange={(e) => { setFilename(e.target.value); setStatus(undefined); }} />
+      </label>
       {geometry && <p className="design-export-hint">
-        {settings.pdf === 'a4' && settings.format === 'pdf' ? 'A4 · ' : ''}{geometry.width} × {geometry.height} px
+        {paper ? `${PDF_PAPERS[paper.paper].label} · ${paper.orientation} · ` : ''}{geometry.width} × {geometry.height} px
         {brand ? ` and ${geometry.width * 2} × ${geometry.height * 2} px` : ''}
-        {totalKb ? ` · ${brand ? '≈ ' : ''}${totalKb.toLocaleString()} KB` : ''}
+        {delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}
       </p>}
-      {sample && <ExportPreview file={sample} />}
-      {prepared?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
-      {!invalid && !previewError && !prepared && !progress && <p className="design-export-hint">Preparing preview…</p>}
+      {image && <ExportPreview image={image} />}
+      {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
+      {!invalid && !previewError && !image && !progress && <p className="design-export-hint">Preparing preview…</p>}
       <ExportOptions settings={settings} patch={patch} savePreset={savePreset} />
     </fieldset>
     {(invalid || error || previewError) && <p role="alert">{invalid || error || previewError}</p>}
@@ -205,15 +209,12 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   </div>;
 }
 
-function ExportPreview({ file }: { file: ExportFile }) {
-  const [preview, setPreview] = useState<{ file: ExportFile; url: string }>();
+function ExportPreview({ image }: { image: Blob }) {
+  const [preview, setPreview] = useState<{ image: Blob; url: string }>();
   useEffect(() => {
-    const url = URL.createObjectURL(file.bytes);
-    setPreview({ file, url });
+    const url = URL.createObjectURL(image);
+    setPreview({ image, url });
     return () => URL.revokeObjectURL(url);
-  }, [file]);
-  if (preview?.file !== file) return null;
-  return file.mime === 'application/pdf'
-    ? <iframe className="design-export-preview" title="Export preview (PDF)" src={`${preview.url}#toolbar=0&navpanes=0&view=Fit`} tabIndex={-1} />
-    : <img className="design-export-preview" src={preview.url} alt="Export preview" />;
+  }, [image]);
+  return preview?.image === image ? <img className="design-export-preview" src={preview.url} alt="Export preview" /> : null;
 }

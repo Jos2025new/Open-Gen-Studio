@@ -41,7 +41,7 @@ Columnas del estado actual: **Control**, **Dónde está hoy** (superficie y cont
 | FX | [[fx]] · [fx.md](fx.md) | 44 | 42 | 2 | 0 | Menú FX y editor de filtros y efectos |
 | Navegación y zoom | [[navegacion-zoom]] · [navegacion-zoom.md](navegacion-zoom.md) | 13 | 13 | 0 | 0 | Zoom, encuadre, rueda, Pan |
 | Documentos, importar y exportar | [[documentos]] · [documentos.md](documentos.md) | 22 | 22 | 0 | 0 | Nuevo, selector, importar, exportar, galería, portapapeles |
-| Atajos | [[atajos]] · [atajos.md](atajos.md) | 41 | 41 | 0 | 0 | Todas las teclas |
+| Atajos | [[atajos]] · [atajos.md](atajos.md) | 42 | 42 | 0 | 0 | Todas las teclas |
 | Menús contextuales y popovers | [[menus-contextuales]] · [menus-contextuales.md](menus-contextuales.md) | 19 | 19 | 0 | 0 | Los dos clics derechos y todos los popovers |
 | Gestos del lienzo | [[lienzo-gestos]] · [lienzo-gestos.md](lienzo-gestos.md) | 29 | 29 | 0 | 0 | Stage: gestos, modificadores, asas, cursores |
 | Designer embebido en Studio | [[estudio-embebido]] · [estudio-embebido.md](estudio-embebido.md) | 15 | 15 | 0 | 0 | Barra y menú reducidos del tablero |

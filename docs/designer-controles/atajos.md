@@ -27,6 +27,7 @@ El manejador es `designerKey` (`designerKeys.ts:31`), registrado en la ventana p
 | T: Text | Tecla (`shortcuts.ts:4`) | `ui.tool = text` | Igual | Listada | Igual que hoy | se conserva | no dibujado |
 | K: Ruler | Tecla (`shortcuts.ts:4`) | `ui.tool = ruler` | Igual | Listada | Igual que hoy | se conserva | no dibujado |
 | Ctrl+S | Tecla (`designerKeys.ts:32`) | `saveNow` | Siempre, incluso dentro de campos | Listada («Mod + S») | Igual que hoy | se conserva | no dibujado |
+| Ctrl/Cmd+Shift+E | Tecla ([designerKeys.ts](../../src/components/designer/designerKeys.ts)) | Abre Export | Hay documento, con foco en el tablero en Studio | Listada («Mod + Shift + E») | Igual que hoy | implementado | sandbox pendiente |
 | Ctrl+Z | Tecla (`designerKeys.ts:38`) | `undoDoc` | Hay documento | Listada | Igual que hoy | se conserva | no dibujado |
 | Ctrl+Shift+Z / Ctrl+Y | Tecla (misma rama) | `redoDoc` | Hay documento | Ctrl+Y no aparece en la lista del Designer (sí en la de Nodes) | Igual que hoy | se conserva | no dibujado |
 | Shift+R | Tecla (`designerKeys.ts:43`) | `ui.rulers` | Solo en el Designer completo (no en Studio) | Listada | Igual que hoy | se conserva | no dibujado |

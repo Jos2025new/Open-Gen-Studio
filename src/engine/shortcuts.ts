@@ -11,6 +11,8 @@ export const TOOL_NAMES: Record<DesignTool, string> = {
   move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text', ruler: 'Ruler', shapeBuilder: 'Shape Builder',
 };
 
+export const DESIGN_EXPORT_KEY = 'e';
+
 export interface ShortcutGroup {
   title: string;
   items: Array<{ keys: string; action: string }>;
@@ -53,6 +55,7 @@ export function shortcutGroups(): ShortcutGroup[] {
       title: 'Designer',
       items: [
         { keys: 'Mod + S', action: 'Save state and pending layer pixels now' },
+        { keys: `Mod + Shift + ${DESIGN_EXPORT_KEY.toUpperCase()}`, action: 'Open Export (Designer and the Designer board in Studio)' },
         ...Object.entries(DESIGN_TOOL_KEYS).map(([key, tool]) => ({ keys: key.toUpperCase(), action: TOOL_NAMES[tool] })),
         { keys: 'Space (hold)', action: 'Pan' },
         { keys: 'X / D', action: 'Swap the primary and secondary color / reset them to white and black' },

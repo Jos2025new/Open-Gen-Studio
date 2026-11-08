@@ -460,7 +460,7 @@ export async function exportDocFile(sessionId: string, docId: string, format: Ex
   if (!doc) throw new Error('Open a document before exporting.');
   const settings = { ...DEFAULT_EXPORT, format };
   const { files, notices } = await prepareDesignExport(doc, settings, {});
-  deliverDesignExport(await exportDownloadFile(doc, files));
+  deliverDesignExport(await exportDownloadFile(doc.name, files));
   rememberDesignExport(sessionId, docId, { settings });
   for (const notice of notices) toast(notice, 'info', 8000);
 }

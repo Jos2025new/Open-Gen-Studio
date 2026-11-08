@@ -103,7 +103,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
     const draft = { settings, target: input.data.layer_id ?? currentExportTarget(doc, settings) };
     try {
       const { files, notices } = await until(prepareDesignExport(doc, settings, resolveExportTarget(doc, draft)));
-      const file = await until(exportDownloadFile(doc, files));
+      const file = await until(exportDownloadFile(doc.name, files));
       const name = deliverDesignExport(file);
       rememberDesignExport(sessionId, doc.id, draft);
       respond([`Browser download requested for ${name}.`, ...notices].join(' '));

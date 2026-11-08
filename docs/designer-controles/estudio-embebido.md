@@ -17,7 +17,7 @@ Comparte `Stage`, el `ToolDock` y el estado `ui` con el Designer completo, pero 
 | File › Open… | Menú File (`EmbeddedFileMenu.tsx:37`) | `selectDoc` (lista de miniaturas) | Hay documentos | Reutiliza `DocumentChoices` | Igual que hoy | se conserva | no dibujado |
 | File › Import image | Menú File (`EmbeddedFileMenu.tsx:38`) | `importDesignFiles` | Hay documento | — | Igual que hoy | se conserva | no dibujado |
 | File › Save to gallery… | Menú File (`EmbeddedFileMenu.tsx:39`) | Guarda en la galería tras Cancel / Save | Hay documento | — | Igual que hoy | se conserva | no dibujado |
-| File › Export… | Menú File ([EmbeddedFileMenu.tsx](../../src/components/studio/EmbeddedFileMenu.tsx)) | Abre el mismo panel Export que Designer | Hay documento | Presets, formato, área, tamaño y vista previa. Ver [[documentos#Exportación de fase 1]] | Dentro de File | implementado | sandbox pendiente |
+| File › Export… | Menú File ([EmbeddedFileMenu.tsx](../../src/components/studio/EmbeddedFileMenu.tsx)) | Abre el mismo panel Export que Designer, también con Ctrl/Cmd+Shift+E con foco en el tablero | Hay documento | Presets, formato, área, tamaño y vista previa. Ver [[documentos#Exportación de fase 1]] | Dentro de File | implementado | sandbox pendiente |
 | Nombre del documento | Barra superior (`EmbeddedDesigner.tsx:48`) | Ninguno | Hay documento | Solo texto | Igual que hoy | se conserva | no dibujado |
 | Select and move | Barra superior (`EmbeddedDesigner.tsx:50`) | `ui.tool = move` | Hay documento | Duplica Edit del dock completo | Igual que hoy | se conserva | no dibujado |
 | Pan (or hold Space and drag) | Barra superior (`EmbeddedDesigner.tsx:51`) | `ui.tool = hand` | Hay documento | — | Igual que hoy | se conserva | no dibujado |

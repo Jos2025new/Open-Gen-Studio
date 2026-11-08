@@ -121,15 +121,20 @@ export default [{
   tests: ['tests/fx-render.test.ts', 'tests/design-export-job.test.ts'],
 }, {
   id: 'designer-export-panel',
-  what: 'Designer y Studio comparten el panel y el motor prepara los archivos antes de la descarga.',
+  what: 'Designer y Studio comparten el panel y el atajo. La miniatura es ligera y la codificación final comienza al pulsar Export.',
   sides: [
     ['src/components/designer/DesignerWorkspace.tsx', '<ExportPanel'],
     ['src/components/studio/EmbeddedFileMenu.tsx', '<ExportPanel'],
     ['src/components/designer/ExportPanel.tsx', 'prepareDesignExport('],
+    ['src/components/designer/ExportPanel.tsx', 'prepareDesignPreview('],
+    ['src/engine/design/exportRaster.ts', 'PREVIEW_MAX_SIDE = 512'],
+    ['src/components/designer/designerKeys.ts', "'ogs:designer-export'"],
+    ['src/engine/shortcuts.ts', 'DESIGN_EXPORT_KEY'],
+    ['README.md', '| Mod + Shift + E |'],
     ['src/engine/design/exportDesign.ts', 'await exportPlan('],
     ['src/engine/design/actions.ts', 'await prepareDesignExport('],
     ['src/engine/agent/canvasCalls.ts', 'until(prepareDesignExport('],
     ['docs/designer-controles/documentos.md', '## Exportación de fase 1'],
   ],
-  tests: ['tests/design-export-job.test.ts', 'tests/studio-designer.test.ts'],
+  tests: ['tests/design-export-job.test.ts', 'tests/studio-designer.test.ts', 'tests/designer-keys.test.ts'],
 }];

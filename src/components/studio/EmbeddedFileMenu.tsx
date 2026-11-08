@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUpFromLine, ChevronLeft, FilePlus2, FileText, FolderOpen, Images, ImagePlus } from '../ui/icons';
 import type { DesignDoc } from '../../engine/types';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
@@ -22,6 +22,13 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
   const input = useRef<HTMLInputElement>(null);
   const go = (v: View) => setView(v);
   const close = () => { pop.close(); setView('menu'); };
+  const setOpen = pop.setOpen;
+  useEffect(() => {
+    if (!doc || busy) return;
+    const open = () => { setView('export'); setOpen(true); };
+    window.addEventListener('ogs:designer-export', open);
+    return () => window.removeEventListener('ogs:designer-export', open);
+  }, [doc?.id, busy, setOpen]);
   const saveToGallery = async () => {
     if (!doc || busy) return;
     close();

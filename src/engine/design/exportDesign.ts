@@ -2,7 +2,8 @@ import { uid } from '../../lib/id';
 import { blobToDataUrl, canvasToBlob, downloadBlob } from '../../lib/media';
 import { setDoc } from '../../store/store';
 import type { DesignDoc } from '../types';
-import { exportPlan, type ExportFile, type ExportTarget } from './exportJob';
+import { ExportError, exportError } from './exportErrors';
+import { exportPlan, exportPreview, type ExportFile, type ExportTarget } from './exportJob';
 import type { ExportSettings, RememberedExport } from './exportSettings';
 import { getSelection, type PixelSelection } from './pixelSelection';
 import { ensureBuffers, getBuffer, isUnreadable, rasterBufferIds } from './raster';
@@ -29,11 +30,27 @@ export function resolveExportTarget(doc: DesignDoc, { settings, target }: Rememb
   return { selection: target && target === currentExportTarget(doc, settings) ? getSelection(doc.id) ?? undefined : undefined };
 }
 
-export async function prepareDesignExport(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal, onProgress?: (done: number, total: number) => void) {
+async function loadExportLayers(doc: DesignDoc, target: ExportTarget, signal?: AbortSignal) {
   const layers = target.layerId ? doc.layers.filter((l) => l.id === target.layerId) : doc.layers.filter((l) => l.visible);
-  await ensureBuffers(layers);
-  signal?.throwIfAborted();
-  if (rasterBufferIds(layers).some(isUnreadable)) throw new Error('Layer pixels could not be read. Retry from the Layers panel before exporting. No file was created.');
+  try {
+    await ensureBuffers(layers);
+    signal?.throwIfAborted();
+    if (rasterBufferIds(layers).some(isUnreadable)) {
+      throw new ExportError('Layer pixels could not be read, so retry from the Layers panel before exporting.');
+    }
+  } catch (error) {
+    signal?.throwIfAborted();
+    throw exportError(error, 'The design could not be read, so reopen it and try again.');
+  }
+}
+
+export async function prepareDesignPreview(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal) {
+  await loadExportLayers(doc, target, signal);
+  return exportPreview(doc, settings, target, signal);
+}
+
+export async function prepareDesignExport(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, filename = doc.name) {
+  await loadExportLayers(doc, target, signal);
   const notices = new Set<string>();
   if (settings.area === 'selection' && (settings.format === 'svg' || settings.format === 'pdf' || settings.preset === 'brand')) {
     notices.add('SVG and PDF use an embedded image for a pixel selection.');
@@ -46,7 +63,7 @@ export async function prepareDesignExport(doc: DesignDoc, settings: ExportSettin
     layout: layoutText,
     ascent: textAscent,
     notice: (message) => notices.add(message),
-  }, signal, onProgress);
+  }, signal, onProgress, filename);
   if (settings.format === 'webp' && files[0].mime === 'image/jpeg') notices.add('This browser does not encode WebP. The Lightweight web preset prepared a JPG.');
   return { files, notices: [...notices] };
 }
@@ -59,7 +76,11 @@ export function deliverDesignExport(file: ExportFile): string {
   for (let i = 2; requestedNames.has(name.toLowerCase()); i++) {
     name = `${file.name.slice(0, dot)}-${i}${file.name.slice(dot)}`;
   }
-  downloadBlob(file.bytes, name);
+  try {
+    downloadBlob(file.bytes, name);
+  } catch (error) {
+    throw exportError(error, 'The download could not start, so check your browser downloads and try again.');
+  }
   requestedNames.add(name.toLowerCase());
   return name;
 }

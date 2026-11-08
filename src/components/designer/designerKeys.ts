@@ -17,7 +17,7 @@ import { deleteLayers, mergeDown, redoDoc, undoDoc } from '../../engine/design/a
 import { activeLayer } from '../../engine/design/doc';
 import { record } from '../../engine/design/history';
 import { toolBlockReason } from '../../engine/design/rules';
-import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
+import { DESIGN_EXPORT_KEY, DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 import { applyBoolean } from '../../engine/design/shapeBuilder';
 import type { BoolOp } from '../../engine/design/shapeBoolean';
 import type { UiState } from '../../store/store';
@@ -44,6 +44,11 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
   const layer = activeLayer(doc);
   const k = e.key.toLowerCase();
   const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.shiftKey && !e.altKey && k === DESIGN_EXPORT_KEY) {
+    e.preventDefault();
+    window.dispatchEvent(new Event('ogs:designer-export'));
+    return;
+  }
   // `[` and `]` (AltGr on a Spanish keyboard, which Windows reports as Ctrl+Alt): the brush or eraser size, read from `key`, not `code`.
   const altGr = Boolean(e.getModifierState?.('AltGraph'));
   const ui = useStore.getState().ui;

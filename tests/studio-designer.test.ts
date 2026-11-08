@@ -14,6 +14,7 @@ vi.mock('../src/components/designer/designerKeys', async (orig) => ({ ...(await 
 const file = vi.hoisted(() => ({ importDesignFiles: vi.fn(async () => undefined), runDesignOutput: vi.fn(async () => undefined) }));
 vi.mock('../src/components/designer/designerFile', async (orig) => ({ ...(await orig<typeof import('../src/components/designer/designerFile')>()), ...file }));
 const download = vi.hoisted(() => ({
+  preview: vi.fn(async () => new Blob(['png'], { type: 'image/png' })),
   prepare: vi.fn(async () => ({
     files: [{ name: 'design.jpg', mime: 'image/jpeg', bytes: new Blob(['jpeg'], { type: 'image/jpeg' }) }],
     notices: [],
@@ -23,6 +24,7 @@ const download = vi.hoisted(() => ({
 vi.mock('../src/engine/design/exportDesign', async (original) => ({
   ...await original<typeof import('../src/engine/design/exportDesign')>(),
   prepareDesignExport: download.prepare,
+  prepareDesignPreview: download.preview,
   deliverDesignExport: download.deliver,
 }));
 const upload = vi.hoisted(() => ({ uploadFiles: vi.fn(async () => [] as string[]) }));
@@ -256,8 +258,49 @@ describe('file menu', () => {
     expect(panel.querySelector('input[type="number"]')).toHaveProperty('value', '1600');
     expect(panel.querySelector('[aria-label="Quality value"]')).toHaveProperty('value', '85');
     act(() => { format.value = 'pdf'; format.dispatchEvent(new Event('change', { bubbles: true })); });
-    expect(panel.textContent).toContain('Home printing · A4');
+    expect(panel.textContent).toContain('Home printing');
     expect(panel.querySelector('[aria-label="Quality value"]')).toBeNull();
+  });
+  it('debounces a 3× thumbnail and prepares the named file only after Export', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:preview', revokeObjectURL: () => undefined });
+    download.prepare.mockClear();
+    download.preview.mockClear();
+    try {
+      render(createElement(StudioBoard));
+      act(() => q('[aria-label="File"]')!.click());
+      act(() => item('Export')!.click());
+      const panel = document.querySelector('.design-export')!;
+      const size = panel.querySelectorAll('select')[3];
+      act(() => { size.value = '3'; size.dispatchEvent(new Event('change', { bubbles: true })); });
+      const filename = panel.querySelector<HTMLInputElement>('input[placeholder]')!;
+      expect(filename.value).toBe(doc().name);
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(filename, 'Named export');
+        filename.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(download.preview).toHaveBeenCalledOnce();
+      expect(download.preview).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ size: 3 }), {}, expect.anything());
+      expect(download.prepare).not.toHaveBeenCalled();
+      await act(async () => item('Export')!.click());
+      expect(download.prepare).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ size: 3 }), {}, expect.anything(), expect.anything(), 'Named export');
+      expect(panel.textContent).toContain('KB');
+      act(() => item('Back to File')!.click());
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+  it('opens Export with Ctrl+Shift+E when the Designer board has focus', async () => {
+    const real = await vi.importActual<typeof import('../src/components/designer/designerKeys')>('../src/components/designer/designerKeys');
+    keys.designerKey.mockImplementationOnce(real.designerKey);
+    render(createElement(StudioBoard));
+    act(() => q('.studio-designer')!.focus());
+    const key = new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true });
+    act(() => q('.studio-designer')!.dispatchEvent(key));
+    expect(key.defaultPrevented).toBe(true);
+    expect(document.querySelector('.design-export')).not.toBeNull();
   });
   it('remembers a successful download request and saves a custom preset in app settings', async () => {
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:test', revokeObjectURL: () => undefined });

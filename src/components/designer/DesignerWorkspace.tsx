@@ -72,6 +72,14 @@ export function DesignerWorkspace() {
     try { await runDesignOutput(session.id, doc.id, true); } finally { setBusy(false); }
   };
 
+  const setExportOpen = exportMenu.setOpen;
+  useEffect(() => {
+    if (!doc || busy) return;
+    const open = () => setExportOpen(true);
+    window.addEventListener('ogs:designer-export', open);
+    return () => window.removeEventListener('ogs:designer-export', open);
+  }, [doc?.id, busy, setExportOpen]);
+
   const importRef = useRef<HTMLInputElement>(null);
   const importFiles = async (files: File[]) => { if (doc) await importDesignFiles(session.id, doc.id, files); };
   useEffect(() => {

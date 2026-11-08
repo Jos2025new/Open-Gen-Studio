@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer';
+import { svg2pdf } from 'svg2pdf.js';
 import { unzipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
 import { currentExportTarget, deliverDesignExport, resolveExportTarget } from '../src/engine/design/exportDesign';
-import { exportDownloadFile, exportGeometry, exportPlan, validateExport } from '../src/engine/design/exportJob';
+import { exportDownloadFile, exportGeometry, exportPlan, exportPreview, validateExport } from '../src/engine/design/exportJob';
 import { BUILTIN_EXPORTS, DEFAULT_EXPORT, type ExportSettings } from '../src/engine/design/exportSettings';
 import { setSelection } from '../src/engine/design/pixelSelection';
 import type { SvgDeps } from '../src/engine/design/export';
@@ -16,7 +17,8 @@ vi.mock('../src/lib/idb', async (original) => ({
 vi.mock('svg2pdf.js', async () => {
   // Use the real browser build. The package's Node entry points at a UMD script without an ESM export.
   // @ts-expect-error The browser bundle has no separate declaration file.
-  return import('../node_modules/svg2pdf.js/dist/svg2pdf.es.js');
+  const browser = await import('../node_modules/svg2pdf.js/dist/svg2pdf.es.js');
+  return { svg2pdf: vi.fn(browser.svg2pdf) };
 });
 
 const layout: SvgDeps = { rasterHref: async () => null, layout: () => ({ lines: ['Hello'], width: 50, lineHeightPx: 14 }), ascent: () => 11 };
@@ -72,6 +74,19 @@ describe('raster export pipeline (browser encoder double)', () => {
     expect(fillColors.includes('#ffffff')).toBe(format === 'jpg');
   });
 
+  it('encodes one small PNG with the export proportions even for 3× and print', async () => {
+    const doc = { ...design, width: 2000, height: 1000 };
+    const jpg = await exportPreview(doc, { ...DEFAULT_EXPORT, size: 3, format: 'jpg' }, {});
+    expect(jpg.type).toBe('image/png');
+    expect(encodes).toEqual([{ width: 512, height: 256, mime: 'image/png', quality: undefined }]);
+    expect(fillColors).toContain('#ffffff');
+    await exportPreview(doc, { ...settings('home-print'), pdf: { paper: 'letter', orientation: 'landscape' } }, {});
+    expect(encodes.at(-1)).toMatchObject({ width: 512, height: 396, mime: 'image/png' });
+    await exportPreview(doc, settings('brand'), {});
+    expect(encodes.at(-1)).toMatchObject({ width: 512, height: 256, mime: 'image/png' });
+    expect(encodes).toHaveLength(3);
+  });
+
   it('supports explicit transparency and a solid background without editing the document', async () => {
     const blue = { ...design, background: '#0000ff' };
     await exportPlan(blue, { ...DEFAULT_EXPORT, background: null }, {}, layout);
@@ -85,7 +100,7 @@ describe('raster export pipeline (browser encoder double)', () => {
     const [file] = await exportPlan(design, { ...DEFAULT_EXPORT, format: 'jpg', maxKb: 1 }, {}, layout);
     expect(file.bytes.size).toBeLessThanOrEqual(1024);
     expect(encodes.map((x) => x.quality)).toEqual([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]);
-    await expect(exportPlan(design, { ...DEFAULT_EXPORT, format: 'jpg', maxKb: 0.05 }, {}, layout)).rejects.toThrow('Increase the limit');
+    await expect(exportPlan(design, { ...DEFAULT_EXPORT, format: 'jpg', maxKb: 0.05 }, {}, layout)).rejects.toThrow('increase the limit');
     expect(encodes.at(-1)?.quality).toBe(0);
   });
 
@@ -113,7 +128,7 @@ describe('presets and delivery', () => {
       const files = await exportPlan(design, settings(preset), {}, layout);
       expect(files).toHaveLength(1);
       expect(encodes.at(-1)).toEqual({ width, height, mime, quality });
-      expect(await exportDownloadFile(design, files)).toBe(files[0]);
+      expect(await exportDownloadFile(design.name, files)).toBe(files[0]);
     }
     const fit = { ...settings('instagram'), fitInstagram: true };
     expect(exportGeometry(design, fit, {})).toMatchObject({ width: 1080, height: 1350, offsetY: 315 });
@@ -131,17 +146,17 @@ describe('presets and delivery', () => {
   it('creates one ZIP with three distinct names and the same bytes as the prepared files', async () => {
     const files = await exportPlan(design, settings('brand'), {}, layout);
     expect(encodes.map(({ width, height }) => [width, height])).toEqual([[120, 80], [240, 160]]);
-    const zip = await exportDownloadFile(design, files);
+    const zip = await exportDownloadFile(design.name, files);
     expect(zip).toMatchObject({ name: 'My-design.zip', mime: 'application/zip' });
     const entries = unzipSync(new Uint8Array(await zip.bytes.arrayBuffer()));
     expect(Object.keys(entries)).toEqual(['My-design.svg', 'My-design.png', 'My-design@2x.png']);
     for (const file of files) expect(entries[file.name]).toEqual(new Uint8Array(await file.bytes.arrayBuffer()));
-    await expect(exportDownloadFile(design, [files[0], files[0]])).rejects.toThrow('duplicate filenames');
+    await expect(exportDownloadFile(design.name, [files[0], files[0]])).rejects.toThrow('duplicate filenames');
   });
 
   it('stops the bundle on a failed or cancelled output', async () => {
     failPngWidth = 240;
-    await expect(exportPlan(design, settings('brand'), {}, layout).then((files) => exportDownloadFile(design, files))).rejects.toThrow('No file was created');
+    await expect(exportPlan(design, settings('brand'), {}, layout).then((files) => exportDownloadFile(design.name, files))).rejects.toThrow('No file was created');
     const controller = new AbortController();
     encodes.length = 0;
     await expect(exportPlan(design, settings('brand'), {}, layout, controller.signal, (done) => {
@@ -153,9 +168,14 @@ describe('presets and delivery', () => {
   it('suggests unique download names within this app instance', async () => {
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:download', revokeObjectURL: () => undefined });
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    const [file] = await exportPlan(design, DEFAULT_EXPORT, {}, layout);
-    expect(deliverDesignExport(file)).toBe('My-design.png');
-    expect(deliverDesignExport(file)).toBe('My-design-2.png');
+    const [file] = await exportPlan(design, { ...DEFAULT_EXPORT, size: 2 }, {}, layout, undefined, undefined, ' My / logo ');
+    expect(deliverDesignExport(file)).toBe('My-logo@2x.png');
+    expect(deliverDesignExport(file)).toBe('My-logo@2x-2.png');
+    const filename = ' Pack / Brand ';
+    const files = await exportPlan(design, settings('brand'), {}, layout, undefined, undefined, filename);
+    const zip = await exportDownloadFile(filename, files);
+    expect(zip.name).toBe('Pack-Brand.zip');
+    expect(files.map((file) => file.name)).toEqual(['Pack-Brand.svg', 'Pack-Brand.png', 'Pack-Brand@2x.png']);
     expect(click).toHaveBeenCalledTimes(2);
   });
 });
@@ -170,7 +190,7 @@ describe('vector exports and remembered targets', () => {
     expect(svg.querySelector('rect[fill="#ff0000"]')).not.toBeNull();
   });
 
-  it('renders a PDF with a shape and text, and Print at home makes a landscape A4 page', async () => {
+  it('renders a PDF with a shape and text, and Print at home makes a portrait A4 page', async () => {
     const text = newTextLayer('Text', 'Hello', { x: 25, y: 30, width: 60 });
     const doc = { ...design, layers: [rect, text] };
     const [screen] = await exportPlan(doc, { ...DEFAULT_EXPORT, format: 'pdf' }, {}, layout);
@@ -184,8 +204,27 @@ describe('vector exports and remembered targets', () => {
     expect(pdf).toMatch(/%%EOF\s*$/);
     const paperPdf = await paper.bytes.text();
     const [, width, height] = /\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/.exec(paperPdf) ?? [];
-    expect(Number(width)).toBeCloseTo(841.89);
-    expect(Number(height)).toBeCloseTo(595.28);
+    expect(Number(width)).toBeCloseTo(595.28);
+    expect(Number(height)).toBeCloseTo(841.89);
+    const [old] = await exportPlan(doc, { ...settings('home-print'), pdf: 'a4' }, {}, layout);
+    expect((await old.bytes.text()).match(/\/MediaBox \[.*?\]/)?.[0]).toBe(paperPdf.match(/\/MediaBox \[.*?\]/)?.[0]);
+  });
+
+  it('exports Letter landscape at 279.4 × 215.9 mm', async () => {
+    const [file] = await exportPlan(design, { ...settings('home-print'), pdf: { paper: 'letter', orientation: 'landscape' } }, {}, layout);
+    const [, width, height] = /\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/.exec(await file.bytes.text()) ?? [];
+    expect(Number(width) * 25.4 / 72).toBeCloseTo(279.4);
+    expect(Number(height) * 25.4 / 72).toBeCloseTo(215.9);
+  });
+
+  it('logs converter failures without exposing the internal error', async () => {
+    const internal = new Error('Internal SVG failure at private/path');
+    vi.mocked(svg2pdf).mockRejectedValueOnce(internal);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(exportPlan(design, settings('home-print'), {}, layout)).rejects.toMatchObject({
+      message: 'Could not prepare PDF, so try a smaller size or another format.',
+    });
+    expect(logged).toHaveBeenCalledWith('[Designer export]', internal);
   });
 
   it('checks the original target instead of substituting an active layer or new selection', () => {
@@ -196,7 +235,7 @@ describe('vector exports and remembered targets', () => {
     const remembered = { settings: selection, target: currentExportTarget(design, selection) };
     expect(resolveExportTarget(design, remembered).selection).toBeDefined();
     setSelection(design.id, { points: [[5, 6], [20, 6], [20, 30]] });
-    expect(() => validateExport(design, selection, resolveExportTarget(design, remembered))).toThrow('Select an area');
+    expect(() => validateExport(design, selection, resolveExportTarget(design, remembered))).toThrow('select an area');
     expect(design.lastExport).toBeUndefined();
     expect(() => validateExport(design, DEFAULT_EXPORT, {})).not.toThrow();
   });

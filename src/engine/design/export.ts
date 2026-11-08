@@ -1,3 +1,4 @@
+import { paperLayout, type PdfPage } from './exportSettings';
 import { pathTransform } from './path';
 import { markerSvg } from './markers';
 import { gradientSvg } from './gradientPaint';
@@ -206,20 +207,21 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgView
  * PDF from the same SVG (jsPDF + svg2pdf.js, loaded only when used). Shapes and images stay vector/embedded;
  * text uses the PDF standard fonts unless the family is embedded, so it may not match the design fonts.
  */
-export async function svgToPdf(svg: string, width: number, height: number, a4 = false): Promise<Blob> {
+export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage): Promise<Blob> {
   const [{ jsPDF }, { svg2pdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const el = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
-  const pdf = new jsPDF({ unit: 'px', format: a4 ? 'a4' : [width, height], orientation: width >= height ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
-  const pageWidth = pdf.internal.pageSize.getWidth(), pageHeight = pdf.internal.pageSize.getHeight();
-  const scale = a4 ? Math.min(pageWidth / width, pageHeight / height) : 1;
-  const fittedWidth = width * scale, fittedHeight = height * scale;
+  const layout = page ? paperLayout(page, width, height) : undefined;
+  const pdf = new jsPDF({
+    unit: 'px', format: layout ? [layout.pageWidth, layout.pageHeight] : [width, height],
+    orientation: page?.orientation ?? (width >= height ? 'landscape' : 'portrait'), hotfixes: ['px_scaling'],
+  });
   // svg2pdf reads computed styles: the SVG must be in the document while it converts.
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden';
   host.appendChild(el);
   document.body.appendChild(host);
   try {
-    await svg2pdf(el, pdf, { x: (pageWidth - fittedWidth) / 2, y: (pageHeight - fittedHeight) / 2, width: fittedWidth, height: fittedHeight });
+    await svg2pdf(el, pdf, layout ?? { x: 0, y: 0, width, height });
   } finally {
     host.remove();
   }

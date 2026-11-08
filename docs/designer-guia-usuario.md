@@ -228,8 +228,8 @@ Técnico: [[designer-tecnico#Límites de recursos]]; [[designer-tecnico-2#Popove
 ## Exportar y guardar en la galería
 
 - `Save to gallery`: guarda el diseño como imagen PNG en la galería de la app, tras una confirmación (`Save` o `Cancel`).
-- `Export` abre el panel. Elige para qué lo quieres o ajusta formato, área y tamaño. Puedes exportar PNG, JPG, WebP, SVG o PDF. «Logo / brand» descarga un ZIP con SVG y dos PNG.
-- `More options` ajusta el fondo, la compresión o el papel A4 según el formato. También guarda presets propios. El documento recuerda la última exportación y avisa si falta la capa o selección elegida.
+- `Export` o Ctrl/Cmd+Shift+E abre el panel. Elige para qué lo quieres o ajusta formato, área, tamaño y nombre. Puedes exportar PNG, JPG, WebP, SVG o PDF. «Logo / brand» descarga un ZIP con SVG y dos PNG.
+- `More options` ajusta el fondo, la compresión o el tamaño y la orientación del papel según el formato. También guarda presets propios. El documento recuerda la última exportación y avisa si falta la capa o selección elegida.
 - Si el archivo vectorial pierde algún efecto o supera un límite, revisa el aviso del panel. La selección de píxeles se conserva como imagen incrustada en SVG y PDF.
 
 Técnico: [[designer-tecnico#Importar y exportar]].

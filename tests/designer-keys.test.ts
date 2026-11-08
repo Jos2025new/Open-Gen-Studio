@@ -68,6 +68,20 @@ describe('Designer keyboard shortcuts', () => {
     } finally { window.removeEventListener('ogs:designer-zoom', zoom); window.removeEventListener('ogs:designer-fit', fit); stop(); }
   });
 
+  it('opens Export with Ctrl or Command plus Shift+E and keeps editable fields out of board shortcuts', () => {
+    const stop = listen();
+    const open = vi.fn();
+    window.addEventListener('ogs:designer-export', open);
+    try {
+      expect(press('E', { ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(true);
+      expect(press('E', { metaKey: true, shiftKey: true }).defaultPrevented).toBe(true);
+      expect(press('E', { ctrlKey: true, shiftKey: true, altKey: true }).defaultPrevented).toBe(false);
+      const input = document.body.appendChild(document.createElement('input'));
+      expect(press('E', { ctrlKey: true, shiftKey: true }, input).defaultPrevented).toBe(false);
+      expect(open).toHaveBeenCalledTimes(2);
+    } finally { window.removeEventListener('ogs:designer-export', open); stop(); }
+  });
+
   it('M in Select cycles its shape; elsewhere it picks Select', () => {
     const stop = listen();
     try {
