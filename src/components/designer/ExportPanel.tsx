@@ -224,10 +224,10 @@ function ExportPreview({ image, layout, caption }: { image: Blob; layout?: Retur
   }, [image]);
   const trim = layout?.trim;
   return <figure className="design-export-figure">
-    <div className="design-export-frame">
+    <div className="design-export-frame"><div className="design-export-page">
       {preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
-    </div>
+    </div></div>
     <figcaption className="design-export-hint">{caption}</figcaption>
   </figure>;
 }

@@ -1,10 +1,15 @@
 .design-export {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  max-block-size: min(42rem, calc(100vh - 5rem));
   gap: var(--sp-2);
   padding: var(--sp-3);
   font-size: var(--fs-s);
 }
 .design-export fieldset {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-block-size: 0;
   display: grid;
   min-inline-size: 0;
   gap: var(--sp-2);
@@ -94,6 +99,19 @@
 }
 .design-export-remove:disabled { opacity: .35; cursor: default; }
 .design-export-figure { display: grid; gap: var(--sp-1); margin: 0; justify-items: center; }
-.design-export-frame { position: relative; display: inline-block; max-inline-size: 100%; line-height: 0; }
-.design-export-frame .design-export-preview { inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: 12rem; }
+.design-export-figure { inline-size: 100%; justify-items: stretch; }
+.design-export-frame {
+  display: grid;
+  place-items: center;
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface-3, var(--surface)) 0 50%) 0 0 / 12px 12px;
+}
+.design-export-page { position: relative; display: inline-block; max-inline-size: 100%; line-height: 0; box-shadow: 0 0 0 1px var(--border-strong, var(--border)); }
+.design-export-frame .design-export-preview { border: 0; border-radius: 0; background: none; inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: 12rem; }
 .design-export-trim { position: absolute; border: 1px dashed var(--accent, currentColor); pointer-events: none; }
+.design-export > :not(fieldset) { flex: none; }
+.design-export .opt-choice { display: grid; gap: var(--sp-1); block-size: auto; align-items: stretch; }
+.design-export .opt-choice .opt-choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.design-export .opt-choice .opt-choices button { inline-size: auto; padding-inline: var(--sp-2); white-space: nowrap; overflow: visible; text-overflow: clip; }
+.design-export > .design-export-buttons { padding-block-start: var(--sp-1); border-block-start: 1px solid var(--border); }

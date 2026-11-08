@@ -26,7 +26,7 @@ export function ExportOptions({ settings, patch, geometry, areaOptions }: {
     {!multi ? <ExportMenu label="Format" value={settings.format} options={formatOptions}
       onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />
       : <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />}
-    {!multi && <button type="button" className="opt opt-pick" onClick={() => patch({ outputs: [row(typeof settings.size === 'number' ? settings.size : 1, settings.format), row(2, settings.format, '@2x')], preset: undefined })}>
+    {!multi && !page && <button type="button" className="opt opt-pick" onClick={() => patch({ outputs: [row(typeof settings.size === 'number' ? settings.size : 1, settings.format), row(2, settings.format, '@2x')], preset: undefined })}>
       <span className="opt-label">+ Add scale</span>
     </button>}
     {multi && <Hint>{rows.length} files · packed in one ZIP</Hint>}

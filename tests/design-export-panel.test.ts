@@ -27,6 +27,14 @@ beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserv
 afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; setSettings({ designExportPresets: [] }); });
 
 describe('export panel', () => {
+  it('stacks menus opened inside a popover above it', () => {
+    act(() => { root.render(createElement('div', { className: 'popover', style: { zIndex: 100 } }, createElement(ExportPanel, { sessionId: 's', doc: base }))); });
+    click(byText('Format'));
+    const menus = [...document.body.querySelectorAll<HTMLElement>('body > .popover')];
+    expect(menus).toHaveLength(1);
+    expect(Number(menus[0].style.zIndex)).toBeGreaterThan(100);
+  });
+
   it('uses the app controls: no native select, format menu with purposes', () => {
     mount();
     expect(document.querySelectorAll('select').length).toBe(0);
@@ -60,6 +68,10 @@ describe('export panel', () => {
     click(document.querySelector('[aria-label="Remove file 3"]'));
     click(document.querySelector('[aria-label="Remove file 2"]'));
     expect(text()).not.toContain('files ·');
+    click(byText('Format'));
+    click(byText('PDF', '.menu-item'));
+    click(byText('Paper', '[role="radio"]'));
+    expect(byText('Add scale')).toBeUndefined();
     expect(document.querySelectorAll('select').length).toBe(0);
   });
 

@@ -100,6 +100,9 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
         next.maxHeight = below;
       }
     }
+    // A popover opened from inside another stacks above it, whatever the parent's own layer.
+    const parent = a.closest('.popover');
+    if (parent) next.zIndex = (Number.parseInt(getComputedStyle(parent).zIndex, 10) || 100) + 1;
     setStyle(next);
   }, [anchor, placement, width, align, edge, boundarySelector, clearOf]);
 
