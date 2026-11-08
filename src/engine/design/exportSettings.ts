@@ -25,18 +25,61 @@ export function paperLayout(page: PdfPage, width: number, height: number) {
     x: (pageWidth - fittedWidth) / 2, y: (pageHeight - fittedHeight) / 2 };
 }
 
-export type ExportArea = 'canvas' | 'selection' | 'layer';
+export type ExportArea = 'canvas' | 'content' | 'objects' | 'selection' | 'layer';
+
+/** One file of a multi-file export: a scale, the text added to the name, and a format. */
+export interface ExportRow { scale: number; suffix: string; format: ExportFormat }
+export interface SvgOptions { decimals?: number; minify?: boolean; metadata?: boolean }
+/** Print shop PDF: the paper is the trim size; bleed is added on every side, marks need a slug outside it. */
+export interface PrintOptions { bleedMm: number; marks: boolean }
+export const MARK_SLUG_MM = 5;
+
+export const row = (scale: number, format: ExportFormat, suffix = ''): ExportRow => ({ scale, suffix, format });
+/** The suffix a plain scale gets when the user did not write one (2 gives @2x). */
+export const autoSuffix = (scale: number) => (scale > 1 ? `@${scale}x` : '');
+
+export const PX_PER_MM = 96 / 25.4;
+/**
+ * The PDF page for artwork `width` × `height`, in 96-dpi px. Paper: the design fitted inside. Print shop: trim = paper,
+ * the artwork scaled to cover trim + bleed, with room for crop marks outside the bleed.
+ */
+export function pageLayout(page: PdfPage, width: number, height: number, print?: PrintOptions) {
+  const paper = paperLayout(page, width, height);
+  if (!print) return { ...paper, trim: undefined as undefined | { x: number; y: number; w: number; h: number }, bleed: 0, marks: false };
+  const bleed = print.bleedMm * PX_PER_MM, slug = print.marks ? MARK_SLUG_MM * PX_PER_MM : 0, edge = bleed + slug;
+  const trimW = paper.pageWidth, trimH = paper.pageHeight;
+  const scale = Math.max((trimW + 2 * bleed) / width, (trimH + 2 * bleed) / height);
+  const w = width * scale, h = height * scale;
+  return { pageWidth: trimW + 2 * edge, pageHeight: trimH + 2 * edge, scale, width: w, height: h,
+    x: edge + (trimW - w) / 2, y: edge + (trimH - h) / 2, trim: { x: edge, y: edge, w: trimW, h: trimH }, bleed, marks: print.marks };
+}
 export interface ExportSettings {
   format: ExportFormat;
   area: ExportArea;
-  size: 1 | 2 | 3 | 'width' | 'long-side';
+  size: number | 'width' | 'long-side';
   pixels?: number;
   quality?: number;
   maxKb?: number;
   background?: string | null;
   fitInstagram?: boolean;
   pdf?: 'screen' | 'a4' | PdfPage;
+  print?: PrintOptions;
+  /** Several files at once; absent means one file from `format` and `size`. */
+  outputs?: ExportRow[];
+  /** Text before the name. */
+  prefix?: string;
+  /** Settings that apply when SVG is among the outputs. */
+  svg?: SvgOptions;
+  /** Put the files in subfolders by format when saving to a chosen folder. */
+  subfolders?: boolean;
+  /** Inside one output of `outputs`: the text added to that file's name. */
+  suffix?: string;
   preset?: string;
+}
+
+/** The file rows an export produces: its own list, or the single format and size. */
+export function exportRows(settings: ExportSettings): ExportRow[] {
+  return settings.outputs?.length ? settings.outputs : [row(typeof settings.size === 'number' ? settings.size : 1, settings.format)];
 }
 
 export interface RememberedExport {
@@ -59,7 +102,11 @@ export const BUILTIN_EXPORTS = [
   { id: 'web', name: 'Lightweight web', group: 'Share', settings: defaults('web', { format: 'webp', quality: 80 }) },
   { id: 'home-print', name: 'Print at home', group: 'Print', settings: defaults('home-print', { format: 'pdf', pdf: DEFAULT_PDF_PAGE }) },
   { id: 'portfolio', name: 'Portfolio', group: 'Work', settings: defaults('portfolio', { size: 2 }) },
-  { id: 'brand', name: 'Logo / brand', group: 'Work', settings: defaults('brand', { format: 'svg' }) },
+  { id: 'brand', name: 'Logo / brand', group: 'Work', settings: defaults('brand', { format: 'svg', outputs: [row(1, 'svg'), row(1, 'png'), row(2, 'png', '@2x')] }) },
+  { id: 'ios', name: 'iOS', group: 'Apps', settings: defaults('ios', { outputs: [row(1, 'png'), row(2, 'png', '@2x'), row(3, 'png', '@3x')] }) },
+  { id: 'android', name: 'Android', group: 'Apps', settings: defaults('android', { outputs: [
+    row(0.75, 'png', '-ldpi'), row(1, 'png', '-mdpi'), row(1.5, 'png', '-hdpi'), row(2, 'png', '-xhdpi'), row(3, 'png', '-xxhdpi'), row(4, 'png', '-xxxhdpi')] }) },
+  { id: 'print-shop', name: 'Print shop', group: 'Print', settings: defaults('print-shop', { format: 'pdf', pdf: DEFAULT_PDF_PAGE, print: { bleedMm: 3, marks: true } }) },
 ] as const;
 
 export const DEFAULT_JPEG_QUALITY = 92;

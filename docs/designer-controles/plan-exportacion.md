@@ -79,7 +79,19 @@ Los valores exactos (1600, 85, 80) son puntos de partida: déjalos en una tabla 
 
 ## Fuera de la fase 1
 
-Varias versiones a la vez (escala × formato × sufijo), seguir en segundo plano, CMYK, PDF/X, presets iOS/Android.
+Seguir en segundo plano, CMYK, PDF/X.
+
+## Fases 2 y 3 (2026-11-08)
+
+Hecho en `task/export`; motor en `exportSettings.ts`/`exportJob.ts`, campos en `ExportOptions.tsx`/`ExportFields.tsx`.
+
+- **Panel con controles propios** (sin `<select>`; test lo comprueba): menú de formato con icono y propósito, escala (deslizador) o ancho/lado largo en px, calidad Compress/High/Limit size, fondo transparente visible, solo los campos que aplican, vista previa con pie, contorno de página (y de corte con sangrado) en PDF de papel.
+- **Varias salidas**: `settings.outputs` = filas `{scale, suffix, format}`; Logo/brand, iOS y Android son listas de filas de serie. Más de un archivo → un ZIP todo o nada. Nombres repetidos se numeran (`-2`).
+- **Presets**: iOS, Android, Print shop; los propios guardan filas y se borran con confirmación en línea.
+- **Qué exportar**: Canvas, Drawing only (recorte al contenido), Selected objects (unión con trazo y desenfoque; solo esos objetos), Pixel selection, Layer. Prefijo de nombre.
+- **SVG**: decimales, minificar, título; sin fuentes incrustadas (el motor no las tiene) y el panel lo avisa.
+- **Imprenta (fase 3)**: PDF con papel = tamaño final, sangrado configurable (3 mm), arte escalado para cubrirlo y recortado ahí, marcas de corte en un margen extra de 5 mm. Las capas ráster se incrustan con sus píxeles nativos; no hay remuestreo a 300 ppp.
+- **Carpeta (fase 3)**: con `showDirectoryPicker` (Chromium) se elige carpeta y «Subfolders by format»; sin API sigue la descarga. No sobrescribe: añade `-2`.
 
 ## Pruebas (vitest; solo las afectadas mientras trabajas, `npm test` una vez al entregar)
 

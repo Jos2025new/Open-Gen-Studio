@@ -18,7 +18,6 @@
   gap: var(--sp-1);
   color: var(--text-2);
 }
-.design-export select,
 .design-export label:not(.opt) > input {
   inline-size: 100%;
   min-inline-size: 0;
@@ -61,3 +60,40 @@
   flex-wrap: wrap;
   gap: var(--sp-2);
 }
+.design-export-fields,
+.design-export-outputs,
+.design-export-actions,
+.design-export-folder { display: grid; gap: var(--sp-2); }
+.design-export-output {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto auto;
+  gap: var(--sp-1);
+  align-items: center;
+}
+.design-export-output > input,
+.design-export-row input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 2rem;
+  padding-inline: var(--sp-2);
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field-bg);
+  color: var(--text);
+}
+.design-export-remove {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 0;
+  border-radius: var(--field-radius);
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.design-export-remove:disabled { opacity: .35; cursor: default; }
+.design-export-figure { display: grid; gap: var(--sp-1); margin: 0; justify-items: center; }
+.design-export-frame { position: relative; display: inline-block; max-inline-size: 100%; line-height: 0; }
+.design-export-frame .design-export-preview { inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: 12rem; }
+.design-export-trim { position: absolute; border: 1px dashed var(--accent, currentColor); pointer-events: none; }

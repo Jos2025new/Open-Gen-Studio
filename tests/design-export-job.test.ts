@@ -4,9 +4,10 @@ import { svg2pdf } from 'svg2pdf.js';
 import { unzipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
+import { writeFilesToFolder, type FolderHandle } from '../src/engine/design/exportFolder';
 import { currentExportTarget, deliverDesignExport, resolveExportTarget } from '../src/engine/design/exportDesign';
 import { exportDownloadFile, exportGeometry, exportPlan, exportPreview, validateExport } from '../src/engine/design/exportJob';
-import { BUILTIN_EXPORTS, DEFAULT_EXPORT, type ExportSettings } from '../src/engine/design/exportSettings';
+import { BUILTIN_EXPORTS, DEFAULT_EXPORT, row, type ExportSettings } from '../src/engine/design/exportSettings';
 import { setSelection } from '../src/engine/design/pixelSelection';
 import type { SvgDeps } from '../src/engine/design/export';
 
@@ -151,7 +152,7 @@ describe('presets and delivery', () => {
     const entries = unzipSync(new Uint8Array(await zip.bytes.arrayBuffer()));
     expect(Object.keys(entries)).toEqual(['My-design.svg', 'My-design.png', 'My-design@2x.png']);
     for (const file of files) expect(entries[file.name]).toEqual(new Uint8Array(await file.bytes.arrayBuffer()));
-    await expect(exportDownloadFile(design.name, [files[0], files[0]])).rejects.toThrow('duplicate filenames');
+    expect((await exportDownloadFile(design.name, [files[0], files[0]])).name).toBe('My-design.zip');
   });
 
   it('stops the bundle on a failed or cancelled output', async () => {
@@ -238,5 +239,76 @@ describe('vector exports and remembered targets', () => {
     expect(() => validateExport(design, selection, resolveExportTarget(design, remembered))).toThrow('select an area');
     expect(design.lastExport).toBeUndefined();
     expect(() => validateExport(design, DEFAULT_EXPORT, {})).not.toThrow();
+  });
+});
+
+describe('rows, areas, options and print', () => {
+  const names = async (preset: string) => (await exportPlan(design, settings(preset), {}, layout)).map((f) => f.name);
+  const sizes = () => encodes.map(({ width, height }) => `${width}x${height}`);
+
+  it('builds brand, iOS and Android files from rows', async () => {
+    expect(await names('brand')).toEqual(['My-design.svg', 'My-design.png', 'My-design@2x.png']);
+    expect(await names('ios')).toEqual(['My-design.png', 'My-design@2x.png', 'My-design@3x.png']);
+    encodes.length = 0;
+    expect(await names('android')).toEqual(['ldpi', 'mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'].map((d) => `My-design-${d}.png`));
+    expect(sizes()).toEqual(['90x60', '120x80', '180x120', '240x160', '360x240', '480x320']);
+  });
+
+  it('numbers repeated names instead of failing, and adds the prefix', async () => {
+    const dup = { ...DEFAULT_EXPORT, prefix: 'app_', outputs: [row(1, 'png'), row(1, 'png'), row(1, 'png', '@x')] };
+    expect((await exportPlan(design, dup, {}, layout)).map((f) => f.name)).toEqual(['app_My-design.png', 'app_My-design-2.png', 'app_My-design@x.png']);
+  });
+
+  it('exports selected objects (incl. stroke reach) and drawing-only bounds', () => {
+    const second = newVectorLayer('Outlined', [{ type: 'rect', x: 60, y: 40, w: 10, h: 10, radius: 0, fill: null, stroke: '#000000', strokeWidth: 4 }]);
+    const doc = { ...design, layers: [rect, second] };
+    const only = exportGeometry(doc, { ...DEFAULT_EXPORT, area: 'objects' }, { objects: [{ layerId: second.id, ids: [second.shapes[0].id] }] });
+    expect(only.box.x).toBeLessThan(59);
+    expect(only.box.x).toBeGreaterThan(54);
+    expect(only.box.w).toBeGreaterThanOrEqual(14);
+    expect(only.doc.layers).toHaveLength(1);
+    const both = exportGeometry(doc, { ...DEFAULT_EXPORT, area: 'objects' }, { objects: [{ layerId: second.id, ids: [second.shapes[0].id] }, { layerId: rect.id, ids: [rect.shapes[0].id] }] });
+    expect(both.box.x).toBe(10);
+    expect(both.box.x + both.box.w).toBeGreaterThanOrEqual(72);
+    expect(() => exportGeometry(doc, { ...DEFAULT_EXPORT, area: 'objects' }, {})).toThrow('No picked objects');
+    expect(exportGeometry(design, { ...DEFAULT_EXPORT, area: 'content' }, {})).toMatchObject({ width: 20, height: 10, box: { x: 10, y: 8, w: 20, h: 10 } });
+  });
+
+  it('rounds, minifies and drops the title in SVG', async () => {
+    const odd = { ...design, layers: [newVectorLayer('Odd', [{ type: 'rect', x: 10.123456, y: 8, w: 20, h: 10, radius: 0, fill: '#ff0000', stroke: null, strokeWidth: 0 }])] };
+    const svg = async (options: ExportSettings['svg']) => (await exportPlan(odd, { ...DEFAULT_EXPORT, format: 'svg', svg: options }, {}, layout))[0].bytes.text();
+    expect(await svg({})).toContain('10.123');
+    const small = await svg({ decimals: 1, minify: true, metadata: false });
+    expect(small).toContain('x="10.1"');
+    expect(small).not.toMatch(/\n|inkscape:|<title>/);
+  });
+
+  it('makes a print PDF of trim + bleed, with room for crop marks', async () => {
+    const mm = async (print: ExportSettings['print']) => {
+      const [file] = await exportPlan(design, { ...settings('print-shop'), print }, {}, layout);
+      const [, w, h] = /\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/.exec(await file.bytes.text()) ?? [];
+      return [Number(w) * 25.4 / 72, Number(h) * 25.4 / 72];
+    };
+    const [w, h] = await mm({ bleedMm: 3, marks: false });
+    expect([w, h].map((v) => Math.round(v * 10) / 10)).toEqual([216, 303]);
+    const [mw, mh] = await mm({ bleedMm: 3, marks: true });
+    expect([mw, mh].map((v) => Math.round(v * 10) / 10)).toEqual([226, 313]);
+  });
+
+  it('writes into a chosen folder, optionally by format, without overwriting', async () => {
+    const tree = new Map<string, string[]>();
+    const handle = (path: string): FolderHandle => ({
+      name: path || 'root',
+      getDirectoryHandle: async (name) => handle(`${path}${name}/`),
+      getFileHandle: async (name, options) => {
+        const list = tree.get(path) ?? [];
+        if (!list.includes(name)) { if (!options?.create) throw new Error('missing'); tree.set(path, [...list, name]); }
+        return { createWritable: async () => ({ write: async () => undefined, close: async () => undefined }) };
+      },
+    });
+    const files = await exportPlan(design, settings('brand'), {}, layout);
+    expect(await writeFilesToFolder(handle(''), files, true)).toEqual(['svg/My-design.svg', 'png/My-design.png', 'png/My-design@2x.png']);
+    expect(await writeFilesToFolder(handle(''), files.slice(1, 2), false)).toEqual(['My-design.png']);
+    expect((await writeFilesToFolder(handle(''), files.slice(1, 2), true))[0]).toBe('png/My-design-2.png');
   });
 });

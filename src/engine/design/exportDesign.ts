@@ -5,6 +5,7 @@ import type { DesignDoc } from '../types';
 import { ExportError, exportError } from './exportErrors';
 import { exportPlan, exportPreview, type ExportFile, type ExportTarget } from './exportJob';
 import type { ExportSettings, RememberedExport } from './exportSettings';
+import { objectPicks } from './objectSelection';
 import { getSelection, type PixelSelection } from './pixelSelection';
 import { ensureBuffers, getBuffer, isUnreadable, rasterBufferIds } from './raster';
 import { layoutText, textAscent } from './render';
@@ -13,6 +14,7 @@ const selectionKeys = new WeakMap<PixelSelection, string>();
 
 export function currentExportTarget(doc: DesignDoc, settings: ExportSettings): string | undefined {
   if (settings.area === 'layer') return doc.activeLayerId ?? undefined;
+  if (settings.area === 'objects') return objectPicks(doc.id).length ? JSON.stringify(objectPicks(doc.id)) : undefined;
   if (settings.area !== 'selection') return;
   const selection = getSelection(doc.id);
   if (!selection) return;
@@ -25,8 +27,9 @@ export function currentExportTarget(doc: DesignDoc, settings: ExportSettings): s
 }
 
 export function resolveExportTarget(doc: DesignDoc, { settings, target }: RememberedExport): ExportTarget {
-  if (settings.area === 'canvas') return {};
+  if (settings.area === 'canvas' || settings.area === 'content') return {};
   if (settings.area === 'layer') return { layerId: target };
+  if (settings.area === 'objects') return target && target === currentExportTarget(doc, settings) ? { objects: objectPicks(doc.id) } : {};
   return { selection: target && target === currentExportTarget(doc, settings) ? getSelection(doc.id) ?? undefined : undefined };
 }
 
@@ -52,7 +55,7 @@ export async function prepareDesignPreview(doc: DesignDoc, settings: ExportSetti
 export async function prepareDesignExport(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, filename = doc.name) {
   await loadExportLayers(doc, target, signal);
   const notices = new Set<string>();
-  if (settings.area === 'selection' && (settings.format === 'svg' || settings.format === 'pdf' || settings.preset === 'brand')) {
+  if (settings.area === 'selection' && (settings.format === 'svg' || settings.format === 'pdf' || settings.outputs?.some((r) => r.format === 'svg' || r.format === 'pdf'))) {
     notices.add('SVG and PDF use an embedded image for a pixel selection.');
   }
   const files = await exportPlan(doc, settings, target, {

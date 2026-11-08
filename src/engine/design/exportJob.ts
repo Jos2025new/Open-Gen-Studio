@@ -1,12 +1,13 @@
 import { zip } from 'fflate';
 import { blobToDataUrl } from '../../lib/media';
 import { fxTarget } from '../fx/plan';
-import type { DesignDoc } from '../types';
+import type { DesignDoc, Layer } from '../types';
 import { unionBox, type Box } from './doc';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
 import { checkRasterExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
-import { DEFAULT_JPEG_QUALITY, paperLayout, pdfPage, type ExportSettings } from './exportSettings';
+import { autoSuffix, DEFAULT_JPEG_QUALITY, pageLayout, pdfPage, type ExportSettings } from './exportSettings';
+import type { ObjectPick } from './objectSelection';
 import { selectionBox, selectionPath, type PixelSelection } from './pixelSelection';
 import { layerBox } from './render';
 import { blurRegion } from './shapeLook';
@@ -14,6 +15,8 @@ import { blurRegion } from './shapeLook';
 export interface ExportTarget {
   layerId?: string;
   selection?: PixelSelection;
+  /** Picked objects, possibly in several layers. */
+  objects?: ObjectPick[];
 }
 
 export interface ExportFile {
@@ -32,17 +35,54 @@ function exportArea(doc: DesignDoc, settings: ExportSettings, target: ExportTarg
     if (!box) throw new ExportError('The pixel selection is missing, so select an area or choose Canvas.');
     return { doc, box };
   }
+  if (settings.area === 'content') {
+    const bounds = unionBox(doc.layers.filter((l) => l.visible && l.type !== 'fx').map(layerExtent).filter((b): b is Box => !!b));
+    const box = bounds && clampBox(bounds, page);
+    if (!box) throw new ExportError('The drawing has no content, so choose Canvas.');
+    return { doc, box };
+  }
+  if (settings.area === 'objects') return objectsArea(doc, target.objects, page);
   const layer = doc.layers.find((l) => l.id === target.layerId && l.visible && l.type !== 'fx');
   if (!layer) throw new ExportError('The layer is unavailable, so choose a visible layer.');
+  const extent = layerExtent(layer);
+  const box = extent && clampBox(extent, page);
+  if (!box) throw new ExportError('The layer has no area on the canvas, so choose another layer.');
+  return { doc: onlyLayers(doc, new Map([[layer.id, layer]])), box };
+}
+
+/** Where a layer shows: its geometry plus the reach of strokes and blur. */
+function layerExtent(layer: Layer): Box | null {
   const geometry = layerBox(layer);
   const paintExtents = layer.type === 'vector' && !layer.pixelMask
     ? layer.shapes.filter((shape) => shape.blur || (shape.strokeWidth > 0 && (shape.stroke || shape.strokeGradient))).map(blurRegion)
     : [];
-  const bounds = unionBox(geometry ? [geometry, ...paintExtents] : paintExtents);
+  return unionBox(geometry ? [geometry, ...paintExtents] : paintExtents);
+}
+
+/** Only these layers (and the FX acting on them), without the page background. */
+function onlyLayers(doc: DesignDoc, keep: Map<string, Layer>): DesignDoc {
+  const layers = doc.layers.flatMap((l) => {
+    if (keep.has(l.id)) return [keep.get(l.id)!];
+    const target = l.type === 'fx' ? fxTarget(doc.layers, l.id) : undefined;
+    return target && keep.has(target.id) ? [l] : [];
+  });
+  return { ...doc, layers, background: null };
+}
+
+function objectsArea(doc: DesignDoc, picks: ObjectPick[] | undefined, page: Box) {
+  const keep = new Map<string, Layer>();
+  for (const pick of picks ?? []) {
+    const layer = doc.layers.find((l) => l.id === pick.layerId && l.visible && l.type !== 'fx');
+    if (!layer) continue;
+    const ids = new Set(pick.ids);
+    keep.set(layer.id, layer.type === 'vector'
+      ? { ...layer, shapes: layer.shapes.filter((s) => ids.has(s.id)), strokes: layer.strokes?.filter((s) => ids.has(s.id)) }
+      : layer);
+  }
+  const bounds = unionBox([...keep.values()].map(layerExtent).filter((b): b is Box => !!b));
   const box = bounds && clampBox(bounds, page);
-  if (!box) throw new ExportError('The layer has no area on the canvas, so choose another layer.');
-  const layers = doc.layers.filter((l) => l === layer || (l.type === 'fx' && fxTarget(doc.layers, l.id) === layer));
-  return { doc: { ...doc, layers, background: null }, box };
+  if (!box) throw new ExportError('No picked objects are on the canvas, so pick objects (Edit tool) or choose Canvas.');
+  return { doc: onlyLayers(doc, keep), box };
 }
 
 function clampBox(box: Box, page: Box): Box | null {
@@ -71,13 +111,9 @@ export function exportGeometry(doc: DesignDoc, settings: ExportSettings, target:
     offsetY: fit ? (fittedHeight - box.h * fittedScale) / 2 : 0 };
 }
 
-function exportOutputs(settings: ExportSettings) {
-  if (settings.preset !== 'brand') return [settings];
-  return [
-    { ...settings, size: 1, format: 'svg' },
-    { ...settings, size: 1, format: 'png' },
-    { ...settings, size: 2, format: 'png' },
-  ] satisfies ExportSettings[];
+function exportOutputs(settings: ExportSettings): ExportSettings[] {
+  if (!settings.outputs?.length) return [settings];
+  return settings.outputs.map((r) => ({ ...settings, outputs: undefined, size: r.scale, format: r.format, suffix: r.suffix }));
 }
 
 export function validateExport(doc: DesignDoc, settings: ExportSettings, target: ExportTarget) {
@@ -98,6 +134,20 @@ function fileBase(name: string): string {
   return name.trim().replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 120) || 'design';
 }
 
+const filePrefix = (prefix = '') => prefix.trim().replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 40);
+
+/** Names that repeat get -2, -3 … so the user never meets a duplicate-name error. */
+function uniqueNames(files: ExportFile[]): ExportFile[] {
+  const seen = new Set<string>();
+  return files.map((file) => {
+    const dot = file.name.lastIndexOf('.');
+    let name = file.name;
+    for (let i = 2; seen.has(name.toLowerCase()); i++) name = `${file.name.slice(0, dot)}-${i}${file.name.slice(dot)}`;
+    seen.add(name.toLowerCase());
+    return name === file.name ? file : { ...file, name };
+  });
+}
+
 function rasterLayout(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal) {
   const geometry = exportGeometry(doc, settings, target);
   const background = settings.background === undefined ? geometry.doc.background : settings.background;
@@ -116,14 +166,21 @@ function rasterLayout(doc: DesignDoc, settings: ExportSettings, target: ExportTa
 
 /** One small raster frame, with the same crop, paper fit and background as the selected output. */
 export async function exportPreview(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal): Promise<Blob> {
-  const output = settings.preset === 'brand' ? { ...settings, size: 1, format: 'png' } as const : settings;
+  const output = exportOutputs(settings)[0];
   const { renderDoc, options } = rasterLayout(doc, output, target, signal);
   const paper = output.format === 'pdf' ? pdfPage(output.pdf) : undefined;
-  const layout = paper && paperLayout(paper, options.width, options.height);
+  const layout = paper && pageLayout(paper, options.width, options.height, output.print);
   const width = layout?.pageWidth ?? options.width, height = layout?.pageHeight ?? options.height;
   const shrink = Math.min(1, PREVIEW_MAX_SIDE / Math.max(width, height));
+  const bleedClip = layout?.trim && ((ctx: CanvasRenderingContext2D) => {
+    const { box } = options;
+    ctx.beginPath();
+    ctx.rect(box.x + (layout.trim!.x - layout.bleed - layout.x) / layout.scale / options.scale, box.y + (layout.trim!.y - layout.bleed - layout.y) / layout.scale / options.scale,
+      (layout.trim!.w + 2 * layout.bleed) / layout.scale / options.scale, (layout.trim!.h + 2 * layout.bleed) / layout.scale / options.scale);
+    ctx.clip();
+  });
   return exportDoc(renderDoc, 'image/png', {
-    ...options, preview: true, whiteBase: output.format === 'jpg',
+    ...options, clip: bleedClip || options.clip, preview: true, whiteBase: output.format === 'jpg',
     width: Math.max(1, Math.round(width * shrink)), height: Math.max(1, Math.round(height * shrink)),
     scale: options.scale * (layout?.scale ?? 1) * shrink,
     offsetX: ((layout?.x ?? 0) + (options.offsetX ?? 0) * (layout?.scale ?? 1)) * shrink,
@@ -144,13 +201,13 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     });
   } else {
     // Pixel selections can have arbitrary alpha. Preserve their exact shape in SVG and PDF as an embedded image.
-    const svg = selection ? await maskedSvg(renderDoc, options) : await docToSvg(renderDoc, deps, options);
+    const svg = selection ? await maskedSvg(renderDoc, options) : await docToSvg(renderDoc, deps, options, settings.svg);
     signal?.throwIfAborted();
-    bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, pdfPage(settings.pdf)) : new Blob([svg], { type: 'image/svg+xml' });
+    bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, pdfPage(settings.pdf), settings.print) : new Blob([svg], { type: 'image/svg+xml' });
   }
   signal?.throwIfAborted();
   const extension = bytes.type === 'image/jpeg' ? 'jpg' : format;
-  const suffix = typeof settings.size === 'number' && settings.size > 1 ? `@${settings.size}x` : '';
+  const suffix = settings.suffix ?? (typeof settings.size === 'number' ? autoSuffix(settings.size) : '');
   return { name: `${base}${suffix}.${extension}`, mime: bytes.type, bytes };
 }
 
@@ -167,7 +224,7 @@ export async function exportPlan(doc: DesignDoc, settings: ExportSettings, targe
   } catch (error) {
     throw exportError(error, 'The export settings could not be checked, so reopen the design or choose another area.');
   }
-  const base = fileBase(filename);
+  const base = filePrefix(settings.prefix) + fileBase(filename);
   const outputs = exportOutputs(settings);
   const files: ExportFile[] = [];
   for (const output of outputs) {
@@ -182,13 +239,13 @@ export async function exportPlan(doc: DesignDoc, settings: ExportSettings, targe
       throw exportError(error, `Could not prepare ${output.format.toUpperCase()}, so try a smaller size or another format.`);
     }
   }
-  return files;
+  return uniqueNames(files);
 }
 
 export async function exportDownloadFile(filename: string, files: ExportFile[], signal?: AbortSignal): Promise<ExportFile> {
   signal?.throwIfAborted();
   if (files.length === 1) return files[0];
-  if (new Set(files.map((file) => file.name)).size !== files.length) throw new ExportError('The ZIP contains duplicate filenames, so choose a different preset or format.');
+  files = uniqueNames(files);
   try {
     const entries = await Promise.all(files.map(async (file) => [file.name, new Uint8Array(await file.bytes.arrayBuffer())] as const));
     signal?.throwIfAborted();

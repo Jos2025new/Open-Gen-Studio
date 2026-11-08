@@ -1,4 +1,4 @@
-import { paperLayout, type PdfPage } from './exportSettings';
+import { MARK_SLUG_MM, PX_PER_MM, pageLayout, type PdfPage, type PrintOptions, type SvgOptions } from './exportSettings';
 import { pathTransform } from './path';
 import { markerSvg } from './markers';
 import { gradientSvg } from './gradientPaint';
@@ -24,6 +24,7 @@ import type { FxLayer } from '../fx/types';
  */
 
 export type { ExportFormat } from './exportSettings';
+
 
 export interface SvgDeps {
   /** Data URL of a raster layer's pixels (as displayed). Null when they could not be read (an empty layer still has a
@@ -139,7 +140,25 @@ export interface SvgViewport {
   box: { x: number; y: number; w: number; h: number };
 }
 
-export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport): Promise<string> {
+/** Round every number with decimals inside attribute values (embedded images are left alone). */
+export function roundSvgNumbers(svg: string, decimals: number): string {
+  return svg.replace(/(\s[\w:-]+=")([^"]*)(")/g, (all, open: string, value: string, close: string) =>
+    value.startsWith('data:') ? all : open + value.replace(/-?\d*\.\d+/g, (num) => String(+(+num).toFixed(decimals))) + close);
+}
+
+/** Smaller file: no editor-only attributes or namespaces, no whitespace between tags. */
+export function minifySvg(svg: string): string {
+  return svg.replace(/ (?:inkscape|sodipodi):[\w-]+="[^"]*"/g, '').replace(/ xmlns:(?:inkscape|sodipodi)="[^"]*"/g, '')
+    .replace(/>\s+</g, '><').replace(/\n/g, '');
+}
+
+export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport, options: SvgOptions = {}): Promise<string> {
+  let svg = await buildSvg(doc, deps, viewport, options.metadata !== false);
+  if (options.decimals !== undefined) svg = roundSvgNumbers(svg, Math.max(0, Math.min(6, Math.round(options.decimals))));
+  return options.minify ? minifySvg(svg) : svg;
+}
+
+async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | undefined, title: boolean): Promise<string> {
   const { width, height, box } = viewport ?? { width: doc.width, height: doc.height, box: { x: 0, y: 0, w: doc.width, h: doc.height } };
   const body: string[] = [], defs: string[] = [], skipped = new Set<string>(), unread: string[] = [];
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
@@ -195,7 +214,7 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgView
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="${width}" height="${height}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}">`,
-    `<title>${xmlEscape(doc.name)}</title>`,
+    ...(title ? [`<title>${xmlEscape(doc.name)}</title>`] : []),
     // Content outside the page is cut, as in the editor.
     `<defs><clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath>${defs.join('')}</defs>`,
     `<g clip-path="url(#page)">${body.join('')}</g>`,
@@ -207,13 +226,13 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgView
  * PDF from the same SVG (jsPDF + svg2pdf.js, loaded only when used). Shapes and images stay vector/embedded;
  * text uses the PDF standard fonts unless the family is embedded, so it may not match the design fonts.
  */
-export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage): Promise<Blob> {
+export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage, print?: PrintOptions): Promise<Blob> {
   const [{ jsPDF }, { svg2pdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const el = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
-  const layout = page ? paperLayout(page, width, height) : undefined;
+  const layout = page ? pageLayout(page, width, height, print) : undefined;
   const pdf = new jsPDF({
     unit: 'px', format: layout ? [layout.pageWidth, layout.pageHeight] : [width, height],
-    orientation: page?.orientation ?? (width >= height ? 'landscape' : 'portrait'), hotfixes: ['px_scaling'],
+    orientation: layout ? (layout.pageWidth >= layout.pageHeight ? 'landscape' : 'portrait') : width >= height ? 'landscape' : 'portrait', hotfixes: ['px_scaling'],
   });
   // svg2pdf reads computed styles: the SVG must be in the document while it converts.
   const host = document.createElement('div');
@@ -221,9 +240,33 @@ export async function svgToPdf(svg: string, width: number, height: number, page?
   host.appendChild(el);
   document.body.appendChild(host);
   try {
+    const { trim } = layout ?? {};
+    if (layout && trim) {
+      // Artwork covers trim + bleed and is cut there, so nothing spills into the mark area.
+      pdf.saveGraphicsState();
+      pdf.rect(trim.x - layout.bleed, trim.y - layout.bleed, trim.w + 2 * layout.bleed, trim.h + 2 * layout.bleed, null);
+      pdf.clip();
+      pdf.discardPath();
+    }
     await svg2pdf(el, pdf, layout ?? { x: 0, y: 0, width, height });
+    if (layout && trim) {
+      pdf.restoreGraphicsState();
+      if (layout.marks) cropMarks(pdf, trim, layout.bleed);
+    }
   } finally {
     host.remove();
   }
   return pdf.output('blob');
+}
+
+/** Thin registration-black lines at the trim corners, starting beyond the bleed so they never print on the artwork. */
+function cropMarks(pdf: { setDrawColor(c: number): void; setLineWidth(w: number): void; line(a: number, b: number, c: number, d: number): void }, trim: { x: number; y: number; w: number; h: number }, bleed: number) {
+  const gap = bleed + 0.5 * PX_PER_MM, len = (MARK_SLUG_MM - 0.5) * PX_PER_MM;
+  pdf.setDrawColor(0);
+  pdf.setLineWidth(0.33);
+  for (const x of [trim.x, trim.x + trim.w]) for (const [y, dir] of [[trim.y, -1], [trim.y + trim.h, 1]] as const) {
+    const out = x === trim.x ? -1 : 1;
+    pdf.line(x, y + dir * gap, x, y + dir * (gap + len));
+    pdf.line(x + out * gap, y, x + out * (gap + len), y);
+  }
 }

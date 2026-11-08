@@ -21,7 +21,7 @@ export const DESIGNER_TOOLS: ToolSpec[] = [
         properties: {
           format: { type: 'string', enum: EXPORT_FORMATS },
           preset: { type: 'string', enum: BUILTIN_EXPORTS.map((preset) => preset.id) },
-          area: { type: 'string', enum: ['canvas', 'selection', 'layer'], description: 'Selection means the current pixel selection.' },
+          area: { type: 'string', enum: ['canvas', 'content', 'objects', 'selection', 'layer'], description: 'Content trims the canvas to the drawing; objects are the currently picked objects; selection is the current pixel selection.' },
           layer_id: { type: 'string', description: 'For a layer export, use its id or omit for the active layer.' },
         },
       },
@@ -96,7 +96,7 @@ export const designerFxSchema = z.object({ commands: z.array(commandSchema).min(
 export const exportDesignSchema = z.object({
   format: z.enum(EXPORT_FORMATS).optional(),
   preset: z.enum(BUILTIN_EXPORTS.map((option) => option.id)).optional(),
-  area: z.enum(['canvas', 'selection', 'layer']).optional(),
+  area: z.enum(['canvas', 'content', 'objects', 'selection', 'layer']).optional(),
   layer_id: z.string().min(1).max(80).optional(),
 }).strict().refine(({ layer_id, area }) => !layer_id || area === 'layer', 'Use layer_id only for a layer export.')
   .refine(({ format, preset }) => !preset || !format, 'Choose one available preset or a format.');
