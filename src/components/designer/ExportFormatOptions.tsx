@@ -30,10 +30,11 @@ function options(settings: ExportSettings, baseline: ExportSettings, patch: Patc
     { key: 'pdf-page', label: 'PDF page', group: 'PDF', applies: pdf,
       node: <InlineSelect label="PDF page" value={pdfMode} options={[{ value: 'screen', label: 'Screen' }, { value: 'paper', label: 'Paper' }, { value: 'print', label: 'Print shop' }]}
         onChange={(m) => patch({ pdf: m === 'screen' ? 'screen' : page ?? DEFAULT_PDF_PAGE, print: m === 'print' ? { bleedMm: 3, marks: false } : undefined })} /> },
-    { key: 'paper', label: 'Paper', group: 'PDF', applies: !!page, contextual: true, node: page && <>
-      <InlineSelect label="Paper" value={page.paper} options={Object.entries(PDF_PAPERS).map(([paper, { label }]) => ({ value: paper as PdfPaper, label }))} onChange={(paper) => patch({ pdf: { ...page, paper } })} />
+    { key: 'paper', label: 'Paper', group: 'PDF', applies: !!page, contextual: true, node: page &&
+      <InlineSelect label="Paper" value={page.paper} options={Object.entries(PDF_PAPERS).map(([paper, { label }]) => ({ value: paper as PdfPaper, label }))} onChange={(paper) => patch({ pdf: { ...page, paper } })} /> },
+    { key: 'orientation', label: 'Orientation', group: 'PDF', applies: !!page, contextual: true, node: page &&
       <InlineChoice label="Orientation" value={page.orientation} options={[{ value: 'portrait', label: 'Portrait', render: portrait }, { value: 'landscape', label: 'Landscape', render: <RectangleHorizontal size={14} /> }] as { value: PdfPage['orientation']; label: string; render: ReactNode }[]}
-        onChange={(orientation) => patch({ pdf: { ...page, orientation } })} /></> },
+        onChange={(orientation) => patch({ pdf: { ...page, orientation } })} /> },
     { key: 'print', label: 'Bleed', group: 'PDF', applies: !!settings.print, contextual: true, node: settings.print && <>
       <InlineSlider label="Bleed" value={settings.print.bleedMm} min={0} max={10} step={0.5} unit="mm" onChange={(bleedMm) => patch({ print: { ...settings.print!, bleedMm } })} />
       <InlineToggle label="Crop marks" checked={settings.print.marks} onChange={(marks) => patch({ print: { ...settings.print!, marks } })} /></> },

@@ -3,6 +3,8 @@
  * by the same `.sidebar-tool-settings .tool-settings` and `.brush-row` rules as the Tool panel, so this file only
  * holds what those do not: the panel frame, the summary (thumbnail and facts), the text field and the footer.
  */
+/* The panel sits on the same surface as the Tool panel, so its fields read as fields (field-bg on surface). */
+.popover:has(.design-export), .design-export-pop { background: var(--surface); }
 .design-export { display: flex; flex-direction: column; max-block-size: min(40rem, calc(100vh - 5rem)); }
 .design-export-scroll { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
 .design-export-body { min-inline-size: 0; margin: 0; border: 0; }
@@ -18,7 +20,7 @@
 
 /* A short text as one field: the name on the left, the text on the right. */
 .opt-text { cursor: text; }
-.opt-text > input { flex: 1 1 auto; min-inline-size: 0; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: right; outline: none; }
+.opt.opt-text > input:not([type=range]):not([type=checkbox]) { flex: 1 1 auto; min-inline-size: 0; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: right; outline: none; }
 
 /* Summary: a small thumbnail of the page beside what will be written. */
 .design-export-summary { flex: 1 1 100%; display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.625rem; align-items: center; }
