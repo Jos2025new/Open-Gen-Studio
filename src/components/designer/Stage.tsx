@@ -258,7 +258,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     return layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
   };
   const targetsBox = (ts: Array<{ layer: Layer; ids: string[] | null }>) => unionBox(ts.map((t) => (t.ids ? objectsBox(t.layer, t.ids) : layerBox(t.layer))).filter((b): b is NonNullable<typeof b> => Boolean(b)));
-  const targets = tool === 'move' && !editingText ? xformTargets(doc) : [];
+  // Clicking empty canvas shows nothing selected (as in Inkscape), though the layer stays active for painting.
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  const nothingPicked = !objPick?.length && !pickedLayers(doc.id, doc.layers.map((l) => l.id)).length;
+  const dismissed = nothingPicked && dismissedFor != null && dismissedFor === doc.activeLayerId;
+  const targets = tool === 'move' && !editingText && !dismissed ? xformTargets(doc) : [];
   const tBox = targets.length ? targetsBox(targets) : null;
   const targetSig = targets.map((t) => `${t.layer.id}:${t.ids?.join(',') ?? '*'}`).join('|');
   // A new selection starts with the scale handles and its own center.
@@ -403,7 +407,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (active && active.visible && !editingText && drag.current?.kind !== 'xform') {
       const objectsMode = tool === 'move' && !editLayers && !shiftDown;
       const objects = objectsMode ? layerObjects(active) : [];
-      if (objectsMode && objects.length) {
+      if (objectsMode && objects.length && !dismissed) {
         // Objects mode: every object of the active layer faintly, the picked ones in the accent; no layer handles.
         const ids = pickedIn(objPick, active.id);
         ctx.save();
@@ -423,7 +427,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         ctx.restore();
       } else {
         const b = layerBox(active);
-        if (b && !framed) {
+        if (b && !framed && !dismissed) {
           ctx.strokeStyle = accentA();
           ctx.lineWidth = 1;
           ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
@@ -464,9 +468,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         ctx.strokeStyle = accentA();
         ctx.beginPath();
         if (h.op !== 'pivot') { drawArrowHandle(ctx, h, hx, hy); continue; }
-        if (h.op === 'scale') ctx.rect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE);
-        else { ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.moveTo(hx - 9, hy); ctx.lineTo(hx + 9, hy); ctx.moveTo(hx, hy - 9); ctx.lineTo(hx, hy + 9); }
-        if (h.op !== 'pivot') { ctx.fill(); ctx.strokeStyle = '#ececef'; ctx.stroke(); continue; }
+        ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.moveTo(hx - 9, hy); ctx.lineTo(hx + 9, hy); ctx.moveTo(hx, hy - 9); ctx.lineTo(hx, hy + 9);
         ctx.strokeStyle = '#0a0a0b'; ctx.lineWidth = 3; ctx.stroke();
         ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
       }
@@ -539,7 +541,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       ctx.stroke(path);
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, editMarquee, rulers, guidesShown, guidesLocked, guidePreview, paintFrame, targetSig, handleMode, pivot, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, editMarquee, rulers, guidesShown, guidesLocked, guidePreview, paintFrame, targetSig, dismissed, handleMode, pivot, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -638,6 +640,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         }
       }
       setSelectedCurve(null);
+      setDismissedFor(null);
 
       const marquee = beginEditMarquee({ doc: current, point: p, layersMode: editLayers, shift: e.shiftKey, alt: e.altKey, autoSelect: useStore.getState().ui.autoSelect ?? false });
       if (marquee) {
@@ -702,12 +705,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         // Plain click on empty canvas clears both stores; a hit replaces a different layer group.
         if (!whole) {
           setLayerPicks(doc.id, []);
+          setDismissedFor(current.activeLayerId);
           return;
         }
         const pickedNow = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
         if (!pickedNow.includes(whole.id)) pickLayer(doc.id, whole.id, false, pickedNow);
         if (whole && !layerObjects(whole).length && whole.type !== 'vector') {
-          const again = current.activeLayerId === whole.id;
+          const again = current.activeLayerId === whole.id && !dismissed; // After an empty click it is a new selection, not a second click.
           setActiveLayer(sessionId, doc.id, whole.id);
           if (!whole.locked) {
             // One of several picked layers: they all move together (as in Inkscape).
@@ -746,7 +750,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
             return;
           }
           if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
-            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: otherPickedLayers(current, act.id), again: true, pre: current };
+            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: otherPickedLayers(current, act.id), again: !dismissed, pre: current };
             return;
           }
         }
@@ -757,7 +761,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (!hit || !sel.includes(hit.id)) pickLayer(doc.id, hit?.id ?? '', false, sel);
       setActiveLayer(sessionId, doc.id, hit?.id ?? null);
       if (hit && !hit.locked) {
-        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(current, hit.id), pre: current, again: sel.includes(hit.id) };
+        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(current, hit.id), pre: current, again: sel.includes(hit.id) && !dismissed };
       }
       return;
     }
@@ -1067,6 +1071,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (d.kind === 'editMarquee') {
       setEditMarquee(null);
       finishEditMarquee({ drag: d, sessionId, doc, zoom: view.zoom, release: e ? toDoc(e.clientX, e.clientY) : undefined, cancelled: e?.type === 'pointercancel' });
+      const after = getDoc(sessionId, doc.id) ?? doc;
+      if (!objectPicks(doc.id).length && !pickedLayers(doc.id, after.layers.map((l) => l.id)).length) setDismissedFor(after.activeLayerId);
       return;
     }
     if (d.kind === 'pixelMove') { if (e) d.move.update(lockedPoint(toDoc(e.clientX, e.clientY), d.start, e)); return; }
