@@ -1,22 +1,23 @@
 import { useState, type ReactNode } from 'react';
 import { exportRows, row, type ExportArea, type ExportSettings } from '../../engine/design/exportSettings';
-import { Button } from '../ui/primitives';
+import { Button, Segmented } from '../ui/primitives';
 import { ExportMenu, ExportRows, formatOptions, OptText, withRows } from './ExportFields';
 import { FormatGear } from './ExportFormatOptions';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 type Patch = (options: Partial<ExportSettings>) => void;
 
-/** What to export: one menu field. Selected objects and pixel selection are offered when they exist (or are the choice). */
-export function AreaRow({ settings, patch, picked, pixels }: { settings: ExportSettings; patch: Patch; picked: boolean; pixels: boolean }) {
-  const all: Array<{ value: ExportArea; label: string; ok: boolean }> = [
-    { value: 'canvas', label: 'Canvas', ok: true },
-    { value: 'content', label: 'Drawing', ok: true },
-    { value: 'objects', label: 'Selected objects', ok: picked },
-    { value: 'selection', label: 'Pixel selection', ok: pixels },
-    { value: 'layer', label: 'Layer', ok: true },
-  ];
-  return <InlineSelect label="Area" value={settings.area} options={all.filter((a) => a.ok || a.value === settings.area).map(({ value, label }) => ({ value, label }))} onChange={(area) => patch({ area })} />;
+/** What to export, as the app's tabs: Canvas · Drawing · Selection · Layer. Selection means the picked objects when
+ * there are some, else the pixel selection; with both, a field below chooses. */
+export function AreaTabs({ settings, patch, picked, pixels }: { settings: ExportSettings; patch: Patch; picked: boolean; pixels: boolean }) {
+  const tab = settings.area === 'objects' ? 'selection' : settings.area;
+  return <>
+    <div className="design-export-tabs">
+      <Segmented<'canvas' | 'content' | 'selection' | 'layer'> size="sm" value={tab} onChange={(t) => patch({ area: t === 'selection' ? (picked || !pixels ? 'objects' : 'selection') : t })}
+        options={[{ value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing' }, { value: 'selection', label: 'Selection' }, { value: 'layer', label: 'Layer' }]} />
+    </div>
+    {tab === 'selection' && picked && pixels && <div className="brush-row"><InlineSelect<ExportArea> label="Selection" value={settings.area} options={[{ value: 'objects', label: 'Objects' }, { value: 'selection', label: 'Pixels' }]} onChange={(area) => patch({ area })} /></div>}
+  </>;
 }
 
 /** Width, height and DPI, linked: DPI is the pixels per inch of the design at its 96-dpi size. */
@@ -34,33 +35,36 @@ export function ExportSize({ patch, geometry }: { patch: Patch; geometry: { widt
   </>;
 }
 
-/** Background: the color field, and a Transparent switch beside it for PNG and WebP. */
-export function BackgroundRow({ settings, patch, docBackground }: { settings: ExportSettings; patch: Patch; docBackground: string | null }) {
+/** Background, beside the preview it changes: a Transparent switch (PNG and WebP) and the color. */
+export function BackgroundFields({ settings, patch, docBackground }: { settings: ExportSettings; patch: Patch; docBackground: string | null }) {
   const alpha = exportRows(settings).some((r) => r.format === 'png' || r.format === 'webp');
   const clear = alpha && (settings.background === null || (settings.background === undefined && !docBackground));
   const color = settings.background ?? docBackground ?? '#ffffff';
-  return <div className="brush-row design-export-bg">
-    {!clear && <InlineColor label="Background" showValue value={color} onChange={(background) => patch({ background })} />}
+  return <>
     {alpha && <InlineToggle label="Transparent" checked={clear} onChange={(on) => patch({ background: on ? null : docBackground ? undefined : '#ffffff' })} />}
+    {!clear && <InlineColor label="Background" showValue value={color} onChange={(background) => patch({ background })} />}
+  </>;
+}
+
+/** The output bar: file name, format and its gear on one line (the file count when several are exported). */
+export function OutputBar({ settings, baseline, patch, hasText, gear, name }: { settings: ExportSettings; baseline: ExportSettings; patch: Patch; hasText: boolean; gear?: ReactNode; name: ReactNode }) {
+  const multi = !!settings.outputs?.length;
+  return <div className="brush-row design-export-bar">
+    {name}
+    {!multi && <ExportMenu bare label="Format" value={settings.format} options={formatOptions}
+      onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />}
+    <FormatGear settings={settings} baseline={baseline} patch={patch} hasText={hasText}>{gear}</FormatGear>
   </div>;
 }
 
-/** Format with its gear, the rows when several files are exported, and Add scale. */
-export function FormatRow({ settings, baseline, patch, hasText, gear }: { settings: ExportSettings; baseline: ExportSettings; patch: Patch; hasText: boolean; gear?: ReactNode }) {
+/** Several files: one row each (scale, suffix, format), or the button that starts them. */
+export function ScaleRows({ settings, patch }: { settings: ExportSettings; patch: Patch }) {
   const rows = exportRows(settings), multi = !!settings.outputs?.length;
   const page = rows.some((r) => r.format === 'pdf') && settings.pdf && settings.pdf !== 'screen';
-  return <>
-    <div className="brush-row">
-      {!multi && <ExportMenu label="Format" value={settings.format} options={formatOptions}
-        onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />}
-      {multi && <span className="opt design-export-files"><span className="opt-label">{rows.length} files</span></span>}
-      <FormatGear settings={settings} baseline={baseline} patch={patch} hasText={hasText}>{gear}</FormatGear>
-    </div>
-    {multi && <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />}
-    {!multi && !page && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ outputs: [row(typeof settings.size === 'number' ? settings.size : 1, settings.format), row(2, settings.format, '@2x')], preset: undefined })}>
-      <span className="opt-label">+ Add scale</span>
-    </button>}
-  </>;
+  if (multi) return <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />;
+  return page ? null : <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ outputs: [row(typeof settings.size === 'number' ? settings.size : 1, settings.format), row(2, settings.format, '@2x')], preset: undefined })}>
+    <span className="opt-label">+ Add scale</span>
+  </button>;
 }
 
 /** Save the current settings as a preset; delete one of your own after an inline confirmation. */

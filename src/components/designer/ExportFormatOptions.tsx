@@ -69,9 +69,10 @@ export function PinButton({ id, label }: { id: string; label: string }) {
 const inMain = (o: Option, pinned: string[]) => o.applies && (o.contextual || o.changed || pinned.includes(o.key));
 
 /** The options the current action needs, plus anything changed or pinned: one field row each. */
-export function MainOptions({ settings, baseline, patch, hasText }: { settings: ExportSettings; baseline: ExportSettings; patch: Patch; hasText: boolean }) {
+export function MainOptions({ settings, baseline, patch, hasText, only }: { settings: ExportSettings; baseline: ExportSettings; patch: Patch; hasText: boolean; /** Keys to show (the page block); the rest when `only` is false. */ only: string[] | false }) {
   const pinned = usePinned();
-  return <>{options(settings, baseline, patch, hasText).filter((o) => inMain(o, pinned)).map((o) => <div key={o.key} className="brush-row">{o.node}</div>)}</>;
+  const page = ['paper', 'orientation', 'print'];
+  return <>{options(settings, baseline, patch, hasText).filter((o) => inMain(o, pinned) && (only ? only.includes(o.key) : !page.includes(o.key))).map((o) => <div key={o.key} className="brush-row">{o.node}</div>)}</>;
 }
 
 /** The gear button beside Format, and behind it the rest of the options grouped by format, each with a pin. */

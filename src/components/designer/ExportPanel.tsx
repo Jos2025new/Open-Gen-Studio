@@ -10,7 +10,7 @@ import { getSelection, useSelectionVersion } from '../../engine/design/pixelSele
 import { rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
-import { AreaRow, BackgroundRow, ExportSize, FormatRow, PresetActions } from './ExportOptions';
+import { AreaTabs, BackgroundFields, ExportSize, OutputBar, PresetActions, ScaleRows } from './ExportOptions';
 import { MainOptions, PinButton, usePinned } from './ExportFormatOptions';
 import { OptText } from './ExportFields';
 
@@ -202,24 +202,30 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
         const preset = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === id);
         apply(preset?.settings ?? { ...settings, preset: undefined, fitInstagram: undefined }, id);
       }} /></div>
-      <div className="design-export-summary">
-        <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} layout={layout} />
-        <div className="design-export-facts">
-          <strong>{info || '—'}</strong>
-          {!invalid && <span data-testid="export-names">{namesLine}</span>}
-          {delivered && <span>{delivered.kb.toLocaleString()} KB</span>}
-        </div>
-      </div>
-      {warnings.map((note) => <p className="opt-hint design-export-warn" role="note" key={note}>{note}</p>)}
-      <div className="brush-row"><AreaRow settings={settings} patch={patch} picked={!!objectPicks?.length} pixels={!!getSelection(doc.id)} /></div>
+      <AreaTabs settings={settings} patch={patch} picked={!!objectPicks?.length} pixels={!!getSelection(doc.id)} />
       {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ area: settings.area })}>
         <span className="opt-label">Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}</span>
       </button>}
+      <span className="field-label design-export-title">{paper ? 'Page' : 'Size'}</span>
       {geometry && !paper && !settings.outputs?.length && <ExportSize patch={patch} geometry={geometry} />}
+      <MainOptions settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} only={['paper', 'orientation', 'print']} />
+      <ScaleRows settings={settings} patch={patch} />
       {instagramFit && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ fitInstagram: true })}><span className="opt-label">Fit to 4:5</span></button>}
       {settings.preset === 'instagram' && settings.fitInstagram && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ fitInstagram: false })}><span className="opt-label">Use original ratio</span></button>}
-      <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? null} />
-      <FormatRow settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} gear={<>
+      <span className="field-label design-export-title">Preview</span>
+      <div className="design-export-summary">
+        <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} layout={layout} />
+        <div className="design-export-facts">
+          <BackgroundFields settings={settings} patch={patch} docBackground={doc.background ?? null} />
+          <span>{info || '—'}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</span>
+        </div>
+      </div>
+      {warnings.map((note) => <p className="opt-hint design-export-warn" role="note" key={note}>{note}</p>)}
+      <span className="field-label design-export-title">File</span>
+      <MainOptions settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} only={false} />
+      {showPrefix && <div className="brush-row">{prefixField}</div>}
+      <OutputBar settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText}
+        name={<OptText label="Name" value={filename} placeholder={doc.name} onChange={(v) => { setFilename(v); setStatus(undefined); }} />} gear={<>
         {!showPrefix && <><span className="field-label design-export-title">File</span><div className="brush-row">{prefixField}<PinButton id="prefix" label="Prefix" /></div></>}
         {!folder && !pinned.includes('folder') && saveTo}
         <span className="field-label design-export-title">Preset</span>
@@ -228,8 +234,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
           setChoice('');
         }} />
       </>} />
-      <MainOptions settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} />
-      <div className="brush-row">{showPrefix && prefixField}<OptText label="File name" value={filename} placeholder={doc.name} onChange={(v) => { setFilename(v); setStatus(undefined); }} /></div>
+      {!invalid && <p className="opt-hint design-export-names" data-testid="export-names">{namesLine}</p>}
       {(folder || pinned.includes('folder')) && saveTo}
     </div></fieldset></div>
     <footer className="design-export-footer">

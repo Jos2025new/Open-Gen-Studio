@@ -10,15 +10,15 @@ type Icon = ComponentType<{ size?: number; strokeWidth?: number; className?: str
 export interface MenuOption<T extends string> { value: T; label: string; detail?: string; icon?: Icon; group?: string }
 
 /** The app's field menu (like InlineSelect) whose choices may carry a short purpose line and groups. */
-export function ExportMenu<T extends string>({ label, value, options, onChange, autoFocus }: {
-  label: string; value: T; options: MenuOption<T>[]; onChange: (value: T) => void; autoFocus?: boolean;
+export function ExportMenu<T extends string>({ label, value, options, onChange, autoFocus, bare }: {
+  label: string; value: T; options: MenuOption<T>[]; onChange: (value: T) => void; autoFocus?: boolean; /** Value only, the name as its accessible label (a compact bar). */ bare?: boolean;
 }) {
   const pop = usePopover();
   const current = options.find((o) => o.value === value);
   let group: string | undefined;
   return <>
-    <button type="button" ref={pop.ref} className="opt opt-pick" aria-haspopup="listbox" aria-expanded={pop.open} autoFocus={autoFocus} onClick={pop.toggle}>
-      <span className="opt-label">{label}</span>
+    <button type="button" ref={pop.ref} className="opt opt-pick" aria-label={bare ? `${label} · ${current?.label ?? value}` : undefined} aria-haspopup="listbox" aria-expanded={pop.open} autoFocus={autoFocus} onClick={pop.toggle}>
+      {!bare && <span className="opt-label">{label}</span>}
       <span className="opt-value">{current?.label ?? value}</span>
       <ChevronDown size={12} />
     </button>

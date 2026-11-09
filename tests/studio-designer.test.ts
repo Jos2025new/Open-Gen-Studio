@@ -247,7 +247,7 @@ describe('file menu', () => {
     expect(useStore.getState().sessions[sid].activeDocId).toBe(first);
   });
   const pick = (panel: Element, label: string, option: string) => {
-    act(() => [...panel.querySelectorAll<HTMLElement>('button.opt-pick')].find((b) => b.textContent?.includes(label))!.click());
+    act(() => [...panel.querySelectorAll<HTMLElement>('button.opt-pick')].find((b) => b.textContent?.includes(label) || b.getAttribute('aria-label')?.startsWith(`${label} · `))!.click());
     act(() => [...document.querySelectorAll<HTMLElement>('.menu-item')].find((b) => b.textContent?.startsWith(option))!.click());
   };
   const typeInto = (input: HTMLInputElement, value: string) => act(() => {

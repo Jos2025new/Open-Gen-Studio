@@ -31,7 +31,7 @@ const click = (el: Element | null | undefined) => { expect(el).toBeTruthy(); act
 const gear = () => { if (!document.querySelector('.design-export-pop')) click(document.querySelector('[aria-label="Format options"]')); };
 const byText = (label: string, selector = 'button') => [...document.body.querySelectorAll(selector)].find((e) => e.textContent?.includes(label));
 /** A field menu by its name (InlineSelect / ExportMenu), then the choice. */
-const field = (label: string) => [...document.body.querySelectorAll('button.opt-pick')].find((b) => b.querySelector('.opt-label')?.textContent === label);
+const field = (label: string) => [...document.body.querySelectorAll('button.opt-pick')].find((b) => b.querySelector('.opt-label')?.textContent === label || b.getAttribute('aria-label')?.startsWith(`${label} · `));
 const choose = (label: string, option: string) => { click(field(label)); click([...document.body.querySelectorAll('.menu-item')].find((e) => e.textContent?.startsWith(option))); };
 const nums = () => [...document.querySelectorAll<HTMLInputElement>('.design-export-size .opt-num')];
 
@@ -78,12 +78,12 @@ describe('export panel', () => {
     expect([w2.value, h2.value, dpi.value, document.querySelector('[role=alert]')?.textContent]).toEqual(['240', '160', '192', undefined]);
   });
 
-  it('chooses the area in one field: selections are offered only when they exist', () => {
+  it('chooses the area with the app tabs', () => {
     mount();
-    click(field('Area'));
-    expect([...document.querySelectorAll('.menu-item')].map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Layer']);
-    click(byText('Drawing', '.menu-item'));
-    expect(field('Area')?.textContent).toContain('Drawing');
+    const tabs = [...document.querySelectorAll('.design-export-tabs .segmented button')];
+    expect(tabs.map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Selection', 'Layer']);
+    click(tabs[1]);
+    expect(document.querySelector('.design-export-tabs .is-active')?.textContent).toBe('Drawing');
   });
 
   it('says edited for a changed preset, and Custom only when none applies', () => {
@@ -99,7 +99,8 @@ describe('export panel', () => {
     mount();
     const line = () => document.querySelector('[data-testid="export-names"]')?.textContent;
     expect(line()).toBe('Doc.png');
-    expect(text()).toContain('File name');
+    expect(field('Name')).toBeUndefined();
+    expect(document.querySelector('.design-export-bar .opt-text')?.textContent).toContain('Name');
     expect(text()).not.toContain('Prefix');
     gear();
     expect(text()).toContain('Prefix');
@@ -144,7 +145,7 @@ describe('export panel', () => {
 
   it('shows a labelled, readable background', () => {
     mount({ ...base, background: '#ffffff' });
-    expect(document.querySelector('.design-export-bg .opt-color')?.textContent).toBe('Background#FFFFFF');
+    expect(document.querySelector('.design-export-facts .opt-color')?.textContent).toBe('Background#FFFFFF');
   });
 
   it('judges the rendered preview: a white raster layer on a white page is flagged', async () => {
