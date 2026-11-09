@@ -82,6 +82,8 @@ export interface ExportSettings {
   /** Inside one output of `outputs`: the text added to that file's name. */
   suffix?: string;
   preset?: string;
+  /** The preset these settings started from (kept after edits, so the panel can say "edited"). */
+  base?: string;
 }
 
 /** The file rows an export produces: its own list, or the single format and size. */

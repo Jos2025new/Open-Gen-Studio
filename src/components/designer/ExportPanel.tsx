@@ -11,6 +11,8 @@ import { rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
 import { AreaRow, BackgroundRow, ExportSize, FormatRow, PresetActions } from './ExportOptions';
+
+import { lowContrastNotice } from '../../engine/design/exportContrast';
 import { ExportMenu } from './ExportFields';
 import { InlineToggle } from './InlineControls';
 import { Folder } from '../ui/icons';
@@ -20,7 +22,7 @@ const groups = ['Share', 'Print', 'Work', 'Apps'];
 const stable = (value: unknown): string => JSON.stringify(value, (_k, v) => v && typeof v === 'object' && !Array.isArray(v)
   ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => (a < b ? -1 : 1))) : v);
 const sameSettings = (a: ExportSettings, b: ExportSettings) => {
-  const strip = ({ preset: _p, fitInstagram: _f, ...rest }: ExportSettings) => rest;
+  const strip = ({ preset: _p, base: _b, fitInstagram: _f, ...rest }: ExportSettings) => rest;
   return stable(strip(initialExport({ lastExport: { settings: a } } as DesignDoc).settings)) === stable(strip(initialExport({ lastExport: { settings: b } } as DesignDoc).settings));
 };
 const cm = (mm: number) => (Math.round(mm / 10 * 10) / 10).toFixed(1);
@@ -34,7 +36,7 @@ function initialExport(doc: DesignDoc): RememberedExport {
 
 export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc: DesignDoc; onBack?: () => void }) {
   const [draft, setDraft] = useState(() => initialExport(doc));
-  const [choice, setChoice] = useState(() => draft.settings.preset ?? '');
+  const [choice, setChoice] = useState(() => draft.settings.preset ?? draft.settings.base ?? '');
   const [filename, setFilename] = useState(doc.name);
   const [progress, setProgress] = useState<string>();
   const [error, setError] = useState<string>();
@@ -85,7 +87,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
 
   function apply(next: ExportSettings, name: string) {
     setChoice(name);
-    const settings = next.pdf === 'a4' ? { ...next, pdf: pdfPage('a4') } : next;
+    const settings = { ...(next.pdf === 'a4' ? { ...next, pdf: pdfPage('a4') } : next), base: name || undefined };
     setDraft({ settings, target: currentExportTarget(doc, settings) });
     setError(undefined);
     setStatus(undefined);
@@ -152,10 +154,12 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const instagramFit = settings.preset === 'instagram' && geometry && !settings.fitInstagram
     && geometry.box.w !== geometry.box.h && geometry.box.w * 5 !== geometry.box.h * 4;
   const rows = exportRows(settings);
+  const pageColor = settings.background !== undefined ? settings.background : doc.background ?? (rows.some((r) => r.format === 'pdf' || r.format === 'jpg') ? '#ffffff' : null);
+  const faint = useMemo(() => lowContrastNotice(doc, pageColor), [doc, pageColor]);
   const paper = rows[0].format === 'pdf' ? pdfPage(settings.pdf) : undefined;
   const chosen = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === choice);
-  const shownChoice = chosen && sameSettings(settings, chosen.settings) ? choice : '';
-  const own = custom.find((p) => p.id === shownChoice);
+  const edited = !!chosen && !sameSettings(settings, chosen.settings);
+  const own = custom.find((p) => p.id === choice);
   const layout = paper && geometry ? pageLayout(paper, geometry.width, geometry.height, settings.print) : undefined;
   const [short, long] = paper ? PDF_PAPERS[paper.paper].mm : [0, 0];
   const trimMm = paper ? (paper.orientation === 'portrait' ? [short, long] : [long, short]) : [0, 0];
@@ -163,15 +167,15 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const info = paper ? `${paperName}${settings.print ? ' trim' : ''} · ${cm(trimMm[0])} × ${cm(trimMm[1])} cm${settings.print ? ` + ${settings.print.bleedMm} mm bleed` : ''}`
     : geometry ? `${geometry.width} × ${geometry.height} px${rows.length > 1 ? ` · ${rows.length} files` : ''}` : '';
   const presetOptions = [
-    ...BUILTIN_EXPORTS.map((p) => ({ value: p.id as string, label: p.name, group: p.group })).sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group)),
-    ...custom.map((p) => ({ value: p.id, label: p.name, group: 'My presets' })),
+    ...BUILTIN_EXPORTS.map((p) => ({ value: p.id as string, label: p.name + (edited && p.id === choice ? ' (edited)' : ''), group: p.group })).sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group)),
+    ...custom.map((p) => ({ value: p.id, label: p.name + (edited && p.id === choice ? ' (edited)' : ''), group: 'My presets' })),
     { value: '', label: 'Custom', group: 'Other' },
   ];
 
   return <div className="design-export">
     {onBack && <Button size="sm" variant="ghost" onClick={onBack}>Back to File</Button>}
     <div className="design-export-scroll"><fieldset disabled={!!progress}>
-      <ExportMenu autoFocus label="What is it for?" value={shownChoice} options={presetOptions} onChange={(id) => {
+      <ExportMenu autoFocus label="What is it for?" value={choice} options={presetOptions} onChange={(id) => {
         const preset = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === id);
         apply(preset?.settings ?? { ...settings, preset: undefined, fitInstagram: undefined }, id);
       }} />
@@ -179,7 +183,8 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <Button size="sm" onClick={() => patch({ area: settings.area })}>
         Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}
       </Button>}
-      <ExportPreview image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
+      <ExportPreview ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
+      {faint && <p className="design-export-hint" role="note">{faint}</p>}
       {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
       {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
       {geometry && !paper && !settings.outputs?.length && <ExportSize settings={settings} patch={patch} geometry={geometry} />}
@@ -188,7 +193,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
         <Button size="sm" onClick={() => patch({ fitInstagram: true })}>Fit to 4:5</Button>
       </div>}
       {settings.preset === 'instagram' && settings.fitInstagram && <Button size="sm" variant="ghost" onClick={() => patch({ fitInstagram: false })}>Use original ratio</Button>}
-      <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? '#ffffff'} />
+      <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? null} />
       <div className="design-export-row">
         <label>Name prefix
           <input value={settings.prefix ?? ''} maxLength={40} placeholder="optional" onChange={(e) => patch({ prefix: e.target.value || undefined })} />
@@ -225,7 +230,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   </div>;
 }
 
-function ExportPreview({ image, stale, busy, layout, caption }: { image?: Blob; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout>; caption: string }) {
+function ExportPreview({ image, ratio, stale, busy, layout, caption }: { image?: Blob; ratio: number; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout>; caption: string }) {
   const [preview, setPreview] = useState<{ image: Blob; url: string }>();
   useEffect(() => {
     if (!image) return;
@@ -235,7 +240,7 @@ function ExportPreview({ image, stale, busy, layout, caption }: { image?: Blob; 
   }, [image]);
   const trim = layout?.trim;
   return <figure className="design-export-figure">
-    <div className={`design-export-frame${stale ? ' is-stale' : ''}`}>{image ? <div className="design-export-page">
+    <div className={`design-export-frame${stale ? ' is-stale' : ''}`}>{image ? <div className="design-export-page" style={{ '--ratio': ratio } as React.CSSProperties}>
       {preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
     </div> : <span className="design-export-hint">{busy ? 'Preparing preview…' : 'No preview'}</span>}</div>

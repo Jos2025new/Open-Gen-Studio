@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { exportRows, row, type ExportSettings } from '../../engine/design/exportSettings';
 import { Button } from '../ui/primitives';
-import { ExportMenu, ExportRows, formatOptions, withRows } from './ExportFields';
+import { ExportMenu, ExportRows, formatOptions, Segmented, withRows } from './ExportFields';
 import { FormatGear } from './ExportFormatOptions';
-import { InlineChoice, InlineColor, InlineToggle } from './InlineControls';
+import { InlineColor, InlineToggle } from './InlineControls';
 
 type Patch = (options: Partial<ExportSettings>) => void;
 const group = (area: ExportSettings['area']) => (area === 'objects' || area === 'selection' ? 'selection' : area);
@@ -12,9 +12,9 @@ const group = (area: ExportSettings['area']) => (area === 'objects' || area === 
 export function AreaRow({ settings, patch, picked, pixels }: { settings: ExportSettings; patch: Patch; picked: boolean; pixels: boolean }) {
   const current = group(settings.area);
   return <>
-    <InlineChoice label="Export area" value={current} options={[{ value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing' }, { value: 'selection', label: 'Selection' }, { value: 'layer', label: 'Layer' }]}
+    <Segmented label="Export area" value={current} options={[{ value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing' }, { value: 'selection', label: 'Selection' }, { value: 'layer', label: 'Layer' }]}
       onChange={(g) => patch({ area: g === 'selection' ? (pixels && !picked ? 'selection' : 'objects') : g })} />
-    {current === 'selection' && <InlineChoice label="Selection of" value={settings.area} options={[{ value: 'objects', label: 'Objects' }, { value: 'selection', label: 'Pixels' }]} onChange={(area) => patch({ area })} />}
+    {current === 'selection' && <Segmented label="Selection of" value={settings.area} options={[{ value: 'objects', label: 'Objects' }, { value: 'selection', label: 'Pixels' }]} onChange={(area) => patch({ area })} />}
   </>;
 }
 
@@ -41,12 +41,17 @@ export function ExportSize({ settings, patch, geometry }: { settings: ExportSett
   </div>;
 }
 
-/** One row: the background color and a Transparent switch (PNG and WebP only). */
-export function BackgroundRow({ settings, patch, docBackground }: { settings: ExportSettings; patch: Patch; docBackground: string }) {
+const colorName = (c: string) => (c.toLowerCase() === '#ffffff' ? 'White' : c.toLowerCase() === '#000000' ? 'Black' : c.toUpperCase());
+
+/** One row: swatch, a readable value, and a Transparent switch (PNG and WebP only). */
+export function BackgroundRow({ settings, patch, docBackground }: { settings: ExportSettings; patch: Patch; docBackground: string | null }) {
   const alpha = exportRows(settings).some((r) => r.format === 'png' || r.format === 'webp');
-  return <div className="design-export-row">
-    <InlineColor label="Background" value={settings.background ?? docBackground} onChange={(background) => patch({ background })} showValue />
-    {alpha && <InlineToggle label="Transparent" checked={settings.background === null} onChange={(on) => patch({ background: on ? null : undefined })} />}
+  const clear = alpha && (settings.background === null || (settings.background === undefined && !docBackground));
+  const color = settings.background ?? docBackground ?? '#ffffff';
+  return <div className="design-export-bgrow">
+    <InlineColor label="Background color" iconOnly value={color} onChange={(background) => patch({ background })} />
+    <span className="design-export-bgvalue">{clear ? 'Transparent' : colorName(color)}</span>
+    {alpha && <InlineToggle label="Transparent" checked={clear} onChange={(on) => patch({ background: on ? null : docBackground ? undefined : '#ffffff' })} />}
   </div>;
 }
 

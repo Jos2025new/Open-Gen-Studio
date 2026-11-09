@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportPanel } from '../src/components/designer/ExportPanel';
 import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
+import { lowContrastNotice } from '../src/engine/design/exportContrast';
 import { DEFAULT_EXPORT } from '../src/engine/design/exportSettings';
 import { setSettings, useStore } from '../src/store/store';
 
@@ -50,7 +52,7 @@ describe('export panel', () => {
     expect(label()).toContain('Lightweight web');
     click(byText('Format'));
     click(byText('PNG', '.menu-item'));
-    expect(label()).toContain('Custom');
+    expect(label()).toContain('Lightweight web (edited)');
     expect(document.querySelector('.design-export-frame')).not.toBeNull();
     expect(document.querySelector('.design-export-footer .design-export-buttons')).not.toBeNull();
   });
@@ -73,6 +75,33 @@ describe('export panel', () => {
     expect([...row.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Selection', 'Layer']);
     click(byText('Selection', '[role="radio"]'));
     expect(text()).toContain('Selection of');
+  });
+
+  it('says edited for a changed preset, and Custom only when none applies', () => {
+    mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, format: 'png', base: 'home-print' } } });
+    expect(document.querySelector('button.opt-pick')!.textContent).toContain('Print at home (edited)');
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount();
+    expect(document.querySelector('button.opt-pick')!.textContent).toContain('Custom');
+  });
+
+  it('shows a readable background and warns about white art on a white page', () => {
+    const white = newVectorLayer('W', [{ type: 'rect', x: 1, y: 1, w: 9, h: 9, radius: 0, fill: '#ffffff', stroke: null, strokeWidth: 0 }]);
+    mount({ ...base, background: '#ffffff', layers: [white] });
+    expect(text()).toContain('White');
+    expect(document.querySelector('[role="note"]')?.textContent).toContain('white on a white page');
+    expect(lowContrastNotice({ ...base, layers: [layer] }, '#ffffff')).toBeUndefined();
+    expect(lowContrastNotice({ ...base, layers: [white] }, null)).toBeUndefined();
+  });
+
+  it('keeps segmented buttons in equal flexible columns, never fixed narrower than their text', () => {
+    const css = readFileSync('src/styles/designer-export.css', 'utf8');
+    const rule = /\.design-export-seg-row button \{([^}]*)\}/.exec(css)![1];
+    expect(rule).toMatch(/flex:\s*1 1 0/);
+    expect(rule).toMatch(/min-inline-size:\s*0/);
+    expect(rule).toMatch(/white-space:\s*nowrap/);
+    expect(rule).not.toMatch(/(^|[;\s])(inline-)?(size|width):/);
   });
 
   it('shows the scale unit in rows', () => {

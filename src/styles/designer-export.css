@@ -134,3 +134,30 @@
 .design-export-gear:hover { color: var(--text); }
 .design-export-pop .design-export-fields { padding: var(--sp-1); }
 .design-export-pop .design-export-hint { margin: 0; color: var(--text-2); font-size: var(--fs-s); }
+.design-export-seg { display: grid; gap: var(--sp-1); min-inline-size: 0; }
+.design-export-seg-label { color: var(--text-2); }
+.design-export-seg-row { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); }
+.design-export-seg-row button {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  min-block-size: 1.75rem;
+  padding-inline: var(--sp-1);
+  border: 0;
+  border-radius: var(--radius-s, 4px);
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-s);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.design-export-seg-row button:hover { color: var(--text); }
+.design-export-seg-row button.is-on { color: var(--text); background: var(--field-on, var(--surface-3)); }
+.design-export-bgrow { display: flex; align-items: center; gap: var(--sp-2); min-inline-size: 0; }
+.design-export-bgvalue { flex: 1 1 auto; min-inline-size: 0; overflow-wrap: anywhere; color: var(--text); }
+.design-export-bgrow .opt-toggle { flex: 0 0 auto; inline-size: auto; }
+:is(.design-export, .design-export-pop) .opt { inline-size: 100%; margin: 0; box-sizing: border-box; }
+.design-export-bgrow .opt { inline-size: auto; }
+.design-export-frame { container-type: size; padding: 2px; }
+.design-export-frame .design-export-page { inline-size: min(100cqw, calc(100cqh * var(--ratio, 1))); aspect-ratio: var(--ratio, 1); max-inline-size: none; }
+.design-export-frame .design-export-preview { inline-size: 100%; block-size: 100%; max-inline-size: none; max-block-size: none; object-fit: fill; }

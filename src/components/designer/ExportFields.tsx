@@ -70,4 +70,12 @@ export function withRows(rows: ExportRow[]): Partial<ExportSettings> {
   return { outputs: rows, preset: undefined };
 }
 
+/** A few named choices on one full-width row, equal columns, with the label above (the export panel's one segmented control). */
+export function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: Array<{ value: T; label: string }>; onChange: (v: T) => void }) {
+  return <div className="design-export-seg" role="radiogroup" aria-label={label}>
+    <span className="design-export-seg-label">{label}</span>
+    <span className="design-export-seg-row">{options.map((o) => <button key={o.value} type="button" role="radio" aria-checked={o.value === value} aria-label={o.label} className={o.value === value ? 'is-on' : ''} onClick={() => onChange(o.value)}>{o.label}</button>)}</span>
+  </div>;
+}
+
 export function Hint({ children }: { children: ReactNode }) { return <p className="design-export-hint">{children}</p>; }

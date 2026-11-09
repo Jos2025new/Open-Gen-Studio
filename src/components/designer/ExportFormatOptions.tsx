@@ -1,8 +1,8 @@
 import { DEFAULT_JPEG_QUALITY, DEFAULT_PDF_PAGE, exportRows, PDF_PAPERS, pdfPage, type ExportSettings, type PdfPage, type PdfPaper } from '../../engine/design/exportSettings';
 import { Settings } from '../ui/icons';
 import { Popover, usePopover } from '../ui/Popover';
-import { Hint } from './ExportFields';
-import { InlineChoice, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
+import { Hint, Segmented } from './ExportFields';
+import { InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 const quality = { compress: 75, high: DEFAULT_JPEG_QUALITY };
 
@@ -15,18 +15,18 @@ export function FormatOptions({ settings, patch, hasText }: { settings: ExportSe
   const level = settings.maxKb !== undefined ? 'limit' : (settings.quality ?? DEFAULT_JPEG_QUALITY) < 90 ? 'compress' : 'high';
   const svg = settings.svg ?? {};
   const text = hasText && has('svg', 'pdf') && <>
-    <InlineChoice label="Text" value={settings.text ?? 'fonts'} options={[{ value: 'fonts', label: 'Embed fonts' }, { value: 'paths', label: 'Convert to paths' }]} onChange={(t) => patch({ text: t })} />
+    <Segmented label="Text" value={settings.text ?? 'fonts'} options={[{ value: 'fonts', label: 'Embed fonts' }, { value: 'paths', label: 'Convert to paths' }]} onChange={(t) => patch({ text: t })} />
     {(settings.text ?? 'fonts') === 'fonts' && <Hint>System fonts cannot be embedded: that text keeps the font name.</Hint>}
   </>;
   return <div className="design-export-fields">
     {has('pdf') && <>
       <div className="menu-sep-label">PDF</div>
       {text}
-      <InlineChoice label="PDF page" value={pdfMode} options={[{ value: 'screen', label: 'Screen' }, { value: 'paper', label: 'Paper' }, { value: 'print', label: 'Print shop' }]}
+      <Segmented label="PDF page" value={pdfMode} options={[{ value: 'screen', label: 'Screen' }, { value: 'paper', label: 'Paper' }, { value: 'print', label: 'Print shop' }]}
         onChange={(m) => patch({ pdf: m === 'screen' ? 'screen' : page ?? DEFAULT_PDF_PAGE, print: m === 'print' ? { bleedMm: 3, marks: false } : undefined })} />
       {page && <>
         <InlineSelect label="Paper" value={page.paper} options={Object.entries(PDF_PAPERS).map(([paper, { label }]) => ({ value: paper as PdfPaper, label }))} onChange={(paper) => patch({ pdf: { ...page, paper } })} />
-        <InlineChoice label="Orientation" value={page.orientation} options={[{ value: 'portrait', label: 'Portrait' }, { value: 'landscape', label: 'Landscape' }] as { value: PdfPage['orientation']; label: string }[]}
+        <Segmented label="Orientation" value={page.orientation} options={[{ value: 'portrait', label: 'Portrait' }, { value: 'landscape', label: 'Landscape' }] as { value: PdfPage['orientation']; label: string }[]}
           onChange={(orientation) => patch({ pdf: { ...page, orientation } })} />
         <InlineSlider label="Raster resolution" value={settings.ppi ?? 300} min={72} max={600} step={1} unit="ppi" allowManualOverflow onChange={(ppi) => patch({ ppi: Math.round(ppi) })} />
       </>}
@@ -44,7 +44,7 @@ export function FormatOptions({ settings, patch, hasText }: { settings: ExportSe
     </>}
     {has('jpg', 'webp') && <>
       <div className="menu-sep-label">JPG · WebP</div>
-      <InlineChoice label="Quality" value={level} options={[{ value: 'compress', label: 'Compress' }, { value: 'high', label: 'High' }, { value: 'limit', label: 'Limit size' }]}
+      <Segmented label="Quality" value={level} options={[{ value: 'compress', label: 'Compress' }, { value: 'high', label: 'High' }, { value: 'limit', label: 'Limit size' }]}
         onChange={(l) => patch(l === 'limit' ? { maxKb: settings.maxKb ?? 500 } : { maxKb: undefined, quality: quality[l] })} />
       {level === 'limit' && <InlineSlider label="Maximum" value={settings.maxKb ?? 500} min={10} max={2000} step={10} unit="KB" allowManualOverflow onChange={(maxKb) => patch({ maxKb: Math.round(maxKb) })} />}
     </>}
