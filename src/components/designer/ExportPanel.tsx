@@ -84,7 +84,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       } catch (error) {
         if (!controller.signal.aborted) setPreview({ request, error: message(error) });
       }
-    }, 500);
+    }, lastImage ? 150 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [request, invalid]);
 
@@ -214,7 +214,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       {settings.preset === 'instagram' && settings.fitInstagram && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ fitInstagram: false })}><span className="opt-label">Use original ratio</span></button>}
       <span className="field-label design-export-title">Preview</span>
       <div className="design-export-summary">
-        <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} layout={layout} />
+        <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={invalid ? undefined : image ?? lastImage} stale={!image} layout={layout} />
         <div className="design-export-facts">
           <BackgroundFields settings={settings} patch={patch} docBackground={doc.background ?? null} />
           <span>{info || '—'}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</span>

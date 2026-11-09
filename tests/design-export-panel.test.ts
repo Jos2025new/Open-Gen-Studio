@@ -84,6 +84,7 @@ describe('export panel', () => {
     expect(tabs.map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Selection', 'Layer']);
     click(tabs[1]);
     expect(document.querySelector('.design-export-tabs .is-active')?.textContent).toBe('Drawing');
+    expect((tabs[2] as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('says edited for a changed preset, and Custom only when none applies', () => {

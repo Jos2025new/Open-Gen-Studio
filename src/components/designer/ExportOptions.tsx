@@ -14,7 +14,7 @@ export function AreaTabs({ settings, patch, picked, pixels }: { settings: Export
   return <>
     <div className="design-export-tabs">
       <Segmented<'canvas' | 'content' | 'selection' | 'layer'> size="sm" value={tab} onChange={(t) => patch({ area: t === 'selection' ? (picked || !pixels ? 'objects' : 'selection') : t })}
-        options={[{ value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing' }, { value: 'selection', label: 'Selection' }, { value: 'layer', label: 'Layer' }]} />
+        options={[{ value: 'canvas', label: 'Canvas' }, { value: 'content', label: 'Drawing' }, { value: 'selection', label: 'Selection', disabled: !picked && !pixels && tab !== 'selection', tip: 'Select objects or an area first' }, { value: 'layer', label: 'Layer' }]} />
     </div>
     {tab === 'selection' && picked && pixels && <div className="brush-row"><InlineSelect<ExportArea> label="Selection" value={settings.area} options={[{ value: 'objects', label: 'Objects' }, { value: 'selection', label: 'Pixels' }]} onChange={(area) => patch({ area })} /></div>}
   </>;

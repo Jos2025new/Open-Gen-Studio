@@ -40,4 +40,4 @@
 
 .design-export-buttons { display: flex; flex: 1 1 100%; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .design-export-footer { flex: none; display: grid; gap: 0.375rem; padding: 0.625rem; border-block-start: 1px solid var(--border); }
-.design-export-footer > p { margin: 0; }
+.design-export-footer > p { margin: 0; white-space: normal; }
