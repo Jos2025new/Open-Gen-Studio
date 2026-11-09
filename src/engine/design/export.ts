@@ -1,3 +1,4 @@
+import { shapesSvgTree } from './objectGroupTree';
 import { MARK_LENGTH_MM, MARK_OFFSET_MM, PX_PER_MM, pageLayout, type PdfPage, type PrintOptions, type SvgOptions } from './exportSettings';
 import { pathTransform } from './path';
 import { markerSvg } from './markers';
@@ -201,7 +202,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
     } else if (l.type === 'vector') {
       // Pressure strokes become their filled outline: an editable path, not the original gesture.
       const strokes = await Promise.all((l.strokes ?? []).map((s) => strokeSvg(s)));
-      inner = l.shapes.map(shapeSvg).join('') + strokes.join('');
+      inner = shapesSvgTree(l, shapeSvg, xmlEscape) + strokes.join('');
       if (l.pixelMask) {
         const mask = l.pixelMask, href = await deps.rasterHref(mask);
         // Without its mask the layer would show what the mask hides: left out, and said.

@@ -1,3 +1,4 @@
+import { objectGroupKey } from './objectGroupKeys';
 import { toast, saveNow, setUi, useStore } from '../../store/store';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
@@ -81,6 +82,9 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
   } else if (!tools && !mod && !e.altKey && e.shiftKey && k === 'r') {
     e.preventDefault();
     setUi({ rulers: !useStore.getState().ui.rulers });
+  } else if (mod && k === 'g' && objectGroupKey(sessionId, doc, e.shiftKey)) {
+    // Ctrl+G / Ctrl+Shift+G on picked shapes: group / ungroup them inside their layer (SVG <g>).
+    e.preventDefault();
   } else if (mod && k === 'g') {
     // Ctrl+G: the selected layers into a folder.
     e.preventDefault();

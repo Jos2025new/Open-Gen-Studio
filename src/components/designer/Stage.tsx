@@ -1,10 +1,11 @@
+import { clickPick, expandPicks } from '../../engine/design/objectGroupTree';
 import type { RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { useBoardFocus } from '../studio/useBoardFocus';
 import { canDragGuides, drawGuides } from './drawGuides';
 import { sameGuides, type GuideLines } from './guideLines';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { DesignDoc, Layer, Stroke, TextLayer } from '../../engine/types';
+import type { DesignDoc, Layer, Stroke, TextLayer, VectorLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
 import { brushPoint } from '../../engine/design/brushControl';
 import { drawStroke } from '../../engine/design/brushTextures';
@@ -47,7 +48,7 @@ import { boxShape } from '../../engine/design/shapeDraw';
 import { gestureBuffers, transformLayer } from '../../engine/design/affine';
 import { type Mat } from '../../engine/design/matrix';
 import { applyGradient, GRADIENT_DEFAULT, paintGradient, type GradientSpec } from '../../engine/design/gradient';
-import { editShape, isPicked, objectPicks, pickedIn, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
+import { editShape, isPicked, objectPicks, pickedIn, pickObject, setObjectPick, setObjectPicks, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox } from '../../engine/design/objectOps';
 import { getSelection, selectionClipFor, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { drawSelect, selectIdle, selectMove, selectPress, selectUp, useSelectSession, type SelectGesture } from './StageSelect';
@@ -667,6 +668,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
             const had = isPicked(picks, layer.id, id);
             if (!had) pickObject(doc.id, layer.id, id, true);
             setLayerPicks(doc.id, []);
+            if (layer.type === 'vector') { const cur = objectPicks(doc.id); setObjectPicks(doc.id, cur.map((pk) => (pk.layerId === layer!.id ? { ...pk, ids: had ? pk.ids.filter((x) => !clickPick(layer as VectorLayer, id).includes(x) || x === id) : expandPicks(layer as VectorLayer, pk.ids) } : pk))); }
             const now = objectPicks(doc.id);
             drag.current = { kind: 'objMove', layerId: layer.id, ids: pickedIn(now, layer.id), startX: p.x, startY: p.y, base: layer, others: otherGroups(current, now, layer.id), ctrlToggle: had ? id : undefined, pre: current };
             return;
@@ -678,7 +680,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           setLayerPicks(doc.id, []);
           // Dragging one of several picked objects moves them all; another object starts a new pick.
           const again = isPicked(picks, layer.id, id);
-          const ids = again ? pickedIn(picks, layer.id) : [id];
+          const ids = again ? pickedIn(picks, layer.id) : layer.type === 'vector' ? clickPick(layer, id) : [id];
           if (!again) setObjectPick(doc.id, { layerId: layer.id, ids });
           drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, others: again ? otherGroups(current, picks, layer.id) : undefined, again, pre: current };
           return;

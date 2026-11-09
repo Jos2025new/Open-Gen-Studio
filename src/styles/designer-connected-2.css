@@ -34,3 +34,17 @@
 .context-strip .node-mode:disabled { opacity: 0.5; cursor: not-allowed; }
 .context-strip .node-done { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.5rem; }
 .node-more { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; padding: 0.375rem; }
+/* LayerObjects.tsx: a layer's groups and objects under its row, opened by the chevron at the row's start. */
+.layer-objects-chevron { flex: 0 0 1rem; width: 1rem; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; color: var(--text-2, var(--text)); cursor: pointer; }
+.layer-objects { display: flex; flex-direction: column; gap: 0.125rem; margin: 0.25rem 0.375rem 0.375rem 1.975rem; box-sizing: border-box; padding-left: 0.5rem; border-left: 1px solid var(--border); min-width: 0; }
+.layer-object, .layer-object-name, .layer-object-toggle { display: flex; align-items: center; gap: 0.45rem; box-sizing: border-box; width: 100%; min-width: 0; min-height: 1.95rem; background: none; border: 0; outline: none; color: var(--text-2, var(--text)); font-size: calc(var(--fs-xs, 0.75rem) * 1.2); text-align: left; cursor: pointer; padding: 0 0.45rem; border-radius: 6px; }
+.layer-object:focus-visible, .layer-object-name:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.layer-object:hover { background: var(--surface-hover, rgba(255,255,255,0.05)); color: var(--text); }
+.layer-object.is-picked { color: var(--text); background: var(--active-bg, color-mix(in srgb, var(--accent) 16%, transparent)); }
+.layer-object-name, .layer-object-toggle { width: auto; padding: 0; min-height: 0; color: inherit; }
+.layer-object-group > .layer-object { gap: 0.25rem; }
+/* Shelf thumbnails: the 64×40 canvas fits its (narrower) frame centred, and the active row's frame sits centred. */
+.layer-shelf .layer-thumb { width: 100%; height: 100%; object-fit: contain; }
+.layer-shelf .layer-row.is-active > .layer-select { justify-content: center; }
+.layer-objects-chevron:focus { outline: none; box-shadow: none; }
+.layer-objects-chevron:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); border-radius: 4px; }

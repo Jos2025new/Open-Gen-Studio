@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PanelPeekHandle, usePanelPeek } from './LayersPeek';
+import { LayerObjects, LayerObjectsToggle } from './LayerObjects';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from '../ui/icons';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import type { RelativeTo } from '../../engine/design/transform';
@@ -210,6 +211,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}
         onDoubleClick={l.type === 'fx' ? (e) => { if ((e.target as HTMLElement).closest('input, .layer-name, .layer-toggle')) return; fxRow.current = e.currentTarget; setFxEdit(l.id); } : undefined}>
+        <LayerObjectsToggle layer={l} />
         <button className="layer-select" aria-label={`Select ${l.name}`} aria-pressed={layer?.id === l.id} onClick={(e) => {
           if (drag?.active) return;
           // Shift: the whole run from the active layer to this one (the active layer stays the anchor). Ctrl: add or take out one.
@@ -227,7 +229,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         <LayerUnreadable layer={l} />
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
-      </div>{l.type === 'raster' && (paintModeOf(doc) === 'design' || hasEditableStrokes(l) || l.paintFlattened) && <RasterLimitControls sessionId={sessionId} docId={doc.id} layer={l} />}</Fragment>; })}
+      </div><LayerObjects sessionId={sessionId} doc={doc} layer={l} />{l.type === 'raster' && (paintModeOf(doc) === 'design' || hasEditableStrokes(l) || l.paintFlattened) && <RasterLimitControls sessionId={sessionId} docId={doc.id} layer={l} />}</Fragment>; })}
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     <div className="layer-actions">

@@ -1,3 +1,4 @@
+import { expandPicks } from '../../engine/design/objectGroupTree';
 import type { DesignDoc } from '../../engine/types';
 import { layerBox } from '../../engine/design/render';
 import { pixelTarget } from '../../engine/design/autoSelect';
@@ -79,7 +80,12 @@ export function finishEditMarquee(args: {
     const cur = objectPicks(doc.id);
     const layerIds = [...new Set([...cur.map((p) => p.layerId), ...find.objects.keys()])];
     setLayerPicks(doc.id, []);
-    setObjectPicks(doc.id, layerIds.map((layerId) => ({ layerId, ids: combineSelection(pickedIn(cur, layerId), find.objects.get(layerId) ?? [], drag.combine) })));
+    setObjectPicks(doc.id, layerIds.map((layerId) => {
+      const ids = combineSelection(pickedIn(cur, layerId), find.objects.get(layerId) ?? [], drag.combine);
+      const l = current.layers.find((x) => x.id === layerId);
+      // A rectangle touching part of a group picks the whole group, as a click does.
+      return { layerId, ids: l?.type === 'vector' && drag.combine !== 'subtract' ? expandPicks(l, ids) : ids };
+    }));
   } else if (find.layers.length === 0 && drag.combine !== 'replace') {
     return;
   } else {
