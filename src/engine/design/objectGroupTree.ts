@@ -32,7 +32,9 @@ export function clickPick(layer: VectorLayer, id: string): string[] {
 export function expandPicks(layer: VectorLayer, ids: string[]): string[] {
   const set = new Set<string>();
   for (const id of ids) for (const x of clickPick(layer, id)) set.add(x);
-  return layer.shapes.filter((s) => set.has(s.id)).map((s) => s.id);
+  // Shapes in paint order; anything else picked (lineart strokes) is kept as it was.
+  const shapes = new Set(layer.shapes.map((s) => s.id));
+  return [...layer.shapes.filter((s) => set.has(s.id)).map((s) => s.id), ...ids.filter((x) => !shapes.has(x))];
 }
 
 /** Groups that still have shapes. */

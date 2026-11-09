@@ -668,7 +668,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
             const had = isPicked(picks, layer.id, id);
             if (!had) pickObject(doc.id, layer.id, id, true);
             setLayerPicks(doc.id, []);
-            if (layer.type === 'vector') { const cur = objectPicks(doc.id); setObjectPicks(doc.id, cur.map((pk) => (pk.layerId === layer!.id ? { ...pk, ids: had ? pk.ids.filter((x) => !clickPick(layer as VectorLayer, id).includes(x) || x === id) : expandPicks(layer as VectorLayer, pk.ids) } : pk))); }
+            if (layer.type === 'vector' && !had) { const cur = objectPicks(doc.id); setObjectPicks(doc.id, cur.map((pk) => (pk.layerId === layer!.id ? { ...pk, ids: expandPicks(layer as VectorLayer, pk.ids) } : pk))); }
             const now = objectPicks(doc.id);
             drag.current = { kind: 'objMove', layerId: layer.id, ids: pickedIn(now, layer.id), startX: p.x, startY: p.y, base: layer, others: otherGroups(current, now, layer.id), ctrlToggle: had ? id : undefined, pre: current };
             return;
@@ -1092,7 +1092,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
     if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
     // A Ctrl-click (no drag) on something already picked takes it out of the pick.
-    if (d.kind === 'objMove' && d.ctrlToggle && !d.moved) pickObject(doc.id, d.layerId, d.ctrlToggle, true);
+    if (d.kind === 'objMove' && d.ctrlToggle && !d.moved) {
+      // Ctrl-click (no drag) on a picked group takes the whole group out; other objects toggle alone.
+      const l = (getDoc(sessionId, doc.id) ?? doc).layers.find((x) => x.id === d.layerId);
+      if (l?.type === 'vector') { const out = clickPick(l, d.ctrlToggle); setObjectPicks(doc.id, objectPicks(doc.id).map((pk) => (pk.layerId === l.id ? { ...pk, ids: pk.ids.filter((x) => !out.includes(x)) } : pk))); }
+      else pickObject(doc.id, d.layerId, d.ctrlToggle, true);
+    }
     if (d.kind === 'move' && d.ctrlToggle && !d.moved) { const cur = getDoc(sessionId, doc.id) ?? doc; const ids = pickLayer(doc.id, d.ctrlToggle, true, layerSelection(doc.id, cur.activeLayerId, cur.layers.map((l) => l.id))); setActiveLayer(sessionId, doc.id, ids.at(-1) ?? null); }
     if (d.kind === 'objMove') {
       applyRasterMove();
