@@ -1,168 +1,37 @@
-.design-export {
-  display: flex;
-  flex-direction: column;
-  max-block-size: min(42rem, calc(100vh - 5rem));
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  font-size: var(--fs-s);
-}
-.design-export fieldset {
-  display: grid;
-  min-inline-size: 0;
-  gap: var(--sp-2);
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-:is(.design-export, .design-export-pop) label:not(.opt) {
-  display: grid;
-  min-inline-size: 0;
-  gap: var(--sp-1);
-  color: var(--text-2);
-}
-:is(.design-export, .design-export-pop) label:not(.opt) > input {
-  inline-size: 100%;
-  min-inline-size: 0;
-  min-block-size: 2rem;
-  padding-inline: var(--sp-2);
-  border: 1px solid var(--field-border);
-  border-radius: var(--field-radius);
-  background: var(--field-bg);
-  color: var(--text);
-}
-.design-export-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-2);
-}
-.design-export-hint {
-  color: var(--text-2);
-  overflow-wrap: anywhere;
-}
-.design-export p { margin: 0; }
-.design-export-preview {
-  display: block;
-  inline-size: 100%;
-  block-size: 9rem;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-}
-.design-export-options {
-  border-block-start: 1px solid var(--border);
-  padding-block-start: var(--sp-2);
-}
-.design-export-options summary { cursor: pointer; }
-.design-export-options > :not(summary) { margin-block-start: var(--sp-2); }
-.design-export-options .opt { inline-size: 100%; }
-.design-export-buttons {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-.design-export-fields,
-.design-export-outputs,
-.design-export-actions,
-.design-export-folder { display: grid; gap: var(--sp-2); }
-.design-export-output {
-  display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr) auto auto;
-  gap: var(--sp-1);
-  align-items: center;
-}
-.design-export-output input,
-.design-export-row input {
-  inline-size: 100%;
-  min-inline-size: 0;
-  min-block-size: 2rem;
-  padding-inline: var(--sp-2);
-  border: 1px solid var(--field-border);
-  border-radius: var(--field-radius);
-  background: var(--field-bg);
-  color: var(--text);
-}
-.design-export-remove {
-  display: grid;
-  place-items: center;
-  inline-size: 2rem;
-  block-size: 2rem;
-  border: 0;
-  border-radius: var(--field-radius);
-  background: none;
-  color: var(--text-2);
-  cursor: pointer;
-}
-.design-export-remove:disabled { opacity: .35; cursor: default; }
-.design-export-figure { display: grid; gap: var(--sp-1); margin: 0; justify-items: center; }
-.design-export-figure { inline-size: 100%; justify-items: stretch; }
-.design-export-frame {
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-sm);
-}
-.design-export-page { position: relative; display: inline-block; max-inline-size: 100%; line-height: 0; box-shadow: 0 0 0 1px var(--border-strong, var(--border)); }
-.design-export-trim { position: absolute; border: 1px dashed var(--accent, currentColor); pointer-events: none; }
+/*
+ * Export panel. Every field is the Designer's own (InlineSelect, InlineSlider, InlineToggle, InlineColor), laid out
+ * by the same `.sidebar-tool-settings .tool-settings` and `.brush-row` rules as the Tool panel, so this file only
+ * holds what those do not: the panel frame, the summary (thumbnail and facts), the text field and the footer.
+ */
+.design-export { display: flex; flex-direction: column; max-block-size: min(40rem, calc(100vh - 5rem)); }
 .design-export-scroll { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
-.design-export-footer { flex: none; display: grid; gap: var(--sp-1); padding-block-start: var(--sp-2); border-block-start: 1px solid var(--border); background: var(--surface-2); }
+.design-export-body { min-inline-size: 0; margin: 0; border: 0; }
+.design-export-pop .design-export-body { padding: 0.5rem; }
+.design-export-title { flex: 1 1 100%; margin-block-start: 0.25rem; }
+
+/* Fields that the Tool panel does not pair: a toggle or text beside another field shares the row. */
+.design-export-body .brush-row > :is(.opt-toggle, .opt-text, .opt-color, .opt-choice, .design-export-files) { flex: 1 1 0; min-inline-size: 0; height: 2.25rem; }
+.design-export-body .brush-row > .opt-choice { justify-content: space-between; }
+.design-export-body .brush-row > .opt-color { justify-content: space-between; padding: 0 0.75rem; }
+.design-export-body .brush-row > .opt.is-icon { flex: none; inline-size: 2.25rem; height: 2.25rem; justify-content: center; padding: 0; }
+.design-export-body .design-export-add { flex: 1 1 100%; height: 2.25rem; justify-content: center; }
+
+/* A short text as one field: the name on the left, the text on the right. */
+.opt-text { cursor: text; }
+.opt-text > input { flex: 1 1 auto; min-inline-size: 0; padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: right; outline: none; }
+
+/* Summary: a small thumbnail of the page beside what will be written. */
+.design-export-summary { flex: 1 1 100%; display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.625rem; align-items: center; }
+.design-export-frame { display: grid; place-items: center; block-size: 5.5rem; container-type: size; }
+.design-export-page { position: relative; inline-size: min(100cqw, calc(100cqh * var(--ratio, 1))); aspect-ratio: var(--ratio, 1); background: #fff; line-height: 0; box-shadow: 0 0 0 1px var(--border), 0 0.0625rem 0.25rem rgb(0 0 0 / 0.35); }
+.design-export-page.is-transparent { background: repeating-conic-gradient(#d9d9d9 0 25%, #fff 0 50%) 0 0 / 0.5rem 0.5rem; }
+.design-export-frame.is-stale .design-export-page { opacity: 0.55; }
+.design-export-preview { inline-size: 100%; block-size: 100%; object-fit: fill; }
+.design-export-trim { position: absolute; border: 1px dashed var(--accent); pointer-events: none; }
+.design-export-facts { display: grid; gap: 0.25rem; min-inline-size: 0; font-size: var(--fs-xs); color: var(--text-2); overflow-wrap: anywhere; }
+.design-export-facts strong { color: var(--text); font-weight: 500; }
+.design-export-warn { flex: 1 1 100%; margin: 0; color: var(--warning, var(--text)); }
+
+.design-export-buttons { display: flex; flex: 1 1 100%; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.design-export-footer { flex: none; display: grid; gap: 0.375rem; padding: 0.625rem; border-block-start: 1px solid var(--border); }
 .design-export-footer > p { margin: 0; }
-.design-export-frame { block-size: 14.5rem; }
-.design-export-frame.is-stale .design-export-page { opacity: .55; }
-.design-export-scale { position: relative; display: block; }
-.design-export-scale > input { padding-inline-end: 1.4rem; }
-.design-export-scale > span { position: absolute; inset-block: 0; inset-inline-end: .5rem; display: grid; align-items: center; color: var(--text-2); pointer-events: none; }
-:is(.design-export, .design-export-pop) .opt-choice { display: grid; gap: var(--sp-1); block-size: auto; align-items: stretch; }
-:is(.design-export, .design-export-pop) .opt-choice .opt-choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-:is(.design-export, .design-export-pop) .opt-choice .opt-choices button { inline-size: auto; padding-inline: var(--sp-2); white-space: nowrap; overflow: visible; text-overflow: clip; }
-.design-export-size { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); }
-.design-export-formatrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-1); align-items: center; }
-.design-export-gear {
-  display: grid;
-  place-items: center;
-  inline-size: 2rem;
-  block-size: 2rem;
-  border: 1px solid var(--field-border);
-  border-radius: var(--field-radius);
-  background: var(--field-bg);
-  color: var(--text-2);
-  cursor: pointer;
-}
-.design-export-gear:hover { color: var(--text); }
-.design-export-pop .design-export-fields { padding: var(--sp-1); }
-.design-export-pop .design-export-hint { margin: 0; color: var(--text-2); font-size: var(--fs-s); }
-.design-export-seg { display: grid; gap: var(--sp-1); min-inline-size: 0; }
-.design-export-seg-label { color: var(--text-2); }
-.design-export-seg-row { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); }
-.design-export-seg-row button {
-  flex: 1 1 0;
-  min-inline-size: 0;
-  min-block-size: 1.75rem;
-  padding-inline: var(--sp-1);
-  border: 0;
-  border-radius: var(--radius-s, 4px);
-  background: none;
-  color: var(--text-2);
-  font: inherit;
-  font-size: var(--fs-s);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.design-export-seg-row button:hover { color: var(--text); }
-.design-export-seg-row button.is-on { color: var(--text); background: var(--field-on, var(--surface-3)); }
-.design-export-bgrow { display: flex; align-items: center; gap: var(--sp-2); min-inline-size: 0; }
-.design-export-bgvalue { flex: 1 1 auto; min-inline-size: 0; overflow-wrap: anywhere; color: var(--text); }
-.design-export-bgrow .opt-toggle { flex: 0 0 auto; inline-size: auto; }
-:is(.design-export, .design-export-pop) .opt { inline-size: 100%; margin: 0; box-sizing: border-box; }
-.design-export-bgrow .opt { inline-size: auto; }
-.design-export-bg { display: grid; gap: var(--sp-1); }
-.design-export-frame { container-type: size; padding: 12px; background: var(--surface-3, var(--surface-2)); }
-.design-export-frame .design-export-page { inline-size: min(100cqw, calc(100cqh * var(--ratio, 1))); aspect-ratio: var(--ratio, 1); max-inline-size: none; background: #fff; box-shadow: 0 0 0 1px var(--border-strong, var(--border)), 0 3px 14px rgb(0 0 0 / .35); }
-.design-export-frame .design-export-page.is-transparent { background: repeating-conic-gradient(#d9d9d9 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
-.design-export-frame .design-export-preview { inline-size: 100%; block-size: 100%; max-inline-size: none; max-block-size: none; object-fit: fill; }
-.design-export-more summary { cursor: pointer; color: var(--text-2); }
-.design-export-more[open] > :not(summary) { margin-block-start: var(--sp-2); }
-.design-export-opt { display: flex; align-items: flex-end; gap: var(--sp-1); min-inline-size: 0; }
-.design-export-opt > :first-child { flex: 1 1 auto; min-inline-size: 0; display: grid; gap: var(--sp-2); }
-.design-export-pin { flex: none; display: grid; place-items: center; inline-size: 1.75rem; block-size: 2rem; border: 0; border-radius: var(--field-radius); background: none; color: var(--text-3, var(--text-2)); cursor: pointer; }
-.design-export-pin:hover, .design-export-pin[aria-pressed="true"] { color: var(--text); }

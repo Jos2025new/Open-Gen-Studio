@@ -12,11 +12,12 @@ import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
 import { AreaRow, BackgroundRow, ExportSize, FormatRow, PresetActions } from './ExportOptions';
 import { MainOptions, PinButton, usePinned } from './ExportFormatOptions';
+import { OptText } from './ExportFields';
 
 import { blankNotice, hasVisibleContent, isNearUniform, parseColor, samplePreview } from '../../engine/design/exportContrast';
 import { ExportMenu } from './ExportFields';
 import { InlineToggle } from './InlineControls';
-import { Folder } from '../ui/icons';
+import { Folder, X } from '../ui/icons';
 
 import { exportError } from '../../engine/design/exportErrors';
 const groups = ['Share', 'Print', 'Work', 'Apps'];
@@ -170,82 +171,83 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const hasText = doc.layers.some((l) => l.type === 'text' && l.visible);
   const pinned = usePinned();
   const showPrefix = rows.length > 1 || !!settings.prefix || pinned.includes('prefix');
-  const folderControls = canChooseFolder() ? (
-      <div className="design-export-folder">
-      <div className="menu-sep-label">Save to</div><PinButton id="folder" label="folder" />
-      <Button size="sm" icon={Folder} onClick={() => void chooseFolder().then((dir) => dir && setFolder(dir)).catch((e) => setError(message(e)))}>
-        {folder ? `Folder: ${folder.name}` : 'Choose folder'}
-      </Button>
-      {folder && <Button size="sm" variant="ghost" onClick={() => setFolder(undefined)}>Use downloads</Button>}
-      {folder && <InlineToggle label="Subfolders by format" checked={!!settings.subfolders} onChange={(subfolders) => patch({ subfolders })} />}
+  const saveTo = canChooseFolder() ? <>
+    <span className="field-label design-export-title">Save to</span>
+    <div className="brush-row">
+      <button type="button" className="opt opt-pick" onClick={() => void chooseFolder().then((dir) => dir && setFolder(dir)).catch((e) => setError(message(e)))}>
+        <Folder size={13} /><span className="opt-label">{folder ? folder.name : 'Downloads'}</span><span className="opt-value">{folder ? 'Change' : 'Choose folder'}</span>
+      </button>
+      {folder && <button type="button" className="opt opt-pick is-icon" aria-label="Use downloads" data-tip="Use downloads" onClick={() => setFolder(undefined)}><X size={13} /></button>}
+      <PinButton id="folder" label="folder" />
     </div>
-  ) : undefined;
+    {folder && <InlineToggle label="Subfolders by format" checked={!!settings.subfolders} onChange={(subfolders) => patch({ subfolders })} />}
+  </> : null;
   const files = exportFileNames(settings, filename);
-  const namesLine = `→ ${files.slice(0, 3).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}${files.length > 1 && !folder ? ' (ZIP)' : ''}`;
+  const namesLine = `${files.slice(0, 3).join(', ')}${files.length > 3 ? ` +${files.length - 3}` : ''}${files.length > 1 && !folder ? ' · ZIP' : ''}`;
   const presetOptions = [
     ...BUILTIN_EXPORTS.map((p) => ({ value: p.id as string, label: p.name + (edited && p.id === choice ? ' (edited)' : ''), group: p.group })).sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group)),
     ...custom.map((p) => ({ value: p.id, label: p.name + (edited && p.id === choice ? ' (edited)' : ''), group: 'My presets' })),
     { value: '', label: 'Custom', group: 'Other' },
   ];
+  const prefixField = <OptText label="Prefix" value={settings.prefix ?? ''} maxLength={40} onChange={(v) => patch({ prefix: v || undefined })} />;
+  const warnings = [
+    ...(preview?.request === request && preview.blank ? [blankNotice(pageColor)] : []),
+    ...(delivered?.notices ?? []),
+  ];
 
   return <div className="design-export">
     {onBack && <Button size="sm" variant="ghost" onClick={onBack}>Back to File</Button>}
-    <div className="design-export-scroll"><fieldset disabled={!!progress}>
-      <ExportMenu autoFocus label="What is it for?" value={choice} options={presetOptions} onChange={(id) => {
+    <div className="design-export-scroll"><fieldset disabled={!!progress} className="sidebar-tool-settings design-export-body"><div className="tool-settings">
+      <div className="brush-row"><ExportMenu autoFocus label="Preset" value={choice} options={presetOptions} onChange={(id) => {
         const preset = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === id);
         apply(preset?.settings ?? { ...settings, preset: undefined, fitInstagram: undefined }, id);
-      }} />
-      <AreaRow settings={settings} patch={patch} picked={!!objectPicks?.length} pixels={!!getSelection(doc.id)} />
-      {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <Button size="sm" onClick={() => patch({ area: settings.area })}>
-        Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}
-      </Button>}
-      <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} />
-      {preview?.request === request && preview.blank && <p className="design-export-hint" role="note">{blankNotice(pageColor)}</p>}
-      {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
-      {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
-      {geometry && !paper && !settings.outputs?.length && <ExportSize settings={settings} patch={patch} geometry={geometry} />}
-      {instagramFit && <div className="design-export-hint">
-        <span>This ratio differs from 4:5 or square.</span>
-        <Button size="sm" onClick={() => patch({ fitInstagram: true })}>Fit to 4:5</Button>
-      </div>}
-      {settings.preset === 'instagram' && settings.fitInstagram && <Button size="sm" variant="ghost" onClick={() => patch({ fitInstagram: false })}>Use original ratio</Button>}
-      <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? null} />
-      <MainOptions settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} />
-      <div className={showPrefix ? 'design-export-row' : undefined}>
-        {showPrefix && <div className="design-export-opt"><label>Prefix
-          <input value={settings.prefix ?? ''} maxLength={40} onChange={(e) => patch({ prefix: e.target.value || undefined })} />
-        </label>{pinned.includes('prefix') && <PinButton id="prefix" label="Prefix" />}</div>}
-        <label>File name
-          <input value={filename} placeholder={doc.name} onChange={(e) => { setFilename(e.target.value); setStatus(undefined); }} />
-        </label>
+      }} /></div>
+      <div className="design-export-summary">
+        <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} layout={layout} />
+        <div className="design-export-facts">
+          <strong>{info || '—'}</strong>
+          {!invalid && <span data-testid="export-names">{namesLine}</span>}
+          {delivered && <span>{delivered.kb.toLocaleString()} KB</span>}
+        </div>
       </div>
-      {invalid ? null : <p className="design-export-hint" data-testid="export-names">{namesLine}</p>}
-      <FormatRow settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} prefix={!showPrefix} extra={folder || pinned.includes('folder') ? undefined : folderControls} />
-      {(folder || pinned.includes('folder')) && folderControls}
-      <details className="design-export-more" open={!!own}>
-        <summary>More</summary>
+      {warnings.map((note) => <p className="opt-hint design-export-warn" role="note" key={note}>{note}</p>)}
+      <div className="brush-row"><AreaRow settings={settings} patch={patch} picked={!!objectPicks?.length} pixels={!!getSelection(doc.id)} /></div>
+      {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ area: settings.area })}>
+        <span className="opt-label">Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}</span>
+      </button>}
+      {geometry && !paper && !settings.outputs?.length && <ExportSize patch={patch} geometry={geometry} />}
+      {instagramFit && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ fitInstagram: true })}><span className="opt-label">Fit to 4:5</span></button>}
+      {settings.preset === 'instagram' && settings.fitInstagram && <button type="button" className="opt opt-pick design-export-add" onClick={() => patch({ fitInstagram: false })}><span className="opt-label">Use original ratio</span></button>}
+      <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? null} />
+      <FormatRow settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} gear={<>
+        {!showPrefix && <><span className="field-label design-export-title">File</span><div className="brush-row">{prefixField}<PinButton id="prefix" label="Prefix" /></div></>}
+        {!folder && !pinned.includes('folder') && saveTo}
+        <span className="field-label design-export-title">Preset</span>
         <PresetActions savePreset={savePreset} own={own} deletePreset={() => {
           setSettings((st) => ({ designExportPresets: (st.designExportPresets ?? []).filter((p) => p.id !== choice) }));
           setChoice('');
         }} />
-      </details>
-    </fieldset></div>
+      </>} />
+      <MainOptions settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} />
+      <div className="brush-row">{showPrefix && prefixField}<OptText label="File name" value={filename} placeholder={doc.name} onChange={(v) => { setFilename(v); setStatus(undefined); }} /></div>
+      {(folder || pinned.includes('folder')) && saveTo}
+    </div></fieldset></div>
     <footer className="design-export-footer">
-    {(invalid || error || previewError) && <p role="alert">{invalid || error || previewError}</p>}
-    <div className="design-export-buttons">
-      {progress ? <Button size="sm" onClick={() => {
-        running.current?.abort();
-        running.current = null;
-        setProgress(undefined);
-        setStatus('Export cancelled. No file was downloaded.');
-      }}>Cancel</Button> : <Button size="sm" variant="primary" disabled={!!invalid} onClick={() => void run()}>Export</Button>}
-    </div>
-    {(progress || status) && <p role="status">{progress || status}</p>}
+      {(invalid || error || previewError) && <p className="opt-hint" role="alert">{invalid || error || previewError}</p>}
+      {(progress || status) && <p className="opt-hint" role="status">{progress || status}</p>}
+      <div className="design-export-buttons">
+        {progress ? <Button size="sm" onClick={() => {
+          running.current?.abort();
+          running.current = null;
+          setProgress(undefined);
+          setStatus('Export cancelled. No file was downloaded.');
+        }}>Cancel</Button> : <Button size="sm" variant="primary" disabled={!!invalid} onClick={() => void run()}>Export</Button>}
+      </div>
     </footer>
   </div>;
 }
 
-function ExportPreview({ image, transparent, ratio, stale, busy, layout }: { image?: Blob; transparent: boolean; ratio: number; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout> }) {
+function ExportPreview({ image, transparent, ratio, stale, layout }: { image?: Blob; transparent: boolean; ratio: number; stale: boolean; layout?: ReturnType<typeof pageLayout> }) {
   const [preview, setPreview] = useState<{ image: Blob; url: string }>();
   useEffect(() => {
     if (!image) return;
@@ -254,11 +256,10 @@ function ExportPreview({ image, transparent, ratio, stale, busy, layout }: { ima
     return () => URL.revokeObjectURL(url);
   }, [image]);
   const trim = layout?.trim;
-  return <figure className="design-export-figure">
-    <div className={`design-export-frame${stale ? ' is-stale' : ''}`}>{image ? <div className={`design-export-page${transparent ? ' is-transparent' : ''}`} style={{ '--ratio': ratio } as React.CSSProperties}>
-      {preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
+  return <div className={`design-export-frame${stale ? ' is-stale' : ''}`} aria-busy={stale}>
+    <div className={`design-export-page${transparent ? ' is-transparent' : ''}`} style={{ '--ratio': ratio } as React.CSSProperties}>
+      {image && preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
-    </div> : <span className="design-export-hint">{busy ? 'Preparing preview…' : 'No preview'}</span>}</div>
-    {busy && image && <figcaption className="design-export-hint">Updating preview…</figcaption>}
-  </figure>;
+    </div>
+  </div>;
 }

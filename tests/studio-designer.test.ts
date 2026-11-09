@@ -261,15 +261,15 @@ describe('file menu', () => {
     const panel = document.querySelector('.design-export')!;
     expect(panel.querySelectorAll('select').length).toBe(0);
     expect(panel.textContent).toContain('PNG');
-    pick(panel, 'What is it for?', 'WhatsApp');
+    pick(panel, 'Preset', 'WhatsApp');
     expect(panel.textContent).toContain('JPG');
-    expect(panel.querySelector<HTMLInputElement>('.design-export-size input')?.value).toBe('1600');
-    expect(document.querySelector('.design-export [aria-label="Compress"]')?.getAttribute('aria-checked')).toBe('true');
+    expect(panel.querySelector<HTMLInputElement>('.design-export-size .opt-num')?.value).toBe('1600');
+    expect([...panel.querySelectorAll('button.opt-pick')].find((b) => b.textContent?.startsWith('Quality'))?.textContent).toContain('Compress');
     pick(panel, 'Format', 'PDF');
     act(() => panel.querySelector<HTMLElement>('[aria-label="Format options"]')!.click());
-    act(() => document.querySelector<HTMLElement>('.design-export-pop [aria-label="Paper"]')!.click());
+    pick(document.body, 'PDF page', 'Paper');
     expect(document.body.textContent).toContain('Orientation');
-    expect(document.querySelector('[aria-label="Compress"]')).toBeNull();
+    expect([...panel.querySelectorAll('button.opt-pick')].some((b) => b.textContent?.startsWith('Quality'))).toBe(false);
   });
   it('debounces a 3× thumbnail and prepares the named file only after Export', async () => {
     vi.useFakeTimers();
@@ -281,7 +281,7 @@ describe('file menu', () => {
       act(() => q('[aria-label="File"]')!.click());
       act(() => item('Export')!.click());
       const panel = document.querySelector('.design-export')!;
-      typeInto(panel.querySelector('.design-export-size input')!, '360');
+      typeInto(panel.querySelector('.design-export-size .opt-num')!, '360');
       const filename = [...panel.querySelectorAll<HTMLInputElement>('input[placeholder]')].find((i) => i.placeholder === doc().name)!;
       expect(filename.value).toBe(doc().name);
       act(() => {
@@ -318,12 +318,13 @@ describe('file menu', () => {
       act(() => q('[aria-label="File"]')!.click());
       act(() => item('Export')!.click());
       const panel = document.querySelector('.design-export')!;
-      pick(panel, 'What is it for?', 'WhatsApp');
+      pick(panel, 'Preset', 'WhatsApp');
       await act(async () => item('Export')!.click());
       expect(download.deliver).toHaveBeenCalledWith(expect.objectContaining({ name: 'design.jpg' }));
       expect(doc().lastExport?.settings).toMatchObject({ format: 'jpg', pixels: 1600, quality: 85 });
+      act(() => panel.querySelector<HTMLElement>('[aria-label="Format options"]')!.click());
       act(() => item('Save as preset')!.click());
-      const name = panel.querySelector<HTMLInputElement>('input[maxlength="60"]')!;
+      const name = document.querySelector<HTMLInputElement>('input[maxlength="60"]')!;
       act(() => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(name, 'Small JPG');
         name.dispatchEvent(new Event('input', { bubbles: true }));

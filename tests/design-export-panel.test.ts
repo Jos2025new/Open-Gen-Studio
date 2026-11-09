@@ -30,6 +30,10 @@ const text = () => document.body.textContent ?? '';
 const click = (el: Element | null | undefined) => { expect(el).toBeTruthy(); act(() => { (el as HTMLElement).click(); }); };
 const gear = () => { if (!document.querySelector('.design-export-pop')) click(document.querySelector('[aria-label="Format options"]')); };
 const byText = (label: string, selector = 'button') => [...document.body.querySelectorAll(selector)].find((e) => e.textContent?.includes(label));
+/** A field menu by its name (InlineSelect / ExportMenu), then the choice. */
+const field = (label: string) => [...document.body.querySelectorAll('button.opt-pick')].find((b) => b.querySelector('.opt-label')?.textContent === label);
+const choose = (label: string, option: string) => { click(field(label)); click([...document.body.querySelectorAll('.menu-item')].find((e) => e.textContent?.startsWith(option))); };
+const nums = () => [...document.querySelectorAll<HTMLInputElement>('.design-export-size .opt-num')];
 
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
 afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; setSettings({ designExportPresets: [], designExportPinned: [] }); });
@@ -37,7 +41,7 @@ afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerH
 describe('export panel', () => {
   it('stacks menus opened inside a popover above it', () => {
     act(() => { root.render(createElement('div', { className: 'popover', style: { zIndex: 100 } }, createElement(ExportPanel, { sessionId: 's', doc: base }))); });
-    click(byText('Format'));
+    click(field('Format'));
     const menus = [...document.body.querySelectorAll<HTMLElement>('body > .popover')];
     expect(menus).toHaveLength(1);
     expect(Number(menus[0].style.zIndex)).toBeGreaterThan(100);
@@ -46,8 +50,9 @@ describe('export panel', () => {
   it('uses the app controls: no native select, format menu with purposes', () => {
     mount();
     expect(document.querySelectorAll('select').length).toBe(0);
-    click(byText('Format'));
-    for (const note of ['Best for sharing', 'Best for images and complex illustrations', 'Smaller files for websites', 'Scalable, for web and logos', 'Documents and printing']) expect(text()).toContain(note);
+    expect(document.querySelectorAll('.design-export .opt').length).toBeGreaterThan(5);
+    click(field('Format'));
+    for (const note of ['Best for sharing', 'Images and complex illustrations', 'Smaller files for websites', 'Scalable, for web and logos', 'Documents and printing']) expect(text()).toContain(note);
     expect(document.querySelectorAll('select').length).toBe(0);
   });
 
@@ -55,8 +60,7 @@ describe('export panel', () => {
     mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, format: 'webp', quality: 80, preset: 'web' } } });
     const label = () => document.querySelector('button.opt-pick')!.textContent;
     expect(label()).toContain('Lightweight web');
-    click(byText('Format'));
-    click(byText('PNG', '.menu-item'));
+    choose('Format', 'PNG');
     expect(label()).toContain('Lightweight web (edited)');
     expect(document.querySelector('.design-export-frame')).not.toBeNull();
     expect(document.querySelector('.design-export-footer .design-export-buttons')).not.toBeNull();
@@ -64,22 +68,22 @@ describe('export panel', () => {
 
   it('links width, height and DPI', () => {
     mount();
-    const [w, h, dpi] = [...document.querySelectorAll<HTMLInputElement>('.design-export-size input')];
+    const [w, h, dpi] = nums();
     expect([w.value, h.value, dpi.value]).toEqual(['120', '80', '96']);
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(dpi, '192');
       dpi.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const [w2, h2] = [...document.querySelectorAll<HTMLInputElement>('.design-export-size input')];
+    const [w2, h2] = nums();
     expect([w2.value, h2.value, dpi.value, document.querySelector('[role=alert]')?.textContent]).toEqual(['240', '160', '192', undefined]);
   });
 
-  it('groups the area as one row with a Selection sub-choice', () => {
+  it('chooses the area in one field: selections are offered only when they exist', () => {
     mount();
-    const row = document.querySelector('[aria-label="Export area"]')!;
-    expect([...row.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Selection', 'Layer']);
-    click(byText('Selection', '[role="radio"]'));
-    expect(text()).toContain('Selection of');
+    click(field('Area'));
+    expect([...document.querySelectorAll('.menu-item')].map((b) => b.textContent)).toEqual(['Canvas', 'Drawing', 'Layer']);
+    click(byText('Drawing', '.menu-item'));
+    expect(field('Area')?.textContent).toContain('Drawing');
   });
 
   it('says edited for a changed preset, and Custom only when none applies', () => {
@@ -94,7 +98,7 @@ describe('export panel', () => {
   it('shows one File name with the real result names, and the prefix only in the gear unless set', () => {
     mount();
     const line = () => document.querySelector('[data-testid="export-names"]')?.textContent;
-    expect(line()).toBe('→ Doc.png');
+    expect(line()).toBe('Doc.png');
     expect(text()).toContain('File name');
     expect(text()).not.toContain('Prefix');
     gear();
@@ -103,25 +107,23 @@ describe('export panel', () => {
     document.body.innerHTML = '';
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
     mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, prefix: 'app_', outputs: [{ scale: 1, suffix: '', format: 'png' }, { scale: 2, suffix: '@2x', format: 'png' }] } } });
-    expect(line()).toBe('→ app_Doc.png, app_Doc@2x.png (ZIP)');
-    expect([...document.querySelectorAll('label')].some((l) => l.textContent?.startsWith('Prefix') && !l.textContent.includes('added'))).toBe(true);
+    expect(line()).toBe('app_Doc.png, app_Doc@2x.png · ZIP');
+    expect(document.querySelector('.design-export-scroll')?.textContent).toContain('Prefix');
   });
 
   it('shows Quality in the main panel for JPG only, and pins gear options to the main panel', () => {
     mount();
-    expect(document.querySelector('.design-export [aria-label="Compress"]')).toBeNull();
-    click(byText('Format'));
-    click(byText('JPG', '.menu-item'));
-    expect(document.querySelector('.design-export [aria-label="Compress"]')).not.toBeNull();
-    click(byText('Format'));
-    click(byText('SVG', '.menu-item'));
-    expect(document.querySelector('.design-export [aria-label="Compress"]')).toBeNull();
+    expect(field('Quality')).toBeUndefined();
+    choose('Format', 'JPG');
+    expect(field('Quality')?.textContent).toContain('High');
+    choose('Format', 'SVG');
+    expect(field('Quality')).toBeUndefined();
     gear();
     expect(document.querySelector('.design-export')?.textContent).not.toContain('Minify');
     click(document.querySelector('[aria-label="Pin Minify"]'));
     expect(useStore.getState().settings.designExportPinned).toEqual(['minify']);
     expect(document.querySelector('.design-export')?.textContent).toContain('Minify');
-    expect(document.querySelector('.design-export [aria-label="Unpin Minify"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Unpin Minify"]')).not.toBeNull();
   });
 
   it('shows paper, bleed and marks in the main panel only for Print shop, and Prefix for several outputs', () => {
@@ -142,8 +144,7 @@ describe('export panel', () => {
 
   it('shows a labelled, readable background', () => {
     mount({ ...base, background: '#ffffff' });
-    expect(document.querySelector('.design-export-bg')?.textContent).toContain('Background');
-    expect(document.querySelector('.design-export-bgvalue')?.textContent).toBe('White');
+    expect(document.querySelector('.design-export-bg .opt-color')?.textContent).toBe('Background#FFFFFF');
   });
 
   it('judges the rendered preview: a white raster layer on a white page is flagged', async () => {
@@ -178,23 +179,21 @@ describe('export panel', () => {
     }
   });
 
-  it('keeps segmented buttons in equal flexible columns, never fixed narrower than their text', () => {
+  it('draws no field of its own: the panel CSS never restyles the shared .opt fields', () => {
     const css = readFileSync('src/styles/designer-export.css', 'utf8');
-    const rule = /\.design-export-seg-row button \{([^}]*)\}/.exec(css)![1];
-    expect(rule).toMatch(/flex:\s*1 1 0/);
-    expect(rule).toMatch(/min-inline-size:\s*0/);
-    expect(rule).toMatch(/white-space:\s*nowrap/);
-    expect(rule).not.toMatch(/(^|[;\s])(inline-)?(size|width):/);
+    expect(css).not.toMatch(/\.opt\s*\{/);
+    expect(css).not.toMatch(/!important/);
+    expect(css.length).toBeLessThan(5000);
   });
 
   it('shows the scale unit in rows', () => {
     mount();
     click(byText('+ Add scale'));
-    expect(document.querySelector('.design-export-scale')?.textContent).toContain('×');
+    expect(field('Scale of file 2')?.textContent).toContain('2×');
   });
 
   it('offers the text choice only for SVG or PDF of a document with text', () => {
-    const toSvg = () => { click(byText('Format')); click(byText('SVG', '.menu-item')); };
+    const toSvg = () => choose('Format', 'SVG');
     mount();
     toSvg();
     gear();
@@ -207,28 +206,24 @@ describe('export panel', () => {
     gear();
     expect(text()).not.toContain('Convert to paths');
     toSvg();
-    gear();
-    expect(text()).toContain('Embed fonts');
+    expect(field('Text')?.textContent).toContain('Embed fonts');
+    click(field('Text'));
     expect(text()).toContain('Convert to paths');
   });
 
   it('shows only the fields that apply', () => {
     mount();
     expect(text()).toContain('Transparent');
-    gear();
-    expect(text()).not.toContain('Limit size');
-    click(byText('Format'));
-    click(byText('JPG', '.menu-item'));
-    gear();
-    expect(text()).toContain('Limit size');
+    expect(field('Quality')).toBeUndefined();
+    choose('Format', 'JPG');
+    expect(field('Quality')).toBeDefined();
     expect(text()).not.toContain('Transparent');
-    click(byText('Format'));
-    click(byText('PDF', '.menu-item'));
+    choose('Format', 'PDF');
     gear();
-    click(byText('Paper', '[role="radio"]'));
-    expect(text()).not.toContain('Width (px)');
+    choose('PDF page', 'Paper');
+    expect(nums()).toHaveLength(0);
     expect(text()).toContain('Orientation');
-    expect(text()).toContain('Print shop');
+    expect(field('PDF page')?.textContent).toContain('Paper');
     expect(text()).toContain('Raster resolution');
   });
 
@@ -241,10 +236,9 @@ describe('export panel', () => {
     click(document.querySelector('[aria-label="Remove file 3"]'));
     click(document.querySelector('[aria-label="Remove file 2"]'));
     expect(text()).not.toContain('files ·');
-    click(byText('Format'));
-    click(byText('PDF', '.menu-item'));
+    choose('Format', 'PDF');
     gear();
-    click(byText('Paper', '[role="radio"]'));
+    choose('PDF page', 'Paper');
     expect(byText('Add scale')).toBeUndefined();
     expect(document.querySelectorAll('select').length).toBe(0);
   });
@@ -252,6 +246,7 @@ describe('export panel', () => {
   it('deletes an own preset only after an inline confirmation', () => {
     setSettings({ designExportPresets: [{ id: 'mine', name: 'Mine', settings: DEFAULT_EXPORT }] });
     mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, preset: 'mine' } } });
+    gear();
     click(byText('Delete preset'));
     expect(text()).toContain('Delete “Mine”?');
     click(byText('Cancel'));
