@@ -122,7 +122,8 @@ describe('drawDoc with FX layers', () => {
   it('a "below" FX filters everything under it, background included, and nothing above it', () => {
     const sepia = newFxLayer('filter', { scope: 'below', ops: [newFxOp('sepia')] });
     const { x } = view();
-    drawDoc(x, page([sepia], 1));
+    // New documents default to transparent; this case explicitly exercises a painted page background.
+    drawDoc(x, { ...page([sepia], 1), background: '#ffffff' });
     const pass = calls.find((k) => k.fn === 'drawImage' && k.filter === 'sepia(1)')!;
     // The background was filled on the composite the sepia pass reads.
     expect(calls.find((k) => k.fn === 'fillRect' && k.canvas === pass.src)).toBeDefined();

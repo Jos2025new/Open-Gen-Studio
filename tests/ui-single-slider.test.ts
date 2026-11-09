@@ -46,11 +46,12 @@ describe('the Designer draws its controls from InlineControls', () => {
     }
     expect(bad).toEqual([]);
   });
-  // A field reads the same wherever it sits: its containers are --surface, the chosen option inside a field is --field-on (not the hover tone).
-  it('fields sit on --surface and chosen options use --field-on', () => {
-    const css = ['designer.css', 'designer-connected.css'].map((f) => readFileSync(join('src/styles', f), 'utf8')).join('\n');
+  // Floating bars share --bar-bg; field selections use --field-on rather than the hover tone.
+  it('fields use the shared bar surface and chosen options use --field-on', () => {
+    const css = ['designer.css', 'designer-connected.css', 'designer-connected-2.css'].map((f) => readFileSync(join('src/styles', f), 'utf8')).join('\n');
     const body = (sel: string) => [...css.matchAll(/(?:^|\})\s*([^{}]+)\{([^{}]*)\}/gm)].filter((m) => m[1].trim() === sel).map((m) => m[2]).join(';');
-    expect(body('.context-strip')).toContain('background: var(--surface)');
+    expect(body('.context-strip')).toContain('background: var(--bar-bg)');
+    expect(readFileSync('src/styles/tokens.css', 'utf8')).toMatch(/--bar-bg:\s*var\(--surface\)/);
     expect(body('.layers-panel')).toContain('background: var(--surface)');
     expect(body('.opt-choice .opt-choices button.is-on')).toContain('var(--field-on)');
     expect(body('.opt .segmented button.is-active')).toContain('var(--field-on)');

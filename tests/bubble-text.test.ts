@@ -10,10 +10,11 @@ describe("the user's message bubble", () => {
   it('keeps only its own padding around the text', () => {
     expect(css).toMatch(/\.bubble > p \{ margin: 0; \}/);
   });
-  // 2026-10-26: message and prompt box stood out too much from the background; they take the step closest to it.
-  it('message and prompt box sit one soft step above the background', () => {
+  // The composer follows the shared bar token (history 058); the message keeps its own surface.
+  it('keeps the message surface and uses the shared bar background for the composer', () => {
     expect(chat).toMatch(/\.bubble \{ background: var\(--surface\);/);
-    expect(composer).toMatch(/\.composer \{ background: var\(--surface\);/);
+    expect(composer).toMatch(/\.composer \{ background: var\(--bar-bg\);/);
+    expect(readFileSync('src/styles/tokens.css', 'utf8')).toMatch(/--bar-bg:\s*var\(--surface\)/);
   });
 });
 

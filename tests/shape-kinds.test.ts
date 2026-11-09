@@ -19,8 +19,9 @@ describe('merged shape tools: model', () => {
     expect(ellipseTypeOfTool('rect')).toBeNull();
   });
   it('the toolbox has one variant per merged tool and every tool and key stays reachable', () => {
-    const edit = TOOLBOX.find((f) => f.id === 'edit')!.variants.map((v) => v.id);
-    expect(edit).toEqual(['edit', 'hand', 'rect', 'ellipse', 'line', 'polygon', 'shape-builder']);
+    expect(TOOLBOX.find((f) => f.id === 'edit')!.variants.map((v) => v.id)).toEqual(['edit']);
+    expect(TOOLBOX.find((f) => f.id === 'pan')!.variants.map((v) => v.id)).toEqual(['hand']);
+    expect(TOOLBOX.find((f) => f.id === 'shapes')!.variants.map((v) => v.id)).toEqual(['rect', 'ellipse', 'line', 'polygon', 'shape-builder']);
     expect([...toolboxTools()].sort()).toEqual(Object.keys(TOOL_NAMES).sort());
     for (const t of Object.values(DESIGN_TOOL_KEYS)) expect(toolboxTools()).toContain(t);
     expect(TOOLBOX.flatMap((f) => f.variants).find((v) => v.id === 'ellipse')!.also).toEqual(['sector', 'arc', 'chord']);
