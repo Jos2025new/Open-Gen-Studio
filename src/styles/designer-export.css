@@ -3,8 +3,6 @@
  * by the same `.sidebar-tool-settings .tool-settings` and `.brush-row` rules as the Tool panel, so this file only
  * holds what those do not: the panel frame, the summary (thumbnail and facts), the text field and the footer.
  */
-/* The panel sits on the same surface as the Tool panel, so its fields read as fields (field-bg on surface). */
-.popover:has(.design-export), .design-export-pop { background: var(--surface); }
 .design-export { display: flex; flex-direction: column; max-block-size: min(40rem, calc(100vh - 5rem)); }
 .design-export-scroll { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
 .design-export-body { min-inline-size: 0; margin: 0; border: 0; }
