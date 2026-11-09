@@ -312,7 +312,7 @@ describe('rows, areas, options and print', () => {
       getDirectoryHandle: async (name) => handle(`${path}${name}/`),
       getFileHandle: async (name, options) => {
         const list = tree.get(path) ?? [];
-        if (!list.includes(name)) { if (!options?.create) throw new Error('missing'); tree.set(path, [...list, name]); }
+        if (!list.includes(name)) { if (!options?.create) throw new DOMException('missing', 'NotFoundError'); tree.set(path, [...list, name]); }
         return { createWritable: async () => ({ write: async () => undefined, close: async () => undefined }) };
       },
     });

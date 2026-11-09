@@ -20,26 +20,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 334 | 245 |
-| [store.ts](../src/store/store.ts) | 227 | 231 |
-| [icons.tsx](../src/components/ui/icons.tsx) | 138 | 1 |
+| [types.ts](../src/engine/types.ts) | 339 | 252 |
+| [store.ts](../src/store/store.ts) | 227 | 232 |
+| [icons.tsx](../src/components/ui/icons.tsx) | 139 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 96 | 0 |
+| [actions.ts](../src/engine/design/actions.ts) | 67 | 39 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 4 |
-| [actions.ts](../src/engine/design/actions.ts) | 64 | 37 |
-| [media.ts](../src/lib/media.ts) | 55 | 47 |
+| [media.ts](../src/lib/media.ts) | 56 | 49 |
 | [catalog.ts](../src/engine/catalog.ts) | 47 | 23 |
+| [doc.ts](../src/engine/design/doc.ts) | 44 | 65 |
 | [ops.ts](../src/engine/ops.ts) | 44 | 18 |
-| [doc.ts](../src/engine/design/doc.ts) | 43 | 64 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 43 | 20 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
-| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 41 | 18 |
-| [id.ts](../src/lib/id.ts) | 38 | 0 |
-| [raster.ts](../src/engine/design/raster.ts) | 37 | 26 |
+| [id.ts](../src/lib/id.ts) | 39 | 0 |
+| [raster.ts](../src/engine/design/raster.ts) | 38 | 27 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
 | [format.ts](../src/lib/format.ts) | 35 | 1 |
 | [actions.ts](../src/engine/actions.ts) | 34 | 25 |
 | [types.ts](../src/engine/providers/types.ts) | 29 | 9 |
+| [render.ts](../src/engine/design/render.ts) | 28 | 9 |
 | [pathNodes.ts](../src/engine/design/pathNodes.ts) | 27 | 15 |
-| [render.ts](../src/engine/design/render.ts) | 27 | 9 |
 
 ## Por área
 
@@ -49,26 +49,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 17 | 6 |
 | `src/components/chat` | 22 | 20 |
 | `src/components/composer` | 15 | 14 |
-| `src/components/designer` | 98 | 51 |
+| `src/components/designer` | 100 | 53 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
 | `src/components/shell` | 35 | 24 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 16 |
-| `src/engine` | 61 | 304 |
+| `src/engine` | 61 | 311 |
 | `src/engine/agent` | 54 | 111 |
-| `src/engine/design` | 145 | 173 |
+| `src/engine/design` | 148 | 182 |
 | `src/engine/flow` | 12 | 25 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 33 | 316 |
-| `src/store` | 16 | 233 |
+| `src/lib` | 33 | 319 |
+| `src/store` | 16 | 234 |
 
-209 de 609 módulos no tienen ningún test que los importe directamente.
+211 de 614 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -82,6 +82,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
+- [LayerObjects.tsx](../src/components/designer/LayerObjects.tsx)
 - [LayerUnreadable.tsx](../src/components/designer/LayerUnreadable.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)

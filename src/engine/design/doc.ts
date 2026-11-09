@@ -141,6 +141,11 @@ export function dropIndex(n: number, from: number, slot: number): number | null 
 
 export function cloneLayer(layer: Layer): Layer {
   const id = uid('lyr');
+  if (layer.type === 'vector') {
+    // Object groups get new ids too, so a copy never shares <g id> with its source.
+    const gids = new Map((layer.objectGroups ?? []).map((g) => [g.id, uid('og')]));
+    if (gids.size) layer = { ...layer, objectGroups: layer.objectGroups!.map((g) => ({ ...g, id: gids.get(g.id)!, parentId: g.parentId && gids.get(g.parentId) })), shapes: layer.shapes.map((s) => (s.groupId ? { ...s, groupId: gids.get(s.groupId) } : s)) };
+  }
   if (layer.type === 'vector') return { ...layer, id, name: `${layer.name} copy`, ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, id: uid('mask') } } : {}), shapes: layer.shapes.map((s) => ({ ...s, id: uid('shp') })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => ({ ...s, id: uid('stk') })) } : {}) };
   return { ...layer, id, name: `${layer.name} copy` };
 }

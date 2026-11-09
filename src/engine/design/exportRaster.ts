@@ -19,6 +19,8 @@ export interface RasterExport {
   offsetX?: number;
   offsetY?: number;
   mask?: HTMLCanvasElement;
+  /** Where the mask lies in page units (default: the whole page). */
+  maskBox?: { x: number; y: number; w: number; h: number };
   clip?: (ctx: CanvasRenderingContext2D) => void;
   preview?: boolean;
   whiteBase?: boolean;
@@ -60,7 +62,8 @@ export async function exportDoc(doc: DesignDoc, type: RasterMime = 'image/png', 
       drawDoc(ctx, doc, { origin: 'export', resolution: 'document', exportScale });
       if (options.mask) {
         ctx.globalCompositeOperation = 'destination-in';
-        ctx.drawImage(options.mask, 0, 0);
+        const mb = options.maskBox ?? { x: 0, y: 0, w: doc.width, h: doc.height };
+        ctx.drawImage(options.mask, mb.x, mb.y, mb.w, mb.h);
       }
       ctx.restore();
     } else {

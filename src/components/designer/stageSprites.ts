@@ -80,3 +80,36 @@ export function drawCenterMark(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
   ctx.restore();
 }
+
+type ScreenBox = { x: number; y: number; w: number; h: number };
+/** Selection overlay in screen pixels: while a handle is held, a thin box (and the center it turns about); otherwise
+    the two-tone box, the center mark (scale mode) and the handles (arrows; the pivot as a ringed cross). */
+export function drawTransformOverlay(ctx: CanvasRenderingContext2D, b: ScreenBox, live: { op: string; x: number; y: number } | null,
+  handles: Array<{ op: string; fx: number; fy: number; x: number; y: number }>, scaleMode: boolean): void {
+  ctx.save();
+  ctx.lineWidth = 1;
+  if (live) {
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = 'rgba(236,236,239,0.6)';
+    ctx.strokeRect(Math.round(b.x) + 0.5, Math.round(b.y) + 0.5, Math.round(b.w), Math.round(b.h));
+    ctx.setLineDash([]);
+    if (live.op !== 'scale') {
+      const px = Math.round(live.x) + 0.5, py = Math.round(live.y) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px - 6, py); ctx.lineTo(px + 6, py); ctx.moveTo(px, py - 6); ctx.lineTo(px, py + 6);
+      ctx.strokeStyle = '#0a0a0b'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = '#ececef'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  drawSelectionBox(ctx, Math.round(b.x) - 0.5, Math.round(b.y) - 0.5, Math.round(b.w) + 1, Math.round(b.h) + 1);
+  if (scaleMode) drawCenterMark(ctx, b.x + b.w / 2, b.y + b.h / 2);
+  for (const h of handles) {
+    if (h.op !== 'pivot') { drawArrowHandle(ctx, h, h.x, h.y); continue; }
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, 5, 0, Math.PI * 2); ctx.moveTo(h.x - 9, h.y); ctx.lineTo(h.x + 9, h.y); ctx.moveTo(h.x, h.y - 9); ctx.lineTo(h.x, h.y + 9);
+    ctx.strokeStyle = '#0a0a0b'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}

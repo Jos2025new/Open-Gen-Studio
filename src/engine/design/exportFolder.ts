@@ -23,11 +23,25 @@ export async function chooseFolder(): Promise<FolderHandle | undefined> {
 }
 
 async function exists(dir: FolderHandle, name: string): Promise<boolean> {
-  try { await dir.getFileHandle(name); return true; } catch { return false; }
+  // Only "not found" means free; a permission or other error must stop the write, not overwrite blindly.
+  try { await dir.getFileHandle(name); return true; } catch (error) {
+    if ((error as { name?: string })?.name === 'NotFoundError' || (error as { name?: string })?.name === 'TypeMismatchError') return false;
+    throw error;
+  }
 }
 
 /** Write each file into the folder (optionally in a subfolder per format). Existing files are never overwritten: the name gets -2, -3 … */
-export async function writeFilesToFolder(dir: FolderHandle, files: ExportFile[], subfolders: boolean): Promise<string[]> {
+// One folder write at a time in this window: choosing a free name and creating it are two steps, so two exports into
+// the same folder (two panels, even with different handles to it) could pick the same name and overwrite each other.
+let queue: Promise<unknown> = Promise.resolve();
+
+export function writeFilesToFolder(dir: FolderHandle, files: ExportFile[], subfolders: boolean): Promise<string[]> {
+  const run = queue.catch(() => undefined).then(() => writeNow(dir, files, subfolders));
+  queue = run;
+  return run;
+}
+
+async function writeNow(dir: FolderHandle, files: ExportFile[], subfolders: boolean): Promise<string[]> {
   const written: string[] = [];
   for (const file of files) {
     const dot = file.name.lastIndexOf('.');

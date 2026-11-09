@@ -35,7 +35,10 @@ export function resolveExportTarget(doc: DesignDoc, { settings, target }: Rememb
 }
 
 async function loadExportLayers(doc: DesignDoc, target: ExportTarget, signal?: AbortSignal) {
-  const layers = target.layerId ? doc.layers.filter((l) => l.id === target.layerId) : doc.layers.filter((l) => l.visible);
+  // Only what the export draws: the chosen layer, or the layers of the picked objects, or every visible layer.
+  const picked = target.objects?.length ? new Set(target.objects.map((p) => p.layerId)) : null;
+  const layers = target.layerId ? doc.layers.filter((l) => l.id === target.layerId)
+    : picked ? doc.layers.filter((l) => l.visible && picked.has(l.id)) : doc.layers.filter((l) => l.visible);
   try {
     await ensureBuffers(layers);
     signal?.throwIfAborted();

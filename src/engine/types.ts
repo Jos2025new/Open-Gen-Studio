@@ -840,10 +840,10 @@ export interface RasterLayer extends LayerBase {
 
 export interface VectorShape extends ShapeSpec {
   id: string;
-  /** Innermost object group (VectorLayer.objectGroups) this shape belongs to, if any. Members stay contiguous. */
+  /** Innermost object group (contiguous members). */
   groupId?: string;
 }
-/** A group of shapes inside a vector layer, as SVG <g>: groups nest through parentId. */
+/** Shapes group in a vector layer (SVG <g>), nesting via parentId. */
 export interface ObjectGroup { id: string; name: string; parentId?: string; collapsed?: boolean }
 
 export type { Stroke, StrokeStyle, StrokeTexture } from './strokeTypes';
@@ -854,7 +854,7 @@ export interface VectorLayer extends LayerBase {
   /** Alpha coverage for a lifted region; vector geometry stays editable. */
   pixelMask?: RasterLayer;
   shapes: VectorShape[];
-  /** Object groups over `shapes` (Ctrl+G in Objects mode); a tree through ObjectGroup.parentId. */
+  /** Object groups over `shapes` (a tree). */
   objectGroups?: ObjectGroup[];
   /** Editable pressure strokes (Lineart tool), drawn above the shapes. */
   strokes?: Stroke[];

@@ -146,16 +146,19 @@ export interface SvgViewport {
   box: { x: number; y: number; w: number; h: number };
 }
 
+const TEXT_ATTRS = new Set(['version', 'id', 'class', 'href', 'xlink:href', 'inkscape:label', 'font-family', 'aria-label', 'xml:space', 'encoding']);
 /** Round every number with decimals inside attribute values (embedded images are left alone). */
 export function roundSvgNumbers(svg: string, decimals: number): string {
-  return svg.replace(/(\s[\w:-]+=")([^"]*)(")/g, (all, open: string, value: string, close: string) =>
-    value.startsWith('data:') ? all : open + value.replace(/-?\d*\.\d+/g, (num) => String(+(+num).toFixed(decimals))) + close);
+  // Names, ids, links and the XML declaration are text, not geometry: "Version 1.25" and version="1.0" stay as written.
+  return svg.replace(/(\s([\w:-]+)=")([^"]*)(")/g, (all, open: string, name: string, value: string, close: string) =>
+    value.startsWith('data:') || TEXT_ATTRS.has(name) ? all : open + value.replace(/-?\d*\.\d+/g, (num) => String(+(+num).toFixed(decimals))) + close);
 }
 
 /** Smaller file: no editor-only attributes or namespaces, no whitespace between tags. */
 export function minifySvg(svg: string): string {
   return svg.replace(/ (?:inkscape|sodipodi):[\w-]+="[^"]*"/g, '').replace(/ xmlns:(?:inkscape|sodipodi)="[^"]*"/g, '')
-    .replace(/>\s+</g, '><').replace(/\n/g, '');
+    // Only indentation (whitespace with a line break) goes: a lone space between tags can be text (xml:space).
+    .replace(/>\s*\n\s*</g, '><').replace(/\n/g, '');
 }
 
 export interface SvgBuildOptions extends SvgOptions {

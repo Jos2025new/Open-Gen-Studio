@@ -28,7 +28,7 @@ import { rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots } from './ShapeKnots';
 import { worldPoints } from '../../engine/design/strokes';
-import { checkerTile, drawArrowHandle, drawCenterMark, drawSelectionBox } from './stageSprites';
+import { checkerTile, drawTransformOverlay } from './stageSprites';
 import { GradientKnots } from './ShapeHandles';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
@@ -259,7 +259,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     return layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
   };
   const targetsBox = (ts: Array<{ layer: Layer; ids: string[] | null }>) => unionBox(ts.map((t) => (t.ids ? objectsBox(t.layer, t.ids) : layerBox(t.layer))).filter((b): b is NonNullable<typeof b> => Boolean(b)));
-  // Clicking empty canvas shows nothing selected (as in Inkscape), though the layer stays active for painting.
+  // Empty click: nothing shown selected; the layer stays active.
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
   const nothingPicked = !objPick?.length && !pickedLayers(doc.id, doc.layers.map((l) => l.id)).length;
   const dismissed = nothingPicked && dismissedFor != null && dismissedFor === doc.activeLayerId;
@@ -403,7 +403,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (all) ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
       ctx.restore();
     }
-    // The two-tone box below already frames the selection: no accent outline on top of it.
+    // Framed by the two-tone box: no accent outline on top.
     const framed = !!tBox && (handles.length > 0 || shapeEditing) && !editingText;
     if (active && active.visible && !editingText && drag.current?.kind !== 'xform') {
       const objectsMode = tool === 'move' && !editLayers && !shiftDown;
@@ -436,45 +436,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       }
     }
     if (tool === 'move' && !editLayers && !shiftDown && !editingText && !framed) outlinePicked(ctx, doc, objPick, active?.id, accentA(), (b) => [sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom]);
-    // Transform handles around what Edit acts on: squares to scale; in rotate mode, round corners to rotate,
-    // diamonds on the sides to skew, and the rotation center (drag it to move it).
+    // Transform handles and box (stageSprites.ts: drawTransformOverlay).
     const xformLive = drag.current?.kind === 'xform' && drag.current.op !== 'pivot' ? drag.current : null;
-    if (tBox && xformLive) {
-      // While a handle is held (as in Inkscape): no handles in the way, only a thin dashed box around the shape as
-      // it turns, and the center it turns about.
-      ctx.save();
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = 'rgba(236,236,239,0.6)';
-      ctx.strokeRect(Math.round(sx(tBox.x)) + 0.5, Math.round(sy(tBox.y)) + 0.5, Math.round(tBox.w * view.zoom), Math.round(tBox.h * view.zoom));
-      ctx.setLineDash([]);
-      if (xformLive.op !== 'scale') {
-        const px = Math.round(sx(xformLive.cx)) + 0.5, py = Math.round(sy(xformLive.cy)) + 0.5;
-        ctx.strokeStyle = '#0a0a0b';
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(px - 6, py); ctx.lineTo(px + 6, py); ctx.moveTo(px, py - 6); ctx.lineTo(px, py + 6); ctx.stroke();
-        ctx.strokeStyle = '#ececef';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else if (tBox && (handles.length || shapeEditing) && !editingText) {
-      ctx.save();
-      ctx.lineWidth = 1;
-      drawSelectionBox(ctx, Math.round(sx(tBox.x)) - 0.5, Math.round(sy(tBox.y)) - 0.5, Math.round(tBox.w * view.zoom) + 1, Math.round(tBox.h * view.zoom) + 1);
-      if (handleMode === 'scale') drawCenterMark(ctx, sx(tBox.x + tBox.w / 2), sy(tBox.y + tBox.h / 2));
-      for (const h of handles) {
-        const hx = sx(h.x), hy = sy(h.y);
-        ctx.fillStyle = '#0a0a0b';
-        ctx.strokeStyle = accentA();
-        ctx.beginPath();
-        if (h.op !== 'pivot') { drawArrowHandle(ctx, h, hx, hy); continue; }
-        ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.moveTo(hx - 9, hy); ctx.lineTo(hx + 9, hy); ctx.moveTo(hx, hy - 9); ctx.lineTo(hx, hy + 9);
-        ctx.strokeStyle = '#0a0a0b'; ctx.lineWidth = 3; ctx.stroke();
-        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
-      }
-      ctx.restore();
-    }
+    if (tBox && (xformLive || ((handles.length || shapeEditing) && !editingText))) drawTransformOverlay(ctx, { x: sx(tBox.x), y: sy(tBox.y), w: tBox.w * view.zoom, h: tBox.h * view.zoom }, xformLive && { op: xformLive.op, x: sx(xformLive.cx), y: sy(xformLive.cy) }, handles.map((h) => ({ ...h, x: sx(h.x), y: sy(h.y) })), handleMode === 'scale');
     if ((tool === 'move' || (tool === 'lineart' && lineartMode === 'edit')) && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
       const stroke = active.strokes?.find((s) => s.id === selectedCurve.strokeId);
       if (stroke) {
@@ -713,7 +677,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         const pickedNow = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
         if (!pickedNow.includes(whole.id)) pickLayer(doc.id, whole.id, false, pickedNow);
         if (whole && !layerObjects(whole).length && whole.type !== 'vector') {
-          const again = current.activeLayerId === whole.id && !dismissed; // After an empty click it is a new selection, not a second click.
+          const again = current.activeLayerId === whole.id && !dismissed;
           setActiveLayer(sessionId, doc.id, whole.id);
           if (!whole.locked) {
             // One of several picked layers: they all move together (as in Inkscape).

@@ -1,3 +1,5 @@
+import { strokesExportMask } from './exportStrokeMask';
+import { layerObjects } from './objectOps';
 import { zip } from 'fflate';
 import { blobToDataUrl } from '../../lib/media';
 import { fxTarget } from '../fx/plan';
@@ -73,10 +75,13 @@ function onlyLayers(doc: DesignDoc, keep: Map<string, Layer>): DesignDoc {
 
 function objectsArea(doc: DesignDoc, picks: ObjectPick[] | undefined, page: Box) {
   const keep = new Map<string, Layer>();
+  const partial = new Map<string, Set<string>>();
   for (const pick of picks ?? []) {
     const layer = doc.layers.find((l) => l.id === pick.layerId && l.visible && l.type !== 'fx');
     if (!layer) continue;
     const ids = new Set(pick.ids);
+    // Some strokes of a painted layer: its pixels are kept and cut to those strokes' footprint (exportStrokeMask.ts).
+    if (layer.type === 'raster' && (layer.paintStrokes ?? []).some((st) => !st.erase && !ids.has(st.id))) partial.set(layer.id, ids);
     keep.set(layer.id, layer.type === 'vector'
       ? { ...layer, shapes: layer.shapes.filter((s) => ids.has(s.id)), strokes: layer.strokes?.filter((s) => ids.has(s.id)) }
       : layer);
@@ -84,7 +89,10 @@ function objectsArea(doc: DesignDoc, picks: ObjectPick[] | undefined, page: Box)
   const bounds = unionBox([...keep.values()].map(layerExtent).filter((b): b is Box => !!b));
   const box = bounds && clampBox(bounds, page);
   if (!box) throw new ExportError('No picked objects are on the canvas, so pick objects (Edit tool) or choose Canvas.');
-  return { doc: onlyLayers(doc, keep), box };
+  const strokeBoxes = [...partial].flatMap(([id, ids]) => layerObjects(keep.get(id)!).filter((o) => ids.has(o.id)).map((o) => o.box));
+  const tight = partial.size ? unionBox([...[...keep.values()].filter((l) => !partial.has(l.id)).map(layerExtent).filter((b): b is Box => !!b), ...strokeBoxes]) : null;
+  const area = (tight && clampBox(tight, page)) || box;
+  return { doc: onlyLayers(doc, keep), box: area, mask: partial.size ? strokesExportMask(doc, [...keep.values()], partial, area) : undefined, maskBox: partial.size ? area : undefined };
 }
 
 function clampBox(box: Box, page: Box): Box | null {
@@ -118,16 +126,20 @@ function exportOutputs(settings: ExportSettings): ExportSettings[] {
   return settings.outputs.map((r) => ({ ...settings, outputs: undefined, size: r.scale, format: r.format, suffix: r.suffix }));
 }
 
+/** A suffix stays inside one file name: no folder separators or characters file systems reject. */
+const safeSuffix = (suffix: string) => suffix.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-');
+
 /** The file names an export will produce, as the panel shows them before exporting. */
 export function exportFileNames(settings: ExportSettings, filename: string): string[] {
   const base = filePrefix(settings.prefix) + fileBase(filename);
   return uniqueNames(exportOutputs(settings).map((o) => ({
-    name: `${base}${o.suffix ?? (typeof o.size === 'number' ? autoSuffix(o.size) : '')}.${o.format}`,
+    name: `${base}${safeSuffix(o.suffix ?? (typeof o.size === 'number' ? autoSuffix(o.size) : ''))}.${o.format}`,
   }))).map((f) => f.name);
 }
 
 export function validateExport(doc: DesignDoc, settings: ExportSettings, target: ExportTarget) {
-  if ((settings.format === 'jpg' || settings.format === 'webp') && settings.maxKb !== undefined
+  const sized = [settings.format, ...(settings.outputs ?? []).map((o) => o.format)].some((f) => f === 'jpg' || f === 'webp');
+  if (sized && settings.maxKb !== undefined
     && (!Number.isFinite(settings.maxKb) || settings.maxKb <= 0)) {
     throw new ExportError('The file size limit is invalid, so enter a value above zero.');
   }
@@ -164,7 +176,7 @@ function rasterLayout(doc: DesignDoc, settings: ExportSettings, target: ExportTa
   const renderDoc = background === geometry.doc.background ? geometry.doc : { ...geometry.doc, background };
   const selection = settings.area === 'selection' ? target.selection : undefined;
   const options: RasterExport = {
-    ...geometry, signal, mask: selection?.mask,
+    ...geometry, signal, mask: selection?.mask ?? ('mask' in geometry ? geometry.mask : undefined), maskBox: selection?.mask ? undefined : ('maskBox' in geometry ? geometry.maskBox : undefined),
     clip: selection && !selection.mask ? (ctx) => {
       selectionPath(ctx, doc, selection);
       ctx.clip('evenodd');
@@ -190,7 +202,8 @@ export async function exportPreview(doc: DesignDoc, settings: ExportSettings, ta
     ctx.clip();
   });
   return exportDoc(renderDoc, 'image/png', {
-    ...options, clip: bleedClip || options.clip, preview: true, whiteBase: output.format === 'jpg',
+    // Both clips apply: the bleed box and the selection's own shape (the preview matches the exported area).
+    ...options, clip: bleedClip || options.clip ? (ctx: CanvasRenderingContext2D) => { if (bleedClip) bleedClip(ctx); options.clip?.(ctx); } : undefined, preview: true, whiteBase: output.format === 'jpg',
     width: Math.max(1, Math.round(width * shrink)), height: Math.max(1, Math.round(height * shrink)),
     scale: options.scale * (layout?.scale ?? 1) * shrink,
     offsetX: ((layout?.x ?? 0) + (options.offsetX ?? 0) * (layout?.scale ?? 1)) * shrink,
@@ -220,7 +233,7 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     const live = (settings.text ?? 'fonts') === 'fonts' && texts.length > 0;
     const { found, missing } = live ? await collectFonts(texts, deps.fontFile) : { found: new Map(), missing: [] as string[] };
     missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
-    const svg = selection ? await maskedSvg(renderDoc, options, ratio) : await docToSvg(renderDoc, deps, options, {
+    const svg = selection || options.mask ? await maskedSvg(renderDoc, options, ratio, settings.svg?.metadata !== false) : await docToSvg(renderDoc, deps, options, {
       ...settings.svg, text: settings.text ?? 'fonts', fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
     });
     signal?.throwIfAborted();
@@ -229,16 +242,16 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
   }
   signal?.throwIfAborted();
   const extension = bytes.type === 'image/jpeg' ? 'jpg' : format;
-  const suffix = settings.suffix ?? (typeof settings.size === 'number' ? autoSuffix(settings.size) : '');
+  const suffix = safeSuffix(settings.suffix ?? (typeof settings.size === 'number' ? autoSuffix(settings.size) : ''));
   return { name: `${base}${suffix}.${extension}`, mime: bytes.type, bytes };
 }
 
-async function maskedSvg(doc: DesignDoc, options: RasterExport, ratio = 1): Promise<string> {
+async function maskedSvg(doc: DesignDoc, options: RasterExport, ratio = 1, metadata = true): Promise<string> {
   const { width, height } = options;
   const big = ratio === 1 ? options : { ...options, width: Math.round(width * ratio), height: Math.round(height * ratio), scale: options.scale * ratio,
     offsetX: (options.offsetX ?? 0) * ratio, offsetY: (options.offsetY ?? 0) * ratio };
   const href = await blobToDataUrl(await exportDoc(doc, 'image/png', big));
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><title>${xmlEscape(doc.name)}</title><image width="${width}" height="${height}" href="${href}"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${metadata ? `<title>${xmlEscape(doc.name)}</title>` : ''}<image width="${width}" height="${height}" href="${href}"/></svg>`;
 }
 
 export async function exportPlan(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, deps: SvgDeps, signal?: AbortSignal, onProgress?: (done: number, total: number) => void, filename = doc.name): Promise<ExportFile[]> {

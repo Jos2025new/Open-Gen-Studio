@@ -44,7 +44,9 @@ export function liveObjectGroups(layer: VectorLayer): ObjectGroup[] {
 
 /** Pure: group these shapes (whole outer groups are nested, not split). Members gather at the topmost one. */
 export function groupShapes(layer: VectorLayer, ids: string[], name?: string): { layer: VectorLayer; groupId: string } | null {
-  const picked = expandPicks(layer, ids);
+  // Only shapes group (lineart strokes are drawn above every shape, outside the tree).
+  const shapeIds = new Set(layer.shapes.map((s) => s.id));
+  const picked = expandPicks(layer, ids).filter((x) => shapeIds.has(x));
   if (picked.length < 2) return null;
   const set = new Set(picked);
   const tops = new Set(picked.map((x) => groupChain(layer, layer.shapes.find((s) => s.id === x)!.groupId).at(-1)?.id ?? ''));
@@ -84,7 +86,7 @@ export function shapesSvgTree(layer: VectorLayer, shapeSvg: (s: VectorShape) => 
     let k = 0;
     while (k < open.length && k < chain.length && open[k].id === chain[k].id) k++;
     for (let i = open.length - 1; i >= k; i--) out += '</g>';
-    for (let i = k; i < chain.length; i++) out += `<g id="${esc(chain[i].id)}" inkscape:label="${esc(chain[i].name)}">`;
+    for (let i = k; i < chain.length; i++) out += `<g id="${esc(`${layer.id}-${chain[i].id}`)}" inkscape:label="${esc(chain[i].name)}">`;
     open = chain;
     out += shapeSvg(s);
   }
