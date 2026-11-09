@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { printPixelRatio, printPreflight } from '../src/engine/design/exportPrint';
 import { writeFilesToFolder, type FolderHandle } from '../src/engine/design/exportFolder';
 import { currentExportTarget, deliverDesignExport, resolveExportTarget } from '../src/engine/design/exportDesign';
-import { exportDownloadFile, exportGeometry, exportPlan, exportPreview, validateExport } from '../src/engine/design/exportJob';
+import { exportDownloadFile, exportFileNames, exportGeometry, exportPlan, exportPreview, validateExport } from '../src/engine/design/exportJob';
 import { BUILTIN_EXPORTS, DEFAULT_EXPORT, row, type ExportSettings } from '../src/engine/design/exportSettings';
 import { setSelection } from '../src/engine/design/pixelSelection';
 import type { SvgDeps } from '../src/engine/design/export';
@@ -254,6 +254,13 @@ describe('rows, areas, options and print', () => {
     encodes.length = 0;
     expect(await names('android')).toEqual(['ldpi', 'mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'].map((d) => `My-design-${d}.png`));
     expect(sizes()).toEqual(['90x60', '120x80', '180x120', '240x160', '360x240', '480x320']);
+  });
+
+  it('lists the real file names before exporting', async () => {
+    expect(exportFileNames({ ...DEFAULT_EXPORT, format: 'pdf' }, 'Design 1')).toEqual(['Design-1.pdf']);
+    expect(exportFileNames(settings('ios'), 'Design 1')).toEqual(['Design-1.png', 'Design-1@2x.png', 'Design-1@3x.png']);
+    const planned = (await exportPlan(design, { ...settings('android'), prefix: 'a_' }, {}, layout)).map((f) => f.name);
+    expect(exportFileNames({ ...settings('android'), prefix: 'a_' }, design.name)).toEqual(planned);
   });
 
   it('numbers repeated names instead of failing, and adds the prefix', async () => {

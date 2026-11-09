@@ -5,14 +5,19 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportPanel } from '../src/components/designer/ExportPanel';
 import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
-import { lowContrastNotice } from '../src/engine/design/exportContrast';
+import { hasVisibleContent, isNearUniform, parseColor } from '../src/engine/design/exportContrast';
 import { DEFAULT_EXPORT } from '../src/engine/design/exportSettings';
 import { setSettings, useStore } from '../src/store/store';
 
+const preview = vi.hoisted(() => ({ promise: new Promise<Blob>(() => undefined), sample: null as Uint8ClampedArray | null }));
 vi.mock('../src/lib/idb', async (original) => ({ ...await original<typeof import('../src/lib/idb')>(), stateDb: { get: async () => undefined, set: async () => undefined } }));
 vi.mock('../src/engine/design/exportDesign', async (original) => ({
   ...await original<typeof import('../src/engine/design/exportDesign')>(),
-  prepareDesignPreview: () => new Promise(() => undefined),
+  prepareDesignPreview: () => preview.promise,
+}));
+vi.mock('../src/engine/design/exportContrast', async (original) => ({
+  ...await original<typeof import('../src/engine/design/exportContrast')>(),
+  samplePreview: async () => preview.sample,
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -86,13 +91,58 @@ describe('export panel', () => {
     expect(document.querySelector('button.opt-pick')!.textContent).toContain('Custom');
   });
 
-  it('shows a readable background and warns about white art on a white page', () => {
-    const white = newVectorLayer('W', [{ type: 'rect', x: 1, y: 1, w: 9, h: 9, radius: 0, fill: '#ffffff', stroke: null, strokeWidth: 0 }]);
-    mount({ ...base, background: '#ffffff', layers: [white] });
-    expect(text()).toContain('White');
-    expect(document.querySelector('[role="note"]')?.textContent).toContain('white on a white page');
-    expect(lowContrastNotice({ ...base, layers: [layer] }, '#ffffff')).toBeUndefined();
-    expect(lowContrastNotice({ ...base, layers: [white] }, null)).toBeUndefined();
+  it('shows one File name with the real result names, and the prefix only in the gear unless set', () => {
+    mount();
+    const line = () => document.querySelector('[data-testid="export-names"]')?.textContent;
+    expect(line()).toBe('→ Doc.png');
+    expect(text()).toContain('File name');
+    expect(text()).not.toContain('Prefix');
+    gear();
+    expect(text()).toContain('Prefix (added before every file name)');
+    act(() => root.unmount());
+    document.body.innerHTML = '';
+    host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, prefix: 'app_', outputs: [{ scale: 1, suffix: '', format: 'png' }, { scale: 2, suffix: '@2x', format: 'png' }] } } });
+    expect(line()).toBe('→ app_Doc.png, app_Doc@2x.png (ZIP)');
+    expect([...document.querySelectorAll('label')].some((l) => l.textContent?.startsWith('Prefix') && !l.textContent.includes('added'))).toBe(true);
+  });
+
+  it('shows a labelled, readable background', () => {
+    mount({ ...base, background: '#ffffff' });
+    expect(document.querySelector('.design-export-bg')?.textContent).toContain('Background');
+    expect(document.querySelector('.design-export-bgvalue')?.textContent).toBe('White');
+  });
+
+  it('judges the rendered preview: a white raster layer on a white page is flagged', async () => {
+    const white = { id: 'r', name: 'Paint', type: 'raster', visible: true, x: 0, y: 0, width: 100, height: 60, opacity: 1, blend: 'normal' } as never;
+    const doc = { ...base, background: '#ffffff', layers: [white] };
+    expect(hasVisibleContent(doc)).toBe(true);
+    const white64 = new Uint8ClampedArray(64 * 64 * 4).fill(255);
+    expect(isNearUniform(white64, parseColor('#ffffff'))).toBe(true);
+    const marked = white64.slice();
+    for (let i = 0; i < 4 * 64 * 4; i += 4) marked.set([0, 0, 0, 255], i);
+    expect(isNearUniform(marked, parseColor('#ffffff'))).toBe(false);
+    expect(isNearUniform(new Uint8ClampedArray(64 * 64 * 4), null)).toBe(true);
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:p', revokeObjectURL: () => undefined });
+    vi.useFakeTimers();
+    try {
+      preview.promise = Promise.resolve(new Blob(['x']));
+      preview.sample = white64;
+      mount(doc);
+      await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+      expect(document.querySelector('[role="note"]')?.textContent).toContain('white on a white page');
+      preview.sample = marked;
+      act(() => root.unmount());
+      root = createRoot(host);
+      mount(doc);
+      await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+      expect(document.querySelector('[role="note"]')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+      preview.promise = new Promise(() => undefined);
+      preview.sample = null;
+    }
   });
 
   it('keeps segmented buttons in equal flexible columns, never fixed narrower than their text', () => {

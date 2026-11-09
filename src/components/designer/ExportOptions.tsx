@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { exportRows, row, type ExportSettings } from '../../engine/design/exportSettings';
 import { Button } from '../ui/primitives';
 import { ExportMenu, ExportRows, formatOptions, Segmented, withRows } from './ExportFields';
@@ -48,15 +48,18 @@ export function BackgroundRow({ settings, patch, docBackground }: { settings: Ex
   const alpha = exportRows(settings).some((r) => r.format === 'png' || r.format === 'webp');
   const clear = alpha && (settings.background === null || (settings.background === undefined && !docBackground));
   const color = settings.background ?? docBackground ?? '#ffffff';
-  return <div className="design-export-bgrow">
-    <InlineColor label="Background color" iconOnly value={color} onChange={(background) => patch({ background })} />
-    <span className="design-export-bgvalue">{clear ? 'Transparent' : colorName(color)}</span>
-    {alpha && <InlineToggle label="Transparent" checked={clear} onChange={(on) => patch({ background: on ? null : docBackground ? undefined : '#ffffff' })} />}
+  return <div className="design-export-bg">
+    <span className="design-export-seg-label">Background</span>
+    <div className="design-export-bgrow">
+      <InlineColor label="Background color" iconOnly value={color} onChange={(background) => patch({ background })} />
+      <span className="design-export-bgvalue">{clear ? 'Transparent' : colorName(color)}</span>
+      {alpha && <InlineToggle label="Transparent" checked={clear} onChange={(on) => patch({ background: on ? null : docBackground ? undefined : '#ffffff' })} />}
+    </div>
   </div>;
 }
 
 /** Format menu with its gear, or the list of files when several scales are exported. */
-export function FormatRow({ settings, patch, hasText }: { settings: ExportSettings; patch: Patch; hasText: boolean }) {
+export function FormatRow({ settings, patch, hasText, extra }: { settings: ExportSettings; patch: Patch; hasText: boolean; extra?: ReactNode }) {
   const rows = exportRows(settings), multi = !!settings.outputs?.length;
   const page = rows.some((r) => r.format === 'pdf') && settings.pdf && settings.pdf !== 'screen';
   return <>
@@ -64,7 +67,7 @@ export function FormatRow({ settings, patch, hasText }: { settings: ExportSettin
       {!multi ? <ExportMenu label="Format" value={settings.format} options={formatOptions}
         onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />
         : <span className="design-export-hint">Files</span>}
-      <FormatGear settings={settings} patch={patch} hasText={hasText} />
+      <FormatGear settings={settings} patch={patch} hasText={hasText} extra={extra} />
     </div>
     {multi && <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />}
     {multi && <p className="design-export-hint">{rows.length} files · packed in one ZIP</p>}

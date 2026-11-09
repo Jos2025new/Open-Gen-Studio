@@ -118,6 +118,14 @@ function exportOutputs(settings: ExportSettings): ExportSettings[] {
   return settings.outputs.map((r) => ({ ...settings, outputs: undefined, size: r.scale, format: r.format, suffix: r.suffix }));
 }
 
+/** The file names an export will produce, as the panel shows them before exporting. */
+export function exportFileNames(settings: ExportSettings, filename: string): string[] {
+  const base = filePrefix(settings.prefix) + fileBase(filename);
+  return uniqueNames(exportOutputs(settings).map((o) => ({
+    name: `${base}${o.suffix ?? (typeof o.size === 'number' ? autoSuffix(o.size) : '')}.${o.format}`,
+  }))).map((f) => f.name);
+}
+
 export function validateExport(doc: DesignDoc, settings: ExportSettings, target: ExportTarget) {
   if ((settings.format === 'jpg' || settings.format === 'webp') && settings.maxKb !== undefined
     && (!Number.isFinite(settings.maxKb) || settings.maxKb <= 0)) {
@@ -139,7 +147,7 @@ function fileBase(name: string): string {
 const filePrefix = (prefix = '') => prefix.trim().replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 40);
 
 /** Names that repeat get -2, -3 … so the user never meets a duplicate-name error. */
-function uniqueNames(files: ExportFile[]): ExportFile[] {
+function uniqueNames<T extends { name: string }>(files: T[]): T[] {
   const seen = new Set<string>();
   return files.map((file) => {
     const dot = file.name.lastIndexOf('.');

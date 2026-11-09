@@ -1,44 +1,53 @@
+import { createCanvas, ctx2d } from '../../lib/media';
 import type { DesignDoc } from '../types';
+import { layerBox } from './render';
 
-type Rgb = [number, number, number];
-function parse(color: string | null | undefined): Rgb | null {
+const SAMPLE = 64;
+const TOLERANCE = 12;
+const BLANK_SHARE = 0.995;
+
+/** Does the design have anything visible to export (a visible layer with content)? */
+export function hasVisibleContent(doc: DesignDoc): boolean {
+  return doc.layers.some((l) => l.visible && l.type !== 'fx' && !!layerBox(l));
+}
+
+export function parseColor(color: string | null | undefined): [number, number, number] | null {
   const m = /^#([\da-f]{3}|[\da-f]{6})(?:[\da-f]{2})?$/i.exec(color?.trim() ?? '');
   if (!m) return null;
   const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
-  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as Rgb;
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
 }
-const lum = ([r, g, b]: Rgb) => [r, g, b].map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0);
-const name = (l: number) => (l > 0.85 ? 'white' : l < 0.05 ? 'black' : 'similar');
 
 /**
- * Says when everything drawn is about the colour of the page it lands on, so the file would look empty. Only plain
- * colours are judged (gradients, pictures and unknown formats count as visible). `page` is the colour behind the art.
+ * True when (nearly) every pixel of the rendered preview is the page colour, so the file would look empty.
+ * `data` is RGBA. A see-through pixel shows the page, so it counts as page colour; with no page colour (transparent
+ * output) only see-through pixels do.
  */
-export function lowContrastNotice(doc: DesignDoc, page: string | null): string | undefined {
-  const bg = parse(page);
-  if (!bg) return;
-  const colors: Array<string | null | undefined> = [];
-  for (const l of doc.layers) {
-    if (!l.visible || l.type === 'fx') continue;
-    if (l.type === 'raster') return;
-    if (l.type === 'text') colors.push(l.color);
-    else {
-      for (const s of l.shapes) {
-        if (s.fillGradient || s.strokeGradient) return;
-        colors.push(s.fill);
-        if (s.strokeWidth > 0) colors.push(s.stroke);
-      }
-      for (const s of l.strokes ?? []) colors.push(s.color);
-      if (l.pixelMask) return;
-    }
+export function isNearUniform(data: ArrayLike<number>, page: [number, number, number] | null): boolean {
+  let same = 0;
+  const total = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] <= TOLERANCE || (page && Math.max(Math.abs(data[i] - page[0]), Math.abs(data[i + 1] - page[1]), Math.abs(data[i + 2] - page[2])) <= TOLERANCE)) same++;
   }
-  const ink = colors.filter(Boolean).map(parse);
-  if (!ink.length || ink.some((c) => !c)) return;
-  const bgL = lum(bg);
-  const worst = Math.max(...(ink as Rgb[]).map((c) => { const a = lum(c), hi = Math.max(a, bgL), lo = Math.min(a, bgL); return (hi + 0.05) / (lo + 0.05); }));
-  if (worst >= 1.5) return;
-  const a = name(lum((ink as Rgb[])[0])), b = name(bgL);
-  return a !== 'similar' && b !== 'similar' && a === b
-    ? `Your design is ${a} on a ${b} page and will not be visible. Change the background or the paper color.`
-    : 'Your design has almost the same color as the page and may not be visible. Change the background or the paper color.';
+  return total > 0 && same / total >= BLANK_SHARE;
+}
+
+/** The preview bitmap shrunk to 64×64 RGBA, or null where the browser cannot decode it. */
+export async function samplePreview(blob: Blob): Promise<Uint8ClampedArray | null> {
+  if (typeof createImageBitmap !== 'function') return null;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const ctx = ctx2d(createCanvas(SAMPLE, SAMPLE));
+    ctx.drawImage(bitmap, 0, 0, SAMPLE, SAMPLE);
+    bitmap.close?.();
+    return ctx.getImageData(0, 0, SAMPLE, SAMPLE).data;
+  } catch {
+    return null;
+  }
+}
+
+export function blankNotice(page: string | null): string {
+  const rgb = parseColor(page);
+  const white = rgb && Math.min(...rgb) > 235;
+  return `Your design is ${white ? 'white on a white page' : 'the same color as the page'} and will not be visible. Change the background or the paper color.`;
 }

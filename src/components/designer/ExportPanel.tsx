@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { uid } from '../../lib/id';
 import type { DesignDoc } from '../../engine/types';
 import { currentExportTarget, deliverDesignExport, prepareDesignExport, prepareDesignPreview, rememberDesignExport, resolveExportTarget } from '../../engine/design/exportDesign';
-import { exportDownloadFile, exportGeometry, validateExport } from '../../engine/design/exportJob';
+import { exportDownloadFile, exportFileNames, exportGeometry, validateExport } from '../../engine/design/exportJob';
 import { canChooseFolder, chooseFolder, writeFilesToFolder, type FolderHandle } from '../../engine/design/exportFolder';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { BUILTIN_EXPORTS, DEFAULT_EXPORT, exportRows, pageLayout, PDF_PAPERS, pdfPage, type ExportSettings, type RememberedExport } from '../../engine/design/exportSettings';
@@ -12,7 +12,7 @@ import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
 import { AreaRow, BackgroundRow, ExportSize, FormatRow, PresetActions } from './ExportOptions';
 
-import { lowContrastNotice } from '../../engine/design/exportContrast';
+import { blankNotice, hasVisibleContent, isNearUniform, parseColor, samplePreview } from '../../engine/design/exportContrast';
 import { ExportMenu } from './ExportFields';
 import { InlineToggle } from './InlineControls';
 import { Folder } from '../ui/icons';
@@ -41,7 +41,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const [progress, setProgress] = useState<string>();
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<string>();
-  const [preview, setPreview] = useState<{ request: object; image?: Blob; error?: string }>();
+  const [preview, setPreview] = useState<{ request: object; image?: Blob; error?: string; blank?: boolean }>();
   const running = useRef<AbortController | null>(null);
   const [delivery, setDelivery] = useState<{ request: object; kb: number; notices: string[] }>();
   const [folder, setFolder] = useState<FolderHandle>();
@@ -77,7 +77,8 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
     const timer = setTimeout(async () => {
       try {
         const image = await prepareDesignPreview(doc, settings, target, controller.signal);
-        if (!controller.signal.aborted) setPreview({ request, image });
+        const sample = hasVisibleContent(doc) ? await samplePreview(image) : null;
+        if (!controller.signal.aborted) setPreview({ request, image, blank: !!sample && isNearUniform(sample, parseColor(pageColor)) });
       } catch (error) {
         if (!controller.signal.aborted) setPreview({ request, error: message(error) });
       }
@@ -155,7 +156,6 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
     && geometry.box.w !== geometry.box.h && geometry.box.w * 5 !== geometry.box.h * 4;
   const rows = exportRows(settings);
   const pageColor = settings.background !== undefined ? settings.background : doc.background ?? (rows.some((r) => r.format === 'pdf' || r.format === 'jpg') ? '#ffffff' : null);
-  const faint = useMemo(() => lowContrastNotice(doc, pageColor), [doc, pageColor]);
   const paper = rows[0].format === 'pdf' ? pdfPage(settings.pdf) : undefined;
   const chosen = [...BUILTIN_EXPORTS, ...custom].find((p) => p.id === choice);
   const edited = !!chosen && !sameSettings(settings, chosen.settings);
@@ -166,6 +166,18 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const paperName = paper ? `${PDF_PAPERS[paper.paper].label} ${paper.orientation}` : '';
   const info = paper ? `${paperName}${settings.print ? ' trim' : ''} · ${cm(trimMm[0])} × ${cm(trimMm[1])} cm${settings.print ? ` + ${settings.print.bleedMm} mm bleed` : ''}`
     : geometry ? `${geometry.width} × ${geometry.height} px${rows.length > 1 ? ` · ${rows.length} files` : ''}` : '';
+  const folderControls = canChooseFolder() ? (
+      <div className="design-export-folder">
+      <div className="menu-sep-label">Save to</div>
+      <Button size="sm" icon={Folder} onClick={() => void chooseFolder().then((dir) => dir && setFolder(dir)).catch((e) => setError(message(e)))}>
+        {folder ? `Folder: ${folder.name}` : 'Choose folder'}
+      </Button>
+      {folder && <Button size="sm" variant="ghost" onClick={() => setFolder(undefined)}>Use downloads</Button>}
+      {folder && <InlineToggle label="Subfolders by format" checked={!!settings.subfolders} onChange={(subfolders) => patch({ subfolders })} />}
+    </div>
+  ) : undefined;
+  const files = exportFileNames(settings, filename);
+  const namesLine = `→ ${files.slice(0, 3).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}${files.length > 1 && !folder ? ' (ZIP)' : ''}`;
   const presetOptions = [
     ...BUILTIN_EXPORTS.map((p) => ({ value: p.id as string, label: p.name + (edited && p.id === choice ? ' (edited)' : ''), group: p.group })).sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group)),
     ...custom.map((p) => ({ value: p.id, label: p.name + (edited && p.id === choice ? ' (edited)' : ''), group: 'My presets' })),
@@ -183,8 +195,8 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <Button size="sm" onClick={() => patch({ area: settings.area })}>
         Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}
       </Button>}
-      <ExportPreview ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
-      {faint && <p className="design-export-hint" role="note">{faint}</p>}
+      <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
+      {preview?.request === request && preview.blank && <p className="design-export-hint" role="note">{blankNotice(pageColor)}</p>}
       {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
       {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
       {geometry && !paper && !settings.outputs?.length && <ExportSize settings={settings} patch={patch} geometry={geometry} />}
@@ -194,26 +206,23 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       </div>}
       {settings.preset === 'instagram' && settings.fitInstagram && <Button size="sm" variant="ghost" onClick={() => patch({ fitInstagram: false })}>Use original ratio</Button>}
       <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? null} />
-      <div className="design-export-row">
-        <label>Name prefix
-          <input value={settings.prefix ?? ''} maxLength={40} placeholder="optional" onChange={(e) => patch({ prefix: e.target.value || undefined })} />
-        </label>
-        <label>Name
+      <div className={settings.prefix ? 'design-export-row' : undefined}>
+        {settings.prefix && <label>Prefix
+          <input value={settings.prefix} maxLength={40} onChange={(e) => patch({ prefix: e.target.value || undefined })} />
+        </label>}
+        <label>File name
           <input value={filename} placeholder={doc.name} onChange={(e) => { setFilename(e.target.value); setStatus(undefined); }} />
         </label>
       </div>
-      <FormatRow settings={settings} patch={patch} hasText={doc.layers.some((l) => l.type === 'text' && l.visible)} />
-      {canChooseFolder() && <div className="design-export-folder">
-        <Button size="sm" icon={Folder} onClick={() => void chooseFolder().then((dir) => dir && setFolder(dir)).catch((e) => setError(message(e)))}>
-          {folder ? `Folder: ${folder.name}` : 'Choose folder'}
-        </Button>
-        {folder && <Button size="sm" variant="ghost" onClick={() => setFolder(undefined)}>Use downloads</Button>}
-        {folder && <InlineToggle label="Subfolders by format" checked={!!settings.subfolders} onChange={(subfolders) => patch({ subfolders })} />}
-      </div>}
-      <PresetActions savePreset={savePreset} own={own} deletePreset={() => {
-        setSettings((st) => ({ designExportPresets: (st.designExportPresets ?? []).filter((p) => p.id !== choice) }));
-        setChoice('');
-      }} />
+      {invalid ? null : <p className="design-export-hint" data-testid="export-names">{namesLine}</p>}
+      <FormatRow settings={settings} patch={patch} hasText={doc.layers.some((l) => l.type === 'text' && l.visible)} extra={folderControls} />
+      <details className="design-export-more" open={!!own}>
+        <summary>More</summary>
+        <PresetActions savePreset={savePreset} own={own} deletePreset={() => {
+          setSettings((st) => ({ designExportPresets: (st.designExportPresets ?? []).filter((p) => p.id !== choice) }));
+          setChoice('');
+        }} />
+      </details>
     </fieldset></div>
     <footer className="design-export-footer">
     {(invalid || error || previewError) && <p role="alert">{invalid || error || previewError}</p>}
@@ -230,7 +239,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   </div>;
 }
 
-function ExportPreview({ image, ratio, stale, busy, layout, caption }: { image?: Blob; ratio: number; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout>; caption: string }) {
+function ExportPreview({ image, transparent, ratio, stale, busy, layout, caption }: { image?: Blob; transparent: boolean; ratio: number; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout>; caption: string }) {
   const [preview, setPreview] = useState<{ image: Blob; url: string }>();
   useEffect(() => {
     if (!image) return;
@@ -240,7 +249,7 @@ function ExportPreview({ image, ratio, stale, busy, layout, caption }: { image?:
   }, [image]);
   const trim = layout?.trim;
   return <figure className="design-export-figure">
-    <div className={`design-export-frame${stale ? ' is-stale' : ''}`}>{image ? <div className="design-export-page" style={{ '--ratio': ratio } as React.CSSProperties}>
+    <div className={`design-export-frame${stale ? ' is-stale' : ''}`}>{image ? <div className={`design-export-page${transparent ? ' is-transparent' : ''}`} style={{ '--ratio': ratio } as React.CSSProperties}>
       {preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
     </div> : <span className="design-export-hint">{busy ? 'Preparing preview…' : 'No preview'}</span>}</div>

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { DEFAULT_JPEG_QUALITY, DEFAULT_PDF_PAGE, exportRows, PDF_PAPERS, pdfPage, type ExportSettings, type PdfPage, type PdfPaper } from '../../engine/design/exportSettings';
 import { Settings } from '../ui/icons';
 import { Popover, usePopover } from '../ui/Popover';
@@ -7,7 +8,7 @@ import { InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 const quality = { compress: 75, high: DEFAULT_JPEG_QUALITY };
 
 /** Everything that only one format needs, grouped by format (the gear next to Format opens it). */
-export function FormatOptions({ settings, patch, hasText }: { settings: ExportSettings; patch: (options: Partial<ExportSettings>) => void; hasText: boolean }) {
+export function FormatOptions({ settings, patch, hasText, extra }: { settings: ExportSettings; patch: (options: Partial<ExportSettings>) => void; hasText: boolean; extra?: ReactNode }) {
   const rows = exportRows(settings);
   const has = (...formats: string[]) => rows.some((r) => formats.includes(r.format));
   const page = has('pdf') ? pdfPage(settings.pdf) : undefined;
@@ -19,6 +20,10 @@ export function FormatOptions({ settings, patch, hasText }: { settings: ExportSe
     {(settings.text ?? 'fonts') === 'fonts' && <Hint>System fonts cannot be embedded: that text keeps the font name.</Hint>}
   </>;
   return <div className="design-export-fields">
+    <div className="menu-sep-label">Files</div>
+    <label>Prefix (added before every file name)
+      <input value={settings.prefix ?? ''} maxLength={40} placeholder="optional" onChange={(e) => patch({ prefix: e.target.value || undefined })} />
+    </label>
     {has('pdf') && <>
       <div className="menu-sep-label">PDF</div>
       {text}
@@ -49,11 +54,12 @@ export function FormatOptions({ settings, patch, hasText }: { settings: ExportSe
       {level === 'limit' && <InlineSlider label="Maximum" value={settings.maxKb ?? 500} min={10} max={2000} step={10} unit="KB" allowManualOverflow onChange={(maxKb) => patch({ maxKb: Math.round(maxKb) })} />}
     </>}
     {has('png') && !has('svg', 'pdf', 'jpg', 'webp') && <Hint>PNG is lossless: it has no extra options.</Hint>}
+    {extra}
   </div>;
 }
 
 /** The gear button beside Format, with the options of the chosen format(s) in a small popover. */
-export function FormatGear(props: { settings: ExportSettings; patch: (options: Partial<ExportSettings>) => void; hasText: boolean }) {
+export function FormatGear(props: { settings: ExportSettings; patch: (options: Partial<ExportSettings>) => void; hasText: boolean; extra?: ReactNode }) {
   const pop = usePopover();
   return <>
     <button type="button" ref={pop.ref} className="design-export-gear" aria-label="Format options" data-tip="Format options" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}><Settings size={15} /></button>

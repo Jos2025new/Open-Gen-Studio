@@ -14,13 +14,13 @@
   padding: 0;
   margin: 0;
 }
-.design-export label:not(.opt) {
+:is(.design-export, .design-export-pop) label:not(.opt) {
   display: grid;
   min-inline-size: 0;
   gap: var(--sp-1);
   color: var(--text-2);
 }
-.design-export label:not(.opt) > input {
+:is(.design-export, .design-export-pop) label:not(.opt) > input {
   inline-size: 100%;
   min-inline-size: 0;
   min-block-size: 2rem;
@@ -100,12 +100,9 @@
 .design-export-frame {
   display: grid;
   place-items: center;
-  padding: var(--sp-2);
   border-radius: var(--r-sm);
-  background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface-3, var(--surface)) 0 50%) 0 0 / 12px 12px;
 }
 .design-export-page { position: relative; display: inline-block; max-inline-size: 100%; line-height: 0; box-shadow: 0 0 0 1px var(--border-strong, var(--border)); }
-.design-export-frame .design-export-preview { border: 0; border-radius: 0; background: none; inline-size: auto; block-size: auto; max-inline-size: 100%; max-block-size: 12rem; }
 .design-export-trim { position: absolute; border: 1px dashed var(--accent, currentColor); pointer-events: none; }
 .design-export-scroll { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
 .design-export-footer { flex: none; display: grid; gap: var(--sp-1); padding-block-start: var(--sp-2); border-block-start: 1px solid var(--border); background: var(--surface-2); }
@@ -158,6 +155,10 @@
 .design-export-bgrow .opt-toggle { flex: 0 0 auto; inline-size: auto; }
 :is(.design-export, .design-export-pop) .opt { inline-size: 100%; margin: 0; box-sizing: border-box; }
 .design-export-bgrow .opt { inline-size: auto; }
-.design-export-frame { container-type: size; padding: 2px; }
-.design-export-frame .design-export-page { inline-size: min(100cqw, calc(100cqh * var(--ratio, 1))); aspect-ratio: var(--ratio, 1); max-inline-size: none; }
+.design-export-bg { display: grid; gap: var(--sp-1); }
+.design-export-frame { container-type: size; padding: 12px; background: var(--surface-3, var(--surface-2)); }
+.design-export-frame .design-export-page { inline-size: min(100cqw, calc(100cqh * var(--ratio, 1))); aspect-ratio: var(--ratio, 1); max-inline-size: none; background: #fff; box-shadow: 0 0 0 1px var(--border-strong, var(--border)), 0 3px 14px rgb(0 0 0 / .35); }
+.design-export-frame .design-export-page.is-transparent { background: repeating-conic-gradient(#d9d9d9 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
 .design-export-frame .design-export-preview { inline-size: 100%; block-size: 100%; max-inline-size: none; max-block-size: none; object-fit: fill; }
+.design-export-more summary { cursor: pointer; color: var(--text-2); }
+.design-export-more[open] > :not(summary) { margin-block-start: var(--sp-2); }
