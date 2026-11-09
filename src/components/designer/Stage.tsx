@@ -27,7 +27,7 @@ import { rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots } from './ShapeKnots';
 import { worldPoints } from '../../engine/design/strokes';
-import { checkerTile, drawArrowHandle } from './stageSprites';
+import { checkerTile, drawArrowHandle, drawCenterMark, drawSelectionBox } from './stageSprites';
 import { GradientKnots } from './ShapeHandles';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
@@ -398,6 +398,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (all) ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
       ctx.restore();
     }
+    // The two-tone box below already frames the selection: no accent outline on top of it.
+    const framed = !!tBox && (handles.length > 0 || shapeEditing) && !editingText;
     if (active && active.visible && !editingText && drag.current?.kind !== 'xform') {
       const objectsMode = tool === 'move' && !editLayers && !shiftDown;
       const objects = objectsMode ? layerObjects(active) : [];
@@ -408,11 +410,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         ctx.lineWidth = 1;
         for (const o of objects) {
           const on = ids.includes(o.id);
+          if (on && framed) continue;
           ctx.strokeStyle = on ? accentA() : accentA(0.28);
           ctx.strokeRect(sx(o.box.x) + 0.5, sy(o.box.y) + 0.5, o.box.w * view.zoom, o.box.h * view.zoom);
         }
         const all = ids.length > 1 ? objectsBox(active, ids) : null;
-        if (all) {
+        if (all && !framed) {
           ctx.setLineDash([5, 4]);
           ctx.strokeStyle = accentA(0.55);
           ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
@@ -420,14 +423,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         ctx.restore();
       } else {
         const b = layerBox(active);
-        if (b) {
+        if (b && !framed) {
           ctx.strokeStyle = accentA();
           ctx.lineWidth = 1;
           ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
         }
       }
     }
-    if (tool === 'move' && !editLayers && !shiftDown && !editingText) outlinePicked(ctx, doc, objPick, active?.id, accentA(), (b) => [sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom]);
+    if (tool === 'move' && !editLayers && !shiftDown && !editingText && !framed) outlinePicked(ctx, doc, objPick, active?.id, accentA(), (b) => [sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom]);
     // Transform handles around what Edit acts on: squares to scale; in rotate mode, round corners to rotate,
     // diamonds on the sides to skew, and the rotation center (drag it to move it).
     const xformLive = drag.current?.kind === 'xform' && drag.current.op !== 'pivot' ? drag.current : null;
@@ -450,23 +453,22 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         ctx.stroke();
       }
       ctx.restore();
-    } else if (tBox && handles.length && !editingText) {
+    } else if (tBox && (handles.length || shapeEditing) && !editingText) {
       ctx.save();
       ctx.lineWidth = 1;
-      ctx.strokeStyle = accentA(0.7);
-      ctx.setLineDash([4, 3]);
-      ctx.strokeRect(sx(tBox.x) - 0.5, sy(tBox.y) - 0.5, tBox.w * view.zoom + 1, tBox.h * view.zoom + 1);
-      ctx.setLineDash([]);
+      drawSelectionBox(ctx, Math.round(sx(tBox.x)) - 0.5, Math.round(sy(tBox.y)) - 0.5, Math.round(tBox.w * view.zoom) + 1, Math.round(tBox.h * view.zoom) + 1);
+      if (handleMode === 'scale') drawCenterMark(ctx, sx(tBox.x + tBox.w / 2), sy(tBox.y + tBox.h / 2));
       for (const h of handles) {
         const hx = sx(h.x), hy = sy(h.y);
         ctx.fillStyle = '#0a0a0b';
         ctx.strokeStyle = accentA();
         ctx.beginPath();
-        if (h.op === 'rotate' || h.op === 'skew') { drawArrowHandle(ctx, h, hx, hy); continue; }
+        if (h.op !== 'pivot') { drawArrowHandle(ctx, h, hx, hy); continue; }
         if (h.op === 'scale') ctx.rect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE);
         else { ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.moveTo(hx - 9, hy); ctx.lineTo(hx + 9, hy); ctx.moveTo(hx, hy - 9); ctx.lineTo(hx, hy + 9); }
-        if (h.op !== 'pivot') ctx.fill();
-        ctx.stroke();
+        if (h.op !== 'pivot') { ctx.fill(); ctx.strokeStyle = '#ececef'; ctx.stroke(); continue; }
+        ctx.strokeStyle = '#0a0a0b'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
       }
       ctx.restore();
     }
