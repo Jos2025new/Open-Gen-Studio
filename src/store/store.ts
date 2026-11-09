@@ -57,6 +57,8 @@ import type {
 
 export interface Settings {
   designExportPresets?: CustomExportPreset[];
+  /** Export options the user pinned to the main panel (by option key), for every document. */
+  designExportPinned?: string[];
   keys: Record<RemoteProviderId, string>;
   agent: { provider: LlmProviderId | 'offline'; model: string; /** True only when the user pinned this exact director model. */ modelPinned?: boolean; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; showThinking?: boolean; updateComposerDefaults?: boolean };
   guidedRounds: number;

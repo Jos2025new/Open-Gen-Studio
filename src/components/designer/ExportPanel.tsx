@@ -11,6 +11,7 @@ import { rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { setSettings, useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
 import { AreaRow, BackgroundRow, ExportSize, FormatRow, PresetActions } from './ExportOptions';
+import { MainOptions, PinButton, usePinned } from './ExportFormatOptions';
 
 import { blankNotice, hasVisibleContent, isNearUniform, parseColor, samplePreview } from '../../engine/design/exportContrast';
 import { ExportMenu } from './ExportFields';
@@ -166,9 +167,12 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const paperName = paper ? `${PDF_PAPERS[paper.paper].label} ${paper.orientation}` : '';
   const info = paper ? `${paperName}${settings.print ? ' trim' : ''} · ${cm(trimMm[0])} × ${cm(trimMm[1])} cm${settings.print ? ` + ${settings.print.bleedMm} mm bleed` : ''}`
     : geometry ? `${geometry.width} × ${geometry.height} px${rows.length > 1 ? ` · ${rows.length} files` : ''}` : '';
+  const hasText = doc.layers.some((l) => l.type === 'text' && l.visible);
+  const pinned = usePinned();
+  const showPrefix = rows.length > 1 || !!settings.prefix || pinned.includes('prefix');
   const folderControls = canChooseFolder() ? (
       <div className="design-export-folder">
-      <div className="menu-sep-label">Save to</div>
+      <div className="menu-sep-label">Save to</div><PinButton id="folder" label="folder" />
       <Button size="sm" icon={Folder} onClick={() => void chooseFolder().then((dir) => dir && setFolder(dir)).catch((e) => setError(message(e)))}>
         {folder ? `Folder: ${folder.name}` : 'Choose folder'}
       </Button>
@@ -195,7 +199,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       {settings.area !== 'canvas' && settings.area !== 'content' && draft.target !== currentExportTarget(doc, settings) && <Button size="sm" onClick={() => patch({ area: settings.area })}>
         Use current {settings.area === 'layer' ? 'layer' : settings.area === 'objects' ? 'objects' : 'selection'}
       </Button>}
-      <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} caption={settings.print ? 'Dashed line: trim. The design extends into the bleed.' : paper ? 'Page preview with the design fitted inside.' : 'Preview of the first file.'} />
+      <ExportPreview transparent={pageColor === null} ratio={layout ? layout.pageWidth / layout.pageHeight : geometry ? geometry.width / geometry.height : 1} image={image ?? lastImage} stale={!image} busy={!invalid && !previewError && !image} layout={layout} />
       {preview?.request === request && preview.blank && <p className="design-export-hint" role="note">{blankNotice(pageColor)}</p>}
       {geometry && <p className="design-export-hint">{info}{delivered ? ` · ${delivered.kb.toLocaleString()} KB` : ''}</p>}
       {delivered?.notices.map((note) => <p className="design-export-hint" key={note}>{note}</p>)}
@@ -206,16 +210,18 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
       </div>}
       {settings.preset === 'instagram' && settings.fitInstagram && <Button size="sm" variant="ghost" onClick={() => patch({ fitInstagram: false })}>Use original ratio</Button>}
       <BackgroundRow settings={settings} patch={patch} docBackground={doc.background ?? null} />
-      <div className={settings.prefix ? 'design-export-row' : undefined}>
-        {settings.prefix && <label>Prefix
-          <input value={settings.prefix} maxLength={40} onChange={(e) => patch({ prefix: e.target.value || undefined })} />
-        </label>}
+      <MainOptions settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} />
+      <div className={showPrefix ? 'design-export-row' : undefined}>
+        {showPrefix && <div className="design-export-opt"><label>Prefix
+          <input value={settings.prefix ?? ''} maxLength={40} onChange={(e) => patch({ prefix: e.target.value || undefined })} />
+        </label>{pinned.includes('prefix') && <PinButton id="prefix" label="Prefix" />}</div>}
         <label>File name
           <input value={filename} placeholder={doc.name} onChange={(e) => { setFilename(e.target.value); setStatus(undefined); }} />
         </label>
       </div>
       {invalid ? null : <p className="design-export-hint" data-testid="export-names">{namesLine}</p>}
-      <FormatRow settings={settings} patch={patch} hasText={doc.layers.some((l) => l.type === 'text' && l.visible)} extra={folderControls} />
+      <FormatRow settings={settings} baseline={chosen?.settings ?? DEFAULT_EXPORT} patch={patch} hasText={hasText} prefix={!showPrefix} extra={folder || pinned.includes('folder') ? undefined : folderControls} />
+      {(folder || pinned.includes('folder')) && folderControls}
       <details className="design-export-more" open={!!own}>
         <summary>More</summary>
         <PresetActions savePreset={savePreset} own={own} deletePreset={() => {
@@ -239,7 +245,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   </div>;
 }
 
-function ExportPreview({ image, transparent, ratio, stale, busy, layout, caption }: { image?: Blob; transparent: boolean; ratio: number; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout>; caption: string }) {
+function ExportPreview({ image, transparent, ratio, stale, busy, layout }: { image?: Blob; transparent: boolean; ratio: number; stale: boolean; busy: boolean; layout?: ReturnType<typeof pageLayout> }) {
   const [preview, setPreview] = useState<{ image: Blob; url: string }>();
   useEffect(() => {
     if (!image) return;
@@ -253,6 +259,6 @@ function ExportPreview({ image, transparent, ratio, stale, busy, layout, caption
       {preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
     </div> : <span className="design-export-hint">{busy ? 'Preparing preview…' : 'No preview'}</span>}</div>
-    <figcaption className="design-export-hint">{busy && image ? 'Updating preview…' : caption}</figcaption>
+    {busy && image && <figcaption className="design-export-hint">Updating preview…</figcaption>}
   </figure>;
 }

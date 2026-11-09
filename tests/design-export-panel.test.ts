@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportPanel } from '../src/components/designer/ExportPanel';
 import { createDoc, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
 import { hasVisibleContent, isNearUniform, parseColor } from '../src/engine/design/exportContrast';
-import { DEFAULT_EXPORT } from '../src/engine/design/exportSettings';
+import { BUILTIN_EXPORTS, DEFAULT_EXPORT } from '../src/engine/design/exportSettings';
 import { setSettings, useStore } from '../src/store/store';
 
 const preview = vi.hoisted(() => ({ promise: new Promise<Blob>(() => undefined), sample: null as Uint8ClampedArray | null }));
@@ -32,7 +32,7 @@ const gear = () => { if (!document.querySelector('.design-export-pop')) click(do
 const byText = (label: string, selector = 'button') => [...document.body.querySelectorAll(selector)].find((e) => e.textContent?.includes(label));
 
 beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
-afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; setSettings({ designExportPresets: [] }); });
+afterEach(() => { act(() => root.unmount()); host.remove(); document.body.innerHTML = ''; setSettings({ designExportPresets: [], designExportPinned: [] }); });
 
 describe('export panel', () => {
   it('stacks menus opened inside a popover above it', () => {
@@ -98,13 +98,46 @@ describe('export panel', () => {
     expect(text()).toContain('File name');
     expect(text()).not.toContain('Prefix');
     gear();
-    expect(text()).toContain('Prefix (added before every file name)');
+    expect(text()).toContain('Prefix');
     act(() => root.unmount());
     document.body.innerHTML = '';
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
     mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, prefix: 'app_', outputs: [{ scale: 1, suffix: '', format: 'png' }, { scale: 2, suffix: '@2x', format: 'png' }] } } });
     expect(line()).toBe('→ app_Doc.png, app_Doc@2x.png (ZIP)');
     expect([...document.querySelectorAll('label')].some((l) => l.textContent?.startsWith('Prefix') && !l.textContent.includes('added'))).toBe(true);
+  });
+
+  it('shows Quality in the main panel for JPG only, and pins gear options to the main panel', () => {
+    mount();
+    expect(document.querySelector('.design-export [aria-label="Compress"]')).toBeNull();
+    click(byText('Format'));
+    click(byText('JPG', '.menu-item'));
+    expect(document.querySelector('.design-export [aria-label="Compress"]')).not.toBeNull();
+    click(byText('Format'));
+    click(byText('SVG', '.menu-item'));
+    expect(document.querySelector('.design-export [aria-label="Compress"]')).toBeNull();
+    gear();
+    expect(document.querySelector('.design-export')?.textContent).not.toContain('Minify');
+    click(document.querySelector('[aria-label="Pin Minify"]'));
+    expect(useStore.getState().settings.designExportPinned).toEqual(['minify']);
+    expect(document.querySelector('.design-export')?.textContent).toContain('Minify');
+    expect(document.querySelector('.design-export [aria-label="Unpin Minify"]')).not.toBeNull();
+  });
+
+  it('shows paper, bleed and marks in the main panel only for Print shop, and Prefix for several outputs', () => {
+    mount();
+    const main = () => document.querySelector('.design-export')!.textContent!;
+    expect(main()).not.toContain('Orientation');
+    expect(main()).not.toContain('Bleed');
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ ...base, lastExport: { settings: BUILTIN_EXPORTS.find((p) => p.id === 'print-shop')!.settings } });
+    for (const field of ['Orientation', 'Bleed', 'Crop marks']) expect(main()).toContain(field);
+    expect(main()).not.toContain('Prefix');
+    act(() => root.unmount());
+    root = createRoot(host);
+    mount({ ...base, lastExport: { settings: BUILTIN_EXPORTS.find((p) => p.id === 'ios')!.settings } });
+    expect(main()).toContain('Prefix');
   });
 
   it('shows a labelled, readable background', () => {
@@ -220,7 +253,7 @@ describe('export panel', () => {
     setSettings({ designExportPresets: [{ id: 'mine', name: 'Mine', settings: DEFAULT_EXPORT }] });
     mount({ ...base, lastExport: { settings: { ...DEFAULT_EXPORT, preset: 'mine' } } });
     click(byText('Delete preset'));
-    expect(text()).toContain('Delete the preset');
+    expect(text()).toContain('Delete “Mine”?');
     click(byText('Cancel'));
     expect(useStore.getState().settings.designExportPresets).toHaveLength(1);
     click(byText('Delete preset'));

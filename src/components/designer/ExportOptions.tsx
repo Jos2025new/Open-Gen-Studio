@@ -59,7 +59,7 @@ export function BackgroundRow({ settings, patch, docBackground }: { settings: Ex
 }
 
 /** Format menu with its gear, or the list of files when several scales are exported. */
-export function FormatRow({ settings, patch, hasText, extra }: { settings: ExportSettings; patch: Patch; hasText: boolean; extra?: ReactNode }) {
+export function FormatRow({ settings, baseline, patch, hasText, prefix, extra }: { settings: ExportSettings; baseline: ExportSettings; patch: Patch; hasText: boolean; prefix: boolean; extra?: ReactNode }) {
   const rows = exportRows(settings), multi = !!settings.outputs?.length;
   const page = rows.some((r) => r.format === 'pdf') && settings.pdf && settings.pdf !== 'screen';
   return <>
@@ -67,10 +67,9 @@ export function FormatRow({ settings, patch, hasText, extra }: { settings: Expor
       {!multi ? <ExportMenu label="Format" value={settings.format} options={formatOptions}
         onChange={(format) => patch({ format, ...(format !== 'png' && format !== 'webp' ? { background: undefined } : {}) })} />
         : <span className="design-export-hint">Files</span>}
-      <FormatGear settings={settings} patch={patch} hasText={hasText} extra={extra} />
+      <FormatGear settings={settings} baseline={baseline} patch={patch} hasText={hasText} prefix={prefix} extra={extra} />
     </div>
     {multi && <ExportRows rows={rows} onChange={(next) => patch(withRows(next))} />}
-    {multi && <p className="design-export-hint">{rows.length} files · packed in one ZIP</p>}
     {!multi && !page && <button type="button" className="opt opt-pick" onClick={() => patch({ outputs: [row(typeof settings.size === 'number' ? settings.size : 1, settings.format), row(2, settings.format, '@2x')], preset: undefined })}>
       <span className="opt-label">+ Add scale</span>
     </button>}
@@ -99,7 +98,7 @@ export function PresetActions({ savePreset, own, deletePreset }: {
     {error && <p role="alert">{error}</p>}
   </div>;
   if (mode === 'deleting' && own) return <div className="design-export-actions">
-    <p>Delete the preset “{own.name}”? Your exported files are not touched.</p>
+    <p>Delete “{own.name}”?</p>
     <div className="design-export-buttons">
       <Button size="sm" variant="ghost" onClick={() => setMode(undefined)}>Cancel</Button>
       <Button size="sm" onClick={() => { deletePreset(); setMode(undefined); }}>Delete preset</Button>

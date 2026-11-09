@@ -162,3 +162,7 @@
 .design-export-frame .design-export-preview { inline-size: 100%; block-size: 100%; max-inline-size: none; max-block-size: none; object-fit: fill; }
 .design-export-more summary { cursor: pointer; color: var(--text-2); }
 .design-export-more[open] > :not(summary) { margin-block-start: var(--sp-2); }
+.design-export-opt { display: flex; align-items: flex-end; gap: var(--sp-1); min-inline-size: 0; }
+.design-export-opt > :first-child { flex: 1 1 auto; min-inline-size: 0; display: grid; gap: var(--sp-2); }
+.design-export-pin { flex: none; display: grid; place-items: center; inline-size: 1.75rem; block-size: 2rem; border: 0; border-radius: var(--field-radius); background: none; color: var(--text-3, var(--text-2)); cursor: pointer; }
+.design-export-pin:hover, .design-export-pin[aria-pressed="true"] { color: var(--text); }

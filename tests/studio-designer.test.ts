@@ -264,12 +264,12 @@ describe('file menu', () => {
     pick(panel, 'What is it for?', 'WhatsApp');
     expect(panel.textContent).toContain('JPG');
     expect(panel.querySelector<HTMLInputElement>('.design-export-size input')?.value).toBe('1600');
-    act(() => panel.querySelector<HTMLElement>('[aria-label="Format options"]')!.click());
-    expect(document.querySelector('.design-export-pop [aria-label="Compress"]')?.getAttribute('aria-checked')).toBe('true');
+    expect(document.querySelector('.design-export [aria-label="Compress"]')?.getAttribute('aria-checked')).toBe('true');
     pick(panel, 'Format', 'PDF');
+    act(() => panel.querySelector<HTMLElement>('[aria-label="Format options"]')!.click());
     act(() => document.querySelector<HTMLElement>('.design-export-pop [aria-label="Paper"]')!.click());
     expect(document.body.textContent).toContain('Orientation');
-    expect(document.querySelector('.design-export-pop [aria-label="Compress"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Compress"]')).toBeNull();
   });
   it('debounces a 3× thumbnail and prepares the named file only after Export', async () => {
     vi.useFakeTimers();
