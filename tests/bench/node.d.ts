@@ -9,7 +9,7 @@ declare module 'node:fs' {
   export function symlinkSync(target: string, path: string): void;
   export function existsSync(path: string): boolean;
   export function mkdirSync(path: string, opts?: { recursive?: boolean }): void;
-  export function writeFileSync(path: string, data: string): void;
+  export function writeFileSync(path: string, data: string | Uint8Array): void;
   export function mkdtempSync(prefix: string): string;
   export function rmSync(path: string, opts?: { recursive?: boolean; force?: boolean }): void;
 }

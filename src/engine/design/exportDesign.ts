@@ -3,6 +3,7 @@ import { blobToDataUrl, canvasToBlob, downloadBlob } from '../../lib/media';
 import { setDoc } from '../../store/store';
 import type { DesignDoc } from '../types';
 import { ExportError, exportError } from './exportErrors';
+import { exportDoc } from './exportRaster';
 import { loadBundledFont } from './exportFontFiles';
 import { exportPlan, exportPreview, type ExportFile, type ExportTarget } from './exportJob';
 import type { ExportSettings, RememberedExport } from './exportSettings';
@@ -71,6 +72,8 @@ export async function prepareDesignExport(doc: DesignDoc, settings: ExportSettin
     rasterSize: (layer) => { const buf = getBuffer(layer.id); return buf ? { w: buf.width, h: buf.height } : null; },
     layout: layoutText,
     ascent: textAscent,
+    // Twice the page pixels unless told (PDF for print asks for more): sharp beside vectors, small enough to embed.
+    picture: async (part, box = { x: 0, y: 0, w: part.width, h: part.height }, scale = 2) => exportDoc(part, 'image/png', { width: Math.ceil(box.w * scale), height: Math.ceil(box.h * scale), scale, box, signal }).then(blobToDataUrl, () => null),
     notice: (message) => notices.add(message),
   }, signal, onProgress, filename);
   if (settings.format === 'webp' && files[0].mime === 'image/jpeg') notices.add('This browser does not encode WebP. The Lightweight web preset prepared a JPG.');

@@ -1,5 +1,5 @@
 import { strokesExportMask } from './exportStrokeMask';
-import { layerObjects } from './objectOps';
+import { layerObjects, wholeLayerObject } from './objectOps';
 import { zip } from 'fflate';
 import { blobToDataUrl } from '../../lib/media';
 import { fxTarget } from '../fx/plan';
@@ -14,6 +14,7 @@ import { autoSuffix, DEFAULT_JPEG_QUALITY, pageLayout, pdfPage, type ExportSetti
 import type { ObjectPick } from './objectSelection';
 import { selectionBox, selectionPath, type PixelSelection } from './pixelSelection';
 import { layerBox } from './render';
+import { shownLayer } from './objectGroupTree';
 import { blurRegion } from './shapeLook';
 
 export interface ExportTarget {
@@ -58,7 +59,7 @@ function exportArea(doc: DesignDoc, settings: ExportSettings, target: ExportTarg
 function layerExtent(layer: Layer): Box | null {
   const geometry = layerBox(layer);
   const paintExtents = layer.type === 'vector' && !layer.pixelMask
-    ? layer.shapes.filter((shape) => shape.blur || (shape.strokeWidth > 0 && (shape.stroke || shape.strokeGradient))).map(blurRegion)
+    ? shownLayer(layer).shapes.filter((shape) => shape.blur || (shape.strokeWidth > 0 && (shape.stroke || shape.strokeGradient))).map(blurRegion)
     : [];
   return unionBox(geometry ? [geometry, ...paintExtents] : paintExtents);
 }
@@ -80,8 +81,9 @@ function objectsArea(doc: DesignDoc, picks: ObjectPick[] | undefined, page: Box)
     const layer = doc.layers.find((l) => l.id === pick.layerId && l.visible && l.type !== 'fx');
     if (!layer) continue;
     const ids = new Set(pick.ids);
+    if (!layerObjects(layer).some((object) => ids.has(object.id))) continue;
     // Some strokes of a painted layer: its pixels are kept and cut to those strokes' footprint (exportStrokeMask.ts).
-    if (layer.type === 'raster' && (layer.paintStrokes ?? []).some((st) => !st.erase && !ids.has(st.id))) partial.set(layer.id, ids);
+    if (layer.type === 'raster' && !wholeLayerObject(layer) && !ids.has(layer.id) && (layer.paintStrokes ?? []).some((st) => !st.erase && !ids.has(st.id))) partial.set(layer.id, ids);
     keep.set(layer.id, layer.type === 'vector'
       ? { ...layer, shapes: layer.shapes.filter((s) => ids.has(s.id)), strokes: layer.strokes?.filter((s) => ids.has(s.id)) }
       : layer);
@@ -229,12 +231,14 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     // On paper: pixels the SVG turns into an image are made at the chosen ppi (300) for the printed size; layers keep their own pixels.
     const ppi = settings.ppi ?? 300, ratio = layout ? printPixelRatio(layout.scale, ppi) : 1;
     if (layout) printPreflight(renderDoc, options.scale * layout.scale, deps.rasterSize ?? (() => null), ppi).forEach((m) => deps.notice?.(m));
+    // PDF has no filters: what blur and effects cover goes in as pictures, at the print resolution (never under 2×).
+    const pdfDeps = format === 'pdf' && deps.picture ? { ...deps, picture: (part: DesignDoc, area?: Box) => deps.picture!(part, area, Math.max(2, ratio)) } : deps;
     const texts = renderDoc.layers.filter((l): l is Extract<typeof l, { type: 'text' }> => l.type === 'text' && l.visible);
     const live = (settings.text ?? 'fonts') === 'fonts' && texts.length > 0;
     const { found, missing } = live ? await collectFonts(texts, deps.fontFile) : { found: new Map(), missing: [] as string[] };
     missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
-    const svg = selection || options.mask ? await maskedSvg(renderDoc, options, ratio, settings.svg?.metadata !== false) : await docToSvg(renderDoc, deps, options, {
-      ...settings.svg, text: settings.text ?? 'fonts', fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
+    const svg = selection || options.mask ? await maskedSvg(renderDoc, options, ratio, settings.svg?.metadata !== false) : await docToSvg(renderDoc, pdfDeps, options, {
+      ...settings.svg, text: settings.text ?? 'fonts', ...(format === 'pdf' ? { hidden: false, filters: false } : {}), fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
     });
     signal?.throwIfAborted();
     bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, page, settings.print,

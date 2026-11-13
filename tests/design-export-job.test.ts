@@ -363,6 +363,29 @@ describe('text output and print resolution', () => {
     expect(printPreflight(doc, 1, () => ({ w: 4000, h: 2000 }))).toEqual([]);
   });
 
+  it('PDF keeps blend modes and the opacity of a group as a whole; blur asks for a picture at print resolution', async () => {
+    const box = (id: string, x: number, extra = {}) => ({ id, type: 'rect', x, y: 0, w: 50, h: 50, radius: 0, fill: '#ff0000', stroke: null, strokeWidth: 0, ...extra });
+    const vec = (name: string, extra = {}) => ({ ...newVectorLayer(name), id: name, shapes: [box(`${name}1`, 0), box(`${name}2`, 25)], ...extra }) as never;
+    const looks = { ...design, layers: [
+      vec('Plain'), vec('Blend', { blend: 'multiply' }), vec('Faded', { shapes: [box('f1', 0, { groupId: 'g' }), box('f2', 25, { groupId: 'g' })], objectGroups: [{ id: 'g', name: 'G', opacity: 0.5 }] }),
+      vec('Soft', { shapes: [box('s1', 0, { blur: 3 })] }), vec('Off', { blend: 'screen', visible: false }),
+    ] };
+    const notes: string[] = [], asked: { w: number; scale: number }[] = [];
+    // No picture comes back here (jsdom draws none): the export says the blur is left out. tests/pdf-look.test.ts draws it.
+    const picture = async (_part: unknown, area: { w: number }, scale: number) => { asked.push({ w: area.w, scale }); return null; };
+    const pdf = await (await exportPlan(looks, settings('print-shop'), {}, { ...layout, picture, notice: (m: string) => notes.push(m) } as never))[0].bytes.text();
+    // Standard PDF transparency (pdfLook.ts): the blended layer and the faded group are isolated groups, painted once.
+    expect(pdf).toContain('/BM /Multiply');
+    expect(pdf).toContain('/ca 0.5 /CA 0.5');
+    expect(pdf.match(/\/Group <<\/S \/Transparency \/I true/g)).toHaveLength(2);
+    expect(pdf).not.toContain('/BM /Screen');
+    // The picture asked for is the blurred shape alone, at 300 ppi for the printed size (never under 2×).
+    expect(asked).toHaveLength(1);
+    expect(asked[0].w).toBeLessThan(design.width);
+    expect(asked[0].scale).toBeGreaterThanOrEqual(2);
+    expect(notes).toContain('PDF has no equivalent for the blur of 1 shape: left out of this file. PNG and JPG keep it.');
+  });
+
   it('asks for 300 ppi raster for the printed size, never below 1:1', () => {
     expect(printPixelRatio(6.7)).toBeCloseTo(20.9, 1);
     expect(printPixelRatio(0.1)).toBe(1);
