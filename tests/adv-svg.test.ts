@@ -169,7 +169,14 @@ describe('importar SVG: anidado y <use> repetido', () => {
     expect(allShapes(res.doc.layers).length).toBeLessThan(8192);
   });
 
-  it('<use> que apunta a <use> diez niveles atrás produce 2^10 formas exactas (crecimiento multiplicativo, sin límite)', async () => {
+  it('D69: un grupo grande usado muchas veces se corta por formas producidas, no por visitas a <use>', async () => {
+    const rects = Array.from({ length: 2000 }, (_, i) => `<rect x="${i % 50}" y="${Math.floor(i / 50)}" width="1" height="1"/>`).join('');
+    const uses = Array.from({ length: 200 }, (_, i) => `<use href="#big" x="${i}"/>`).join('');
+    const res = await importSvg(svgOf(`<defs><g id="big">${rects}</g></defs>${uses}`), 't', fakeRaster);
+    expect('error' in res && res.error).toMatch(/expansion limit/i);
+  });
+
+  it('<use> que apunta a <use> diez niveles atrás produce 2^10 formas exactas (dentro del presupuesto)', async () => {
     let body = '<rect id="u0" x="0" y="0" width="1" height="1" fill="red"/>';
     for (let i = 1; i <= 10; i++) body += `<g id="u${i}"><use href="#u${i - 1}"/><use href="#u${i - 1}" x="${i}"/></g>`;
     const res = await importSvg(svgOf(`<defs>${body}</defs><use href="#u10"/>`), 't', fakeRaster);
@@ -258,9 +265,18 @@ describe('exportar y volver a importar: bordes del documento', () => {
     expect('doc' in res && res.doc.layers).toEqual([]);
   });
 
-  it('la exportación no escribe NaN ni Infinity en el SVG (export.ts: sin guarda de coordenadas no finitas)', async () => {
-    const layer = { id: 'L', name: 'L', type: 'vector', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [shape('s', NaN)] } as unknown as VectorLayer;
-    await expect(docToSvg(docWith([layer]), deps)).rejects.toThrow(/non-finite/i);
+  it('la exportación omite la forma con NaN o Infinity, avisa y exporta el resto (como Inkscape, pero avisando)', async () => {
+    const layer = { id: 'L', name: 'L', type: 'vector', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [shape('bad', NaN), shape('inf', 5, { w: Infinity }), shape('ok', 20)] } as unknown as VectorLayer;
+    const notes: string[] = [];
+    const svg = await docToSvg(docWith([layer]), { ...deps, notice: (m) => notes.push(m) });
+    expect(svg).not.toMatch(/NaN|Infinity/);
+    expect(new DOMParser().parseFromString(svg, 'image/svg+xml').getElementsByTagName('parsererror')).toHaveLength(0);
+    expect(svg).toMatch(/x="20"/);
+    expect(notes.join(' ')).toMatch(/invalid numbers/i);
+    expect(notes.join(' ')).toMatch(/rect in “L”.*rect in “L”/);
+  });
+  it('un tamaño de página no finito sí impide exportar', async () => {
+    await expect(docToSvg(docWith([], { width: NaN }), deps)).rejects.toThrow(/page size/i);
   });
 
   it('una capa de vector sin formas sobrevive a la ida y vuelta (structure/index: solo nace una capa por tanda de formas)', async () => {

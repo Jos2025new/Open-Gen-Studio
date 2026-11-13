@@ -1,3 +1,4 @@
+import { allFinite, finiteDoc } from './exportFinite';
 import { shapesSvgTree, shownLayer } from './objectGroupTree';
 import { MARK_LENGTH_MM, MARK_OFFSET_MM, PX_PER_MM, pageLayout, type PdfPage, type PrintOptions, type SvgOptions } from './exportSettings';
 import { pathTransform } from './path';
@@ -178,15 +179,11 @@ export interface SvgBuildOptions extends SvgOptions {
 }
 
 export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport, options: SvgBuildOptions = {}): Promise<string> {
-  const pending: unknown[] = [doc, viewport];
-  const seen = new WeakSet<object>();
-  while (pending.length) {
-    const value = pending.pop();
-    if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Cannot export SVG: document contains a non-finite number');
-    if (!value || typeof value !== 'object' || seen.has(value)) continue;
-    seen.add(value);
-    for (const child of Object.values(value)) pending.push(child);
-  }
+  if (!allFinite([doc.width, doc.height, viewport])) throw new Error('Cannot export SVG: the page size is not a finite number');
+  // A shape or layer holding NaN or Infinity is left out and named, not the whole export failed (exportFinite.ts).
+  const finite = finiteDoc(doc);
+  if (finite.dropped.length) deps.notice?.(`${finite.dropped.join(', ')} had invalid numbers: left out of this file.`);
+  doc = finite.doc;
   let svg = await buildSvg(doc, deps, viewport, options);
   if (options.decimals !== undefined) svg = roundSvgNumbers(svg, Math.max(0, Math.min(6, Math.round(options.decimals))));
   return options.minify ? minifySvg(svg) : svg;

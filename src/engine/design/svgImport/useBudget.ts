@@ -1,5 +1,6 @@
 /** Conservative bound on reachable SVG expansion before invoking a browser rasterizer. */
-export function unsafeUseExpansion(root: Element, limit = 8192): boolean {
+/** cycles: what a reference loop costs (the walk itself skips loops with a warning, so the import path counts them 0). */
+export function unsafeUseExpansion(root: Element, limit = 8192, cycles = limit + 1): boolean {
   const elements = [root, ...Array.from(root.getElementsByTagName('*'))];
   if (!elements.some((el) => el.localName.toLowerCase() === 'use')) return false;
   const ids = new Map<string, Element>();
@@ -9,7 +10,8 @@ export function unsafeUseExpansion(root: Element, limit = 8192): boolean {
   const count = (el: Element, referenced: boolean, depth: number): number => {
     const cached = referenced ? memo.get(el) : undefined;
     if (cached !== undefined) return cached;
-    if (depth > 128 || active.has(el)) return limit + 1;
+    if (depth > 128) return limit + 1;
+    if (active.has(el)) return cycles;
     active.add(el);
     const tag = el.localName.toLowerCase();
     let total = referenced || tag === 'use' ? 1 : 0;

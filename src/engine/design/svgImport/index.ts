@@ -8,6 +8,9 @@ import { walkSvg, type Item, type Own, type Place, type RasterItem } from './str
 import { defaultRasterizer, type Rasterizer } from './rasterize';
 import { unsafeUseExpansion } from './useBudget';
 
+/** Elements that <use> may produce in one import (a legit icon sheet stays far below). */
+export const MAX_USE_ELEMENTS = 100_000;
+
 /*
  * Import an SVG as a document, in the model the export writes: its layers are layers, its groups are object groups
  * inside them, editable shapes where the model can hold them, raster layers for the rest. See docs/inkscape-importacion.md.
@@ -65,6 +68,9 @@ function vectorLayer(name: string, items: ShapeItem[]): VectorLayer {
 export async function importSvg(text: string, name: string, rasterizer: Rasterizer = defaultRasterizer): Promise<SvgImport | { error: string }> {
   const clean = sanitizeSvg(text);
   if ('error' in clean) return clean;
+  // Bound what <use> can produce before walking: counted in produced elements (memoized per referenced element), so
+  // a big group referenced many times cannot blow up even when nothing is rasterized (D69).
+  if (unsafeUseExpansion(clean.root, MAX_USE_ELEMENTS, 0)) return { error: 'SVG use expansion limit reached; import stopped.' };
   const walked = walkSvg(clean.root);
   if (walked.items.some((item) => item.kind === 'raster') && (walked.warnings.includes('use expansion limit reached; content skipped') || unsafeUseExpansion(clean.root))) {
     return { error: 'SVG use expansion limit reached; import stopped before rasterizing.' };
