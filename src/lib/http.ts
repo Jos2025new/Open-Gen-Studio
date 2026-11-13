@@ -1,3 +1,5 @@
+import { providerFetch } from './providerFetch';
+
 export class HttpError extends Error {
   readonly status: number;
   readonly body: unknown;
@@ -109,7 +111,7 @@ export async function requestJson<T = unknown>(
   let res: Response;
   let body: unknown;
   try {
-    res = await fetch(url, { ...rest, signal: controller?.signal ?? signal });
+    res = await providerFetch(url, { ...rest, signal: controller?.signal ?? signal });
     body = await readBody(res);
   } catch (err) {
     const host = new URL(url, location.href).host;

@@ -1,4 +1,5 @@
 import { cacheDb } from '../../lib/idb';
+import { providerFetch } from '../../lib/providerFetch';
 import { AbortedError, HttpError, NetworkError, extractErrorMessage, isAbort, readSse, requestJson } from '../../lib/http';
 import type { LlmMessage, LlmProviderId } from '../types';
 import { NANO_BASE } from './nanogpt';
@@ -323,7 +324,7 @@ export async function chat(opts: {
   const t0 = Date.now();
   const send = async (withReasoning: boolean): Promise<Response> => {
     try {
-      return await fetch(ENDPOINTS[opts.provider].chat, {
+      return await providerFetch(ENDPOINTS[opts.provider].chat, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers(opts.provider, opts.apiKey) },
         body: JSON.stringify(withReasoning ? { ...body, ...reasoning } : body),

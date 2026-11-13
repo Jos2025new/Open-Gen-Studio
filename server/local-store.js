@@ -1,6 +1,6 @@
 // Local disk copy of the app's saved state and media, served by the Vite dev/preview server at /x/store.
 // The app has no backend: this only exists while `npm run dev` / `npm run preview` runs. Files live in
-// <project>/data (git-ignored): state.json (contains API keys, mode 600) and <ns>/<id>.<ext> media files.
+// <project>/data (git-ignored): state.json (mode 600; API keys live in the system keyring, see keys.js) and <ns>/<id>.<ext> media files.
 import { execFile } from 'node:child_process';
 import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -8,6 +8,8 @@ import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createStoreV2 } from './store-v2.js';
 import { EPS_MAX_BYTES, handleEps } from './eps.js';
+import { PROVIDERS, createKeyStore, maskOf } from './keys.js';
+import { handleProxy } from './provider-proxy.js';
 
 const run = promisify(execFile);
 /** data/logs/app.log rotates here: the previous file is kept as app.log.1 and then overwritten. */
@@ -115,6 +117,10 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
   const sandbox = dir === resolve(root, '.sandbox/data');
   // Format 2 (ADR 0014): once store-v2/HEAD.json exists, reads are assembled from it and state writes become commits.
   const v2 = createStoreV2(dir);
+  // API keys (keys.js): keyring or keys.json, never in the saved state. Keys still in the state files move out once, at start.
+  const keys = createKeyStore(dir);
+  let migration = null;
+  const migrateKeys = () => (migration ??= serialState(() => keys.migrate()).catch(() => ({ migrated: [], backups: [], failed: ['error'] })));
 
   // State writes run one at a time, check and write together: two tabs can never both pass the baseAt check
   // before either writes. A failed write does not stop the queue.
@@ -177,6 +183,8 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     if (!isLoopback(req.socket?.remoteAddress)) return send(403, 'only from this computer');
 
     if (path === '/ping') return send(200, 'ok');
+    // Keys still in the saved state move out before the page can read it (a no-op after the first time).
+    const m = await migrateKeys();
 
     // Writes (state, media, log, trace, join, wipe) only from the app itself: they carry X-OGS, which a page on another site
     // cannot send without a preflight the dev server refuses, and any Origin they carry is this server's own.
@@ -188,6 +196,25 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       if (req.headers['x-ogs'] !== '1' || (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`)) {
         return send(403, 'writes only from the app');
       }
+    }
+
+    // Keys and provider calls (docs/seguridad.md): the page never holds a key. Same loopback and X-OGS checks as every write.
+    if (path === '/keys' || path.startsWith('/keys/') || path === '/proxy') {
+      if (path === '/keys' && req.method === 'GET') return send(200, JSON.stringify({ ...(await keys.status()), migrated: m.migrated, failed: m.failed }), 'application/json');
+      if (path.startsWith('/keys/')) {
+        const p = path.slice('/keys/'.length);
+        if (!PROVIDERS.includes(p)) return send(404, 'unknown provider');
+        if (req.method === 'PUT') {
+          let key;
+          try { key = JSON.parse((await body(req)).toString('utf8')).key; } catch { return send(400, 'not a key'); }
+          const where = await keys.set(p, key);
+          if (!where) return send(400, 'not a key');
+          return send(200, JSON.stringify({ mask: maskOf(String(key).trim()), where, ...(await keys.status()) }), 'application/json');
+        }
+        if (req.method === 'DELETE') { await keys.remove(p); return send(204); }
+      }
+      if (path === '/proxy' && req.method === 'POST') return handleProxy(req, res, keys);
+      return send(405, 'method not allowed');
     }
 
     // Format 2 commit: the app sends the global record and only the sessions that changed (ADR 0014).
@@ -419,7 +446,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
 
   return {
     name: 'local-store',
-    configureServer: (server) => void server.middlewares.use(middleware),
-    configurePreviewServer: (server) => void server.middlewares.use(middleware),
+    configureServer: (server) => { void migrateKeys(); server.middlewares.use(middleware); },
+    configurePreviewServer: (server) => { void migrateKeys(); server.middlewares.use(middleware); },
   };
 }

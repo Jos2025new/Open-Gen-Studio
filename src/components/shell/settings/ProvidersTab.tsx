@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bell, BellRing, Eye, EyeOff, ExternalLink, KeyRound, PanelTop } from '../../ui/icons';
 import { askNotifyPermission } from '../../../lib/doneNotice';
+import { saveKey, useKeyWarning } from '../../../engine/providerKeys';
 import { loadCatalogs, loadLlmCatalog } from '../../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../../engine/providers/types';
@@ -14,15 +15,16 @@ export function ProviderRow({ id, autoFocus = false }: { id: RemoteProviderId; a
   const status = useStore((s) => s.catalog.status[id]);
   const error = useStore((s) => s.catalog.errors[id]);
   const count = useStore((s) => Object.values(s.catalog.models).filter((m) => m.provider === id).length);
+  // A stored key is never in the page: the field shows its last 4 characters, and typing replaces the key.
   const [value, setValue] = useState(saved);
   const [show, setShow] = useState(false);
   useEffect(() => setValue(saved), [saved]);
 
-  const commit = () => {
+  const commit = async () => {
     const v = value.trim();
     if (v === saved) return;
     const wasConnected = Boolean(saved);
-    setSettings((s) => ({ keys: { ...s.keys, [id]: v } }));
+    await saveKey(id, v);
     // Schemas may include prices that depend on the key.
     setCatalog((c) => ({ schemas: Object.fromEntries(Object.entries(c.schemas).filter(([ref]) => !ref.startsWith(`${id}::`))) }));
     void loadCatalogs({ force: true, preferRemote: Boolean(v) && !wasConnected });
@@ -68,6 +70,7 @@ export function ProviderRow({ id, autoFocus = false }: { id: RemoteProviderId; a
 /** Settings → Providers: notices when a run finishes, then one key field per provider. */
 export function ProvidersTab() {
   const settings = useStore((s) => s.settings);
+  const warning = useKeyWarning();
   return <>
     <SetGroup icon={Bell} title="Notifications">
       <SetRow icon={BellRing} label="Notify when done" tip="When a generation finishes while this tab is in the background, show a browser notification.">
@@ -86,6 +89,7 @@ export function ProvidersTab() {
       </SetRow>
     </SetGroup>
     <SetGroup icon={KeyRound} title="API keys">
+      {warning ? <div className="prov-error" role="status">{warning}</div> : null}
       {REMOTE_PROVIDERS.map((p) => <ProviderRow key={p} id={p} />)}
     </SetGroup>
   </>;
