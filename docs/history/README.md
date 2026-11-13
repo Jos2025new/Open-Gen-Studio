@@ -61,4 +61,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [057: lápiz, dabs, bordes, borrador y booleanas](057-2026-11-W44.md).
 - [058: grafito fit8, preset y tecla repetida](058-2026-11-W45.md).
 - [059: traspaso de accesibilidad (2026-11-07)](059-2026-11-W45-traspaso.md).
+- [060: objetos, grupos, SVG y PDF (2026-11-12)](060-2026-11-W46.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
+
+- [Informe parcial: objetos y profundidad](informe-gpt-objetos-y-z.md).

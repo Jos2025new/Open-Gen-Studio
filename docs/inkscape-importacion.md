@@ -12,12 +12,14 @@ El Designer importa `.svg` (botón «Import image») como un diseño nuevo; el �
 
 | SVG | OGS |
 | --- | --- |
-| `<g inkscape:groupmode="layer" inkscape:label>` y `<g>` | Carpeta con ese nombre (id si no hay etiqueta). Anidadas: «Padre / Hijo». Una carpeta interrumpida por otra vuelve como «Nombre (2)» |
-| `display:none` | Capa oculta |
-| `sodipodi:insensitive` | Capa bloqueada |
-| `opacity` de grupo | Se multiplica en la opacidad de las capas del grupo |
-| `opacity` o `mix-blend-mode` de una forma | Esa forma va en su propia capa con esa opacidad y mezcla |
-| Formas consecutivas del mismo contenedor y con los mismos ajustes | Una capa vectorial |
+| `<g inkscape:groupmode="layer" inkscape:label>` | Capa con ese nombre. Si sale en varias capas (imágenes entre sus formas, subcapas), una carpeta con su nombre |
+| `<g>` | Grupo de objetos dentro de su capa, anidado como en el SVG, con su nombre, opacidad y mezcla. Un `<g>` sin nombre ni ajustes alrededor de un solo elemento no crea grupo |
+| `inkscape:label`, `data-name`, o un `id` que no sea el automático de Inkscape (`rect123`) | Nombre de la capa, el grupo o la forma |
+| `display:none` | Capa, grupo o forma ocultos |
+| `sodipodi:insensitive` | Capa, grupo o forma bloqueados |
+| `opacity` de una forma | Va a su relleno o a su trazo si solo tiene uno (misma imagen); con ambos, o con `mix-blend-mode` propio, un grupo de uno la lleva |
+| `clip-path` rectangular que no corta nada (la página, un marco de Figma, la caja de Canva) | Se ignora; no rasteriza |
+| Formas consecutivas de la misma capa | Una capa vectorial |
 | rect (x, y, w, h, rx, ry), circle, ellipse, line, polyline, polygon | Rectángulo, elipse, línea o trazado editable |
 | path | Trazado con `d` completo (relativos, H, V, S, T y arcos pasan a M L C Q Z; los arcos, a Béziers). Más de 20 000 caracteres: se rasteriza |
 | fill, stroke, stroke-width, linejoin, linecap, miterlimit, dasharray y dashoffset (en anchos de trazo), paint-order | Los mismos campos de la forma. Sin valor, SVG usa unión inglete y punta recta (no las de OGS) y se escriben así |
@@ -35,8 +37,8 @@ Solo ese elemento, con su estilo heredado, en su caja ya transformada, como capa
 ## Limitaciones
 
 - Texto y demás dejan de ser editables (píxeles a escala 1 de la página; tope de 16 Mpx por elemento).
-- La opacidad de grupo se multiplica por capa: con formas superpuestas dentro de un grupo difiere de SVG.
-- Las puntas de flecha (`marker-start`, `marker-end`) se rasterizan al importar: el importador no las lee todavía.
+- Una imagen (texto, gradiente no convertible, grupo con filtro) dentro de un grupo lo parte: la imagen va en su capa con la opacidad de los grupos de encima, y el grupo sigue en la capa siguiente.
+- Las puntas de flecha de otros programas se rasterizan; las que escribe OGS vuelven como puntas ([intercambio](intercambio-svg.md)).
 - El grosor de trazo con escala no uniforme usa la escala media (el modelo no lo distingue).
 - El `<svg>` anidado no recorta a su viewport.
 - Cada SVG crea un diseño nuevo; el diseño actual no se toca.

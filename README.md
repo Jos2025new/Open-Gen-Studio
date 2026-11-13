@@ -201,7 +201,9 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Ctrl+A / Ctrl+D | Select all pixels / deselect |
 | Ctrl+Shift+I | Invert the selection |
 | Ctrl+J | Selected pixels to a new layer |
-| Ctrl+G | Group the selected layers |
+| Ctrl+G | Group the picked shapes (from several layers: they gather in the topmost one's layer), or the selected layers into a folder |
+| Ctrl+Shift+G | Ungroup the picked shapes |
+| Home / Page Up / Page Down / End | Selection to front / forward / backward / to back (objects inside their layer; layers in Layer mode) |
 | Shift+R | Show or hide rulers |
 | Shift+M | Shape Builder: drag across regions of the picked shapes to merge them (Delete mode or Alt removes them, Esc cancels) |
 | Ctrl+Alt+U / S / I / E | Union, Subtract, Intersect, Exclude the picked shapes (on macOS the browser takes Cmd+Alt+I/U for DevTools: use the buttons) |

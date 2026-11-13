@@ -38,12 +38,12 @@ export default [
     what: 'ADR 0016: Dibujo/Diseño coincide al crear, abrir y pintar; Dibujo no crea trazos editables.',
     sides: [
       ['src/engine/design/paintMode.ts', 'export function paintModeOf'],
-      ['src/engine/design/paintMode.ts', 'export function strokeObjectsAvailable'],
+      ['src/engine/design/paintMode.ts', 'export function paintsPixelsDirectly'],
       ['src/engine/design/doc.ts', "paintMode: 'drawing'"],
       ['src/components/designer/Stage.tsx', 'const direct = paintsPixelsDirectly(current, target);'],
       ['src/components/designer/StagePaintCommit.ts', 'if (gesture.direct) {'],
       ['src/components/designer/PaintModeToggle.tsx', 'export function PaintModeToggle'],
-      ['src/components/designer/ToolSettings.tsx', '<EditModeToggle objects={strokeObjectsAvailable(doc)} />'],
+      ['src/components/designer/ToolSettings.tsx', '<EditModeToggle />'],
       ['src/engine/design/actions.ts', 'const restored = { ...prev, lastExport: doc.lastExport, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };'],
       ['src/engine/design/actions.ts', 'const restored = { ...next, lastExport: doc.lastExport, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };'],
     ],
@@ -303,7 +303,7 @@ export default [
     sides: [
       ['src/engine/fx/plan.ts', 'export function fxPlan'],
       ['src/engine/design/render.ts', 'const steps = fxPlan(doc.layers, opts.hideLayerId)'],
-      ['src/engine/design/export.ts', 'for (const step of fxPlan(doc.layers))'],
+      ['src/engine/design/export.ts', 'for (const step of fxPlan(doc.layers, undefined, keepHidden))'],
     ],
     tests: ['tests/fx-render.test.ts', 'tests/fx-svg.test.ts'],
   },

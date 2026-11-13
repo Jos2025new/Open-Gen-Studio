@@ -1,6 +1,6 @@
 # Propuesta: objetos completos y profundidad (Z)
 
-Fecha: 2026-11-09. Estado: propuesta, sin implementar. Rama de partida: `task/export` (commit `34b26ea4`).
+Fecha: 2026-11-09. Estado: puntos 1–4 del diagnóstico y las bases de Z de la sección 4 implementados sin commit (2026-11-10: `objectMeta.ts`, `projection.ts`, `stackOrder.ts`, `groupAcross.ts`); 5 y 6 pendientes; desde 2026-11-10 las formas se dibujan dentro de la capa activa (`drawShape.ts`) y los grupos llevan opacidad y fusión propias (`groupPaint.ts`); imagen y texto como objetos, en [su propuesta](propuesta-imagen-texto-como-objetos.md). Rama de partida: `task/export` (commit `34b26ea4`).
 
 Origen: conversación con el usuario tras cerrar la selección tipo Inkscape, los grupos de objetos y el endurecimiento del export (2026-11-08/09). El usuario quiere que la app cumpla lo que espera un profesional y prevé funciones 2.5D/semi‑3D.
 

@@ -18,9 +18,13 @@
 - [Fusión de task/agent-forcing](fusion-agent-forcing.md): comparación con modelo-general y decisiones que no deben revertirse.
 - [Catálogo de voz y efectos](catalogo-voz-y-efectos.md): modelos de texto a voz y efectos de Atlas y NanoGPT, precios por 1000 caracteres y propuesta (2026-10-08).
 - [Objetos y Z](propuesta-objetos-y-profundidad.md) (2026-11-09, propuesta).
+- [Imagen y texto como objetos: dos arquitecturas](propuesta-imagen-texto-como-objetos.md) (2026-11-10, solo diseño).
+- [Diagnóstico del modelo de objetos](diagnostico-modelo-objetos.md) (2026-11-10): rendimiento con grupos e ida y vuelta de SVG, medido.
+- [Base para PSD, AI, EPS y CorelDRAW](propuesta-formatos-externos.md) (2026-11-10, solo diseño): comparación de modelos y dos ajustes mínimos.
 - [Propuesta: conocimiento del agente en archivos y vistas guardadas](propuesta-conocimiento-y-vistas.md): vistas de filtros, reglas del agente en `.md` al estilo OKF y carga por partes (2026-10-27, sin implementar).
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
-- [Importar SVG de Inkscape](inkscape-importacion.md): qué queda editable (carpetas, formas, opacidades, blur) y qué se rasteriza, y cómo se sanea.
+- [Importar SVG](inkscape-importacion.md): qué queda editable (capas, grupos, formas, opacidades, blur) y qué se rasteriza, y cómo se sanea.
+- [Intercambio SVG](intercambio-svg.md): contrato de ida y vuelta, otros programas, efectos y sus equivalentes; test `svg-round-trip`, `svg-import-apps`.
 - [Formas al estilo de Inkscape](inkscape-formas.md): fórmulas de esquinas, trazo y desenfoque, con la línea exacta del código de Inkscape y las diferencias deliberadas.
 - [Investigación: ajuste (snapping) de Inkscape frente a OGS](investigacion-snapping.md): fórmulas con cita, comparación vigente, límites comprobados y pruebas locales.
 - [Diagnóstico: trazos de lineart que se deforman al encoger](diagnostico-escala-lineart.md): hipótesis, experimentos, causa (taper sin escalar y umbrales de perfect-freehand) y arreglo propuesto.
