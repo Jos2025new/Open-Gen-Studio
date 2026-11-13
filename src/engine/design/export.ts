@@ -178,6 +178,15 @@ export interface SvgBuildOptions extends SvgOptions {
 }
 
 export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport, options: SvgBuildOptions = {}): Promise<string> {
+  const pending: unknown[] = [doc, viewport];
+  const seen = new WeakSet<object>();
+  while (pending.length) {
+    const value = pending.pop();
+    if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Cannot export SVG: document contains a non-finite number');
+    if (!value || typeof value !== 'object' || seen.has(value)) continue;
+    seen.add(value);
+    for (const child of Object.values(value)) pending.push(child);
+  }
   let svg = await buildSvg(doc, deps, viewport, options);
   if (options.decimals !== undefined) svg = roundSvgNumbers(svg, Math.max(0, Math.min(6, Math.round(options.decimals))));
   return options.minify ? minifySvg(svg) : svg;

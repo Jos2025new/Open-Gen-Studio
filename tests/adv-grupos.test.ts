@@ -180,7 +180,7 @@ describe('desagrupar y reordenar sobre árboles aleatorios', () => {
     expect(bad.slice(0, 5)).toEqual([]);
   });
 
-  it.fails('reordenar una forma suelta no cambia el orden de las demás (grupo partido en un archivo viejo; stackOrder.ts restackShapes)', () => {
+  it('reordenar una forma suelta no cambia el orden de las demás (grupo partido en un archivo viejo; stackOrder.ts restackShapes)', () => {
     // Causa: restackShapes junta los miembros de un grupo partido en su primera posición; b y c cambian de orden sin
     // que ninguna de las dos se haya movido (resultado a,c,d,b). Solo d debe moverse.
     const layer = layerOf([shapeOf('a', 'G'), shapeOf('b'), shapeOf('c', 'G'), shapeOf('d')], [{ id: 'G', name: 'G' }]);
@@ -349,4 +349,9 @@ describe('Ctrl+G entre capas: aspecto y conservación (aleatorio)', () => {
     }
     expect(bad.slice(0, 5)).toEqual([]);
   });
+});
+it('brings the selected shape above its group sibling in a split group while preserving the untouched shapes', () => {
+  const layer = { type: 'vector', shapes: [{ id: 'a', groupId: 'G' }, { id: 'b' }, { id: 'c', groupId: 'G' }], objectGroups: [{ id: 'G', name: 'G' }] } as VectorLayer;
+  const result = restackShapes(layer, ['a'], 'forward')?.shapes.map((s) => s.id);
+  expect(result).toEqual(['b', 'c', 'a']);
 });

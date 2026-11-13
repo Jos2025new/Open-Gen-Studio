@@ -6,6 +6,7 @@ import { createDoc, newRasterLayer, newVectorLayer } from '../doc';
 import { sanitizeSvg } from './sanitize';
 import { walkSvg, type Item, type Own, type Place, type RasterItem } from './structure';
 import { defaultRasterizer, type Rasterizer } from './rasterize';
+import { unsafeUseExpansion } from './useBudget';
 
 /*
  * Import an SVG as a document, in the model the export writes: its layers are layers, its groups are object groups
@@ -32,7 +33,7 @@ export function describeReport(r: ImportReport): string {
 
 type ShapeItem = Extract<Item, { kind: 'shape' }>;
 const top = (p: Place): Place => (p.parent?.name != null ? top(p.parent) : p);
-const whole = (i: Item, k: 'hidden' | 'locked') => i.place[k] || i[k] || i.groups.some((g) => g[k]);
+const whole = (i: Exclude<Item, { kind: 'empty-layer' }>, k: 'hidden' | 'locked') => i.place[k] || i[k] || i.groups.some((g) => g[k]);
 
 /**
  * One vector layer from consecutive shapes of one SVG layer: its groups become object groups with their name, state,
@@ -65,6 +66,9 @@ export async function importSvg(text: string, name: string, rasterizer: Rasteriz
   const clean = sanitizeSvg(text);
   if ('error' in clean) return clean;
   const walked = walkSvg(clean.root);
+  if (walked.items.some((item) => item.kind === 'raster') && (walked.warnings.includes('use expansion limit reached; content skipped') || unsafeUseExpansion(clean.root))) {
+    return { error: 'SVG use expansion limit reached; import stopped before rasterizing.' };
+  }
   const report: ImportReport = { editable: 0, rasterized: 0, reasons: {}, removed: clean.stats, warnings: [...walked.warnings] };
   const doc = createDoc(name, walked.width, walked.height, null);
   const layers: Layer[] = [], places: Place[] = [], buffers = new Map<string, HTMLCanvasElement>(), used = new Map<string, number>();
@@ -84,6 +88,12 @@ export async function importSvg(text: string, name: string, rasterizer: Rasteriz
   for (const item of walked.items) if (item.kind === 'raster') rasters.set(item, await rasterizer(item, walked));
 
   for (const item of walked.items) {
+    if (item.kind === 'empty-layer') {
+      flush();
+      const p = item.place;
+      add({ ...newVectorLayer(unique(p.name ?? 'Layer'), []), visible: !p.hidden, locked: p.locked, opacity: p.opacity, blend: p.blend }, p);
+      continue;
+    }
     if (item.kind === 'shape') {
       if (pending.length && pending[0].place !== item.place) flush();
       pending.push(item);

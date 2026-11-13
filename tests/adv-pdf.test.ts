@@ -28,7 +28,7 @@ async function run(markup: string) {
 const GRADIENT = '<linearGradient id="g"><stop offset="0" stop-color="#f00" stop-opacity="0.2"/><stop offset="1" stop-color="#00f"/></linearGradient>';
 
 describe('pdfLook: lo que se dibuja fuera de su grupo', () => {
-  it.fails('un <defs> dentro de un grupo con opacidad sigue valiendo para formas fuera del grupo (SVG: los id son globales); pdfLook.ts paint() quita los defs al cerrar el grupo', async () => {
+  it('un <defs> dentro de un grupo con opacidad sigue valiendo para formas fuera del grupo (SVG: los id son globales); pdfLook.ts paint() quita los defs al cerrar el grupo', async () => {
     // Causa: paint() mueve los hijos de <defs> a un ámbito y los borra al terminar el grupo.
     const { calls } = await run(`<g opacity="0.5"><defs><linearGradient id="gr"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f"/></linearGradient></defs><rect x="0" y="0" width="10" height="10" fill="#000"/></g><rect x="20" y="20" width="50" height="50" fill="url(#gr)"/>`);
     const outside = calls.find((c) => c.includes('x="20"')) ?? '';
@@ -42,13 +42,13 @@ describe('pdfLook: lo que se dibuja fuera de su grupo', () => {
 });
 
 describe('pdfLook: entradas raras de opacidad y mezcla', () => {
-  it.fails('opacidad en el atributo y en style= distintas: gana style (CSS), que es lo que se ve (pdfLook.ts lookOf lee primero el atributo)', async () => {
+  it('opacidad en el atributo y en style= distintas: gana style (CSS), que es lo que se ve (pdfLook.ts lookOf lee primero el atributo)', async () => {
     // Causa: lookOf usa el atributo opacity antes que style="opacity:"; con opacity="1" el 0.3 se pierde.
     const { text } = await run(`<g opacity="1" style="opacity:0.3"><rect x="0" y="0" width="10" height="10" fill="#000"/></g>`);
     expect(text).toContain('/ca 0.3');
   });
 
-  it.fails('opacidad en porcentaje ("50%") se lee como 50 y se recorta a 1: el grupo no se hace (pdfLook.ts lookOf)', async () => {
+  it('opacidad en porcentaje ("50%") se lee como 50 y se recorta a 1: el grupo no se hace (pdfLook.ts lookOf)', async () => {
     // Causa: parseFloat("50%") = 50, que se limita a 1; el porcentaje válido de SVG 2 se pierde.
     const { text } = await run(`<g opacity="50%"><rect x="0" y="0" width="10" height="10" fill="#000"/></g>`);
     expect(text).toContain('/ca 0.5');
@@ -79,7 +79,7 @@ describe('pdfLook: entradas raras de opacidad y mezcla', () => {
 });
 
 describe('pdfLook: degradados con alfa', () => {
-  it.fails('un degradado con alfa usado desde style="fill:url(#g)" conserva su alfa (pdfLook.ts alphaGradients solo mira el atributo fill)', async () => {
+  it('un degradado con alfa usado desde style="fill:url(#g)" conserva su alfa (pdfLook.ts alphaGradients solo mira el atributo fill)', async () => {
     // Causa: alphaGradients quita stop-opacity de los degradados aunque la forma lo use por style; sale opaco.
     const { text } = await run(`<defs>${GRADIENT}</defs><rect x="0" y="0" width="50" height="50" style="fill:url(#g)"/>`);
     expect(text).toContain('/SMask');
@@ -95,4 +95,14 @@ describe('pdfLook: degradados con alfa', () => {
     const { text } = await run(`<defs>${opaque}</defs><rect x="0" y="0" width="50" height="50" fill="url(#g)"/>`);
     expect(text).not.toContain('/SMask');
   });
+});
+
+it.each(['opacity:1;opacity:50%', 'opacity:50% !important'])('resolves CSS opacity: %s', async (style) => {
+  const { text } = await run(`<g opacity=".5" style="${style}"><rect width="10" height="10"/></g>`);
+  expect(text).toContain('/ca 0.5');
+});
+
+it('preserves an existing mask when converting an inline alpha gradient', async () => {
+  const { calls } = await run(`<defs>${GRADIENT}<mask id="left"><rect id="mask-left" width="5" height="10" fill="white"/></mask></defs><rect width="10" height="10" mask="url(#left)" style="fill:url(#g)"/>`);
+  expect(calls.some((c) => c.includes('id="mask-left"'))).toBe(true);
 });

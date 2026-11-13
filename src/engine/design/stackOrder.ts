@@ -43,6 +43,12 @@ export function restackShapes(layer: VectorLayer, ids: readonly string[], op: St
     into.push({ shape: s });
   }
   const whole = (n: Node) => { const ls = leaves(n); return ls.some((s) => set.has(s.id)) && ls.every((s) => set.has(s.id) || !pickable(layer, s)); };
+  const moving = new Set<VectorShape>();
+  const collect = (n: Node): void => {
+    if (whole(n)) leaves(n).forEach((s) => moving.add(s));
+    else if ('children' in n) n.children.forEach(collect);
+  };
+  root.forEach(collect);
   // Only a real move counts: members of a group that are not together (older files) are left as they are.
   let moved = false;
   const walk = (ns: Node[]): Node[] => {
@@ -50,7 +56,22 @@ export function restackShapes(layer: VectorLayer, ids: readonly string[], op: St
     if (next.some((n, i) => n !== ns[i])) moved = true;
     return next.map((n) => ('shape' in n || whole(n) ? n : { ...n, children: walk(n.children) }));
   };
-  const shapes = walk(root).flatMap(leaves);
+  const ordered = walk(root).flatMap(leaves);
+  const shapes = layer.shapes.filter((s) => !moving.has(s));
+  const runs: VectorShape[][] = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const s = ordered[i];
+    if (moving.has(s)) {
+      if (!i || !moving.has(ordered[i - 1])) runs.push([]);
+      runs[runs.length - 1].push(s);
+    }
+  }
+  for (const run of runs) {
+    const first = ordered.indexOf(run[0]), last = first + run.length - 1;
+    const anchor = op === 'front' || op === 'forward' ? ordered.slice(0, first).reverse().find((s) => !moving.has(s)) : ordered.slice(last + 1).find((s) => !moving.has(s));
+    const at = anchor ? shapes.indexOf(anchor) + (op === 'front' || op === 'forward' ? 1 : 0) : (op === 'front' || op === 'forward' ? 0 : shapes.length);
+    shapes.splice(at, 0, ...run);
+  }
   return moved ? { ...layer, shapes } : null;
 }
 

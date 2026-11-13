@@ -4,7 +4,7 @@ Detalle de las filas D del [índice](pendientes.md). Prioridad, **origen** y evi
 
 ## Bugs hallados por tests adversariales (2026-11-12)
 
-Cada uno tiene un `it.fails` que lo reproduce: al arreglarlo, el test pasa y hay que quitarle el `.fails`.
+Estado 2026-11-12: se prepararon correcciones para D62–D70 y sus reproducciones pasan como tests normales; quedan pendientes la revisión del agente, `npm test` y la prueba en sandbox. Las descripciones siguientes registran los fallos originales. D69 añade límites tanto en el recorrido editable como antes de rasterizar; su cobertura no demuestra seguridad frente a todos los SVG posibles.
 
 - **D62 · alto · 2026-11-12 · Ctrl+Alt+clic salta a formas que no están bajo el cursor:** `src/engine/design/objectBelow.ts:24` prueba las partes vectoriales por su caja, no por `vectorObjectHit`. Test: `tests/adv-seleccion.test.ts:30`.
 - **D63 · medio · 2026-11-12 · Distribuir solapa objetos:** `objectOps.ts:207` (`distributeBoxes`) usa el último por x, no el borde derecho máximo. Test: `tests/adv-seleccion.test.ts:132`.

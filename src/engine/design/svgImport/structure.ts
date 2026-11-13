@@ -34,7 +34,8 @@ export interface RasterItem extends Common {
   /** A standalone SVG, in page units, showing just this element through `box`, `scale` output pixels per unit. */
   svgFor: (box: Box, scale: number) => string;
 }
-export type Item = ShapeItem | RasterItem;
+export interface EmptyLayerItem { kind: 'empty-layer'; place: Place }
+export type Item = ShapeItem | RasterItem | EmptyLayerItem;
 export interface Walked { width: number; height: number; items: Item[]; warnings: string[] }
 
 interface Wrap { tag: string; attrs: Array<[string, string]> }
@@ -44,7 +45,12 @@ interface Ctx { style: Style; ctm: Mat; chain: Wrap[]; place: Place; groups: Gro
 const SKIP = new Set(['defs', 'metadata', 'title', 'desc', 'namedview', 'style', 'script', 'symbol', 'lineargradient', 'radialgradient', 'meshgradient', 'pattern', 'clippath', 'mask', 'marker', 'filter', 'font', 'cursor', 'view', 'perspective', 'color-profile']);
 const RESOURCES = 'defs,style,linearGradient,radialGradient,meshgradient,pattern,clipPath,mask,filter,marker,symbol';
 const MAX_DEPTH = 64;
+const MAX_USE_EXPANSIONS = 4096;
 const lc = (el: Element) => el.localName.toLowerCase();
+const finiteValues = (value: unknown): boolean => {
+  if (typeof value === 'number') return Number.isFinite(value);
+  return !value || typeof value !== 'object' || Object.values(value).every(finiteValues);
+};
 const unionOf = (bs: Box[]): Box | null => {
   if (!bs.length) return null;
   const x = Math.min(...bs.map((b) => b.x)), y = Math.min(...bs.map((b) => b.y));
@@ -60,7 +66,7 @@ const label = nameOf;
 const DRAWN = (el: Element) => !SKIP.has(lc(el));
 
 /** The page box a walked item covers (shape paint including stroke and blur margin, or the raster hint). */
-export function itemBox(i: Item): Box {
+export function itemBox(i: ShapeItem | RasterItem): Box {
   if (i.kind === 'raster') return i.hint;
   const b = pageBox(i.shape), m = strokeReach(i.shape) + BLUR_MARGIN * (i.shape.blur ?? 0);
   return { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m };
@@ -77,7 +83,7 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
   const warnings: string[] = [];
   if (sheet.skipped) warnings.push(`${sheet.skipped} CSS selector${sheet.skipped === 1 ? '' : 's'} with combinators or attributes ignored`);
   const vb = numbers(root.getAttribute('viewBox'));
-  const [vw, vh] = vb.length === 4 && vb[2] > 0 && vb[3] > 0 ? [vb[2], vb[3]] : [setup.width, setup.height];
+  const [vw, vh] = vb.length === 4 && vb.every(Number.isFinite) && vb[2] > 0 && vb[3] > 0 ? [vb[2], vb[3]] : [setup.width, setup.height];
   const serializer = new XMLSerializer();
 
   // Resources every standalone element needs: styles and everything that can be referenced by id.
@@ -87,7 +93,7 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
   const rootStyle = computeStyle(root, sheet, {});
   const rootWrap: Wrap = wrapOf(root);
   const items: Item[] = [];
-  let count = 0;
+  let count = 0, useExpansions = 0;
 
   /** The clip as a page rectangle, when it is one plain upright rectangle (a rect, or a path that draws one); null otherwise. */
   function clipBox(value: string, ctm: Mat): Box | null {
@@ -182,11 +188,16 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
 
   function walk(el: Element, ctx: Ctx, out: Item[]): void {
     const name = lc(el);
-    if (SKIP.has(name) || ctx.depth > MAX_DEPTH) return;
+    if (SKIP.has(name)) return;
+    if (ctx.depth > MAX_DEPTH) {
+      if (!warnings.includes('SVG nesting limit reached; content skipped')) warnings.push('SVG nesting limit reached; content skipped');
+      return;
+    }
     let style = computeStyle(el, sheet, ctx.style);
     // The blur of a wrapper around one shape (how this app writes a blurred shape) is that shape's blur.
     if (ctx.filter && !style.filter) style = { ...style, filter: ctx.filter };
     const ctm = multiply(ctx.ctm, parseTransform(el.getAttribute('transform')));
+    if (!ctm.every(Number.isFinite)) { warnings.push('element with non-finite transform was skipped'); return; }
     const container = name === 'g' || name === 'a' || name === 'switch' || name === 'svg';
     // visibility is inherited, so every element below reads it by itself; display:none belongs to the one that sets it.
     const own: Own = {
@@ -218,10 +229,11 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
         const bx = parseLength(el.getAttribute('x'), vw) ?? 0, by = parseLength(el.getAttribute('y'), vh) ?? 0;
         const nvb = numbers(el.getAttribute('viewBox')), nw = parseLength(el.getAttribute('width'), vw), nh = parseLength(el.getAttribute('height'), vh);
         gctm = multiply(ctm, [1, 0, 0, 1, bx, by]);
-        if (nvb.length === 4 && nvb[2] > 0 && nvb[3] > 0 && nw && nh) gctm = multiply(gctm, viewBoxMatrix(nvb, nw, nh, el.getAttribute('preserveAspectRatio')));
+        if (nvb.length === 4 && nvb.every(Number.isFinite) && nvb[2] > 0 && nvb[3] > 0 && nw && nh) gctm = multiply(gctm, viewBoxMatrix(nvb, nw, nh, el.getAttribute('preserveAspectRatio')));
         warnings.includes('nested svg: clip to its viewport ignored') || warnings.push('nested svg: clip to its viewport ignored');
       }
       const down: Ctx = { ...inner, ctm: gctm, chain: [...ctx.chain, wrapOf(el)], filter: blurOne ? style.filter : undefined };
+      if (!gctm.every(Number.isFinite)) { warnings.push('element with non-finite transform was skipped'); return; }
       const sub: Item[] = [];
       // Layers: Inkscape's, and Illustrator's (a named group right on the page). Inside a group a layer is a group, as in Inkscape.
       const onPage = !ctx.groups.length && (el.getAttribute('inkscape:groupmode') === 'layer' || ctx.place.name === null);
@@ -229,11 +241,13 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
       const plain = !named && !own.hidden && !own.locked && own.opacity >= 1 && own.blend === 'normal';
       if (name === 'g' && onPage && isLayerEl(el)) {
         const up = ctx.place;
-        walkChildren(el, { ...down, place: { id: ++count, name: named ?? 'Layer', parent: up, hidden: up.hidden || own.hidden, locked: up.locked || own.locked, opacity: up.opacity * own.opacity, blend: own.blend !== 'normal' ? own.blend : up.blend } }, sub);
+        const place: Place = { id: ++count, name: named ?? 'Layer', parent: up, hidden: up.hidden || own.hidden, locked: up.locked || own.locked, opacity: up.opacity * own.opacity, blend: own.blend !== 'normal' ? own.blend : up.blend };
+        walkChildren(el, { ...down, place }, sub);
+        if (!kids.length) sub.push({ kind: 'empty-layer', place });
       } else if (ogs === 'shape' && kids.length === 1) walkChildren(el, { ...down, carry: { ...own, label: named } }, sub);
       else if (name !== 'g' || (plain && (kids.length <= 1 || !!clip || (!ctx.groups.length && kids.every(isLayerEl))))) walkChildren(el, down, sub);
       else walkChildren(el, { ...down, groups: [...ctx.groups, { id: ++count, name: named ?? 'Group', ...own }] }, sub);
-      const inside = unionOf(sub.map(itemBox));
+      const inside = unionOf(sub.filter((i): i is ShapeItem | RasterItem => i.kind !== 'empty-layer').map(itemBox));
       if (clip && inside && !covers(clip, { x: 0, y: 0, w: width, h: height }) && !covers(clip, inside)) reasons.push('clip-path');
       // A group with an effect over all its content is one picture: drawn alone, then placed.
       if (!reasons.length) out.push(...sub);
@@ -242,6 +256,11 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
     }
 
     if (name === 'use') {
+      if (useExpansions >= MAX_USE_EXPANSIONS) {
+        if (!warnings.includes('use expansion limit reached; content skipped')) warnings.push('use expansion limit reached; content skipped');
+        return;
+      }
+      useExpansions++;
       const href = el.getAttribute('href') ?? el.getAttribute('xlink:href') ?? '';
       const target = href.startsWith('#') ? ids.get(href.slice(1)) : undefined;
       if (!target || ctx.uses.has(target) || target.contains(el)) { warnings.push('a use pointing nowhere or into itself was skipped'); return; }
@@ -254,8 +273,10 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
       const useCtx: Ctx = { ...inner, ctm: tctm, uses, chain: [...ctx.chain, wrap], groups: plainUse ? ctx.groups : [...ctx.groups, { id: ++count, name: named ?? 'Group', ...own }] };
       if (lc(target) === 'symbol') {
         const svb = numbers(target.getAttribute('viewBox')), uw = parseLength(el.getAttribute('width'), vw), uh = parseLength(el.getAttribute('height'), vh);
-        const sctm = svb.length === 4 && svb[2] > 0 && svb[3] > 0 ? multiply(tctm, viewBoxMatrix(svb, uw ?? svb[2], uh ?? svb[3], target.getAttribute('preserveAspectRatio'))) : tctm;
-        const symWrap = svb.length === 4 && svb[2] > 0 && svb[3] > 0 ? { tag: 'g', attrs: [['transform', `matrix(${viewBoxMatrix(svb, uw ?? svb[2], uh ?? svb[3], target.getAttribute('preserveAspectRatio')).join(' ')})`]] as Array<[string, string]> } : null;
+        const validViewBox = svb.length === 4 && svb.every(Number.isFinite) && svb[2] > 0 && svb[3] > 0;
+        const sctm = validViewBox ? multiply(tctm, viewBoxMatrix(svb, uw ?? svb[2], uh ?? svb[3], target.getAttribute('preserveAspectRatio'))) : tctm;
+        if (!sctm.every(Number.isFinite)) { warnings.push('symbol with non-finite transform was skipped'); return; }
+        const symWrap = validViewBox ? { tag: 'g', attrs: [['transform', `matrix(${viewBoxMatrix(svb, uw ?? svb[2], uh ?? svb[3], target.getAttribute('preserveAspectRatio')).join(' ')})`]] as Array<[string, string]> } : null;
         walkChildren(target, { ...useCtx, ctm: sctm, chain: symWrap ? [...useCtx.chain, symWrap] : useCtx.chain }, out);
       } else walk(target, useCtx, out);
       return;
@@ -264,7 +285,8 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
     const common = { place: ctx.place, groups: ctx.groups, label: named };
     if (SHAPE_TAGS.has(name)) {
       const r = buildShape(el, style, shapeCtx);
-      if (r.ok === true) out.push({ kind: 'shape', shape: r.shape, ...common, ...own });
+      if (r.ok === true && finiteValues(r.shape)) out.push({ kind: 'shape', shape: r.shape, ...common, ...own });
+      else if (r.ok === true) warnings.push('shape with non-finite values was skipped');
       else if (r.ok === false) out.push(rasterItem(el, ctx, own, r.reasons, r.hint, false, named));
       return;
     }
@@ -275,6 +297,7 @@ export function walkSvg(root: Element, maxSide = 8192): Walked {
     if (name === 'image') {
       const x = parseLength(el.getAttribute('x'), vw) ?? 0, y = parseLength(el.getAttribute('y'), vh) ?? 0, w = parseLength(el.getAttribute('width'), vw) ?? 0, h = parseLength(el.getAttribute('height'), vh) ?? 0;
       if (w > 0 && h > 0) out.push(rasterItem(el, ctx, own, ['image'], mapBox(ctm, { x, y, w, h }), false, named));
+      else warnings.push('image without a usable width and height was skipped');
     }
   }
 

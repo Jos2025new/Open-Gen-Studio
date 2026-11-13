@@ -9,10 +9,8 @@ export function parseLength(text: string | null | undefined, ref = 0, em = 16): 
   const m = /^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(%|em|ex|[a-zA-Z]*)\s*$/.exec(text ?? '');
   if (!m) return null;
   const v = Number(m[1]), u = m[2].toLowerCase();
-  if (u === '%') return (v * ref) / 100;
-  if (u === 'em') return v * em;
-  if (u === 'ex') return v * em * 0.5;
-  return u in UNITS ? v * UNITS[u] : null;
+  const value = u === '%' ? (v * ref) / 100 : u === 'em' ? v * em : u === 'ex' ? v * em * 0.5 : u in UNITS ? v * UNITS[u] : null;
+  return value !== null && Number.isFinite(value) ? value : null;
 }
 
 /** Numbers separated by spaces or commas. */
@@ -40,8 +38,9 @@ export function parseTransform(text: string | null | undefined): Mat {
       case 'skewX': if (a.length === 1) t = [1, 0, Math.tan((a[0] * Math.PI) / 180), 1, 0, 0]; break;
       case 'skewY': if (a.length === 1) t = [1, Math.tan((a[0] * Math.PI) / 180), 0, 1, 0, 0]; break;
     }
-    if (!t) return IDENTITY;
+    if (!t || !t.every(Number.isFinite)) return IDENTITY;
     m = multiply(m, t);
+    if (!m.every(Number.isFinite)) return IDENTITY;
   }
   // Anything left over that is not separators means a malformed list: ignore it whole, as renderers do.
   return text.replace(/(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/g, '').replace(/[\s,]/g, '') ? IDENTITY : m;
@@ -53,7 +52,7 @@ export function parseTransform(text: string | null | undefined): Mat {
  */
 export function pageSetup(svg: Element): { width: number; height: number; matrix: Mat } {
   const vb = numbers(svg.getAttribute('viewBox'));
-  const hasVb = vb.length === 4 && vb[2] > 0 && vb[3] > 0;
+  const hasVb = vb.length === 4 && vb.every(Number.isFinite) && vb[2] > 0 && vb[3] > 0;
   const w0 = parseLength(svg.getAttribute('width'), hasVb ? vb[2] : 0), h0 = parseLength(svg.getAttribute('height'), hasVb ? vb[3] : 0);
   const width = w0 && w0 > 0 ? w0 : hasVb ? vb[2] : 1000, height = h0 && h0 > 0 ? h0 : hasVb ? vb[3] : 1000;
   if (!hasVb) return { width, height, matrix: IDENTITY };

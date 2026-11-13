@@ -1,12 +1,15 @@
 import { canvasToBlob, createCanvas, ctx2d } from '../../../lib/media';
 import { sanitizeSvg } from './sanitize';
 import { pageSetup } from './transforms';
+import { unsafeUseExpansion } from './useBudget';
 
 /** A whole SVG as one PNG (the node area takes images, not layers): sanitized first, then drawn by the browser. */
 export async function flattenSvg(text: string, maxSide = 4096): Promise<Blob | string> {
   const clean = sanitizeSvg(text);
   if ('error' in clean) return clean.error;
-  const { root } = clean, page = pageSetup(root);
+  const { root } = clean;
+  if (unsafeUseExpansion(root)) return 'SVG use expansion limit reached; rasterization stopped.';
+  const page = pageSetup(root);
   if (!root.getAttribute('viewBox')) root.setAttribute('viewBox', `0 0 ${page.width} ${page.height}`);
   const k = Math.min(1, maxSide / Math.max(page.width, page.height));
   const w = Math.max(1, Math.round(page.width * k)), h = Math.max(1, Math.round(page.height * k));

@@ -34,12 +34,22 @@ const LOOK_STYLE = /(?:^|;)\s*(?:opacity|mix-blend-mode|mask)\s*:[^;]*/g;
 
 const all = (root: Element): Element[] => [...root.getElementsByTagName('*')];
 const apart = (el: Element): boolean => { for (let p: Element | null = el; p; p = p.parentElement) if (APART.has(p.localName)) return true; return false; };
-const css = (el: Element, name: string): string | null => new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`).exec(el.getAttribute('style') ?? '')?.[1].trim() ?? null;
+const css = (el: Element, name: string): string | null => {
+  let result: string | null = null, important = false;
+  for (const declaration of (el.getAttribute('style') ?? '').split(';')) {
+    const colon = declaration.indexOf(':');
+    if (colon < 0 || declaration.slice(0, colon).trim().toLowerCase() !== name) continue;
+    const value = declaration.slice(colon + 1).trim(), priority = /\s*!important\s*$/i.test(value);
+    if (!important || priority) { result = value.replace(/\s*!important\s*$/i, '').trim(); important = priority; }
+  }
+  return result;
+};
 const ref = (value: string | null): string | null => /^url\(\s*["']?#([^"')]+)["']?\s*\)/.exec(value ?? '')?.[1] ?? null;
 const num = (v: number): string => String(Math.round(v * 10000) / 10000);
 
 function lookOf(el: Element): Look | null {
-  const o = parseFloat(el.getAttribute('opacity') ?? css(el, 'opacity') ?? '1');
+  const raw = css(el, 'opacity') ?? el.getAttribute('opacity') ?? '1';
+  const o = parseFloat(raw) / (raw.trim().endsWith('%') ? 100 : 1);
   const opacity = Number.isFinite(o) ? Math.min(1, Math.max(0, o)) : 1;
   const blend = BLEND[css(el, 'mix-blend-mode') ?? ''] ?? null, mask = ref(el.getAttribute('mask') ?? css(el, 'mask'));
   return opacity < 1 || blend || mask ? { opacity, blend, mask } : null;
@@ -73,7 +83,7 @@ function alphaGradients(root: Element): void {
   if (!withAlpha.size) return;
   let seq = 0;
   for (const el of all(root)) {
-    const fill = ref(el.getAttribute('fill')), stroke = ref(el.getAttribute('stroke'));
+    const fill = ref(css(el, 'fill') ?? el.getAttribute('fill')), stroke = ref(css(el, 'stroke') ?? el.getAttribute('stroke'));
     const f = fill && withAlpha.has(fill) ? fill : null, s = stroke && withAlpha.has(stroke) ? stroke : null;
     if ((!f && !s) || apart(el)) continue;
     const g = document.createElementNS(SVG, 'g'), defs = g.appendChild(document.createElementNS(SVG, 'defs'));
@@ -82,7 +92,10 @@ function alphaGradients(root: Element): void {
     const piece = (paint: 'fill' | 'stroke', grad: string | null) => {
       const p = el.cloneNode(true) as Element, other = paint === 'fill' ? 'stroke' : 'fill';
       p.removeAttribute('transform');
+      p.removeAttribute('mask');
       p.setAttribute(other, 'none');
+      const value = css(el, paint);
+      if (value) p.setAttribute(paint, value);
       if (paint === 'fill') for (const m of ['marker-start', 'marker-mid', 'marker-end']) p.removeAttribute(m);
       if (!grad) return p;
       const mask = defs.appendChild(document.createElementNS(SVG, 'mask')), shape = p.cloneNode(true) as Element;
@@ -94,13 +107,15 @@ function alphaGradients(root: Element): void {
       p.setAttribute('mask', `url(#${mask.id})`);
       return p;
     };
-    const hasFill = (el.getAttribute('fill') ?? 'black') !== 'none', hasStroke = (el.getAttribute('stroke') ?? 'none') !== 'none';
+    const hasFill = (css(el, 'fill') ?? el.getAttribute('fill') ?? 'black') !== 'none', hasStroke = (css(el, 'stroke') ?? el.getAttribute('stroke') ?? 'none') !== 'none';
     const parts = [hasFill ? piece('fill', f) : null, hasStroke ? piece('stroke', s) : null].filter((p): p is Element => !!p);
     if (el.getAttribute('paint-order') === 'stroke') parts.reverse();
     // The element's own look stays on the group; its pieces carry only their paint.
     const style = el.getAttribute('style'), opacity = el.getAttribute('opacity');
     if (style) g.setAttribute('style', style);
     if (opacity) g.setAttribute('opacity', opacity);
+    const originalMask = el.getAttribute('mask');
+    if (originalMask) g.setAttribute('mask', originalMask);
     parts.forEach((p, i) => { p.removeAttribute('opacity'); p.removeAttribute('style'); if (i) p.removeAttribute('id'); g.appendChild(p); });
     el.replaceWith(g);
   }
@@ -130,6 +145,7 @@ export async function svgIntoPdf(pdf: jsPDF, GState: new (p: { opacity: number }
   io.events.subscribe('addFormObject', (form) => { lastForm = form.id; });
   // The working copy svg2pdf reads: the root, the definitions in reach, and the piece being drawn.
   const work = root.cloneNode(false) as Element, shared = work.appendChild(document.createElementNS(SVG, 'defs'));
+  for (const defs of all(root).filter((el) => el.localName === 'defs')) for (const child of [...defs.children]) shared.appendChild(child.cloneNode(true));
   root.after(work);
 
   /** One svg2pdf pass over `items`, placed under copies of their ancestors (transforms, clips, inherited paint). */
@@ -155,12 +171,11 @@ export async function svgIntoPdf(pdf: jsPDF, GState: new (p: { opacity: number }
     return forms.push(lastForm) - 1;
   };
   const paint = async (el: Element, chain: Element[]): Promise<void> => {
-    const scoped: Element[] = [];
     let run: Element[] = [];
     for (const child of [...el.children]) {
       const tag = child.localName;
       if (tag === 'style') { work.insertBefore(child, shared); continue; }
-      if (tag === 'defs') { for (const d of [...child.children]) scoped.push(shared.appendChild(d)); continue; }
+      if (tag === 'defs') continue;
       if (child.getAttribute('display') === 'none' || css(child, 'display') === 'none') continue;
       const look = looks.get(child);
       if (!look && !holds.has(child)) { run.push(child); continue; }
@@ -169,7 +184,6 @@ export async function svgIntoPdf(pdf: jsPDF, GState: new (p: { opacity: number }
       if (look) await drawLook(child, look, chain); else await paint(child, [...chain, child]);
     }
     await draw(chain, run);
-    scoped.forEach((d) => d.remove());
   };
   const drawLook = async (el: Element, look: Look, chain: Element[]): Promise<void> => {
     const container = el.localName === 'g' || el.localName === 'svg' || el.localName === 'a';
