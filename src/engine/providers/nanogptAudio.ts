@@ -1,4 +1,5 @@
 import { cacheDb } from '../../lib/idb';
+import { providerFetch } from '../../lib/providerFetch';
 import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http';
 import { extensionForMime } from '../../lib/media';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, RemoteJob, TranscriberSummary } from '../types';
@@ -104,7 +105,7 @@ export async function generateSpeech(req: GenRequest): Promise<GenResult> {
   if (typeof instructions === 'string' && instructions.trim() && TAKES_INSTRUCTIONS.test(req.model.id)) body.instructions = instructions.trim();
   req.onStatus('Generating');
   req.onRequest?.({ url: `${BASE}/v1/audio/speech`, body });
-  const res = await fetch(`${BASE}/v1/audio/speech`, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
+  const res = await providerFetch(`${BASE}/v1/audio/speech`, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
   const type = res.headers.get('content-type') ?? '';
   if (!res.ok || type.includes('json')) {
     const json = (await res.json().catch(() => ({}))) as Loose;

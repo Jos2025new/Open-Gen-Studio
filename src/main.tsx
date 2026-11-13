@@ -8,6 +8,7 @@ import '@fontsource/dm-sans/600.css';
 import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
 import '@xyflow/react/dist/style.css';
+import { startKeySync } from './engine/providerKeys';
 import './styles/tokens.css';
 import './styles/accents.css';
 import './styles/soft-contrast.css';
@@ -48,6 +49,7 @@ installBoardAutoOpen();
 installDoneNotice();
 installDoneSignal();
 
+startKeySync();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

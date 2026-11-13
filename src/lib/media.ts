@@ -1,4 +1,5 @@
 import { AbortedError, isAbort } from './http';
+import { providerFetch } from './providerFetch';
 import { HOST_NOT_ALLOWED, MAX_HOPS, TOO_MANY_REDIRECTS } from './mediaHosts';
 import { canvasMade } from './trace';
 
@@ -110,7 +111,7 @@ export async function fetchBlob(url: string, init: RequestInit & { timeoutMs?: n
     else signal?.addEventListener('abort', forward, { once: true });
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
     try {
-      const res = await fetch(target, { ...opts, signal: controller.signal });
+      const res = await providerFetch(target, { ...opts, signal: controller.signal });
       if (!res.ok) throw new Error(`Download failed (${res.status})${relayed ? await relayReason(res, relayed) : ''}`);
       return await res.blob();
     } catch (err) {
