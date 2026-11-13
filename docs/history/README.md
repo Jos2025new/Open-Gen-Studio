@@ -1,0 +1,64 @@
+# Historial
+
+Índice completo de las entradas del historial y de los traspasos, en orden. Lo pertinente; evidencia, no estado actual. Los informes de evidencia que viven fuera de esta carpeta siguen en el [índice general](../README.md#historial).
+
+- [001-2026-10-W40](001-2026-10-W40.md) — 29393 bytes.
+- [002-2026-10-W40](002-2026-10-W40.md) — 28429 bytes.
+- [003-2026-10-W40](003-2026-10-W40.md) — 29562 bytes.
+- [004-2026-10-W40](004-2026-10-W40.md) — 29117 bytes.
+- [005-2026-10-W40](005-2026-10-W40.md) — 29387 bytes.
+- [006-2026-10-W40](006-2026-10-W40.md) — 29432 bytes.
+- [007-2026-10-W40](007-2026-10-W40.md) — 3706 bytes.
+- [008-2026-09-W40](008-2026-09-W40.md) — 29535 bytes.
+- [009-2026-09-W40](009-2026-09-W40.md) — 29062 bytes.
+- [010-2026-09-W39](010-2026-09-W39.md) — 28940 bytes.
+- [011-2026-09-W39](011-2026-09-W39.md) — 896 bytes.
+- [012-2026-09-W40](012-2026-09-W40.md) — 11079 bytes.
+- [013-2026-09-W39](013-2026-09-W39.md) — 29187 bytes.
+- [014-2026-09-W39](014-2026-09-W39.md) — 29414 bytes.
+- [015-2026-09-W39](015-2026-09-W39.md) — 8682 bytes.
+- [016-2026-09-W40](016-2026-09-W40.md) — 1339 bytes.
+- [017-2026-10-W40](017-2026-10-W40.md) — 7357 bytes.
+- [018-2026-10-W40: Designer, correcciones y revisión con evidencia](018-2026-10-W40.md) — 20805 bytes.
+- [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](019-2026-10-W41.md) — 12788 bytes.
+- [020-2026-10-W41: Disparo forzado y correcciones de encaje](020-2026-10-W41.md) — 9214 bytes.
+- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](021-2026-10-W41.md) — 23113 bytes.
+- [022-2026-10-W41: Brocha de SAI, revisión de Astra, integración y purga (2026-10-09)](022-2026-10-W41.md) — 16469 bytes.
+- [023-2026-10-W41: Revisión de Astra, exportación, Niveles y Curvas, reglas (2026-10-10)](023-2026-10-W41.md) — 8573 bytes.
+- [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](024-2026-10-W41.md) — 29926 bytes.
+- [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12; sesión del 2026-10-13 al final)](025-2026-10-W42.md) — ver tamaño en el archivo.
+- [026-2026-10-W42: Designer, formas, paint, nodos y cierre de snapping (2026-10-13–14)](026-2026-10-W42.md) — evidencia por commit, aprobación manual y espaciado; E2E pendiente por sandbox ocupado.
+- [027-2026-10-W42: selección por modo en Edit](027-2026-10-W42.md) — Align conserva su guardia de modo y Edit incorpora marquee por objetos/capas.
+- [028-2026-10-W42: redondeo común de rectángulos seleccionados](028-2026-10-W42.md) — Rx/Ry actúa sobre los rectángulos del conjunto explícito en Object o Layer.
+- [029-2026-10-W42: edición de nodos en varios paths](029-2026-10-W42.md) — selección y movimiento multi-path en Object o Layer, con límites explícitos.
+- [030-2026-10-W42: correcciones de marquee y selección](030-2026-10-W42.md) — coordenadas del indicador, pista click-through y limpieza/modificación coherente de Object/Layer.
+- [031-2026-10-W42: edición de nodos desde rectángulos seleccionados](031-2026-10-W42.md) — Rx/Ry conserva la edición paramétrica y una acción explícita convierte la selección para editar nodos juntos.
+- [032-2026-10-W42: Autoselect entre capas en Edit](032-2026-10-W42.md) — Shift/Ctrl amplía la selección sin obligar a cambiar a Layer; Align y Rx operan sobre el grupo.
+- [033-2026-10-W42: control compacto de radios múltiples](033-2026-10-W42.md) — Rx/Ry, esquinas agudas y conversión a paths ocupan menos lienzo y se envuelven en estrecho.
+- [034-2026-10-W42: alineación de bordes opuestos y grupo](034-2026-10-W42.md) — cuatro acciones contra el borde opuesto y movimiento conjunto con referencia fija.
+- [035-2026-10-W42: menú compacto de Align](035-2026-10-W42.md) — diez acciones en cuadrícula con nombres accesibles y referencia/grupo arriba.
+- [036-2026-10-W42: Align en el panel derecho](036-2026-10-W42.md) — Align contextual dentro de Tool cuando Edit está activa.
+- [037-2026-10-W42: roles de referencia, realismo y precios de OpenRouter](037-2026-10-W42.md) — cambios de dos ramas, decisiones, bugs y pendientes.
+- [038-2026-10-W42: modos, Check status, agente y guías (2026-10-14/15)](038-2026-10-W42.md) — decisiones del usuario, atribución, límites y pendientes de `task/ref-roles`.
+- [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](039-2026-10-W42.md) — por commit: qué, dónde, evidencia y decisiones del usuario.
+- [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
+- [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](041-2026-10-W42.md) — una sola tarjeta antes del plan.
+- [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](042-2026-10-W42.md) — método, límites de la evidencia, maquetas, decisiones, commits, arreglos y guarda de esquema.
+- [043-2026-10-W42: incidente de guardado, plan y fase 1 de la protección (2026-10-18)](043-2026-10-W42.md) — incidente, diagnóstico, commits de `task/save-guard`, pruebas y pendientes.
+- [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
+- [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](045-2026-10-W42.md).
+- [046-2026-10-W43: Spaces, etapa 2: texto, Reusar e historial](046-2026-10-W43.md).
+- [047-2026-10-W43: un workflow pregunta antes de cargarse (2026-10-19)](047-2026-10-W43.md).
+- [048-2026-10-W43: ronda de interfaz 2026-10-19/20, pasos 1 y 2 del sistema visual (2026-10-20)](048-2026-10-W43.md).
+- [049-2026-10-W43: DeepSeek sin prompt en NanoGPT y tope de bytes de las referencias (2026-10-21)](049-2026-10-W43.md).
+- [050-2026-10-W43: precio honesto del plan (B10), margen de precio del usuario, frenos de Nodes con motivo (2026-10-23)](050-2026-10-W43.md).
+- [051-2026-10-W43: auditoría del pincel, lienzo/exportación/selección, D30 y presión simulada (2026-10-23)](051-2026-10-W43.md).
+- [052-2026-10-W43: un solo toolbox, tarjeta del pincel con pestañas, tarjeta Sizes y tarjeta Edit (2026-10-23)](052-2026-10-W43.md).
+- [053-2026-10-W43: Auto con una tarjeta, Studio independiente del tablero, límites del modelo y rechazos del agente (2026-10-24), abierto y frágil](053-2026-10-W43.md).
+- [054-2026-10-W44: origen y cierre del toolbox, limpieza de ramas del 2026-10-27 y typecheck en `npm test` (2026-10-27)](054-2026-10-W44.md).
+- [055-2026-10-W44: cierre de mapas, integración y limpieza (2026-10-29)](055-2026-10-W44.md).
+- [056-2026-10-W44: barra de paneles, Vista y Filtros, Home, barra lateral y caja de Nodes (2026-10-31)](056-2026-10-W44.md).
+- [057-2026-11-W44: lápiz y dabs, bordes vivos, borrador raster y arreglos de booleanas (2026-11-01)](057-2026-11-W44.md).
+- [058-2026-11-W45: lápiz de grafito (fit8), preset que se conserva y tecla repetida (2026-11-05)](058-2026-11-W45.md).
+- [059: traspaso de accesibilidad (2026-11-07)](059-2026-11-W45-traspaso.md).
+- [060: recorredor de interfaz, conversación y acuerdo (2026-11-07)](060-2026-11-W45-recorredor.md).

@@ -45,4 +45,4 @@ El usuario delegó la elección el 2026-10-08: «Escoge lo mejor y documenta por
 
 - **Comprobado:** con 24 procesos saturando 8 núcleos (carga entre 25 y 39), 4 de 4 ejecuciones completas pasaron (967 tests). Antes, con una carga de 34, fallaban hasta 8.
 - **Regla para tests nuevos:** si el comportamiento depende del tiempo, se usa reloj falso; si se espera una escritura o una respuesta, se espera por su condición; no se usan pausas fijas para dar algo por hecho.
-- **Sigue abierto:** las pruebas de recorrido completo del punto 6, en [pendientes](../pendientes.md).
+- **Sigue abierto:** las pruebas de recorrido completo del punto 6, en [pendientes](../pendientes.md). El enfoque para recorrer la interfaz está en la [0029](0029-recorredor-de-interfaz.md).
