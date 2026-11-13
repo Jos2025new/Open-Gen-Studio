@@ -3,7 +3,7 @@ import { layerBox, toLayerSpace } from './render';
 import { getRasterSurface } from './raster';
 import { bufferAlpha } from './hitAlpha';
 import { rasterPaintedBox } from './rasterBounds';
-import { layerObjects } from './objectOps';
+import { pickableObjects } from './objectOps';
 import { marqueeBounds, type MarqueeBounds } from './marquee';
 
 /*
@@ -52,7 +52,7 @@ export function marqueeFind(doc: DesignDoc, x0: number, y0: number, x1: number, 
   const layers: string[] = [];
   for (const l of doc.layers) {
     if (!l.visible || l.locked || l.type === 'fx') continue;
-    const hits = layerObjects(l).filter((o) => touches(b, o.box)).map((o) => o.id);
+    const hits = pickableObjects(l).filter((o) => l.type === 'raster' && o.id === l.id ? painted(l, b) : touches(b, o.box)).map((o) => o.id);
     if (hits.length) { objects.set(l.id, hits); layers.push(l.id); continue; }
     if (l.type === 'vector') continue;
     if (l.type === 'raster') { if (painted(l, b)) layers.push(l.id); continue; }

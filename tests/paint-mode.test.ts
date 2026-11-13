@@ -27,7 +27,7 @@ vi.mock('../src/engine/design/rules', () => ({ isProtectedImage: () => false }))
 
 import { createDoc } from '../src/engine/design/doc';
 import { commitStagePaintGesture } from '../src/components/designer/StagePaintCommit';
-import { hasEditableStrokes, paintModeOf, paintsPixelsDirectly, strokeObjectsAvailable } from '../src/engine/design/paintMode';
+import { hasEditableStrokes, paintModeOf, paintsPixelsDirectly } from '../src/engine/design/paintMode';
 
 const raster = (over: Partial<RasterLayer> = {}): RasterLayer => ({
   id: 'L', type: 'raster', name: 'L', visible: true, locked: false, opacity: 1, blend: 'normal', x: 0, y: 0, width: 10, height: 10,
@@ -60,12 +60,6 @@ describe('Drawing or Design (ADR 0016)', () => {
     expect(paintsPixelsDirectly(docWith([raster(editable)], { paintMode: 'drawing' }), raster(editable))).toBe(false);
     expect(paintsPixelsDirectly(docWith([raster()], { paintMode: 'design' }), raster())).toBe(false);
     expect(hasEditableStrokes(raster(editable))).toBe(true);
-  });
-
-  it('single-stroke selection is offered in Design, or on a raster layer with editable strokes only', () => {
-    expect(strokeObjectsAvailable(docWith([raster()], { paintMode: 'drawing' }))).toBe(false);
-    expect(strokeObjectsAvailable(docWith([raster(editable)], { paintMode: 'drawing' }))).toBe(true);
-    expect(strokeObjectsAvailable(docWith([raster()], { paintMode: 'design' }))).toBe(true);
   });
 
   it('a Drawing stroke writes no editable entry, and a Design stroke still records one', () => {

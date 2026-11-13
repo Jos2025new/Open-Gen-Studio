@@ -41,8 +41,3 @@ export function paintsPixelsDirectly(doc: Pick<DesignDoc, 'paintMode' | 'layers'
   return paintModeOf(doc) === 'drawing' && !hasEditableStrokes(layer);
 }
 
-/** Selecting and moving single strokes is offered in Design, or on a raster layer that already has editable strokes. */
-export function strokeObjectsAvailable(doc: Pick<DesignDoc, 'paintMode' | 'layers' | 'activeLayerId'>): boolean {
-  const active = doc.layers.find((l) => l.id === doc.activeLayerId);
-  return !(active?.type === 'raster' && paintModeOf(doc) === 'drawing' && !hasEditableStrokes(active));
-}

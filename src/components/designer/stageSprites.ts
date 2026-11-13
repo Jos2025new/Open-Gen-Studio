@@ -1,7 +1,7 @@
 /* Canvas sprites the Stage paints: the transform arrows of a selection and the transparency checkerboard.
    Pure drawing, moved out of Stage.tsx to keep it under its size limit (no behaviour change). */
 
-export function drawArrowHandle(ctx: CanvasRenderingContext2D, h: { op: string; fx: number; fy: number }, x: number, y: number): void {
+export function drawArrowHandle(ctx: CanvasRenderingContext2D, h: { op: string; fx: number; fy: number }, x: number, y: number, color = '#0a0a0b'): void {
   // One closed block-arrow outline (shaft and both heads), filled dark over a 1 px light rim: reads on any fill.
   const SW = 1.6, HW = 4.6, HL = 5;
   ctx.save();
@@ -37,7 +37,7 @@ export function drawArrowHandle(ctx: CanvasRenderingContext2D, h: { op: string; 
   ctx.strokeStyle = '#ffffff';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = '#0a0a0b';
+  ctx.fillStyle = color;
   ctx.fill();
   ctx.restore();
 }
@@ -81,11 +81,18 @@ export function drawCenterMark(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.restore();
 }
 
+export type HandleKey = { op: string; fx: number; fy: number };
+export const sameHandle = (a: HandleKey | null | undefined, b: HandleKey | null | undefined): boolean =>
+  !a || !b ? !a && !b : a.op === b.op && a.fx === b.fx && a.fy === b.fy;
+export const handleCursor = (h: HandleKey): string => h.op === 'pivot' ? 'move' : h.op === 'rotate' ? 'grab'
+  : h.op === 'skew' ? (h.fy ? 'ew-resize' : 'ns-resize')
+    : h.fx && h.fy ? (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize') : h.fx ? 'ew-resize' : 'ns-resize';
+
 type ScreenBox = { x: number; y: number; w: number; h: number };
 /** Selection overlay in screen pixels: while a handle is held, a thin box (and the center it turns about); otherwise
     the two-tone box, the center mark (scale mode) and the handles (arrows; the pivot as a ringed cross). */
 export function drawTransformOverlay(ctx: CanvasRenderingContext2D, b: ScreenBox, live: { op: string; x: number; y: number } | null,
-  handles: Array<{ op: string; fx: number; fy: number; x: number; y: number }>, scaleMode: boolean): void {
+  handles: Array<{ op: string; fx: number; fy: number; x: number; y: number }>, scaleMode: boolean, hover?: HandleKey | null, accent = '#0a0a0b'): void {
   ctx.save();
   ctx.lineWidth = 1;
   if (live) {
@@ -105,11 +112,11 @@ export function drawTransformOverlay(ctx: CanvasRenderingContext2D, b: ScreenBox
   drawSelectionBox(ctx, Math.round(b.x) - 0.5, Math.round(b.y) - 0.5, Math.round(b.w) + 1, Math.round(b.h) + 1);
   if (scaleMode) drawCenterMark(ctx, b.x + b.w / 2, b.y + b.h / 2);
   for (const h of handles) {
-    if (h.op !== 'pivot') { drawArrowHandle(ctx, h, h.x, h.y); continue; }
+    if (h.op !== 'pivot') { drawArrowHandle(ctx, h, h.x, h.y, sameHandle(h, hover) ? accent : undefined); continue; }
     ctx.beginPath();
     ctx.arc(h.x, h.y, 5, 0, Math.PI * 2); ctx.moveTo(h.x - 9, h.y); ctx.lineTo(h.x + 9, h.y); ctx.moveTo(h.x, h.y - 9); ctx.lineTo(h.x, h.y + 9);
     ctx.strokeStyle = '#0a0a0b'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = sameHandle(h, hover) ? accent : '#ffffff'; ctx.lineWidth = 1; ctx.stroke();
   }
   ctx.restore();
 }

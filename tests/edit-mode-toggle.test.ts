@@ -17,7 +17,7 @@ describe('Edit: Object and Layer are always there', () => {
   it('Object shows disabled with its reason where there are no single objects', () => {
     const html = render('objects', false);
     expect(button(html, 'Object')).toContain('disabled');
-    expect(button(html, 'Object')).toContain('Object needs editable strokes or shapes; the active raster layer has none. Choose Layer to work with the whole layer.');
+    expect(button(html, 'Object')).toContain('No objects are available. Choose Layer to work with the whole layer.');
     expect(button(html, 'Object')).toContain('aria-description=');
     expect(button(html, 'Object')).toContain('title=');
     expect(button(html, 'Layer')).not.toContain('disabled');

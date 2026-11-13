@@ -1,5 +1,6 @@
 import { allVectorObjects, maskBounds, maskContains } from './vectorMask';
 import { vectorObjectHit } from './objectHit';
+import { pickable, shownLayer } from './objectGroupTree';
 import type { DesignDoc, Layer, RasterLayer, VectorLayer } from '../types';
 import { setDoc, toast, useStore } from '../../store/store';
 import { record } from './history';
@@ -10,6 +11,8 @@ import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
 import {composeRaster} from './rasterCompose';
 import { alignBoxDelta, turnVector, unionBoxes, type AlignTo, type Box, type RelativeTo, type Turn } from './transform';
 import { pixelsNotReady } from './rasterMissing';
+import { hitTestPixel, layerBox } from './render';
+import { multiply, rotateAbout, scaleAbout } from './matrix';
 
 /*
  * Edit in Objects mode: the operations act on the objects picked inside the active layer (objectSelection.ts), and
@@ -23,13 +26,28 @@ const union = (bs: Box[]): Box | null => {
   return { x, y, w: Math.max(...bs.map((b) => b.x + b.w)) - x, h: Math.max(...bs.map((b) => b.y + b.h)) - y };
 };
 
+/** A text, placed image or raster without individual strokes is one object. */
+export function wholeLayerObject(layer: Layer): boolean {
+  return layer.type === 'text' || (layer.type === 'raster' && !layer.paintStrokes?.length);
+}
+
 /** The objects of a layer that can be picked, with their boxes (page coordinates). */
 export function layerObjects(layer: Layer): Array<{ id: string; box: Box }> {
-  if (layer.type === 'raster') return (layer.paintStrokes ?? []).filter((s) => !s.erase).map((s) => ({ id: s.id, box: rasterStrokeBox(layer, s) })).filter((o): o is { id: string; box: Box } => Boolean(o.box));
+  if (wholeLayerObject(layer)) {
+    const box = layerBox(layer);
+    return box ? [{ id: layer.id, box }] : [];
+  }
+  if (layer.type === 'raster') {
+    const strokes = (layer.paintStrokes ?? []).filter((s) => !s.erase).map((s) => ({ id: s.id, box: rasterStrokeBox(layer, s) })).filter((o): o is { id: string; box: Box } => Boolean(o.box));
+    // An image painted over: the image (id = layer id) and its strokes are sibling objects, image first (Illustrator).
+    const box = layer.sourceAssetId ? layerBox(layer) : null;
+    return box ? [{ id: layer.id, box }, ...strokes] : strokes;
+  }
   if (layer.type === 'vector') {
     const mask = layer.pixelMask ? maskBounds(layer.pixelMask) : null;
     return [
-    ...layer.shapes.map((s) => ({ id: s.id, box: shapeBox(s) as Box | null })),
+    // Hidden shapes are no objects here: they never count in a box. Locked ones do (they are seen, and move with their group).
+    ...shownLayer(layer).shapes.map((s) => ({ id: s.id, box: shapeBox(s) as Box | null })),
     ...(layer.strokes ?? []).map((s) => ({ id: s.id, box: strokeBox(s) })),
   ].map(o => {
     if (!layer.pixelMask || !o.box) return o;
@@ -42,10 +60,30 @@ export function layerObjects(layer: Layer): Array<{ id: string; box: Box }> {
   return [];
 }
 
+/** The objects a click or a marquee may pick: not the locked shapes (nor the hidden, which are no objects). */
+export function pickableObjects(layer: Layer): Array<{ id: string; box: Box }> {
+  const objs = layerObjects(layer);
+  if (layer.type !== 'vector') return objs;
+  const off = new Set(layer.shapes.filter((s) => !pickable(layer, s)).map((s) => s.id));
+  return off.size ? objs.filter((o) => !off.has(o.id)) : objs;
+}
+
+/** Ids a pick of this layer may hold: its objects, plus every shape (a picked group carries its hidden members). */
+export function pickIds(layer: Layer): Set<string> {
+  return new Set([...layerObjects(layer).map((o) => o.id), ...(layer.type === 'vector' ? layer.shapes.map((s) => s.id) : [])]);
+}
+
 /** The topmost object of the layer under a point. */
 export function objectAt(layer: Layer, x: number, y: number): string | null {
+  if (layer.type === 'raster' && wholeLayerObject(layer)) return hitTestPixel({ layers: [layer] } as DesignDoc, x, y)?.id ?? null;
+  if (layer.type === 'raster' && layer.sourceAssetId) {
+    // A stroke on top wins; elsewhere on the image's pixels, the image.
+    const strokes = layerObjects(layer).slice(1);
+    for (let i = strokes.length - 1; i >= 0; i--) { const b = strokes[i].box; if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return strokes[i].id; }
+    return hitTestPixel({ layers: [layer] } as DesignDoc, x, y)?.id ?? null;
+  }
   if (layer.type === 'vector' && !maskContains(layer, x, y)) return null;
-  const objs = layerObjects(layer);
+  const objs = pickableObjects(layer);
   for (let i = objs.length - 1; i >= 0; i--) {
     const b = objs[i].box;
     if (x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) continue;
@@ -62,6 +100,7 @@ export function objectsBox(layer: Layer, ids: string[]): Box | null {
 /** Move some objects of a layer (pure; a painted layer still needs `composeRaster`). */
 export function translateObjects(layer: Layer, ids: string[], dx: number, dy: number): Layer {
   if (!dx && !dy) return layer;
+  if ((wholeLayerObject(layer) || layer.type === 'raster') && ids.includes(layer.id)) return translateLayer(layer, dx, dy);
   if (layer.type === 'raster') return ids.reduce((l, id) => moveRasterStroke(l, id, dx, dy), layer as RasterLayer);
   if (layer.type === 'vector' && layer.pixelMask && allVectorObjects(layer, ids)) return translateLayer(layer, dx, dy);
   if (layer.type === 'vector') return {
@@ -76,6 +115,12 @@ export function translateObjects(layer: Layer, ids: string[], dx: number, dy: nu
 export function turnObjects(layer: Layer, ids: string[], turn: Turn): Layer {
   const box = objectsBox(layer, ids);
   if (!box) return layer;
+  if ((wholeLayerObject(layer) || layer.type === 'raster') && ids.includes(layer.id) && layer.type !== 'vector' && layer.type !== 'fx') {
+    const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+    const m = turn === 'flip-h' ? scaleAbout(-1, 1, cx, cy) : turn === 'flip-v' ? scaleAbout(1, -1, cx, cy)
+      : rotateAbout(turn === 'rotate-cw' ? Math.PI / 2 : turn === 'rotate-ccw' ? -Math.PI / 2 : Math.PI, cx, cy);
+    return { ...layer, transform: multiply(m, layer.transform ?? [1, 0, 0, 1, 0, 0]) };
+  }
   if (layer.type === 'vector') {
     if (layer.pixelMask && allVectorObjects(layer, ids)) return turnVector(layer, turn);
     // The picked objects alone, as a layer: turned about their own joint center, then put back in place.
@@ -187,7 +232,7 @@ export function commitLayers(sessionId: string, docId: string, nexts: Layer[], r
   if (!doc || !nexts.length) return;
   const locked = nexts.find((n) => n.locked);
   if (locked) return void toast(`"${locked.name}" is locked.`, 'error');
-  for (const next of nexts) if (next.type === 'raster' && !composeRaster(next)) return void toast(pixelsNotReady([next.id, next.paintBaseId]), 'error');
+  for (const next of nexts) if (next.type === 'raster' && !wholeLayerObject(doc.layers.find((l) => l.id === next.id) ?? next) && !composeRaster(next)) return void toast(pixelsNotReady([next.id, next.paintBaseId]), 'error');
   if (recordFirst) record(doc);
   const by = new Map(nexts.map((n) => [n.id, n.type === 'raster' ? { ...n, rev: n.rev + 1 } : n] as const));
   setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => by.get(l.id) ?? l) }));

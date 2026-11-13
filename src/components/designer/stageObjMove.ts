@@ -1,6 +1,6 @@
 import type { DesignDoc, Layer, RasterLayer } from '../../engine/types';
 import { composeMoving } from '../../engine/design/rasterCompose';
-import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
+import { layerObjects, objectAt, objectsBox, pickIds, translateObjects, wholeLayerObject } from '../../engine/design/objectOps';
 import { unionBox } from '../../engine/design/doc';
 import type { ObjectPick } from '../../engine/design/objectSelection';
 import { setDoc } from '../../store/store';
@@ -19,7 +19,7 @@ export function otherGroups(doc: DesignDoc, picks: readonly ObjectPick[], layerI
     if (pick.layerId === layerId) continue;
     const base = doc.layers.find((l) => l.id === pick.layerId);
     if (!base || !base.visible || base.locked) continue;
-    const own = new Set(layerObjects(base).map((o) => o.id));
+    const own = pickIds(base);
     const ids = pick.ids.filter((id) => own.has(id));
     if (ids.length) out.push({ layerId: base.id, ids, base });
   }
@@ -31,7 +31,7 @@ export function moveGroups(groups: ObjGroup[], dx: number, dy: number): Map<stri
   const out = new Map<string, Layer>();
   for (const g of groups) {
     const moved = translateObjects(g.base, g.ids, dx, dy);
-    if (moved.type === 'raster' && g.base.type === 'raster') {
+    if (moved.type === 'raster' && g.base.type === 'raster' && !(wholeLayerObject(g.base) || g.ids.includes(g.base.id))) {
       if (!(g.compose ??= composeMoving(g.base, g.ids) ?? undefined)) return null;
       g.compose(moved);
     }
@@ -42,7 +42,7 @@ export function moveGroups(groups: ObjGroup[], dx: number, dy: number): Map<stri
 
 /** Joint box of the groups' objects that snap (painted strokes are never snapped). */
 export function snapBox(groups: ObjGroup[]) {
-  return unionBox(groups.filter((g) => g.base.type !== 'raster').map((g) => objectsBox(g.base, g.ids)).filter((b): b is NonNullable<typeof b> => Boolean(b)));
+  return unionBox(groups.filter((g) => g.base.type !== 'raster' || (wholeLayerObject(g.base) || g.ids.includes(g.base.id))).map((g) => objectsBox(g.base, g.ids)).filter((b): b is NonNullable<typeof b> => Boolean(b)));
 }
 
 /** The topmost visible, unlocked layer with an object under the point (Ctrl-click picks from any layer). */
@@ -71,7 +71,7 @@ export const dragGroups = (d: ObjGroup & { others?: ObjGroup[] }): ObjGroup[] =>
 
 /** After the drag: painted layers close their edit and bump their revision. */
 export function commitPaintedMove(sessionId: string, docId: string, groups: ObjGroup[]): void {
-  const painted = groups.filter((g) => g.base.type === 'raster').map((g) => g.layerId);
+  const painted = groups.filter((g) => g.base.type === 'raster' && !(wholeLayerObject(g.base) || g.ids.includes(g.base.id))).map((g) => g.layerId);
   if (!painted.length) return;
   painted.forEach((id) => commitEdit(id));
   setDoc(sessionId, docId, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (painted.includes(l.id) && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l)) }));

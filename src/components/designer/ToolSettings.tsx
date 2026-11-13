@@ -24,7 +24,6 @@ import { toast } from '../../store/store';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
 import { PaintModeToggle } from './PaintModeToggle';
-import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { RulerSettings } from './StrokeRulerOverlay';
 import { SnapControl } from './SnapControl';
 import { AlignControls } from './AlignControls';
@@ -54,9 +53,7 @@ const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof TrianglesCenterl
 /** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
 /** Edit acts on the objects inside a layer (default) or on whole layers. Also in the layer's Properties. */
 /**
- * Object and Layer are always shown. Object is disabled (with its reason) when the active layer has no single objects
- * to pick (a raster layer in Drawing with no editable strokes, ADR 0016). The stored mode is never changed silently:
- * the same value drives what the tools do.
+ * Object and Layer are always shown. A raster layer without editable strokes is one whole object.
  */
 export function EditModeToggle({ objects = true }: { objects?: boolean }) {
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
@@ -66,7 +63,7 @@ export function EditModeToggle({ objects = true }: { objects?: boolean }) {
 /** The view of the Edit mode choice, with the mode passed in (the store is read by EditModeToggle). */
 export function EditModeOptions({ mode, objects = true }: { mode: 'objects' | 'layers'; objects?: boolean }) {
   return <span className="opt edit-mode"><span className="opt-label">Edit</span><Segmented size="sm" value={mode} onChange={(v) => setUi({ selectMode: v })} options={[
-    { value: 'objects' as const, label: 'Object', disabled: !objects, tip: objects ? 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' : 'Object needs editable strokes or shapes; the active raster layer has none. Choose Layer to work with the whole layer.' },
+    { value: 'objects' as const, label: 'Object', disabled: !objects, tip: objects ? 'Move, align and transform picked objects; images, text and flattened paint count as whole objects' : 'No objects are available. Choose Layer to work with the whole layer.' },
     { value: 'layers' as const, label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
   ]} /></span>;
 }
@@ -254,7 +251,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, m
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle objects={strokeObjectsAvailable(doc)} /><AutoSelectToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle /><AutoSelectToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}

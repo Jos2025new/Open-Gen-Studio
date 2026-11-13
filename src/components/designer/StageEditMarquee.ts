@@ -2,7 +2,7 @@ import { expandPicks } from '../../engine/design/objectGroupTree';
 import type { DesignDoc } from '../../engine/types';
 import { layerBox } from '../../engine/design/render';
 import { pixelTarget } from '../../engine/design/autoSelect';
-import { objectAt } from '../../engine/design/objectOps';
+import { objectAt, wholeLayerObject } from '../../engine/design/objectOps';
 import { marqueeBounds } from '../../engine/design/marquee';
 import { marqueeFind } from '../../engine/design/marqueePick';
 import { layerSelection, setLayerPicks } from '../../engine/design/selection';
@@ -34,7 +34,7 @@ export function updateEditMarquee(drag: EditMarqueeDrag, point: { x: number; y: 
 
 export function editAreaOccupied(doc: DesignDoc, p: { x: number; y: number }, mode: EditMarqueeDrag['mode'], autoSelect = false): boolean {
   if (mode === 'objects') {
-    return doc.layers.some((l) => l.visible && !l.locked && objectAt(l, p.x, p.y) != null) || pixelTarget(doc, p.x, p.y, autoSelect) != null;
+    return doc.layers.some((l) => l.visible && !l.locked && (autoSelect || !wholeLayerObject(l) || l.id === doc.activeLayerId) && objectAt(l, p.x, p.y) != null) || pixelTarget(doc, p.x, p.y, autoSelect) != null;
   }
   return doc.layers.some((l) => {
     if (!l.visible || l.type === 'fx') return false;

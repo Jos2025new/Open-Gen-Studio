@@ -13,8 +13,9 @@ vi.mock('../src/engine/design/viewCoordinates', async (original) => ({
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Stage } from '../src/components/designer/Stage';
-import { addEmptyLayer, newBlankDoc, patchLayer, setActiveLayer } from '../src/engine/design/actions';
-import { setObjectPick, objectPicks } from '../src/engine/design/objectSelection';
+import { addEmptyLayer, addTextLayer, newBlankDoc, patchLayer, setActiveLayer } from '../src/engine/design/actions';
+import { setObjectPick, objectPicks, useShapeEdit } from '../src/engine/design/objectSelection';
+import { layerSelection, setLayerPicks } from '../src/engine/design/selection';
 import { setUi, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -47,9 +48,33 @@ afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks()
 describe('group selection on canvas', () => {
   it('moves both selected group members on Ctrl-drag', () => {
     const canvas = host.querySelector('canvas.stage-canvas')!;
-    const fire = (type: string, x: number) => act(() => canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: 240, button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', ctrlKey: true, altKey: true })));
+    const fire = (type: string, x: number) => act(() => canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: 240, button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', ctrlKey: true })));
     fire('pointerdown', 240); fire('pointermove', 290); fire('pointerup', 290);
     expect(currentLayer().shapes.map((s) => s.x)).toEqual([250, 450]);
     expect(objectPicks(docId)[0].ids).toEqual(['a', 'b']);
+  });
+  it('enters a group on the first double click and edits on the second', () => {
+    const canvas = host.querySelector('canvas.stage-canvas')!;
+    const pointer = (type: string, x: number, y: number) => act(() => canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1, pointerType: 'mouse' })));
+    const dbl = () => { for (let i = 0; i < 2; i++) { pointer('pointerdown', 240, 240); pointer('pointerup', 240, 240); } act(() => canvas.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 240, clientY: 240 }))); };
+    dbl();
+    expect(objectPicks(docId)).toEqual([{ layerId, ids: ['a'] }]);
+    expect(useShapeEdit.getState().byDoc[docId]).toBeUndefined();
+    dbl();
+    expect(useShapeEdit.getState().byDoc[docId]?.shapeId).toBe('a');
+    pointer('pointerdown', 800, 800); pointer('pointerup', 800, 800);
+    expect(objectPicks(docId)).toEqual([]);
+  });
+  it('selects a text layer as an object and keeps Layer mode selecting the layer', () => {
+    const id = addTextLayer(sid, docId, 'Hello', { x: 200, y: 200, width: 100 }, {})!;
+    act(() => { setActiveLayer(sid, docId, id); setLayerPicks(docId, []); setObjectPick(docId, null); root.render(createElement(Stage, { sessionId: sid, doc: doc(), selectedCurve: null, setSelectedCurve: () => undefined })); });
+    const canvas = host.querySelector('canvas.stage-canvas')!;
+    const click = () => { for (const type of ['pointerdown', 'pointerup']) act(() => canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: 220, clientY: 210, button: 0, pointerId: 1, pointerType: 'mouse' }))); };
+    click();
+    expect(objectPicks(docId)).toEqual([{ layerId: id, ids: [id] }]);
+    act(() => { setObjectPick(docId, null); setLayerPicks(docId, []); setUi({ selectMode: 'layers' }); root.render(createElement(Stage, { sessionId: sid, doc: doc(), selectedCurve: null, setSelectedCurve: () => undefined })); });
+    click();
+    expect(objectPicks(docId)).toEqual([]);
+    expect(layerSelection(docId, doc().activeLayerId, doc().layers.map((l) => l.id))).toEqual([id]);
   });
 });

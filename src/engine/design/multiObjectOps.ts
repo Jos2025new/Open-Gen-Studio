@@ -1,7 +1,12 @@
 import type { DesignDoc, Layer, ShapeSpec } from '../types';
 import { toast } from '../../store/store';
 import { mutateDoc } from './actions';
-import { alignBoxes, commitLayers, distributeBoxes, layerObjects, moveEach, translateObjects, turnObjects, withoutObjects } from './objectOps';
+import { alignBoxes, commitLayers, distributeBoxes, layerObjects, moveEach, pickIds, translateObjects, turnObjects, wholeLayerObject, withoutObjects } from './objectOps';
+import { removeLayer } from './doc';
+import { composeRaster } from './rasterCompose';
+import { getRasterSurface } from './raster';
+import { record } from './history';
+import { pixelsNotReady } from './rasterMissing';
 import type { ObjectPick } from './objectSelection';
 import { looksUnchanged, noChangeNote } from './symmetry';
 import type { AlignTo, Box, RelativeTo, Turn } from './transform';
@@ -19,7 +24,7 @@ export function pickGroups(doc: DesignDoc, picks: readonly ObjectPick[]): PickGr
   for (const pick of picks) {
     const layer = doc.layers.find((l) => l.id === pick.layerId);
     if (!layer) continue;
-    const own = new Set(layerObjects(layer).map((o) => o.id));
+    const own = pickIds(layer);
     const ids = pick.ids.filter((id) => own.has(id));
     if (ids.length) out.push({ layer, ids });
   }
@@ -83,8 +88,17 @@ export function translatePicks(groups: PickGroup[], dx: number, dy: number): Lay
 /** Delete the picked objects of every layer, one undo step. */
 export function deletePicks(sessionId: string, docId: string, doc: DesignDoc, picks: readonly ObjectPick[]): void {
   const groups = pickGroups(doc, picks);
-  const next = groups.map((g) => withoutObjects(g.layer, g.ids)).filter((l, i) => l !== groups[i].layer);
-  commitLayers(sessionId, docId, next);
+  const gone = groups.filter((g) => (wholeLayerObject(g.layer) || g.layer.type === 'raster') && g.ids.includes(g.layer.id));
+  const parts = groups.filter((g) => !gone.includes(g));
+  const next = parts.map((g) => withoutObjects(g.layer, g.ids)).filter((l, i) => l !== parts[i].layer);
+  if (!gone.length) return commitLayers(sessionId, docId, next);
+  const locked = groups.find((g) => g.layer.locked);
+  if (locked) return void toast(`"${locked.layer.name}" is locked.`, 'error');
+  for (const layer of next) if (layer.type === 'raster' && (!layer.paintBaseId || !getRasterSurface(layer.paintBaseId))) return void toast(pixelsNotReady([layer.id, layer.paintBaseId]), 'error');
+  record(doc);
+  for (const layer of next) if (layer.type === 'raster') composeRaster(layer);
+  const byId = new Map(next.map((layer) => [layer.id, layer.type === 'raster' ? { ...layer, rev: layer.rev + 1 } : layer] as const));
+  mutateDoc(sessionId, docId, (d) => gone.reduce((acc, g) => removeLayer(acc, g.layer.id), { ...d, layers: d.layers.map((l) => byId.get(l.id) ?? l) }), { record: false });
 }
 
 /** The first locked layer among the picks, if any. */

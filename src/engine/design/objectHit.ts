@@ -4,6 +4,7 @@ import { strokeReach } from './shapeLook';
 import { localBox, toLocal } from './shapeTransform';
 import { strokeBox, worldPoints } from './strokes';
 import { lengthScale } from './matrix';
+import { shownLayer } from './objectGroupTree';
 
 /*
  * A click on a vector object lands on what it draws, not on the box around it: an ellipse's corners, the empty side
@@ -49,5 +50,5 @@ export function vectorObjectHit(l: VectorLayer, id: string, x: number, y: number
 
 /** Any of the layer's shapes or strokes is under the point. */
 export function vectorLayerHit(l: VectorLayer, x: number, y: number): boolean {
-  return l.shapes.some((s) => shapeHit(s, x, y)) || (l.strokes ?? []).some((s) => strokeHit(s, x, y));
+  return shownLayer(l).shapes.some((s) => shapeHit(s, x, y)) || (l.strokes ?? []).some((s) => strokeHit(s, x, y));
 }
