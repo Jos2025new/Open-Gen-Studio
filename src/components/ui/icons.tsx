@@ -32,6 +32,7 @@ export const ArrowRightFromLine = makeIcon('lucide-arrow-right-from-line', LU.Ar
 export const ArrowUp = makeIcon('lucide-arrow-up', LU.ArrowUp, PH.ArrowUp, OB.ArrowUp);
 export const ArrowUpDown = makeIcon('lucide-arrow-up-down', LU.ArrowUpDown, PH.ArrowUpDown, OB.ArrowUpDown);
 export const ArrowUpFromLine = makeIcon('lucide-arrow-up-from-line', LU.ArrowUpFromLine, PH.ArrowUpFromLine, OB.ArrowUpFromLine);
+export const ArrowUpToLine = makeIcon('lucide-arrow-up-to-line', LU.ArrowUpToLine, undefined, undefined);
 export const AudioLines = makeIcon('lucide-audio-lines', LU.AudioLines, PH.AudioLines, OB.AudioLines);
 export const Bell = makeIcon('lucide-bell', LU.Bell, PH.Bell, OB.Bell);
 export const BellOff = makeIcon('lucide-bell-off', LU.BellOff, PH.BellOff, OB.BellOff);

@@ -43,6 +43,11 @@
 .layer-object.is-picked { color: var(--text); background: var(--active-bg, color-mix(in srgb, var(--accent) 16%, transparent)); }
 .layer-object-name, .layer-object-toggle { width: auto; padding: 0; min-height: 0; color: inherit; }
 .layer-object-group > .layer-object { gap: 0.25rem; }
+/* Objects that can be named, hidden and locked: the name fills the row, eye and lock sit at its end as on a layer row. */
+.layer-object > .layer-object-name { flex: 1; min-width: 0; gap: 0.45rem; display: flex; align-items: center; }
+.layer-object:hover .layer-toggle { opacity: 1; }
+.layer-object .layer-toggle { flex: 0 0 auto; order: 0 !important; }
+.layer-object.is-off > .layer-object-name { opacity: .55; }
 /* Shelf thumbnails: the 64×40 canvas fits its (narrower) frame centred, and the active row's frame sits centred. */
 .layer-shelf .layer-thumb { width: 100%; height: 100%; object-fit: contain; }
 .layer-shelf .layer-row.is-active > .layer-select { justify-content: center; }

@@ -7,7 +7,9 @@ import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
 import { useLayerSelection } from './selection';
 import { objectPicks, setObjectPicks, setShapeEdit, useShapeEdit } from './objectSelection';
-import { layerObjects } from './objectOps';
+import { pickIds } from './objectOps';
+import { validPicks } from './objectGroupTree';
+import { normalizeObjectTrees } from './objectTreeNormalize';
 import { nodeSegs, pageSegs } from './pathNodes';
 import { placeFor } from '../place';
 import {rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, releaseBuffers, setBuffer} from './raster';
@@ -60,11 +62,11 @@ function releaseUnused(wereLive: string[] = []): void {
 }
 
 export function addDoc(sessionId: string, doc: DesignDoc): void {
-  patchSession(sessionId, (s) => ({ ...s, docs: [...s.docs, pinPaintMode(doc)], activeDocId: doc.id }));
+  patchSession(sessionId, (s) => ({ ...s, docs: [...s.docs, normalizeObjectTrees(pinPaintMode(doc))], activeDocId: doc.id }));
 }
 
 export function selectDoc(sessionId: string, docId: string): void {
-  patchSession(sessionId, (s) => ({ ...s, activeDocId: docId, docs: s.docs.map((d) => (d.id === docId ? pinPaintMode(d) : d)) }));
+  patchSession(sessionId, (s) => ({ ...s, activeDocId: docId, docs: s.docs.map((d) => (d.id === docId ? normalizeObjectTrees(pinPaintMode(d)) : d)) }));
   const doc = getDoc(sessionId, docId);
   if (doc) void ensureBuffers(doc.layers);
 }
@@ -383,7 +385,7 @@ function pruneNodePick(before: DesignDoc, after: DesignDoc): void {
   if (count(before) !== count(after)) setShapeEdit(after.id, { ...edit, node: undefined, nodes: [] });
 }
 
-/** After undo/redo the picks keep only what the restored document still has (a stale pick moved or deleted ghosts). */
+/** After any change, undo or redo, the picks keep only what the document still has and lets be picked (a stale pick moved or deleted ghosts). */
 export function prunePicks(doc: DesignDoc): void {
   const ids = new Set(doc.layers.map((l) => l.id));
   const layers = useLayerSelection.getState().byDoc[doc.id];
@@ -392,8 +394,10 @@ export function prunePicks(doc: DesignDoc): void {
   if (!picks.length) return;
   const kept = picks.map((pick) => {
     const layer = doc.layers.find((l) => l.id === pick.layerId);
-    const alive = new Set(layer ? layerObjects(layer).map((o) => o.id) : []);
-    return { layerId: pick.layerId, ids: pick.ids.filter((id) => alive.has(id)) };
+    // A hidden or locked layer holds no selection, nor does a hidden or locked shape by itself (objectGroupTree.ts).
+    if (!layer || !layer.visible || layer.locked) return { layerId: pick.layerId, ids: [] };
+    const alive = pickIds(layer), ids = pick.ids.filter((id) => alive.has(id));
+    return { layerId: pick.layerId, ids: layer.type === 'vector' ? validPicks(layer, ids) : ids };
   });
   if (kept.some((k, i) => k.ids.length !== picks[i].ids.length)) setObjectPicks(doc.id, kept);
 }

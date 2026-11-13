@@ -1,5 +1,5 @@
 /* Combine shapes (BooleanOps.tsx) and the Shape Builder overlay (ShapeBuilder.tsx). Cards and themes are untouched: only existing tokens. */
-.boolean-ops { display: inline-flex; align-items: center; gap: 0.125rem; }
+.boolean-ops, .stack-order { display: inline-flex; align-items: center; gap: 0.125rem; }
 .boolean-ops .boolean-more { padding: 0 0.25rem; min-width: 0; }
 .boolean-ops .icon-btn:disabled { opacity: .45; }
 .edit-card .boolean-ops { margin-top: 0.25rem; }

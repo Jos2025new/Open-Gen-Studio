@@ -116,6 +116,7 @@ function resampled(src: HTMLCanvasElement, b: Mat): HTMLCanvasElement {
  */
 export function transformLayer(base: Layer, ids: string[] | null, m: Mat, buffers: { main?: HTMLCanvasElement; paintBase?: HTMLCanvasElement }, persist: boolean): Layer {
   if (base.type === 'fx') return base;
+  if (ids?.includes(base.id)) ids = null;
   if (base.type === 'vector') return transformObjects(base, ids, m);
   if (base.type === 'text') return ids ? base : { ...base, transform: multiply(m, base.transform ?? [1, 0, 0, 1, 0, 0]) };
   // Raster.

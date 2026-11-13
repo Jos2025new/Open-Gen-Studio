@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ShapeSpec } from '../src/engine/types';
+import type { ShapeSpec, VectorLayer, VectorShape } from '../src/engine/types';
+const inLayer = (shapes: VectorShape[]) => ({ shapes } as VectorLayer);
 import { editableShapeAt, blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
 import { scaleLayer } from '../src/engine/design/doc';
 import { shapeToPath, transformShape } from '../src/engine/design/affine';
@@ -90,13 +91,13 @@ describe('review of 4ef6270', () => {
 describe('shape edit mode', () => {
   it('double-click finds the topmost shape under the point: rectangle, ellipse (knots) or path (nodes); lines have none', () => {
     const shapes = [{ ...rect({ type: 'path', x: 0, y: 0, w: 500, h: 500 }), id: 'c' }, { ...rect(), id: 'a' }, { ...rect({ type: 'ellipse', x: 50 }), id: 'b' }];
-    expect(editableShapeAt(shapes, 60, 40)?.id).toBe('b');
-    expect(editableShapeAt(shapes, 20, 40)?.id).toBe('a');
-    expect(editableShapeAt(shapes, 400, 400)?.id).toBe('c');
-    expect(editableShapeAt([{ ...rect({ type: 'line', w: 100, h: 0 }), id: 'l' }], 50, 20)).toBeNull();
+    expect(editableShapeAt(inLayer(shapes), 60, 40)?.id).toBe('b');
+    expect(editableShapeAt(inLayer(shapes), 20, 40)?.id).toBe('a');
+    expect(editableShapeAt(inLayer(shapes), 400, 400)?.id).toBe('c');
+    expect(editableShapeAt(inLayer([{ ...rect({ type: 'line', w: 100, h: 0 }), id: 'l' }]), 50, 20)).toBeNull();
     // Review: a path on top hides the rectangle under it.
-    expect(editableShapeAt([{ ...rect(), id: 'a' }, { ...rect({ type: 'path' }), id: 'p' }], 20, 40)?.id).toBe('p');
-    expect(editableShapeAt([{ ...rect({ x: 110, y: 80, w: -100, h: -60 }), id: 'n' }], 20, 30)?.id).toBe('n');
+    expect(editableShapeAt(inLayer([{ ...rect(), id: 'a' }, { ...rect({ type: 'path' }), id: 'p' }]), 20, 40)?.id).toBe('p');
+    expect(editableShapeAt(inLayer([{ ...rect({ x: 110, y: 80, w: -100, h: -60 }), id: 'n' }]), 20, 30)?.id).toBe('n');
   });
 });
 
@@ -190,8 +191,8 @@ describe('scaling keeps the look', () => {
     const [px, py] = toPage(e, 30, 40), [lx, ly] = toLocal(e, px, py);
     expect([lx, ly]).toEqual([expect.closeTo(30, 9), expect.closeTo(40, 9)]);
     // Double-click finds it through its turn.
-    expect(editableShapeAt([{ ...e, id: 'e' }], 100, 140)?.id).toBe('e');
-    expect(editableShapeAt([{ ...e, id: 'e' }], 10, 50)).toBeNull();
+    expect(editableShapeAt(inLayer([{ ...e, id: 'e' }]), 100, 140)?.id).toBe('e');
+    expect(editableShapeAt(inLayer([{ ...e, id: 'e' }]), 10, 50)).toBeNull();
   });
 
   it('a line turns as a line; Convert to path keeps the turn and the dash start', () => {
@@ -230,6 +231,6 @@ describe('stroke style', () => {
     const svg = shapeSvg({ ...rect({ rx: 12, ry: 6, join: 'bevel', blur: 2 }), id: 'shp1' });
     expect(svg).toContain('rx="12" ry="6"');
     expect(svg).toContain('stroke-linejoin="bevel"');
-    expect(svg).toMatch(/^<g filter="url\(#blur-shp1\)"><defs><filter id="blur-shp1"/);
+    expect(svg).toMatch(/^<g data-ogs="shape" filter="url\(#blur-shp1\)"><defs><filter id="blur-shp1"/);
   });
 });

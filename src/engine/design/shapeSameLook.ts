@@ -1,5 +1,6 @@
 import type { DesignDoc, VectorShape } from '../types';
 import type { ObjectPick } from './objectSelection';
+import { pickable } from './objectGroupTree';
 
 /*
  * «Select same» by stroke cap and corner join (Illustrator's "Select paths by stroke cap and corner join" script, and
@@ -36,7 +37,7 @@ export function findShapesByLook(doc: DesignDoc, queries: LookQuery | readonly L
   if (!list.length) return out;
   for (const layer of doc.layers) {
     if (layer.type !== 'vector' || !layer.visible || layer.locked) continue;
-    for (const shape of layer.shapes) if (hasStroke(shape) && list.some((q) => matches(shape, q))) out.push({ layerId: layer.id, shapeId: shape.id });
+    for (const shape of layer.shapes) if (hasStroke(shape) && pickable(layer, shape) && list.some((q) => matches(shape, q))) out.push({ layerId: layer.id, shapeId: shape.id });
   }
   return out;
 }

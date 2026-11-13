@@ -15,6 +15,8 @@ import { cachedBelow, keepBelow } from './belowFxCache';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
+import { shownLayer } from './objectGroupTree';
+import { hasGroupLook, paintShapeTree } from './groupPaint';
 import { rasterPaintedBox } from './rasterBounds';
 import { fxPlan } from '../fx/plan';
 import { paintArea, RetainedPage, type FrameMemo, type Rect } from './retainedPage';
@@ -80,7 +82,7 @@ function untransformedBox(l: Layer): Box | null {
     case 'raster':
       return rasterPaintedBox(l) ?? { x: l.x, y: l.y, w: l.width, h: l.height };
     case 'vector':
-      return unionBox([...l.shapes.map(shapeBox), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
+      return unionBox([...shownLayer(l).shapes.map(shapeBox), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
     case 'text': {
       const t = layoutText(l);
       return { x: l.x, y: l.y, w: t.width, h: t.height };
@@ -202,7 +204,7 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
       end();
     }
   } else if (l.type === 'vector') {
-    const paint = (c: CanvasRenderingContext2D) => { l.shapes.forEach(s => drawShape(c, s)); l.strokes?.forEach(s => drawStroke(c, s)); };
+    const paint = (c: CanvasRenderingContext2D) => { const sh = shownLayer(l); if (hasGroupLook(sh)) paintShapeTree(c, sh, sh.shapes, drawShape, (g) => GCO[g.blend!] ?? 'source-over'); else sh.shapes.forEach(s => drawShape(c, s)); l.strokes?.forEach(s => drawStroke(c, s)); };
     // Opacity and blend belong to the layer as a whole, as SVG groups them (W3C Compositing): with more than one
     // paint operation (two shapes, or one with fill and stroke) they are composed first and blended once. One
     // operation, full opacity and Normal stay direct. A pixel mask already composes the layer.
@@ -219,7 +221,7 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
     (it is composed before its blur); a Lineart stroke counts as several (its tip stamps overlap). */
 function paintOps(l: VectorLayer): number {
   let n = 0;
-  for (const s of l.shapes) n += s.blur ? 1 : ((s.fill || s.fillGradient) && s.type !== 'line' ? 1 : 0) + ((s.stroke || s.strokeGradient) && s.strokeWidth > 0 ? 1 : 0);
+  for (const s of shownLayer(l).shapes) n += s.blur ? 1 : ((s.fill || s.fillGradient) && s.type !== 'line' ? 1 : 0) + ((s.stroke || s.strokeGradient) && s.strokeWidth > 0 ? 1 : 0);
   return n + (l.strokes?.length ?? 0) * 2;
 }
 
@@ -227,7 +229,7 @@ function paintOps(l: VectorLayer): number {
     only what the layer paints (with its strokes and blur margins), cut to the target; its canvas is reused. */
 let groupScratch: HTMLCanvasElement | undefined;
 function drawGrouped(ctx: CanvasRenderingContext2D, l: VectorLayer, paint: (c: CanvasRenderingContext2D) => void): void {
-  const r = unionBox([...l.shapes.map(blurRegion), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
+  const r = unionBox([...shownLayer(l).shapes.map(blurRegion), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
   if (!r) return;
   const m = ctx.getTransform(), pad = 2;
   const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);

@@ -22,8 +22,12 @@ import { DESIGN_EXPORT_KEY, DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 import { applyBoolean } from '../../engine/design/shapeBuilder';
 import type { BoolOp } from '../../engine/design/shapeBoolean';
 import type { UiState } from '../../store/store';
+import { STACK_OPS, type StackOp } from '../../engine/design/stackOrder';
+import { restackSelection } from '../../engine/design/stackOrderActions';
 
 const BOOLEAN_KEYS: Record<string, BoolOp> = { u: 'union', s: 'subtract', i: 'intersect', e: 'exclude' };
+
+const STACK_KEYS: Record<string, StackOp> = Object.fromEntries(STACK_OPS.map((s) => [s.key, s.op]));
 
 const SHAPE_NAMES: Record<string, string> = { rect: 'Rectangle', ellipse: 'Ellipse', lasso: 'Lasso', polygon: 'Polygon', wand: 'Magic wand' };
 
@@ -82,6 +86,11 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
   } else if (!tools && !mod && !e.altKey && e.shiftKey && k === 'r') {
     e.preventDefault();
     setUi({ rulers: !useStore.getState().ui.rulers });
+  } else if (!mod && !e.altKey && !e.shiftKey && STACK_KEYS[e.key] && ui.tool === 'move') {
+    // Home / PageUp / PageDown / End: the selection to front, one place forward, one place backward, to back.
+    // Cancelled even when nothing can move: the key must never scroll a panel instead.
+    e.preventDefault();
+    restackSelection(sessionId, doc.id, STACK_KEYS[e.key]);
   } else if (mod && k === 'g' && objectGroupKey(sessionId, doc, e.shiftKey)) {
     // Ctrl+G / Ctrl+Shift+G on picked shapes: group / ungroup them inside their layer (SVG <g>).
     e.preventDefault();

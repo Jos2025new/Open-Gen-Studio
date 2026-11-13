@@ -4,6 +4,7 @@ import { shapeBox, translateLayer, unionBox, type Box } from './doc';
 import { rasterPaintedBox } from './rasterBounds';
 import { blurRegion, strokeReach } from './shapeLook';
 import { layerBox } from './render';
+import { shownLayer } from './objectGroupTree';
 import { setSelection } from './pixelSelection';
 import { solidPageFills, extendSolidPageFills } from './solidPageFill';
 
@@ -55,7 +56,7 @@ function paintedBox(l: Layer): Box | null {
   if (l.type === 'raster' && !l.sourceAssetId && rasterPaintedBox(l) === null) return null;
   const b = layerBox(l);
   if (!b || l.type !== 'vector' || l.pixelMask) return b;
-  return unionBox([b, ...l.shapes.map((s) => (strokeReach(s) > 0 || (s.blur ?? 0) > 0 ? blurRegion(s) : shapeBox(s)))]);
+  return unionBox([b, ...shownLayer(l).shapes.map((s) => (strokeReach(s) > 0 || (s.blur ?? 0) > 0 ? blurRegion(s) : shapeBox(s)))]);
 }
 
 /** The page shrinks (or grows) to the box of every visible layer; never cut: past MAX_SIDE it refuses. */

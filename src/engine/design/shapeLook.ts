@@ -1,4 +1,5 @@
-import type { ShapeSpec } from '../types';
+import type { ShapeSpec, VectorLayer, VectorShape } from '../types';
+import { pickable, shownLayer } from './objectGroupTree';
 import { clamp } from '../../lib/format';
 import { pageBox, toLocal } from './shapeTransform';
 
@@ -105,12 +106,16 @@ export function clickKnot(s: ShapeSpec, knot: 'rx' | 'ry', mods: { shift: boolea
   return { rx: r, ry: r };
 }
 
-/** The topmost shape of a vector layer under a page point, if it has an edit mode (rectangle, ellipse: knots; path: nodes). */
-export function editableShapeAt<T extends ShapeSpec>(shapes: T[], px: number, py: number): T | null {
+/**
+ * The topmost shape of a vector layer under a page point, if it has an edit mode (rectangle, ellipse: knots; path: nodes).
+ * Hidden shapes are not there; a locked one is seen (it still covers what is under it) but has no edit mode.
+ */
+export function editableShapeAt(layer: VectorLayer, px: number, py: number): VectorShape | null {
+  const shapes = shownLayer(layer).shapes;
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i], b = rectBox(s), [x, y] = toLocal(s, px, py);
     // The topmost shape under the point decides: a path over a rectangle hides it (no edit mode through it).
-    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return s.type === 'rect' || s.type === 'ellipse' || s.type === 'path' ? s : null;
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return (s.type === 'rect' || s.type === 'ellipse' || s.type === 'path') && pickable(layer, s) ? s : null;
   }
   return null;
 }

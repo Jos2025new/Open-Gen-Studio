@@ -1,19 +1,17 @@
 import type { DesignDoc } from '../../engine/types';
+import { toast } from '../../store/store';
 import { objectPicks, setObjectPicks } from '../../engine/design/objectSelection';
-import { groupPicked, ungroupPicked } from '../../engine/design/objectGroups';
-import { getDoc } from '../../engine/design/actions';
-import { clickPick } from '../../engine/design/objectGroupTree';
+import { groupPicks, ungroupPicked } from '../../engine/design/objectGroups';
 
-/** Ctrl+G / Ctrl+Shift+G on shapes picked in one vector layer. False when it does not apply (layers get Ctrl+G). */
+/** Ctrl+G / Ctrl+Shift+G on picked shapes, of one vector layer or several. False when it does not apply (layers get Ctrl+G). */
 export function objectGroupKey(sessionId: string, doc: DesignDoc, ungroup: boolean): boolean {
-  const picks = objectPicks(doc.id);
-  if (picks.length !== 1) return false;
-  const { layerId, ids } = picks[0];
-  const layer = doc.layers.find((l) => l.id === layerId);
-  if (layer?.type !== 'vector' || !ids.some((id) => layer.shapes.some((s) => s.id === id))) return false;
-  if (ungroup) return ungroupPicked(sessionId, doc.id, layerId, ids);
-  if (!groupPicked(sessionId, doc.id, layerId, ids)) return false;
-  const next = getDoc(sessionId, doc.id)?.layers.find((l) => l.id === layerId);
-  if (next?.type === 'vector') setObjectPicks(doc.id, [{ layerId, ids: clickPick(next, ids[0]) }]);
+  const picks = objectPicks(doc.id).filter((p) => { const l = doc.layers.find((x) => x.id === p.layerId); return l?.type === 'vector' && p.ids.some((id) => l.shapes.some((s) => s.id === id)); });
+  if (!picks.length) return false;
+  if (ungroup) return picks.map((p) => ungroupPicked(sessionId, doc.id, p.layerId, p.ids)).some(Boolean);
+  const done = groupPicks(sessionId, doc.id, picks);
+  if (!done) return false;
+  // Never silent: what stops the group is said (no change was made).
+  if ('error' in done) { toast(done.error, 'info'); return true; }
+  setObjectPicks(doc.id, [{ layerId: done.layerId, ids: done.ids }]);
   return true;
 }

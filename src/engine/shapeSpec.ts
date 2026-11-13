@@ -1,5 +1,6 @@
 import type { PrimSpec } from './design/primitives';
 import type { MarkerKind } from './design/markers';
+import type { ObjectMeta } from './objectMeta';
 
 /** One colour stop of an editable gradient: colour as #rrggbb and alpha 0–1 (SVG stop-color and stop-opacity). */
 export interface GradientStop { offset: number; color: string; alpha: number }
@@ -18,7 +19,7 @@ export interface GradientPaint {
 }
 
 /** A vector shape. Look fields are optional: shapes saved before them keep their look (design/shapeLook.ts). */
-export interface ShapeSpec {
+export interface ShapeSpec extends ObjectMeta {
   type: 'rect' | 'ellipse' | 'line' | 'path';
   /** path: SVG path data in absolute commands, in its own coordinates (`box0`), mapped onto x/y/w/h. */
   d?: string;

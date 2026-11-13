@@ -787,7 +787,7 @@ export interface Graph {
 export type LayerType = 'raster' | 'vector' | 'text';
 export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'color-dodge' | 'color-burn' | 'soft-light' | 'hard-light' | 'difference' | 'exclusion' | 'hue' | 'saturation' | 'color' | 'luminosity';
 
-export interface LayerBase {
+export interface LayerBase extends ObjectDepth {
   id: string;
   name: string;
   /** The folder this layer belongs to (DesignDoc.groups), if any. */
@@ -843,8 +843,8 @@ export interface VectorShape extends ShapeSpec {
   /** Innermost object group (contiguous members). */
   groupId?: string;
 }
-/** Shapes group in a vector layer (SVG <g>), nesting via parentId. */
-export interface ObjectGroup { id: string; name: string; parentId?: string; collapsed?: boolean }
+export type { ObjectGroup } from './objectMeta';
+import type { ObjectDepth, ObjectGroup } from './objectMeta';
 
 export type { Stroke, StrokeStyle, StrokeTexture } from './strokeTypes';
 import type { Stroke } from './strokeTypes';

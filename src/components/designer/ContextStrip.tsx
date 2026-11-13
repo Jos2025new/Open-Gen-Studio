@@ -21,6 +21,7 @@ import { multiLayerRectangles } from '../../engine/design/multiRectEdit';
 import { multiPathTargets } from '../../engine/design/multiPathEdit';
 import { layerSelection } from '../../engine/design/selection';
 import { BooleanOps } from './BooleanOps';
+import { StackOrder } from './StackOrder';
 import { MultiShapeLook } from './MultiShapeLook';
 import { SelectSameLook } from './SelectSameLook';
 import { pickGroups } from '../../engine/design/multiObjectOps';
@@ -124,6 +125,7 @@ export function ContextStrip({ sessionId, doc, variant = 'card' }: { sessionId: 
       {strokeEditing ? <><NodeModeButtons modes={[...STROKE_MODES]} /><NodeDoneButton docId={doc.id} /></> : <StrokeStripFields sessionId={sessionId} doc={doc} layerId={strokes.layerId} strokes={strokes.strokes} />}
     </div> : variant === 'strip' ? (editCount > 1 ? <EditOps sessionId={sessionId} doc={doc} alignOnly /> : null) : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
     {variant === 'strip' && !multiNodeEdit && <BooleanOps sessionId={sessionId} doc={doc} />}
+    {tool === 'move' && !editing && !strokeEditing && !multiNodeEdit && <StackOrder sessionId={sessionId} doc={doc} />}
     {tool === 'move' && roundTargets.length > 1 && <MultiRectangleRadii sessionId={sessionId} doc={doc} targets={roundTargets} />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
     {variant === 'card' && !editing && <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>}

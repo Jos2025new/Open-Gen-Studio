@@ -99,6 +99,18 @@ describe('applying a boolean', () => {
     undoDoc(sid, doc.id);
     expect(shapesNow().map((s) => s.id)).toEqual(['a', 'z', 'b']);
   });
+  it('shapes of two groups: the result sits in the group of the top-most one, the emptied group goes, the other stays one run', () => {
+    const sid = useStore.getState().activeSessionId;
+    const shapes = [{ ...A, groupId: 'ga' }, { ...rect('a2', 300, 0, 10, 10, '#000'), groupId: 'gb' }, { ...B, groupId: 'gb' }, { ...rect('b2', 300, 50, 10, 10, '#000'), groupId: 'gb' }];
+    const layer = { ...newVectorLayer('Shapes'), shapes, objectGroups: [{ id: 'ga', name: 'A' }, { id: 'gb', name: 'B' }] } as VectorLayer;
+    const doc = { ...createDoc('t', 400, 400), layers: [layer], activeLayerId: layer.id };
+    addDoc(sid, doc);
+    setObjectPick(doc.id, { layerId: layer.id, ids: ['a', 'b'] });
+    expect(applyBoolean(sid, doc.id, 'union')).toBeNull();
+    const now = getDoc(sid, doc.id)!.layers[0] as VectorLayer;
+    expect(now.shapes.map((x) => [x.type, x.groupId])).toEqual([['rect', 'gb'], ['path', 'gb'], ['rect', 'gb']]);
+    expect(now.objectGroups).toEqual([{ id: 'gb', name: 'B' }]);
+  });
   it('divide gives every region its own picked shape; a lone shape does nothing', () => {
     const { sid, doc, shapesNow } = setup([A, B]);
     applyBoolean(sid, doc.id, 'divide');

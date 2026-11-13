@@ -1,3 +1,4 @@
+import { normalizeObjectTree } from './objectTreeNormalize';
 import type { DesignDoc, VectorShape } from '../types';
 import { toast } from '../../store/store';
 import { getDoc, patchLayer } from './actions';
@@ -30,12 +31,15 @@ function replaceShapes(sessionId: string, docId: string, layerId: string, inputs
   const layer = getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId);
   if (layer?.type !== 'vector') return;
   const gone = new Set(inputs.map((s) => s.id)), top = Math.max(...layer.shapes.map((s, i) => (gone.has(s.id) ? i : -1)));
-  const byId = new Map(results.map((r) => [r.id, r])), fresh = results.filter((r) => !gone.has(r.id));
+  // New pieces go where the top-most input was: at its place and in its group, as Inkscape and Illustrator leave a result.
+  const byId = new Map(results.map((r) => [r.id, r])), fresh = results.filter((r) => !gone.has(r.id)).map((r) => ({ ...r, groupId: layer.shapes[top]?.groupId }));
   const shapes = layer.shapes.flatMap((s, i) => {
     const same = gone.has(s.id) ? byId.get(s.id) : s;
     return i === top ? [...(same ? [same] : []), ...fresh] : same ? [same] : [];
   });
-  patchLayer(sessionId, docId, layerId, { shapes });
+  // Groups emptied by the operation go, and the tree stays whole (objectTreeNormalize.ts).
+  const next = normalizeObjectTree({ ...layer, shapes });
+  patchLayer(sessionId, docId, layerId, { shapes: next.shapes, objectGroups: next.objectGroups });
   setObjectPick(docId, { layerId, ids: [...results.map((s) => s.id), ...alsoPicked] });
 }
 
