@@ -15,7 +15,7 @@ export const KEYED_HOSTS = {
 const METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
 /** Request headers the server sets itself or must never carry on: the page's own auth, cookies, origin and local markers. */
 const DROP_REQUEST = /^(host|connection|content-length|transfer-encoding|authorization|x-api-key|proxy-authorization|cookie|origin|referer|x-ogs.*|sec-.*|accept-encoding|keep-alive|upgrade)$/i;
-const DROP_RESPONSE = /^(set-cookie|set-cookie2|content-encoding|content-length|transfer-encoding|connection|keep-alive|www-authenticate|strict-transport-security)$/i;
+const DROP_RESPONSE = /^(set-cookie|set-cookie2|access-control-.*|content-encoding|content-length|transfer-encoding|connection|keep-alive|www-authenticate|strict-transport-security)$/i;
 
 /** The headers a provider wants for its key. */
 export function authHeaders(provider, key) {
