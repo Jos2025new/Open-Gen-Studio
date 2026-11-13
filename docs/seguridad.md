@@ -8,8 +8,7 @@ Esta página dice qué está protegido y qué no, con la prueba de cada punto. *
 
 | Riesgo | Detalle | Qué hacer |
 | --- | --- | --- |
-| **Claves en texto plano** | `data/state.json` guarda las claves de los proveedores sin cifrar, con permisos solo para tu usuario. Cualquier programa que corra con tu usuario puede leerlas. | No subas ni compartas `data/` ni sus copias `data.bak-*` (ya están fuera de git). |
-| **Las claves salen desde el navegador** | Las llamadas a los proveedores se hacen desde la página, así que una extensión del navegador con acceso a la página podría verlas. | Usa un perfil de navegador sin extensiones que no conozcas. |
+| **Claves de proveedor** (cerrado parcialmente, 2026-11-13) | Las claves ya no están en `state.json` ni en la página: viven en el llavero del sistema (`secret-tool`, la clave por stdin) y las llamadas a los proveedores pasan por `POST /x/store/proxy`, que añade la clave en el servidor ([keys.js](../server/keys.js), [provider-proxy.js](../server/provider-proxy.js), [test](../tests/provider-proxy.test.ts)). Quedan dos huecos: sin `secret-tool` (o si falla) las claves se guardan en `data/keys.json` con permisos 600 y la app lo avisa en Ajustes → Providers; y las copias anteriores (`state.json.bak-keys-*`, `backups/`, `data.bak-*`, instantáneas de `store-v2`) conservan las claves antiguas en texto plano. | Comprueba las claves y borra a mano esas copias cuando verifiques que todo funciona. No subas `data/`. |
 
 ## Lo que no es un riesgo (comprobado)
 
@@ -20,6 +19,14 @@ Esta página dice qué está protegido y qué no, con la prueba de cada punto. *
 | «DNS rebinding: un dominio que apunta a 127.0.0.1» | Vite 8 rechaza nombres de servidor desconocidos (`Blocked request. This host…`) antes de llegar a `/x/store`. | Comprobado con Vite 8.3.1 (2026-10-08): 403. |
 | «Con `vite --host`, cualquiera en tu red lee tus claves» | Era cierto hasta el 2026-10-08. Ahora `/x/store` solo responde a peticiones del propio ordenador (127.0.0.1 o ::1); desde otra dirección responde 403 «only from this computer». | [store-server.test.ts](../tests/store-server.test.ts) («only from this computer») y servidor real en 0.0.0.0: loopback 200, IP de red 403. |
 | «Un navegador automatizado puede escribir en tus datos» | Las escrituras con `X-OGS-Automated: 1` se rechazan fuera del sandbox. | [automated-write.test.ts](../tests/automated-write.test.ts) |
+
+## Claves y proxy de proveedores (2026-11-13)
+
+- La página guarda solo un marcador (`ogs:****1234`: últimos 4 caracteres); la clave real nunca vuelve a ella. `GET /x/store/keys` solo dice si existe y cómo se guarda.
+- `POST /x/store/proxy` (solo loopback, con `X-OGS`, como toda escritura) recibe el destino en `X-OGS-Target` y solo contacta los hosts de una lista cerrada (`api.fal.ai`, `queue.fal.run`, `openrouter.ai`, `nano-gpt.com`, `api.atlascloud.ai`; https, puerto por defecto, sin credenciales en la URL). Quita la cabecera de autenticación de la página, añade la clave por host y devuelve el estado y el texto de error del proveedor; el cuerpo se transmite sin cargarlo en memoria (subidas y SSE). No sigue redirecciones: las devuelve y las sigue el navegador, sin clave.
+- Al arrancar, una migración única copia `state.json` y `store-v2/globals.json` a `*.bak-keys-<fecha>` (600), mueve las claves al llavero (la lee de vuelta antes de quitarla del archivo) y deja el marcador. Si no puede guardarla en ningún sitio, el archivo la conserva.
+- El llavero distingue datos reales y sandbox (atributo `store` = hash de la carpeta de datos).
+- No cubierto: una extensión con acceso a la página sigue pudiendo usar el proxy mientras la página esté abierta (no ve la clave, pero puede pedir llamadas); el navegador guarda el marcador, no la clave, en IndexedDB.
 
 ## Límites que conviene saber
 
