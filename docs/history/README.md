@@ -63,6 +63,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [059: traspaso de accesibilidad (2026-11-07)](059-2026-11-W45-traspaso.md).
 - [060: objetos, grupos, SVG y PDF (2026-11-12)](060-2026-11-W46.md).
 - [061: cierre de la tanda D62–D70 (2026-11-12)](061-2026-11-W46-cierre.md).
+- [062: recorredor de interfaz, conversación y acuerdo (2026-11-07; renumerado desde la rama plus-center)](062-2026-11-W45-recorredor.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
 - [Informe parcial: objetos y profundidad](informe-gpt-objetos-y-z.md).

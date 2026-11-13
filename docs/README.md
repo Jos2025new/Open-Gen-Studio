@@ -95,6 +95,7 @@
 - [0026 — Motor de booleanas: Clipper2 (BSL-1.0) y ajuste de curvas (aceptado 2026-11-01; actualizado el mismo día)](decisions/0026-motor-booleano.md).
 - [0027 — Pincel: cápsula, dabs (aceptado 2026-11-01)](decisions/0027-motor-pincel-dabs.md).
 - [0028 — Grafito (propuesto)](decisions/0028-lapiz-grafito.md).
+- [0029 — Recorredor de interfaz: la máquina busca a lo ancho, solo lo confirmado se fija (enfoque aceptado 2026-11-07; sin implementar)](decisions/0029-recorredor-de-interfaz.md).
 
 ## Propuestas de interfaz
 
