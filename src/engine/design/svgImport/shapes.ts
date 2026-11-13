@@ -1,3 +1,4 @@
+import { MARKER_KINDS, type MarkerKind } from '../markers';
 import type { BlendMode, ShapeSpec } from '../../types';
 import { lengthScale, type Mat } from '../matrix';
 import { transformShape } from '../affine';
@@ -61,7 +62,14 @@ export function buildShape(el: Element, style: Style, c: ShapeCtx): ShapeOutcome
   if (blur === 'other') reasons.push('filter');
   if (style['clip-path'] && style['clip-path'] !== 'none') reasons.push('clip-path');
   if (style.mask && style.mask !== 'none') reasons.push('mask');
-  if (tag !== 'rect' && tag !== 'circle' && tag !== 'ellipse' && ['marker-start', 'marker-mid', 'marker-end'].some((k) => style[k] && style[k] !== 'none')) reasons.push('marker');
+  // Arrowheads this app wrote (its marker says its kind) stay arrowheads; any other marker is drawn as a picture.
+  const ends: Partial<ShapeSpec> = {};
+  if (tag !== 'rect' && tag !== 'circle' && tag !== 'ellipse') for (const [k, field] of [['marker-start', 'markerStart'], ['marker-mid', null], ['marker-end', 'markerEnd']] as const) {
+    if (!style[k] || style[k] === 'none') continue;
+    const kind = c.ids.get(/^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)$/.exec(style[k]!.trim())?.[1] ?? '')?.getAttribute('data-ogs') as MarkerKind | null;
+    if (field && kind && MARKER_KINDS.some((m) => m.value === kind && kind !== 'none')) ends[field] = kind;
+    else if (!reasons.includes('marker')) reasons.push('marker');
+  }
 
   const sw = Math.max(0, parseLength(style['stroke-width'], Math.hypot(c.vw, c.vh) / Math.SQRT2, c.fontSize) ?? 1);
   const fillOk = fillPaint.kind === 'color', strokeOk = strokePaint.kind === 'color';
@@ -77,7 +85,7 @@ export function buildShape(el: Element, style: Style, c: ShapeCtx): ShapeOutcome
     ...(/^\s*stroke/.test(style['paint-order'] ?? '') ? { paintOrder: 'stroke' as const } : {}),
     ...(style['fill-rule'] === 'evenodd' ? { fillRule: 'evenodd' as const } : {}),
     ...(fo < 1 ? { fillOpacity: fo } : {}), ...(so < 1 ? { strokeOpacity: so } : {}),
-    ...(typeof blur === 'number' ? { blur } : {}),
+    ...(typeof blur === 'number' ? { blur } : {}), ...ends,
   };
   const base = { fill: fillOk ? (fillPaint as { color: string }).color : null, stroke: strokeOk ? (strokePaint as { color: string }).color : null, strokeWidth: sw, radius: 0, ...look, ...(fillGrad ? { fillGradient: fillGrad } : {}), ...(strokeGrad ? { strokeGradient: strokeGrad } : {}) };
   const k = lengthScale(c.ctm);

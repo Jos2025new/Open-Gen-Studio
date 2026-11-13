@@ -65,6 +65,25 @@ describe('docToSvg with FX layers', () => {
     expect(svg).toContain('feBlend mode="screen"');
     expect(notes).toEqual(['SVG has no equivalent for Lens flare: left out of this file. PNG and JPG keep it.']);
   });
+  it('with a way to draw a picture, what the lens flare covers is a picture (the layer, or everything under it), said by name; the rest stays editable', async () => {
+    const notes: string[] = [], asked: string[][] = [];
+    const withPicture = { ...deps(notes), picture: async (d: DesignDoc) => { asked.push(d.layers.map((l) => `${l.id}:${l.opacity}`)); return 'data:image/png;base64,PIC'; } };
+    const svg = await docToSvg(doc([shape('a', 'A', { opacity: 0.5 }), fx('effect', 'layer', [newFxOp('flare')]), shape('b', 'B')]), withPicture);
+    // The layer alone with its FX, at full opacity: its own opacity stays on its <g>.
+    expect(asked).toEqual([['a:1', 'fxlayer:1']]);
+    expect(svg).toContain('<g id="a" inkscape:groupmode="layer" inkscape:label="A" opacity="0.5"><image width="300" height="200" preserveAspectRatio="none" href="data:image/png;base64,PIC"/></g>');
+    expect(svg).toMatch(/<g id="b"[^>]*><rect /);
+    expect(notes).toEqual(['SVG has no equivalent for an effect, so these are pictures in this file: “A” (Lens flare).']);
+    asked.length = 0;
+    const below = await docToSvg(doc([shape('a', 'A'), fx('effect', 'below', [newFxOp('flare')]), shape('b', 'B')]), withPicture);
+    expect(asked).toEqual([['a:1', 'fxbelow:1']]);
+    expect(below).not.toMatch(/<g id="a"/);
+    expect(below).toMatch(/<g id="fxbelow"[^>]*><image [^>]*PIC"\/><\/g><g id="b"/);
+    // An effect SVG can say stays a filter: nothing is drawn as a picture.
+    asked.length = 0;
+    expect(await docToSvg(doc([shape('a', 'A'), fx('filter', 'layer', [newFxOp('invert')])]), withPicture)).toContain('<filter');
+    expect(asked).toEqual([]);
+  });
   it('hidden FX layers are not exported', async () => {
     const svg = await docToSvg(doc([shape('a', 'A'), fx('filter', 'below', [newFxOp('invert')], { visible: false })]), deps());
     expect(svg).not.toContain('<filter');

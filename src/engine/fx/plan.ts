@@ -15,7 +15,7 @@ export type FxStep =
 
 export const fxActive = (l: FxLayer) => l.visible && l.opacity > 0 && l.ops.some((o) => o.enabled);
 
-export function fxPlan(layers: Layer[], hideLayerId?: string): FxStep[] {
+export function fxPlan(layers: Layer[], hideLayerId?: string, keepHidden = false): FxStep[] {
   const steps: FxStep[] = [];
   for (let i = 0; i < layers.length; i++) {
     const l = layers[i];
@@ -28,7 +28,8 @@ export function fxPlan(layers: Layer[], hideLayerId?: string): FxStep[] {
       const f = layers[++i] as FxLayer;
       if (fxActive(f)) fx.push(f);
     }
-    if (l.id === hideLayerId || !l.visible || l.opacity <= 0) continue;
+    // keepHidden: an editable file keeps what is hidden, marked so (export.ts).
+    if (l.id === hideLayerId || (!keepHidden && (!l.visible || l.opacity <= 0))) continue;
     steps.push(fx.length ? { t: 'clip', layer: l, fx } : { t: 'draw', layer: l });
   }
   return steps;

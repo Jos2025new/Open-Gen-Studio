@@ -29,20 +29,28 @@ async function load(rasterizer = fakeRasterizer()) {
   if ('error' in res) throw new Error(res.error);
   return res;
 }
-const names = (d: DesignDoc) => d.layers.map((l) => l.name);
 const groupName = (d: DesignDoc, l: { groupId?: string }) => d.groups?.find((g) => g.id === l.groupId)?.name;
 
 describe('Inkscape SVG import: structure', () => {
-  it('page size comes from width/height; layers and groups become folders in order, with their names', async () => {
+  it('page size comes from width/height; Inkscape layers are layers, in order; one split by pictures is a folder with its name', async () => {
     const { doc } = await load();
     expect([doc.width, doc.height]).toEqual([Math.round(210 * 96 / 25.4), Math.round(297 * 96 / 25.4)]);
-    expect(doc.groups?.map((g) => g.name)).toEqual(['Fondo', 'Formas', 'Formas / Grupo uno', 'Oculta', 'Bloqueada']);
-    // Paint order is the document order: Fondo, Formas (blurred ellipse, gradient picture, text picture), group, hidden, locked.
-    expect(doc.layers.map((l) => [l.type, groupName(doc, l)])).toEqual([
-      ['vector', 'Fondo'], ['vector', 'Formas'], ['raster', 'Formas'], ['raster', 'Formas'], ['vector', 'Formas / Grupo uno'], ['vector', 'Oculta'], ['vector', 'Bloqueada'],
+    // Paint order is the document order. Formas holds a blurred ellipse, a gradient picture, a text picture and a group.
+    expect(doc.layers.map((l) => [l.type, l.name, groupName(doc, l)])).toEqual([
+      ['vector', 'Fondo', undefined], ['vector', 'Formas', 'Formas'], ['raster', 'gradrect', 'Formas'], ['raster', 'Text', 'Formas'], ['vector', 'Formas 2', 'Formas'],
+      ['vector', 'Oculta', undefined], ['vector', 'Bloqueada', undefined],
     ]);
-    expect(names(doc)[0]).toBe('Fondo');
-    expect(names(doc)[4]).toBe('special'); // a lone shape is named by its id (or inkscape:label)
+    expect(doc.groups?.map((g) => g.name)).toEqual(['Formas']);
+  });
+
+  it('a group is an object group inside its layer; shapes keep their name, not Inkscape\'s automatic ids', async () => {
+    const { doc } = await load();
+    const after = doc.layers[4] as VectorLayer;
+    expect(after.objectGroups?.map((g) => [g.name, g.parentId])).toEqual([['Grupo uno', undefined]]);
+    expect(after.shapes.map((s) => [s.name, s.groupId])).toEqual([['special', after.objectGroups![0].id]]);
+    // r1 and p1 are ids Inkscape gives by itself: no name.
+    expect((doc.layers[0] as VectorLayer).shapes.map((s) => s.name)).toEqual([undefined, undefined]);
+    expect((doc.layers[0] as VectorLayer).objectGroups).toBeUndefined();
   });
 
   it('consecutive shapes of one container share a vector layer', async () => {
@@ -50,16 +58,15 @@ describe('Inkscape SVG import: structure', () => {
     expect((doc.layers[0] as VectorLayer).shapes.map((s) => s.type)).toEqual(['rect', 'path']);
   });
 
-  it('keeps visibility (display:none), lock (sodipodi:insensitive) and group opacity', async () => {
+  it('keeps visibility (display:none), lock (sodipodi:insensitive) and layer opacity', async () => {
     const { doc } = await load();
-    const by = (g: string) => doc.layers.filter((l) => groupName(doc, l) === g);
-    expect(by('Oculta')[0].visible).toBe(false);
-    expect(by('Fondo')[0].visible).toBe(true);
-    expect(by('Bloqueada')[0].locked).toBe(true);
-    expect(by('Fondo')[0].locked).toBe(false);
-    expect(by('Formas').map((l) => l.opacity)).toEqual([0.5, 0.5, 0.5]);
-    expect(by('Formas / Grupo uno')[0].opacity).toBe(0.5);
-    expect(by('Fondo')[0].opacity).toBe(1);
+    const by = (name: string) => doc.layers.find((l) => l.name === name)!;
+    expect(by('Oculta').visible).toBe(false);
+    expect(by('Fondo').visible).toBe(true);
+    expect(by('Bloqueada').locked).toBe(true);
+    expect(by('Fondo').locked).toBe(false);
+    expect(doc.layers.filter((l) => groupName(doc, l) === 'Formas').map((l) => l.opacity)).toEqual([0.5, 0.5, 0.5, 0.5]);
+    expect(by('Fondo').opacity).toBe(1);
   });
 });
 

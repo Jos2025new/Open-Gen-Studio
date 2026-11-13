@@ -93,7 +93,9 @@ export function markerSvg(s: ShapeSpec, id: string, color: string, xmlEscape: (v
   for (const [side, kind, orient] of [['s', s.markerStart, 'auto-start-reverse'], ['e', s.markerEnd, 'auto']] as const) {
     if (!kind || kind === 'none') continue;
     const mid = `${id}-${side}`;
-    parts.push(`<marker id="${mid}" markerUnits="strokeWidth" markerWidth="3" markerHeight="3" refX="0" refY="0" orient="${orient}" overflow="visible">${content(kind)}</marker>`);
+    // data-ogs names the kind, so the import reads the arrowhead back instead of drawing the line as a picture.
+    // The box holds the whole head at scale 1 (tip at 0,0): readers that cut markers to their box (PDF) keep it.
+    parts.push(`<marker id="${mid}" data-ogs="${kind}" markerUnits="strokeWidth" viewBox="-4 -2 5 4" markerWidth="5" markerHeight="4" refX="0" refY="0" orient="${orient}" overflow="visible">${content(kind)}</marker>`);
     attrs.push(`marker-${side === 's' ? 'start' : 'end'}="url(#${mid})"`);
   }
   return { defs: parts.join(''), attrs: attrs.join(' ') };

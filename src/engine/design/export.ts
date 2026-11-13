@@ -1,4 +1,4 @@
-import { shapesSvgTree } from './objectGroupTree';
+import { shapesSvgTree, shownLayer } from './objectGroupTree';
 import { MARK_LENGTH_MM, MARK_OFFSET_MM, PX_PER_MM, pageLayout, type PdfPage, type PrintOptions, type SvgOptions } from './exportSettings';
 import { pathTransform } from './path';
 import { markerSvg } from './markers';
@@ -10,12 +10,13 @@ import { multiply } from './matrix';
 import { inkscapePrimAttrs } from './inkscapeShape';
 import { decorationRects } from './textLayout';
 import { base64, textPathData } from './exportText';
-import { blurFilterSvg, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
+import { blurFilterSvg, blurRegion, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
-import { fontStack, shapeBox } from './doc';
+import { fontStack, shapeBox, type Box } from './doc';
 import { strokeSvg } from './brushTextures';
 import { fxPlan } from '../fx/plan';
 import { fxFilter } from '../fx/svg';
+import { FX_DEFS } from '../fx/defs';
 import type { FxLayer } from '../fx/types';
 
 /*
@@ -40,6 +41,9 @@ export interface SvgDeps {
   fontFile?: (family: string, weight: number) => Promise<Uint8Array | null>;
   /** Pixel size of a raster layer's buffer (for the print preflight). */
   rasterSize?: (layer: Extract<Layer, { type: 'raster' }>) => { w: number; h: number } | null;
+  /** Data URL of a document drawn on its page (or on `box` of it), transparent where nothing is. With it, what an
+   *  effect the file cannot say covers is written as a picture (and said); without it, the effect is left out (and said). */
+  picture?: (doc: DesignDoc, box?: Box, scale?: number) => Promise<string | null>;
   /** What the SVG could not keep (an FX with no SVG equivalent, unreadable pixels), said once per export. */
   notice?: (message: string) => void;
 }
@@ -70,10 +74,11 @@ export function shapeSvg(s: VectorShape): string {
   const body = aligned ? alignedBody(s) : mk.attrs ? shapeBody(s).replace(/\/>$/, ` ${mk.attrs}/>`) : shapeBody(s);
   // Editable gradients: their <linearGradient>/<radialGradient> definitions sit beside the shape, like its markers.
   const grads = (s.fillGradient ? gradientSvg(s.fillGradient, s, gradId(s, 'f'), xmlEscape) : '') + (s.strokeGradient && s.strokeWidth > 0 ? gradientSvg(s.strokeGradient, s, gradId(s, 's'), xmlEscape) : '');
-  const marked = mk.defs || grads ? `<g><defs>${mk.defs}${grads}</defs>${body}</g>` : body;
+  // data-ogs="shape": this <g> is one shape with its definitions, not a group (svgImport/structure.ts reads it back).
+  const marked = mk.defs || grads ? `<g data-ogs="shape"><defs>${mk.defs}${grads}</defs>${body}</g>` : body;
   if (!s.blur || s.blur <= 0) return marked;
   const id = `blur-${xmlEscape(s.id)}`;
-  return `<g filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${marked}</g>`;
+  return `<g data-ogs="shape" filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${marked}</g>`;
 }
 
 /**
@@ -95,7 +100,7 @@ function alignedBody(s: VectorShape): string {
   const n = (v: number) => +v.toFixed(3), area = `x="${n(b.x - m)}" y="${n(b.y - m)}" width="${n(b.w + 2 * m)}" height="${n(b.h + 2 * m)}"`;
   const def = inside ? `<clipPath id="${id}">${geo}</clipPath>` : `<mask id="${id}" maskUnits="userSpaceOnUse" ${area}><rect ${area} fill="#fff"/>${geo}</mask>`;
   const stroked = `<g ${inside ? 'clip-path' : 'mask'}="url(#${id})">${strokeEl}</g>`;
-  return `<g><defs>${def}</defs>${s.paintOrder === 'stroke' ? stroked + fillEl : fillEl + stroked}</g>`;
+  return `<g data-ogs="stroke-${inside ? 'inside' : 'outside'}"><defs>${def}</defs>${s.paintOrder === 'stroke' ? stroked + fillEl : fillEl + stroked}</g>`;
 }
 
 function shapeBody(s: VectorShape): string {
@@ -156,12 +161,17 @@ export function roundSvgNumbers(svg: string, decimals: number): string {
 
 /** Smaller file: no editor-only attributes or namespaces, no whitespace between tags. */
 export function minifySvg(svg: string): string {
-  return svg.replace(/ (?:inkscape|sodipodi):[\w-]+="[^"]*"/g, '').replace(/ xmlns:(?:inkscape|sodipodi)="[^"]*"/g, '')
+  return svg.replace(/ (?:(?:inkscape|sodipodi):[\w-]+|data-ogs)="[^"]*"/g, '').replace(/ xmlns:(?:inkscape|sodipodi)="[^"]*"/g, '')
     // Only indentation (whitespace with a line break) goes: a lone space between tags can be text (xml:space).
     .replace(/>\s*\n\s*</g, '><').replace(/\n/g, '');
 }
 
 export interface SvgBuildOptions extends SvgOptions {
+  /** Keep hidden layers, groups and shapes, marked display:none as Inkscape does (default: yes, unless minified). */
+  hidden?: boolean;
+  /** false: the file is read by something without filters (PDF), so every effect and blur becomes a picture of what
+   *  it covers, in place, and the rest stays vector. */
+  filters?: boolean;
   /** 'paths' draws text as outlines; fontFaces is the embedded @font-face CSS. */
   text?: 'fonts' | 'paths';
   fontFaces?: string;
@@ -180,7 +190,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
   // FX (ADR 0011): the same plan as the canvas. 'below' wraps everything before it, 'layer' wraps its target's content.
   const filtered = (content: string, fx: FxLayer, asLayer: boolean): string => {
-    const id = `fx-${xmlEscape(fx.id)}`, f = fxFilter(fx, id, doc.width, doc.height);
+    const id = `fx-${xmlEscape(fx.id)}`, f = noFilters ? { markup: '', skipped: noSvg(fx) } : fxFilter(fx, id, doc.width, doc.height);
     f.skipped.forEach((label) => skipped.add(label));
     const layerAttrs = asLayer ? ` id="${xmlEscape(fx.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(fx.name)}"` : '';
     if (!f.markup) return asLayer ? `<g${layerAttrs}>${content}</g>` : content;
@@ -191,28 +201,68 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
     const style = fx.blend !== 'normal' ? ` style="mix-blend-mode:${fx.blend}"` : '';
     return `<g${layerAttrs}>${content}<g filter="url(#${id})" opacity="${n(fx.opacity)}"${style}>${copy}</g></g>`;
   };
-  for (const step of fxPlan(doc.layers)) {
+  const keepHidden = build.hidden ?? !build.minify;
+  // An effect SVG cannot say: what it covers becomes a picture with the effect in it, the rest of the file stays editable.
+  const pictured: string[] = [];
+  const noFilters = build.filters === false, kind = noFilters ? 'PDF' : 'SVG';
+  const noSvg = (fx: FxLayer) => fx.ops.filter((o) => o.enabled && (noFilters || !FX_DEFS[o.kind].svg)).map((o) => FX_DEFS[o.kind].label);
+  const picture = async (part: DesignDoc, what: string, lost: string[], area?: Box): Promise<string | null> => {
+    const href = lost.length && deps.picture ? await deps.picture(part, area) : null;
+    if (!href) return null;
+    if (what) pictured.push(`${what} (${[...new Set(lost)].join(', ')})`);
+    const at = area ? ` x="${n(area.x)}" y="${n(area.y)}"` : '';
+    return `<image${at} width="${area?.w ?? doc.width}" height="${area?.h ?? doc.height}" preserveAspectRatio="none" href="${href}"/>`;
+  };
+  // Without filters, a blurred shape is a picture of that shape alone, cut to the reach of its blur.
+  const blurred = new Map<string, string>(), unblurred: string[] = [];
+  if (noFilters) for (const l of doc.layers) {
+    if (l.type !== 'vector' || !l.visible) continue;
+    for (const s of l.shapes) {
+      if (!s.blur || s.blur <= 0 || s.hidden) continue;
+      const r = blurRegion(s), x = Math.floor(r.x), y = Math.floor(r.y);
+      const alone = { ...l, opacity: 1, blend: 'normal', pixelMask: undefined, strokes: [], objectGroups: [], shapes: [{ ...s, groupId: undefined }] } as Layer;
+      const pic = await picture({ ...doc, background: null, layers: [alone] }, '', ['Blur'], { x, y, w: Math.ceil(r.x + r.w) - x, h: Math.ceil(r.y + r.h) - y });
+      if (pic) blurred.set(s.id, pic); else unblurred.push(s.name ?? 'a shape');
+    }
+  }
+  if (blurred.size) pictured.push(`${blurred.size} blurred shape${blurred.size > 1 ? 's' : ''}`);
+  const shapeOrPicture = blurred.size ? (s: VectorShape) => blurred.get(s.id) ?? shapeSvg(s) : shapeSvg;
+  // A layer folder is written as Inkscape writes a layer with sublayers; the import reads it back as a folder.
+  let folder: { id: string; from: number } | null = null;
+  const closeFolder = () => {
+    const g = folder && doc.groups?.find((x) => x.id === folder!.id);
+    if (g && body.length > folder!.from) body.splice(folder!.from, body.length, `<g id="${xmlEscape(g.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(g.name)}">${body.slice(folder!.from).join('')}</g>`);
+    folder = null;
+  };
+  for (const step of fxPlan(doc.layers, undefined, keepHidden)) {
+    if ((step.t === 'below' ? undefined : step.layer.groupId) !== folder?.id) {
+      closeFolder();
+      if (step.t !== 'below' && step.layer.groupId) folder = { id: step.layer.groupId, from: body.length };
+    }
     if (step.t === 'below') {
-      body.splice(0, body.length, filtered(body.join(''), step.fx, true));
+      const pic = await picture({ ...doc, layers: doc.layers.slice(0, doc.layers.indexOf(step.fx) + 1) }, `everything under “${step.fx.name}”`, noSvg(step.fx));
+      body.splice(0, body.length, pic ? `<g id="${xmlEscape(step.fx.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(step.fx.name)}">${pic}</g>` : filtered(body.join(''), step.fx, true));
       continue;
     }
     const l = step.layer;
     let inner: string;
-    if (l.type === 'raster') {
+    const pic = step.t === 'clip' && l.visible ? await picture({ ...doc, background: null, layers: [{ ...l, opacity: 1, blend: 'normal' }, ...step.fx] }, `“${l.name}”`, step.fx.flatMap(noSvg)) : null;
+    if (pic) inner = pic;
+    else if (l.type === 'raster') {
       const href = await deps.rasterHref(l);
       if (!href) { unread.push(l.name); continue; }
       inner = `<image x="${n(l.x)}" y="${n(l.y)}" width="${n(l.width)}" height="${n(l.height)}" preserveAspectRatio="none" href="${href}"/>`;
     } else if (l.type === 'vector') {
       // Pressure strokes become their filled outline: an editable path, not the original gesture.
       const strokes = await Promise.all((l.strokes ?? []).map((s) => strokeSvg(s)));
-      inner = shapesSvgTree(l, shapeSvg, xmlEscape) + strokes.join('');
+      inner = shapesSvgTree(keepHidden ? l : shownLayer(l), shapeOrPicture, xmlEscape) + strokes.join('');
       if (l.pixelMask) {
         const mask = l.pixelMask, href = await deps.rasterHref(mask);
         // Without its mask the layer would show what the mask hides: left out, and said.
         if (!href) { unread.push(l.name); continue; }
         const id = `mask-${xmlEscape(l.id)}`;
         const transform = mask.transform ? ` transform="matrix(${mask.transform.map(n).join(' ')})"` : '';
-        inner = `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000" style="mask-type:alpha"><image x="${n(mask.x)}" y="${n(mask.y)}" width="${n(mask.width)}" height="${n(mask.height)}" preserveAspectRatio="none" href="${href}"${transform}/></mask></defs><g mask="url(#${id})">${inner}</g>`;
+        inner = `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000" mask-type="alpha"><image x="${n(mask.x)}" y="${n(mask.y)}" width="${n(mask.width)}" height="${n(mask.height)}" preserveAspectRatio="none" href="${href}"${transform}/></mask></defs><g mask="url(#${id})">${inner}</g>`;
       }
     } else {
       const t = deps.layout(l);
@@ -224,15 +274,19 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
       }
       inner = textSvg(l, t, deps.ascent(l), paths);
     }
-    const style = l.blend !== 'normal' ? ` style="mix-blend-mode:${l.blend}"` : '';
+    const css = [l.visible ? '' : 'display:none', l.blend !== 'normal' ? `mix-blend-mode:${l.blend}` : ''].filter(Boolean).join(';');
+    const style = `${css ? ` style="${css}"` : ''}${l.locked ? ' sodipodi:insensitive="true"' : ''}`;
     const opacity = l.opacity < 1 ? ` opacity="${n(l.opacity)}"` : '';
     // A rotated or skewed image or text keeps its transform, as Inkscape writes it (inner group: the layer stays plain).
-    if (l.transform && l.type !== 'vector') inner = `<g transform="matrix(${l.transform.map(n).join(' ')})">${inner}</g>`;
+    if (!pic && l.transform && l.type !== 'vector') inner = `<g transform="matrix(${l.transform.map(n).join(' ')})">${inner}</g>`;
     // Its FX act on the content in page space, before the layer's own opacity and blend (as on the canvas).
-    if (step.t === 'clip') inner = step.fx.reduce((acc, fx) => filtered(acc, fx, false), inner);
+    if (!pic && step.t === 'clip') inner = step.fx.reduce((acc, fx) => filtered(acc, fx, false), inner);
     body.push(`<g id="${xmlEscape(l.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(l.name)}"${opacity}${style}>${inner}</g>`);
   }
-  if (skipped.size) deps.notice?.(`SVG has no equivalent for ${[...skipped].join(', ')}: left out of this file. PNG and JPG keep it.`);
+  closeFolder();
+  if (pictured.length) deps.notice?.(`${kind} has no equivalent for ${noFilters ? 'blur and effects' : 'an effect'}, so these are pictures in this file: ${pictured.join('; ')}.`);
+  if (unblurred.length) skipped.add(`the blur of ${unblurred.length} shape${unblurred.length > 1 ? 's' : ''}`);
+  if (skipped.size) deps.notice?.(`${kind} has no equivalent for ${[...skipped].join(', ')}: left out of this file. PNG and JPG keep it.`);
   if (unread.length) deps.notice?.(`The pixels of ${unread.join(', ')} could not be read: left out of this file.`);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -250,7 +304,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
  * text uses the PDF standard fonts unless the family is embedded, so it may not match the design fonts.
  */
 export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage, print?: PrintOptions, fonts: { family: string; weight: number; sfnt: Uint8Array }[] = []): Promise<Blob> {
-  const [{ jsPDF }, { svg2pdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
+  const [{ jsPDF, GState }, { svg2pdf }, { svgIntoPdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js'), import('./pdfLook')]);
   const el = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
   const layout = page ? pageLayout(page, width, height, print) : undefined;
   const pdf = new jsPDF({
@@ -280,7 +334,8 @@ export async function svgToPdf(svg: string, width: number, height: number, page?
       pdf.clip();
       pdf.discardPath();
     }
-    await svg2pdf(el, pdf, layout ?? { x: 0, y: 0, width, height });
+    // Group opacity, blend modes, masks and gradient alpha go in as PDF transparency groups (pdfLook.ts).
+    await svgIntoPdf(pdf, GState as never, svg2pdf as never, el, layout ?? { x: 0, y: 0, width, height });
     if (layout && trim) {
       pdf.restoreGraphicsState();
       if (layout.marks) cropMarks(pdf, trim, layout.bleed);

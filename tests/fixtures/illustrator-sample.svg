@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 300 200">
+  <defs>
+    <style>
+      .cls-1, .cls-2 {
+        fill: #f15a24;
+      }
+
+      .cls-3 {
+        fill: none;
+        stroke: #1b1464;
+        stroke-miterlimit: 10;
+        stroke-width: 4px;
+      }
+
+      .cls-4 {
+        fill: url(#linear-gradient);
+      }
+
+      .cls-5 {
+        opacity: .5;
+      }
+
+      .cls-6 {
+        fill: #29abe2;
+      }
+
+      .cls-7 {
+        isolation: isolate;
+      }
+
+      .cls-2 {
+        mix-blend-mode: multiply;
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="20" y1="150" x2="120" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+  </defs>
+  <g class="cls-7">
+    <g id="Background" data-name="Background">
+      <rect class="cls-6" width="300" height="200"/>
+    </g>
+    <g id="Art_work" data-name="Art work">
+      <g id="Logo">
+        <rect class="cls-1" x="20" y="20" width="60" height="60"/>
+        <circle class="cls-3" cx="50" cy="50" r="20"/>
+      </g>
+      <g class="cls-5">
+        <rect class="cls-1" x="120" y="20" width="60" height="60"/>
+        <polygon class="cls-6" points="150 30 170 70 130 70 150 30"/>
+      </g>
+      <rect class="cls-4" x="20" y="130" width="100" height="40"/>
+      <path class="cls-2" d="M200,40c20,0,40,20,40,40s-20,40-40,40Z"/>
+    </g>
+  </g>
+</svg>

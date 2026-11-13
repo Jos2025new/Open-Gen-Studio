@@ -49,10 +49,13 @@ const deps: SvgDeps = {
 };
 
 describe('SVG export', () => {
-  it('keeps layer order, names, opacity and blend, and skips hidden layers', async () => {
+  it('keeps layer order, names, opacity and blend; a hidden layer is kept as display:none, or left out on request', async () => {
     const svg = await docToSvg(doc, deps);
-    const ids = [...svg.matchAll(/<g id="([^"]+)"/g)].map((m) => m[1]);
-    expect(ids).toEqual(['r1', 'v1', 't1']);
+    const layerIds = (s: string) => [...s.matchAll(/<g id="([^"]+)"/g)].map((m) => m[1]);
+    expect(layerIds(svg)).toEqual(['r1', 'v1', 'hidden', 't1']);
+    expect(svg).toContain('<g id="hidden" inkscape:groupmode="layer" inkscape:label="Off" style="display:none">');
+    expect(layerIds(await docToSvg(doc, deps, undefined, { hidden: false }))).toEqual(['r1', 'v1', 't1']);
+    expect(layerIds(await docToSvg(doc, deps, undefined, { minify: true }))).toEqual(['r1', 'v1', 't1']);
     expect(svg).toContain('width="400" height="300" viewBox="0 0 400 300"');
     expect(svg).toContain('<rect width="400" height="300" fill="#ffffff"/>');
     expect(svg).toContain('inkscape:label="Title &lt;A &amp; B&gt;"');
@@ -89,7 +92,7 @@ it('exports vector coverage as an alpha mask while retaining editable SVG shapes
   const mask = { ...base, type: 'raster' as const, id: 'coverage', name: 'coverage', x: 0, y: 0, width: 400, height: 300, pxWidth: 400, pxHeight: 300, rev: 0, transform: [1, 0, 0, 1, 20, 30] as [number, number, number, number, number, number] };
   const svg = await docToSvg({ ...doc, layers: [{ ...vector, pixelMask: mask }] }, deps);
   expect(svg).toContain('maskUnits="userSpaceOnUse"');
-  expect(svg).toContain('mask-type:alpha');
+  expect(svg).toContain('mask-type="alpha"');
   expect(svg).toContain('matrix(1 0 0 1 20 30)');
   expect(svg).toContain('mask="url(#mask-v1)"');
   expect(svg).toContain('<ellipse');
