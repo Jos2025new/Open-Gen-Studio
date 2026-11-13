@@ -4,7 +4,7 @@ Detalle de las filas D del [índice](pendientes.md). Prioridad, **origen** y evi
 
 ## Bugs hallados por tests adversariales (2026-11-12)
 
-Estado 2026-11-12: se prepararon correcciones para D62–D70 y sus reproducciones pasan como tests normales; quedan pendientes la revisión del agente, `npm test` y la prueba en sandbox. Las descripciones siguientes registran los fallos originales. D69 añade límites tanto en el recorrido editable como antes de rasterizar; su cobertura no demuestra seguridad frente a todos los SVG posibles.
+Estado 2026-11-12: D62–D70 corregidos y validados con sus casos originales ([historial 061](history/061-2026-11-W46-cierre.md)). D67: el export omite la forma no finita y avisa, en vez de fallar. D69: tope por elementos producidos (`MAX_USE_ELEMENTS`). Quedan `npm test` completo y la prueba en sandbox (D61). Las descripciones siguientes registran los fallos originales.
 
 - **D62 · alto · 2026-11-12 · Ctrl+Alt+clic salta a formas que no están bajo el cursor:** `src/engine/design/objectBelow.ts:24` prueba las partes vectoriales por su caja, no por `vectorObjectHit`. Test: `tests/adv-seleccion.test.ts:30`.
 - **D63 · medio · 2026-11-12 · Distribuir solapa objetos:** `objectOps.ts:207` (`distributeBoxes`) usa el último por x, no el borde derecho máximo. Test: `tests/adv-seleccion.test.ts:132`.
