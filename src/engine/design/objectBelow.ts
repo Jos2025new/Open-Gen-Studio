@@ -4,6 +4,7 @@ import { hitTestPixel } from './render';
 import { setActiveLayer } from './actions';
 import { objectPicks, setObjectPick, type ObjectPick } from './objectSelection';
 import { setLayerPicks } from './selection';
+import { vectorObjectHit } from './objectHit';
 
 export type Under = { layerId: string; id: string };
 
@@ -21,7 +22,8 @@ export function objectsUnder(doc: DesignDoc, x: number, y: number): Under[] {
       const { id, box } = objs[i];
       if (ids.includes(id)) continue;
       // The image counts only where its pixels are; parts by their box.
-      const hit = id === layer.id ? Boolean(hitTestPixel({ layers: [layer] } as DesignDoc, x, y)) : x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
+      const inside = x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h;
+      const hit = id === layer.id ? Boolean(hitTestPixel({ layers: [layer] } as DesignDoc, x, y)) : inside && (layer.type !== 'vector' || vectorObjectHit(layer, id, x, y));
       if (hit) ids.push(id);
     }
     for (const id of ids) out.push({ layerId: layer.id, id });

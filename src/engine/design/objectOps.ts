@@ -12,7 +12,7 @@ import {composeRaster} from './rasterCompose';
 import { alignBoxDelta, turnVector, unionBoxes, type AlignTo, type Box, type RelativeTo, type Turn } from './transform';
 import { pixelsNotReady } from './rasterMissing';
 import { hitTestPixel, layerBox } from './render';
-import { multiply, rotateAbout, scaleAbout } from './matrix';
+import { apply, IDENTITY, invert, multiply, rotateAbout, scaleAbout, type Mat } from './matrix';
 
 /*
  * Edit in Objects mode: the operations act on the objects picked inside the active layer (objectSelection.ts), and
@@ -28,7 +28,7 @@ const union = (bs: Box[]): Box | null => {
 
 /** A text, placed image or raster without individual strokes is one object. */
 export function wholeLayerObject(layer: Layer): boolean {
-  return layer.type === 'text' || (layer.type === 'raster' && !layer.paintStrokes?.length);
+  return layer.type === 'text' || (layer.type === 'raster' && (!layer.paintStrokes?.length || (!!layer.paintBaseId && layer.paintStrokes.every((s) => s.erase))));
 }
 
 /** The objects of a layer that can be picked, with their boxes (page coordinates). */
@@ -99,7 +99,7 @@ export function objectsBox(layer: Layer, ids: string[]): Box | null {
 
 /** Move some objects of a layer (pure; a painted layer still needs `composeRaster`). */
 export function translateObjects(layer: Layer, ids: string[], dx: number, dy: number): Layer {
-  if (!dx && !dy) return layer;
+  if (!Number.isFinite(dx) || !Number.isFinite(dy) || (!dx && !dy)) return layer;
   if ((wholeLayerObject(layer) || layer.type === 'raster') && ids.includes(layer.id)) return translateLayer(layer, dx, dy);
   if (layer.type === 'raster') return ids.reduce((l, id) => moveRasterStroke(l, id, dx, dy), layer as RasterLayer);
   if (layer.type === 'vector' && layer.pixelMask && allVectorObjects(layer, ids)) return translateLayer(layer, dx, dy);
@@ -134,14 +134,12 @@ export function turnObjects(layer: Layer, ids: string[], turn: Turn): Layer {
     };
   }
   if (layer.type === 'raster') {
-    // In buffer pixels: the strokes' points move; each stroke keeps its color, width and opacity.
-    const kx = layer.pxWidth / layer.width, ky = layer.pxHeight / layer.height;
-    const cx = (box.x + box.w / 2 - layer.x) * kx, cy = (box.y + box.h / 2 - layer.y) * ky;
-    const f = (x: number, y: number): [number, number] =>
-      turn === 'flip-h' ? [2 * cx - x, y]
-        : turn === 'flip-v' ? [x, 2 * cy - y]
-          : turn === 'rotate-180' ? [2 * cx - x, 2 * cy - y]
-            : turn === 'rotate-cw' ? [cx - (y - cy), cy + (x - cx)] : [cx + (y - cy), cy - (x - cx)];
+    const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+    const pageTurn = turn === 'flip-h' ? scaleAbout(-1, 1, cx, cy) : turn === 'flip-v' ? scaleAbout(1, -1, cx, cy)
+      : rotateAbout(turn === 'rotate-cw' ? Math.PI / 2 : turn === 'rotate-ccw' ? -Math.PI / 2 : Math.PI, cx, cy);
+    const bufferToPage = multiply(layer.transform ?? IDENTITY, [layer.width / layer.pxWidth, 0, 0, layer.height / layer.pxHeight, layer.x, layer.y] as Mat);
+    const bufferTurn = multiply(invert(bufferToPage), multiply(pageTurn, bufferToPage));
+    const f = (x: number, y: number) => apply(bufferTurn, x, y);
     return {
       ...layer,
       paintStrokes: layer.paintStrokes?.map((s) => {
@@ -192,7 +190,7 @@ export function alignBoxes(doc: Pick<DesignDoc, 'width' | 'height'>, objs: Array
   return out;
 }
 
-/** Even gaps between 3+ picked objects, the outer two staying put. */
+/** Even gaps between 3+ picked objects, within their original span. */
 export function distributeObjectDeltas(layer: Layer, ids: string[], axis: 'h' | 'v'): Map<string, { dx: number; dy: number }> {
   return distributeBoxes(layerObjects(layer).filter((o) => ids.includes(o.id)), axis);
 }
@@ -203,8 +201,8 @@ export function distributeBoxes(items: Array<{ id: string; box: Box }>, axis: 'h
   if (items.length < 3) return out;
   const h = axis === 'h';
   items.sort((a, z) => (h ? a.box.x - z.box.x : a.box.y - z.box.y));
-  const first = items[0].box, last = items[items.length - 1].box;
-  const span = h ? last.x + last.w - first.x : last.y + last.h - first.y;
+  const first = items[0].box;
+  const span = Math.max(...items.map(({ box }) => h ? box.x + box.w : box.y + box.h)) - (h ? first.x : first.y);
   const used = items.reduce((n, i) => n + (h ? i.box.w : i.box.h), 0);
   const gap = (span - used) / (items.length - 1);
   let at = h ? first.x : first.y;
@@ -282,6 +280,8 @@ export function deletePickedObjects(sessionId: string, docId: string, layerId: s
 /** The layer without those objects (pure; the same layer when it has none of them). */
 export function withoutObjects(l: Layer, ids: readonly string[]): Layer {
   const gone = new Set(ids);
+  if (l.type === 'raster' && !(l.paintStrokes ?? []).some((s) => gone.has(s.id))) return l;
+  if (l.type === 'vector' && !l.shapes.some((s) => gone.has(s.id)) && !(l.strokes ?? []).some((s) => gone.has(s.id))) return l;
   return l.type === 'raster'
     ? { ...l, paintStrokes: (l.paintStrokes ?? []).filter((s) => !gone.has(s.id)) }
     : l.type === 'vector'

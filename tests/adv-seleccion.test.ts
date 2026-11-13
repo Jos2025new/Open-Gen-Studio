@@ -27,7 +27,7 @@ describe('selección: vector con forma diagonal y caja solapada', () => {
     expect(objectAt(v, 90, 10)).toBe(rectId);
   });
 
-  it.fails('objectsUnder no incluye una forma cuya caja cubre el punto pero cuya forma no (objectBelow.ts: parts by box)', () => {
+  it('objectsUnder no incluye una forma cuya caja cubre el punto pero cuya forma no (objectBelow.ts: parts by box)', () => {
     // Causa: objectsUnder comprueba solo la caja de las partes de vector; objectAt usa vectorObjectHit.
     expect(objectsUnder(docOf(v), 90, 10).map((u) => u.id)).toEqual([rectId]);
   });
@@ -80,7 +80,7 @@ describe('selección: capas, vacíos y un solo objeto', () => {
 });
 
 describe('selección: imagen pintada y trazos', () => {
-  it.fails('una capa con base pintada y solo trazos de borrado sigue teniendo un objeto seleccionable', () => {
+  it('una capa con base pintada y solo trazos de borrado sigue teniendo un objeto seleccionable', () => {
     // Causa: layerObjects filtra erase y wholeLayerObject exige no tener trazos; esa capa no tiene ningún objeto (objectOps.ts layerObjects).
     const l = painted({});
     const onlyErase = { ...l, paintBaseId: 'base', paintStrokes: [{ ...l.paintStrokes![0], erase: true }] } as RasterLayer;
@@ -92,7 +92,7 @@ describe('selección: imagen pintada y trazos', () => {
     expect(wholeLayerObject(painted({}))).toBe(false);
   });
 
-  it.fails('withoutObjects devuelve la misma capa cuando no quita nada (contrato del comentario; objectOps.ts withoutObjects)', () => {
+  it('withoutObjects devuelve la misma capa cuando no quita nada (contrato del comentario; objectOps.ts withoutObjects)', () => {
     // Causa: raster y vector siempre crean un objeto nuevo; deletePickedObjects compara con === y registra un paso de deshacer vacío.
     const v = newVectorLayer('V', [rect(0, 0, 10, 10)]);
     expect(withoutObjects(v, ['no-existe'])).toBe(v);
@@ -105,7 +105,7 @@ describe('selección: números extremos y heredados', () => {
     expect(translateObjects(v, [v.shapes[0].id], NaN, 0)).toBe(v);
   });
 
-  it.fails('desplazar con Infinity no deja coordenadas no finitas en la capa (objectOps.ts translateObjects: sin guarda)', () => {
+  it('desplazar con Infinity no deja coordenadas no finitas en la capa (objectOps.ts translateObjects: sin guarda)', () => {
     const v = newVectorLayer('V', [rect(0, 0, 10, 10)]);
     const out = translateObjects(v, [v.shapes[0].id], Infinity, 0) as VectorLayer;
     expect(Number.isFinite(out.shapes[0].x)).toBe(true);
@@ -129,7 +129,7 @@ describe('alinear y distribuir objetos', () => {
     expect(alignObjectDeltas({ width: 200, height: 200 }, v, [v.shapes[0].id], 'left', 'first', true).size).toBe(0);
   });
 
-  it.fails('distribuir: tres objetos sin solape con uno ancho en medio (objectOps.ts distributeBoxes: span = último.x+ancho)', () => {
+  it('distribuir: tres objetos sin solape con uno ancho en medio (objectOps.ts distributeBoxes: span = último.x+ancho)', () => {
     // Causa: distributeBoxes toma como borde derecho el del último por x (C, 40) y no el máximo (B, 90); B acaba solapando C.
     // Orden por x: A(0..10), B(20..90), C(30..40).
     const items = [
@@ -151,7 +151,7 @@ describe('alinear y distribuir objetos', () => {
 });
 
 describe('girar objetos de imagen pintada con píxeles no cuadrados', () => {
-  it.fails('un giro de 90° conserva la longitud del trazo en página (objectOps.ts turnObjects, rama raster: gira en píxeles de buffer con kx≠ky)', () => {
+  it('un giro de 90° conserva la longitud del trazo en página (objectOps.ts turnObjects, rama raster: gira en píxeles de buffer con kx≠ky)', () => {
     // Capa 50x40 pt con buffer 100x40 px: kx=2, ky=1. Un trazo horizontal de 10 pt debe seguir midiendo 10 pt tras girarlo.
     const base = newRasterLayer('P', { x: 0, y: 0, width: 50, height: 40 }, { width: 100, height: 40 });
     const l = { ...base, paintStrokes: [{ id: 's', x: 0, y: 0, color: '#000', opacity: 1, erase: false, segments: [[20, 20, 40, 20, 2]] }] } as RasterLayer;
@@ -160,4 +160,26 @@ describe('girar objetos de imagen pintada con píxeles no cuadrados', () => {
     const lenPage = Math.hypot((bx - ax) / 2, (by - ay) / 1);
     expect(lenPage).toBeCloseTo(10, 5);
   });
+});
+
+describe('independent probes', () => {
+  it('ignores vector parts outside the same bounds used by ordinary clicks', () => {
+    const v = newVectorLayer('V', [rect(0, 0, 50, 50), rect(20, 20, 10, 10, {stroke: '#000', strokeWidth: 8})]) as VectorLayer;
+    expect(objectAt(v, 18, 25)).toBe(v.shapes[0].id);
+    expect(objectsUnder(docOf(v), 18, 25).map((u) => u.id)).toEqual([v.shapes[0].id]);
+  });
+  it('rotates by 90 degrees around the page center of a translated stroke layer', () => {
+    const l = {...painted({}), transform: [1, 0, 0, 1, 40, 60]} as RasterLayer;
+    const out = turnObjects(l, ['st'], 'rotate-cw') as RasterLayer;
+    const [ax, ay, bx, by] = out.paintStrokes![0].segments[0];
+    expect((ax + bx) / 2).toBeCloseTo(12.5, 1);
+    expect((ay + by) / 2).toBeCloseTo(12.5, 1);
+  });
+});
+it('keeps page length after a 90 degree rotation under scale compensated by pixel ratio', () => {
+  const base = newRasterLayer('P', { x: 0, y: 0, width: 50, height: 40 }, { width: 100, height: 40 });
+  const l = { ...base, transform: [2, 0, 0, 1, 0, 0], paintStrokes: [{ id: 's', x: 0, y: 0, color: '#000', opacity: 1, erase: false, segments: [[20, 20, 40, 20, 2]] }] } as RasterLayer;
+  const out = turnObjects(l, ['s'], 'rotate-cw') as RasterLayer;
+  const [ax, ay, bx, by] = out.paintStrokes![0].segments[0];
+  expect(Math.hypot((bx - ax) / 2 * 2, by - ay)).toBeCloseTo(20, 5);
 });
