@@ -163,19 +163,19 @@ async function request(text: string, reply: Array<{ name: string; args: unknown 
 describe('the agent: find_commands and run_commands', () => {
   it('are tools the agent is told it has, and the only two the registry adds', () => {
     expect(TOOLS.map((t) => t.function.name)).toEqual(expect.arrayContaining(['find_commands', 'run_commands']));
-    expect(CAPABILITIES).toContain('- find_commands: Designer only for now: lists what the app can do as commands');
-    expect(CAPABILITIES).toContain('- run_commands: Designer only for now: runs commands in order, as the user\'s own actions.');
+    expect(CAPABILITIES).toContain('- find_commands: Lists what the app can do as commands in every area.');
+    expect(CAPABILITIES).toContain('- run_commands: Runs commands of any area in order, as the user\'s own actions.');
   });
 
   it('find_commands answers one line per command, with why one cannot run now', () => {
     const all = findCommandsTool(sid, { area: 'designer' });
     const lines = all.text.split('\n');
-    expect(lines[0]).toBe(`Document on screen: ${doc.id} "Page", 800x600.`);
+    expect(lines[0]).toBe(`Commands run as the user's own actions in this session. Document on screen: ${doc.id} "Page", 800x600.`);
     expect(lines).toHaveLength(38);
     expect(lines).toContain('designer.layer.move {layer: string, dir: 1|-1} — One place up (1) or down (-1) in the stack.');
     expect(lines.find((l) => l.startsWith('designer.doc.undo'))).toBe('designer.doc.undo {} — Takes back the last change of the document. [not now: Nothing to undo.]');
     expect(findCommandsTool(sid, { text: 'opacity' }).text.split('\n')).toHaveLength(2);
-    expect(findCommandsTool(sid, { text: 'zzz' })).toEqual({ text: 'No command matches. Areas: designer.', done: false });
+    expect(findCommandsTool(sid, { text: 'zzz' })).toEqual({ text: 'No command matches. Areas: designer, nodes, studio, library, skills, models, sessions.', done: false });
     expect(findCommandsTool(sid, { area: 3 }).text).toMatch(/^Invalid find_commands input: area/);
   });
 
@@ -202,8 +202,6 @@ describe('the agent: find_commands and run_commands', () => {
     expect(answer).toEqual({ text: 'Step 2 failed (failed): There is no layer under it, or one of the two is locked. Steps 1 to 1 ran and were taken back: the documents are as before.', done: false });
     expect(now().layers).toEqual([]);
     expect((await runCommandsTool(sid, { seq: [{ cmd: 'designer.layer.nothing' }] })).text).toBe('Step 1 failed (unknown): No command "designer.layer.nothing". Nothing ran.');
-    expect((await runCommandsTool(sid, { seq: [{ cmd: 'designer.doc.read' }, { cmd: 'nodes.node.add' }] })).text).toBe('Step 2: "nodes.node.add" is not a Designer command. run_commands runs only designer.* for now. Nothing ran.');
-    expect(findCommandsTool(sid, { area: 'nodes' })).toEqual({ text: 'No command matches. Areas: designer.', done: false });
     expect((await runCommandsTool(sid, { seq: [{ cmd: 'designer.doc.read', on: { session: 'other' } }] })).text).toMatch(/^Invalid run_commands input: seq\.0\.on/);
   });
 

@@ -56,16 +56,19 @@ export default [
   },
   {
     id: 'agent-command-tools',
-    what: 'El agente llega al registro por dos herramientas, no una por comando; solo puede nombrar un doc de su sesión.',
+    what: 'El agente llega a todas las áreas del registro por dos herramientas, no una por comando, en cualquier espacio; solo nombra un doc de su sesión; AGENT_HIDDEN no se lista ni se ejecuta; gasto y borrado se rechazan con texto legible.',
     sides: [
       ['src/engine/agent/commandTools.ts', "name: 'run_commands'"],
       ['src/engine/agent/commandTools.ts', "name: 'find_commands'"],
       ['src/engine/agent/commandCalls.ts', 'export async function runCommandsTool'],
+      ['src/engine/agent/commandCalls.ts', 'export const AGENT_HIDDEN'],
       ['src/engine/agent/canvasCalls.ts', "call.name === 'find_commands' || call.name === 'run_commands'"],
       ['src/engine/agent/designerTools.ts', '...COMMAND_TOOLS,'],
       ['src/engine/skills/app/designer.md', 'run_commands lo hace al momento'],
+      ['src/engine/skills/app/nodes.md', 'run_commands las ejecuta'],
+      ['src/engine/skills/app/canvas.md', 'run_commands las ejecuta'],
     ],
-    tests: ['tests/designer-commands.test.ts'],
+    tests: ['tests/designer-commands.test.ts', 'tests/agent-commands.test.ts'],
   },
   {
     id: 'nodes-commands',
