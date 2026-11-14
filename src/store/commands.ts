@@ -19,6 +19,7 @@ export const commands = [
     args: z.object({ archived: z.boolean().optional() }).strict(),
     effect: 'read',
     run: (_ctx, args) => {
+      // check-commands: reads-active marks the session currently on screen.
       const st = useStore.getState();
       return visibleSessions(st.sessions)
         .filter((s) => (args.archived ? Boolean(s.archived) : !s.archived))

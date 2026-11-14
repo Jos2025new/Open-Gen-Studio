@@ -7,7 +7,7 @@ primera pasada no obliga a reescribir acciones.
 
 ## Pasos
 
-**Estado (2026-11-14):** pasos 1 y 2 hechos en `task/commands`; del paso 5, Nodes y sesiones; el paso 3 es una propuesta sin revisar en `task/cmd-checks`; contrato y medidas en el [ADR 0030](decisions/0030-nucleo-de-comandos.md).
+**Estado (2026-11-14):** pasos 1 y 2 hechos en `task/commands`; paso 4 implementado en `task/cmd-checks`, con `test:related` pendiente; del paso 5, Nodes y sesiones; el paso 3 es una propuesta sin revisar en `task/cmd-checks`; contrato y medidas en el [ADR 0030](decisions/0030-nucleo-de-comandos.md).
 
 Raíz del frente: una rama `task/commands` salida de `task/export`. Cada sesión, su worktree. Como mucho tres sesiones a
 la vez; el sandbox es uno, se usa por turno.

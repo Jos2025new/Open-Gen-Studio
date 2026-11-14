@@ -1,0 +1,10 @@
+[
+  {
+    "id": "sessions.new",
+    "text": "Changes the session on screen (newSession sets activeSessionId)."
+  },
+  {
+    "id": "sessions.select",
+    "text": "Changes the session on screen (selectSession sets activeSessionId)."
+  }
+]

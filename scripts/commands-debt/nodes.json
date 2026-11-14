@@ -1,0 +1,18 @@
+[
+  {
+    "id": "nodes.node.new_data",
+    "text": "Reads the composer's current model and settings for the defaults."
+  },
+  {
+    "id": "nodes.node.add_connected",
+    "text": "When the connection is rejected the action returns null after a notice; the command says only that no input fit."
+  },
+  {
+    "id": "nodes.node.rename",
+    "text": "Also renames the node's result asset; undo brings the node title back, not the asset name."
+  },
+  {
+    "id": "nodes.node.set_sketch",
+    "text": "The replaced copy is deleted from the gallery; undo does not bring the asset back."
+  }
+]

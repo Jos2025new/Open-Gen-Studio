@@ -1,6 +1,18 @@
 /** Checked by map.mjs: the command core (ADR 0030). */
 export default [
   {
+    id: 'command-check',
+    what: 'El check estático vigila la convención y la deuda; la prueba de humo ejecuta los comandos sin autorizar gasto.',
+    sides: [
+      ['scripts/check-commands.mjs', 'function inspect('],
+      ['scripts/check-all.mjs', "['commands', 'node', ['scripts/check-commands.mjs']]"],
+      ['package.json', 'node scripts/check-commands.mjs'],
+      ['src/engine/design/commands.ts', 'check-commands: reads-active'],
+      ['src/store/commands.ts', 'check-commands: reads-active'],
+    ],
+    tests: ['tests/commands-smoke.test.ts'],
+  },
+  {
     id: 'command-index',
     what: 'Los comandos de un apartado van en commands.ts o <nombre>.commands.ts y exportan `commands`; index.ts los reúne por nombre de archivo, nadie los lista a mano.',
     sides: [

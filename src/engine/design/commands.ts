@@ -22,6 +22,7 @@ export const commands = [
     effect: 'read',
     needs: ['session'],
     run: ({ on }) => {
+      // check-commands: reads-active marks the document currently on screen.
       const active = A.activeDoc(on.session!)?.id;
       return A.sessionDocs(on.session!).map((d) => ({ id: d.id, name: d.name, width: d.width, height: d.height, layers: d.layers.length, active: d.id === active }));
     },

@@ -151,6 +151,12 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_
 
 - Ejecutar nodos de verdad, y ambos apartados en el sandbox. Ningún comando de Nodes ni de sesiones se llama aún desde la interfaz ni desde el agente.
 
+## Check y prueba de humo (paso 4)
+
+`node scripts/check-commands.mjs` comprueba los campos obligatorios, ids y alias únicos, esquemas estrictos, lecturas activas sin declarar y deuda nueva. Lista por área los comandos y su deuda, incluidos los archivos que no exportan `commands`. Una lectura activa legítima lleva una marca con motivo junto al código. Si desaparece o cambia deuda, revisa el resultado y ejecuta `node scripts/check-commands.mjs --update`; cada área tiene su propia línea base. `--self-test` prueba los rechazos del check.
+
+`tests/commands-smoke.test.ts` genera argumentos desde los esquemas y comprueba los invariantes de documentos, grafos y sesiones. Rechaza el gasto y bloquea `fetch`. Lista las excepciones que necesitan navegador o píxeles. No prueba proveedores, resultados visuales ni todos los valores o secuencias posibles; un fallo distinto de argumentos o referencias puede ser una respuesta válida del comando.
+
 ## Alternativas
 
 - **Una herramienta del agente por comando.** Descartada: 100 herramientas inflan el contexto y desorientan a los modelos débiles. El agente tendrá `find_commands` y `run_commands`.

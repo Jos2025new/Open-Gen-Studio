@@ -1,0 +1,22 @@
+[
+  {
+    "id": "designer.doc.ensure",
+    "text": "Reads the active document of the session (ensureDoc -> activeDoc)."
+  },
+  {
+    "id": "designer.doc.from_asset",
+    "text": "Changes the workspace on screen (openAssetInDesigner sets ui.workspace)."
+  },
+  {
+    "id": "designer.layer.add",
+    "text": "No position argument: it goes above the document's active layer; a text layer takes the text tool's style (ui.text)."
+  },
+  {
+    "id": "designer.layer.place_asset",
+    "text": "\"new\" and \"replace\" depend on the document's active layer."
+  },
+  {
+    "id": "designer.layer.ensure_paint",
+    "text": "Depends on the document's active layer and records no undo by itself (the stroke that follows does)."
+  }
+]
