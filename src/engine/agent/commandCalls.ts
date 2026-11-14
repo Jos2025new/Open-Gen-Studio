@@ -8,13 +8,15 @@ import { findCommandsSchema, runCommandsSchema } from './commandTools';
 type ToolAnswer = { text: string; done: boolean };
 const problems = (error: { issues: { path: PropertyKey[]; message: string }[] }) => error.issues.map((issue) => `${issue.path.join('.') || 'input'}: ${issue.message}`).join('; ');
 const RESULT_MAX = 4000;
+/** The one area the agent reaches through these two tools for now; other areas keep their own tools until decided. */
+const AREA = 'designer';
 
 /** The commands of an area, one line each, with whether each can run on the document on screen. */
 export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer {
   const v = findCommandsSchema.safeParse(input ?? {});
   if (!v.success) return { text: `Invalid find_commands input: ${problems(v.error)}`, done: false };
   const doc = activeDoc(sessionId);
-  const found = findCommands({ ...v.data, signatures: true, caller: 'agent', ...(doc ? { on: { session: sessionId, doc: doc.id } } : {}) });
+  const found = v.data.area && v.data.area !== AREA ? [] : findCommands({ ...v.data, area: AREA, signatures: true, caller: 'agent', ...(doc ? { on: { session: sessionId, doc: doc.id } } : {}) });
   if (!found.length) return { text: 'No command matches. Areas: designer.', done: false };
   const lines = found.map((f) => `${f.id} ${f.signature} — ${f.description ?? f.title}${typeof f.available === 'string' ? ` [not now: ${f.available}]` : ''}`);
   const where = doc ? `Document on screen: ${doc.id} "${doc.name}", ${doc.width}x${doc.height}.` : 'No document is open: start with designer.doc.new.';
@@ -25,6 +27,8 @@ export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer 
 export async function runCommandsTool(sessionId: string, input: unknown, signal?: AbortSignal): Promise<ToolAnswer> {
   const v = runCommandsSchema.safeParse(input);
   if (!v.success) return { text: `Invalid run_commands input: ${problems(v.error)}`, done: false };
+  const outside = v.data.seq.findIndex((step) => !step.cmd.startsWith(`${AREA}.`));
+  if (outside >= 0) return { text: `Step ${outside + 1}: "${v.data.seq[outside].cmd}" is not a Designer command. run_commands runs only designer.* for now. Nothing ran.`, done: false };
   const doc = activeDoc(sessionId);
   const result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal });
   const ran = result.results.length;
