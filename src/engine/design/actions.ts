@@ -24,7 +24,7 @@ import { rebasePaintPixels } from './paintBounds';
 import { paintModeOf, pinPaintMode } from './paintMode';
 import { awaitFrame } from '../../lib/trace';
 
-export { fxSummary } from '../fx/commands';
+export { fxSummary } from '../fx/fxCommands';
 
 const get = useStore.getState;
 

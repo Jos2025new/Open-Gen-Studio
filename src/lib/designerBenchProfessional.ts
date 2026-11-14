@@ -1,7 +1,7 @@
 import { sandboxBenchAllowed } from './designerBenchFixtures';
 import { createDoc, newRasterLayer, newVectorLayer } from '../engine/design/doc';
 import { TIP_PRESETS } from '../engine/design/brushEngine';
-import { newFxLayer, newFxOp } from '../engine/fx/commands';
+import { newFxLayer, newFxOp } from '../engine/fx/fxCommands';
 import type { FxGroup, FxKind, FxLayer, FxScope } from '../engine/fx/types';
 import type { DesignDoc, Layer, LayerGroup, RasterLayer, RasterStroke, VectorLayer } from '../engine/types';
 import type { ShapeSpec } from '../engine/shapeSpec';

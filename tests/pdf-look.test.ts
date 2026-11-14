@@ -16,7 +16,7 @@ vi.mock('svg2pdf.js', async () => {
 });
 import { docToSvg, svgToPdf, type SvgDeps } from '../src/engine/design/export';
 import { newTextLayer } from '../src/engine/design/doc';
-import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
+import { newFxLayer, newFxOp } from '../src/engine/fx/fxCommands';
 
 /*
  * The PDF contract (docs/intercambio-svg.md → PDF): the PDF of a document looks like the document. Each case is

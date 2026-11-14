@@ -4,7 +4,7 @@ import type { DesignDoc, Layer } from '../../engine/types';
 import type { FxGroup, FxLayer, FxOp } from '../../engine/fx/types';
 import { FX_DEFS, fxKindsOf, type FxParam } from '../../engine/fx/defs';
 import { fxTarget } from '../../engine/fx/plan';
-import type { FxCommand } from '../../engine/fx/commands';
+import type { FxCommand } from '../../engine/fx/fxCommands';
 import { runFx } from '../../engine/design/fx';
 import { Field, IconButton, MenuItem, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';

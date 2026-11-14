@@ -129,7 +129,7 @@ test('FX: selecting the FX layer shows its settings; changing its radius changes
   await addImage(page, 'Photo', '#ffffff', [0.3, 0.3, 0.4, 0.4]);
   await page.evaluate(async () => {
     const st = await import('/src/store/store.ts' as string); const A = await import('/src/engine/design/actions.ts' as string);
-    const D = await import('/src/engine/design/doc.ts' as string); const F = await import('/src/engine/fx/commands.ts' as string);
+    const D = await import('/src/engine/design/doc.ts' as string); const F = await import('/src/engine/fx/fxCommands.ts' as string);
     const sid = st.useStore.getState().activeSessionId, d = A.activeDoc(sid);
     A.mutateDoc(sid, d.id, (x: any) => D.insertLayer(x, { ...F.newFxLayer('filter', { scope: 'layer', ops: [F.newFxOp('blur', { radius: 1 })] }), name: 'Soft' }, 'above'));
   });

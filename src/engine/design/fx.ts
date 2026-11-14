@@ -1,5 +1,5 @@
 import { getDoc, mutateDoc } from './actions';
-import { runFxCommands, type FxCommand, type FxRun } from '../fx/commands';
+import { runFxCommands, type FxCommand, type FxRun } from '../fx/fxCommands';
 import { awaitFrame } from '../../lib/trace';
 
 /** Run FX commands on a document as one undo step (the layers panel and the agent both come through here). */

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, blobDb: { set: async () => undefined } }));
-import { runFxCommands } from '../src/engine/fx/commands';
+import { runFxCommands } from '../src/engine/fx/fxCommands';
 import { fxParams, FX_DEFS, FX_KINDS } from '../src/engine/fx/defs';
 import { fxPlan, fxTarget } from '../src/engine/fx/plan';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';

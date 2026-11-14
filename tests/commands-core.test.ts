@@ -350,7 +350,8 @@ describe('the automatic index', () => {
     resetRegistry();
     const { collected } = await import('../src/engine/commands');
     const files = [...collected.loaded.map((l) => l.file), ...collected.skipped];
-    expect(files).toContain('/src/engine/fx/commands.ts');
+    expect(files).toContain('/src/engine/design/fx.commands.ts');
+    expect(collected.skipped).toEqual([]);
     expect(files.every((file) => /(^|\/|\.)commands\.ts$/.test(file))).toBe(true);
   });
 });

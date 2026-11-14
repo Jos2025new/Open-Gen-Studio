@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clipTo, EMPTY, fxMargin, grow, isEmpty, union } from '../src/engine/design/retainedPage';
-import { newFxOp } from '../src/engine/fx/commands';
+import { newFxOp } from '../src/engine/fx/fxCommands';
 
 describe('FX margins (Paso 3)', () => {
   it('tone and colour ops reach nothing', () => {

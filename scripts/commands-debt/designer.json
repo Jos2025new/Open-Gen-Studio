@@ -8,6 +8,10 @@
     "text": "Changes the workspace on screen (openAssetInDesigner sets ui.workspace)."
   },
   {
+    "id": "designer.fx.add",
+    "text": "Without above, the layer is placed above the document’s active layer."
+  },
+  {
     "id": "designer.layer.add",
     "text": "No position argument: it goes above the document's active layer; a text layer takes the text tool's style (ui.text)."
   },
