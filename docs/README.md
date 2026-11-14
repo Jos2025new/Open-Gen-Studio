@@ -96,6 +96,7 @@
 - [0027 — Pincel: cápsula, dabs (aceptado 2026-11-01)](decisions/0027-motor-pincel-dabs.md).
 - [0028 — Grafito (propuesto)](decisions/0028-lapiz-grafito.md).
 - [0029 — Recorredor de interfaz: la máquina busca a lo ancho, solo lo confirmado se fija (enfoque aceptado 2026-11-07; sin implementar)](decisions/0029-recorredor-de-interfaz.md).
+- [0030 — Núcleo de comandos: un registro, dos entradas, un paso de deshacer por historial (aceptado 2026-11-13; solo el núcleo, en `task/commands`)](decisions/0030-nucleo-de-comandos.md).
 
 ## Propuestas de interfaz
 

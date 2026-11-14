@@ -1,0 +1,100 @@
+import type { z } from 'zod';
+
+/*
+ * The command contract (ADR 0030). A command is one thing the app can do, callable the same way by the interface, the
+ * agent, a command line and, later, an outside door. Nothing here imports code: a `commands.ts` pays nothing for it.
+ */
+
+/** What a command does to the world. It decides who must approve it (see `run.ts`). */
+export type Effect = 'read' | 'write' | 'spend' | 'delete';
+
+/** Who is calling. `ui` is typed code after a user's click; the other three come through the boundary. */
+export type Caller = 'ui' | 'agent' | 'cli' | 'external';
+
+/**
+ * What a command acts on. The caller resolves it and passes it in `on`: no command reads "the active document" by
+ * itself, so the agent can act on a document that is not on screen and a shortcut acts on the active one.
+ */
+export interface Target {
+  session?: string;
+  doc?: string;
+  node?: string;
+}
+export type TargetKey = keyof Target;
+
+export interface CommandContext {
+  on: Target;
+  caller: Caller;
+  signal?: AbortSignal;
+}
+
+/** `true`, or the reason it cannot run now ("no layer is selected"): the agent reads it, the interface shows it. */
+export type Availability = true | string;
+
+export interface CommandSpec<A = unknown, R = unknown> {
+  /** Area and verb in dots: `designer.layer.add`. */
+  id: string;
+  /** What a palette shows. */
+  title: string;
+  /** One line for the agent: what it does and what it returns. */
+  description?: string;
+  /** Other ids that reach this command (an old id after a rename, a short name). */
+  aliases?: readonly string[];
+  /** The arguments. Checked only for callers at the boundary; the interface is typed and is not checked. */
+  args: z.ZodType<A>;
+  effect: Effect;
+  /** The parts of `on` this command cannot run without. */
+  needs?: readonly TargetKey[];
+  /** The undo histories this call changes, as `kind:id` ("designer:doc_1"). One call or sequence = one step in each. */
+  history?: (on: Target, args: A) => string | readonly string[] | null | undefined;
+  available?: (ctx: CommandContext) => Availability;
+  /** The result must be data that survives JSON: a later step of a sequence, the agent or a CLI reads it. */
+  run: (ctx: CommandContext, args: A) => R;
+}
+
+/** A command of any argument type, as the registry holds them. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyCommand = CommandSpec<any, any>;
+
+/** Types a command from its zod schema: `defineCommand({ id, title, args: z.object({...}), effect, run })`. */
+export function defineCommand<A, R>(spec: CommandSpec<A, R>): CommandSpec<A, R> {
+  return spec;
+}
+
+/** One call in its canonical form. `args` may hold `"$1"` or `"$1.id"` inside a sequence. */
+export interface Call {
+  cmd: string;
+  args?: unknown;
+  on?: Target;
+}
+/** Calls in order. `on` here is the default target of every step. */
+export interface Sequence {
+  seq: Call[];
+  on?: Target;
+}
+
+export type ErrorCode =
+  | 'unknown' // no command with that id or alias
+  | 'invalid' // arguments do not match the schema
+  | 'target' // `on` lacks something the command needs
+  | 'unavailable' // `available()` gave a reason
+  | 'ref' // a `$n` that does not point to an earlier step or to a field that exists
+  | 'denied' // approval needed and not given
+  | 'history' // a history the command names has no adapter
+  | 'failed'; // the command threw
+
+export class CommandError extends Error {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+    /** 1-based step of a sequence. */
+    readonly step?: number,
+  ) {
+    super(message);
+    this.name = 'CommandError';
+  }
+}
+
+export type RunResult =
+  | { ok: true; results: unknown[] }
+  | { ok: false; error: { code: ErrorCode; message: string; step?: number }; results: unknown[]; rolledBack: boolean };

@@ -7,6 +7,7 @@ import captureContracts from './map-contracts-capture.mjs';
 import nodeContracts from './map-contracts-nodes.mjs';
 import sg from './map-contracts-saveguard.mjs';
 import keyContracts from './map-contracts-keys.mjs';
+import commandContracts from './map-contracts-commands.mjs';
 
 export default [
   ...videoContracts,
@@ -17,6 +18,7 @@ export default [
   ...nodeContracts,
   ...sg,
   ...keyContracts,
+  ...commandContracts,
   {
     id: 'snap-controls',
     what: 'Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes.',
