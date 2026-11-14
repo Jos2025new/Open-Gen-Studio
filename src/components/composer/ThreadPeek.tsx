@@ -7,7 +7,7 @@ import { FeedList, NoticeView } from '../chat/FeedList';
 export function ThreadPeek({ workspace }: { workspace: string }) {
   const open = useStore((s) => s.ui.threadOpen);
   const sessionId = useStore((s) => s.activeSessionId);
-  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => f.workspace === s.ui.workspace).length ?? 0);
+  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.length ?? 0);
   const hasNodeMessage = useStore((s) => s.sessions[s.activeSessionId]?.feed.some((f) => f.workspace === 'node' && f.type === 'user' && f.mode === 'agent') ?? false);
   const feed = useStore((s) => s.sessions[s.activeSessionId]?.feed);
   const pending = useStore((s) => {
@@ -15,7 +15,7 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
     return Boolean(sess?.agent.pending) || Boolean(sess?.agent.busy);
   });
   const lastKey = useStore((s) => {
-    const f = s.sessions[s.activeSessionId]?.feed.filter((x) => x.workspace === s.ui.workspace);
+    const f = s.sessions[s.activeSessionId]?.feed;
     const last = f?.[f.length - 1];
     return last ? (last.type === 'assistant' ? `${last.id}:${last.text.length}` : last.id) : '';
   });

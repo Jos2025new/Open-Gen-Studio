@@ -111,11 +111,13 @@ type Frame = (p: { result: boolean; label: string; children: ReactNode }) => Rea
 function SideContent({ sessionId, space, frame: FrameBox }: { sessionId: string; space: Space; frame: Frame }) {
   const { view, open } = useCorner();
   const { items, talked } = useSpaceFeed(sessionId, space);
+  const allFeed = useStore((s) => s.sessions[sessionId]?.feed);
+  const hasConversation = Boolean(allFeed?.some((f) => f.type === 'user' || f.type === 'assistant'));
   const pending = useStore((s) => Boolean(s.sessions[sessionId]?.agent.pending || s.sessions[sessionId]?.agent.busy));
   const selected = useSelectedResult(sessionId);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const notices = items.filter((f) => f.type === 'notice');
-  const lastKey = items.length ? `${items[items.length - 1].id}:${items.length}` : '';
+  const lastKey = allFeed?.length ? `${allFeed[allFeed.length - 1].id}:${allFeed.length}` : '';
   const body = useRef<HTMLDivElement>(null);
   const shown = space === 'node' && open && selected && dismissed !== selected.node.id ? selected : null;
 
@@ -155,7 +157,7 @@ function SideContent({ sessionId, space, frame: FrameBox }: { sessionId: string;
         <ResultSummary generation={shown.generation} asset={shown.asset} />
       ) : view === 'create' ? (
         <CreateForm designer={space === 'designer'} />
-      ) : talked ? (
+      ) : talked || hasConversation ? (
         <FeedList sessionId={sessionId} compact />
       ) : notices.length ? (
         <div className="composer-alerts">{notices.map((item) => item.type === 'notice' && <NoticeView key={item.id} item={item} sessionId={sessionId} />)}</div>

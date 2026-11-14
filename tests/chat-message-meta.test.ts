@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatResult, chat as chatFn } from '../src/engine/providers/llm';
 import type { AssistantFeedItem, UserFeedItem } from '../src/engine/types';
@@ -15,6 +18,9 @@ vi.mock('../src/lib/writerLock', async (importOriginal) => {
   return { ...mod, mayStartWork: () => true };
 });
 
+import { FeedList } from '../src/components/chat/FeedList';
+import { ThreadPeek } from '../src/components/composer/ThreadPeek';
+import { DesignerCorner, useCorner } from '../src/components/node/NodeSide';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { buildMessageMetaSummary } from '../src/engine/feedMeta';
 import { useStore } from '../src/store/store';
@@ -198,5 +204,116 @@ describe('chat message metadata (step 10)', () => {
     expect(summary.dateTime).toContain('2026');
     expect(summary.detailParts).toEqual([]);
     expect(summary.tooltip).toContain('Space: Designer');
+  });
+
+  it('renders date, time with timezone, Space tag, and hover/compact metadata on user and agent messages and never cuts across Spaces', () => {
+    const sid = resetStore();
+    const st = useStore.getState();
+    const feed: Array<UserFeedItem | AssistantFeedItem> = [
+      {
+        id: 'fd_studio_u',
+        createdAt: Date.UTC(2026, 5, 1, 15, 0),
+        workspace: 'chat',
+        type: 'user',
+        text: 'From Studio',
+        mode: 'agent',
+        attachments: [],
+        meta: {
+          timeZone: 'UTC',
+          agent: 'Director',
+          space: 'studio',
+          provider: 'openrouter',
+          model: 'anthropic/claude-sonnet-4',
+          runId: 'turn_abc',
+        },
+      },
+      {
+        id: 'fd_node_a',
+        createdAt: Date.UTC(2026, 5, 1, 15, 1),
+        workspace: 'node',
+        type: 'assistant',
+        text: 'Reply from Canvas',
+        engine: 'Claude Sonnet 4',
+        meta: {
+          timeZone: 'UTC',
+          agent: 'Director',
+          space: 'canvas',
+          provider: 'openrouter',
+          model: 'anthropic/claude-sonnet-4',
+          usage: { inputTokens: 120, outputTokens: 45 },
+          costUsd: 0.0012,
+          costEstimated: false,
+          runId: 'turn_abc',
+        },
+      },
+      {
+        id: 'fd_legacy_u',
+        createdAt: Date.UTC(2026, 0, 15, 14, 30),
+        workspace: 'designer',
+        type: 'user',
+        text: 'Old Designer message',
+        mode: 'agent',
+        attachments: [],
+      },
+    ];
+    useStore.setState({
+      ui: { ...st.ui, workspace: 'node', threadOpen: true },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed } },
+    });
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      act(() => {
+        root.render(createElement(FeedList, { sessionId: sid }));
+      });
+      // Continuous thread across Spaces: no filter button and all 3 messages appear in Node view.
+      expect(host.querySelector('.feed-everywhere')).toBeNull();
+      expect(host.textContent).toContain('From Studio');
+      expect(host.textContent).toContain('Reply from Canvas');
+      expect(host.textContent).toContain('Old Designer message');
+
+      const badges = [...host.querySelectorAll('.ws-badge')].map((el) => el.textContent);
+      expect(badges).toEqual(['Studio', 'Canvas', 'Designer']);
+
+      const times = [...host.querySelectorAll('time.msg-time')];
+      expect(times).toHaveLength(3);
+      expect(times[0].textContent).toContain('UTC');
+      expect(times[1].textContent).toContain('UTC');
+
+      const metas = [...host.querySelectorAll('.msg-meta')];
+      expect(metas[0].textContent).toContain('Director');
+      expect(metas[0].textContent).toContain('claude-sonnet-4 (OpenRouter)');
+      expect(metas[0].textContent).toContain('run turn_abc');
+      expect(metas[0].getAttribute('data-tip')).toContain('Time:');
+      expect(metas[0].getAttribute('data-tip')).toContain('Run: turn_abc');
+
+      expect(metas[1].textContent).toContain('120 in / 45 out');
+      expect(metas[1].textContent).toContain('$0.0012');
+      expect(metas[1].getAttribute('data-tip')).toContain('Model: anthropic/claude-sonnet-4');
+
+      // Switching to Designer renders the full cross-Space thread in ThreadPeek and DesignerCorner too.
+      act(() => {
+        useStore.setState((s) => ({ ui: { ...s.ui, workspace: 'designer', threadOpen: true } }));
+        useCorner.setState({ open: true, view: 'chat' });
+        root.render(
+          createElement(
+            'div',
+            null,
+            createElement(ThreadPeek, { workspace: 'designer' }),
+            createElement(DesignerCorner, { sessionId: sid }),
+          ),
+        );
+      });
+      expect(host.querySelector('.thread-toggle .num')?.textContent).toBe('3');
+      const peekBadges = [...host.querySelectorAll('.thread-peek .ws-badge')].map((el) => el.textContent);
+      expect(peekBadges).toEqual(['Studio', 'Canvas', 'Designer']);
+      const cornerBadges = [...host.querySelectorAll('.designer-corner .ws-badge')].map((el) => el.textContent);
+      expect(cornerBadges).toEqual(['Studio', 'Canvas', 'Designer']);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
   });
 });
