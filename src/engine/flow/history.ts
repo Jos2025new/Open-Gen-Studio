@@ -17,9 +17,43 @@ export function graphHistory(id: string, direction: 'undo' | 'redo') { return [.
 function logical(g: Graph) {
   return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges });
 }
+/** Open groups by session: the first `recordGraph` inside one is its undo step, the later ones add nothing (ADR 0030). */
+const groups = new Map<string, { first: Entry | null }>();
+
+/**
+ * Makes every change to this graph until `close` one undo step: a command, or a sequence of them. `revert` puts the
+ * graph back as it was at the first change, takes that step out and returns the graph of then (or null when nothing
+ * was recorded); the caller stores it.
+ */
+export function openHistoryGroup(id: string): { close(): void; revert(): Graph | null } {
+  const group = { first: null as Entry | null };
+  groups.set(id, group);
+  const end = () => { if (groups.get(id) === group) groups.delete(id); };
+  return {
+    close: end,
+    revert() {
+      end();
+      const first = group.first;
+      if (!first) return null;
+      const s = stack(id), at = s.past.lastIndexOf(first);
+      if (at >= 0) s.past.splice(at);
+      notify();
+      return first.before;
+    },
+  };
+}
+
 export function recordGraph(id: string, before: Graph, after: Graph) {
   const s = stack(id);
   after.nodes.forEach(n => s.latest.set(n.id, n));
+  const group = groups.get(id);
+  if (group?.first) {
+    group.first.after = structuredClone(after);
+    // A later edit within 700 ms must not merge into the command's step: it is already the user's own step.
+    group.first.time = 0;
+    notify();
+    return;
+  }
   const edits = { ...after, nodes: after.nodes.map(n => {
     const prev = before.nodes.find(p => p.id === n.id);
     if (prev && 'outputIndex' in prev.data && 'outputIndex' in n.data && prev.data.generationId !== n.data.generationId) {
@@ -37,11 +71,12 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
   const key = `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
   const time = Date.now();
   const last = s.past.at(-1);
-  if (!added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
+  if (!group && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
     last.after = structuredClone(after); last.time = time;
   } else {
     s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time });
     if (s.past.length > 40) s.past.shift();
+    if (group) group.first = s.past[s.past.length - 1];
   }
   s.future = [];
   notify();

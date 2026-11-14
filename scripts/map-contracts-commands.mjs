@@ -55,4 +55,24 @@ export default [
     ],
     tests: ['tests/designer-commands.test.ts'],
   },
+  {
+    id: 'nodes-commands',
+    what: 'Cada acción exportada de flow/actions.ts es un comando o dice por qué no (NODES_ACTIONS); el destino es `on.session` y una secuencia es un paso de deshacer del grafo.',
+    sides: [
+      ['src/engine/flow/commands.ts', 'export const NODES_ACTIONS'],
+      ['src/engine/flow/commands.ts', "id: 'nodes.run.start'"],
+      ['src/engine/flow/commandKit.ts', "registerHistory('nodes'"],
+      ['src/engine/flow/history.ts', 'export function openHistoryGroup'],
+    ],
+    tests: ['tests/nodes-commands.test.ts'],
+  },
+  {
+    id: 'sessions-commands',
+    what: 'Las funciones de sesión del store son comandos (SESSION_ACTIONS) con el destino en `on.session`; ninguno lee la sesión activa salvo `sessions.list` para marcarla.',
+    sides: [
+      ['src/store/commands.ts', 'export const SESSION_ACTIONS'],
+      ['src/store/commands.ts', "id: 'sessions.list'"],
+    ],
+    tests: ['tests/sessions-commands.test.ts'],
+  },
 ];
