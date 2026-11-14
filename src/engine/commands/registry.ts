@@ -51,15 +51,36 @@ export function resetRegistry(): void {
 }
 
 /** Why this command cannot run on this target now, or `true`. A missing part of `on` is a reason too. */
-export function availability(spec: AnyCommand, ctx: CommandContext): Availability {
+export function availability(spec: AnyCommand, ctx: CommandContext, args?: unknown): Availability {
   const missing = missingTarget(spec, ctx.on);
   if (missing) return missing;
-  return spec.available ? spec.available(ctx) : true;
+  return spec.available ? spec.available(ctx, args as never) : true;
 }
 
 export function missingTarget(spec: AnyCommand, on: Target): string | undefined {
   const lacks = (spec.needs ?? []).filter((key: TargetKey) => !on[key]);
   return lacks.length ? `${spec.id} needs ${lacks.map((key) => `on.${key}`).join(' and ')}.` : undefined;
+}
+
+type Json = { type?: string; properties?: Record<string, Json>; required?: string[]; items?: Json; enum?: unknown[]; anyOf?: Json[]; const?: unknown; minimum?: number; maximum?: number };
+
+function shape(s: Json): string {
+  if (s.const !== undefined) return JSON.stringify(s.const);
+  if (s.enum) return s.enum.map((v) => JSON.stringify(v)).join('|');
+  if (s.anyOf) return s.anyOf.map(shape).join('|');
+  if (s.type === 'array') return `[${s.items ? shape(s.items) : 'any'}]`;
+  if (s.type === 'object') {
+    const need = new Set(s.required ?? []);
+    const keys = Object.entries(s.properties ?? {}).map(([key, value]) => `${key}${need.has(key) ? '' : '?'}: ${shape(value)}`);
+    return keys.length ? `{${keys.join(', ')}}` : s.properties ? '{}' : 'object';
+  }
+  const range = s.minimum !== undefined && s.maximum !== undefined ? ` ${s.minimum}..${s.maximum}` : '';
+  return `${s.type === 'integer' ? 'int' : (s.type ?? 'any')}${range}`;
+}
+
+/** The arguments in one short line, `{layer: string, opacity?: number 0..1}`: what an agent reads, far below the schema in tokens. */
+export function signature(spec: AnyCommand): string {
+  return shape(argsSchema(spec) as Json);
 }
 
 /** The arguments as JSON Schema, for the agent, a CLI or MCP. Built once per command, on first use. */
@@ -83,6 +104,8 @@ export interface FoundCommand {
   available?: Availability;
   /** Present when `schemas` was asked for. */
   args?: unknown;
+  /** The arguments in one line. */
+  signature?: string;
 }
 
 export interface FindQuery {
@@ -94,6 +117,7 @@ export interface FindQuery {
   on?: Target;
   caller?: Caller;
   schemas?: boolean;
+  signatures?: boolean;
 }
 
 /** What the palette and the agent's `find_commands` read: the commands of an area, with whether each can run now. */
@@ -113,6 +137,7 @@ export function findCommands(query: FindQuery = {}): FoundCommand[] {
     if (spec.needs?.length) item.needs = spec.needs;
     if (query.on) item.available = availability(spec, { on: query.on, caller: query.caller ?? 'ui' });
     if (query.schemas) item.args = argsSchema(spec);
+    if (query.signatures) item.signature = signature(spec);
     found.push(item);
   }
   return found.sort((a, b) => a.id.localeCompare(b.id));

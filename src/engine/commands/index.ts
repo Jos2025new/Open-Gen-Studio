@@ -10,7 +10,7 @@ export const collected = collect(import.meta.glob(['/src/**/commands.ts', '/src/
 
 export { defineCommand, CommandError } from './types';
 export type { Availability, Call, Caller, CommandContext, CommandSpec, Effect, ErrorCode, RunResult, Sequence, Target } from './types';
-export { allCommands, argsSchema, availability, command, findCommands } from './registry';
+export { allCommands, argsSchema, availability, command, findCommands, signature } from './registry';
 export type { FindQuery, FoundCommand } from './registry';
 export { invoke, run, setApprover, needsApproval, MAX_STEPS } from './run';
 export type { ApprovalRequest, ApprovalStep, Approver, RunOptions } from './run';

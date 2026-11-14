@@ -21,10 +21,10 @@ function openHistories(spec: AnyCommand, on: Target, args: unknown, txs: Transac
   for (const key of typeof keys === 'string' ? [keys] : keys) txs.touch(key);
 }
 
-function check(spec: AnyCommand, ctx: CommandContext): void {
+function check(spec: AnyCommand, ctx: CommandContext, args: unknown): void {
   const missing = missingTarget(spec, ctx.on);
   if (missing) throw new CommandError('target', missing);
-  const can = spec.available ? spec.available(ctx) : true;
+  const can = spec.available ? spec.available(ctx, args as never) : true;
   if (can !== true) throw new CommandError('unavailable', can);
 }
 
@@ -47,7 +47,7 @@ export function invoke<A, R>(spec: CommandSpec<A, R>, args: A, on: Target = {}):
   };
   let result: R;
   try {
-    check(spec, ctx);
+    check(spec, ctx, args);
     openHistories(spec, on, args, txs);
     result = spec.run(ctx, args);
   } catch (error) {
@@ -242,7 +242,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       if (!target.success) throw new CommandError('ref', `${spec.id}: a reference in "on" must give an id (text).`);
       on = target.data;
       if (!ready) args = parseArgs(spec, refs(args, i + 1, results), i + 1);
-      check(spec, { on, caller: options.caller, signal: options.signal });
+      check(spec, { on, caller: options.caller, signal: options.signal }, args);
       openHistories(spec, on, args, txs);
       const result = await spec.run({ on, caller: options.caller, signal: options.signal }, args);
       results.push(result ?? null);
