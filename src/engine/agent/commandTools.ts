@@ -12,11 +12,11 @@ export const COMMAND_TOOLS: ToolSpec[] = [
     function: {
       name: 'find_commands',
       description:
-        'Designer only for now: lists what the app can do as commands, one per line: id {arguments} — what it does [and why it cannot run now]. Call it before run_commands when you do not know an id or its arguments. Free, changes nothing.',
+        'Lists what the app can do as commands in every area. With neither area nor text: the areas and what each is for. With one: a line per command, id {arguments} — what it does [and why it cannot run now]. Call it before run_commands when you do not know an id or its arguments. Free, changes nothing.',
       parameters: {
         type: 'object',
         properties: {
-          area: { type: 'string', enum: ['designer'], description: 'Only the commands of this area.' },
+          area: { type: 'string', enum: ['designer', 'nodes', 'studio', 'library', 'skills', 'models', 'sessions'], description: 'Only the commands of this area.' },
           text: { type: 'string', description: 'Words to look for, e.g. "layer opacity".' },
         },
       },
@@ -27,7 +27,7 @@ export const COMMAND_TOOLS: ToolSpec[] = [
     function: {
       name: 'run_commands',
       description:
-        'Designer only for now: runs commands in order, as the user\'s own actions. All or nothing, one undo step per document, free. A step can use an earlier result: "$1" is the result of step 1 and "$1.layer" a field of it. Steps act on the document on screen unless "on" names another one (ids from designer.doc.list). Take ids and arguments from find_commands; never guess them.',
+        'Runs commands of any area in order, as the user\'s own actions. All or nothing, one undo step per document. Commands that spend or delete need the user\'s approval and are refused from here. A step can use an earlier result: "$1" is the result of step 1 and "$1.layer" a field of it. Designer steps act on the document on screen unless "on" names another one (ids from designer.doc.list). Take ids and arguments from find_commands; never guess them.',
       parameters: {
         type: 'object',
         properties: {

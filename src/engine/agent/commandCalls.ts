@@ -1,4 +1,4 @@
-import { findCommands, run } from '../commands';
+import { allCommands, command, findCommands, run } from '../commands';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
 import { findCommandsSchema, runCommandsSchema } from './commandTools';
@@ -8,27 +8,62 @@ import { findCommandsSchema, runCommandsSchema } from './commandTools';
 type ToolAnswer = { text: string; done: boolean };
 const problems = (error: { issues: { path: PropertyKey[]; message: string }[] }) => error.issues.map((issue) => `${issue.path.join('.') || 'input'}: ${issue.message}`).join('; ');
 const RESULT_MAX = 4000;
-/** The one area the agent reaches through these two tools for now; other areas keep their own tools until decided. */
-const AREA = 'designer';
+/** Commands the agent never sees and never runs (id -> why). Whoever types the id gets the reason and nothing runs. */
+export const AGENT_HIDDEN: Record<string, string> = {
+  'models.composer.pick': 'the model is the user\'s choice',
+  'models.composer.reset': 'the model is the user\'s choice',
+  'models.agent.pick': 'the model is the user\'s choice',
+  'models.agent.reset': 'the model is the user\'s choice',
+  'skills.skill.select': 'the skill is the user\'s choice',
+  'skills.workflow.select': 'the workflow is the user\'s choice',
+  'sessions.select': 'it would move the user to another session in the middle of the agent\'s turn',
+  'sessions.new': 'it would move the user to another session in the middle of the agent\'s turn',
+  'sessions.archive': 'it hides sessions from the user\'s list',
+};
 
-/** The commands of an area, one line each, with whether each can run on the document on screen. */
+/** What each area is for: the index `find_commands` answers when it gets neither `area` nor `text`. */
+const AREAS: Record<string, string> = {
+  designer: 'documents, layers, text, shapes, filters and effects of the Designer',
+  nodes: 'the node graph: nodes, connections, layout and runs',
+  studio: 'assets and generations: attach, estimate, regenerate, delete, start a generation',
+  library: 'saved subjects, styles and voices',
+  skills: 'read skills, workflows and guides',
+  models: 'the model catalog (read only)',
+  sessions: 'list, rename, pin and title sessions',
+};
+const NEEDS_APPROVAL = 'needs the user\'s approval: not available from here yet';
+const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
+const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
+
+/** The commands of an area, one line each, with whether each can run now; with neither area nor text, an index of the areas. */
 export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer {
   const v = findCommandsSchema.safeParse(input ?? {});
   if (!v.success) return { text: `Invalid find_commands input: ${problems(v.error)}`, done: false };
   const doc = activeDoc(sessionId);
-  const found = v.data.area && v.data.area !== AREA ? [] : findCommands({ ...v.data, area: AREA, signatures: true, caller: 'agent', ...(doc ? { on: { session: sessionId, doc: doc.id } } : {}) });
-  if (!found.length) return { text: 'No command matches. Areas: designer.', done: false };
-  const lines = found.map((f) => `${f.id} ${f.signature} — ${f.description ?? f.title}${typeof f.available === 'string' ? ` [not now: ${f.available}]` : ''}`);
-  const where = doc ? `Document on screen: ${doc.id} "${doc.name}", ${doc.width}x${doc.height}.` : 'No document is open: start with designer.doc.new.';
-  return { text: [where, ...lines].join('\n'), done: true };
+  const where = doc ? ` Document on screen: ${doc.id} "${doc.name}", ${doc.width}x${doc.height}.` : '';
+  const context = `Commands run as the user's own actions in this session.${where}`;
+  const everything = visible(allCommands());
+  const index = (): string => {
+    const names = Object.keys(AREAS);
+    const known = [...names, ...new Set(everything.map((c) => areaOf(c.id)).filter((a) => !names.includes(a)))];
+    return [context, 'Areas (call find_commands with area, or with text):', ...known.map((a) => `${a} (${everything.filter((c) => areaOf(c.id) === a).length}) — ${AREAS[a] ?? 'other commands'}`)].join('\n');
+  };
+  const { area, text } = v.data;
+  if ((!area && !text) || (area && !everything.some((c) => areaOf(c.id) === area))) return { text: index(), done: true };
+  const found = visible(findCommands({ area, text, signatures: true, caller: 'agent', ...(doc ? { on: { session: sessionId, doc: doc.id } } : { on: { session: sessionId } }) }));
+  if (!found.length) return { text: `No command matches. Areas: ${Object.keys(AREAS).join(', ')}.`, done: false };
+  const lines = found.map((f) => `${f.id} ${f.signature} — ${f.description ?? f.title}${f.effect === 'spend' || f.effect === 'delete' ? ` [${NEEDS_APPROVAL}]` : ''}${typeof f.available === 'string' ? ` [not now: ${f.available}]` : ''}`);
+  return { text: [context, ...lines].join('\n'), done: true };
 }
 
 /** Runs the sequence on this session; steps act on the document on screen unless they name another. */
 export async function runCommandsTool(sessionId: string, input: unknown, signal?: AbortSignal): Promise<ToolAnswer> {
   const v = runCommandsSchema.safeParse(input);
   if (!v.success) return { text: `Invalid run_commands input: ${problems(v.error)}`, done: false };
-  const outside = v.data.seq.findIndex((step) => !step.cmd.startsWith(`${AREA}.`));
-  if (outside >= 0) return { text: `Step ${outside + 1}: "${v.data.seq[outside].cmd}" is not a Designer command. run_commands runs only designer.* for now. Nothing ran.`, done: false };
+  for (const [i, step] of v.data.seq.entries()) {
+    const reason = AGENT_HIDDEN[command(step.cmd)?.id ?? step.cmd];
+    if (reason) return { text: `Step ${i + 1}: "${step.cmd}" is not available to the agent: ${reason}. Nothing ran.`, done: false };
+  }
   const doc = activeDoc(sessionId);
   const result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal });
   const ran = result.results.length;
@@ -36,6 +71,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
     const kept = ran === 0 ? 'Nothing ran.'
       : result.kept ? `Steps 1 to ${ran} ran and stay, as one undo step: the sequence waited on a step and the user may have edited meanwhile, so nothing was taken back. Read the document before going on.`
       : result.rolledBack ? `Steps 1 to ${ran} ran and were taken back: the documents are as before.` : `Steps 1 to ${ran} ran and stay.`;
+    if (result.error.code === 'denied') return { text: `Step ${result.error.step ?? 1} ${NEEDS_APPROVAL} (it spends or deletes). Nothing ran.`, done: false };
     return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${result.error.message} ${kept}`, done: false };
   }
   // The agent's edit glows on the canvas for a moment (in memory only: never saved, undone or exported).

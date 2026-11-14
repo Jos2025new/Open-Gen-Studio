@@ -93,12 +93,14 @@ Solo el primero lee el doc activo. Los demás dependen de la capa activa del doc
 
 ### Agente
 
-Dos herramientas, en `src/engine/agent/commandTools.ts` y `commandCalls.ts`:
+Dos herramientas, en `src/engine/agent/commandTools.ts` y `commandCalls.ts`. Desde 2026-11-14 llegan a las 7 áreas y se ofrecen en todos los espacios de trabajo (antes: solo `designer.*` y solo en el Designer).
 
-- `find_commands { area?, text? }`: una línea por comando, `id {argumentos} — qué hace [not now: motivo]`.
-- `run_commands { seq }`: la secuencia sobre el doc en pantalla, salvo que un paso nombre otro en `on.doc`. El agente no puede nombrar otra sesión.
+- `find_commands { area?, text? }`: sin `area` ni `text` responde un índice (una línea por área: `área (n) — para qué sirve`). Con alguno, una línea por comando, `id {argumentos} — qué hace [needs the user's approval…] [not now: motivo]`. Un área desconocida devuelve el índice. La línea de contexto nombra el doc en pantalla solo si hay uno.
+- `run_commands { seq }`: la secuencia sobre la sesión del agente; los pasos del Designer actúan sobre el doc en pantalla, salvo que un paso nombre otro en `on.doc`. El agente no puede nombrar otra sesión.
+- **Ocultos al agente** (`AGENT_HIDDEN` en `commandCalls.ts`; no se listan y `run_commands` los rechaza con el motivo, sin ejecutar nada): `models.composer.pick`, `models.composer.reset`, `models.agent.pick`, `models.agent.reset` y `skills.skill.select`, `skills.workflow.select` (los elige el usuario); `sessions.select`, `sessions.new`, `sessions.archive` (llevarían al usuario a otra sesión a mitad del turno del agente).
+- **Gasto y borrado:** no hay quien apruebe, así que fallan con `denied`. El listado los marca y la respuesta dice que hace falta la aprobación del usuario y que no se ejecutó nada. Seguirá así hasta la tarjeta de aprobación (paso 7).
 
-Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una línea.
+Las herramientas anteriores (nodos, Designer, generación) no cambian. Las guías `app:designer`, `app:nodes` y `app:canvas` ganan una línea.
 
 ### Medido (`COMMANDS_BENCH=1`, mejor de cinco rondas)
 
@@ -121,7 +123,7 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 
 ## El resto de apartados (paso 5, 2026-11-14)
 
-Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_commands` y `run_commands` siguen limitados a `designer.*`.
+Envoltura mecánica, sin reescribir ninguna acción. El agente llega a todo esto por `find_commands` y `run_commands` (ver «Agente»).
 
 ### Nodes
 

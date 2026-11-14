@@ -122,12 +122,9 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   return { handled: true, workspace: c.workspace };
           }
           if (call.name === 'find_commands' || call.name === 'run_commands') {
-  if (c.workspace !== 'designer') respond(`${call.name} works only in the Designer.`);
-  else {
-    const r = call.name === 'find_commands' ? findCommandsTool(sessionId, parsed.value) : await until(runCommandsTool(sessionId, parsed.value));
-    if (r.done && call.name === 'run_commands') log.action({ icon: 'fix', label: 'Ran commands', detail: r.text });
-    respond(r.text);
-  }
+  const r = call.name === 'find_commands' ? findCommandsTool(sessionId, parsed.value) : await until(runCommandsTool(sessionId, parsed.value));
+  if (r.done && call.name === 'run_commands') log.action({ icon: 'fix', label: 'Ran commands', detail: r.text });
+  respond(r.text);
   return { handled: true, workspace: c.workspace };
           }
           if (call.name === 'view_canvas') {
