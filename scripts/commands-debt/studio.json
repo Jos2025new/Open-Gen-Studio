@@ -1,0 +1,70 @@
+[
+  {
+    "id": "studio.direct.check",
+    "text": "Reads the composer and the active session and workspace."
+  },
+  {
+    "id": "studio.asset.estimate",
+    "text": "Reads the active session and may fetch and cache provider schemas."
+  },
+  {
+    "id": "studio.layer.estimate",
+    "text": "May fetch and cache provider schemas while estimating."
+  },
+  {
+    "id": "studio.images.accepts",
+    "text": "Reads the composer model for the requested kind."
+  },
+  {
+    "id": "studio.param.has",
+    "text": "Reads the composer model for the requested kind."
+  },
+  {
+    "id": "studio.lyrics.apply",
+    "text": "Reads and changes the composer; the action reports some failures only as notices."
+  },
+  {
+    "id": "studio.generation.edit",
+    "text": "Reads and changes the composer; unsupported generations only produce a notice."
+  },
+  {
+    "id": "studio.asset.reference",
+    "text": "Changes the composer and screen; missing model views only produce a notice."
+  },
+  {
+    "id": "studio.asset.attach",
+    "text": "Changes the composer attachment list."
+  },
+  {
+    "id": "studio.node.send_asset",
+    "text": "Reads the active session and changes the screen."
+  },
+  {
+    "id": "studio.model.prepare",
+    "text": "May fetch a provider schema and change the catalog."
+  },
+  {
+    "id": "studio.generate.start",
+    "text": "Reads the active session, composer and screen; the action reports some failures only as notices."
+  },
+  {
+    "id": "studio.generation.regenerate",
+    "text": "The action reports some failures only as notices."
+  },
+  {
+    "id": "studio.asset.run_op",
+    "text": "Reads the active session and screen; failures can be reported only as notices."
+  },
+  {
+    "id": "studio.layer.run_op",
+    "text": "The action catches failures and reports them only as notices."
+  },
+  {
+    "id": "studio.assets.delete",
+    "text": "The action reports assets in use only as a notice."
+  },
+  {
+    "id": "studio.session.delete",
+    "text": "May change the session on screen when deleting a session."
+  }
+]
