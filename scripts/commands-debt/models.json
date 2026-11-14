@@ -1,0 +1,14 @@
+[
+  {
+    "id": "models.catalog.load",
+    "text": "Loading catalogs can change the composer models on screen."
+  },
+  {
+    "id": "models.composer.pick",
+    "text": "Changes the composer on screen and the action reads the active session to remember the choice."
+  },
+  {
+    "id": "models.composer.reset",
+    "text": "Changes the composer on screen."
+  }
+]

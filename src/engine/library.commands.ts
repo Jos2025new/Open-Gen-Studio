@@ -1,0 +1,26 @@
+import { z } from 'zod';
+import { defineCommand } from './commands/types';
+import { useStore } from '../store/store';
+import * as A from './actions';
+
+const id = z.string().min(1);
+const name = z.string().trim().min(1);
+const kind = z.enum(['character', 'object', 'product', 'location', 'style']);
+const capture = z.object({ camera: z.string(), tone: z.string(), light: z.string(), texture: z.string(), imperfect: z.array(z.string()).optional() }).strict();
+const subject = z.object({ id, name, kind: kind.optional(), description: z.string().optional(), frontalAssetId: id.optional(), refAssetIds: z.array(id), videoAssetId: id.optional(), voiceId: z.string().optional(), capture: capture.optional() }).strict();
+const imageAvailable = (asset?: string) => !asset || useStore.getState().assets[asset]?.kind === 'image' ? true : `No image asset "${asset}".`;
+const subjectAvailable = (subject?: string) => !subject || useStore.getState().library.some((s) => s.id === subject) ? true : `No subject "${subject}".`;
+const sessionAvailable = (session?: string) => session && useStore.getState().sessions[session] ? true : `No session "${session}".`;
+const requireSubject = <T>(value: T | null | undefined, reason: string): T => { if (value == null) throw new Error(reason); return value; };
+
+export const commands = [
+  defineCommand({ id: 'library.subject.save', title: 'Save subject', args: z.object({ subject }).strict(), effect: 'write', run: (_ctx, args) => { A.saveSubject(args.subject); return args.subject; } }),
+  defineCommand({ id: 'library.subject.delete', title: 'Delete subject', args: z.object({ id }).strict(), effect: 'delete', available: (_ctx, args) => subjectAvailable(args?.id), run: (_ctx, args) => { A.deleteSubject(args.id); return { id: args.id }; } }),
+  defineCommand({ id: 'library.subject.get', title: 'Read subject', args: z.object({ name }).strict(), effect: 'read', available: (_ctx, args) => !args?.name || A.libraryItem(args.name) ? true : `No subject named "${args.name}".`, run: (_ctx, args) => requireSubject(A.libraryItem(args.name), 'Subject not found.') }),
+  defineCommand({ id: 'library.subject.from_asset', title: 'Save subject from image', args: z.object({ asset: id, name, kind: kind.optional(), replace: z.boolean().optional(), views: z.array(id).optional() }).strict(), effect: 'write', available: (_ctx, args) => imageAvailable(args?.asset), run: (_ctx, args) => requireSubject(A.subjectFromAsset(args.asset, args.name, args.kind, { replace: args.replace, views: args.views }), 'Could not save the subject; the name may already exist.') }),
+  defineCommand({ id: 'library.subject.from_sheet', title: 'Save subject from sheet', args: z.object({ asset: id, name, kind, replace: z.boolean() }).strict(), effect: 'write', debt: 'Falls back to the active session when the asset has no session; the action hides its failure reason.', available: (_ctx, args) => imageAvailable(args?.asset), run: async (_ctx, args) => requireSubject(await A.saveSheetViews(args.asset, args.name, args.kind, args.replace), 'Could not save the sheet views.') }),
+  defineCommand({ id: 'library.subject.from_attachments', title: 'Save subject from attachments', args: z.object({ name }).strict(), effect: 'write', debt: 'Reads and changes the composer attachments on screen.', run: (_ctx, args) => requireSubject(A.subjectFromAttachments(args.name), 'Attach an image or video first.') }),
+  defineCommand({ id: 'library.style.create', title: 'Create Recraft style', args: z.object({ name }).strict(), effect: 'spend', needs: ['session'], debt: 'Reads composer attachments and selects the style on screen; the action hides provider failures.', available: (ctx) => sessionAvailable(ctx.on.session), run: async (ctx, args) => { const before = useStore.getState().sessions[ctx.on.session!].styles?.length ?? 0; await A.createRecraftStyle(ctx.on.session!, args.name); if ((useStore.getState().sessions[ctx.on.session!].styles?.length ?? 0) <= before) throw new Error('Could not create the style.'); return { created: true }; } }),
+  defineCommand({ id: 'library.voice.create', title: 'Create subject voice', args: z.object({ subject: id }).strict(), effect: 'spend', needs: ['session'], debt: 'Reads composer attachments on screen; the action hides provider failures.', available: (ctx, args) => { const session = sessionAvailable(ctx.on.session); return session === true ? subjectAvailable(args?.subject) : session; }, run: async (ctx, args) => { const before = useStore.getState().library.find((s) => s.id === args.subject)?.voiceId; await A.createSubjectVoice(ctx.on.session!, args.subject); const after = useStore.getState().library.find((s) => s.id === args.subject)?.voiceId; if (!after || after === before) throw new Error('Could not create the voice.'); return { subject: args.subject }; } }),
+];
+export const LIBRARY_ACTIONS = { saveSubject: 'library.subject.save', deleteSubject: 'library.subject.delete', libraryItem: 'library.subject.get', subjectFromAsset: 'library.subject.from_asset', saveSheetViews: 'library.subject.from_sheet', subjectFromAttachments: 'library.subject.from_attachments', createRecraftStyle: 'library.style.create', createSubjectVoice: 'library.voice.create' } as const;

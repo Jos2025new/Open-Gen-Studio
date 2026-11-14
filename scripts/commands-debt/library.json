@@ -1,0 +1,18 @@
+[
+  {
+    "id": "library.subject.from_sheet",
+    "text": "Falls back to the active session when the asset has no session; the action hides its failure reason."
+  },
+  {
+    "id": "library.subject.from_attachments",
+    "text": "Reads and changes the composer attachments on screen."
+  },
+  {
+    "id": "library.style.create",
+    "text": "Reads composer attachments and selects the style on screen; the action hides provider failures."
+  },
+  {
+    "id": "library.voice.create",
+    "text": "Reads composer attachments on screen; the action hides provider failures."
+  }
+]
