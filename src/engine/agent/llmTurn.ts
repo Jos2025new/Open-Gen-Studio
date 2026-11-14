@@ -1,4 +1,5 @@
 import { runCanvasCall } from './canvasCalls';
+import { commandCatalog } from './commandCalls';
 import { cardDraft, draftGate } from './draftActions';
 import { mayStartWork } from '../../lib/writerLock';
 import { planRequiresSettings, roundsFor } from '../procedure';
@@ -37,7 +38,8 @@ function toolsFor(style: AgentStyle) {
 
 const SILENCE_MS = 60_000;
 const TURN_CAP_MS = 5 * 60_000;
-const AGENT_SYSTEM = `${MUST}\n\n${CAPABILITIES}\n\n${SYSTEM_PROMPT}\n\n${MUST}`;
+let systemCache: string | undefined;
+export const agentSystem = () => (systemCache ??= `${MUST}\n\n${CAPABILITIES}\n\n${commandCatalog()}\n\n${SYSTEM_PROMPT}\n\n${MUST}`);
 /** Past this, append one warning for this turn (a running stream cannot be interrupted). */
 const HURRY_MS = 50_000;
 const HURRY_NOTE =
@@ -126,7 +128,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           provider: engine.provider,
           apiKey: engine.key,
           model: engine.model,
-          system: AGENT_SYSTEM,
+          system: agentSystem(),
           messages: repairHistory(session(sessionId).agent.history),
           tools: toolsFor(get().composer.agentStyle),
           effort: get().settings.agent.effort,

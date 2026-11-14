@@ -203,6 +203,49 @@ describe('the agent: find_commands and run_commands', () => {
     expect(now().layers).toEqual([]);
     expect((await runCommandsTool(sid, { seq: [{ cmd: 'designer.layer.nothing' }] })).text).toBe('Step 1 failed (unknown): No command "designer.layer.nothing". Nothing ran.');
     expect((await runCommandsTool(sid, { seq: [{ cmd: 'designer.doc.read', on: { session: 'other' } }] })).text).toMatch(/^Invalid run_commands input: seq\.0\.on/);
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], docs: [], activeDocId: null } } }));
+    expect((await runCommandsTool(sid, { seq: [{ cmd: 'designer.layer.add_text', args: { text: 'Hola', x: 0, y: 0, width: 0 } }] })).text).toBe(
+      'Step 1 failed (target): designer.layer.add_text needs on.doc (target a new doc from an earlier step with "on": "$1.doc", or pass an id from designer.doc.list). Nothing ran.',
+    );
+  });
+
+  it('finishes the Cartel poster evidence request in 2 model calls (down from 5), with or without explicit on: "$1.doc"', async () => {
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], docs: [], activeDocId: null } } }));
+    const cartelSteps = [
+      { cmd: 'designer.doc.new', args: { width: 1080, height: 1350, name: 'Cartel' } },
+      { cmd: 'designer.layer.add_text', args: { text: 'Gran apertura', x: 80, y: 120, width: 920, style: { fontFamily: 'Display', fontSize: 120, fontWeight: 700, color: '#111111', align: 'center' } } },
+      { cmd: 'designer.layer.set', args: { layer: '$2.layer', name: 'Titular' } },
+      { cmd: 'designer.layer.add_shapes', args: { shapes: [{ type: 'rect', x: 80, y: 600, w: 500, h: 300, fill: '#E63946', stroke: null }], name: 'Rectángulo' } },
+      { cmd: 'designer.layer.add_shapes', args: { shapes: [{ type: 'ellipse', x: 640, y: 600, w: 300, h: 300, fill: '#1D3557', stroke: null }], name: 'Círculo' } },
+      { cmd: 'designer.fx.add', args: { group: 'filter', scope: 'below', ops: [{ kind: 'blur' }], name: 'Desenfoque' } },
+    ];
+    const calls = await request(
+      'Crea un documento de 1080×1350 llamado Cartel, añade un título que diga "Gran apertura", un rectángulo, un círculo y una capa de efecto de desenfoque. Después renombra la capa del título a "Titular".',
+      [{ name: 'run_commands', args: { seq: cartelSteps } }],
+    );
+    // Call 1 (find_commands) and Calls 2-3 (failed target + split doc.new) disappear: 1 run_commands + 1 reply = 2 calls.
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain('designer.doc.new {width: int 1..16384, height: int 1..16384, name?: string}');
+    expect(calls[0]).toContain('designer.fx.add');
+    expect(calls[0]).toContain('blur) or effect (glow, shadow, flare)');
+    expect(calls[1]).toContain('Done, 6 steps.');
+    const created = actions.activeDoc(sid)!;
+    expect([created.name, created.width, created.height]).toEqual(['Cartel', 1080, 1350]);
+    expect(created.layers.map((l) => [l.name, l.type])).toEqual([
+      ['Titular', 'text'],
+      ['Rectángulo', 'vector'],
+      ['Círculo', 'vector'],
+      ['Desenfoque', 'fx'],
+    ]);
+    expect(historyDepth(created.id).undo).toBe(1);
+
+    // Also accepts explicit "on": "$1.doc" (string shorthand) and "on": { doc: "$1.doc" }.
+    for (const on of ['$1.doc', { doc: '$1.doc' }] as const) {
+      useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], docs: [], activeDocId: null } } }));
+      const ans = await runCommandsTool(sid, { seq: [cartelSteps[0], ...cartelSteps.slice(1).map((s) => ({ ...s, on }))] });
+      expect(ans.done).toBe(true);
+      expect(actions.activeDoc(sid)?.layers.map((l) => l.name)).toEqual(['Titular', 'Rectángulo', 'Círculo', 'Desenfoque']);
+    }
   });
 
   it('measures what the registry costs', async () => {

@@ -32,7 +32,7 @@ export const commands = [
   docCommand({
     id: 'designer.fx.add',
     title: 'Add FX layer',
-    description: 'Add a filter or effect layer and return its id.',
+    description: 'Add a filter (brightness, contrast, saturation, hue, grayscale, sepia, invert, levels, curves, blur) or effect (glow, shadow, flare) layer and return its id.',
     args: z.object({
       group: z.enum(['filter', 'effect']),
       scope: scope.optional(),
