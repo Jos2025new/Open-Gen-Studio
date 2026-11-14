@@ -125,4 +125,14 @@ export default [
     ],
     tests: ['tests/designer-fx-commands.test.ts'],
   },
+  {
+    id: 'skills-commands',
+    what: 'Skills, workflows y guías son comandos `skills.*` (SKILLS_ACTIONS); elegir uno hace lo mismo que el selector del compositor.',
+    sides: [
+      ['src/engine/skills/commands.ts', 'export const SKILLS_ACTIONS'],
+      ['src/engine/skills/commands.ts', "id: 'skills.workflow.select'"],
+      ['src/components/composer/AgentControls.tsx', 'setComposer({ workflowId'],
+    ],
+    tests: ['tests/skills-commands.test.ts'],
+  },
 ];

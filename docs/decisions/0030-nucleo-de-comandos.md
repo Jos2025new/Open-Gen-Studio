@@ -119,7 +119,7 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 - El agente encadena tres comandos del Designer en una llamada, con un solo paso de deshacer (`tests/designer-commands.test.ts`, con el modelo simulado).
 - `invoke` añade unos 2 µs con el adaptador real: por debajo de los 5 µs fijados.
 
-## Nodes, sesiones, biblioteca, catálogo, Studio y FX (paso 5, 2026-11-14)
+## El resto de apartados (paso 5, 2026-11-14)
 
 Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_commands` y `run_commands` siguen limitados a `designer.*`.
 
@@ -171,6 +171,12 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_
 - `FX_DO` (`src/engine/design/fx.commands.ts`): cada forma `do` de `FxCommand` → un comando `designer.fx.*` (`add`, `set`, `add_op`, `set_op`, `move_op`, `remove_op`, `delete`). Son 7, hechos con `docCommand` sobre `runFx`: mismo destino y mismo paso de deshacer que el resto del Designer. Como son `designer.*`, el agente ya llega a ellos por `run_commands`.
 - `src/engine/fx/commands.ts` pasó a llamarse `fxCommands.ts`: tenía el nombre de la convención sin exportar `commands` y el índice lo saltaba. Ya no hay archivos saltados.
 - **Deuda (1 comando):** `designer.fx.add` sin `above` va encima de la capa activa del doc.
+
+### Skills, workflows y guías
+
+- `SKILLS_ACTIONS` (`src/engine/skills/commands.ts`): 8 comandos `skills.*`: listar, leer y elegir skill; listar, leer y elegir workflow; listar y leer guías. Las otras 8 funciones exportadas de `src/engine/skills/` son ayudas internas o devuelven una tarjeta.
+- Elegir recibe el estado deseado (`null` para quitar) y hace lo mismo que `AgentControls.tsx`: `setComposer`. Sin historial.
+- **Deuda (2 comandos):** `skills.skill.select` y `skills.workflow.select` cambian la selección del compositor en pantalla.
 
 ### Sin comprobar
 

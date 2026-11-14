@@ -7,7 +7,7 @@ primera pasada no obliga a reescribir acciones.
 
 ## Pasos
 
-**Estado (2026-11-14):** pasos 1, 2 y 4 hechos en `task/commands`; del paso 5, Nodes, sesiones, biblioteca, catálogo, Studio y chat y FX (faltan skills y workflows); el paso 3 es una [propuesta](propuesta-puerta-externa.md) sin revisar; falta la suite completa; contrato y medidas en el [ADR 0030](decisions/0030-nucleo-de-comandos.md).
+**Estado (2026-11-14):** pasos 1, 2, 4 y 5 hechos en `task/commands`: 111 comandos en 7 apartados, con 38 de deuda anotada en `scripts/commands-debt/`; el paso 3 es una [propuesta](propuesta-puerta-externa.md) sin revisar; contrato y medidas en el [ADR 0030](decisions/0030-nucleo-de-comandos.md).
 
 Raíz del frente: una rama `task/commands` salida de `task/export`. Cada sesión, su worktree. Como mucho tres sesiones a
 la vez; el sandbox es uno, se usa por turno.
