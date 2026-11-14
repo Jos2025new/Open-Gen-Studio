@@ -54,6 +54,7 @@
 - Toolbox del Designer (un solo dock: familias → variantes → tarjeta de ajustes; Edit sigue la selección): código `src/components/designer/ToolDock.tsx`, `toolboxModel.ts`, `EditCard.tsx`; test `tests/toolbox-dock.test.ts`, `tests/toolbox-model.test.ts`; contrato `designer-toolbox-dock`; ver [propuesta](propuesta-toolbox-dock.md) y [plan](plan-toolbox-dock.md).
 - Toolbox y pestañas (2026-11-01): tecla en tooltip, franja con selección, Properties al elegir: código `ToolDock.tsx`, `usePropsOnPick.ts`; test `tests/tool-dock-strip-and-keys.test.ts`, `tests/designer-props-on-pick.test.ts`; ver [toolbox-dock](designer-controles/toolbox-dock.md).
 - Edición de nodos y selección Node·Segment·Face (2026-11-01): código `selectMode.ts`; test `tests/select-mode.test.ts`; sin prueba visual; ver [nodos-modos](designer-controles/nodos-modos.md).
+- Comandos del Designer y del agente (2026-11-13): 30 comandos, `find_commands` y `run_commands`: código `src/engine/commands/`, `src/engine/design/commands.ts`, `layer.commands.ts`, `src/engine/agent/commandCalls.ts`; tests `tests/commands-core.test.ts`, `tests/designer-commands.test.ts`; sin prueba visual; ver [ADR 0030](decisions/0030-nucleo-de-comandos.md).
 - [Booleanas, Shape Builder y Fix overlaps](designer-controles/booleanas.md) (2026-11-01): test `tests/fix-overlaps.test.ts`; sin prueba visual.
 - [Pincel: lápiz, Tooth, Edge y dabs](designer-controles/pincel.md) (2026-11-01): código `brushDabs.ts`, `brushEngine.ts`, `brushPresets.ts`; test `tests/brush-dabs.test.ts`, `tests/brush-living-edge.test.ts`, `tests/brush-presets.test.ts`; falta calibrar.
 - [cuota provisional de trazos raster](raster-limit.md).
@@ -96,7 +97,7 @@
 - [0027 — Pincel: cápsula, dabs (aceptado 2026-11-01)](decisions/0027-motor-pincel-dabs.md).
 - [0028 — Grafito (propuesto)](decisions/0028-lapiz-grafito.md).
 - [0029 — Recorredor de interfaz: la máquina busca a lo ancho, solo lo confirmado se fija (enfoque aceptado 2026-11-07; sin implementar)](decisions/0029-recorredor-de-interfaz.md).
-- [0030 — Núcleo de comandos: un registro, dos entradas, un paso de deshacer por historial (aceptado 2026-11-13; solo el núcleo, en `task/commands`)](decisions/0030-nucleo-de-comandos.md).
+- [0030 — Núcleo de comandos: un registro, dos entradas, un paso de deshacer por historial (aceptado 2026-11-13; núcleo, Designer y agente en `task/commands`)](decisions/0030-nucleo-de-comandos.md).
 
 ## Propuestas de interfaz
 

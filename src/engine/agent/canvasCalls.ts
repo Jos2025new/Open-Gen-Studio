@@ -7,6 +7,7 @@ import { exportDownloadFile } from '../design/exportJob';
 import { BUILTIN_EXPORTS, DEFAULT_EXPORT } from '../design/exportSettings';
 import { exportDesignSchema } from './designerTools';
 import { designerFxTool } from './designerFx';
+import { findCommandsTool, runCommandsTool } from './commandCalls';
 import { nodeIdsSchema } from './tools';
 import { isAbort } from '../../lib/http';
 import { chatToNodes } from '../flow/fromChat';
@@ -118,6 +119,15 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   const r = c.workspace === 'designer' ? designerFxTool(sessionId, parsed.value) : { text: 'designer_fx works only in the Designer.', done: false };
   if (r.done) log.action({ icon: 'fix', label: 'Changed filters and effects', detail: r.text });
   respond(r.text);
+  return { handled: true, workspace: c.workspace };
+          }
+          if (call.name === 'find_commands' || call.name === 'run_commands') {
+  if (c.workspace !== 'designer') respond(`${call.name} works only in the Designer.`);
+  else {
+    const r = call.name === 'find_commands' ? findCommandsTool(sessionId, parsed.value) : await until(runCommandsTool(sessionId, parsed.value));
+    if (r.done && call.name === 'run_commands') log.action({ icon: 'fix', label: 'Ran commands', detail: r.text });
+    respond(r.text);
+  }
   return { handled: true, workspace: c.workspace };
           }
           if (call.name === 'view_canvas') {

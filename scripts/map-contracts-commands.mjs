@@ -31,4 +31,28 @@ export default [
     ],
     tests: ['tests/commands-core.test.ts'],
   },
+  {
+    id: 'designer-commands',
+    what: 'Cada acción exportada de design/actions.ts es un comando o dice por qué no (DESIGNER_ACTIONS); el destino va en `on` y una secuencia es un paso de deshacer del doc.',
+    sides: [
+      ['src/engine/design/commands.ts', 'export const DESIGNER_ACTIONS'],
+      ['src/engine/design/layer.commands.ts', "id: 'designer.layer.set'"],
+      ['src/engine/design/commandKit.ts', "registerHistory('designer'"],
+      ['src/engine/design/history.ts', 'export function openHistoryGroup'],
+    ],
+    tests: ['tests/designer-commands.test.ts'],
+  },
+  {
+    id: 'agent-command-tools',
+    what: 'El agente llega al registro por dos herramientas, no una por comando; solo puede nombrar un doc de su sesión.',
+    sides: [
+      ['src/engine/agent/commandTools.ts', "name: 'run_commands'"],
+      ['src/engine/agent/commandTools.ts', "name: 'find_commands'"],
+      ['src/engine/agent/commandCalls.ts', 'export async function runCommandsTool'],
+      ['src/engine/agent/canvasCalls.ts', "call.name === 'find_commands' || call.name === 'run_commands'"],
+      ['src/engine/agent/designerTools.ts', '...COMMAND_TOOLS,'],
+      ['src/engine/skills/app/designer.md', 'run_commands lo hace al momento'],
+    ],
+    tests: ['tests/designer-commands.test.ts'],
+  },
 ];

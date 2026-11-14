@@ -4,7 +4,7 @@
 
 Aceptado
 
-El usuario aprobó el [plan revisado](../propuesta-todo-es-un-nodo-plan.md) y dio la orden de empezar el paso 1 el 2026-11-13. Implementado solo el núcleo, en `task/commands`: ningún apartado tiene comandos todavía y la app no lo usa.
+El usuario aprobó el [plan revisado](../propuesta-todo-es-un-nodo-plan.md) y dio la orden de empezar el paso 1 el 2026-11-13. En `task/commands` están el núcleo (paso 1) y el Designer con las dos herramientas del agente (paso 2). La interfaz todavía no llama a los comandos: sigue llamando a las acciones.
 
 ## Fecha
 
@@ -31,7 +31,11 @@ El núcleo vive en `src/engine/commands/` y no importa nada de la app.
 
 ### Un comando
 
-`id` (`designer.layer.add`), `title`, `description`, `aliases`, `args` (zod), `effect`, `needs`, `history`, `available`, `run`. El resultado debe ser un dato que sobreviva a JSON.
+`id` (`designer.layer.add`), `title`, `description`, `aliases`, `args` (zod), `effect`, `needs`, `history`, `available`, `debt`, `run`. El resultado debe ser un dato que sobreviva a JSON.
+
+- `available(ctx, args?)` devuelve `true` o el motivo. Sin argumentos responde por el destino en general (una lista, la paleta); con ellos, por esa llamada concreta («No layer "x" in this document»).
+- `debt` dice qué le falta al comando para cumplir el contrato (lee algo «activo» por dentro). El check del paso 4 lo lista.
+- `effect: 'delete'` es solo para lo que no se puede deshacer. Borrar capas es `write`: vuelve con deshacer.
 
 ### Dos entradas al mismo registro
 
@@ -58,11 +62,59 @@ Medido: `invoke` añade 0,82 µs por llamada sobre un comando vacío (20 000 lla
 - `src/engine/fx/commands.ts` ya existe y no es un archivo de comandos. El índice lo salta porque no exporta `commands` y lo deja en `collected.skipped`, que el check del paso 4 listará como deuda.
 - Los comandos de `src/engine/actions.ts` no pueden ir en `src/engine/commands.ts`: `import '../commands'` dejaría de llegar a la carpeta del núcleo. Van en `src/engine/actions.commands.ts`.
 
-## Cómo sabremos si funcionó
+## Designer y agente (paso 2, 2026-11-13)
 
-- Paso 2: las 39 acciones del Designer como comandos, y el agente encadena tres en una llamada.
-- El coste por llamada sigue por debajo de 5 µs con el adaptador real del Designer.
-- Ningún comando del Designer necesita leer el doc activo; el que lo necesite lo dice en `available()` y cuenta como deuda.
+### Las 39 acciones
+
+`DESIGNER_ACTIONS` (`src/engine/design/commands.ts`) dice, para cada función exportada de `actions.ts`, qué comando la ejecuta o por qué no es uno. Un test la mantiene completa: no se puede añadir una acción sin decidir.
+
+- **32 acciones → 30 comandos**: 12 de documento (`designer.doc.*`, en `commands.ts`) y 18 de capa (`designer.layer.*`, en `layer.commands.ts`). Ninguna acción se reescribió.
+- **7 no son comandos**: `mutateDoc`, `addDoc`, `assetCanvas`, `canvasToAsset`, `noticeSkippedLayer`, `prunePicks` y `applyLayerStep`. Reciben o devuelven una función, un documento entero o un canvas, o son fontanería de otra acción.
+- Todos reciben el destino en `on` (`session`, `doc`). Una acción devolvía `null` y avisaba con un toast cuando no hacía nada; su comando lanza el motivo, para que quien llama lo lea.
+
+### Deuda (5 comandos)
+
+| Comando | Qué lee por dentro |
+|---|---|
+| `designer.doc.ensure` | El doc activo de la sesión |
+| `designer.doc.from_asset` | Cambia el apartado en pantalla |
+| `designer.layer.add` | Va encima de la capa activa del doc; el texto toma el estilo de la herramienta |
+| `designer.layer.place_asset` | `new` y `replace` dependen de la capa activa del doc |
+| `designer.layer.ensure_paint` | Depende de la capa activa del doc y no registra deshacer |
+
+Solo el primero lee el doc activo. Los demás dependen de la capa activa del doc, que es estado de ese doc y no de la pantalla.
+
+### Deshacer
+
+`openHistoryGroup(docId)` en `src/engine/design/history.ts`: mientras el grupo está abierto, el primer `record()` es el paso de deshacer y los siguientes no añaden nada. Al fallar, `revert()` devuelve píxeles, selección y documento al estado inicial y quita ese paso. El adaptador `designer` está en `commandKit.ts`.
+
+### Agente
+
+Dos herramientas, en `src/engine/agent/commandTools.ts` y `commandCalls.ts`:
+
+- `find_commands { area?, text? }`: una línea por comando, `id {argumentos} — qué hace [not now: motivo]`.
+- `run_commands { seq }`: la secuencia sobre el doc en pantalla, salvo que un paso nombre otro en `on.doc`. El agente no puede nombrar otra sesión.
+
+Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una línea.
+
+### Medido (`COMMANDS_BENCH=1`, mejor de cinco rondas)
+
+| Qué | Acción directa | Por el registro |
+|---|---|---|
+| `designer.layer.select` (sin deshacer) | 1,4–2,6 µs | `invoke` 1,9 µs |
+| `designer.layer.set` (con deshacer) | 3,7 µs | `invoke` 5,4–5,9 µs |
+| Una llamada por la frontera (`run`) | — | 15 µs |
+
+| Lo que lee el modelo | Caracteres |
+|---|---|
+| Las dos herramientas, en cada turno | 1 319 |
+| Una herramienta por comando (30), en cada turno | 12 376 |
+| Lista de `find_commands`, solo cuando la pide | 4 463 |
+
+### Cumplido
+
+- El agente encadena tres comandos del Designer en una llamada, con un solo paso de deshacer (`tests/designer-commands.test.ts`, con el modelo simulado).
+- `invoke` añade unos 2 µs con el adaptador real: por debajo de los 5 µs fijados.
 
 ## Alternativas
 
@@ -80,4 +132,11 @@ Medido: `invoke` añade 0,82 µs por llamada sobre un comando vacío (20 000 lla
 - La aprobación todavía no lleva coste. Llega con el nodo de comando (paso 7 del plan).
 - El adaptador del Designer (paso 2) tiene que agrupar las llamadas a `record()` de sus acciones en una sola. `history.ts` del Designer no está en [persistencia protegida](../persistencia-protegida.md); si el adaptador necesitara tocar una zona protegida, se para y se pide autorización.
 - La puerta externa no existe. `caller: 'external'` solo fija la regla de aprobación; [seguridad](../seguridad.md) sigue rechazando peticiones de fuera.
-- Sin comprobar: el índice dentro de la app compilada (solo en vitest), porque nada lo importa todavía.
+- **Crear y borrar documentos queda fuera de deshacer**, como en la app: una secuencia que falla no quita el doc que creó.
+- `designer.doc.delete` es `delete`: desde el agente se rechaza siempre hasta que exista la tarjeta de aprobación (paso 7).
+- En una secuencia, un paso con gasto cuyos argumentos llevan `$n` llega al aprobador sin resolver: la tarjeta no puede mostrar el coste real. Lo resuelve el paso 7.
+- Si el usuario edita el doc mientras una secuencia del agente espera, su cambio cae en el mismo paso de deshacer.
+- **Sin comprobar:**
+  - Los comandos que tocan píxeles (`place_asset`, `flatten`, `merge_down`, `rasterize`, `to_asset`, `replace_pixels`, `place_above`, `ensure_paint`, y `add` o `duplicate` de una capa raster): node no tiene canvas. Los tests cubren capas vectoriales y de texto.
+  - El agente con un modelo real, y todo ello en el sandbox.
+  - El índice dentro de la app compilada: `canvasCalls.ts` ya lo importa, pero solo se ha ejecutado en vitest.

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BUILTIN_EXPORTS, EXPORT_FORMATS } from '../design/exportSettings';
 import type { ToolSpec } from '../providers/llm';
 import { FX_DEFS, FX_KINDS } from '../fx/defs';
+import { COMMAND_TOOLS } from './commandTools';
 
 /* Designer tools: look at the page, and FX layers through the same commands as the layers panel (ADR 0011). */
 
@@ -78,6 +79,7 @@ export const DESIGNER_TOOLS: ToolSpec[] = [
       },
     },
   },
+  ...COMMAND_TOOLS,
 ];
 
 const params = z.record(z.string(), z.union([z.number(), z.string()])).optional();

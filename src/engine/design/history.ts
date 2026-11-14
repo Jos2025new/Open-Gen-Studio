@@ -105,10 +105,44 @@ function trimStack(docId: string, s: Stack): void {
   if (n > 0) dropped.set(docId, (dropped.get(docId) ?? 0) + n);
 }
 
+/** Open groups by document: the first `record` inside one is its undo step, the later ones add nothing (ADR 0030). */
+const groups = new Map<string, { first: Snapshot | null; extra: number }>();
+
+/**
+ * Makes every change to this document until `close` one undo step: a command, or a sequence of them. `revert` puts
+ * pixels and picks back as they were at the first change, takes that step out and returns the document of then (or
+ * null when nothing was recorded); the caller stores it.
+ */
+export function openHistoryGroup(docId: string): { close(): void; revert(): DesignDoc | null } {
+  const group = { first: null as Snapshot | null, extra: 0 };
+  groups.set(docId, group);
+  const end = () => { if (groups.get(docId) === group) groups.delete(docId); };
+  return {
+    close: end,
+    revert() {
+      end();
+      const first = group.first;
+      if (!first) return null;
+      const s = stack(docId), at = s.past.lastIndexOf(first);
+      if (at >= 0) s.past.splice(at);
+      restoreHistoryBuffers(first.buffers);
+      restorePicks(docId, first);
+      listeners.forEach((l) => l());
+      return first.doc;
+    },
+  };
+}
+
 /** Record the state *before* a change. */
 export function record(doc: DesignDoc): void {
   const s = stack(doc.id);
+  const group = groups.get(doc.id);
+  if (group?.first) {
+    group.extra++;
+    return;
+  }
   s.past.push(capture(doc));
+  if (group) group.first = s.past[s.past.length - 1];
   if (s.past.length > LIMIT) s.past.shift();
   s.future = [];
   trimStack(doc.id, s);
@@ -117,6 +151,12 @@ export function record(doc: DesignDoc): void {
 
 /** Takes back the step `record` just made, when the gesture ended up changing nothing. */
 export function unrecord(doc: DesignDoc): void {
+  const group = groups.get(doc.id);
+  if (group && group.extra > 0) {
+    group.extra--;
+    return;
+  }
+  if (group) group.first = null;
   stack(doc.id).past.pop();
   listeners.forEach((l) => l());
 }
