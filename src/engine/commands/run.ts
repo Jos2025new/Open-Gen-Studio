@@ -124,6 +124,10 @@ export function setApprover(fn: Approver | null): void {
   approver = fn;
 }
 
+export function getApprover(): Approver | null {
+  return approver;
+}
+
 /** Spending and deleting always ask when the caller is not the user's own click; from outside, writing asks too. */
 export function needsApproval(effect: Effect, caller: Caller): boolean {
   if (caller === 'ui') return false;
@@ -283,7 +287,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   }
 
   const seq = steps.length > 1 ? ++sequences : undefined;
-  const runStep = async (i: number, bufferedEchoes?: (() => void)[]): Promise<void> => {
+  const runStep = (i: number, bufferedEchoes?: (() => void)[]): Promise<void> | void => {
     const step = steps[i];
     const { spec } = step;
     const at = Date.now();
@@ -314,7 +318,20 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       openHistories(spec, on, args, txs);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
       const out: unknown = spec.run({ on, caller: options.caller, signal: options.signal }, args);
-      results[i] = (thenable(out) ? await settle(out, txs) : out) ?? null;
+      if (thenable(out)) {
+        return settle(out, txs).then(
+          (val) => {
+            results[i] = val ?? null;
+            step.ran = true;
+            said();
+          },
+          (error: unknown) => {
+            said(error ?? new Error('failed'));
+            throw { error, step: i + 1 };
+          },
+        );
+      }
+      results[i] = out ?? null;
       step.ran = true;
       said();
     } catch (error) {
@@ -331,7 +348,8 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         const step = steps[i];
         const ran = steps.map((s) => s.ran);
         if (!needsApproval(step.spec.effect, options.caller) && canResolveRefs(step.rawOn, ran) && canResolveRefs(step.rawArgs, ran)) {
-          await runStep(i, bufferedEchoes);
+          const pending = runStep(i, bufferedEchoes);
+          if (pending) await pending;
         }
       }
     } catch (failure) {
@@ -401,7 +419,8 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   for (let i = 0; i < steps.length; i++) {
     if (steps[i].ran) continue;
     try {
-      await runStep(i);
+      const pending = runStep(i);
+      if (pending) await pending;
     } catch (failure) {
       const { error, step } = failure as { error: unknown; step: number };
       return fail(error, step);

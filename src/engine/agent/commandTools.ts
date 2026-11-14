@@ -27,7 +27,7 @@ export const COMMAND_TOOLS: ToolSpec[] = [
     function: {
       name: 'run_commands',
       description:
-        'Runs commands of any area in order, as the user\'s own actions. All or nothing, one undo step per document. Commands that spend or delete need the user\'s approval and are refused from here. A step can use an earlier result: "$1" is the result of step 1 and "$1.layer" a field of it. Designer steps act on the document on screen unless "on" names another one (ids from designer.doc.list). Take ids and arguments from find_commands; never guess them.',
+        'Runs commands of any area in order, as the user\'s own actions. All or nothing, one undo step per document. Commands that spend or delete ask for the user\'s approval once for the whole sequence with its total cost. A step can use an earlier result: "$1" is the result of step 1 and "$1.layer" a field of it. Designer steps act on the document on screen unless "on" names another one (ids from designer.doc.list). Take ids and arguments from find_commands; never guess them.',
       parameters: {
         type: 'object',
         properties: {

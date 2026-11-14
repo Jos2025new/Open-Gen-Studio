@@ -4,4 +4,4 @@
 - Cada nodo conserva sus ajustes: confirm_settings no se usa aquí. El ejecutor respeta el candidato elegido; si falta, rechaza el dependiente.
 - En Studio, antes de tocar nodos llama a open_board con view nodes en ese turno, aunque el tablero ya muestre Nodes; fuera de Studio, si el usuario ya está en Nodes no hace falta.
 - Límites: no admite pasos layer ni join_clips. read_graph no edita ni ejecuta; conectar respeta puertos y ciclos. No hay herramientas de archivos, internet ni shell.
-- Otras acciones de la app (nodos, tablero, biblioteca, modelos y sesiones): run_commands las ejecuta al momento; find_commands sin argumentos da las áreas. Lo que gasta o borra lo rechaza por ahora: para eso sigue con las herramientas de siempre.
+- Otras acciones de la app (nodos, tablero, biblioteca, modelos y sesiones): run_commands las ejecuta al momento; find_commands sin argumentos da las áreas. Lo que gasta o borra pide una sola aprobación al usuario con el coste total de la secuencia.

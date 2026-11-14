@@ -689,6 +689,24 @@ export interface ActivityFeedItem extends FeedBase {
   entries: ActivityEntry[];
 }
 
+export interface CommandApprovalStep {
+  step: number;
+  cmd: string;
+  title: string;
+  effect: 'read' | 'write' | 'spend' | 'delete';
+  args: unknown;
+  estimate: Estimate;
+}
+
+export interface CommandApprovalFeedItem extends FeedBase {
+  type: 'commands';
+  status: 'awaiting' | 'running' | 'done' | 'error' | 'canceled';
+  steps: CommandApprovalStep[];
+  totalSteps: number;
+  estimate: Estimate;
+  error?: string;
+}
+
 export type FeedItem =
   | UserFeedItem
   | AssistantFeedItem
@@ -696,6 +714,7 @@ export type FeedItem =
   | QuestionsFeedItem
   | SettingsFeedItem
   | PlanFeedItem
+  | CommandApprovalFeedItem
   | GenerationFeedItem
   | NoticeFeedItem;
 

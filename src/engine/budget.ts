@@ -22,6 +22,20 @@ export function remainingBudget(): number | null {
  * spends it. If the action ends without creating one (the graph changed, a recovery was refused, an error), it dies with it.
  */
 let pass: { sessionId: string } | null = null;
+/** Sequence-level pass for "Allow this time": stays alive across all spend steps of one approved sequence until it ends. */
+let sequencePass: { sessionId: string } | null = null;
+/** "Don't ask again until next session": active for the sessions open when chosen until a new session is created. */
+let untilNextSession: { knownSessions: Set<string> } | null = null;
+
+function untilNextSessionActive(): boolean {
+  if (!untilNextSession) return false;
+  const ids = Object.keys(get().sessions);
+  if (ids.some((id) => !untilNextSession!.knownSessions.has(id))) {
+    untilNextSession = null;
+    return false;
+  }
+  return true;
+}
 
 /** The session whose runs no longer ask (the active one by default). */
 function sessionNoAsk(sessionId?: string): boolean {
@@ -29,14 +43,14 @@ function sessionNoAsk(sessionId?: string): boolean {
   return Boolean(s.sessions[sessionId ?? s.activeSessionId]?.noAskOverLimit);
 }
 
-/** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", or a "Continue once" just given. */
+/** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", "Don't ask again until next session", or a pass just given. */
 export function overLimitAccepted(sessionId?: string): boolean {
   const { budgetOn, budgetUsd, budgetAccepted, budgetNoAsk } = get().settings;
-  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
+  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || untilNextSessionActive() || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
 }
 
 function passFor(sessionId: string): boolean {
-  return pass?.sessionId === sessionId;
+  return pass?.sessionId === sessionId || sequencePass?.sessionId === sessionId;
 }
 
 /** The approved action started spending: the pass is used up. */
@@ -74,14 +88,47 @@ export function withOncePass<T>(sessionId: string, action: () => T): T {
   return result;
 }
 
-/** "Don't ask again": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
+/**
+ * "Allow this time": grants a sequence-level pass for `sessionId` until the returned cleanup function is called.
+ */
+export function beginOncePass(sessionId: string): () => void {
+  const mine = { sessionId };
+  pass = mine;
+  sequencePass = mine;
+  return () => {
+    if (pass === mine) pass = null;
+    if (sequencePass === mine) sequencePass = null;
+  };
+}
+
+export function allowThisTime<T>(sessionId: string, action: () => T): T {
+  const end = beginOncePass(sessionId);
+  let result: T;
+  try { result = action(); } catch (e) { end(); throw e; }
+  if (result instanceof Promise) return result.finally(end) as T;
+  end();
+  return result;
+}
+
+/** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
 export function dontAskAgain(sessionId: string = get().activeSessionId): void {
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: true }));
+}
+
+export const allowForSession = dontAskAgain;
+
+/** "Don't ask again until next session": stops asking until a new session is created (or the app reloads). */
+export function dontAskUntilNextSession(sessionId: string = get().activeSessionId): void {
+  const ids = new Set(Object.keys(get().sessions));
+  if (sessionId) ids.add(sessionId);
+  untilNextSession = { knownSessions: ids };
 }
 
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
   pass = null;
+  sequencePass = null;
+  untilNextSession = null;
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }
 

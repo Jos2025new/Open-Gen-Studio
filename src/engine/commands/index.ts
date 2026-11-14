@@ -12,7 +12,7 @@ export { defineCommand, CommandError } from './types';
 export type { Availability, Call, Caller, CommandContext, CommandSpec, Effect, ErrorCode, RunResult, Sequence, Target } from './types';
 export { allCommands, argsSchema, availability, command, findCommands, signature } from './registry';
 export type { FindQuery, FoundCommand } from './registry';
-export { invoke, run, setApprover, needsApproval, MAX_STEPS } from './run';
+export { invoke, run, setApprover, getApprover, needsApproval, MAX_STEPS } from './run';
 export type { ApprovalRequest, ApprovalStep, Approver, RunOptions } from './run';
 export { lastCommands, subscribeEcho } from './echo';
 export type { EchoEntry } from './echo';

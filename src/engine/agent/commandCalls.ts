@@ -1,6 +1,10 @@
-import { allCommands, command, findCommands, run } from '../commands';
+import { uid } from '../../lib/id';
+import { appendFeed, updateFeedItem, useStore } from '../../store/store';
+import { allowForSession, beginOncePass, dontAskUntilNextSession, overLimit } from '../budget';
+import { allCommands, command, findCommands, getApprover, run, type ApprovalRequest, type Approver } from '../commands';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
+import type { CommandApprovalFeedItem } from '../types';
 import { findCommandsSchema, runCommandsSchema } from './commandTools';
 
 /* Runs find_commands and run_commands. The text is the tool result the agent reads. */
@@ -31,9 +35,53 @@ const AREAS: Record<string, string> = {
   models: 'the model catalog (read only)',
   sessions: 'list, rename, pin and title sessions',
 };
-const NEEDS_APPROVAL = 'needs the user\'s approval: not available from here yet';
+const NEEDS_APPROVAL = 'needs the user\'s approval';
 const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
 const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
+
+export type CommandApprovalDecision = 'approve' | 'once' | 'session' | 'until-next-session' | 'cancel';
+
+interface PendingCommandApproval {
+  sessionId: string;
+  itemId: string;
+  request: ApprovalRequest;
+  resolve: (approved: boolean) => void;
+  setReleasePass: (fn: () => void) => void;
+}
+
+const pending = new Map<string, PendingCommandApproval>();
+
+/**
+ * Resolves an awaiting command sequence approval card.
+ * Under the spending limit, `'approve'` runs the sequence.
+ * At/over the spending limit, requests are held unless the user picks `'once'` ("Allow this time"),
+ * `'session'` ("Allow for the whole session"), `'until-next-session'` ("Don't ask again until next session"), or `'cancel'`.
+ */
+export function decideCommandApproval(sessionId: string, itemId: string, decision: CommandApprovalDecision): boolean {
+  const entry = pending.get(itemId);
+  if (!entry || entry.sessionId !== sessionId) {
+    if (decision === 'cancel') {
+      updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => (it.status === 'awaiting' ? { ...it, status: 'canceled' } : it));
+    }
+    return false;
+  }
+  if (decision === 'cancel') {
+    pending.delete(itemId);
+    updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'canceled' }));
+    entry.resolve(false);
+    return true;
+  }
+  const hasSpend = entry.request.steps.some((s) => s.effect === 'spend');
+  const heldAtLimit = hasSpend && overLimit(entry.request.estimate, sessionId);
+  if (heldAtLimit && decision === 'approve') return false;
+  if (decision === 'session') allowForSession(sessionId);
+  else if (decision === 'until-next-session') dontAskUntilNextSession(sessionId);
+  else if (decision === 'once') entry.setReleasePass(beginOncePass(sessionId));
+  pending.delete(itemId);
+  updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));
+  entry.resolve(true);
+  return true;
+}
 
 /** The commands of an area, one line each, with whether each can run now; with neither area nor text, an index of the areas. */
 export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer {
@@ -65,7 +113,61 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
     if (reason) return { text: `Step ${i + 1}: "${step.cmd}" is not available to the agent: ${reason}. Nothing ran.`, done: false };
   }
   const doc = activeDoc(sessionId);
-  const result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal });
+  let approvalItemId: string | null = null;
+  let releasePass: (() => void) | null = null;
+  const sessionApprover: Approver | undefined =
+    !getApprover() && useStore.getState().sessions[sessionId]
+      ? (request) =>
+          new Promise<boolean>((resolve) => {
+            if (signal?.aborted) {
+              resolve(false);
+              return;
+            }
+            const itemId = uid('fd');
+            approvalItemId = itemId;
+            const item: CommandApprovalFeedItem = {
+              id: itemId,
+              createdAt: Date.now(),
+              workspace: useStore.getState().ui.workspace,
+              type: 'commands',
+              status: 'awaiting',
+              steps: request.steps.map((s) => ({ step: s.step, cmd: s.cmd, title: s.title, effect: s.effect, args: s.args, estimate: s.estimate })),
+              totalSteps: v.data.seq.length,
+              estimate: request.estimate,
+            };
+            appendFeed(sessionId, item);
+            const onAbort = () => decideCommandApproval(sessionId, itemId, 'cancel');
+            signal?.addEventListener('abort', onAbort, { once: true });
+            pending.set(itemId, {
+              sessionId,
+              itemId,
+              request,
+              resolve: (ok) => {
+                signal?.removeEventListener('abort', onAbort);
+                resolve(ok);
+              },
+              setReleasePass: (fn) => {
+                releasePass = fn;
+              },
+            });
+          })
+      : undefined;
+
+  let result;
+  try {
+    result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal, approver: sessionApprover });
+  } finally {
+    releasePass?.();
+  }
+  if (approvalItemId) {
+    updateFeedItem<CommandApprovalFeedItem>(sessionId, approvalItemId, (it) =>
+      result.ok
+        ? { ...it, status: 'done' }
+        : result.error.code === 'denied'
+          ? { ...it, status: 'canceled' }
+          : { ...it, status: 'error', error: result.error.message },
+    );
+  }
   const ran = result.results.length;
   if (!result.ok) {
     const kept = ran === 0 ? 'Nothing ran.'
