@@ -18,7 +18,7 @@ export const AGENT_HIDDEN: Record<string, string> = {
   'skills.workflow.select': 'the workflow is the user\'s choice',
   'sessions.select': 'it would move the user to another session in the middle of the agent\'s turn',
   'sessions.new': 'it would move the user to another session in the middle of the agent\'s turn',
-  'sessions.archive': 'it would move the user to another session in the middle of the agent\'s turn',
+  'sessions.archive': 'it hides sessions from the user\'s list',
 };
 
 /** What each area is for: the index `find_commands` answers when it gets neither `area` nor `text`. */
