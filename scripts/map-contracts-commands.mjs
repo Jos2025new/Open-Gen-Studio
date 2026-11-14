@@ -138,4 +138,16 @@ export default [
     ],
     tests: ['tests/skills-commands.test.ts'],
   },
+  {
+    id: 'command-palette',
+    what: 'La paleta de Ctrl+K lista los comandos del registro, pide un segundo paso a los de gasto o borrado y a los que llevan argumentos, y se monta una sola vez en la app.',
+    sides: [
+      ['src/components/shell/commandPaletteModel.ts', 'export function fieldsOf('],
+      ['src/components/shell/CommandPalette.tsx', 'invoke(spec, parsed.data, on)'],
+      ['src/App.tsx', '<CommandPalette />'],
+      ['src/components/shell/homeGuard.ts', 'isPaletteKey(e)'],
+      ['src/engine/shortcuts.ts', 'Open the command palette'],
+    ],
+    tests: ['tests/command-palette.test.ts'],
+  },
 ];

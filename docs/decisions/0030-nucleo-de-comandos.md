@@ -215,3 +215,7 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente llega a todo esto
   - Los comandos que tocan píxeles (`place_asset`, `flatten`, `merge_down`, `rasterize`, `to_asset`, `replace_pixels`, `place_above`, `ensure_paint`, y `add` o `duplicate` de una capa raster): node no tiene canvas. Los tests cubren capas vectoriales y de texto.
   - El agente con un modelo real, y todo ello en el sandbox.
   - El índice dentro de la app compilada: `canvasCalls.ts` ya lo importa, pero solo se ha ejecutado en vitest.
+
+## Paleta de comandos
+
+La paleta (Ctrl+K o Cmd+K, `src/components/shell/CommandPalette.tsx`) es la primera llamada del registro desde la interfaz. Busca en todos los apartados por título, id y alias. Sin texto muestra `Here` (lo que puede correr ahora en el espacio en pantalla) y `Recent` (en memoria, sin escribir en el navegador). Un comando con argumentos pasa a un segundo paso con un campo por argumento, sacado de `argsSchema`. Un comando `spend` o `delete` nunca corre con el primer Enter: siempre pasa al segundo paso, aunque no tenga argumentos. La paleta llama a `invoke`, no a `run`: `run` solo acepta los llamadores de la frontera, y la interfaz no pide aprobación porque el segundo paso ya es la confirmación. Valida los argumentos con el esquema antes de llamar. Deja fuera los comandos cuyos argumentos no son valores simples (listas, objetos, registros): hoy son 32 de 111, y la prueba los cuenta.

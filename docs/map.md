@@ -20,11 +20,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 355 | 271 |
-| [store.ts](../src/store/store.ts) | 241 | 246 |
-| [icons.tsx](../src/components/ui/icons.tsx) | 140 | 1 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 98 | 0 |
-| [actions.ts](../src/engine/design/actions.ts) | 73 | 44 |
+| [types.ts](../src/engine/types.ts) | 356 | 271 |
+| [store.ts](../src/store/store.ts) | 242 | 247 |
+| [icons.tsx](../src/components/ui/icons.tsx) | 141 | 1 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 99 | 0 |
+| [actions.ts](../src/engine/design/actions.ts) | 74 | 44 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 4 |
 | [media.ts](../src/lib/media.ts) | 58 | 50 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
@@ -52,13 +52,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 101 | 56 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 11 |
-| `src/components/shell` | 35 | 24 |
+| `src/components/shell` | 37 | 25 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 16 |
 | `src/engine` | 66 | 333 |
 | `src/engine/agent` | 56 | 113 |
-| `src/engine/commands` | 7 | 11 |
+| `src/engine/commands` | 7 | 12 |
 | `src/engine/design` | 163 | 201 |
 | `src/engine/flow` | 14 | 27 |
 | `src/engine/fx` | 8 | 10 |
@@ -66,10 +66,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 34 | 342 |
-| `src/store` | 17 | 248 |
+| `src/lib` | 34 | 343 |
+| `src/store` | 17 | 249 |
 
-214 de 649 módulos no tienen ningún test que los importe directamente.
+214 de 651 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
