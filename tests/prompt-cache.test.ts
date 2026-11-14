@@ -42,7 +42,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('prompt caching for Anthropic models', () => {
   it.each(['anthropic/claude-haiku-5.5', 'claude-sonnet-4-5'])(
-    'adds ephemeral cache_control breakpoints on last system block and last tool for %s',
+    'adds ephemeral cache_control breakpoints on the system block and the last user message for %s',
     async (model) => {
       let body: Record<string, unknown> = {};
       vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
@@ -63,9 +63,8 @@ describe('prompt caching for Anthropic models', () => {
         role: 'system',
         content: [{ type: 'text', text: 'You are helpful.', cache_control: { type: 'ephemeral' } }],
       });
-      const tools = body.tools as Array<Record<string, unknown>>;
-      expect(tools[0]).not.toHaveProperty('cache_control');
-      expect(tools[1]).toHaveProperty('cache_control', { type: 'ephemeral' });
+      expect(msgs[1]).toEqual({ role: 'user', content: [{ type: 'text', text: 'hi', cache_control: { type: 'ephemeral' } }] });
+      expect(JSON.stringify(body.tools)).not.toContain('cache_control');
       expect(countBreakpoints(body)).toBe(2);
       expect(countBreakpoints(body)).toBeLessThanOrEqual(4);
       expect(sampleTools[1]).not.toHaveProperty('cache_control');

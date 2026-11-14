@@ -269,6 +269,24 @@ function readCachedTokens(u: Loose): number | undefined {
   return undefined;
 }
 
+/** Marks the last user message as a cache breakpoint; a string content becomes one text block. Never mutates its input. */
+function withLastUserBreakpoint(messages: LlmMessage[]): LlmMessage[] {
+  const i = messages.map((m) => m.role).lastIndexOf('user');
+  if (i < 0) return messages;
+  const m = messages[i];
+  const mark = { type: 'ephemeral' as const };
+  let content: unknown = m.content;
+  if (typeof content === 'string') {
+    if (!content) return messages;
+    content = [{ type: 'text', text: content, cache_control: mark }];
+  } else if (Array.isArray(content) && content.length) {
+    content = [...content.slice(0, -1), { ...(content[content.length - 1] as object), cache_control: mark }];
+  } else return messages;
+  const out = messages.slice();
+  out[i] = { ...m, content } as LlmMessage;
+  return out;
+}
+
 /** Only OpenRouter reads `reasoning_details` back, and only those of the current turn (after the last user message); older ones add input tokens for nothing. */
 function withoutDetails(messages: LlmMessage[], provider: LlmProviderId): LlmMessage[] {
   const lastUser = provider === 'openrouter' ? messages.map((m) => m.role).lastIndexOf('user') : messages.length;
@@ -303,14 +321,13 @@ export async function chat(opts: {
   const systemMessage = anthropic && opts.system
     ? { role: 'system' as const, content: [{ type: 'text' as const, text: opts.system, cache_control: { type: 'ephemeral' as const } }] }
     : { role: 'system' as const, content: opts.system };
-  const tools = opts.tools.length
-    ? anthropic
-      ? [...opts.tools.slice(0, -1), { ...opts.tools[opts.tools.length - 1], cache_control: { type: 'ephemeral' as const } }]
-      : opts.tools
-    : undefined;
+  // Anthropic caches tools, then system, then messages, up to each breakpoint: the system breakpoint covers the tools,
+  // and the one on the last user message covers the history, which every call of the tool loop resends.
+  const tools = opts.tools.length ? opts.tools : undefined;
+  const history = withoutDetails(opts.messages, opts.provider);
   const body: Record<string, unknown> = {
     model: opts.model,
-    messages: [systemMessage, ...withoutDetails(opts.messages, opts.provider)],
+    messages: [systemMessage, ...(anthropic ? withLastUserBreakpoint(history) : history)],
     // A call without tools (the plan card's prompt rewrite) sends none: some providers reject an empty list.
     ...(tools ? { tools, tool_choice: 'auto' } : {}),
     stream: true,
