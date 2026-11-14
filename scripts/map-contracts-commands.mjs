@@ -115,4 +115,14 @@ export default [
     ],
     tests: ['tests/studio-commands.test.ts'],
   },
+  {
+    id: 'designer-fx-commands',
+    what: 'Cada forma `do` de FxCommand es un comando `designer.fx.*` (FX_DO) sobre runFx: un paso de deshacer del doc.',
+    sides: [
+      ['src/engine/design/fx.commands.ts', 'export const FX_DO'],
+      ['src/engine/design/fx.ts', 'export function runFx'],
+      ['src/engine/fx/fxCommands.ts', 'export type FxCommand'],
+    ],
+    tests: ['tests/designer-fx-commands.test.ts'],
+  },
 ];
