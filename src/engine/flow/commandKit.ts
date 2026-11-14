@@ -3,6 +3,7 @@ import { registerHistory } from '../commands/history';
 import { defineCommand, type Availability, type CommandContext, type CommandSpec, type Target } from '../commands/types';
 import { patchSession, useStore } from '../../store/store';
 import type { Graph, GraphNode } from '../types';
+import { ensureSystemNodes } from '../nodes/system';
 import { openHistoryGroup } from './history';
 
 /*
@@ -47,11 +48,18 @@ const strings = (...values: unknown[]): string[] => values.flatMap((v) => (Array
 
 /** The session exists and, when the call names nodes or edges, so do they. */
 export function hasTarget(ctx: CommandContext, args?: Named): Availability {
-  const graph = useStore.getState().sessions[ctx.on.session ?? '']?.graph;
+  const sessionId = ctx.on.session ?? '';
+  if (!useStore.getState().sessions[sessionId]) return NO_SESSION;
+  const mentionedNodes = strings(args?.node, args?.source, args?.target, args?.nodes, args?.targets);
+  const mentionedEdges = strings(args?.edge, args?.edges);
+  if ([...mentionedNodes, ...mentionedEdges].some((id) => id.startsWith('sys_'))) {
+    ensureSystemNodes(sessionId);
+  }
+  const graph = useStore.getState().sessions[sessionId]?.graph;
   if (!graph) return NO_SESSION;
-  const missingNode = strings(args?.node, args?.source, args?.target, args?.nodes, args?.targets).find((id) => !graph.nodes.some((n) => n.id === id));
+  const missingNode = mentionedNodes.find((id) => !graph.nodes.some((n) => n.id === id));
   if (missingNode) return `No such node: ${missingNode}.`;
-  const missingEdge = strings(args?.edge, args?.edges).find((id) => !graph.edges.some((e) => e.id === id));
+  const missingEdge = mentionedEdges.find((id) => !graph.edges.some((e) => e.id === id));
   return missingEdge ? `No such edge: ${missingEdge}.` : true;
 }
 

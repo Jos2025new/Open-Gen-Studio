@@ -10,13 +10,14 @@ export const GRAPH_PAGE = 40;
 const MAX_DETAIL = 10;
 
 function kindOf(n: GraphNode): string {
-  return n.data.kind === 'tool' ? `tool:${n.data.op}` : n.data.kind;
+  return n.data.kind === 'tool' ? `tool:${n.data.op}` : n.data.kind === 'ref' ? `ref:${n.data.type}` : n.data.kind;
 }
 
 function statusOf(n: GraphNode, generations: Record<string, Generation>): string {
   const d = n.data;
   if (d.kind === 'text') return d.text.trim() ? 'text' : 'empty';
   if (d.kind === 'asset') return d.assetId ? 'done' : 'empty';
+  if (d.kind === 'ref') return 'live';
   if (runsGeneration(d)) {
     const g = nodeAttempt(n, generations);
     return g ? g.status : 'not run';

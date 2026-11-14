@@ -702,8 +702,27 @@ export type FeedItem =
 // ---------------------------------------------------------------------------
 // Node graph
 
-export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset';
+export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset' | 'ref';
 export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
+export type LinkKind = 'data' | 'ref' | 'control';
+export type SystemNodeType = 'chat' | 'agent' | 'provider' | 'model' | 'session' | 'space' | 'designer.doc' | 'library' | 'toolset';
+export type ModelAttachMode = 'wired' | 'docked' | 'grouped' | 'merged';
+
+export interface PortSpec {
+  id: string;
+  direction: 'in' | 'out';
+  kind: LinkKind;
+  type: string;
+  multi?: boolean;
+  label?: string;
+}
+
+export interface NodeTypeSpec {
+  type: SystemNodeType;
+  title: string;
+  ports: PortSpec[];
+  commands: string[];
+}
 
 export interface TextNodeData {
   kind: 'text';
@@ -712,7 +731,6 @@ export interface TextNodeData {
 }
 
 export interface GenNodeData {
-  /** Plan-local identities retain their source node IDs when materialized. */
   subjects?: PlanSubject[];
   kind: 'image' | 'video' | 'audio' | 'model3d';
   title: string;
@@ -721,9 +739,7 @@ export interface GenNodeData {
   settings: GenSettings;
   generationId?: string;
   outputIndex: number;
-  /** Painted-over copy of the result (Sketch): replaces it downstream; clearing restores the original. */
   sketchAssetId?: string;
-  /** Audio nodes whose model answers with text (MiniMax Lyrics): the output port is text. Kept with `modelRef`. */
   textOutput?: boolean;
 }
 
@@ -734,7 +750,6 @@ export interface ToolNodeData {
   params: Record<string, AdvancedValue>;
   generationId?: string;
   outputIndex: number;
-  /** Painted-over copy of the result (Sketch), as above. */
   sketchAssetId?: string;
 }
 
@@ -742,11 +757,21 @@ export interface AssetNodeData {
   kind: 'asset';
   title: string;
   assetId: string | null;
-  /** Painted-over copy of the result (Sketch), as above. */
   sketchAssetId?: string;
 }
 
-export type GraphNodeData = TextNodeData | GenNodeData | ToolNodeData | AssetNodeData;
+export interface RefNodeData {
+  kind: 'ref';
+  type: SystemNodeType;
+  ref: string;
+  title: string;
+  attachMode?: ModelAttachMode;
+  dockedTo?: string;
+  mergedModels?: string[];
+  mediaKind?: MediaKind | 'llm';
+}
+
+export type GraphNodeData = TextNodeData | GenNodeData | ToolNodeData | AssetNodeData | RefNodeData;
 
 export interface GraphNode {
   id: string;
@@ -759,18 +784,17 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  /** Target port: prompt, ref, first, last, input. */
   targetHandle: string;
   sourceHandle: string;
   outputIndex?: number;
+  kind?: LinkKind;
+  both?: boolean;
 }
 
-/** A named frame around some nodes (each node is in one group at most). */
 export interface GraphGroup {
   id: string;
   title: string;
   nodeIds: string[];
-  /** Optional background tint (hex); none by default. */
   color?: string;
 }
 
@@ -965,12 +989,8 @@ export interface AgentRequestMetrics {
   agentMs: number;
   /** Agent time until the first streamed text or tool call. */
   msToFirstOutput?: number;
-  /**
-   * Per model call (L4), in ms from sending: first byte from the provider, first reasoning fragment, first text or
-   * tool call, and the end; plus reasoning tokens and prompt tokens served from the provider's cache.
-   */
+  /** Per model call (L4) timings and token counts. */
   callTimings?: Array<{ ttfbMs: number; reasoningMs?: number; outputMs?: number; toolMs?: number; totalMs: number; reasoningTokens?: number; cachedTokens?: number }>;
-  /** Calls that ended in an error: what failed and how long it took (no token sample, there was none). */
   failedCalls?: Array<{ error: string; seconds: number }>;
   /** App time per plan card: from the model call's end to the card in the chat. */
   planCheckMs?: number[];

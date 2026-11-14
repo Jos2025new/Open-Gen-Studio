@@ -25,7 +25,7 @@ export function nodeWorkNotInChat(sessionId: string): NodeChatResult[] {
   const results: NodeChatResult[] = [];
   for (const node of session.graph.nodes) {
     const data = node.data;
-    if (data.kind === 'text' || data.kind === 'asset' || !data.generationId || found.has(data.generationId) || shown.has(data.generationId)) continue;
+    if (data.kind === 'text' || data.kind === 'asset' || data.kind === 'ref' || !data.generationId || found.has(data.generationId) || shown.has(data.generationId)) continue;
     const generation = st.generations[data.generationId];
     const assetId = generation?.assetIds[data.outputIndex];
     if (!generation || generation.sessionId !== sessionId || !assetId || !st.assets[assetId]) continue;

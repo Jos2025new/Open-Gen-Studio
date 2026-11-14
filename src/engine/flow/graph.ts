@@ -3,6 +3,7 @@ import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
+import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
 import type {
   Asset,
   AudioStep,
@@ -14,10 +15,12 @@ import type {
   GraphNode,
   GraphNodeData,
   ImageStep,
+  LinkKind,
   Model3dStep,
   OpStep,
   Plan,
   PlanStep,
+  PortSpec,
   PortType,
   TextStep,
   Subject,
@@ -54,6 +57,10 @@ export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): 
       return OPS[data.op].output;
     case 'asset':
       return data.assetId ? assets[data.assetId]?.kind ?? null : null;
+    case 'ref':
+      if (data.type === 'chat' || data.type === 'agent') return 'text';
+      if (data.type === 'designer.doc' || data.type === 'space' || data.type === 'library') return 'image';
+      return null;
   }
 }
 
@@ -95,6 +102,10 @@ export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortT
   }
 }
 
+export function nodePorts(data: GraphNodeData, assets: Record<string, Asset> = {}): PortSpec[] {
+  return allNodePorts(data, assets, inputPorts(data), outputPort(data, assets));
+}
+
 function reaches(edges: GraphEdge[], from: string, to: string): boolean {
   const stack = [from];
   const seen = new Set<string>();
@@ -103,20 +114,49 @@ function reaches(edges: GraphEdge[], from: string, to: string): boolean {
     if (n === to) return true;
     if (seen.has(n)) continue;
     seen.add(n);
-    edges.filter((e) => e.source === n).forEach((e) => stack.push(e.target));
+    edges.filter((e) => (e.kind ?? 'data') === 'data' && e.source === n).forEach((e) => stack.push(e.target));
   }
   return false;
+}
+
+function usesSystemPorts(
+  src: GraphNode,
+  tgt: GraphNode,
+  c: { sourceHandle?: string | null; targetHandle?: string | null; kind?: LinkKind; both?: boolean },
+): boolean {
+  return (
+    src.data.kind === 'ref' ||
+    tgt.data.kind === 'ref' ||
+    c.kind != null ||
+    Boolean(c.both) ||
+    Boolean(c.targetHandle && ['sys_ref', 'model', 'control'].includes(c.targetHandle)) ||
+    Boolean(c.sourceHandle && ['out_ref', 'out_control'].includes(c.sourceHandle))
+  );
 }
 
 export function connectionError(
   graph: Graph,
   assets: Record<string, Asset>,
-  c: { source: string; target: string; targetHandle: string | null },
+  c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
 ): string | null {
   if (c.source === c.target) return 'A node cannot connect to itself.';
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
   if (!src || !tgt) return 'Unknown node.';
+  if (usesSystemPorts(src, tgt, c)) {
+    const resolved = resolveSystemConnection(nodePorts(src.data, assets), nodePorts(tgt.data, assets), c);
+    if (resolved.classMismatch) return resolved.classMismatch;
+    if (!resolved.tgtPort) return 'This node has no such input.';
+    if (!resolved.srcPort) return 'The source has no output yet.';
+    const kind = resolved.kind ?? resolved.tgtPort.kind;
+    if (c.both && kind === 'data') return 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
+    if (resolved.srcPort.kind !== resolved.tgtPort.kind) return `Link class mismatch: cannot connect ${resolved.srcPort.kind} to ${resolved.tgtPort.kind}.`;
+    if (!portTypeCompatible(kind, resolved.srcPort.type, resolved.tgtPort.type)) {
+      return `${resolved.tgtPort.label ?? resolved.tgtPort.id} expects ${resolved.tgtPort.type}, got ${resolved.srcPort.type}.`;
+    }
+    if (kind === 'data' && reaches(graph.edges, c.target, c.source)) return 'That connection would create a loop.';
+    return null;
+  }
   const out = outputPort(src.data, assets);
   const port = inputPorts(tgt.data).find((p) => p.id === c.targetHandle);
   if (!port) return 'This node has no such input.';
@@ -142,8 +182,32 @@ export function handleIndex(handle: string | null | undefined): number | undefin
 }
 
 /** Add an edge, replacing the existing edge on single-input ports. */
-export function connect(graph: Graph, c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null }): Graph {
+export function connect(
+  graph: Graph,
+  c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
+): Graph {
+  const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
+  if (src && tgt && usesSystemPorts(src, tgt, c)) {
+    const resolved = resolveSystemConnection(nodePorts(src.data, {}), nodePorts(tgt.data, {}), c);
+    const kind: LinkKind = c.kind ?? resolved.kind ?? 'data';
+    const targetHandle = resolved.tgtPort?.id ?? c.targetHandle;
+    const sourceHandle = resolved.srcPort?.id ?? (c.sourceHandle || 'out');
+    let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === targetHandle && (e.kind ?? 'data') === kind));
+    if (resolved.tgtPort && resolved.tgtPort.multi === false) {
+      edges = edges.filter((e) => !(e.target === c.target && e.targetHandle === targetHandle && (e.kind ?? 'data') === kind));
+    }
+    edges.push({
+      id: uid('edge'),
+      source: c.source,
+      target: c.target,
+      sourceHandle,
+      targetHandle,
+      kind,
+      ...(c.both && kind !== 'data' ? { both: true } : {}),
+    });
+    return { ...graph, edges };
+  }
   const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
   let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === c.targetHandle));
   if (port && !port.multi) edges = edges.filter((e) => !(e.target === c.target && e.targetHandle === c.targetHandle));
@@ -243,6 +307,8 @@ export function estimatedHeight(data: GraphNodeData): number {
     // Media-first cards: a preview (or the text) plus the label above it; controls float outside.
     case 'text':
       return 170;
+    case 'ref':
+      return 180;
     case 'image':
     case 'model3d':
     case 'video':
@@ -334,7 +400,7 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
   if (index === NO_RESULT) return null;
   const d = node.data;
-  if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
+  if ('sketchAssetId' in d && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;
   if (runsGeneration(d)) {
     const g = d.generationId ? generations[d.generationId] : undefined;
@@ -351,6 +417,29 @@ function finishedText(node: GraphNode, generations: Record<string, Generation>):
   return g?.status === 'done' && g.text != null ? g.text : undefined;
 }
 
+/** Topological execution order determined strictly by `data` links (never by screen position). */
+export function executionOrder(graph: Graph, targets?: string[]): string[] {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const roots = targets?.length ? targets : graph.nodes.filter((n) => runsGeneration(n.data)).map((n) => n.id);
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const ordered: string[] = [];
+  const visit = (id: string) => {
+    if (visited.has(id) || visiting.has(id)) return;
+    const n = byId.get(id);
+    if (!n) return;
+    visiting.add(id);
+    const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap((s) => { const p = parseRef(s.from); return p?.type === 'step' ? [p.id] : []; }) : [];
+    const dataSources = graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === id).map((e) => e.source);
+    for (const srcId of [...dataSources, ...subjectIds]) visit(srcId);
+    visiting.delete(id);
+    visited.add(id);
+    if (runsGeneration(n.data)) ordered.push(id);
+  };
+  roots.forEach(visit);
+  return ordered;
+}
+
 /**
  * Build steps for running `targets`. Upstream generation nodes without a finished
  * output run too; nodes that already have output are referenced by their asset.
@@ -361,17 +450,19 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const run = new Set<string>();
   const checked = new Map<string, boolean>();
   const visiting = new Set<string>();
+  const targetSet = new Set(targets);
   const visit = (id: string, forced: boolean): boolean => {
     const n = byId.get(id);
     if (!n) { errors.push(`No such node: ${id}.`); return false; }
     if (visiting.has(id)) { errors.push('The graph contains a cycle.'); return false; }
-    if (checked.has(id) && !forced) return checked.get(id)!;
+    const effectiveForced = forced || (options.force !== false && targetSet.has(id));
+    if (checked.has(id) && (!effectiveForced || checked.get(id))) return checked.get(id)!;
     if (!runsGeneration(n.data)) return false;
     visiting.add(id);
     const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' ? [p.id] : []; }) : [];
-    const upstream = [...graph.edges.filter(e => e.target === id).map(e => e.source), ...subjectIds].map(id => visit(id, false)).some(Boolean);
+    const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
     visiting.delete(id);
-    const needsRun = forced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
+    const needsRun = effectiveForced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
     checked.set(id, needsRun);
     if (needsRun) {
       if (n.data.sketchAssetId) errors.push(`“${n.data.title}” has a Sketch on its previous base. Reset or save the Sketch before updating this node.`);
@@ -407,7 +498,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const textSteps = new Map<string, TextStep>();
   for (const id of run) {
     const n = byId.get(id)!;
-    const inEdges = graph.edges.filter((e) => e.target === id);
+    const inEdges = graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === id);
     const d = n.data;
     // Text ports (prompt, lyrics): a text node, or a node with a text result (Transcribe, lyrics) from this run or before.
     const textFrom = (handle: string): string | undefined => {
