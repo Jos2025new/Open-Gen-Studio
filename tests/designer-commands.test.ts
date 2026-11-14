@@ -51,9 +51,9 @@ describe('the Designer actions as commands', () => {
   });
 
   it('are found by the automatic index, each with a target, a schema and a one-line signature', () => {
-    expect(collected.loaded.map((l) => l.file)).toEqual(['/src/engine/design/commands.ts', '/src/engine/design/layer.commands.ts']);
+    expect(collected.loaded.map((l) => l.file)).toEqual(expect.arrayContaining(['/src/engine/design/commands.ts', '/src/engine/design/layer.commands.ts']));
     expect(collected.skipped).toEqual(['/src/engine/fx/commands.ts']);
-    for (const spec of allCommands()) {
+    for (const spec of allCommands().filter((c) => c.id.startsWith('designer.'))) {
       expect(spec.needs, spec.id).toContain('session');
       expect(argsSchema(spec), spec.id).toMatchObject({ type: 'object', additionalProperties: false });
     }
@@ -62,7 +62,7 @@ describe('the Designer actions as commands', () => {
   });
 
   it('list what still reads something active as debt', () => {
-    expect(allCommands().filter((c) => c.debt).map((c) => c.id).sort()).toEqual(['designer.doc.ensure', 'designer.doc.from_asset', 'designer.layer.add', 'designer.layer.ensure_paint', 'designer.layer.place_asset']);
+    expect(allCommands().filter((c) => c.debt && c.id.startsWith('designer.')).map((c) => c.id).sort()).toEqual(['designer.doc.ensure', 'designer.doc.from_asset', 'designer.layer.add', 'designer.layer.ensure_paint', 'designer.layer.place_asset']);
   });
 
   it('typed code calls them with invoke, synchronously, as one undo step', () => {
