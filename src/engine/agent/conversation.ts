@@ -21,7 +21,8 @@ import { sectionsOf } from './settingsCard';
 import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
-import { addReplyToRequest, agentEngine, controllers, ending, engineLabel, feedBase, get, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { addReplyToRequest, agentEngine, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
 import { llmTurn } from './llmTurn';
@@ -39,8 +40,9 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const clean = text.trim();
   if (!clean && !attachments.length) return;
 
+  const runId = uid('turn');
   autoTitleSession(sessionId, clean || 'Edit');
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments });
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId }) });
   if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
@@ -52,7 +54,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     // Typing keeps what the card shows selected (the user's pick, else each recommended option), plus the user's words as the note.
     const pick = s.agent.cardPick;
     const shown = pick?.itemId === pendingItem.id ? pick.answers : Object.fromEntries(pendingItem.questions.flatMap((q) => (q.default ? [[q.id, q.default]] : [])));
-    await submitAnswers(sessionId, pendingItem.id, { ...shown, note: clean }, 'typed');
+    await submitAnswers(sessionId, pendingItem.id, { ...shown, note: clean }, 'typed', runId);
     return;
   }
   // Typing while the settings card is open never confirms it: it closes unconfirmed and the agent answers.
@@ -65,7 +67,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`);
       patchAgent(sessionId, { pending: undefined });
-      await llmTurn(sessionId, workspace, { route: 'settings-reply' });
+      await llmTurn(sessionId, workspace, { route: 'settings-reply', runId });
       return;
     }
     patchAgent(sessionId, { pending: undefined });
@@ -83,13 +85,13 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
-      await llmTurn(sessionId, workspace, { route: 'plan-comment' });
+      await llmTurn(sessionId, workspace, { route: 'plan-comment', runId });
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
       removeDraftNodes(sessionId, pendingItem.plan.id);
       addReplyToRequest(sessionId, clean, attachments);
       patchAgent(sessionId, { pending: undefined });
-      await offlineTurn(sessionId, workspace, 'plan-comment');
+      await offlineTurn(sessionId, workspace, 'plan-comment', runId);
     }
     return;
   }
@@ -106,7 +108,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       const why = keys[agent.provider]?.trim() ? `No agent model is chosen for ${LLM_LABELS[agent.provider]}` : `There is no ${LLM_LABELS[agent.provider]} key`;
       notice(sessionId, workspace, `${why}, so the local planner answers. Fix it in Settings → Agent.`, 'info');
     }
-    await offlineTurn(sessionId, workspace, 'new');
+    await offlineTurn(sessionId, workspace, 'new', runId);
     return;
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(), attachments: attachments.length });
@@ -128,7 +130,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // The route goes first: one buried after the context was followed after the prompt's own steps.
   const askFirst = session(sessionId).agent.questionRound === 0;
   pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
-  await llmTurn(sessionId, workspace, { route: 'new' });
+  await llmTurn(sessionId, workspace, { route: 'new', runId });
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
@@ -180,7 +182,7 @@ export function pickAnswers(sessionId: string, itemId: string, answers: Record<s
 }
 
 /** Answers chosen in a questions card. */
-export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips'): Promise<void> {
+export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips', runId?: string): Promise<void> {
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -196,7 +198,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
     if (answers.note) lines.push(`- User note: ${answers.note}`);
     const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, s.agent.draft?.attachments ?? []));
     replyToCard(sessionId, pending?.toolCallId, `User answers (${how}):\n${lines.join('\n')}\n\n${ctx}`);
-    await llmTurn(sessionId, workspace, { route: 'answers' });
+    await llmTurn(sessionId, workspace, { route: 'answers', runId });
     return;
   }
   const draft = s.agent.draft ?? { request: '', answers: {}, attachments: [] };
@@ -204,7 +206,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   // A typed note on an offline card enriches the request itself.
   const request = answers.note ? `${draft.request} ${answers.note}`.trim() : draft.request;
   patchAgent(sessionId, { draft: { ...draft, request, answers: merged } });
-  await offlineTurn(sessionId, workspace, 'answers');
+  await offlineTurn(sessionId, workspace, 'answers', runId);
 }
 
 /** "Skip, plan now" on a questions card: no more questions, plan with sensible defaults. */

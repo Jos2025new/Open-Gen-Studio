@@ -7,6 +7,7 @@ import type { SentRequest } from '../lib/debug';
 import type { Mode, Place } from './placeTypes';
 import type { DraftMode } from './agent/draftFirst';
 import type { FxLayer } from './fx/types';
+import type { ChatMessageMeta } from './feedMeta';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
@@ -530,6 +531,7 @@ export interface UserFeedItem extends FeedBase {
   text: string;
   mode: ComposerMode;
   attachments: string[];
+  meta?: ChatMessageMeta;
 }
 
 export interface AssistantFeedItem extends FeedBase {
@@ -537,6 +539,7 @@ export interface AssistantFeedItem extends FeedBase {
   text: string;
   streaming?: boolean;
   engine: string;
+  meta?: ChatMessageMeta;
 }
 
 export interface QuestionsFeedItem extends FeedBase {

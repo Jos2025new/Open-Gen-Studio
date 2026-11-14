@@ -1,0 +1,202 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ChatResult, chat as chatFn } from '../src/engine/providers/llm';
+import type { AssistantFeedItem, UserFeedItem } from '../src/engine/types';
+
+type ChatArgs = Parameters<typeof chatFn>[0];
+const mockChat = vi.fn<(opts: ChatArgs) => Promise<ChatResult>>();
+
+vi.mock('../src/engine/providers/llm', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../src/engine/providers/llm')>();
+  return { ...mod, chat: (opts: ChatArgs) => mockChat(opts) };
+});
+
+vi.mock('../src/lib/writerLock', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('../src/lib/writerLock')>();
+  return { ...mod, mayStartWork: () => true };
+});
+
+import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { buildMessageMetaSummary } from '../src/engine/feedMeta';
+import { useStore } from '../src/store/store';
+
+function resetStore(opts: { provider?: 'openrouter' | 'offline'; model?: string } = {}) {
+  mockChat.mockReset();
+  const provider = opts.provider ?? 'openrouter';
+  const model = opts.model ?? 'anthropic/claude-sonnet-4';
+  const st = useStore.getState();
+  const sid = st.activeSessionId;
+  useStore.setState({
+    ui: { ...st.ui, workspace: 'node' },
+    composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
+    catalog: {
+      ...st.catalog,
+      llm: {
+        ...st.catalog.llm,
+        openrouter: [
+          { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', contextLength: 200000, vision: true, tools: true, reasoning: false, inputPrice: 3, outputPrice: 15 },
+          { id: 'vendor/unpriced-model', name: 'Unpriced Model', contextLength: 32000, vision: false, tools: true, reasoning: false },
+        ],
+      },
+    },
+    settings: {
+      ...st.settings,
+      keys: { ...st.settings.keys, openrouter: provider === 'openrouter' ? 'sk-test' : '' },
+      agent: {
+        ...st.settings.agent,
+        provider,
+        model: provider === 'openrouter' ? model : '',
+        showThinking: false,
+      },
+    },
+    sessions: {
+      ...st.sessions,
+      [sid]: {
+        ...st.sessions[sid],
+        feed: [],
+        agent: {
+          busy: false,
+          history: [],
+          notes: [],
+          questionRound: 0,
+        },
+      },
+    },
+  });
+  return sid;
+}
+
+describe('chat message metadata (step 10)', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('stores time zone, agent, Space, provider, model, usage, cost, and shared runId on user and LLM agent messages', async () => {
+    const sid = resetStore();
+    mockChat.mockImplementationOnce(async (opts) => {
+      opts.onText?.('Hello back', 'Hello back');
+      return {
+        text: 'Hello back',
+        toolCalls: [],
+        timing: { ttfbMs: 20, totalMs: 120, reasoningMs: 0, outputMs: 120 },
+        usage: { inputTokens: 120, outputTokens: 45, cachedTokens: 20, costUsd: 0.0012 },
+        finishReason: 'stop',
+      };
+    });
+
+    await sendAgentMessage('Make a poster');
+
+    const feed = useStore.getState().sessions[sid].feed;
+    const user = feed.find((f): f is UserFeedItem => f.type === 'user');
+    const assistant = feed.find((f): f is AssistantFeedItem => f.type === 'assistant');
+
+    expect(user?.meta).toBeDefined();
+    expect(user?.meta?.timeZone).toBeTruthy();
+    expect(user?.meta?.agent).toBe('Director');
+    expect(user?.meta?.space).toBe('canvas');
+    expect(user?.meta?.provider).toBe('openrouter');
+    expect(user?.meta?.model).toBe('anthropic/claude-sonnet-4');
+    expect(user?.meta?.runId).toBeTruthy();
+
+    expect(assistant?.meta).toBeDefined();
+    expect(assistant?.meta?.runId).toBe(user?.meta?.runId);
+    expect(assistant?.meta?.agent).toBe('Director');
+    expect(assistant?.meta?.space).toBe('canvas');
+    expect(assistant?.meta?.provider).toBe('openrouter');
+    expect(assistant?.meta?.model).toBe('anthropic/claude-sonnet-4');
+    expect(assistant?.meta?.usage).toEqual({ inputTokens: 120, outputTokens: 45, cachedTokens: 20 });
+    expect(assistant?.meta?.costUsd).toBeCloseTo(0.0012, 6);
+    expect(assistant?.meta?.costEstimated).toBe(false);
+  });
+
+  it('marks catalog-derived cost as estimated and omits costUsd when neither provider nor catalog has pricing', async () => {
+    const sid = resetStore({ model: 'anthropic/claude-sonnet-4' });
+    mockChat.mockImplementationOnce(async (opts) => {
+      opts.onText?.('Estimated', 'Estimated');
+      return {
+        text: 'Estimated',
+        toolCalls: [],
+        timing: { ttfbMs: 20, totalMs: 80, reasoningMs: 0, outputMs: 80 },
+        usage: { inputTokens: 1000, outputTokens: 1000 },
+        finishReason: 'stop',
+      };
+    });
+    await sendAgentMessage('First');
+    const first = useStore.getState().sessions[sid].feed.find((f): f is AssistantFeedItem => f.type === 'assistant');
+    expect(first?.meta?.costEstimated).toBe(true);
+    expect(first?.meta?.costUsd).toBeCloseTo(0.018, 6);
+
+    const sid2 = resetStore({ model: 'vendor/unpriced-model' });
+    mockChat.mockImplementationOnce(async (opts) => {
+      opts.onText?.('No price', 'No price');
+      return {
+        text: 'No price',
+        toolCalls: [],
+        timing: { ttfbMs: 20, totalMs: 60, reasoningMs: 0, outputMs: 60 },
+        usage: { inputTokens: 500, outputTokens: 200 },
+        finishReason: 'stop',
+      };
+    });
+    await sendAgentMessage('Second');
+    const second = useStore.getState().sessions[sid2].feed.find((f): f is AssistantFeedItem => f.type === 'assistant');
+    expect(second?.meta?.usage).toEqual({ inputTokens: 500, outputTokens: 200 });
+    expect(second?.meta?.costUsd).toBeUndefined();
+  });
+
+  it('accumulates usage and cost across tool-only iterations into the surviving assistant message', async () => {
+    const sid = resetStore();
+    mockChat
+      .mockImplementationOnce(async () => ({
+        text: '',
+        toolCalls: [{ id: 'tc1', name: 'unknown_probe_tool', arguments: '{}' }],
+        timing: { ttfbMs: 20, totalMs: 50, reasoningMs: 0, outputMs: 50 },
+        usage: { inputTokens: 100, outputTokens: 20, costUsd: 0.001 },
+        finishReason: 'tool_calls',
+      }))
+      .mockImplementationOnce(async (opts) => {
+        opts.onText?.('Done now', 'Done now');
+        return {
+          text: 'Done now',
+          toolCalls: [],
+          timing: { ttfbMs: 20, totalMs: 70, reasoningMs: 0, outputMs: 70 },
+          usage: { inputTokens: 150, outputTokens: 30, costUsd: 0.002 },
+          finishReason: 'stop',
+        };
+      });
+
+    await sendAgentMessage('Check workspace');
+    const assistant = useStore.getState().sessions[sid].feed.find((f): f is AssistantFeedItem => f.type === 'assistant');
+    expect(assistant?.meta?.usage).toEqual({ inputTokens: 250, outputTokens: 50 });
+    expect(assistant?.meta?.costUsd).toBeCloseTo(0.003, 6);
+  });
+
+  it('records Space, local agent, and shared runId for offline turns', async () => {
+    const sid = resetStore({ provider: 'offline' });
+    await sendAgentMessage('Explain how this works');
+    const feed = useStore.getState().sessions[sid].feed;
+    const user = feed.find((f): f is UserFeedItem => f.type === 'user');
+    const assistant = feed.find((f): f is AssistantFeedItem => f.type === 'assistant');
+    expect(user?.meta?.provider).toBe('offline');
+    expect(assistant?.meta?.agent).toBe('Local planner');
+    expect(assistant?.meta?.provider).toBe('offline');
+    expect(assistant?.meta?.model).toBe('Local planner');
+    expect(assistant?.meta?.space).toBe('canvas');
+    expect(assistant?.meta?.runId).toBe(user?.meta?.runId);
+  });
+
+  it('builds summaries cleanly for legacy messages that have no saved meta field', () => {
+    const legacy: UserFeedItem = {
+      id: 'fd_old',
+      createdAt: Date.UTC(2026, 0, 15, 14, 30),
+      workspace: 'designer',
+      type: 'user',
+      text: 'Legacy prompt',
+      mode: 'agent',
+      attachments: [],
+    };
+    const summary = buildMessageMetaSummary(legacy);
+    expect(summary.spaceLabel).toBe('Designer');
+    expect(summary.dateTime).toContain('2026');
+    expect(summary.detailParts).toEqual([]);
+    expect(summary.tooltip).toContain('Space: Designer');
+  });
+});

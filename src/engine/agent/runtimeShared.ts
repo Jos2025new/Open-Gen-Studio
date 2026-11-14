@@ -15,6 +15,8 @@ import { activeDoc } from '../design/actions';
 import { LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, lineRoutes } from '../catalog';
 import type { AgentQuestion, AgentState, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, PlanStep, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
+import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
+import { placeFor } from '../place';
 import { appendFeed, patchSession, setGraph, toast, updateFeedItem, useStore } from '../../store/store';
 import { suggestModel } from './modelIndex';
 import { recordMetric } from './metrics';
@@ -55,6 +57,23 @@ export const turnCanvas = (workspace: Workspace): Workspace => (workspace === 'c
 
 export function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace: rowCanvas(workspace) };
+}
+
+export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}): ChatMessageMeta {
+  const e = agentEngine();
+  return {
+    timeZone: localTimeZone(),
+    agent: e.kind === 'offline' ? 'Local planner' : 'Director',
+    space: placeFor(get().ui, workspace),
+    provider: e.kind === 'offline' ? 'offline' : e.provider,
+    model: e.kind === 'offline' ? 'Local planner' : e.model,
+    ...extra,
+  };
+}
+
+export function hasLlmCatalogPrice(provider: LlmProviderId, model: string): boolean {
+  const m = get().catalog.llm[provider]?.find((x) => x.id === model);
+  return m?.inputPrice != null || m?.outputPrice != null;
 }
 
 export function notice(sessionId: string, workspace: Workspace, text: string, level: 'info' | 'error' = 'error', retry?: NoticeFeedItem['retry']): void {

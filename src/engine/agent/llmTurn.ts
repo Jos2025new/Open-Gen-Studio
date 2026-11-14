@@ -9,7 +9,9 @@ import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { isCreditError, onAgentCredit } from '../credit';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, loadLlmCatalog, modelSummary } from '../catalog';
-import type { AgentStyle, FeedItem, LlmMessage, SettingsFeedItem, Workspace } from '../types';
+import { uid } from '../../lib/id';
+import type { ChatMessageMeta, ChatMessageUsage } from '../feedMeta';
+import type { AgentStyle, AssistantFeedItem, FeedItem, LlmMessage, SettingsFeedItem, Workspace } from '../types';
 import { addSpend, appendFeed, patchSession, removeFeedItem, updateFeedItem } from '../../store/store';
 import { SYSTEM_PROMPT } from './context';
 import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
@@ -25,7 +27,7 @@ import { activityLog } from './activityLog';
 import { waitHooks } from './schemaWait';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
-import { agentEngine, controllers, ending, engineLabel, feedBase, get, keepCommentedPlan, llmCallUsd, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
+import { agentEngine, controllers, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
@@ -43,13 +45,14 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean }): Promise<void> {
+export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
   const engine = agentEngine();
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
-  const endLog = startTurnLog(sessionId, 'llm', opts.route);
+  const runId = opts.runId ?? uid('turn');
+  const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   let outcome: TurnOutcome = 'text';
   patchAgent(sessionId, { busy: true, phase: 'working' });
   const log = activityLog(sessionId, rowCanvas(workspace));
@@ -66,6 +69,10 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   // Auto confirming the settings itself is the app's step, not the agent's: once per turn it gives the round back.
   let settled = false;
   let hurryNoted = false;
+  let pendingUsage: ChatMessageUsage | undefined;
+  let pendingCost = 0;
+  let pendingHasCost = false;
+  let pendingEstimated = false;
   // If nothing comes out for a minute the activity block says so (Stop is in the composer); output re-arms it.
   // The five-minute cap is the only thing that ends a turn by force (T3).
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -114,6 +121,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         return;
       }
       let textItemId: string | null = null;
+      let textItemMeta: ChatMessageMeta | null = null as ChatMessageMeta | null;
       let result: ChatResult;
       try {
         if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
@@ -145,7 +153,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             armSilence();
             if (!textItemId) {
               firstOutput();
-              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel() };
+              textItemMeta = messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
+              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel(), meta: textItemMeta };
               textItemId = item.id;
               appendFeed(sessionId, item);
             } else {
@@ -165,7 +174,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
         if (isCreditError(err) && !opts.creditRetried) {
           if (textItemId) removeFeedItem(sessionId, textItemId);
-          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, creditRetried: true }); }
+          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }); }
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
@@ -222,6 +231,29 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           ...s,
           usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + llmUsd },
         }));
+        const cachedTokens = (pendingUsage?.cachedTokens ?? 0) + (u.cachedTokens ?? 0);
+        const reasoningTokens = (pendingUsage?.reasoningTokens ?? 0) + (u.reasoningTokens ?? 0);
+        pendingUsage = {
+          inputTokens: (pendingUsage?.inputTokens ?? 0) + u.inputTokens,
+          outputTokens: (pendingUsage?.outputTokens ?? 0) + u.outputTokens,
+          ...(cachedTokens > 0 ? { cachedTokens } : {}),
+          ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+        };
+        if (u.costUsd != null || hasLlmCatalogPrice(engine.provider, engine.model)) {
+          pendingCost += llmUsd;
+          pendingHasCost = true;
+          pendingEstimated = pendingEstimated || u.costUsd == null;
+        }
+      }
+      const meta = textItemMeta ?? messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
+      if (textItemId && (pendingUsage || pendingHasCost)) {
+        updateFeedItem<AssistantFeedItem>(sessionId, textItemId, {
+          meta: {
+            ...meta,
+            ...(pendingUsage ? { usage: pendingUsage } : {}),
+            ...(pendingHasCost ? { costUsd: pendingCost, costEstimated: pendingEstimated } : {}),
+          },
+        });
       }
       // An empty answer stays out of the history: a Retry would otherwise end the request with an empty assistant message.
       if (result.text || result.toolCalls.length) pushHistory(sessionId, {
@@ -394,6 +426,12 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         outcome = 'error';
         notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.');
         return;
+      }
+      if (textItemId && session(sessionId).feed.some((f) => f.id === textItemId)) {
+        pendingUsage = undefined;
+        pendingCost = 0;
+        pendingHasCost = false;
+        pendingEstimated = false;
       }
     }
     outcome = 'error';

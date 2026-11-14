@@ -1,17 +1,18 @@
 import { activeDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import type { Workspace } from '../types';
+import { uid } from '../../lib/id';
 import { appendFeed } from '../../store/store';
 import { offlinePlan } from './offline';
 import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
-import { designerDims, feedBase, get, notice, presentPlan, session, showQuestions } from './runtimeShared';
+import { designerDims, feedBase, get, messageMeta, notice, presentPlan, session, showQuestions } from './runtimeShared';
 
-export async function offlineTurn(sessionId: string, workspace: Workspace, route: TurnRoute): Promise<void> {
-  const end = startTurnLog(sessionId, 'offline', route);
-  end(await offlinePass(sessionId, workspace));
+export async function offlineTurn(sessionId: string, workspace: Workspace, route: TurnRoute, runId = uid('turn')): Promise<void> {
+  const end = startTurnLog(sessionId, 'offline', route, runId);
+  end(await offlinePass(sessionId, workspace, runId));
 }
 
-async function offlinePass(sessionId: string, workspace: Workspace): Promise<TurnOutcome> {
+async function offlinePass(sessionId: string, workspace: Workspace, runId: string): Promise<TurnOutcome> {
   const s = session(sessionId);
   const draft = s.agent.draft ?? { request: '', answers: {}, attachments: [] };
   const st = get();
@@ -29,7 +30,13 @@ async function offlinePass(sessionId: string, workspace: Workspace): Promise<Tur
     doc: docDims ? { width: docDims.width, height: docDims.height } : undefined,
   });
   if (action.kind === 'reply') {
-    appendFeed(sessionId, { ...feedBase(workspace), type: 'assistant', text: action.text, engine: 'Local planner' });
+    appendFeed(sessionId, {
+      ...feedBase(workspace),
+      type: 'assistant',
+      text: action.text,
+      engine: 'Local planner',
+      meta: messageMeta(workspace, { agent: 'Local planner', provider: 'offline', model: 'Local planner', runId }),
+    });
     return 'text';
   }
   if (action.kind === 'questions') {
