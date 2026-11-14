@@ -26,6 +26,10 @@ export function shortcutGroups(): ShortcutGroup[] {
       items: [{ keys: 'Mod + Alt + P', action: 'Start or stop a performance trace (logs/trace-…jsonl)' }],
     },
     {
+      title: 'Everywhere',
+      items: [{ keys: 'Mod + K', action: 'Open the command palette' }],
+    },
+    {
       title: 'Prompt and chat',
       items: [
         { keys: 'Enter', action: 'Send or generate' },

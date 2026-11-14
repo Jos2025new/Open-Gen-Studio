@@ -1,5 +1,6 @@
 import { setUi, useStore } from '../../store/store';
 import { isTraceKey } from './TraceControl';
+import { isPaletteKey } from './commandPaletteModel';
 
 /**
  * While Home or a Space covers the workspace, the workspace stays mounted (drafts survive) but must not
@@ -12,7 +13,7 @@ export function installHomeKeyGuard(): void {
   const OWN = '.popover, .lightbox, .sketch-editor, .side-panel, [role="dialog"]';
   const target = (e: Event) => (e.target instanceof Element ? e.target : null);
   window.addEventListener('keydown', (e) => {
-    if (!covered() || target(e)?.closest(`.home, .space, ${OWN}`)) return;
+    if (!covered() || isPaletteKey(e) || target(e)?.closest(`.home, .space, ${OWN}`)) return;
     e.stopImmediatePropagation();
   }, true);
   // Keys aimed at Home or a Space still bubble on, where the hidden canvas listens: ReactFlow on document (Delete would
@@ -20,7 +21,7 @@ export function installHomeKeyGuard(): void {
   // first on document, this one cuts both, even inside Home's embedded Sessions and Library. Only the trace key and
   // Escape while a side panel is open go on: their window listeners are meant to work from here too.
   const bubble = (e: KeyboardEvent) => {
-    if (!covered() || !target(e)?.closest('.home, .space')) return;
+    if (!covered() || isPaletteKey(e) || !target(e)?.closest('.home, .space')) return;
     if (isTraceKey(e) || (e.key === 'Escape' && useStore.getState().ui.panel)) return;
     e.stopImmediatePropagation();
   };
