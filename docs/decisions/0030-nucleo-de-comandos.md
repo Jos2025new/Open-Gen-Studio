@@ -119,6 +119,38 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 - El agente encadena tres comandos del Designer en una llamada, con un solo paso de deshacer (`tests/designer-commands.test.ts`, con el modelo simulado).
 - `invoke` añade unos 2 µs con el adaptador real: por debajo de los 5 µs fijados.
 
+## Nodes y sesiones (paso 5, 2026-11-14)
+
+Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_commands` y `run_commands` siguen limitados a `designer.*`.
+
+### Nodes
+
+- `NODES_ACTIONS` (`src/engine/flow/commands.ts`): **23 acciones → 21 comandos** `nodes.*` (nodo, arista, orden y ejecución). `tryConnect` y `prepareNodeRun` no son comandos; la lista dice por qué.
+- El destino es `on.session`; nodos y aristas van en los argumentos. `hasTarget` (`commandKit.ts`) rechaza antes de ejecutar un nodo o una arista que no existe.
+- Deshacer: historial `nodes:<sesión>`. `openHistoryGroup` en `src/engine/flow/history.ts` hace de una llamada o secuencia un solo paso del grafo y respeta la fusión de 700 ms por clave. Al fallar, el grafo vuelve con `patchSession`.
+- `nodes.run.start` es `spend`: sin quien apruebe se rechaza (`denied`) y no se llama a ningún proveedor (test).
+- **Deuda (4 comandos):**
+
+| Comando | Qué queda |
+|---|---|
+| `nodes.node.new_data` | Lee el modelo y los ajustes del compositor para los valores por defecto |
+| `nodes.node.add_connected` | Si la conexión se rechaza, la acción avisa y devuelve `null`; el comando solo dice que ninguna entrada encajó |
+| `nodes.node.rename` | También renombra el asset del resultado; deshacer devuelve el título del nodo, no el nombre del asset |
+| `nodes.node.set_sketch` | La copia sustituida se borra de la galería; deshacer no la devuelve |
+
+- `nodes.run.start` prepara la ejecución dos veces: `runNodes` devuelve `null` sin motivo y el comando lo calcula antes para poder decirlo. Se quita cuando `runNodes` devuelva el motivo.
+
+### Sesiones
+
+- `SESSION_ACTIONS` (`src/store/commands.ts`): 7 funciones del store → 7 comandos `sessions.*` (`list`, `new`, `select`, `rename`, `pin`, `auto_title`, `archive`). Las sesiones no tienen deshacer: sin historial.
+- `sessions.pin` recibe el estado deseado y no alterna si ya está así. `sessions.list` lee la sesión activa solo para marcarla.
+- **Deuda (2 comandos):** `sessions.new` y `sessions.select` cambian la sesión en pantalla.
+- Fuera: `deleteSession` (borra datos; va con su aprobación en otra pasada).
+
+### Sin comprobar
+
+- Ejecutar nodos de verdad, y ambos apartados en el sandbox. Ningún comando de Nodes ni de sesiones se llama aún desde la interfaz ni desde el agente.
+
 ## Alternativas
 
 - **Una herramienta del agente por comando.** Descartada: 100 herramientas inflan el contexto y desorientan a los modelos débiles. El agente tendrá `find_commands` y `run_commands`.
