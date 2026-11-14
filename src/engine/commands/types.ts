@@ -103,4 +103,13 @@ export class CommandError extends Error {
 
 export type RunResult =
   | { ok: true; results: unknown[] }
-  | { ok: false; error: { code: ErrorCode; message: string; step?: number }; results: unknown[]; rolledBack: boolean };
+  | {
+      ok: false;
+      error: { code: ErrorCode; message: string; step?: number };
+      /** What the steps before the failure returned. */
+      results: unknown[];
+      /** Some history was put back as it was. */
+      rolledBack: boolean;
+      /** Histories whose changes stay, as one undo step: the sequence had waited and the user may have edited meanwhile. */
+      kept?: string[];
+    };

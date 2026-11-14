@@ -17,7 +17,9 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { findCommandsTool, runCommandsTool } from '../src/engine/agent/commandCalls';
 import { COMMAND_TOOLS } from '../src/engine/agent/commandTools';
 import { CAPABILITIES, TOOLS } from '../src/engine/agent/tools';
-import { allCommands, argsSchema, collected, command, findCommands, invoke, run, signature } from '../src/engine/commands';
+import { z } from 'zod';
+import { allCommands, argsSchema, collected, command, defineCommand, findCommands, invoke, run, signature } from '../src/engine/commands';
+import { register } from '../src/engine/commands/registry';
 import * as actions from '../src/engine/design/actions';
 import { DESIGNER_ACTIONS } from '../src/engine/design/commands';
 import { createDoc } from '../src/engine/design/doc';
@@ -100,6 +102,19 @@ describe('a sequence on the Designer', () => {
     const result = await run({ on: on(), seq: [{ cmd: 'designer.layer.add_text', args: { text: 'Hola', x: 0, y: 0, width: 0 } }, { cmd: 'designer.layer.set', args: { layer: 'nope', opacity: 0.2 } }] }, { caller: 'agent' });
     expect(result).toMatchObject({ ok: false, error: { code: 'unavailable', message: 'No layer "nope" in this document.', step: 2 }, rolledBack: true });
     expect(now().layers).toEqual(before.layers);
+    expect(historyDepth(doc.id).undo).toBe(1);
+  });
+
+  it('keeps the user\'s edit when a step fails after the sequence waited', async () => {
+    // Stands for any step that waits (placing an image decodes it first).
+    register(defineCommand({ id: 'test.wait', title: 'Wait', args: z.object({}).strict(), effect: 'write', needs: ['session', 'doc'], history: (target) => `designer:${target.doc}`, run: () => new Promise<void>((resolve) => setTimeout(resolve, 15)) }));
+    const pending = run({ on: on(), seq: [{ cmd: 'designer.layer.add_shapes', args: { shapes: [rect], name: 'Agent' } }, { cmd: 'test.wait' }, { cmd: 'designer.layer.set', args: { layer: 'nope', opacity: 0.2 } }] }, { caller: 'agent' });
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    actions.addTextLayer(sid, doc.id, 'Mine', { x: 0, y: 0, width: 0 }, {}, 'User');
+    const result = await pending;
+    expect(result).toMatchObject({ ok: false, error: { step: 3 }, rolledBack: false, kept: [`designer:${doc.id}`] });
+    expect(now().layers.map((l) => l.name)).toEqual(['Agent', 'User']);
+    // One undo step holds both: the user's change fell inside the agent's sequence.
     expect(historyDepth(doc.id).undo).toBe(1);
   });
 

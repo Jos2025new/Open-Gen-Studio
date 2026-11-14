@@ -51,6 +51,9 @@ Medido: `invoke` añade 0,82 µs por llamada sobre un comando vacío (20 000 lla
 3. **Todo lo comprobable se comprueba antes del primer paso:** que cada comando exista, que las referencias apunten hacia atrás, y los argumentos y el destino que no dependen de una referencia.
 4. **Deshacer.** Cada comando declara los historiales que toca (`designer:<doc>`, `nodes:<sesión>`). Cada apartado registra un adaptador con `begin(id)` que devuelve `commit` y `rollback`. Una llamada o una secuencia abre una transacción por historial y la cierra al acabar: un paso de deshacer en cada uno. No hay historial global. Un comando que llama a otro sobre el mismo historial se une a la transacción abierta.
 5. **Una secuencia es todo o nada** en sus historiales: si un paso falla, vuelven a como estaban. El gasto ya hecho no se deshace; `results` dice qué pasos corrieron.
+   - **Excepción: si la secuencia esperó, no se deshace.** Mientras un paso espera de verdad (decodificar una imagen, una descarga), el usuario puede editar el mismo doc; volver atrás borraría su cambio junto con los del agente. En ese caso los cambios se quedan como un solo paso de deshacer y el resultado lo dice en `kept`, con `rolledBack: false`.
+   - «Esperó» se decide sin adivinar: un paso que termina dentro de las microtareas de su turno no dejó correr nada más, y se deshace igual que uno síncrono. Entre dos pasos síncronos no hay espera alguna.
+   - Vale también para `invoke` con un comando asíncrono que falla.
 6. **Aprobación por `effect`.** `spend` y `delete` piden aprobación cuando no llama la interfaz; desde fuera (`external`), `write` también. Se pregunta una sola vez por secuencia, con todos los pasos que la necesitan. Sin nadie que pregunte, se rechaza.
 7. **Eco.** Cada comando deja `{ cmd, args, on, caller, ok, ms, at, error, seq }` en un anillo de 50. Los argumentos se guardan por referencia: un comando recibe identificadores, nunca píxeles.
 8. **Índice automático.** `index.ts` reúne con `import.meta.glob` cada `commands.ts` y cada `*.commands.ts` de `src/` y registra su export `commands`. Un id o alias repetido falla al cargar y dice en qué archivo está el primero.
@@ -122,7 +125,8 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 - **Forma de texto con `|`.** Descartada: es un segundo lenguaje que mantener, y ni el agente ni MCP lo necesitan.
 - **Validar siempre con zod.** Descartada: la interfaz ya está tipada y pagaría la validación en cada clic.
 - **Historial global de comandos.** Descartada por ahora: el Designer y Nodes ya tienen el suyo, por documento y por grafo.
-- **Secuencia que conserva los pasos anteriores al fallo.** Descartada: deja el doc a medias y el agente no sabe en qué estado quedó.
+- **Secuencia que conserva siempre los pasos anteriores al fallo.** Descartada como regla general: deja el doc a medias. Se acepta solo cuando la secuencia esperó (regla 5), y entonces se avisa al agente de que lea el doc antes de seguir.
+- **Bloqueo de escritura del doc durante la secuencia.** Aplazada: la interfaz aún no pasa por comandos y bloquear la entrada del usuario va contra su prioridad de no frenar.
 - **Lista de archivos de comandos escrita a mano.** Descartada: varias sesiones añadiendo apartados en paralelo chocarían en ese archivo.
 
 ## Consecuencias
@@ -135,7 +139,7 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 - **Crear y borrar documentos queda fuera de deshacer**, como en la app: una secuencia que falla no quita el doc que creó.
 - `designer.doc.delete` es `delete`: desde el agente se rechaza siempre hasta que exista la tarjeta de aprobación (paso 7).
 - En una secuencia, un paso con gasto cuyos argumentos llevan `$n` llega al aprobador sin resolver: la tarjeta no puede mostrar el coste real. Lo resuelve el paso 7.
-- Si el usuario edita el doc mientras una secuencia del agente espera, su cambio cae en el mismo paso de deshacer.
+- Si el usuario edita el doc mientras una secuencia del agente espera, su cambio cae en el mismo paso de deshacer que los del agente. Nunca se pierde (regla 5), pero un Ctrl+Z quita ambos. Separarlos pide un bloqueo de escritura por doc o que la interfaz pase por comandos; queda para el paso de ventanas.
 - **Sin comprobar:**
   - Los comandos que tocan píxeles (`place_asset`, `flatten`, `merge_down`, `rasterize`, `to_asset`, `replace_pixels`, `place_above`, `ensure_paint`, y `add` o `duplicate` de una capa raster): node no tiene canvas. Los tests cubren capas vectoriales y de texto.
   - El agente con un modelo real, y todo ello en el sandbox.

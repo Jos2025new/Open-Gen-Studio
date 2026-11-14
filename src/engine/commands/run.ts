@@ -15,6 +15,31 @@ import { CommandError, type AnyCommand, type Caller, type CommandContext, type C
 const thenable = (value: unknown): value is PromiseLike<unknown> => typeof (value as PromiseLike<unknown> | null)?.then === 'function';
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** Microtask turns a step gets to finish before it counts as having waited. A step with no real wait needs a handful. */
+const HOPS = 64;
+
+/**
+ * Awaits a step. Microtasks all run before the browser handles the next event, so a step that settles within them
+ * finished in the task it started in and nobody else ran. One that does not has waited (a decode, a download): the
+ * open histories are told, and a later failure will not put them back over what the user did meanwhile.
+ */
+async function settle<T>(pending: PromiseLike<T>, txs: Transactions): Promise<T> {
+  let done = false;
+  const watched = Promise.resolve(pending).then(
+    (value) => {
+      done = true;
+      return value;
+    },
+    (error: unknown) => {
+      done = true;
+      throw error;
+    },
+  );
+  for (let hop = 0; hop < HOPS && !done; hop++) await null;
+  if (!done) txs.waited();
+  return watched;
+}
+
 function openHistories(spec: AnyCommand, on: Target, args: unknown, txs: Transactions): void {
   const keys = spec.history?.(on, args);
   if (!keys) return;
@@ -55,7 +80,7 @@ export function invoke<A, R>(spec: CommandSpec<A, R>, args: A, on: Target = {}):
     throw error;
   }
   if (thenable(result)) {
-    return result.then(
+    return settle(result, txs).then(
       (value) => {
         finish();
         return value;
@@ -172,7 +197,8 @@ let sequences = 0;
 /**
  * Runs `{ cmd, args, on }` or `{ seq: [...], on }` for a caller at the boundary. Everything that can be checked is
  * checked before the first step runs. A sequence is all or nothing in the undo histories it touches: if a step fails,
- * they go back to where they were (money already spent is not undone, and the result says which steps ran).
+ * they go back to where they were (money already spent is not undone, and the result says which steps ran). The one
+ * exception is a sequence that waited on a step: its histories are kept, as one undo step each (`kept`).
  */
 export async function run(input: unknown, options: RunOptions): Promise<RunResult> {
   const results: unknown[] = [];
@@ -180,14 +206,15 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   const fail = (error: unknown, step?: number): RunResult => {
     const known = error instanceof CommandError;
     const code: ErrorCode = known ? error.code : 'failed';
-    const rolledBack = txs.size > 0;
+    const touched = txs.size;
+    let kept: string[] = [];
     try {
-      txs.end(false);
+      kept = txs.end(false);
     } catch {
       /* the first error is the one to report */
     }
     const at = (known && error.step) || step;
-    return { ok: false, error: { code, message: message(error), ...(at ? { step: at } : {}) }, results, rolledBack };
+    return { ok: false, error: { code, message: message(error), ...(at ? { step: at } : {}) }, results, rolledBack: touched > kept.length, ...(kept.length ? { kept } : {}) };
   };
 
   const shaped = (input !== null && typeof input === 'object' && 'seq' in input ? sequenceShape : callShape).safeParse(input);
@@ -244,8 +271,9 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       if (!ready) args = parseArgs(spec, refs(args, i + 1, results), i + 1);
       check(spec, { on, caller: options.caller, signal: options.signal }, args);
       openHistories(spec, on, args, txs);
-      const result = await spec.run({ on, caller: options.caller, signal: options.signal }, args);
-      results.push(result ?? null);
+      // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
+      const out: unknown = spec.run({ on, caller: options.caller, signal: options.signal }, args);
+      results.push((thenable(out) ? await settle(out, txs) : out) ?? null);
       said();
     } catch (error) {
       said(error ?? new Error('failed'));

@@ -29,7 +29,9 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   const result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal });
   const ran = result.results.length;
   if (!result.ok) {
-    const kept = ran === 0 ? 'Nothing ran.' : result.rolledBack ? `Steps 1 to ${ran} ran and were taken back: the documents are as before.` : `Steps 1 to ${ran} ran and stay.`;
+    const kept = ran === 0 ? 'Nothing ran.'
+      : result.kept ? `Steps 1 to ${ran} ran and stay, as one undo step: the sequence waited on a step and the user may have edited meanwhile, so nothing was taken back. Read the document before going on.`
+      : result.rolledBack ? `Steps 1 to ${ran} ran and were taken back: the documents are as before.` : `Steps 1 to ${ran} ran and stay.`;
     return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${result.error.message} ${kept}`, done: false };
   }
   // The agent's edit glows on the canvas for a moment (in memory only: never saved, undone or exported).

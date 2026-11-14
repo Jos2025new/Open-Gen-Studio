@@ -48,6 +48,12 @@ const slow = defineCommand({ id: 'toy.slow', title: 'Slow', args: z.object({ fai
   if (args.fail) throw new Error('slow failed');
   return 'done';
 } });
+/** A step that really waits (a decode, a download) before it changes the document. */
+const bring = defineCommand({ id: 'toy.layer.import', title: 'Import layer', args: z.object({ name: z.string(), fail: z.boolean().optional() }).strict(), effect: 'write', needs: ['doc'], history: (on) => `toy:${on.doc}`, run: async (_ctx, args) => {
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  if (args.fail) throw new Error('import failed');
+  layers.push({ id: `l${layers.length + 1}`, name: args.name, opacity: 1 });
+} });
 const generate = defineCommand({ id: 'toy.generate', title: 'Generate', args: z.object({ prompt: z.string() }).strict(), effect: 'spend', run: (_ctx, args) => ({ image: `img:${args.prompt}` }) });
 const remove = defineCommand({ id: 'toy.layer.delete', title: 'Delete layer', args: z.object({ layer: z.string() }).strict(), effect: 'delete', run: (_ctx, args) => { layers = layers.filter((l) => l.id !== args.layer); } });
 const other = defineCommand({ id: 'toy.other.touch', title: 'Touch the graph', args: z.object({}).strict(), effect: 'write', needs: ['session'], history: (on) => `graph:${on.session}`, run: () => 'touched' });
@@ -73,7 +79,7 @@ beforeEach(() => {
   setApprover(null);
   layers = [];
   log = [];
-  for (const spec of [add, opacity, count, slow, generate, remove, other]) register(spec, 'tests/toy.ts');
+  for (const spec of [add, opacity, count, slow, bring, generate, remove, other]) register(spec, 'tests/toy.ts');
   toyHistory('toy');
   toyHistory('graph');
 });
@@ -95,7 +101,7 @@ describe('registry', () => {
 
   it('lists an area with whether each command can run now, and why not', () => {
     const found = findCommands({ area: 'toy', on: { doc: 'd1' } });
-    expect(found.map((f) => f.id)).toEqual(['toy.generate', 'toy.layer.add', 'toy.layer.count', 'toy.layer.delete', 'toy.layer.opacity', 'toy.other.touch', 'toy.slow']);
+    expect(found.map((f) => f.id)).toEqual(['toy.generate', 'toy.layer.add', 'toy.layer.count', 'toy.layer.delete', 'toy.layer.import', 'toy.layer.opacity', 'toy.other.touch', 'toy.slow']);
     const by = Object.fromEntries(found.map((f) => [f.id, f.available]));
     expect(by['toy.layer.add']).toBe(true);
     expect(by['toy.layer.opacity']).toBe('There is no layer.');
@@ -255,6 +261,34 @@ describe('run (the boundary)', () => {
     expect(thrown).toMatchObject({ ok: false, error: { code: 'failed', message: 'No layer nope.', step: 2 }, rolledBack: true });
     expect(layers).toEqual([]);
     expect(lastCommands(1)[0]).toMatchObject({ ok: false, error: 'No layer nope.' });
+  });
+
+  it('does not put back a sequence that waited: the edit the user made meanwhile would go with it', async () => {
+    const pending = run({
+      on: { doc: 'd1' },
+      seq: [
+        { cmd: 'toy.layer.add', args: { name: 'A' } },
+        { cmd: 'toy.layer.import', args: { name: 'B' } },
+        { cmd: 'toy.layer.opacity', args: { layer: 'nope', value: 1 } },
+      ],
+    }, { caller: 'agent' });
+    // The user edits the same document while step 2 waits.
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    layers.push({ id: 'user', name: 'User', opacity: 1 });
+    const result = await pending;
+    expect(result).toMatchObject({ ok: false, error: { code: 'failed', step: 3 }, rolledBack: false, kept: ['toy:d1'] });
+    expect(layers.map((l) => l.name)).toEqual(['A', 'User', 'B']);
+    expect(log).toEqual(['begin toy:d1', 'commit toy:d1']);
+  });
+
+  it('still puts back a sequence whose asynchronous step never waited, and typed code follows the same rule', async () => {
+    const quick = await run({ on: { doc: 'd1' }, seq: [{ cmd: 'toy.layer.add', args: { name: 'A' } }, { cmd: 'toy.slow', args: { fail: true } }] }, { caller: 'agent' });
+    expect(quick).toMatchObject({ ok: false, error: { step: 2 }, rolledBack: true });
+    expect(quick).not.toHaveProperty('kept');
+    expect(layers).toEqual([]);
+    log = [];
+    await expect(invoke(bring, { name: 'B', fail: true }, { doc: 'd1' })).rejects.toThrow('import failed');
+    expect(log).toEqual(['begin toy:d1', 'commit toy:d1']);
   });
 
   it('refuses a history nobody registered', async () => {
