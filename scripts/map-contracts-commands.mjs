@@ -87,4 +87,22 @@ export default [
     ],
     tests: ['tests/sessions-commands.test.ts'],
   },
+  {
+    id: 'library-commands',
+    what: 'Las funciones de biblioteca de actions.ts son comandos (LIBRARY_ACTIONS); crear estilo o voz es `spend` y borrar un sujeto es `delete`.',
+    sides: [
+      ['src/engine/library.commands.ts', 'export const LIBRARY_ACTIONS'],
+      ['src/engine/library.commands.ts', "id: 'library.voice.create'"],
+    ],
+    tests: ['tests/library-commands.test.ts'],
+  },
+  {
+    id: 'catalog-commands',
+    what: 'Cada función exportada de catalog.ts es un comando `models.*` o dice por qué no (CATALOG_ACTIONS); `apiKeyFor` nunca es un comando.',
+    sides: [
+      ['src/engine/catalog.commands.ts', 'export const CATALOG_ACTIONS'],
+      ['src/engine/catalog.commands.ts', "apiKeyFor: '- returns a secret'"],
+    ],
+    tests: ['tests/catalog-commands.test.ts'],
+  },
 ];

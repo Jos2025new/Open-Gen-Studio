@@ -119,7 +119,7 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 - El agente encadena tres comandos del Designer en una llamada, con un solo paso de deshacer (`tests/designer-commands.test.ts`, con el modelo simulado).
 - `invoke` añade unos 2 µs con el adaptador real: por debajo de los 5 µs fijados.
 
-## Nodes y sesiones (paso 5, 2026-11-14)
+## Nodes, sesiones, biblioteca y catálogo (paso 5, 2026-11-14)
 
 Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_commands` y `run_commands` siguen limitados a `designer.*`.
 
@@ -147,9 +147,17 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_
 - **Deuda (2 comandos):** `sessions.new` y `sessions.select` cambian la sesión en pantalla.
 - Fuera: `deleteSession` (borra datos; va con su aprobación en otra pasada).
 
+### Biblioteca y catálogo de modelos
+
+- `LIBRARY_ACTIONS` (`src/engine/library.commands.ts`): las 8 funciones de biblioteca de `src/engine/actions.ts` → 8 comandos `library.*` (sujeto, hoja, estilo y voz). `library.style.create` y `library.voice.create` son `spend`; `library.subject.delete` es `delete`. Sin quien apruebe se rechazan y no se llama a `fetch` (test).
+- `CATALOG_ACTIONS` (`src/engine/catalog.commands.ts`): de las 33 funciones exportadas de `catalog.ts`, 7 son comandos `models.*` (listar por tipo, leer un modelo, cargar catálogos, elegir o reiniciar el modelo del compositor y el del agente). Las otras 26 son ayudas internas. **`apiKeyFor` nunca es un comando**: devuelve un secreto.
+- Sin historial: ni la biblioteca ni el catálogo están en deshacer.
+- **Deuda (7 comandos):** `library.subject.from_sheet` recurre a la sesión activa si el asset no tiene sesión; `library.subject.from_attachments`, `library.style.create` y `library.voice.create` leen los adjuntos del compositor; `models.catalog.load`, `models.composer.pick` y `models.composer.reset` cambian el compositor en pantalla.
+- Las acciones de hoja, estilo y voz se tragan el motivo del fallo: sus comandos solo pueden dar un motivo genérico.
+
 ### Sin comprobar
 
-- Ejecutar nodos de verdad, y ambos apartados en el sandbox. Ningún comando de Nodes ni de sesiones se llama aún desde la interfaz ni desde el agente.
+- Crear estilos o voces con un proveedor real. Ejecutar nodos de verdad, y ambos apartados en el sandbox. Ninguno de estos comandos se llama aún desde la interfaz ni desde el agente.
 
 ## Check y prueba de humo (paso 4)
 
