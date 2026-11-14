@@ -12,6 +12,12 @@ const params = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()
 const estimate = z.object({ usd: z.number().nullable(), approximate: z.boolean(), lowerBound: z.boolean().optional(), note: z.string().optional(), exact: z.boolean().optional() }).strict();
 const point = z.object({ x: z.number(), y: z.number() }).strict();
 const session = (ctx: { on: { session?: string } }) => useStore.getState().sessions[ctx.on.session!] ? true : `No session "${ctx.on.session}".`;
+/** For the commands whose action works on the session on screen: any other session is refused, never swapped silently. */
+const onScreen = (ctx: { on: { session?: string } }) => {
+  const known = session(ctx);
+  if (known !== true) return known;
+  return useStore.getState().activeSessionId === ctx.on.session ? true : `Session "${ctx.on.session}" is not on screen; this command acts on the one on screen.`;
+};
 const asset = (id?: string) => !id || useStore.getState().assets[id] ? true : `No asset "${id}".`;
 const generation = (id?: string) => !id || useStore.getState().generations[id] ? true : `No generation "${id}".`;
 const layer = (ctx: { on: { session?: string } }, args?: { docId?: string; layerId?: string }) => {
@@ -39,9 +45,9 @@ export const commands = [
     args: z.object({ kind }).strict(),
     effect: 'read',
     needs: ['session'],
-    available: (ctx) => session(ctx),
+    available: (ctx) => onScreen(ctx),
     debt: 'Reads the composer and the active session and workspace.',
-    run: ({ on }, args) => { const result = A.checkDirect(args.kind); if (!result.ok) throw new Error(result.reason ?? "Cannot generate yet."); return result; },
+    run: (_ctx, args) => { const result = A.checkDirect(args.kind); if (!result.ok) throw new Error(result.reason ?? "Cannot generate yet."); return result; },
   }),
   defineCommand({
     id: 'studio.generation.estimate',
@@ -51,7 +57,7 @@ export const commands = [
     effect: 'read',
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
-    run: ({ on }, args) => { const result = A.regenerateEstimate(args.generationId); if (!result) throw new Error("Generation estimate unavailable."); return result; },
+    run: (_ctx, args) => { const result = A.regenerateEstimate(args.generationId); if (!result) throw new Error("Generation estimate unavailable."); return result; },
   }),
   defineCommand({
     id: 'studio.asset.estimate',
@@ -60,9 +66,9 @@ export const commands = [
     args: z.object({ assetId: id, op, params, modelRef: id.optional() }).strict(),
     effect: 'write',
     needs: ['session'],
-    available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
+    available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
     debt: 'Reads the active session and may fetch and cache provider schemas.',
-    run: ({ on }, args) => { return A.opEstimate(args.assetId, args.op, args.params, args.modelRef); },
+    run: (_ctx, args) => { return A.opEstimate(args.assetId, args.op, args.params, args.modelRef); },
   }),
   defineCommand({
     id: 'studio.layer.estimate',
@@ -83,7 +89,7 @@ export const commands = [
     effect: 'read',
     needs: ['session'],
     available: (ctx) => session(ctx),
-    run: ({ on }, args) => { if (!A.schemaReady(args.ref)) throw new Error("Model schema is not ready."); return true; },
+    run: (_ctx, args) => { if (!A.schemaReady(args.ref)) throw new Error("Model schema is not ready."); return true; },
   }),
   defineCommand({
     id: 'studio.images.accepts',
@@ -94,7 +100,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx) => session(ctx),
     debt: 'Reads the composer model for the requested kind.',
-    run: ({ on }, args) => { return A.acceptsImages(args.kind); },
+    run: (_ctx, args) => { return A.acceptsImages(args.kind); },
   }),
   defineCommand({
     id: 'studio.param.has',
@@ -105,7 +111,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx) => session(ctx),
     debt: 'Reads the composer model for the requested kind.',
-    run: ({ on }, args) => { if (!A.hasParam(args.kind, args.role)) throw new Error("Model parameter is unavailable."); return true; },
+    run: (_ctx, args) => { if (!A.hasParam(args.kind, args.role)) throw new Error("Model parameter is unavailable."); return true; },
   }),
   defineCommand({
     id: 'studio.lyrics.apply',
@@ -116,7 +122,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx) => session(ctx),
     debt: 'Reads and changes the composer; the action reports some failures only as notices.',
-    run: async ({ on }, args) => { await A.applyLyrics(args.text); },
+    run: async (_ctx, args) => { await A.applyLyrics(args.text); },
   }),
   defineCommand({
     id: 'studio.generation.edit',
@@ -127,7 +133,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
     debt: 'Reads and changes the composer; unsupported generations only produce a notice.',
-    run: async ({ on }, args) => { await A.editInComposer(args.generationId); },
+    run: async (_ctx, args) => { await A.editInComposer(args.generationId); },
   }),
   defineCommand({
     id: 'studio.asset.favorite',
@@ -137,7 +143,7 @@ export const commands = [
     effect: 'write',
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
-    run: ({ on }, args) => { A.toggleFavorite(args.assetId); },
+    run: (_ctx, args) => { A.toggleFavorite(args.assetId); },
   }),
   defineCommand({
     id: 'studio.asset.reference',
@@ -148,7 +154,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
     debt: 'Changes the composer and screen; missing model views only produce a notice.',
-    run: ({ on }, args) => { A.useAsReference(args.assetId); },
+    run: (_ctx, args) => { A.useAsReference(args.assetId); },
   }),
   defineCommand({
     id: 'studio.asset.attach',
@@ -159,7 +165,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
     debt: 'Changes the composer attachment list.',
-    run: ({ on }, args) => { const a = useStore.getState().assets[args.assetId]; if (!A.AGENT_ATTACHABLE.includes(a.kind)) throw new Error("This asset cannot be attached."); A.toggleAgentAttachment(args.assetId); },
+    run: (_ctx, args) => { const a = useStore.getState().assets[args.assetId]; if (!A.AGENT_ATTACHABLE.includes(a.kind)) throw new Error("This asset cannot be attached."); A.toggleAgentAttachment(args.assetId); },
   }),
   defineCommand({
     id: 'studio.node.add_asset',
@@ -178,9 +184,9 @@ export const commands = [
     args: z.object({ assetId: id }).strict(),
     effect: 'write',
     needs: ['session'],
-    available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
+    available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
     debt: 'Reads the active session and changes the screen.',
-    run: ({ on }, args) => { A.sendToNodes(args.assetId); },
+    run: (_ctx, args) => { A.sendToNodes(args.assetId); },
   }),
   defineCommand({
     id: 'studio.model.prepare',
@@ -191,7 +197,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx) => session(ctx),
     debt: 'May fetch a provider schema and change the catalog.',
-    run: async ({ on }, args) => { await A.prepareModel(args.ref); },
+    run: async (_ctx, args) => { await A.prepareModel(args.ref); },
   }),
   defineCommand({
     id: 'studio.generate.start',
@@ -200,9 +206,9 @@ export const commands = [
     args: z.object({ kind }).strict(),
     effect: 'spend',
     needs: ['session'],
-    available: (ctx) => session(ctx),
+    available: (ctx) => onScreen(ctx),
     debt: 'Reads the active session, composer and screen; the action reports some failures only as notices.',
-    run: async ({ on }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); await A.generateDirect(args.kind); },
+    run: async (_ctx, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); await A.generateDirect(args.kind); },
   }),
   defineCommand({
     id: 'studio.generation.regenerate',
@@ -213,7 +219,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
     debt: 'The action reports some failures only as notices.',
-    run: async ({ on }, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId); if (problem) throw new Error(problem); await A.regenerate(args.generationId); },
+    run: async (_ctx, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId); if (problem) throw new Error(problem); await A.regenerate(args.generationId); },
   }),
   defineCommand({
     id: 'studio.asset.run_op',
@@ -222,9 +228,9 @@ export const commands = [
     args: z.object({ assetId: id, op, params, parentId: id.optional(), modelRef: id.optional(), place: z.enum(['studio', 'canvas', 'designer', 'space-create', 'space-tools']).optional(), mode: z.enum(['image', 'video', 'audio', 'model3d', 'agent']).optional() }).strict(),
     effect: 'spend',
     needs: ['session'],
-    available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
+    available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
     debt: 'Reads the active session and screen; failures can be reported only as notices.',
-    run: async ({ on }, args) => { const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
+    run: async (_ctx, args) => { const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
   }),
   defineCommand({
     id: 'studio.layer.run_op',
@@ -245,7 +251,7 @@ export const commands = [
     effect: 'delete',
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
-    run: ({ on }, args) => { A.deleteGeneration(args.generationId); },
+    run: (_ctx, args) => { A.deleteGeneration(args.generationId); },
   }),
   defineCommand({
     id: 'studio.assets.delete',
@@ -256,7 +262,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : args?.ids?.map(asset).find((v) => v !== true) ?? true,
     debt: 'The action reports assets in use only as a notice.',
-    run: ({ on }, args) => { A.deleteAssets(args.ids); },
+    run: (_ctx, args) => { A.deleteAssets(args.ids); },
   }),
   defineCommand({
     id: 'studio.session.delete',
@@ -267,7 +273,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx) => session(ctx),
     debt: 'May change the session on screen when deleting a session.',
-    run: ({ on }, args) => { A.deleteSession(on.session!); },
+    run: ({ on }) => { A.deleteSession(on.session!); },
   }),
 ];
 

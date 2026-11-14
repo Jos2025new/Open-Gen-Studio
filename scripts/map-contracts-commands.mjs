@@ -105,4 +105,14 @@ export default [
     ],
     tests: ['tests/catalog-commands.test.ts'],
   },
+  {
+    id: 'studio-commands',
+    what: 'Cada función exportada de engine/actions.ts es un comando `studio.*`, es de biblioteca o dice por qué no (STUDIO_ACTIONS); generar y operar son `spend`, borrar es `delete`.',
+    sides: [
+      ['src/engine/actions.commands.ts', 'export const STUDIO_ACTIONS'],
+      ['src/engine/actions.commands.ts', "id: 'studio.generate.start'"],
+      ['src/engine/actions.commands.ts', "id: 'studio.session.delete'"],
+    ],
+    tests: ['tests/studio-commands.test.ts'],
+  },
 ];

@@ -119,7 +119,7 @@ Las 22 herramientas anteriores no cambian. La guía `app:designer` gana una lín
 - El agente encadena tres comandos del Designer en una llamada, con un solo paso de deshacer (`tests/designer-commands.test.ts`, con el modelo simulado).
 - `invoke` añade unos 2 µs con el adaptador real: por debajo de los 5 µs fijados.
 
-## Nodes, sesiones, biblioteca y catálogo (paso 5, 2026-11-14)
+## Nodes, sesiones, biblioteca, catálogo y Studio (paso 5, 2026-11-14)
 
 Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_commands` y `run_commands` siguen limitados a `designer.*`.
 
@@ -155,9 +155,20 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente no cambia: `find_
 - **Deuda (7 comandos):** `library.subject.from_sheet` recurre a la sesión activa si el asset no tiene sesión; `library.subject.from_attachments`, `library.style.create` y `library.voice.create` leen los adjuntos del compositor; `models.catalog.load`, `models.composer.pick` y `models.composer.reset` cambian el compositor en pantalla.
 - Las acciones de hoja, estilo y voz se tragan el motivo del fallo: sus comandos solo pueden dar un motivo genérico.
 
+### Studio y chat
+
+- `STUDIO_ACTIONS` (`src/engine/actions.commands.ts`): cada función exportada de `src/engine/actions.ts` → un comando `studio.*`, la marca de que es de biblioteca, o por qué no es un comando. **23 comandos**: 6 `read`, 10 `write`, 4 `spend` y 3 `delete`.
+- `spend`: `studio.generate.start`, `studio.generation.regenerate`, `studio.asset.run_op` y `studio.layer.run_op`. `delete`: `studio.generation.delete`, `studio.assets.delete` y `studio.session.delete`. Los siete se rechazan sin quien apruebe, con `fetch` bloqueado y el store intacto (test).
+- No son comandos: `uploadFiles` y `attachFiles` (reciben `File`), `assetObjectUrl` (URL de objeto del navegador), `copyText` (portapapeles), `downloadAsset` (descarga) y `needsSpendCheck` (ayuda de presupuesto).
+- Las dos estimaciones de operación (`studio.asset.estimate`, `studio.layer.estimate`) y `studio.model.prepare` son `write`: pueden pedir y guardar el esquema del proveedor.
+- Cinco comandos actúan sobre la sesión en pantalla aunque reciban `on.session` (`studio.direct.check`, `studio.asset.estimate`, `studio.node.send_asset`, `studio.generate.start`, `studio.asset.run_op`). Si `on.session` no es la sesión en pantalla, se rechazan (`unavailable`): nunca generan en una sesión distinta de la nombrada.
+- **Deuda (17 comandos, en `scripts/commands-debt/studio.json`)**, de dos clases:
+  - leen la sesión activa, el compositor o la pantalla por dentro;
+  - **la acción solo avisa con un toast cuando no hace nada, así que el comando puede responder bien sin haber actuado** (generar, regenerar, operaciones, borrar assets en uso, letras, editar en el compositor, usar como referencia). Se quita cuando esas acciones devuelvan el motivo.
+
 ### Sin comprobar
 
-- Crear estilos o voces con un proveedor real. Ejecutar nodos de verdad, y ambos apartados en el sandbox. Ninguno de estos comandos se llama aún desde la interfaz ni desde el agente.
+- Generar, regenerar u operar con un proveedor real. Crear estilos o voces con un proveedor real. Ejecutar nodos de verdad, y ambos apartados en el sandbox. Ninguno de estos comandos se llama aún desde la interfaz ni desde el agente.
 
 ## Check y prueba de humo (paso 4)
 
