@@ -253,6 +253,40 @@ export function limitedLlmFallback(models: LlmModel[]): LlmModel | undefined {
 /** Silence after which an agent call counts as stalled (no headers yet, or no chunk while streaming). */
 export const STALL_MS = 120_000;
 
+/** True for Anthropic models accessed directly or through a router (e.g. OpenRouter `anthropic/claude-...`). */
+export function isAnthropicModel(model: string): boolean {
+  const m = model.toLowerCase();
+  return m.includes('anthropic/') || m.includes('claude');
+}
+
+/** Reads cached input token count across OpenAI/OpenRouter, Anthropic, and Responses usage shapes. */
+function readCachedTokens(u: Loose): number | undefined {
+  const promptDetails = u.prompt_tokens_details as Loose | undefined;
+  const inputDetails = u.input_tokens_details as Loose | undefined;
+  for (const v of [promptDetails?.cached_tokens, u.cache_read_input_tokens, inputDetails?.cached_tokens]) {
+    if (typeof v === 'number') return v;
+  }
+  return undefined;
+}
+
+/** Marks the last user message as a cache breakpoint; a string content becomes one text block. Never mutates its input. */
+function withLastUserBreakpoint(messages: LlmMessage[]): LlmMessage[] {
+  const i = messages.map((m) => m.role).lastIndexOf('user');
+  if (i < 0) return messages;
+  const m = messages[i];
+  const mark = { type: 'ephemeral' as const };
+  let content: unknown = m.content;
+  if (typeof content === 'string') {
+    if (!content) return messages;
+    content = [{ type: 'text', text: content, cache_control: mark }];
+  } else if (Array.isArray(content) && content.length) {
+    content = [...content.slice(0, -1), { ...(content[content.length - 1] as object), cache_control: mark }];
+  } else return messages;
+  const out = messages.slice();
+  out[i] = { ...m, content } as LlmMessage;
+  return out;
+}
+
 /** Only OpenRouter reads `reasoning_details` back, and only those of the current turn (after the last user message); older ones add input tokens for nothing. */
 function withoutDetails(messages: LlmMessage[], provider: LlmProviderId): LlmMessage[] {
   const lastUser = provider === 'openrouter' ? messages.map((m) => m.role).lastIndexOf('user') : messages.length;
@@ -283,11 +317,19 @@ export async function chat(opts: {
   /** Told when the provider refused the reasoning settings and the answer runs without them. */
   onNotice?: (text: string) => void;
 }): Promise<ChatResult> {
+  const anthropic = isAnthropicModel(opts.model);
+  const systemMessage = anthropic && opts.system
+    ? { role: 'system' as const, content: [{ type: 'text' as const, text: opts.system, cache_control: { type: 'ephemeral' as const } }] }
+    : { role: 'system' as const, content: opts.system };
+  // Anthropic caches tools, then system, then messages, up to each breakpoint: the system breakpoint covers the tools,
+  // and the one on the last user message covers the history, which every call of the tool loop resends.
+  const tools = opts.tools.length ? opts.tools : undefined;
+  const history = withoutDetails(opts.messages, opts.provider);
   const body: Record<string, unknown> = {
     model: opts.model,
-    messages: [{ role: 'system', content: opts.system }, ...withoutDetails(opts.messages, opts.provider)],
+    messages: [systemMessage, ...(anthropic ? withLastUserBreakpoint(history) : history)],
     // A call without tools (the plan card's prompt rewrite) sends none: some providers reject an empty list.
-    ...(opts.tools.length ? { tools: opts.tools, tool_choice: 'auto' } : {}),
+    ...(tools ? { tools, tool_choice: 'auto' } : {}),
     stream: true,
     max_tokens: 16000,
   };
@@ -379,13 +421,12 @@ export async function chat(opts: {
     const u = chunk.usage as Loose | undefined;
     if (u) {
       const out = u.completion_tokens_details as Loose | undefined;
-      const inp = u.prompt_tokens_details as Loose | undefined;
       usage = {
         inputTokens: Number(u.prompt_tokens ?? 0),
         outputTokens: Number(u.completion_tokens ?? 0),
         costUsd: typeof u.cost === 'number' ? u.cost : undefined,
         reasoningTokens: typeof out?.reasoning_tokens === 'number' ? out.reasoning_tokens : undefined,
-        cachedTokens: typeof inp?.cached_tokens === 'number' ? inp.cached_tokens : undefined,
+        cachedTokens: readCachedTokens(u),
       };
     }
     const choice = (chunk.choices as Loose[] | undefined)?.[0];
