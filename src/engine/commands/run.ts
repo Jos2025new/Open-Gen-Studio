@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { FREE, UNKNOWN, sumEstimates } from '../pricing';
+import type { Estimate } from '../types';
 import { echo } from './echo';
-import { Transactions } from './history';
+import { Transactions, takeStateSnapshot } from './history';
 import { command, missingTarget } from './registry';
 import { CommandError, type AnyCommand, type Caller, type CommandContext, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
 
@@ -105,10 +107,12 @@ export interface ApprovalStep {
   effect: Effect;
   args: unknown;
   on: Target;
+  estimate: Estimate;
 }
 export interface ApprovalRequest {
   caller: Caller;
   steps: ApprovalStep[];
+  estimate: Estimate;
 }
 /** Shows the user what is about to happen and answers yes or no. One question per sequence, never one per step. */
 export type Approver = (request: ApprovalRequest) => boolean | Promise<boolean>;
@@ -172,6 +176,31 @@ function hasRefs(value: unknown): boolean {
   return value !== null && typeof value === 'object' && Object.values(value).some(hasRefs);
 }
 
+function canResolveRefs(value: unknown, ran: boolean[]): boolean {
+  if (typeof value === 'string') {
+    if (value.startsWith('$$')) return true;
+    const m = REF.exec(value);
+    return !m || Boolean(ran[Number(m[1]) - 1]);
+  }
+  if (Array.isArray(value)) return value.every((item) => canResolveRefs(item, ran));
+  if (value !== null && typeof value === 'object') return Object.values(value).every((item) => canResolveRefs(item, ran));
+  return true;
+}
+
+function partialRefs(value: unknown, at: number, results: unknown[], ran: boolean[]): unknown {
+  if (typeof value === 'string') {
+    if (value.startsWith('$$')) return value;
+    const m = REF.exec(value);
+    if (!m || !ran[Number(m[1]) - 1]) return value;
+    return refs(value, at, results);
+  }
+  if (Array.isArray(value)) return value.map((item) => partialRefs(item, at, results, ran));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, partialRefs(v, at, results, ran)]));
+  }
+  return value;
+}
+
 // --- The boundary ---------------------------------------------------------------------------------------------------
 
 export const MAX_STEPS = 40;
@@ -190,6 +219,7 @@ function parseArgs(spec: AnyCommand, args: unknown, step: number): unknown {
 export interface RunOptions {
   caller: Exclude<Caller, 'ui'>;
   signal?: AbortSignal;
+  approver?: Approver;
 }
 
 let sequences = 0;
@@ -203,6 +233,7 @@ let sequences = 0;
 export async function run(input: unknown, options: RunOptions): Promise<RunResult> {
   const results: unknown[] = [];
   const txs = new Transactions();
+  const steps: { spec: AnyCommand; rawArgs: unknown; rawOn: Target; args: unknown; on: Target; ready: boolean; onReady: boolean; ran: boolean }[] = [];
   const fail = (error: unknown, step?: number): RunResult => {
     const known = error instanceof CommandError;
     const code: ErrorCode = known ? error.code : 'failed';
@@ -214,7 +245,8 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       /* the first error is the one to report */
     }
     const at = (known && error.step) || step;
-    return { ok: false, error: { code, message: message(error), ...(at ? { step: at } : {}) }, results, rolledBack: touched > kept.length, ...(kept.length ? { kept } : {}) };
+    const ranResults = steps.length ? results.filter((_, i) => steps[i]?.ran) : results;
+    return { ok: false, error: { code, message: message(error), ...(at ? { step: at } : {}) }, results: ranResults, rolledBack: touched > kept.length, ...(kept.length ? { kept } : {}) };
   };
 
   const shaped = (input !== null && typeof input === 'object' && 'seq' in input ? sequenceShape : callShape).safeParse(input);
@@ -223,61 +255,156 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   const base: Target = 'seq' in shaped.data ? (shaped.data.on ?? {}) : {};
 
   // Before anything runs: every command exists, references point back, and what holds no reference is already valid.
-  const steps: { spec: AnyCommand; args: unknown; on: Target; ready: boolean }[] = [];
   try {
     calls.forEach((call, i) => {
       const spec = command(call.cmd);
       if (!spec) throw new CommandError('unknown', `No command "${call.cmd}".`, i + 1);
-      const on: Target = { ...base, ...call.on };
+      const rawOn: Target = { ...base, ...call.on };
       refs(call.args, i + 1);
-      refs(on, i + 1);
+      refs(rawOn, i + 1);
       const ready = !hasRefs(call.args);
       const args = ready ? parseArgs(spec, call.args, i + 1) : call.args;
-      if (!hasRefs(on)) {
-        const missing = missingTarget(spec, on);
+      const onReady = !hasRefs(rawOn);
+      if (onReady) {
+        const missing = missingTarget(spec, rawOn);
         if (missing) throw new CommandError('target', missing, i + 1);
       }
-      steps.push({ spec, args, on, ready });
+      steps.push({ spec, rawArgs: call.args, rawOn, args, on: rawOn, ready, onReady, ran: false });
     });
   } catch (error) {
     return fail(error);
   }
 
-  const asks = steps.flatMap(({ spec, args, on }, i): ApprovalStep[] => (needsApproval(spec.effect, options.caller) ? [{ step: i + 1, cmd: spec.id, title: spec.title, effect: spec.effect, args, on }] : []));
-  if (asks.length) {
-    let yes = false;
-    try {
-      yes = approver ? await approver({ caller: options.caller, steps: asks }) : false;
-    } catch (error) {
-      return fail(error, asks[0].step);
-    }
-    if (!yes) return fail(new CommandError('denied', approver ? 'The user did not approve it.' : 'This needs the user\'s approval and nothing here can ask for it.', asks[0].step));
+  const activeApprover = options.approver ?? approver;
+  const lastAskIndex = steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
+  if (lastAskIndex >= 0 && !activeApprover) {
+    const firstAsk = steps.findIndex(({ spec }) => needsApproval(spec.effect, options.caller));
+    return fail(new CommandError('denied', "This needs the user's approval and nothing here can ask for it.", firstAsk + 1));
   }
 
   const seq = steps.length > 1 ? ++sequences : undefined;
-  for (let i = 0; i < steps.length; i++) {
-    const { spec, ready } = steps[i];
+  const runStep = async (i: number, bufferedEchoes?: (() => void)[]): Promise<void> => {
+    const step = steps[i];
+    const { spec } = step;
     const at = Date.now();
     const t0 = performance.now();
-    let args = steps[i].args;
-    let on = steps[i].on;
-    const said = (error?: unknown) =>
-      echo({ cmd: spec.id, args, on, caller: options.caller, ok: error === undefined, ms: performance.now() - t0, at, ...(error === undefined ? {} : { error: message(error) }), ...(seq ? { seq } : {}) });
+    let args = step.args;
+    let on = step.on;
+    const said = (error?: unknown) => {
+      const entry = () =>
+        echo({ cmd: spec.id, args, on, caller: options.caller, ok: error === undefined, ms: performance.now() - t0, at, ...(error === undefined ? {} : { error: message(error) }), ...(seq ? { seq } : {}) });
+      if (bufferedEchoes && error === undefined) bufferedEchoes.push(entry);
+      else entry();
+    };
     try {
       if (options.signal?.aborted) throw new CommandError('failed', 'Stopped.');
-      const target = targetShape.safeParse(refs(on, i + 1, results));
-      if (!target.success) throw new CommandError('ref', `${spec.id}: a reference in "on" must give an id (text).`);
-      on = target.data;
-      if (!ready) args = parseArgs(spec, refs(args, i + 1, results), i + 1);
+      if (!step.onReady) {
+        const target = targetShape.safeParse(refs(step.rawOn, i + 1, results));
+        if (!target.success) throw new CommandError('ref', `${spec.id}: a reference in "on" must give an id (text).`);
+        on = target.data;
+        step.on = on;
+        step.onReady = true;
+      }
+      if (!step.ready) {
+        args = parseArgs(spec, refs(step.rawArgs, i + 1, results), i + 1);
+        step.args = args;
+        step.ready = true;
+      }
       check(spec, { on, caller: options.caller, signal: options.signal }, args);
       openHistories(spec, on, args, txs);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
       const out: unknown = spec.run({ on, caller: options.caller, signal: options.signal }, args);
-      results.push((thenable(out) ? await settle(out, txs) : out) ?? null);
+      results[i] = (thenable(out) ? await settle(out, txs) : out) ?? null;
+      step.ran = true;
       said();
     } catch (error) {
       said(error ?? new Error('failed'));
-      return fail(error, i + 1);
+      throw { error, step: i + 1 };
+    }
+  };
+
+  if (lastAskIndex >= 0 && activeApprover) {
+    const restoreSnapshot = takeStateSnapshot();
+    const bufferedEchoes: (() => void)[] = [];
+    try {
+      for (let i = 0; i < lastAskIndex; i++) {
+        const step = steps[i];
+        const ran = steps.map((s) => s.ran);
+        if (!needsApproval(step.spec.effect, options.caller) && canResolveRefs(step.rawOn, ran) && canResolveRefs(step.rawArgs, ran)) {
+          await runStep(i, bufferedEchoes);
+        }
+      }
+    } catch (failure) {
+      const { error, step } = failure as { error: unknown; step: number };
+      const out = fail(error, step);
+      restoreSnapshot();
+      return out;
+    }
+
+    const ran = steps.map((s) => s.ran);
+    const asks: ApprovalStep[] = [];
+    try {
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        if (!needsApproval(step.spec.effect, options.caller)) continue;
+        if (!step.onReady && canResolveRefs(step.rawOn, ran)) {
+          const target = targetShape.safeParse(refs(step.rawOn, i + 1, results));
+          if (!target.success) throw new CommandError('ref', `${step.spec.id}: a reference in "on" must give an id (text).`, i + 1);
+          step.on = target.data;
+          step.onReady = true;
+          const missing = missingTarget(step.spec, step.on);
+          if (missing) throw new CommandError('target', missing, i + 1);
+        }
+        if (!step.ready && canResolveRefs(step.rawArgs, ran)) {
+          step.args = parseArgs(step.spec, refs(step.rawArgs, i + 1, results), i + 1);
+          step.ready = true;
+        }
+        const previewOn = step.onReady ? step.on : (partialRefs(step.rawOn, i + 1, results, ran) as Target);
+        const previewArgs = step.ready ? step.args : partialRefs(step.rawArgs, i + 1, results, ran);
+        let estimate: Estimate = FREE;
+        if (step.spec.effect === 'spend') {
+          try {
+            estimate = step.spec.estimate ? step.spec.estimate({ on: previewOn, caller: options.caller, signal: options.signal }, previewArgs) : UNKNOWN;
+          } catch {
+            estimate = UNKNOWN;
+          }
+        }
+        asks.push({ step: i + 1, cmd: step.spec.id, title: step.spec.title, effect: step.spec.effect, args: previewArgs, on: previewOn, estimate });
+      }
+    } catch (error) {
+      for (const s of steps) s.ran = false;
+      const out = fail(error);
+      restoreSnapshot();
+      return out;
+    }
+
+    const spendEstimates = asks.filter((a) => a.effect === 'spend').map((a) => a.estimate);
+    const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
+    let yes = false;
+    try {
+      yes = await activeApprover({ caller: options.caller, steps: asks, estimate });
+    } catch (error) {
+      for (const s of steps) s.ran = false;
+      const out = fail(error, asks[0].step);
+      restoreSnapshot();
+      return out;
+    }
+    if (!yes) {
+      for (const s of steps) s.ran = false;
+      const out = fail(new CommandError('denied', 'The user did not approve it.', asks[0].step));
+      restoreSnapshot();
+      return out;
+    }
+    for (const flush of bufferedEchoes) flush();
+  }
+
+  for (let i = 0; i < steps.length; i++) {
+    if (steps[i].ran) continue;
+    try {
+      await runStep(i);
+    } catch (failure) {
+      const { error, step } = failure as { error: unknown; step: number };
+      return fail(error, step);
     }
   }
   try {

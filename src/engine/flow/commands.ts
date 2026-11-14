@@ -301,6 +301,7 @@ export const commands = [
     description: 'Runs these nodes and their missing ancestors, after checking the preview and the spending limit. Spends money and cannot be undone.',
     args: z.object({ targets: ids, force: z.boolean().optional() }).strict(),
     effect: 'spend',
+    estimate: (on, args) => A.previewRun(on.session, args.targets, args.force ?? true).estimate,
     run: async (on, args) => {
       const preview = await A.prepareNodeRun(on.session, args.targets, args.force ?? true);
       if (preview.errors.length) throw new Error(preview.errors[0]);

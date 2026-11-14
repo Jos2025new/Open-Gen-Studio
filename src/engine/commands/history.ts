@@ -92,3 +92,14 @@ export function resetHistories(): void {
   adapters.clear();
   open.clear();
 }
+
+let snapshotter: (() => () => void) | null = null;
+
+/** Registers how `run()` snapshots app state before pre-running steps ahead of an approval prompt. */
+export function registerStateSnapshot(fn: (() => () => void) | null): void {
+  snapshotter = fn;
+}
+
+export function takeStateSnapshot(): () => void {
+  return snapshotter ? snapshotter() : () => {};
+}
