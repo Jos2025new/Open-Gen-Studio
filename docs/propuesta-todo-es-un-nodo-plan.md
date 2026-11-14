@@ -75,11 +75,16 @@ De ese documento se aprovecha la evidencia. Su modelo de datos no se adopta tal 
 
 ## Decisiones del usuario abiertas
 
-1. Dos agentes en un chat: quién habla y cuándo.
-2. Modos de acople de modelos. Propuesta, por la media profesional: cable o acoplado al borde, y agrupar con los
-   grupos que ya existen. La «fusión» de Argon queda fuera mientras no se vea su uso.
-3. Reglas de la puerta externa (paso 3).
-4. Boceto del omnicanvas (paso 12).
+Solo lo que la idea del usuario no resuelve y exige su aprobación por regla (seguridad, identidad visual):
+
+1. Reglas de la puerta externa (paso 3).
+2. Boceto del omnicanvas (paso 12).
+
+Resuelto por la media profesional, cambiable si el usuario lo pide:
+
+- **Dos agentes en un chat:** responde el agente principal; el segundo, cuando se le menciona (@nombre) o se le
+  pasa el turno.
+- **Acople de modelos:** los tres modos que nombró el usuario: cable, acoplado (en el borde o agrupado) y fusionado.
 
 Decidido: el gasto lo pone el usuario. Fija un límite una vez; al llegar al tope se ofrece «Permitir esta vez»,
 «Permitir durante toda la sesión» o «No volver a preguntar hasta la próxima sesión». Sin modo automático ni topes
