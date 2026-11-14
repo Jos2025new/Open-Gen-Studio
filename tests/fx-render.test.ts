@@ -41,7 +41,7 @@ vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: a
 
 import { drawDoc, exportDoc, layerBox } from '../src/engine/design/render';
 import { applyFx, cssFilter, glowPasses, mixFx } from '../src/engine/fx/canvas';
-import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
+import { newFxLayer, newFxOp } from '../src/engine/fx/fxCommands';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
 import type { DesignDoc } from '../src/engine/types';
 import { awaitFrame, startTrace, stopTrace, type TraceEvent } from '../src/lib/trace';

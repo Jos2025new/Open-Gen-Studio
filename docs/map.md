@@ -20,16 +20,16 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 355 | 270 |
-| [store.ts](../src/store/store.ts) | 240 | 243 |
+| [types.ts](../src/engine/types.ts) | 355 | 271 |
+| [store.ts](../src/store/store.ts) | 240 | 244 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 140 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 98 | 0 |
-| [actions.ts](../src/engine/design/actions.ts) | 73 | 43 |
+| [actions.ts](../src/engine/design/actions.ts) | 73 | 44 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 4 |
 | [media.ts](../src/lib/media.ts) | 58 | 50 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
-| [doc.ts](../src/engine/design/doc.ts) | 47 | 71 |
+| [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
 | [ops.ts](../src/engine/ops.ts) | 46 | 18 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 27 |
@@ -56,20 +56,20 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 16 |
-| `src/engine` | 66 | 332 |
+| `src/engine` | 66 | 333 |
 | `src/engine/agent` | 56 | 112 |
-| `src/engine/commands` | 7 | 8 |
-| `src/engine/design` | 162 | 200 |
+| `src/engine/commands` | 7 | 9 |
+| `src/engine/design` | 163 | 201 |
 | `src/engine/flow` | 14 | 26 |
-| `src/engine/fx` | 8 | 9 |
+| `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 59 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 34 | 339 |
-| `src/store` | 17 | 245 |
+| `src/lib` | 34 | 340 |
+| `src/store` | 17 | 246 |
 
-216 de 647 módulos no tienen ningún test que los importe directamente.
+216 de 648 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

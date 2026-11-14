@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { docToSvg, type SvgDeps } from '../src/engine/design/export';
 import { fxFilter, opPrimitives, saturateMatrix } from '../src/engine/fx/svg';
-import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
+import { newFxLayer, newFxOp } from '../src/engine/fx/fxCommands';
 import type { DesignDoc, VectorLayer } from '../src/engine/types';
 import type { FxLayer } from '../src/engine/fx/types';
 

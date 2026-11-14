@@ -1,4 +1,4 @@
-import type { FxCommand } from '../fx/commands';
+import type { FxCommand } from '../fx/fxCommands';
 import { activeDoc } from '../design/actions';
 import { runFx } from '../design/fx';
 import { designerFxSchema } from './designerTools';

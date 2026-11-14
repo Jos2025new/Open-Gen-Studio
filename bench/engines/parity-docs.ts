@@ -1,5 +1,5 @@
 import { createDoc, newRasterLayer, newVectorLayer } from '../../src/engine/design/doc';
-import { newFxLayer, newFxOp } from '../../src/engine/fx/commands';
+import { newFxLayer, newFxOp } from '../../src/engine/fx/fxCommands';
 import type { DesignDoc, Layer, LayerGroup, RasterLayer, RasterStroke } from '../../src/engine/types';
 
 /*

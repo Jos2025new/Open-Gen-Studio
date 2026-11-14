@@ -22,6 +22,7 @@ import { allCommands, argsSchema, collected, command, defineCommand, findCommand
 import { register } from '../src/engine/commands/registry';
 import * as actions from '../src/engine/design/actions';
 import { DESIGNER_ACTIONS } from '../src/engine/design/commands';
+import { FX_DO } from '../src/engine/design/fx.commands';
 import { createDoc } from '../src/engine/design/doc';
 import { historyDepth } from '../src/engine/design/history';
 import { useStore } from '../src/store/store';
@@ -46,13 +47,13 @@ describe('the Designer actions as commands', () => {
     const ids = new Set(Object.values(DESIGNER_ACTIONS).filter((to) => !to.startsWith('- ')));
     for (const id of ids) expect(command(id), id).toBeDefined();
     const designer = allCommands().filter((c) => c.id.startsWith('designer.')).map((c) => c.id);
-    expect(designer.sort()).toEqual([...ids].sort());
-    expect(designer).toHaveLength(30);
+    expect(designer.sort()).toEqual([...ids, ...Object.values(FX_DO)].sort());
+    expect(designer).toHaveLength(37);
   });
 
   it('are found by the automatic index, each with a target, a schema and a one-line signature', () => {
     expect(collected.loaded.map((l) => l.file)).toEqual(expect.arrayContaining(['/src/engine/design/commands.ts', '/src/engine/design/layer.commands.ts']));
-    expect(collected.skipped).toEqual(['/src/engine/fx/commands.ts']);
+    expect(collected.skipped).toEqual([]);
     for (const spec of allCommands().filter((c) => c.id.startsWith('designer.'))) {
       expect(spec.needs, spec.id).toContain('session');
       expect(argsSchema(spec), spec.id).toMatchObject({ type: 'object', additionalProperties: false });
@@ -62,7 +63,7 @@ describe('the Designer actions as commands', () => {
   });
 
   it('list what still reads something active as debt', () => {
-    expect(allCommands().filter((c) => c.debt && c.id.startsWith('designer.')).map((c) => c.id).sort()).toEqual(['designer.doc.ensure', 'designer.doc.from_asset', 'designer.layer.add', 'designer.layer.ensure_paint', 'designer.layer.place_asset']);
+    expect(allCommands().filter((c) => c.debt && c.id.startsWith('designer.')).map((c) => c.id).sort()).toEqual(['designer.doc.ensure', 'designer.doc.from_asset', 'designer.fx.add', 'designer.layer.add', 'designer.layer.ensure_paint', 'designer.layer.place_asset']);
   });
 
   it('typed code calls them with invoke, synchronously, as one undo step', () => {
@@ -170,7 +171,7 @@ describe('the agent: find_commands and run_commands', () => {
     const all = findCommandsTool(sid, { area: 'designer' });
     const lines = all.text.split('\n');
     expect(lines[0]).toBe(`Document on screen: ${doc.id} "Page", 800x600.`);
-    expect(lines).toHaveLength(31);
+    expect(lines).toHaveLength(38);
     expect(lines).toContain('designer.layer.move {layer: string, dir: 1|-1} — One place up (1) or down (-1) in the stack.');
     expect(lines.find((l) => l.startsWith('designer.doc.undo'))).toBe('designer.doc.undo {} — Takes back the last change of the document. [not now: Nothing to undo.]');
     expect(findCommandsTool(sid, { text: 'opacity' }).text.split('\n')).toHaveLength(2);

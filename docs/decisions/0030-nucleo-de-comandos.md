@@ -62,7 +62,7 @@ Medido: `invoke` añade 0,82 µs por llamada sobre un comando vacío (20 000 lla
 
 `commands.ts` junto a cada `actions.ts`. Donde ese nombre ya existe o choca, `<nombre>.commands.ts`:
 
-- `src/engine/fx/commands.ts` ya existe y no es un archivo de comandos. El índice lo salta porque no exporta `commands` y lo deja en `collected.skipped`, que el check del paso 4 listará como deuda.
+- `src/engine/fx/fxCommands.ts` contiene las operaciones FX; los comandos registrados viven en `src/engine/design/fx.commands.ts`.
 - Los comandos de `src/engine/actions.ts` no pueden ir en `src/engine/commands.ts`: `import '../commands'` dejaría de llegar a la carpeta del núcleo. Van en `src/engine/actions.commands.ts`.
 
 ## Designer y agente (paso 2, 2026-11-13)
