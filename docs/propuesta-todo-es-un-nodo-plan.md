@@ -1,62 +1,86 @@
-<!-- Copiado de la nota compartida de Fable (2026-11-12). Sustituye al «Orden de trabajo» y a parte de las «Decisiones» de propuesta-todo-es-un-nodo.md. -->
-# Plan revisado: todo es un comando, docs como ventanas (Fable, 2026-11-12; consulta, repo sin tocar)
+# Plan único: todo es un nodo (2026-11-14)
 
-La dirección acordada me convence entera. Un solo añadido: donde una acción del Designer hoy solo sabe actuar sobre el
-doc activo, su comando lo dice en `available()` («solo sobre el doc activo») y el check lo lista como deuda. Así la
-primera pasada no obliga a reescribir acciones.
+Este documento es **la única referencia** del frente. Cada encargo enlaza su paso. Un cambio de alcance se escribe
+aquí con lo que se quita, y el usuario lo aprueba antes. La versión anterior (Fable, 2026-11-12) está en el historial
+de git. Recortó en silencio la mitad de la idea del usuario, y eso no debe repetirse.
 
-## Pasos
+## La idea del usuario (13 y 14-11, sus palabras resumidas)
 
-**Estado (2026-11-14):** pasos 1, 2, 4 y 5 hechos en `task/commands`: 111 comandos en 7 apartados, con 38 de deuda anotada en `scripts/commands-debt/`; el paso 3 es una [propuesta](propuesta-puerta-externa.md) sin revisar; contrato y medidas en el [ADR 0030](decisions/0030-nucleo-de-comandos.md).
+1. **Todo nace como nodo:**
+   - el chat, al que se conectan uno o dos agentes;
+   - el agente, que vive en un nodo;
+   - los proveedores con su catálogo y los modelos;
+   - las herramientas, el lienzo del Designer con sus capas, los docs, la biblioteca y la sesión;
+   - los Spaces.
 
-Raíz del frente: una rama `task/commands` salida de `task/export`. Cada sesión, su worktree. Como mucho tres sesiones a
-la vez; el sandbox es uno, se usa por turno.
+   Los Spaces muestran esos nodos de la forma que les toca, y siguen siendo nodos.
+2. **Autocontenido «inicio»…«fin», empaquetable:** un nodo o un grafo se envuelve, se guarda y se reutiliza.
+3. **Todo se puede ejecutar como comando:** con un CLI interno, uno externo o MCP. El agente escribe árboles de
+   comandos encadenados, y el CLI le devuelve los resultados exactos.
+4. **Enlaces como en Obsidian:** los nodos existen sueltos y se enlazan después, en una dirección o en las dos.
+   - Puertos personalizables, como en Blender: un Space admite entradas y salidas nuevas.
+   - Modelos de varios proveedores se acoplan, agrupan o fusionan con el chat o el agente.
+5. **Chat:** mensajes agente–usuario, cada uno con fecha, hora y metadatos clave.
+6. **Ejecución:** los nodos se acoplan, se encadenan y se ejecutan con run y stop acotados. La traza es clara para la
+   app, la depuración y el propio agente.
+7. **Omnicanvas:** fusión del Designer infinito y del lienzo de nodos. Ahí se crean docs y se dibuja, al menos en
+   vectorial y diseño. Referencias: Recraft, Infinite Painter, pixols de ZBrush.
+   - Un Designer, un Studio y un lienzo de nodos por sesión.
+   - Las pestañas de docs, como en Photoshop, Krita o SAI, se desacoplan como ventanas, con sus conexiones a la vista y
+     editables.
+   - No debe ralentizarse.
 
-| Ola | Paso | Hecho cuando | Quién | Dónde |
+Referencias verificadas y errores que evitar: tabla de [la propuesta original](propuesta-todo-es-un-nodo.md#referencias).
+Incluye JSON Canvas, Houdini, VS Code, Blender, Unreal, TouchDesigner, ComfyUI, Max/MSP, MCP y Plan 9. Contrato de los
+comandos: [ADR 0030](decisions/0030-nucleo-de-comandos.md).
+
+## Estado y pasos
+
+| # | Paso | Estado | Hecho cuando | Idea |
 |---|---|---|---|---|
-| 0 | a. Suite completa de `task/export` | `npm test` verde o lista de fallos | Haiku | `ogs-export` |
-| 0 | b. Sandbox: PDF con desenfoque y FX, ida y vuelta SVG, objetos | Informe con capturas | Luna | sandbox |
-| 0 | c. Medir: tiempo al cambiar de doc activo y si los docs no activos liberan búferes | Dos cifras | Luna, tras b | sandbox |
-| 0 | d. Inventario de lecturas de «lo activo» (doc, capa, selección) por acción | Tabla archivo:línea | Haiku | solo lectura |
-| 0 | e. Bocetos de la paleta y del escritorio de ventanas | El usuario los aprueba o corrige | Opus | sin código |
-| 1 | 1. Núcleo: `src/engine/commands/` (tipos, registro, `run` y secuencias con `$n`, eco, `aliases`, `available`, `effect`, transacción por historial, índice automático). Primer commit, pequeño | Tests del núcleo; la app no cambia | Fable | `ogs-commands` |
-| 1 | 2. Designer: sus 39 acciones como comandos con destino en `on`; `find_commands` y `run_commands` para el agente | El agente encadena tres comandos del Designer en una llamada; coste por llamada medido; `npm test` verde | Fable, misma sesión | `ogs-commands` |
-| 1 | 3. Seguridad de la puerta externa (solo propuesta) | Documento con reglas y riesgos | GPT, en paralelo | solo lectura |
-| 2 | 4. `check-commands` y prueba de humo desde esquemas | Fallan con archivo:línea ante un comando sin esquema o que rompe el doc | GPT, tras el commit del paso 1 | `ogs-cmd-checks` |
-| 2 | 5. Envoltura por apartado: Nodes (22), Studio y chat (35), sesiones, biblioteca, catálogo, skills | El check de ese apartado sin deuda | DeepSeek, Luna, Haiku; uno por apartado | `ogs-cmd-<apartado>` |
-| 2 | 6. Paleta (Ctrl+K) con repetir el último | Aprobado el boceto; funciona en el sandbox | Opus | `ogs-cmd-palette` |
-| 3 | 7. Nodo de comando en el lienzo actual: el plan del agente se ve, se edita y se guarda | Una secuencia con gasto pide una sola aprobación con su coste | Opus o Fable | `ogs-cmd-node` |
-| 3 | 8. Docs como ventanas: desacoplar pestaña, imagen en las no activas, activar al clic, vista general | Las cifras de 0c lo permiten; boceto aprobado; un doc activo rinde igual que hoy | Opus o Fable | `ogs-windows` |
-| 4 | 9. Cables entre ventanas (perezosos, «desactualizado») y puertos del usuario | Se decide con el paso 8 a la vista | — | — |
-| 4 | 10. Paquete de un nodo; 11. CLI externo y MCP | Decisión de seguridad tomada | — | — |
+| 1 | Núcleo de comandos (`src/engine/commands/`) | **Hecho** (`task/commands`) | Tests del núcleo | 3 |
+| 2 | Designer como comandos; `find_commands` y `run_commands` | **Hecho** | El agente encadena comandos en una llamada | 3 |
+| 3 | Propuesta de puerta externa | Escrita ([doc](propuesta-puerta-externa.md)), sin revisar | El usuario decide las reglas | 3 |
+| 4 | `check-commands` y prueba de humo | **Hecho** | Falla con archivo:línea | 3 |
+| 5 | Envoltura del resto: 111 comandos, 7 apartados, 38 con deuda | **Hecho** | Check por apartado | 3 |
+| 5b | Caché de prompts | **Hecho** (`e647b327`), medido: 12.140 de 12.144 tokens en caché | — | 3 |
+| 5c | Menos llamadas: catálogo en el prompt, `"$1.doc"` | Rama `task/agent-fewer-calls`, revisada, sin fusionar ni medir con modelo real | De 5 a 2 llamadas en la petición del cartel, medido | 3 |
+| 6 | Paleta Ctrl+K | Rama `task/cmd-palette`, código revisado; falta prueba de usuario nuevo | Funciona en el sandbox | 3 |
+| 7 | Aprobación con coste real y límite de gasto (tres opciones al tope) | En curso (Argon, `task/approval-cost`) | Una aprobación por secuencia con el total | 3, 6 |
+| 8 | **Nodos del sistema** (recuperado): chat, agente, proveedor y modelo, sesión, Space, doc, biblioteca, herramientas. Son nodos que **apuntan** a los datos donde ya viven: no se copia ni se migra nada, y la persistencia protegida no se toca | Pendiente | En el lienzo de nodos se ven el chat con su agente y modelos acoplados, el doc y el Space, enlazados | 1, 4 |
+| 9 | **Enlaces** (recuperado): clases datos, referencia y control, dibujadas distinto; `both` para bidireccional en referencia y control; orden de ejecución por enlaces, nunca por posición | Pendiente | Enlazar y desenlazar con un deshacer | 4 |
+| 10 | **Chat como nodo con metadatos** (nuevo): fecha, hora con huso, agente, Space, proveedor y modelo, uso, coste e id de ejecución por mensaje; uno o dos agentes; varios modelos acoplados | Pendiente | Cada mensaje muestra sus metadatos; el hilo no se corta al cambiar de Space | 1, 5 |
+| 11 | **Run, stop y traza** (nuevo): ejecución acotada por nodo, stop inmediato y una traza que leen la interfaz, la depuración y el agente. Nodo de comando: el plan del agente se ve, se edita y se guarda. Solo se calcula lo que se mira | Pendiente | Stop corta una cadena en vuelo; el agente lee la traza de lo que hizo | 3, 6 |
+| 12 | **Omnicanvas** (recuperado entero): fusión del Designer infinito con el lienzo de nodos; los docs se desacoplan como ventanas, una con el editor vivo y las demás con su imagen; se crean docs y se dibuja ahí; los Spaces se ven como nodos | Pendiente: antes, medir el cambio de doc activo y un boceto aprobado | Un doc activo rinde igual que hoy | 1, 7 |
+| 13 | **Puertos del usuario y cables entre ventanas** (recuperado): perezosos, con «desactualizado» | Pendiente | Añadir una entrada a un Space y cablearla | 4 |
+| 14 | **Paquete «inicio»…«fin»** (recuperado): exportar e importar un nodo o un grafo en JSON, con versión al estilo Houdini, sin claves ni código | Pendiente | Ida y vuelta idéntica en un test | 2 |
+| 15 | **CLI externo y MCP** desde el registro | Pendiente: primero la decisión del paso 3 | Una herramienta MCP sale de un comando | 3 |
 
-El paso 5 puede ir en paralelo sin choques porque el índice es automático: cada sesión solo añade un `commands.ts` en su
-carpeta. Para que siga siendo así, la lista de deuda del check va por apartado, no en un archivo común; `docs/map.md`
-se regenera al juntar.
+Orden: 7, 5c y 6 cierran lo empezado. Después 8 → 9 → 10 → 11 forman el núcleo visible de «todo es un nodo». 12 y 13
+van con un boceto aprobado. 14 y 15 van al final.
 
-## Qué cambia respecto al documento, y por qué
+## Lo que ya se sabe para los pasos 8 a 11
 
-- **Paso 1:** fuera la forma de texto con `|`; entran eco, `aliases`, `available`, transacciones, validar solo en la
-  frontera y destino explícito. Lo acordado con el usuario y Opus.
-- **Paso 2:** era «Nodes y Designer, y las herramientas de Nodes generadas iguales a las escritas a mano». Ahora solo
-  Designer, con `find_commands` y `run_commands`. El agente no debe recibir 100 herramientas, y el impacto está en el
-  Designer (de 3 capacidades a unas 40). Nodes pasa a la envoltura mecánica.
-- **Paso 4 antiguo** (CLI interno): `run_commands` sube al paso 2; la paleta queda y pide boceto antes.
-- **Paso 5 antiguo** (nodos `kind: 'ref'` dentro del lienzo de nodos): **se cae.** El omnicanvas es un escritorio de
-  ventanas de docs, no nodos que apuntan a cosas. Las clases de enlace y los puertos del usuario sobreviven, pero para
-  los cables del escritorio, al final.
-- **Se cae también:** «abrir a pantalla completa», la regla 1 estricta y la decisión «lienzo por sesión o global» (ya
-  resuelta: un Designer, un Studio y un lienzo de nodos por sesión).
-- **Entra nuevo:** la ola 0 (cerrar exportación, medir, bocetos), la prueba de humo, el nodo de comando y las ventanas
-  con imagen en las no activas.
-- **Se aplaza sin caerse:** el chat visible en varios apartados, el paquete y la puerta externa.
+Diagnóstico de Argon con archivo:línea, en la rama `task/agent-node-design`, `docs/propuesta-nodo-agente.md` §2:
 
-## Decisiones del usuario
+- **El agente pierde el contexto al pasar del Designer a Nodes** por cuatro causas:
+  1. `buildContext` tiene ramas excluyentes por Space (`context.ts:334-357`);
+  2. `on.doc` se fija una vez por lote (resuelto en 5c);
+  3. `FeedList.tsx:198-200` oculta mensajes de otros Spaces;
+  4. el agente no lee lo que ejecutó.
+- **El desfase entre `usage` y `agentMetrics`:** `approvePlan` cierra la petición antes del turno final del agente
+  (`planRun.ts:75`).
 
-1. Permiso para worktrees y ramas de este frente (el 2026-11-05 pidió no abrir más; el paralelo los necesita).
-2. Campos opcionales nuevos en lo guardado: posición y estado de las ventanas por sesión, y el nodo de comando en el
-   grafo. Sin migración, pero cambian el modelo.
-3. Aprobar los bocetos de la paleta y del escritorio antes del código.
-4. Una sola tarjeta de aprobación por secuencia con gasto, con el coste total.
-5. Reglas de la puerta externa, tras la propuesta de GPT.
-6. Más adelante: dos agentes en un chat y qué significa el primer cable entre docs.
+De ese documento se aprovecha la evidencia. Su modelo de datos no se adopta tal cual, porque no partía de este plan.
+
+## Decisiones del usuario abiertas
+
+1. Dos agentes en un chat: quién habla y cuándo.
+2. Modos de acople de modelos. Propuesta, por la media profesional: cable o acoplado al borde, y agrupar con los
+   grupos que ya existen. La «fusión» de Argon queda fuera mientras no se vea su uso.
+3. Reglas de la puerta externa (paso 3).
+4. Boceto del omnicanvas (paso 12).
+
+Decidido: el gasto lo pone el usuario. Fija un límite una vez; al llegar al tope se ofrece «Permitir esta vez»,
+«Permitir durante toda la sesión» o «No volver a preguntar hasta la próxima sesión». Sin modo automático ni topes
+inventados por la app.

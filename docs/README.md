@@ -22,7 +22,7 @@
 - [Diagnóstico del modelo de objetos](diagnostico-modelo-objetos.md) (2026-11-10): rendimiento con grupos e ida y vuelta de SVG, medido.
 - [Base para PSD, AI, EPS y CorelDRAW](propuesta-formatos-externos.md) (2026-11-10, solo diseño): comparación de modelos y dos ajustes mínimos.
 - [Propuesta: todo es un nodo, todo es un comando](propuesta-todo-es-un-nodo.md) (2026-11-12, sin implementar): contrato de comando, nodo, enlace y paquete; referencias contrastadas y orden de trabajo en siete pasadas.
-- [Plan revisado de «todo es un comando»](propuesta-todo-es-un-nodo-plan.md) (2026-11-12): cuatro olas, docs como ventanas, reparto por agentes; manda sobre el orden de la propuesta.
+- [Plan único de «todo es un nodo»](propuesta-todo-es-un-nodo-plan.md) (2026-11-14): la única referencia del frente; estado por paso y lo que la revisión del 12-11 había quitado, recuperado.
 - [Propuesta: puerta externa de comandos](propuesta-puerta-externa.md) (2026-11-14, sin implementar): seguridad para CLI externo y MCP.
 - [Propuesta: conocimiento del agente en archivos y vistas guardadas](propuesta-conocimiento-y-vistas.md): vistas de filtros, reglas del agente en `.md` al estilo OKF y carga por partes (2026-10-27, sin implementar).
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.

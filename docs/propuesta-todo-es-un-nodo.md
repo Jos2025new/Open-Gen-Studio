@@ -7,7 +7,7 @@ CLI externo o MCP. Cada nodo se guarda como un paquete autocontenido.
 
 Este documento fija el contrato y el orden de trabajo para ejecutarlo en varias pasadas de un solo intento.
 
-**Revisado el 2026-11-12:** el [plan revisado](propuesta-todo-es-un-nodo-plan.md) manda sobre el «Orden de trabajo» y parte de las «Decisiones» de abajo (comandos con destino explícito, agente con `find_commands`/`run_commands`, docs del Designer como ventanas en lugar de nodos `ref`).
+**2026-11-14:** el [plan único](propuesta-todo-es-un-nodo-plan.md) manda sobre el «Orden de trabajo» de abajo; recupera los nodos `ref`, enlaces, paquete y MCP que la revisión del 12-11 había quitado.
 
 ## Qué hay hoy (inventario del 2026-11-12)
 
