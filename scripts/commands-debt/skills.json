@@ -1,0 +1,10 @@
+[
+  {
+    "id": "skills.skill.select",
+    "text": "Changes the composer skill on screen."
+  },
+  {
+    "id": "skills.workflow.select",
+    "text": "Changes the composer workflow on screen."
+  }
+]
