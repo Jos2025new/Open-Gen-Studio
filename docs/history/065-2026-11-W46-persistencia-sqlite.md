@@ -42,6 +42,7 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
   solo si avanza. Un supervisor reanuda la misma conversación para cada extensión.
 - **Red:** Argon sufrió tres cortes de red (TLS) y una extensión que no reconoció el modelo. Entregó en un último tramo
   sin código nuevo, a las 14:57, unos minutos tarde.
+- **Regresión del orden** (pasos 13 y 14): el encargo de Fable a Grok pedía tests de corrección y 30 cortes, pero no repetir las medidas. Grok resolvió el orden perdido de la forma más directa (enviar los 60 000 ids en cada guardado) y nadie midió; Fable lo aceptó revisando solo tests y nombres. Arreglo: todo cambio en el camino de guardado repite el banco, y un test fija que una edición pequeña no envía orden ni toca otras filas.
 - **Delegación:** Argon no delegó en Hydrogen; lanzó pruebas en segundo plano y esperó avisos, contra el encargo.
 
 ## Pendiente
