@@ -17,8 +17,12 @@ import { CommandApprovalCard } from '../src/components/chat/CommandApprovalCard'
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { AGENT_HIDDEN, decideCommandApproval, findCommandsTool, runCommandsTool } from '../src/engine/agent/commandCalls';
 import { COMMAND_TOOLS } from '../src/engine/agent/commandTools';
-import { askAgain, overLimit } from '../src/engine/budget';
+import { z } from 'zod';
+import { budgetProblem } from '../src/engine/actions';
+import { askAgain, dontAskUntilNextSession, overLimit } from '../src/engine/budget';
 import { allCommands, argsSchema, command, setApprover } from '../src/engine/commands';
+import { register } from '../src/engine/commands/registry';
+import { defineCommand } from '../src/engine/commands/types';
 import { graphHistory } from '../src/engine/flow/history';
 import type { CommandApprovalFeedItem } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
@@ -147,7 +151,7 @@ describe('run_commands', () => {
             id: 'fal-ai/test-image',
             name: 'Test Image',
             kind: 'image',
-            price: { skus: [{ unit: 'image', price: 0.05 }] },
+            price: { skus: [{ unit: 'output', usd: 0.05 }] },
           } as never,
         },
       },
@@ -211,22 +215,24 @@ describe('run_commands', () => {
         ...st.catalog,
         models: {
           ...st.catalog.models,
-          'local::paid-image': {
-            ref: 'local::paid-image',
-            provider: 'local',
-            id: 'paid-image',
+          'fal::paid-image': {
+            ref: 'fal::paid-image',
+            provider: 'fal',
+            id: 'fal-ai/paid-image',
             name: 'Paid Local',
             kind: 'image',
-            price: { skus: [{ unit: 'image', price: 0.10 }] },
+            price: { skus: [{ unit: 'output', usd: 0.10 }] },
           } as never,
         },
       },
     });
+    // A stand-in for a paid run: it prices $0.10 and, like the real ones, refuses itself when the limit would stop it.
+    const price = { usd: 0.10, approximate: false };
+    if (!command('nodes.test.paid')) register(defineCommand({ id: 'nodes.test.paid', title: 'Paid stand-in', args: z.object({ node: z.string() }).strict(), effect: 'spend', estimate: () => price, run: (_ctx, args) => { const problem = budgetProblem(price, sid); if (problem) throw new Error(problem); return { ran: args.node }; } }));
     const makeNodeAndRun = [
       { cmd: 'nodes.node.new_data', args: { kind: 'image' } },
       { cmd: 'nodes.node.add', args: { data: '$1', position: { x: 0, y: 0 } } },
-      { cmd: 'nodes.node.edit', args: { node: '$2.node', patch: { prompt: 'over limit cat', modelRef: 'local::paid-image', settings: { count: 1, advanced: {} } } } },
-      { cmd: 'nodes.run.start', args: { targets: ['$2.node'] } },
+      { cmd: 'nodes.test.paid', args: { node: '$2.node' } },
     ];
 
     // 1. At the limit ($0.95 spent + $0.10 > $1.00): plain 'approve' is held; 'once' ("Allow this time") lets only this sequence through.
@@ -238,7 +244,7 @@ describe('run_commands', () => {
     expect(overHtml).toContain('Allow for the whole session');
     expect(overHtml).toContain('Don’t ask again until next session');
     expect(decideCommandApproval(sid, card1.id, 'approve')).toBe(false);
-    expect(useStore.getState().sessions[sid].feed.find((f) => f.id === card1.id)?.status).toBe('awaiting');
+    expect(useStore.getState().sessions[sid].feed.find((f): f is CommandApprovalFeedItem => f.id === card1.id)?.status).toBe('awaiting');
     expect(decideCommandApproval(sid, card1.id, 'once')).toBe(true);
     expect((await run1).done).toBe(true);
     // Next run in the same session is held at the limit again.
@@ -263,6 +269,13 @@ describe('run_commands', () => {
     expect((await run3).done).toBe(true);
     expect(overLimit({ usd: 0.10, approximate: false }, sid)).toBe(false);
     expect(overLimit({ usd: 0.10, approximate: false }, other.id)).toBe(false);
+
+    // Changing the limit also ends it.
+    useStore.setState((cur) => ({ settings: { ...cur.settings, budgetUsd: 1.5 } }));
+    expect(overLimit({ usd: 0.60, approximate: false }, sid)).toBe(true);
+    useStore.setState((cur) => ({ settings: { ...cur.settings, budgetUsd: 1.0 } }));
+    dontAskUntilNextSession(sid);
+    expect(overLimit({ usd: 0.10, approximate: false }, sid)).toBe(false);
 
     // Starting a new session resets "until next session".
     const nextSession = createSession('Next session');

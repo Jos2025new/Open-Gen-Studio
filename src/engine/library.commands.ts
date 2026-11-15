@@ -8,7 +8,7 @@ const styleEstimate = () => {
   const e = estimateMedia('fal::fal-ai/recraft/v4/create-style', 'image', { count: 1, advanced: {} }, true, true);
   return e.usd !== null ? e : { usd: null, approximate: true, note: 'fal bills the style when it is created' };
 };
-const voiceEstimate = () => estimateOp('create_voice', {});
+const voiceEstimate = () => estimateOp('create_voice', {}, undefined, { count: 1, advanced: {} });
 
 const id = z.string().min(1);
 const name = z.string().trim().min(1);

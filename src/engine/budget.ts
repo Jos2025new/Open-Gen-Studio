@@ -24,17 +24,23 @@ export function remainingBudget(): number | null {
 let pass: { sessionId: string } | null = null;
 /** Sequence-level pass for "Allow this time": stays alive across all spend steps of one approved sequence until it ends. */
 let sequencePass: { sessionId: string } | null = null;
-/** "Don't ask again until next session": active for the sessions open when chosen until a new session is created. */
-let untilNextSession: { knownSessions: Set<string> } | null = null;
+/**
+ * "Don't ask again until next session": covers every session open when it was chosen.
+ * DECISION PENDING (user): should it cover all open sessions until a new one is created (today), or last until the app restarts?
+ * The rule lives in `untilNextSessionStillHolds`; changing it is a one-line edit there.
+ */
+let untilNextSession: { knownSessions: Set<string>; budgetOn: boolean; budgetUsd: number } | null = null;
+
+/** Does a granted "until next session" still hold? Ends when a new session appears or the spending limit is changed. */
+function untilNextSessionStillHolds(grant: NonNullable<typeof untilNextSession>): boolean {
+  const { settings, sessions } = get();
+  if (settings.budgetOn !== grant.budgetOn || settings.budgetUsd !== grant.budgetUsd) return false;
+  return Object.keys(sessions).every((id) => grant.knownSessions.has(id));
+}
 
 function untilNextSessionActive(): boolean {
-  if (!untilNextSession) return false;
-  const ids = Object.keys(get().sessions);
-  if (ids.some((id) => !untilNextSession!.knownSessions.has(id))) {
-    untilNextSession = null;
-    return false;
-  }
-  return true;
+  if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) untilNextSession = null;
+  return untilNextSession !== null;
 }
 
 /** The session whose runs no longer ask (the active one by default). */
@@ -65,10 +71,9 @@ export function overLimit(e: Estimate, sessionId?: string): boolean {
 }
 
 /** What the confirmation says when a run goes over the limit. */
-export function overLimitText(e: Estimate): string {
+export function overLimitText(e: Estimate, choices = '“Continue once” lets only this run through; “Don\u2019t ask again” stops asking in this session. Nothing running is stopped.'): string {
   const { budgetUsd } = get().settings;
   const left = Math.max(0, remainingBudget() ?? 0);
-  const choices = '“Continue once” lets only this run through; “Don\u2019t ask again” stops asking in this session. Nothing running is stopped.';
   if (e.usd == null) return `The price of this run is not published, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
@@ -117,11 +122,12 @@ export function dontAskAgain(sessionId: string = get().activeSessionId): void {
 
 export const allowForSession = dontAskAgain;
 
-/** "Don't ask again until next session": stops asking until a new session is created (or the app reloads). */
+/** "Don't ask again until next session": see `untilNextSessionStillHolds` for how long it lasts. */
 export function dontAskUntilNextSession(sessionId: string = get().activeSessionId): void {
-  const ids = new Set(Object.keys(get().sessions));
+  const { sessions, settings } = get();
+  const ids = new Set(Object.keys(sessions));
   if (sessionId) ids.add(sessionId);
-  untilNextSession = { knownSessions: ids };
+  untilNextSession = { knownSessions: ids, budgetOn: settings.budgetOn, budgetUsd: settings.budgetUsd };
 }
 
 /** "Ask again": this session asks once more. */

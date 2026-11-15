@@ -114,7 +114,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   }
   const doc = activeDoc(sessionId);
   let approvalItemId: string | null = null;
-  let releasePass: (() => void) | null = null;
+  const passes: (() => void)[] = [];
   const sessionApprover: Approver | undefined =
     !getApprover() && useStore.getState().sessions[sessionId]
       ? (request) =>
@@ -147,7 +147,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
                 resolve(ok);
               },
               setReleasePass: (fn) => {
-                releasePass = fn;
+                passes.push(fn);
               },
             });
           })
@@ -157,7 +157,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   try {
     result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal, approver: sessionApprover });
   } finally {
-    releasePass?.();
+    for (const release of passes) release();
   }
   if (approvalItemId) {
     updateFeedItem<CommandApprovalFeedItem>(sessionId, approvalItemId, (it) =>

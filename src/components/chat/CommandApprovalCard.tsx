@@ -6,6 +6,8 @@ import { useStore } from '../../store/store';
 import { CircleAlert, Trash, Wand } from '../ui/icons';
 import { Button, costLabel } from '../ui/primitives';
 
+const LIMIT_CHOICES = '“Allow this time” lets only this sequence through; “Allow for the whole session” stops asking in this session; “Don’t ask again until next session” stops asking until a new session starts or the limit changes. Nothing is stopped.';
+
 function stepArgSummary(step: CommandApprovalStep): string {
   if (!step.args || typeof step.args !== 'object') return '';
   const entries = Object.entries(step.args as Record<string, unknown>).flatMap(([k, v]) => {
@@ -61,7 +63,7 @@ export function CommandApprovalCard({ item, sessionId }: { item: CommandApproval
       </ol>
       {over ? (
         <p className="plan-user-model">
-          <CircleAlert size={12} /> {overLimitText(total)}
+          <CircleAlert size={12} /> {overLimitText(total, LIMIT_CHOICES)}
         </p>
       ) : null}
       {item.error ? <p className="plan-error">{item.error}</p> : null}
@@ -102,7 +104,7 @@ export function CommandApprovalCard({ item, sessionId }: { item: CommandApproval
                   variant="primary"
                   className="cc-approve"
                   onClick={() => decideCommandApproval(sessionId, item.id, 'once')}
-                  data-tip={overLimitText(total)}
+                  data-tip={overLimitText(total, LIMIT_CHOICES)}
                 >
                   {free ? (
                     'Allow this time'
