@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useEffect, useMemo } from 'react';
+import { Handle, MarkerType, Position, type NodeProps } from '@xyflow/react';
 import { Bot, Cpu, Database, FileText, Layers, MessageSquare, Sparkles, Wand } from '../ui/icons';
 import type { LucideIcon } from '../ui/icons';
 import { resolveSystemNodeLive, systemNodePorts, type LiveSystemSummary } from '../../engine/nodes/spec';
-import type { PortSpec, SystemNodeType } from '../../engine/types';
+import { ensureSystemNodes } from '../../engine/nodes/system';
+import type { GraphEdge, PortSpec, PortType, SystemNodeType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import type { FlowNode } from './nodes';
 
@@ -94,4 +95,18 @@ export function SystemNode({ data, selected }: NodeProps<FlowNode>) {
       </div>
     </>
   );
+}
+
+/** The system's parts (chat, agent, models, docs, Spaces) are born as nodes that point to where the data lives.
+ *  Added once per session without an undo step; the user's own edits to them are undoable as usual. */
+export function useSystemNodes(sessionId: string, enabled: boolean): void {
+  useEffect(() => { if (enabled) ensureSystemNodes(sessionId); }, [sessionId, enabled]);
+}
+
+/** Edge class and arrowheads for a link: data keeps its typed colour; ref and control are drawn by stroke and point the way (both ends when bidirectional). */
+export function linkClassProps(e: GraphEdge, dataType: PortType | null) {
+  const link = e.kind ?? 'data';
+  if (link === 'data') return { className: `edge-${dataType ?? 'none'}` };
+  const arrow = { type: MarkerType.ArrowClosed, width: 14, height: 14 };
+  return { className: `edge-link-${link}${e.both ? ' edge-both' : ''}`, markerEnd: arrow, ...(e.both ? { markerStart: arrow } : {}) };
 }

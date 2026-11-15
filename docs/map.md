@@ -20,9 +20,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 355 | 271 |
-| [store.ts](../src/store/store.ts) | 241 | 246 |
-| [icons.tsx](../src/components/ui/icons.tsx) | 140 | 1 |
+| [types.ts](../src/engine/types.ts) | 360 | 272 |
+| [store.ts](../src/store/store.ts) | 244 | 248 |
+| [icons.tsx](../src/components/ui/icons.tsx) | 141 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 98 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 73 | 44 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 4 |
@@ -30,10 +30,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
-| [ops.ts](../src/engine/ops.ts) | 46 | 18 |
+| [ops.ts](../src/engine/ops.ts) | 47 | 18 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
+| [id.ts](../src/lib/id.ts) | 41 | 0 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 27 |
-| [id.ts](../src/lib/id.ts) | 40 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 37 | 26 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
 | [format.ts](../src/lib/format.ts) | 35 | 1 |
@@ -51,25 +51,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 15 | 14 |
 | `src/components/designer` | 101 | 56 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 13 | 11 |
+| `src/components/node` | 14 | 11 |
 | `src/components/shell` | 35 | 24 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 16 |
-| `src/engine` | 66 | 333 |
-| `src/engine/agent` | 56 | 113 |
-| `src/engine/commands` | 7 | 11 |
+| `src/engine` | 67 | 334 |
+| `src/engine/agent` | 56 | 114 |
+| `src/engine/commands` | 7 | 12 |
 | `src/engine/design` | 163 | 201 |
-| `src/engine/flow` | 14 | 27 |
+| `src/engine/flow` | 14 | 28 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
+| `src/engine/nodes` | 3 | 1 |
 | `src/engine/params` | 9 | 21 |
-| `src/engine/providers` | 15 | 59 |
+| `src/engine/providers` | 15 | 60 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 34 | 342 |
-| `src/store` | 17 | 248 |
+| `src/lib` | 34 | 344 |
+| `src/store` | 17 | 250 |
 
-214 de 649 módulos no tienen ningún test que los importe directamente.
+218 de 654 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -91,6 +92,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
+- [commands.ts](../src/engine/nodes/commands.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)
 - [designerBenchProfessionalRun.ts](../src/lib/designerBenchProfessionalRun.ts)
