@@ -100,7 +100,7 @@ describe('Nodes library panel (Add node in the toolbox)', () => {
   });
 
   it('the toolbox popover hosts the library, and each kind tints its icon', () => {
-    const ws = readFileSync('src/components/node/NodeWorkspace.tsx', 'utf8');
+    const ws = readFileSync('src/components/node/NodeCanvasParts.tsx', 'utf8');
     expect(ws).toMatch(/className="node-lib-pop">\s*<NodeLibrary/);
     const css = readFileSync('src/styles/node.css', 'utf8');
     expect(css).toMatch(/\.node-lib-item\.k-video \{[^}]*--k:/);
