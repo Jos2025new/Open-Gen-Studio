@@ -61,7 +61,7 @@ export function feedBase(workspace: Workspace) {
 
 export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}): ChatMessageMeta {
   const e = agentEngine();
-  return {
+  const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
     space: placeFor(get().ui, workspace),
@@ -69,6 +69,8 @@ export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta
     model: e.kind === 'offline' ? 'Local planner' : e.model,
     ...extra,
   };
+  if ('agent' in extra && extra.agent === undefined) delete meta.agent;
+  return meta;
 }
 
 export function hasLlmCatalogPrice(provider: LlmProviderId, model: string): boolean {

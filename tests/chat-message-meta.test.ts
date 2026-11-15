@@ -97,7 +97,8 @@ describe('chat message metadata (step 10)', () => {
 
     expect(user?.meta).toBeDefined();
     expect(user?.meta?.timeZone).toBeTruthy();
-    expect(user?.meta?.agent).toBe('Director');
+    expect(user?.meta?.agent).toBeUndefined();
+    expect('agent' in (user?.meta ?? {})).toBe(false);
     expect(user?.meta?.space).toBe('canvas');
     expect(user?.meta?.provider).toBe('openrouter');
     expect(user?.meta?.model).toBe('anthropic/claude-sonnet-4');
@@ -181,6 +182,7 @@ describe('chat message metadata (step 10)', () => {
     const feed = useStore.getState().sessions[sid].feed;
     const user = feed.find((f): f is UserFeedItem => f.type === 'user');
     const assistant = feed.find((f): f is AssistantFeedItem => f.type === 'assistant');
+    expect(user?.meta?.agent).toBeUndefined();
     expect(user?.meta?.provider).toBe('offline');
     expect(assistant?.meta?.agent).toBe('Local planner');
     expect(assistant?.meta?.provider).toBe('offline');
@@ -220,7 +222,6 @@ describe('chat message metadata (step 10)', () => {
         attachments: [],
         meta: {
           timeZone: 'UTC',
-          agent: 'Director',
           space: 'studio',
           provider: 'openrouter',
           model: 'anthropic/claude-sonnet-4',
@@ -283,7 +284,7 @@ describe('chat message metadata (step 10)', () => {
       expect(times[1].textContent).toContain('UTC');
 
       const metas = [...host.querySelectorAll('.msg-meta')];
-      expect(metas[0].textContent).toContain('Director');
+      expect(metas[0].textContent).not.toContain('Director');
       expect(metas[0].textContent).toContain('claude-sonnet-4 (OpenRouter)');
       expect(metas[0].textContent).toContain('run turn_abc');
       expect(metas[0].getAttribute('data-tip')).toContain('Time:');
