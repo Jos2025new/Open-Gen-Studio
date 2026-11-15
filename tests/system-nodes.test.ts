@@ -1,0 +1,166 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/*
+ * System nodes and link classes (plan "todo es un nodo", steps 8 and 9): chat, agent, models, Designer docs and Spaces
+ * are nodes that point to where the data lives; links carry a class (data, ref, control), `both` only on ref and
+ * control; the execution order comes from data links, never from position. No provider is called.
+ */
+vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
+vi.mock('../src/lib/idb', () => ({
+  stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
+  cacheDb: { get: async () => undefined, set: async () => undefined },
+  getAssetBlob: async () => undefined,
+  putAssetBlob: async () => undefined,
+}));
+import { allCommands, collected, command, run } from '../src/engine/commands';
+import { graphHistory, travelGraph } from '../src/engine/flow/history';
+import { connectionError, executionOrder } from '../src/engine/flow/graph';
+import { ensureSystemNodes } from '../src/engine/nodes/system';
+import { createSession, setGraph, useStore } from '../src/store/store';
+import type { Graph, GraphNode } from '../src/engine/types';
+
+let sid = '';
+const on = () => ({ session: sid });
+const graph = () => useStore.getState().sessions[sid].graph;
+const refs = () => graph().nodes.filter((n) => n.data.kind === 'ref');
+const undo = () => travelGraph(sid, graph(), 'undo', 1, (next) => { setGraph(sid, () => next); return true; });
+
+beforeEach(() => {
+  const session = createSession('System nodes');
+  sid = session.id;
+  useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: session } }));
+});
+
+describe('the session\'s parts as nodes', () => {
+  it('shows the chat with its agent, the attached models, the Designer doc and the Spaces', () => {
+    const doc = useStore.getState().sessions[sid].docs[0];
+    ensureSystemNodes(sid);
+    const types = refs().map((n) => n.data.kind === 'ref' && n.data.type);
+    expect(types).toEqual(expect.arrayContaining(['chat', 'agent', 'model', 'designer.doc', 'space']));
+    expect(refs().filter((n) => n.data.kind === 'ref' && n.data.type === 'model').length).toBeGreaterThanOrEqual(2);
+    // The doc node points at the doc; nothing is copied into the graph.
+    const docNode = refs().find((n) => n.data.kind === 'ref' && n.data.type === 'designer.doc')!;
+    expect(docNode.data).toMatchObject({ kind: 'ref', ref: doc?.id ?? 'active' });
+    expect(JSON.stringify(graph())).not.toContain('"layers"');
+    // Chat and agent are linked by a bidirectional control link; models are control links; the doc is a reference.
+    const edge = (a: string, b: string) => graph().edges.find((e) => e.source === a && e.target === b);
+    expect(edge('sys_chat', 'sys_agent')).toMatchObject({ kind: 'control', both: true });
+    expect(edge('sys_model_llm', 'sys_agent')).toMatchObject({ kind: 'control' });
+    expect(graph().edges.find((e) => e.kind === 'ref')).toBeDefined();
+  });
+
+  it('is added once, without an undo step, and leaves the rest of the graph alone', () => {
+    const own: GraphNode = { id: 'mine', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Prompt', text: 'hola' } };
+    setGraph(sid, (g) => ({ ...g, nodes: [own] }));
+    const steps = graphHistory(sid, 'undo').length;
+    const added = ensureSystemNodes(sid);
+    expect(added.length).toBeGreaterThan(3);
+    expect(ensureSystemNodes(sid)).toEqual([]);
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps);
+    expect(graph().nodes.find((n) => n.id === 'mine')).toEqual(own);
+  });
+
+  it('keeps a saved graph unchanged: edges without a class are data links', () => {
+    const saved: Graph = {
+      nodes: [
+        { id: 'a', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'A', text: '' } },
+        { id: 'b', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'B', text: '' } },
+      ],
+      edges: [{ id: 'e', source: 'a', target: 'b', targetHandle: 'in', sourceHandle: 'out' }],
+    };
+    expect(executionOrder(saved, ['b'])).toEqual([]);
+    expect(saved.edges[0].kind).toBeUndefined();
+  });
+});
+
+describe('links with a class', () => {
+  beforeEach(() => { ensureSystemNodes(sid); });
+  const link = (args: Record<string, unknown>) => run({ cmd: 'nodes.system.link', args, on: on() }, { caller: 'agent' });
+
+  it('links with each class, one undo step each, and unlinks with one', async () => {
+    const before = graph().edges.length;
+    const steps = graphHistory(sid, 'undo').length;
+    const ref = await link({ source: 'sys_agent', target: 'sys_space_tools', kind: 'ref', both: true });
+    expect(ref.ok).toBe(true);
+    expect(graph().edges.find((e) => e.target === 'sys_space_tools')).toMatchObject({ kind: 'ref', both: true });
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps + 1);
+    const ctl = await link({ source: 'sys_chat', target: 'sys_space_tools', kind: 'control' });
+    expect(ctl.ok).toBe(true);
+    expect(graph().edges).toHaveLength(before + 2);
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps + 2);
+    expect(undo()).toBe(true);
+    expect(graph().edges).toHaveLength(before + 1);
+
+    const gone = await run({ cmd: 'nodes.system.unlink', args: { source: 'sys_agent', target: 'sys_space_tools', kind: 'ref' }, on: on() }, { caller: 'agent' });
+    expect(gone.ok).toBe(true);
+    expect(graph().edges).toHaveLength(before);
+    expect(undo()).toBe(true);
+    expect(graph().edges).toHaveLength(before + 1);
+  });
+
+  it('refuses a bidirectional data link and a mismatch of classes', async () => {
+    const both = await link({ source: 'sys_agent', target: 'sys_space_tools', kind: 'data', both: true });
+    expect(both).toMatchObject({ ok: false });
+    const mismatch = await link({ source: 'sys_agent', target: 'sys_space_tools', kind: 'ref', target_handle: 'control' });
+    expect(mismatch).toMatchObject({ ok: false });
+    expect(graph().edges.some((e) => e.target === 'sys_space_tools')).toBe(false);
+  });
+
+  it('the canvas validation uses the ports: ref to ref passes, ref to control does not', () => {
+    const g = graph();
+    const st = useStore.getState();
+    expect(connectionError(g, st.assets, { source: 'sys_agent', target: 'sys_space_tools', sourceHandle: 'target', targetHandle: 'ref' })).toBeNull();
+    expect(connectionError(g, st.assets, { source: 'sys_agent', target: 'sys_space_tools', sourceHandle: 'target', targetHandle: 'control' })).not.toBeNull();
+  });
+
+  it('attaches a model in each mode and detaches it', async () => {
+    for (const mode of ['wired', 'docked', 'grouped', 'merged'] as const) {
+      const res = await run({ cmd: 'nodes.system.attach_model', args: { model_ref: 'test::model', mode, media_kind: 'image' }, on: on() }, { caller: 'agent' });
+      expect(res.ok, mode).toBe(true);
+    }
+    const node = refs().find((n) => n.data.kind === 'ref' && n.data.type === 'model' && n.data.ref === 'test::model')!;
+    expect(node.data).toMatchObject({ attachMode: 'merged' });
+    expect((await run({ cmd: 'nodes.system.detach_model', args: { model_ref: 'test::model' }, on: on() }, { caller: 'agent' })).ok).toBe(true);
+    expect(graph().edges.some((e) => e.source === node.id && e.target === 'sys_agent')).toBe(false);
+  });
+});
+
+describe('execution order', () => {
+  it('follows data links, not position or the other classes', () => {
+    const t = (id: string, x: number): GraphNode => ({ id, position: { x, y: 0 }, data: { kind: 'image', title: id, prompt: '', modelRef: 'm', settings: {}, outputIndex: 0 } as GraphNode['data'] });
+    // `late` sits left of `first` on screen; the order must still be first, late.
+    const g: Graph = {
+      nodes: [t('late', -500), t('first', 900)],
+      edges: [
+        { id: 'd', source: 'first', target: 'late', targetHandle: 'ref', sourceHandle: 'out' },
+        { id: 'c', source: 'late', target: 'first', targetHandle: 'control', sourceHandle: 'out_control', kind: 'control' },
+      ],
+    };
+    expect(executionOrder(g, ['late'])).toEqual(['first', 'late']);
+    expect(executionOrder({ ...g, edges: [g.edges[1]] }, ['late'])).toEqual(['late']);
+  });
+});
+
+describe('commands', () => {
+  it('are found by the automatic index with strict schemas', () => {
+    expect(collected.loaded.map((l) => l.file)).toEqual(expect.arrayContaining(['/src/engine/nodes/commands.ts']));
+    const ids = allCommands().filter((c) => c.id.startsWith('nodes.system.')).map((c) => c.id).sort();
+    expect(ids).toEqual(['nodes.system.add', 'nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.ensure', 'nodes.system.execution_order', 'nodes.system.link', 'nodes.system.list', 'nodes.system.unlink']);
+    expect(command('nodes.system.link')!.effect).toBe('write');
+  });
+
+  it('let the agent list, add and link in one sequence, with one undo step', async () => {
+    const steps = graphHistory(sid, 'undo').length;
+    const result = await run({
+      on: on(),
+      seq: [
+        { cmd: 'nodes.system.list', args: {} },
+        { cmd: 'nodes.system.add', args: { type: 'library' } },
+        { cmd: 'nodes.system.link', args: { source: '$2.node', target: 'sys_agent', kind: 'ref' } },
+      ],
+    }, { caller: 'agent' });
+    expect(result.ok).toBe(true);
+    expect(graph().edges.some((e) => e.source.startsWith('sys_library') && e.kind === 'ref')).toBe(true);
+    expect(graphHistory(sid, 'undo').length).toBe(steps + 1);
+  });
+});
