@@ -194,3 +194,22 @@ Código nuevo en `spike/sqlite/`: `store-ba.js` (B+A), `bench4.mjs` + `bench4-se
 - **Sí empeoró de forma grave en escritura:** cada guardado pasa de 28–43 ms a **493–533 ms** (~12–18× peor; 4,7–7,6× más lento que `v2`), el cuerpo del delta crece de 45 KB a **726 KB** (16×), el RSS tras idle sube a **223 MB** (pico **393 MB**) y el WAL previo a `idle()` alcanza **52,1 MB**.
 - **Causa en `46d8f9db`:** `delta-client.mjs` envía `order` completo (40k `generations` + 20k `assets`) en cada commit aunque no cambie, y `store-b.js` ejecuta `recFp.get` + `recPos.run` por los 60.000 registros en cada transacción.
 - **Crash test `kill -9` (`crash-test4.mjs ba 100`):** **80 OK, 20 vacío, 0 torn, 0 commits reconocidos perdidos, 0 fallos de guardas** (21 lecturas de `copy`, 59 de `tables`). Arranque, disco y atomicidad no empeoran.
+
+## Orden con índice fraccionario
+
+5 rondas intercaladas (`v2` y `B+A`, orden rotado; `free -m` previo, sin dbus de usuario en sandbox), carga media 1,45–2,03, `sha` idéntico (`4066900e6d0a9056`). `pos` pasa a clave base-62 (`fractional-index.mjs`); `delta-client.mjs` y `delta-sync.mjs` solo envían `{ after, before, ids }` para los ítems movidos (LIS) y omiten `order` si no cambia; `store-b.js` actualiza solo esas filas.
+
+| Medida (mediana [mín–máx]) | store-v2 (5 r.) | B+A R4 (5 r.) | B+A fracc. (5 r.) |
+|---|---|---|---|
+| Arranque open+read p50 (ms) | 90,4 [87,4–141,2] | 55,3 [52,8–74,4] | **56,1 [52,9–66,0]** (`copy`) |
+| Edición pequeña p50 / p95 (ms) | 67,0 / 274,1 | 27,6 / 37,4 | **29,2 [19,4–31,4] / 37,5** |
+| Edición con generación p50 (ms) | 62,7 [58,8–117,4] | 31,8 [20,8–33,9] | **34,4 [23,1–36,7]** |
+| Gesto 620 KB p50 (ms) | 77,5 [74,4–92,0] | 43,2 [34,4–66,5] | **43,3 [37,3–46,6]** |
+| Reordenar library (50 ítems) p50 (ms) | 62,8 [59,5–105,8] | — | **25,1 [17,3–33,4]** |
+| RSS en uso / tras idle / pico (MB) | 165,5 / 165,4 / 273,9 | 164,6 / 162,9 / 309,8 | 164,3 / 163,7 / 308,8 |
+| Disco datos / con backups (MB) | 29,3 / 55,8 | 82,1 / 131,2 | 82,4 / 131,7 (WAL 0 tras idle) |
+| Cuerpo ed. pequeña / reorden | 29.156 / 29.126 KB | 45 KB / — | **45 KB (0,1 ms) / 848 B** |
+| Mantenimiento en `idle()` (ms) | 0 | 359,5 [335,4–1685] | 376,6 [360,4–426,9] |
+
+- **Regresión corregida:** edición pequeña baja de 492,7 ms (`46d8f9db`) a **29,2 ms** (**16,9×**), reorden de library de 495,5 ms a **25,1 ms** (**19,7×**), cuerpo de 726 KB a **45 KB** (y **848 B** al rotar 1 ítem de library).
+- **Tests y crash (`crash-test4.mjs ba 100`):** 20/20 tests Vitest OK (incluyendo edición pequeña sin datos de orden ni filas tocadas) y **78 OK, 22 vacío, 0 torn, 0 commits perdidos, 0 fallos de guardas** (`copy` 25, `tables` 53).
