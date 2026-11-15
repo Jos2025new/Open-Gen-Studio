@@ -23,6 +23,7 @@
 - [Base para PSD, AI, EPS y CorelDRAW](propuesta-formatos-externos.md) (2026-11-10, solo diseño): comparación de modelos y dos ajustes mínimos.
 - [Propuesta: todo es un nodo, todo es un comando](propuesta-todo-es-un-nodo.md) (2026-11-12, sin implementar): contrato de comando, nodo, enlace y paquete; referencias contrastadas y orden de trabajo en siete pasadas.
 - [Plan único de «todo es un nodo»](propuesta-todo-es-un-nodo-plan.md) (2026-11-14): la única referencia del frente; estado por paso y lo que la revisión del 12-11 había quitado, recuperado.
+- [Persistencia en SQLite con envío de cambios](propuesta-persistencia-sqlite.md) (2026-11-15, sin autorizar): por qué, diseño B+A medido en cuatro rondas, coste, archivos protegidos y fases.
 - [Propuesta: puerta externa de comandos](propuesta-puerta-externa.md) (2026-11-14, sin implementar): seguridad para CLI externo y MCP.
 - [Propuesta: conocimiento del agente en archivos y vistas guardadas](propuesta-conocimiento-y-vistas.md): vistas de filtros, reglas del agente en `.md` al estilo OKF y carga por partes (2026-10-27, sin implementar).
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
