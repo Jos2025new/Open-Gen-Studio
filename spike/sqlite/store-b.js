@@ -150,10 +150,16 @@ export function createStoreB(dir, opts = {}) {
     return { items: rows.map((r) => [r.id, r.meta]), next: rows.length === limit ? rows[rows.length - 1].pos : null };
   }
 
+  // Same name the format-2 store puts in the 409 body: one file per kind, reused for a minute
+  // so a refused autosave does not fill backups/ (server/store-v2.js keepRejected).
+  const lastRejected = new Map();
+  const REJECTED_EVERY_MS = 60_000;
   function keepCopy(kind, payload) {
     mkdirSync(backups, { recursive: true });
-    const name = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+    const recent = kind.startsWith('rejected') ? lastRejected.get(kind) : undefined;
+    const name = recent && Date.now() - recent.at < REJECTED_EVERY_MS ? recent.file : `${kind}-${Date.now()}.json`;
     writeFileSync(join(backups, name), payload, { mode: 0o600 });
+    if (kind.startsWith('rejected') && recent?.file !== name) lastRejected.set(kind, { file: name, at: Date.now() });
     return name;
   }
 
