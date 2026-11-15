@@ -56,7 +56,19 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
       return { kind: 'asset', title: 'Asset', assetId: opts.assetId ?? null };
     case 'ref': {
       const type = opts.type ?? 'chat';
-      return { kind: 'ref', type, ref: opts.ref ?? st.activeSessionId, title: SYSTEM_NODE_TYPES[type].title };
+      const session = st.sessions[st.activeSessionId];
+      const defaults: Record<SystemNodeType, string> = {
+        chat: st.activeSessionId,
+        agent: st.activeSessionId,
+        session: st.activeSessionId,
+        model: st.composer.image.modelRef,
+        provider: 'openrouter',
+        space: 'create',
+        'designer.doc': session?.activeDocId ?? session?.docs[0]?.id ?? 'active',
+        library: 'library',
+        toolset: 'toolset',
+      };
+      return { kind: 'ref', type, ref: opts.ref ?? defaults[type], title: SYSTEM_NODE_TYPES[type].title };
     }
   }
 }

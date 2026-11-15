@@ -10,6 +10,7 @@ import {
   type Edge,
   type NodeChange,
   type EdgeChange,
+  MarkerType,
 } from '@xyflow/react';
 import { Copy, Film, Image as ImageIcon, Play, Plus, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
@@ -31,6 +32,7 @@ import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations, type GroupFlowNode } from './Operations';
+import { ensureSystemNodes } from '../../engine/nodes/system';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
@@ -108,6 +110,10 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
     () => chatWorkNotInNodes(sessionId).map((g) => ({ id: g.id, assetId: g.assetIds[0], label: g.op ? g.op.id.replace(/_/g, ' ') : g.prompt.split(/[.,\n]/)[0].slice(0, 60) || g.kind })),
     [sessionId, graph, generations, feed],
   );
+  // The system's parts (chat, agent, models, docs, Spaces) are born as nodes that point to where the data lives.
+  // Added once per session without an undo step; the user's own edits to them are undoable as usual.
+  useEffect(() => { if (!embedded) ensureSystemNodes(sessionId); }, [sessionId, embedded]);
+  const hasCreative = graph.nodes.some((n) => n.data.kind !== 'ref');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
@@ -232,13 +238,15 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
       graph.edges.map((e) => {
         const src = graph.nodes.find((n) => n.id === e.source);
         const type = src ? outputPort(src.data, assets) : null;
+        const link = e.kind ?? 'data';
         return {
           id: e.id,
           source: e.source,
           target: e.target,
           sourceHandle: e.outputIndex == null ? e.sourceHandle : e.outputIndex === NO_RESULT ? GONE_HANDLE : resultHandle(e.outputIndex),
           targetHandle: e.targetHandle,
-          className: `edge-${type ?? 'none'}`,
+          className: link === 'data' ? `edge-${type ?? 'none'}` : `edge-link-${link}${e.both ? ' edge-both' : ''}`,
+          ...(link !== 'data' ? { markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 }, ...(e.both ? { markerStart: { type: MarkerType.ArrowClosed, width: 14, height: 14 } } : {}) } : {}),
           animated: running.has(e.target),
           selected: selectedEdges.has(e.id),
         };
@@ -313,7 +321,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
   const isValidConnection = useCallback(
     (c: Connection | Edge) => {
       const st = useStore.getState();
-      return connectionError(st.sessions[sessionId].graph, st.assets, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null }) === null;
+      return connectionError(st.sessions[sessionId].graph, st.assets, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null, sourceHandle: c.sourceHandle }) === null;
     },
     [sessionId],
   );
@@ -567,7 +575,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
         }}
       />}
-      {!graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
+      {!hasCreative && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !hasCreative ? (
         <div className="node-empty">
           <h2>Build a flow</h2>
           <p className="faint">Ask the agent in the composer — it creates, connects and lays out the nodes — or add them yourself.</p>

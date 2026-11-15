@@ -26,7 +26,7 @@ export const CANVAS: Record<Workspace, { label: string; icon: typeof MessageSqua
 /** The canvases a session has work on: its messages there, its nodes, its designs. */
 export function sessionCanvases(s: Session): Workspace[] {
   const on = new Set<Workspace>(s.feed.map((f) => f.workspace));
-  if (s.graph.nodes.length) on.add('node');
+  if (s.graph.nodes.some((n) => n.data.kind !== 'ref')) on.add('node');
   if (s.docs.some((d) => d.layers.length)) on.add('designer');
   return (['chat', 'node', 'designer'] as const).filter((w) => on.has(w));
 }
@@ -101,7 +101,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const [draft, setDraft] = useState(session.title);
   const [confirming, setConfirming] = useState(false);
   const docs = session.docs.length;
-  const nodes = session.graph.nodes.length;
+  const nodes = session.graph.nodes.filter((n) => n.data.kind !== 'ref').length;
   const canvases = sessionCanvases(session);
   const CoverIcon = CANVAS[canvases[0] ?? 'chat'].icon;
   const modeLabel = sessionMode(session, stats);

@@ -115,7 +115,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
           kind: 'ref',
           type: 'designer.doc',
           ref: doc.id,
-          title: doc.title || 'Designer Doc',
+          title: doc.name || 'Designer Doc',
         });
       });
     } else {
@@ -195,7 +195,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
           kind: 'ref',
           type: 'designer.doc',
           ref: doc.id,
-          title: doc.title || 'Designer Doc',
+          title: doc.name || 'Designer Doc',
         });
       }
     });
@@ -279,7 +279,7 @@ export function addSystemNode(
     (spec.type === 'model'
       ? modelLabelForRef(defaultRef)
       : spec.type === 'designer.doc'
-        ? session?.docs.find((d) => d.id === defaultRef)?.title ?? SYSTEM_NODE_TYPES[spec.type].title
+        ? session?.docs.find((d) => d.id === defaultRef)?.name ?? SYSTEM_NODE_TYPES[spec.type].title
         : SYSTEM_NODE_TYPES[spec.type].title);
   const id = spec.id ?? uid(`sys_${spec.type.replace('.', '_')}`);
   const count = session?.graph.nodes.length ?? 0;

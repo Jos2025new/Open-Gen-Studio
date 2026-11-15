@@ -1,5 +1,4 @@
 import { OPS, OP_IDS } from '../ops';
-import { LLM_MODELS } from '../providers/llm';
 import { useStore } from '../../store/store';
 import type {
   Asset,
@@ -213,8 +212,6 @@ export function modelLabelForRef(ref: string): string {
     const found = list?.find((m) => m.id === ref);
     if (found) return found.name;
   }
-  const builtIn = LLM_MODELS.find((m) => m.id === ref);
-  if (builtIn) return builtIn.label;
   if (ref.startsWith('local::')) return ref.includes('video') ? 'Local Motion' : 'Local Sketch';
   const parts = ref.split(/[:/]/).filter(Boolean);
   return parts[parts.length - 1] ?? ref;
@@ -336,7 +333,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       return {
         type: 'designer.doc',
         ref: doc?.id ?? d.ref,
-        title: doc?.title || d.title || 'Designer Doc',
+        title: doc?.name || d.title || 'Designer Doc',
         subtitle: doc ? `${doc.width} × ${doc.height} px · ${doc.layers.length} layer(s)` : 'No layers yet (points to active doc)',
         badge: isActive ? 'Active' : 'Doc',
         chips: doc ? [`${doc.layers.length} layers`, `${doc.width}×${doc.height}`] : ['Empty canvas'],
