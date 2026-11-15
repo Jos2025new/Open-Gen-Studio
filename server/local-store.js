@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createStoreV2 } from './store-v2.js';
+import { createSqliteStore, sqliteHead } from './store-sqlite.js';
 import { EPS_MAX_BYTES, handleEps } from './eps.js';
 import { PROVIDERS, createKeyStore, maskOf } from './keys.js';
 import { handleProxy } from './provider-proxy.js';
@@ -117,6 +118,16 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
   const sandbox = dir === resolve(root, '.sandbox/data');
   // Format 2 (ADR 0014): once store-v2/HEAD.json exists, reads are assembled from it and state writes become commits.
   const v2 = createStoreV2(dir);
+  let sqlite = null;
+  const sqliteStore = () => (sqlite ??= createSqliteStore(dir));
+  const v2Files = () => stat(join(dir, 'store-v2', 'HEAD.json')).then(() => true, () => false);
+  // Existing format-2 folders stay on their files until phase 2 migrates them. A new commit, or one
+  // whose folder already has SQLite, is one transaction. The commit body does not change.
+  async function commitStore() {
+    if (sqliteHead(dir)) return sqliteStore();
+    if (await v2Files()) return v2;
+    return sqliteStore();
+  }
   // API keys (keys.js): keyring or keys.json, never in the saved state. Keys still in the state files move out once, at start.
   const keys = createKeyStore(dir);
   let migration = null;
@@ -221,7 +232,8 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     if (path === '/v2/commit' && req.method === 'PUT') {
       let payload;
       try { payload = JSON.parse((await body(req)).toString('utf8')); } catch { return send(400, 'not a commit'); }
-      const r = await serialState(() => v2.commit(payload));
+      const store = await commitStore();
+      const r = await serialState(() => store.commit(payload));
       if (r.status === 409) return send(409, conflictBody(r), 'application/json');
       return send(r.status, r.reason ?? '');
     }
@@ -234,11 +246,13 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     }
 
     if (path === '/state') {
+      if (req.method === 'GET' && sqliteHead(dir)) return send(200, sqliteStore().read(), 'application/json');
       if (req.method === 'GET' && (await v2.readHead())) return send(200, await v2.read(), 'application/json');
       if (req.method === 'GET') return send(200, await readFile(stateFile).catch(() => ''), 'application/json');
-      if (req.method === 'PUT' && (await v2.readHead())) {
+      if (req.method === 'PUT' && (sqliteHead(dir) || await v2.readHead())) {
         const text = (await body(req)).toString('utf8');
-        const r = await serialState(() => v2.commitLegacy(text));
+        const store = sqliteHead(dir) ? sqliteStore() : v2;
+        const r = await serialState(() => store.commitLegacy(text));
         if (r.status === 409) return send(409, conflictBody(r), 'application/json');
         return send(r.status === 204 ? 204 : r.status);
       }
