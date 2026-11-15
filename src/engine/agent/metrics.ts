@@ -1,12 +1,75 @@
 import { uid } from '../../lib/id';
 import { patchSession, useStore } from '../../store/store';
-import type { AgentRequestMetrics, Workspace } from '../types';
+import type { AgentMetricsAggregate, AgentRequestMetrics, Session, Workspace } from '../types';
 
 /*
  * Per-request counters of what the agent already does (R0 of PLAN_AGENT_ROUTE.md): model calls, tokens, the
  * agent's own time until its first output and until the plan card, questions, revisions, models and cost.
  * Nothing here reaches the model; it only records. The user's reading and answering time is not counted.
  */
+
+/** Requests kept per session; older ones are folded into `agentMetricsAggregate`. */
+export const MAX_METRICS = 50;
+
+const ZERO_AGGREGATE: AgentMetricsAggregate = {
+  requests: 0,
+  llmCalls: 0,
+  wrapUpCalls: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  llmUsd: 0,
+  agentMs: 0,
+  questionRounds: 0,
+  plans: 0,
+  revisions: 0,
+  rejectedPlans: 0,
+  findModels: 0,
+};
+
+/** Folds request entries onto an optional aggregate base (missing fields default to zero for older saved data). */
+export function sumAgentMetrics(
+  list: readonly AgentRequestMetrics[] = [],
+  base?: Partial<AgentMetricsAggregate>,
+): AgentMetricsAggregate {
+  const start: AgentMetricsAggregate = {
+    requests: base?.requests ?? 0,
+    llmCalls: base?.llmCalls ?? 0,
+    wrapUpCalls: base?.wrapUpCalls ?? 0,
+    inputTokens: base?.inputTokens ?? 0,
+    outputTokens: base?.outputTokens ?? 0,
+    llmUsd: base?.llmUsd ?? 0,
+    agentMs: base?.agentMs ?? 0,
+    questionRounds: base?.questionRounds ?? 0,
+    plans: base?.plans ?? 0,
+    revisions: base?.revisions ?? 0,
+    rejectedPlans: base?.rejectedPlans ?? 0,
+    findModels: base?.findModels ?? 0,
+  };
+  return list.reduce<AgentMetricsAggregate>(
+    (acc, m) => ({
+      requests: acc.requests + 1,
+      llmCalls: acc.llmCalls + m.llmCalls,
+      wrapUpCalls: acc.wrapUpCalls + (m.wrapUpCalls ?? 0),
+      inputTokens: acc.inputTokens + m.inputTokens,
+      outputTokens: acc.outputTokens + m.outputTokens,
+      llmUsd: acc.llmUsd + m.llmUsd,
+      agentMs: acc.agentMs + m.agentMs,
+      questionRounds: acc.questionRounds + m.questionRounds,
+      plans: acc.plans + m.plans,
+      revisions: acc.revisions + m.revisions,
+      rejectedPlans: acc.rejectedPlans + m.rejectedPlans,
+      findModels: acc.findModels + m.findModels,
+    }),
+    start,
+  );
+}
+
+/** Combined cumulative totals across `agentMetricsAggregate` and currently kept `agentMetrics`. */
+export function sessionMetricsTotals(
+  session: Pick<Session, 'agentMetrics' | 'agentMetricsAggregate'> | undefined,
+): AgentMetricsAggregate {
+  return sumAgentMetrics(session?.agentMetrics ?? [], session?.agentMetricsAggregate ?? ZERO_AGGREGATE);
+}
 
 function patchOpen(sessionId: string, fn: (m: AgentRequestMetrics) => Partial<AgentRequestMetrics>): void {
   patchSession(sessionId, (s) => {
@@ -43,7 +106,16 @@ export function startRequest(sessionId: string, info: { request: string; workspa
     findModels: 0,
     models: [],
   };
-  patchSession(sessionId, (s) => ({ ...s, agentMetrics: [...(s.agentMetrics ?? []), m] }));
+  patchSession(sessionId, (s) => {
+    const combined = [...(s.agentMetrics ?? []), m];
+    if (combined.length <= MAX_METRICS) return { ...s, agentMetrics: combined };
+    const cut = combined.length - MAX_METRICS;
+    return {
+      ...s,
+      agentMetrics: combined.slice(cut),
+      agentMetricsAggregate: sumAgentMetrics(combined.slice(0, cut), s.agentMetricsAggregate),
+    };
+  });
 }
 
 /** Clock for one agent turn; `elapsed()` is the request's agent time so far (earlier turns included). */

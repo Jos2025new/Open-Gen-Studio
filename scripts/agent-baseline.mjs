@@ -31,7 +31,7 @@ export function extractBaseline(saved) {
       ? timings.reduce((sum, t) => sum + t.cachedTokens, 0) : null;
     return {
       modelo: model,
-      tipo: UNKNOWN, // Not persisted; order alone does not show whether a request started a new session.
+      tipo: UNKNOWN, // Not persisted; order is unreliable because only the last 50 requests are retained.
       primeraSalidaMs: number(m.msToFirstOutput) ?? UNKNOWN,
       primerTextoVisibleMs: UNKNOWN, // outputMs also includes tool fragments.
       respuestaTerminadaMs: UNKNOWN, // No request completion timestamp is persisted.
@@ -51,7 +51,7 @@ export function extractBaseline(saved) {
       'Sin clasificación persistida de sesión nueva/continuación; no se deduce del orden.',
       'Primera salida incluye texto o herramienta; primer texto visible y respuesta terminada son desconocidos.',
       'agentMs es trabajo acumulado, excluye espera del usuario; llmUsd puede ser estimado.',
-      'callTimings conserva hasta 12 llamadas por petición; sesiones guardadas anteriormente pueden haber recortado agentMetrics a 50.',
+      'callTimings conserva hasta 12 llamadas por petición; agentMetrics conserva hasta 50 peticiones recientes por sesión (las anteriores se acumulan en agentMetricsAggregate).',
       'Los acumuladores de tokens/coste usan cero cuando falta usage; no permiten distinguir ausencia de un cero real.',
       'No demuestra comparación control/aviso, ni distribución por tipo o por variante exacta de modelo.',
     ],

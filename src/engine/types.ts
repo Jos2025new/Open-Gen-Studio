@@ -996,6 +996,22 @@ export interface AgentRequestMetrics {
   outcome?: 'approved' | 'canceled' | 'superseded';
 }
 
+/** Cumulative totals from trimmed `agentMetrics` entries so session usage stays exact without unbounded lists. */
+export interface AgentMetricsAggregate {
+  requests: number;
+  llmCalls: number;
+  wrapUpCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  llmUsd: number;
+  agentMs: number;
+  questionRounds: number;
+  plans: number;
+  revisions: number;
+  rejectedPlans: number;
+  findModels: number;
+}
+
 /** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
 export type SubjectKind = 'character' | 'object' | 'product' | 'location' | 'style';
 
@@ -1044,8 +1060,10 @@ export interface Session {
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };
   /** Edits the user made back in the conversation, newest last (for us; the agent never sees it). */
   editLog?: EditLogEntry[];
-  /** Per-request agent counters (R0), newest last; see agent/metrics.ts. */
+  /** Per-request agent counters (R0), newest last (capped at MAX_METRICS); see agent/metrics.ts. */
   agentMetrics?: AgentRequestMetrics[];
+  /** Cumulative totals of agentMetrics entries trimmed past MAX_METRICS. */
+  agentMetricsAggregate?: AgentMetricsAggregate;
   subjects?: Subject[];
   styles?: SavedStyle[];
   /** "Don't ask again": over-limit runs here no longer ask. */
