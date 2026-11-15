@@ -62,8 +62,13 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     () => chatWorkNotInNodes(sessionId).map((g) => ({ id: g.id, assetId: g.assetIds[0], label: g.op ? g.op.id.replace(/_/g, ' ') : g.prompt.split(/[.,\n]/)[0].slice(0, 60) || g.kind })),
     [sessionId, graph, generations, feed],
   );
-  const del = useDeleteRequest(sessionId, () => setSelected(new Set()));
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
+  const del = useDeleteRequest(sessionId, (removedNodes, removedEdges) => {
+    if (removedNodes.length) setSelected((prev) => { const next = new Set(prev); removedNodes.forEach((id) => next.delete(id)); return next; });
+    if (removedEdges.length) setSelectedEdges((prev) => { const next = new Set(prev); removedEdges.forEach((id) => next.delete(id)); return next; });
+  });
+  const selectNodes = (ids: Iterable<string>) => { setSelected(new Set(ids)); setSelectedEdges(new Set()); };
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
   // Cut (scissors, X) is a passing tool: it is not remembered, and X or Escape returns to the last one.
@@ -114,9 +119,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       const m = measuredRef.current.get(n.id) ?? { width: NODE_WIDTH, height: 120 };
       return n.position.x < b.x && n.position.x + m.width > a.x && n.position.y < b.y && n.position.y + m.height > a.y;
     }).map((n) => n.id);
-    setSelected(e.shiftKey || e.ctrlKey || e.metaKey ? new Set([...selected, ...hit]) : new Set(hit));
+    if (e.shiftKey || e.ctrlKey || e.metaKey) setSelected(new Set([...selected, ...hit]));
+    else selectNodes(hit);
   };
-  const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
@@ -237,10 +242,11 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
       if (removed.size) disconnectEdges(sessionId, [...removed]);
-      if (picks.length) {
+      if (picks.length || removed.size) {
         setSelectedEdges((prev) => {
           const next = new Set(prev);
           for (const [id, on] of picks) (on ? next.add(id) : next.delete(id));
+          for (const id of removed) next.delete(id);
           return next;
         });
       }
@@ -261,7 +267,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const r = el?.getBoundingClientRect();
     const center = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 };
     const id = addNode(sessionId, data, { x: center.x - NODE_WIDTH / 2 + (Math.random() - 0.5) * 40, y: center.y + (Math.random() - 0.5) * 40 });
-    setSelected(new Set([id]));
+    selectNodes([id]);
   };
 
   // The omnicanvas library also lists the three Spaces (one node each) and the system parts.
@@ -270,8 +276,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const center = () => { const r = canvasRef.current?.getBoundingClientRect(); return r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 }; };
     return {
       has: (space: OmniSpace) => useStore.getState().sessions[sessionId]?.graph.nodes.some((n) => n.data.kind === 'ref' && n.data.type === 'space' && n.data.ref === space) ?? false,
-      onSpace: (space) => { const c = center(); setSelected(new Set([addOmniSpace(sessionId, space, { x: c.x - 160, y: c.y }).id])); },
-      onSystem: (type) => { const c = center(); setSelected(new Set([addSystemNode(sessionId, { type, position: { x: c.x - NODE_WIDTH / 2, y: c.y } })])); },
+      onSpace: (space) => { const c = center(); selectNodes([addOmniSpace(sessionId, space, { x: c.x - 160, y: c.y }).id]); },
+      onSystem: (type) => { const c = center(); selectNodes([addSystemNode(sessionId, { type, position: { x: c.x - NODE_WIDTH / 2, y: c.y } })]); },
     };
   }, [omni, sessionId, rf]);
 
@@ -296,7 +302,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const pos = position ?? (r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
     const ids = await uploadFiles(images);
     const added = ids.map((assetId, i) => addNode(sessionId, { kind: 'asset', title: 'Image', assetId }, { x: pos.x - NODE_WIDTH / 2 + i * (NODE_WIDTH + 30), y: pos.y }));
-    if (added.length) setSelected(new Set(added));
+    if (added.length) selectNodes(added);
   }, [sessionId, rf]);
 
   useEffect(() => {
@@ -315,7 +321,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         if (!hasNodeClipboard()) return;
         e.preventDefault();
         const ids = pasteNodes(sessionId);
-        if (ids.length) setSelected(new Set(ids));
+        if (ids.length) selectNodes(ids);
         return;
       }
       e.preventDefault();
@@ -357,6 +363,15 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   }, [sessionId, selected]);
 
   const runIds = runnableIds(graph.nodes);
+
+  const liveSelected = useMemo(() => {
+    const ids = new Set(graph.nodes.map((n) => n.id));
+    return [...selected].filter((id) => ids.has(id));
+  }, [graph.nodes, selected]);
+  const liveSelectedEdgeSet = useMemo(() => {
+    const ids = new Set(graph.edges.map((e) => e.id));
+    return new Set([...selectedEdges].filter((id) => ids.has(id)));
+  }, [graph.edges, selectedEdges]);
 
   // Right-click menu, anchored to an invisible point at the cursor.
   const menuAnchor = useRef<HTMLDivElement>(null);
@@ -410,7 +425,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         onEdgesChange={onEdgesChange}
         onPaneContextMenu={embedded ? undefined : (e) => openMenu(e)}
         onNodeContextMenu={embedded ? undefined : (e, n) => {
-          setSelected(new Set([n.id]));
+          selectNodes([n.id]);
           openMenu(e, n.id);
         }}
         onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null, sourceHandle: c.sourceHandle })}
@@ -441,7 +456,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={graph.nodes.filter((n) => selected.has(n.id))} />}
-        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
+        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={selectNodes} />
         <CanvasNavigation
           sessionId={sessionId}
           add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
@@ -449,13 +464,13 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
             layoutAll(sessionId);
             window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
           }}
-          onSelect={(id) => setSelected(new Set([id]))}
+          onSelect={(id) => selectNodes([id])}
           tool={tool}
           onTool={pickTool}
-          selectedCount={selected.size}
-          onDelete={() => del.request([...selected])}
+          selectedCount={liveSelected.length + liveSelectedEdgeSet.size}
+          onDelete={() => del.request(liveSelected, [...liveSelectedEdgeSet])}
         /></>}
-        <LinkBar sessionId={sessionId} graph={graph} selected={selectedEdges} />
+        <LinkBar sessionId={sessionId} graph={graph} selected={liveSelectedEdgeSet} />
         {del.card}
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
@@ -492,7 +507,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
               // From a dropped connection: the new node lands there, wired to the port that takes the source.
               const id = menu.from ? addConnected(sessionId, menu.from, data, { x: pos.x, y: pos.y - 40 }, menu.handle) : addNode(sessionId, data, pos);
-              if (id) setSelected(new Set([id]));
+              if (id) selectNodes([id]);
               setMenu(null);
             }}
             onAsset={() => {

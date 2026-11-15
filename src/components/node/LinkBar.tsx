@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Panel, type Edge } from '@xyflow/react';
 import { disconnectEdges, deleteNodes } from '../../engine/flow/actions';
+import { ungroup } from '../../engine/flow/arrange';
 import { GONE_HANDLE, NO_RESULT, outputPort, resultHandle } from '../../engine/flow/graph';
+import { openHistoryGroup } from '../../engine/flow/history';
 import { setLinkBoth } from '../../engine/nodes/system';
 import type { Asset, Graph } from '../../engine/types';
 import { useStore } from '../../store/store';
@@ -46,39 +48,69 @@ export function LinkBar({ sessionId, graph, selected }: { sessionId: string; gra
 }
 
 /** A system node is a pointer: removing it only takes it off the canvas. When it holds model links, ask first. */
-export function useDeleteRequest(sessionId: string, afterDelete: () => void) {
-  const [ask, setAsk] = useState<string[] | null>(null);
+export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[], edges: string[]) => void) {
+  const [ask, setAsk] = useState<{ nodes: string[]; edges: string[] } | null>(null);
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
   const needsConfirm = (ids: string[]) => {
-    if (!graph) return false;
-    const model = (id: string) => { const d = graph.nodes.find((n) => n.id === id)?.data; return d?.kind === 'ref' && d.type === 'model'; };
+    const g = useStore.getState().sessions[sessionId]?.graph ?? graph;
+    if (!g) return false;
+    const model = (id: string) => { const d = g.nodes.find((n) => n.id === id)?.data; return d?.kind === 'ref' && d.type === 'model'; };
     return ids.some((id) => {
-      const d = graph.nodes.find((n) => n.id === id)?.data;
-      return d?.kind === 'ref' && graph.edges.some((e) => (e.kind ?? 'data') === 'control' && (e.source === id || e.target === id) && (model(e.source) || model(e.target)));
+      const d = g.nodes.find((n) => n.id === id)?.data;
+      return d?.kind === 'ref' && g.edges.some((e) => (e.kind ?? 'data') === 'control' && (e.source === id || e.target === id) && (model(e.source) || model(e.target)));
     });
   };
-  const request = (ids: string[]) => {
-    if (needsConfirm(ids)) setAsk(ids);
-    else { deleteNodes(sessionId, ids); afterDelete(); }
+  /** Deletes nodes (with their connected links), standalone links, and group frames as one atomic undo step. */
+  const runDelete = (nodeIds: string[], edgeIds: string[] = []) => {
+    const g = useStore.getState().sessions[sessionId]?.graph;
+    if (!g) return;
+    const groupSet = new Set((g.groups ?? []).map((gr) => gr.id));
+    const nodeSet = new Set(g.nodes.map((n) => n.id));
+    const groupIds = nodeIds.filter((id) => groupSet.has(id));
+    const realNodes = nodeIds.filter((id) => nodeSet.has(id));
+    const dropSet = new Set(realNodes);
+    const edgeSet = new Set(g.edges.map((e) => e.id));
+    const standaloneEdges = edgeIds.filter((id) => {
+      if (!edgeSet.has(id)) return false;
+      const e = g.edges.find((x) => x.id === id);
+      return Boolean(e && !dropSet.has(e.source) && !dropSet.has(e.target));
+    });
+    if (!groupIds.length && !realNodes.length && !standaloneEdges.length) return;
+    const h = openHistoryGroup(sessionId);
+    try {
+      for (const gid of groupIds) ungroup(sessionId, gid);
+      if (realNodes.length) deleteNodes(sessionId, realNodes);
+      if (standaloneEdges.length) void disconnectEdges(sessionId, standaloneEdges);
+    } finally {
+      h.close();
+    }
+    afterDelete(nodeIds, edgeIds);
+  };
+  const request = (nodeIds: string[], edgeIds: string[] = []) => {
+    if (needsConfirm(nodeIds)) setAsk({ nodes: nodeIds, edges: edgeIds });
+    else runDelete(nodeIds, edgeIds);
   };
   const card = useMemo(() => {
     if (!ask || !graph) return null;
-    const names = ask.map((id) => graph.nodes.find((n) => n.id === id)?.data.title ?? id).join(', ');
-    const links = graph.edges.filter((e) => ask.includes(e.source) || ask.includes(e.target)).length;
+    const names = ask.nodes.map((id) => graph.nodes.find((n) => n.id === id)?.data.title ?? id).join(', ');
+    const links = graph.edges.filter((e) => ask.nodes.includes(e.source) || ask.nodes.includes(e.target)).length;
     return (
       <Panel position="top-center" className="link-bar confirm-pop" role="alertdialog" aria-label="Remove from canvas">
         <p>Remove <strong>{names}</strong> from the canvas? It only takes the node off the canvas; the data stays where it is. {links} link{links === 1 ? '' : 's'} (models included) will be detached.</p>
         <div className="spend-actions">
           <Button variant="ghost" onClick={() => setAsk(null)}>Cancel</Button>
-          <Button variant="danger" onClick={() => { deleteNodes(sessionId, ask); setAsk(null); afterDelete(); }}>Remove</Button>
+          <Button variant="danger" onClick={() => { runDelete(ask.nodes, ask.edges); setAsk(null); }}>Remove</Button>
         </div>
       </Panel>
     );
   }, [ask, graph, sessionId]);
-  /** React Flow's Delete key: ask first when needed, and cancel its own removal. */
-  const before = async ({ nodes }: { nodes: Array<{ id: string }> }) => {
-    if (!nodes.length || !needsConfirm(nodes.map((n) => n.id))) return true;
-    setAsk(nodes.map((n) => n.id));
+  /** React Flow's Delete key: handle node/edge deletion atomically so node+link restore in one undo step. */
+  const before = async ({ nodes, edges }: { nodes: Array<{ id: string }>; edges: Array<{ id: string }> }) => {
+    const nodeIds = nodes.map((n) => n.id);
+    const edgeIds = edges.map((e) => e.id);
+    if (!nodeIds.length && !edgeIds.length) return false;
+    if (needsConfirm(nodeIds)) { setAsk({ nodes: nodeIds, edges: edgeIds }); return false; }
+    runDelete(nodeIds, edgeIds);
     return false;
   };
   return { request, card, before };
