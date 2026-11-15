@@ -50,7 +50,8 @@ describe('Nodes library panel (Add node in the toolbox)', () => {
   it('lists Media, Nodes and Tools, each under a head with its count, with the search field focused', async () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(document.activeElement).toBe(field());
-    expect(sections()).toEqual(['Media', 'Nodes', 'Tools']);
+    expect(sections()).toEqual(['Media', 'Nodes', 'System', 'Tools']);
+    expect(labels('System')).toEqual(expect.arrayContaining(['Chat', 'Agent', 'Model', 'Designer Doc', 'Tools']));
     expect(labels('Media')).toEqual(['Import images', 'Asset']);
     expect(labels('Nodes')).toEqual(['Text', 'Image', 'Video', 'Audio', '3D model']);
     expect(labels('Tools').length).toBeGreaterThan(3);
