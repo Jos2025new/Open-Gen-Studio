@@ -104,7 +104,7 @@ async function parent(which, runs) {
       const g = await guards(store, v.k);
       const bad = Object.entries(g).filter(([key, val]) => val === false);
       if (bad.length) { sum.guardFailures++; sum.failures.push({ run: r, guard: bad }); }
-    } else if (sum.failures.length < 10) {
+    } else if (v.kind !== 'empty') {
       sum.failures.push({ run: r, ...v });
     }
     if (typeof store.close === 'function') store.close();
