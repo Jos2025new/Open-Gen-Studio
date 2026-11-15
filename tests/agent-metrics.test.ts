@@ -76,6 +76,16 @@ describe('agent metrics per request (R0)', () => {
     ]);
   });
 
+  it('keeps usage and request metrics in sync through the plan wrap-up', async () => {
+    const before = useStore.getState().sessions[sid()].usage.inputTokens;
+    replies = [{ plan: { texts: ['a'] } }, { text: 'Ready.' }];
+    await sendAgentMessage('a');
+    await approvePlan(sid(), plans()[0].id);
+
+    const addedUsage = useStore.getState().sessions[sid()].usage.inputTokens - before;
+    expect(addedUsage).toBe(metrics().reduce((sum, metric) => sum + metric.inputTokens, 0));
+  });
+
   it('answering questions stays in the same request and counts the round', async () => {
     setup('guided'); // questions are cards of Auto and Guided; Direct has none
     replies = [{ questions: true }];

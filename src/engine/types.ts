@@ -958,6 +958,8 @@ export interface AgentRequestMetrics {
   workflowId?: string;
   attachments: number;
   llmCalls: number;
+  /** Model calls used to summarize a completed plan, tracked separately from request turns. */
+  wrapUpCalls?: number;
   inputTokens: number;
   outputTokens: number;
   llmUsd: number;

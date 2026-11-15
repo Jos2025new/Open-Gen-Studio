@@ -69,10 +69,10 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   }
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = s.agent.pending;
-  if (pending?.feedItemId === itemId) {
+  const closesRequest = pending?.feedItemId === itemId;
+  if (closesRequest) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` });
-    closeRequest(sessionId, 'approved', total.usd);
     if (item.style === 'direct') inheritApproved(sessionId, chosen, item.comparisonKinds);
     else if (item.style === 'auto') confirmApproved(sessionId, chosen, item.comparisonKinds);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
@@ -86,6 +86,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   }));
 
   await runPlanItem(sessionId, itemId, chosen, off);
+  if (closesRequest) closeRequest(sessionId, 'approved', total.usd);
 }
 
 export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null): Promise<{ errors: string[]; itemId?: string }> {
@@ -137,12 +138,13 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
   const status = result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status, error: result.failed.map(f => `${f.stepId}: ${f.error}`).join(' · ') || undefined });
   const pending = session(sessionId).agent.pending;
-  if (pending?.feedItemId === item.id) {
+  const closesRequest = pending?.feedItemId === item.id;
+  if (closesRequest) {
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...result.outputs].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` });
-    closeRequest(sessionId, 'approved', preview.estimate.usd);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
   await wrapUpPlan(sessionId, item.id, item.plan.title, status, `${status}: ${preview.runIds.join(', ')}`);
+  if (closesRequest) closeRequest(sessionId, 'approved', preview.estimate.usd);
 }
 
 /**
