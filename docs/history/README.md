@@ -65,6 +65,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [061: cierre de la tanda D62–D70 (2026-11-12)](061-2026-11-W46-cierre.md).
 - [062: recorredor de interfaz, conversación y acuerdo (2026-11-07; renumerado desde la rama plus-center)](062-2026-11-W45-recorredor.md).
 - [063: claves fuera del navegador y en el llavero (2026-11-13)](063-2026-11-W46-claves.md).
+- [065: persistencia en SQLite, mediciones y pruebas (2026-11-15)](065-2026-11-W46-persistencia-sqlite.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
 - [Informe parcial: objetos y profundidad](informe-gpt-objetos-y-z.md).
