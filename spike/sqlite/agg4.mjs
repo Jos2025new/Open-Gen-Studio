@@ -12,6 +12,7 @@ const rows = [
   ['small edit p95 ms', (d) => d.smallEditMs.p95],
   ['gen edit p50 ms', (d) => d.genEditMs.p50],
   ['gesture p50 ms', (d) => d.gestureMs.p50],
+  ['lib reorder p50 ms', (d) => d.libraryReorderMs?.p50 ?? 0],
   ['import ms', (d) => d.importMs],
   ['RSS after import MB', (d) => d.memAfterImport.rssMB],
   ['heap after import MB', (d) => d.memAfterImport.heapMB],
@@ -27,6 +28,8 @@ const rows = [
   ['disk w/ backups MB', (d) => d.diskAfterIdle.withBackups / 1048576],
   ['wire body KB (small edit)', (d) => d.wire.editBodyBytes / 1024],
   ['wire parse ms', (d) => d.wire.parseMs],
+  ['lib reorder body KB', (d) => (d.libraryReorderWire?.bodyBytes ?? 0) / 1024],
+  ['lib reorder parse ms', (d) => d.libraryReorderWire?.parseMs ?? 0],
 ];
 const vs = ['v2', 'a', 'b', 'ba'].filter((v) => by[v]);
 console.log(`rounds: ${vs.map((v) => `${v}=${by[v].length}`).join(' ')}`);

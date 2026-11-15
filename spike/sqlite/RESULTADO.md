@@ -174,3 +174,23 @@ Código nuevo en `spike/sqlite/`: `store-ba.js` (B+A), `bench4.mjs` + `bench4-se
 - **Archivos protegidos (`docs/persistencia-protegida.md`):** la parte `A` es 100 % servidor y no añade ningún archivo de cliente respecto a `B`. Adoptar `B+A` tocaría en el cliente: `src/lib/disk.ts` (`setCommit` envía `delta`), `src/lib/saveGuard.ts` y `src/lib/idb.ts` (`guard.acked` y `pending` pasan a seguir también los ids/escalares/spend confirmados para rebasar tras 409, fallo de red o recarga), `flushWrite`/`saveNow` en `src/store/store.ts`, `src/store/saveRecovery.ts` y `src/store/writerHandoff.ts`. En el servidor: `server/local-store.js` y reemplazo de `server/store-v2.js` (`server/save-guard.js` y el 409 se conservan). Fuera de protegidos: `src/store/persistJson.ts`, `src/store/formatV2.ts`.
 - **Recomendación final: SÍ adoptar B+A.** Resuelve a la vez el arranque (**55 ms** frente a 91–122 ms de v2 y 205 ms de B), la edición pequeña (**28 ms** frente a 75–82 ms), la edición con generación (**32 ms** frente a 66–79 ms en v2 y 250–323 ms en A), el gesto (**43 ms** frente a 88–102 ms), el tráfico por guardado (**45 KB** frente a 29 MB), la memoria del servidor (**165 MB RSS, 4,9 MB heap**, sin la fuga de A) y los cortes `kill -9` (**0 torn** frente a 3–6 torn en v2).
 - **Riesgos restantes:** (1) mayor uso de disco (`82 MB` de datos frente a `29 MB` en v2 por SQLite + `state-cache.txt`) y bloqueo síncrono de `~360 ms` en el servidor al regenerar la copia en `idle()`; (2) tocar archivos protegidos del cliente (`idb.ts`, `saveGuard.ts`, `disk.ts`, `store.ts`) requiere autorización explícita del usuario y revisión independiente (regla 5 de AGENTS.md).
+
+## Remedición tras la revisión
+
+4 rondas intercaladas (`v2` y `B+A`, orden rotado; 4 en vez de 5 por límite de 30 min) tras `46d8f9db`, mismo fixture (60k filas) y `MemoryMax=2G`, carga media 0,8–2,3, `sha` idéntico (`4066900e6d0a9056`).
+
+| Medida (mediana [mín–máx]) | store-v2 (4 r.) | B+A R4 (5 r.) | B+A revisado (4 r.) |
+|---|---|---|---|
+| Arranque open+read p50 (ms) | 90,3 [85,3–104,0] | 55,3 [52,8–74,4] | 54,8 [45,7–61,0] (`copy`) |
+| Edición pequeña p50 / p95 (ms) | 104,3 [96,1–199,9] / 271,2 | 27,6 [25,3–29,3] / 37,4 | **492,7 [448,1–536,3] / 646,0** |
+| Edición con generación p50 (ms) | 70,5 [64,2–75,6] | 31,8 [20,8–33,9] | **532,8 [472,1–563,9]** |
+| Gesto 620 KB p50 (ms) | 89,0 [77,5–111,3] | 43,2 [34,4–66,5] | **511,1 [483,4–596,5]** |
+| Reordenar library (50 ítems) p50 (ms) | 95,6 [64,4–107,1] | — | **495,5 [450,5–526,3]** |
+| RSS en uso / tras idle / pico (MB) | 164,2 / 164,2 / 272,8 | 164,6 / 162,9 / 309,8 | 181,8 / 222,7 / 392,6 |
+| Disco datos / con backups (MB) | 29,3 / 55,8 | 82,1 / 131,2 | 82,1 / 131,2 (WAL pico 52,1) |
+| Cuerpo ed. pequeña / parse | 29.156 KB / 76,1 ms | 45 KB / 0,1 ms | **726 KB / 11,7 ms** (lib: 683 KB) |
+| Mantenimiento en `idle()` (ms) | 0 | 359,5 [335,4–1685] | 338,4 [304,7–396,2] |
+
+- **Sí empeoró de forma grave en escritura:** cada guardado pasa de 28–43 ms a **493–533 ms** (~12–18× peor; 4,7–7,6× más lento que `v2`), el cuerpo del delta crece de 45 KB a **726 KB** (16×), el RSS tras idle sube a **223 MB** (pico **393 MB**) y el WAL previo a `idle()` alcanza **52,1 MB**.
+- **Causa en `46d8f9db`:** `delta-client.mjs` envía `order` completo (40k `generations` + 20k `assets`) en cada commit aunque no cambie, y `store-b.js` ejecuta `recFp.get` + `recPos.run` por los 60.000 registros en cada transacción.
+- **Crash test `kill -9` (`crash-test4.mjs ba 100`):** **80 OK, 20 vacío, 0 torn, 0 commits reconocidos perdidos, 0 fallos de guardas** (21 lecturas de `copy`, 59 de `tables`). Arranque, disco y atomicidad no empeoran.

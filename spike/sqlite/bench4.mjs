@@ -126,6 +126,40 @@ await srv.exited;
 const s2 = spawnServer();
 const st = await s2.call({ op: 'startup', n: 5 });
 out.startup = { ms: stats(st.times), bytes: st.bytes, source: st.source, fullBytes: st.fullBytes, sha: st.sha, rssAfterFirst: st.rss1, rssEnd: st.rssEnd };
+
+// Library reorder save (after startup, so fixture/disk/startup remain directly comparable to R4).
+await s2.call({ op: 'open' });
+g.library = Array.from({ length: 50 }, (_, i) => ({ id: `lib_${i}`, name: `Lib ${i}` }));
+{
+  const next = cur + 1000;
+  const r = await s2.call({ op: 'commit', body: body(next, cur, {}) });
+  if (r.status !== 204) throw new Error(`lib setup refused: ${r.status} ${r.reason}`);
+  if (delta) client.ack();
+  cur = next;
+}
+const libReorder = [];
+let libWireBytes = 0;
+let libParseMs = 0;
+for (let i = 1; i <= 20; i++) {
+  g.library = [...g.library.slice(1), g.library[0]];
+  const next = cur + 1000;
+  const b = body(next, cur, {});
+  if (i === 1) {
+    const raw = JSON.stringify(b);
+    const t = performance.now();
+    JSON.parse(raw);
+    libParseMs = Number((performance.now() - t).toFixed(1));
+    libWireBytes = raw.length;
+  }
+  const r = await s2.call({ op: 'commit', body: b });
+  if (r.status !== 204) throw new Error(`lib reorder refused: ${r.status} ${r.reason}`);
+  if (delta) client.ack();
+  libReorder.push(r.ms);
+  cur = next;
+}
+out.libraryReorderMs = stats(libReorder);
+out.libraryReorderWire = { bodyBytes: libWireBytes, parseMs: libParseMs };
+await s2.call({ op: 'close' });
 s2.kill();
 await s2.exited;
 
