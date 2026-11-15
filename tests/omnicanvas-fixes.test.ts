@@ -15,8 +15,9 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useDeleteRequest } from '../src/components/node/LinkBar';
 import { ensureOmniNodes, omniSpaceNodeId } from '../src/engine/nodes/omni';
+import { addNode, deleteNodes } from '../src/engine/flow/actions';
 import { travelGraph } from '../src/engine/flow/history';
-import { newSession, setGraph, useStore } from '../src/store/store';
+import { appendFeed, newSession, reconcileDeletionNotices, setGraph, useStore } from '../src/store/store';
 
 const get = useStore.getState;
 
@@ -82,5 +83,40 @@ describe('omnicanvas deletion and undo', () => {
     });
     expect(get().sessions[sid].graph.nodes.some((n) => n.id === spaceId)).toBe(true);
     expect(get().sessions[sid].graph.edges.some((e) => e.id === edgeId)).toBe(true);
+  });
+
+  it('clears stale Agent deletion notices on open and does not pile up ref-node notices', () => {
+    const sid = newSession();
+    ensureOmniNodes(sid);
+    const agent = get().sessions[sid].graph.nodes.find((n) => n.id === 'sys_agent')!;
+    expect(agent).toBeDefined();
+
+    // Simulate a persisted stale notice left in session.feed before re-opening omnicanvas.
+    appendFeed(sid, {
+      id: 'stale_agent_notice',
+      createdAt: Date.now(),
+      workspace: 'node',
+      type: 'notice',
+      level: 'info',
+      text: 'Deleted nodes: Agent. Results remain in the gallery.',
+      undoNodes: { nodes: [structuredClone(agent)], edges: [] },
+    });
+    ensureOmniNodes(sid);
+    expect(get().sessions[sid].feed.some((f) => f.id === 'stale_agent_notice')).toBe(false);
+
+    // Deleting ref/system pointers must not emit gallery deletion notices.
+    deleteNodes(sid, ['sys_agent', omniSpaceNodeId('nodes')]);
+    expect(get().sessions[sid].feed.some((f) => f.type === 'notice' && f.undoNodes)).toBe(false);
+
+    // Creative nodes still get a deletion notice, which clears when undone via canvas history.
+    const textId = addNode(sid, { kind: 'text', title: 'Prompt', text: 'hello' }, { x: 1200, y: 0 });
+    deleteNodes(sid, [textId]);
+    expect(get().sessions[sid].feed.filter((f) => f.type === 'notice' && f.undoNodes)).toHaveLength(1);
+    travelGraph(sid, get().sessions[sid].graph, 'undo', 1, (next) => {
+      setGraph(sid, () => next);
+      reconcileDeletionNotices(sid);
+      return true;
+    });
+    expect(get().sessions[sid].feed.some((f) => f.type === 'notice' && f.undoNodes)).toBe(false);
   });
 });

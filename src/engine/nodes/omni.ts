@@ -1,4 +1,4 @@
-import { setComposer, useStore } from '../../store/store';
+import { reconcileDeletionNotices, setComposer, useStore } from '../../store/store';
 import { selectDoc } from '../design/actions';
 import type { AgentStyle, ComposerMode, Graph, GraphEdge, GraphNode, RefNodeData } from '../types';
 import { NODE_WIDTH } from '../flow/graph';
@@ -74,6 +74,7 @@ export function ensureOmniNodes(sessionId: string): string[] {
   if (nodes.length !== graph.nodes.length || edges.length !== graph.edges.length || omniAt !== graph.omniAt || idsChanged) {
     writeGraph(sessionId, { ...graph, nodes, edges, ...(omniAt !== undefined ? { omniAt, omniAtIds } : {}) });
   }
+  reconcileDeletionNotices(sessionId);
   return added;
 }
 

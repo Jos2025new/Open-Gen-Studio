@@ -544,6 +544,35 @@ export function removeFeedItem(sessionId: string, itemId: string): void {
   patchSession(sessionId, (s) => ({ ...s, feed: s.feed.filter((f) => f.id !== itemId) }));
 }
 
+/** Drop or trim active deletion notices whose nodes are already back on the canvas (e.g. after Ctrl+Z or re-open). */
+export function reconcileDeletionNotices(sessionId: string): void {
+  const s = get().sessions[sessionId];
+  if (!s) return;
+  const live = new Set(s.graph.nodes.map((n) => n.id));
+  let changed = false;
+  const feed: FeedItem[] = [];
+  for (const item of s.feed) {
+    if (item.type !== 'notice' || !item.undoNodes || item.undone || !item.undoNodes.nodes.length) {
+      feed.push(item);
+      continue;
+    }
+    const remaining = item.undoNodes.nodes.filter((n) => !live.has(n.id));
+    if (remaining.length === item.undoNodes.nodes.length) {
+      feed.push(item);
+      continue;
+    }
+    changed = true;
+    if (!remaining.length) continue;
+    const keepIds = new Set(remaining.map((n) => n.id));
+    feed.push({
+      ...item,
+      text: `Deleted nodes: ${remaining.map((n) => n.data.title).join(', ')}. Results remain in the gallery.`,
+      undoNodes: { nodes: remaining, edges: item.undoNodes.edges.filter((e) => keepIds.has(e.source) || keepIds.has(e.target)) },
+    });
+  }
+  if (changed) patchSession(sessionId, (cur) => ({ ...cur, feed }));
+}
+
 export function upsertGeneration(g: Generation): void {
   set((st) => ({ generations: { ...st.generations, [g.id]: g } }));
 }

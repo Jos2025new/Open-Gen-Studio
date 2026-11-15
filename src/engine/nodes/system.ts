@@ -1,5 +1,5 @@
 import { uid } from '../../lib/id';
-import { setGraph, toast, useStore } from '../../store/store';
+import { reconcileDeletionNotices, setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem } from '../flow/locks';
 import { isOmniSpace } from './omniSpaces';
 import type {
@@ -226,7 +226,10 @@ export function ensureSystemNodes(sessionId: string, opts: { recordHistory?: boo
   const session = st.sessions[sessionId];
   if (!session) return [];
   const { nodes, edges, addedIds } = buildInitialSystemGraph(sessionId, session.graph);
-  if (!addedIds.length) return [];
+  if (!addedIds.length) {
+    reconcileDeletionNotices(sessionId);
+    return [];
+  }
   const nextGraph: Graph = { ...session.graph, nodes, edges };
   if (opts.recordHistory) {
     setGraph(sessionId, () => nextGraph);
@@ -242,6 +245,7 @@ export function ensureSystemNodes(sessionId: string, opts: { recordHistory?: boo
       };
     });
   }
+  reconcileDeletionNotices(sessionId);
   return addedIds;
 }
 

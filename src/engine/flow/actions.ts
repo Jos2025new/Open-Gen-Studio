@@ -104,7 +104,12 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
   const groups = (g0: import('../types').Graph) => g0.groups?.map(gr => ({ ...gr, nodeIds: gr.nodeIds.filter(id => !drop.has(id)) })).filter(gr => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
   const error = editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)), ...(g.groups ? { groups: groups(g) } : {}) }));
-  if (!error && deleted.nodes.length) appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${deleted.nodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: deleted });
+  const galleryNodes = deleted.nodes.filter(n => n.data.kind !== 'ref');
+  if (!error && galleryNodes.length) {
+    const galleryIds = new Set(galleryNodes.map(n => n.id));
+    const galleryDeleted = galleryNodes.length === deleted.nodes.length ? deleted : { nodes: galleryNodes, edges: deleted.edges.filter(e => galleryIds.has(e.source) || galleryIds.has(e.target)) };
+    appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${galleryNodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: galleryDeleted });
+  }
   return error;
 }
 
