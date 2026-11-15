@@ -13,6 +13,7 @@ vi.mock('../src/lib/idb', () => ({
 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { NodeLibrary } from '../src/components/node/AddNodeItems';
 import { useDeleteRequest } from '../src/components/node/LinkBar';
 import { ensureOmniNodes, omniSpaceNodeId } from '../src/engine/nodes/omni';
 import { addNode, deleteNodes } from '../src/engine/flow/actions';
@@ -161,5 +162,30 @@ describe('omnicanvas deletion and undo', () => {
     const placed = findFreePosition(createSpace.position, { width: NODE_WIDTH, height: h }, occ, { gapX: 48, gapY: 56 });
     const promptRect = { x: placed.x, y: placed.y, width: NODE_WIDTH, height: h };
     expect(occ.some((o) => rectsOverlap(promptRect, o, 48, 56))).toBe(false);
+  });
+
+  it('shows Nodes -> Text before Spaces/System in omnicanvas Add node and adds on click without hover scroll-jump', async () => {
+    const onPick = vi.fn();
+    await act(async () => {
+      root.render(createElement(NodeLibrary, {
+        onPick,
+        onImport: vi.fn(),
+        onAsset: vi.fn(),
+        omni: { has: () => false, onSpace: vi.fn(), onSystem: vi.fn() },
+      }));
+    });
+    const secs = [...host.querySelectorAll('.node-lib-sec')].map((s) => s.getAttribute('aria-label'));
+    expect(secs.slice(0, 4)).toEqual(['Media', 'Nodes', 'Spaces', 'System']);
+    const textBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (el) => el.querySelector('.node-lib-text > span')?.textContent === 'Text',
+    )!;
+    expect(textBtn).toBeDefined();
+    const scrollIntoView = vi.fn();
+    textBtn.scrollIntoView = scrollIntoView;
+    await act(async () => { textBtn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); });
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    await act(async () => { textBtn.click(); });
+    expect(onPick).toHaveBeenCalledTimes(1);
+    expect(onPick.mock.calls[0][0]).toMatchObject({ kind: 'text' });
   });
 });

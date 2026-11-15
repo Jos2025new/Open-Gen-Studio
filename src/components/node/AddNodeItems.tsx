@@ -35,8 +35,6 @@ const SYSTEM_ENTRIES: Array<[SystemNodeType, LucideIcon, string, string]> = [
 function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }): Entry[] {
   const node = (kind: Exclude<Kind, 'text'> | 'text', icon: LucideIcon, label: string, sub: string, keywords: string): Entry => ({ id: kind, section: 'nodes', kind, icon, label, sub, keywords, run: () => onPick(newNodeData(kind)) });
   return [
-    ...(omni ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
-    ...(omni ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
     ...(onImport ? [{ id: 'import', section: 'media' as const, icon: Upload, label: 'Import images', sub: 'From your computer', keywords: 'upload import images files', run: onImport }] : []),
     ...(onAsset ? [{ id: 'asset', section: 'media' as const, icon: FileImage, label: 'Asset', sub: 'Drag one from the Library', keywords: 'asset gallery library', run: onAsset }] : []),
     node('text', Type, 'Text', 'Prompt or copy that feeds other nodes', 'text prompt copy'),
@@ -44,6 +42,8 @@ function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: Gr
     node('video', Film, 'Video', 'Generate video', 'video generation first frame motion'),
     node('audio', Music, 'Audio', 'Generate music or song lyrics', 'audio music song lyrics voice'),
     node('model3d', Box, '3D model', 'Generate a GLB model from text or image', '3d model glb'),
+    ...(omni ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
+    ...(omni ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
   ];
 }
@@ -55,6 +55,7 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind | 'all'>('all');
   const [at, setAt] = useState(0);
+  const navByKey = useRef(false);
   const list = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
   // The popover places itself after mounting, so the field takes the focus on the next frame (autoFocus is lost).
@@ -62,10 +63,14 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
   const entries = useMemo(() => libraryEntries({ onPick, onAsset, onImport, omni }), [onPick, onAsset, onImport, omni]);
   const q = query.trim().toLowerCase();
   const shown = entries.filter((e) => (kind === 'all' || e.kind === kind) && (!q || `${e.label} ${e.keywords}`.toLowerCase().includes(q)));
-  useEffect(() => setAt(0), [query, kind]);
-  useEffect(() => { list.current?.querySelector('[data-at="true"]')?.scrollIntoView?.({ block: 'nearest' }); }, [at]);
+  useEffect(() => { navByKey.current = false; setAt(0); }, [query, kind]);
+  useEffect(() => {
+    if (!navByKey.current) return;
+    navByKey.current = false;
+    list.current?.querySelector('[data-at="true"]')?.scrollIntoView?.({ block: 'nearest' });
+  }, [at]);
   const keys = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setAt((i) => (shown.length ? (i + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length : 0)); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); navByKey.current = true; setAt((i) => (shown.length ? (i + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length : 0)); }
     if (e.key === 'Enter' && shown[at]) { e.preventDefault(); shown[at].run(); }
   };
   const chips: Array<Kind | 'all'> = ['all', 'image', 'video', 'audio', 'model3d', 'text'];
@@ -75,12 +80,12 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
       {chips.map((c) => <button key={c} type="button" className={`node-lib-chip${kind === c ? ' is-on' : ''}`} aria-pressed={kind === c} onClick={() => setKind(c)}>{c === 'all' ? 'All' : KIND_LABEL[c]}</button>)}
     </div>
     <div ref={list} className="node-lib-list" role="listbox" aria-label="Nodes and tools">
-      {(['spaces', 'system', 'media', 'nodes', 'tools'] as const).map((section) => {
+      {(['media', 'nodes', 'spaces', 'system', 'tools'] as const).map((section) => {
         const items = shown.filter((e) => e.section === section);
         return items.length ? <div key={section} className="node-lib-sec" role="group" aria-label={SECTION_LABEL[section]}>
           <div className="node-lib-head">{SECTION_LABEL[section]}<span className="num">{items.length}</span></div>
           {items.map((e) => { const i = shown.indexOf(e); return (
-            <button key={e.id} type="button" role="option" aria-selected={i === at} data-at={i === at} className={`node-lib-item${i === at ? ' is-at' : ''}${e.kind ? ` k-${e.kind}` : ''}`} onMouseEnter={() => setAt(i)} onClick={e.run}>
+            <button key={e.id} type="button" role="option" aria-selected={i === at} data-at={i === at} className={`node-lib-item${i === at ? ' is-at' : ''}${e.kind ? ` k-${e.kind}` : ''}`} onMouseEnter={() => { navByKey.current = false; setAt(i); }} onClick={e.run}>
               <span className="node-lib-icon"><e.icon size={16} strokeWidth={1.8} aria-hidden /></span>
               <span className="node-lib-text"><span>{e.label}</span><small>{e.sub}</small></span>
             </button>
