@@ -15,7 +15,9 @@ import { ActivityBlock } from './ActivityBlock';
 import { QuestionsCard } from './QuestionsCard';
 import { SettingsCard } from './SettingsCard';
 
-function MessageMeta({ item, className = '' }: { item: Extract<FeedItem, { type: 'user' | 'assistant' }>; className?: string }) {
+type MetaFeedItem = Extract<FeedItem, { type: 'user' | 'assistant' | 'notice' | 'plan' | 'questions' | 'settings' }>;
+
+function MessageMeta({ item, className = '' }: { item: MetaFeedItem; className?: string }) {
   const s = buildMessageMetaSummary(item);
   return (
     <div className={`msg-meta ${className}`.trim()} data-tip={s.tooltip}>
@@ -156,6 +158,7 @@ export function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionI
           Retry
         </button>
       ) : null}
+      <MessageMeta item={item} className="notice-meta faint" />
     </div>
   );
 }
@@ -181,11 +184,26 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
     case 'activity':
       return <ActivityBlock item={item} sessionId={sessionId} />;
     case 'questions':
-      return <QuestionsCard item={item} sessionId={sessionId} />;
+      return (
+        <div className="feed-card-wrap">
+          <QuestionsCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'settings':
-      return item.inline ? null : <SettingsCard item={item} sessionId={sessionId} />;
+      return item.inline ? null : (
+        <div className="feed-card-wrap">
+          <SettingsCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'plan':
-      return <PlanCard item={item} sessionId={sessionId} />;
+      return (
+        <div className="feed-card-wrap">
+          <PlanCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'generation':
       if (studio) return <StudioGeneration generationId={item.generationId} fallback={<GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />} />;
       return <GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />;

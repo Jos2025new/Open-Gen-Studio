@@ -29,21 +29,22 @@ async function offlinePass(sessionId: string, workspace: Workspace, runId: strin
     workflow: workflowById(st.composer.workflowId),
     doc: docDims ? { width: docDims.width, height: docDims.height } : undefined,
   });
+  const meta = messageMeta(workspace, { agent: 'Local planner', provider: 'offline', model: 'Local planner', runId });
   if (action.kind === 'reply') {
     appendFeed(sessionId, {
       ...feedBase(workspace),
       type: 'assistant',
       text: action.text,
       engine: 'Local planner',
-      meta: messageMeta(workspace, { agent: 'Local planner', provider: 'offline', model: 'Local planner', runId }),
+      meta,
     });
     return 'text';
   }
   if (action.kind === 'questions') {
-    showQuestions(sessionId, workspace, action.intro, action.questions, null);
+    showQuestions(sessionId, workspace, action.intro, action.questions, null, meta);
     return 'questions';
   }
-  const result = await presentPlan(sessionId, workspace, action.plan, null);
-  if (result.errors.length) notice(sessionId, workspace, `The plan could not be built: ${result.errors.join(' ')}`);
+  const result = await presentPlan(sessionId, workspace, action.plan, null, false, undefined, undefined, meta);
+  if (result.errors.length) notice(sessionId, workspace, `The plan could not be built: ${result.errors.join(' ')}`, 'error', undefined, meta);
   return result.errors.length ? 'error' : 'plan';
 }

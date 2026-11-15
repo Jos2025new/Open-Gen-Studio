@@ -15,6 +15,7 @@ import { planRetryEstimate } from '../retryPartial';
 import { graphToSteps, runsGeneration } from '../flow/graph';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { modelSummary } from '../catalog';
+import type { ChatMessageMeta } from '../feedMeta';
 import type { Estimate, PlanFeedItem, PlanStep, StepState } from '../types';
 import { appendFeed, setGraph, toast, updateFeedItem } from '../../store/store';
 import { WRAPUP_RULE } from './context';
@@ -26,7 +27,7 @@ import { overLimit, overLimitText, rerunNote } from '../budget';
 import { confirmApproved, inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { failedStepSummary } from './failureContext';
-import { agentEngine, closeRevisedPlan, designerDims, feedBase, get, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
+import { agentEngine, closeRevisedPlan, designerDims, feedBase, get, messageMeta, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
 import { pushHistory } from './conversation';
 import { llmTurn } from './llmTurn';
 
@@ -88,7 +89,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   await runPlanItem(sessionId, itemId, chosen, off);
 }
 
-export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null): Promise<{ errors: string[]; itemId?: string }> {
+export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null, meta?: ChatMessageMeta): Promise<{ errors: string[]; itemId?: string }> {
   if (!targets.length) return { errors: ['Select at least one existing node.'] };
   const graph = session(sessionId).graph;
   const missing = targets.find(id => !graph.nodes.some(n => n.id === id && runsGeneration(n.data)));
@@ -100,6 +101,7 @@ export async function presentNodeRun(sessionId: string, targets: string[], toolC
     nodeRun: { targets, force: true, signature: preview.signature },
     plan: { id: uid('pln'), title: 'Run existing nodes', summary: 'Existing node IDs and required upstream updates. No new flow is created.', workspace: 'node', steps: preview.steps, adjustments: [] },
     estimate: preview.estimate, stepStates: {}, stepGenerations: {},
+    meta: meta ?? messageMeta('node'),
   };
   closeRevisedPlan(sessionId, false);
   appendFeed(sessionId, item);

@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatResult, chat as chatFn } from '../src/engine/providers/llm';
-import type { AssistantFeedItem, UserFeedItem } from '../src/engine/types';
+import type { AssistantFeedItem, NoticeFeedItem, PlanFeedItem, QuestionsFeedItem, SettingsFeedItem, UserFeedItem } from '../src/engine/types';
 
 type ChatArgs = Parameters<typeof chatFn>[0];
 const mockChat = vi.fn<(opts: ChatArgs) => Promise<ChatResult>>();
@@ -22,6 +22,7 @@ import { FeedList } from '../src/components/chat/FeedList';
 import { ThreadPeek } from '../src/components/composer/ThreadPeek';
 import { DesignerCorner, useCorner } from '../src/components/node/NodeSide';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { notice } from '../src/engine/agent/runtimeShared';
 import { buildMessageMetaSummary, formatMessageDateTime } from '../src/engine/feedMeta';
 import { useStore } from '../src/store/store';
 
@@ -334,6 +335,110 @@ describe('chat message metadata (step 10)', () => {
       expect(peekBadges).toEqual(['Studio', 'Canvas', 'Designer']);
       const cornerBadges = [...host.querySelectorAll('.designer-corner .ws-badge')].map((el) => el.textContent);
       expect(cornerBadges).toEqual(['Studio', 'Canvas', 'Designer']);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('stores date/time zone, Space, and runId on notices and renders metadata on notice, plan, questions, and settings cards', async () => {
+    const sid = resetStore();
+    notice(sid, 'designer', 'Direct notice', 'info', undefined, { runId: 'turn_notice_1' });
+    const directNotice = useStore.getState().sessions[sid].feed.find((f): f is NoticeFeedItem => f.type === 'notice');
+    expect(directNotice?.meta?.timeZone).toBeTruthy();
+    expect(directNotice?.meta?.space).toBe('designer');
+    expect(directNotice?.meta?.runId).toBe('turn_notice_1');
+
+    // Also verify an error notice emitted during an LLM turn carries the turn's runId.
+    mockChat.mockImplementationOnce(async () => ({
+      text: '',
+      toolCalls: [],
+      timing: { ttfbMs: 10, totalMs: 25, reasoningMs: 0, outputMs: 25 },
+      finishReason: 'stop',
+    }));
+    await sendAgentMessage('Empty reply test');
+    const feedAfterTurn = useStore.getState().sessions[sid].feed;
+    const userItem = feedAfterTurn.find((f): f is UserFeedItem => f.type === 'user');
+    const turnNotice = feedAfterTurn.filter((f): f is NoticeFeedItem => f.type === 'notice').at(-1);
+    expect(turnNotice?.meta?.timeZone).toBeTruthy();
+    expect(turnNotice?.meta?.space).toBe('canvas');
+    expect(turnNotice?.meta?.runId).toBe(userItem?.meta?.runId);
+
+    const st = useStore.getState();
+    const cards: Array<NoticeFeedItem | QuestionsFeedItem | SettingsFeedItem | PlanFeedItem> = [
+      {
+        id: 'fd_n1',
+        createdAt: Date.UTC(2026, 5, 1, 15, 0),
+        workspace: 'chat',
+        type: 'notice',
+        level: 'error',
+        text: 'Notice text',
+        meta: { timeZone: 'UTC', space: 'studio', agent: 'Director', provider: 'openrouter', model: 'anthropic/claude-sonnet-4', runId: 'turn_card' },
+      },
+      {
+        id: 'fd_q1',
+        createdAt: Date.UTC(2026, 5, 1, 15, 1),
+        workspace: 'node',
+        type: 'questions',
+        round: 1,
+        maxRounds: 2,
+        status: 'pending',
+        questions: [{ id: 'style', question: 'Which style?', options: ['Bold', 'Clean'], allowCustom: true, multi: false }],
+        meta: { timeZone: 'UTC', space: 'canvas', agent: 'Director', provider: 'openrouter', model: 'anthropic/claude-sonnet-4', runId: 'turn_card' },
+      },
+      {
+        id: 'fd_s1',
+        createdAt: Date.UTC(2026, 5, 1, 15, 2),
+        workspace: 'designer',
+        type: 'settings',
+        status: 'skipped',
+        sections: [],
+        meta: { timeZone: 'UTC', space: 'designer', agent: 'Director', provider: 'openrouter', model: 'anthropic/claude-sonnet-4', runId: 'turn_card' },
+      },
+      {
+        id: 'fd_p1',
+        createdAt: Date.UTC(2026, 5, 1, 15, 3),
+        workspace: 'chat',
+        type: 'plan',
+        style: 'direct',
+        status: 'awaiting',
+        stepStates: { s1: 'pending' },
+        stepGenerations: {},
+        estimate: { usd: 0, approximate: false },
+        plan: {
+          id: 'pln_1',
+          title: 'Card meta plan',
+          summary: 'Summary',
+          workspace: 'chat',
+          adjustments: [],
+          steps: [{ id: 's1', kind: 'text', title: 'Write copy', text: 'Hello' }],
+        },
+        meta: { timeZone: 'UTC', space: 'studio', agent: 'Director', provider: 'openrouter', model: 'anthropic/claude-sonnet-4', runId: 'turn_card' },
+      },
+    ];
+    useStore.setState({
+      ui: { ...st.ui, workspace: 'chat' },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: cards } },
+    });
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      act(() => {
+        root.render(createElement(FeedList, { sessionId: sid }));
+      });
+      const badges = [...host.querySelectorAll('.ws-badge')].map((el) => el.textContent);
+      expect(badges).toEqual(['Studio', 'Canvas', 'Designer', 'Studio']);
+      const times = [...host.querySelectorAll('time.msg-time')];
+      expect(times).toHaveLength(4);
+      expect(times.every((t) => t.textContent?.includes('UTC'))).toBe(true);
+      const metas = [...host.querySelectorAll('.msg-meta')];
+      expect(metas).toHaveLength(4);
+      for (const m of metas) {
+        expect(m.textContent).toContain('run turn_card');
+        expect(m.getAttribute('data-tip')).toContain('Run: turn_card');
+      }
     } finally {
       act(() => root.unmount());
       host.remove();

@@ -1,3 +1,4 @@
+import type { ChatMessageMeta } from '../feedMeta';
 import type { ChatResult } from '../providers/llm';
 import type { LlmMessage, Workspace } from '../types';
 import { editGraphTool } from './nodeTools';
@@ -45,6 +46,7 @@ type CallCtx = {
   ignoreRest: (fromIndex: number) => void;
   toolResults: LlmMessage[];
   afterTools: LlmMessage[];
+  cardMeta?: () => ChatMessageMeta;
 };
 
 /** Runs one of the tool calls answered by the canvas, finder and read tools. Each branch either handles its call ("handled"), ends the turn ("stop"), or leaves the call for the next branch (propose_plan). */
@@ -87,7 +89,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   const v = nodeIdsSchema.safeParse(parsed.value);
   if (c.workspace !== 'node') { respond('run_nodes works only on the node canvas.'); return { handled: true, workspace: c.workspace }; }
   if (!v.success) { respond(`Invalid run_nodes: ${v.error.message}`); return { handled: true, workspace: c.workspace }; }
-  const proposed = await until(presentNodeRun(sessionId, v.data.node_ids, call.id));
+  const proposed = await until(presentNodeRun(sessionId, v.data.node_ids, call.id, c.cardMeta?.()));
   if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); return { handled: true, workspace: c.workspace }; }
   log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
   ignoreRest(index); flushToolResults(sessionId, toolResults); return { handled: true, stop: true, workspace: c.workspace };

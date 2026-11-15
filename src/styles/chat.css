@@ -108,6 +108,8 @@
 .msg-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; flex-wrap: wrap; max-width: 100%; }
 .msg-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.375rem; font-size: var(--fs-xs); color: var(--text-2); }
 .msg-meta.faint, .msg-meta.agent-meta { color: var(--text-3); }
+.feed-card-wrap { display: flex; flex-direction: column; gap: 0.375rem; }
+.notice-meta { flex-basis: 100%; }
 .msg-user .msg-meta { justify-content: flex-end; }
 .msg-meta-detail { color: var(--text-3); }
 .msg-user .msg-meta-detail { opacity: 0; max-width: 0; overflow: hidden; white-space: nowrap; transition: opacity 0.12s; }

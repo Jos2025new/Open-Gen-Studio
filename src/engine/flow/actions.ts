@@ -6,6 +6,8 @@ import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModel
 import { routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
 import { graphEditProblem, lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
+import { localTimeZone } from '../feedMeta';
+import { placeFor } from '../place';
 import { uid } from '../../lib/id';
 import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
@@ -87,7 +89,7 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
   const groups = (g0: import('../types').Graph) => g0.groups?.map(gr => ({ ...gr, nodeIds: gr.nodeIds.filter(id => !drop.has(id)) })).filter(gr => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
   const error = editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)), ...(g.groups ? { groups: groups(g) } : {}) }));
-  if (!error && deleted.nodes.length) appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${deleted.nodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: deleted });
+  if (!error && deleted.nodes.length) appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${deleted.nodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: deleted, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, 'node') } });
   return error;
 }
 

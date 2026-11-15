@@ -81,7 +81,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`);
-          const parts = await visibleAttachments(sessionId, workspace, attachments);
+          const parts = await visibleAttachments(sessionId, workspace, attachments, runId);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
@@ -106,14 +106,14 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     const { agent, keys } = get().settings;
     if (agent.provider !== 'offline') {
       const why = keys[agent.provider]?.trim() ? `No agent model is chosen for ${LLM_LABELS[agent.provider]}` : `There is no ${LLM_LABELS[agent.provider]} key`;
-      notice(sessionId, workspace, `${why}, so the local planner answers. Fix it in Settings → Agent.`, 'info');
+      notice(sessionId, workspace, `${why}, so the local planner answers. Fix it in Settings → Agent.`, 'info', undefined, { runId });
     }
     await offlineTurn(sessionId, workspace, 'new', runId);
     return;
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(), attachments: attachments.length });
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
-  const parts = await visibleAttachments(sessionId, workspace, attachments);
+  const parts = await visibleAttachments(sessionId, workspace, attachments, runId);
   // The Designer page travels with a new request, so "draw on this" needs no extra round.
   if (workspace === 'designer' && agentSeesImages()) {
     const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');
@@ -134,10 +134,10 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
-async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[]) {
+async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[], runId?: string) {
   if (!attachments.some((id) => ['image', 'video', 'model3d'].includes(get().assets[id]?.kind ?? ''))) return [];
   if (!agentSeesImages()) {
-    notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info');
+    notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info', undefined, runId ? { runId } : undefined);
     return [];
   }
   return attachmentParts(attachments);

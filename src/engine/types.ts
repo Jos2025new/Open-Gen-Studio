@@ -524,6 +524,7 @@ interface FeedBase {
   id: string;
   createdAt: number;
   workspace: Workspace;
+  meta?: ChatMessageMeta;
 }
 
 export interface UserFeedItem extends FeedBase {
@@ -531,7 +532,6 @@ export interface UserFeedItem extends FeedBase {
   text: string;
   mode: ComposerMode;
   attachments: string[];
-  meta?: ChatMessageMeta;
 }
 
 export interface AssistantFeedItem extends FeedBase {
@@ -539,7 +539,6 @@ export interface AssistantFeedItem extends FeedBase {
   text: string;
   streaming?: boolean;
   engine: string;
-  meta?: ChatMessageMeta;
 }
 
 export interface QuestionsFeedItem extends FeedBase {

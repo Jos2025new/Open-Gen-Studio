@@ -78,8 +78,20 @@ export function hasLlmCatalogPrice(provider: LlmProviderId, model: string): bool
   return m?.inputPrice != null || m?.outputPrice != null;
 }
 
-export function notice(sessionId: string, workspace: Workspace, text: string, level: 'info' | 'error' = 'error', retry?: NoticeFeedItem['retry']): void {
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level, text, ...(retry ? { retry } : {}) });
+export function notice(
+  sessionId: string,
+  workspace: Workspace,
+  text: string,
+  level: 'info' | 'error' = 'error',
+  retry?: NoticeFeedItem['retry'],
+  meta?: Partial<ChatMessageMeta>,
+): void {
+  const itemMeta: ChatMessageMeta = {
+    timeZone: localTimeZone(),
+    space: placeFor(get().ui, workspace),
+    ...meta,
+  };
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level, text, ...(retry ? { retry } : {}), meta: itemMeta });
   // Errors also show above the prompt box, where they are seen.
   if (level === 'error') pushAlert({ level: 'error', text });
   if (level === 'error' && get().ui.workspace !== 'chat') setThreadOpen(true);
@@ -194,7 +206,14 @@ export function addReplyToRequest(sessionId: string, text: string, attachments: 
 }
 
 /** Send a message from the composer in agent mode. */
-export function showQuestions(sessionId: string, workspace: Workspace, intro: string | undefined, questions: AgentQuestion[], toolCallId: string | null): void {
+export function showQuestions(
+  sessionId: string,
+  workspace: Workspace,
+  intro: string | undefined,
+  questions: AgentQuestion[],
+  toolCallId: string | null,
+  meta?: ChatMessageMeta,
+): void {
   const s = session(sessionId);
   const round = s.agent.questionRound + 1;
   const item: QuestionsFeedItem = {
@@ -206,6 +225,7 @@ export function showQuestions(sessionId: string, workspace: Workspace, intro: st
     maxRounds: roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     status: 'pending',
     ...(toolCallId ? { toolCallId } : {}),
+    meta: meta ?? messageMeta(workspace),
   };
   appendFeed(sessionId, item);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.presented', reason: 'agent asked for user information', sessionId, approvalId: item.id, after: { questionIds: questions.map((q) => q.id), round, maxRounds: item.maxRounds } });
@@ -224,6 +244,7 @@ export async function presentPlan(
   agentMs?: number,
   /** The turn's signal: a plan checked after Stop is dropped */
   signal?: AbortSignal,
+  meta?: ChatMessageMeta,
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
@@ -268,6 +289,7 @@ export async function presentPlan(
     stepStates: Object.fromEntries(plan.steps.map((st) => [st.id, 'pending' as StepState])),
     stepGenerations: {},
     estimate: total,
+    meta: meta ?? messageMeta(workspace),
   };
   const replaced = closeRevisedPlan(sessionId, revision);
   if (replaced) item.revised = true;

@@ -1,4 +1,3 @@
-import { uid } from '../../lib/id';
 import { lineRoutes, resolveModel } from '../catalog';
 import { defaultChoice } from './settingsCard';
 import { offerRequest, userRequest } from '../modelNamed';
@@ -9,6 +8,8 @@ import { askedQuality, draftMode } from './draftFirst';
 import { inConversation } from './requestGuides';
 import { settingsResultText } from './settingsResult';
 import { betterProvider, missing, wantedOf } from './providerFit';
+import type { ChatMessageMeta } from '../feedMeta';
+import { feedBase, messageMeta } from './runtimeShared';
 import { confirmedState } from './switchModel';
 import { rememberSessionModel } from './sessionModel';
 
@@ -19,7 +20,7 @@ import { rememberSessionModel } from './sessionModel';
  * choice is the session's last one, Borrador by default, unless this request clearly asks for another (askedQuality). The plan card shows all of it and lets the user change it.
  * Returns the tool result for the agent.
  */
-export async function autoConfirmSettings(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string; refs?: number; start_image?: boolean }>): Promise<string> {
+export async function autoConfirmSettings(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string; refs?: number; start_image?: boolean }>, meta?: ChatMessageMeta): Promise<string> {
   const agent = () => useStore.getState().sessions[sessionId].agent;
   // Both confirm_settings and propose_plan arrive with the same resolved model priority.
   const chosen = sections;
@@ -53,7 +54,7 @@ export async function autoConfirmSettings(sessionId: string, workspace: Workspac
     if (before && before.recommended.modelRef !== x.recommended.modelRef) x.modelSelection = { ...x.modelSelection, reason: `${x.modelSelection?.reason ?? 'session'}; compatible variant or provider` };
   }
   const draft = cardDraft(sessionId, fitted.map((x) => ({ ...x, chosen: x.chosen ?? x.recommended })), asked && draftMode(asked));
-  const base: SettingsFeedItem = { id: uid('fd'), createdAt: Date.now(), workspace, type: 'settings', summary, status: 'confirmed', toolCallId, inline: true, ...draft };
+  const base: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary, status: 'confirmed', toolCallId, inline: true, meta: meta ?? messageMeta(workspace), ...draft };
   const item: SettingsFeedItem = { ...base, sections: confirmedSections(base, base.sections) };
   appendFeed(sessionId, item);
   patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...confirmedState(s.agent, item, item.sections) } as AgentState }));
