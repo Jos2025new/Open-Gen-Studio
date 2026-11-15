@@ -1,6 +1,7 @@
 import { uid } from '../../lib/id';
 import { setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem } from '../flow/locks';
+import { isOmniSpace } from './omniSpaces';
 import type {
   Graph,
   GraphEdge,
@@ -35,9 +36,9 @@ export {
 };
 
 /* Tidy layout, left of the user's own nodes: models | chat and agent | docs and Spaces. The pitch leaves room for port labels. */
-const COL = 560;
-const ROW = 340;
-const sysOrigin = (graph: Graph): number => {
+export const COL = 560;
+export const ROW = 340;
+export const sysOrigin = (graph: Graph): number => {
   const own = graph.nodes.filter((n) => n.data.kind !== 'ref');
   const sys = graph.nodes.filter((n) => n.data.kind === 'ref');
   if (sys.length) return Math.min(...sys.map((n) => n.position.x));
@@ -273,6 +274,9 @@ export function addSystemNode(
 ): string {
   const st = useStore.getState();
   const session = st.sessions[sessionId];
+  // One Studio, one Nodes and one Designer node per session: asking again gives the one that is there.
+  const only = spec.type === 'space' && spec.ref && isOmniSpace(spec.ref) ? session?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'space' && n.data.ref === spec.ref) : undefined;
+  if (only) return only.id;
   const defaultRef =
     spec.ref ??
     (spec.type === 'chat' || spec.type === 'agent' || spec.type === 'session'

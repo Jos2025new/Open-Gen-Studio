@@ -1,5 +1,7 @@
 import { OPS, OP_IDS } from '../ops';
 import { useStore } from '../../store/store';
+import { isOmniSpace, omniSpacePorts } from './omniSpaces';
+import { omniSpaceLive } from './omniLive';
 import type {
   Asset,
   DesignDoc,
@@ -129,7 +131,7 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
 };
 
 export function systemNodePorts(data: RefNodeData): PortSpec[] {
-  return SYSTEM_NODE_TYPES[data.type]?.ports ?? [];
+  return (data.type === 'space' ? omniSpacePorts(data.ref) : undefined) ?? SYSTEM_NODE_TYPES[data.type]?.ports ?? [];
 }
 
 export function allNodePorts(
@@ -227,6 +229,14 @@ export interface LiveSystemSummary {
   details: string[];
   attachedModels?: Array<{ nodeId: string; ref: string; title: string; mode: ModelAttachMode; mediaKind?: string }>;
   doc?: DesignDoc;
+  /** Studio, Nodes and Designer nodes: the look, the snapshot picture and the parameters (editable when they have options). */
+  view?: 'thumb' | 'node';
+  cover?: string;
+  docName?: string;
+  map?: Array<{ x: number; y: number }>;
+  params?: Array<{ id: string; label: string; value: string; options?: Array<{ value: string; label: string }> }>;
+  /** Chat node: the agent and the models connected to it. */
+  connections?: Array<{ nodeId: string; kind: 'agent' | 'model'; title: string; detail: string }>;
 }
 
 /** Resolve live data from the store without copying or migrating anything. */
@@ -245,6 +255,18 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       const genCount = feed.filter((f) => f.type === 'generation').length;
       const lastMsg = [...feed].reverse().find((f) => f.type === 'user' || f.type === 'assistant');
       const preview = lastMsg && 'text' in lastMsg ? lastMsg.text.slice(0, 90) : 'Conversation ready';
+      const connections: NonNullable<LiveSystemSummary['connections']> = [];
+      const linked = (id: string) => (graph?.edges ?? []).flatMap((e) => (e.source === id ? [e.target] : e.target === id ? [e.source] : []));
+      for (const agentId of linked(node.id)) {
+        const agent = graph?.nodes.find((n) => n.id === agentId);
+        if (agent?.data.kind !== 'ref' || agent.data.type !== 'agent') continue;
+        const busy = st.sessions[agent.data.ref]?.agent.busy;
+        connections.push({ nodeId: agent.id, kind: 'agent', title: agent.data.title || 'Agent', detail: busy ? 'working' : 'ready' });
+        for (const modelId of linked(agent.id)) {
+          const m = graph?.nodes.find((n) => n.id === modelId);
+          if (m?.data.kind === 'ref' && m.data.type === 'model' && !connections.some((c) => c.nodeId === m.id)) connections.push({ nodeId: m.id, kind: 'model', title: m.data.title || modelLabelForRef(m.data.ref), detail: m.data.attachMode ?? 'wired' });
+        }
+      }
       return {
         type: 'chat',
         ref: targetSession?.id ?? d.ref,
@@ -253,6 +275,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         badge: st.ui.workspace === 'chat' ? 'Active' : 'Live',
         chips: [`${userCount} messages`, `${genCount} results`, ...(d.mergedModels ?? []).map((m) => modelLabelForRef(m))],
         details: [preview],
+        connections,
       };
     }
     case 'agent': {
@@ -342,6 +365,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       };
     }
     case 'space': {
+      if (isOmniSpace(d.ref)) return omniSpaceLive(sessionId, d);
       const spaceId = d.ref || 'create';
       const isActive = st.ui.space === spaceId;
       const spaceSession = Object.values(st.sessions).find((s) => s.hidden);

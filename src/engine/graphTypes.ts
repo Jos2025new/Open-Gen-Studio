@@ -76,6 +76,10 @@ export interface RefNodeData {
   dockedTo?: string;
   mergedModels?: string[];
   mediaKind?: MediaKind | 'llm';
+  /** Studio, Nodes and Designer Space nodes (omnicanvas): the look the user chose. Absent = thumbnail. */
+  view?: 'thumb' | 'node';
+  /** Chat node: shows its agent and model connections (undocked) instead of looking like Studio's chat. */
+  undocked?: boolean;
 }
 
 export type GraphNodeData = TextNodeData | GenNodeData | ToolNodeData | AssetNodeData | RefNodeData;
@@ -85,6 +89,8 @@ export interface GraphNode {
   position: { x: number; y: number };
   data: GraphNodeData;
   planId?: string;
+  /** Put here by the omnicanvas, not by the user: the ordinary Nodes canvas does not show it. */
+  omni?: true;
 }
 
 export interface GraphEdge {
@@ -115,4 +121,6 @@ export interface Graph {
   edges: GraphEdge[];
   groups?: GraphGroup[];
   viewport?: { x: number; y: number; zoom: number };
+  /** When the omnicanvas last brought the session's assets in: older ones the user removed do not come back. */
+  omniAt?: number;
 }

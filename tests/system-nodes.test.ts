@@ -147,7 +147,7 @@ describe('commands', () => {
   it('are found by the automatic index with strict schemas', () => {
     expect(collected.loaded.map((l) => l.file)).toEqual(expect.arrayContaining(['/src/engine/nodes/commands.ts']));
     const ids = allCommands().filter((c) => c.id.startsWith('nodes.system.')).map((c) => c.id).sort();
-    expect(ids).toEqual(['nodes.system.add', 'nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.ensure', 'nodes.system.execution_order', 'nodes.system.link', 'nodes.system.list', 'nodes.system.set_link', 'nodes.system.unlink']);
+    expect(ids).toEqual(['nodes.system.add', 'nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.ensure', 'nodes.system.ensure_omni', 'nodes.system.execution_order', 'nodes.system.link', 'nodes.system.list', 'nodes.system.set_link', 'nodes.system.set_view', 'nodes.system.unlink']);
     expect(command('nodes.system.link')!.effect).toBe('write');
   });
 

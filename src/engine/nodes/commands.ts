@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { edgeRef, graphOf, hasTarget, nodeCommand, nodeRef } from '../flow/commandKit';
 import { executionOrder } from '../flow/graph';
 import type { RefNodeData } from '../types';
+import { ensureOmniNodes, setChatUndocked, setSpaceView } from './omni';
 import {
   addSystemNode,
   attachModelToNode,
@@ -41,6 +42,30 @@ export const commands = [
         nodes: graph.nodes.filter((n) => n.data.kind === 'ref').map((n) => ({ id: n.id, ...(n.data as RefNodeData) })),
         edges: graph.edges,
       };
+    },
+  }),
+  nodeCommand({
+    id: 'nodes.system.ensure_omni',
+    title: 'Open the omnicanvas nodes',
+    description: 'Puts on the canvas what the omnicanvas shows: the chat, agent, models and Designer docs, one Studio, one Nodes and one Designer node, and the assets made since the last time. Nothing is copied; no undo step. Safe to repeat.',
+    args: none,
+    effect: 'write',
+    undo: false,
+    run: (on) => ({ added: ensureOmniNodes(on.session) }),
+  }),
+  nodeCommand({
+    id: 'nodes.system.set_view',
+    title: 'Set how a Space or chat node looks',
+    description: 'A Studio, Nodes or Designer node is a thumbnail (view: thumb) or a node with ports and parameters (view: node). The chat node shows its agent and model connections (undocked: true) or looks like Studio\'s chat (undocked: false). A preference of the view: no undo step.',
+    args: z.object({ node: nodeRef, view: z.enum(['thumb', 'node']).optional(), undocked: z.boolean().optional() }).strict(),
+    effect: 'write',
+    undo: false,
+    available: (ctx, args) => hasTarget(ctx, args),
+    run: (on, args) => {
+      if (args.view === undefined && args.undocked === undefined) throw new Error('Give a view or undocked.');
+      if (args.view !== undefined) throwIf(setSpaceView(on.session, args.node, args.view));
+      if (args.undocked !== undefined) throwIf(setChatUndocked(on.session, args.node, args.undocked));
+      return { node: args.node, view: args.view, undocked: args.undocked };
     },
   }),
   nodeCommand({
