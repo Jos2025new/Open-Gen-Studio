@@ -121,7 +121,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         return;
       }
       let textItemId: string | null = null;
-      let textItemMeta: ChatMessageMeta | null = null as ChatMessageMeta | null;
+      let textItemMeta: ChatMessageMeta | undefined;
       let result: ChatResult;
       try {
         if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
