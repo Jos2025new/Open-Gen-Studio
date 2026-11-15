@@ -17,13 +17,37 @@ export function remainingBudget(): number | null {
 }
 
 /**
- * "Continue once": a pass for ONE session that lives exactly as long as the approved action (withOncePass). It is also spent
+ * "Continue once": a pass per session that lives exactly as long as the approved action (withOncePass). It is also spent
  * when that action creates its first generation (so a batch such as Run all, approved once, is one run). Painting never
  * spends it. If the action ends without creating one (the graph changed, a recovery was refused, an error), it dies with it.
  */
-let pass: { sessionId: string } | null = null;
-/** Sequence-level pass for "Allow this time": stays alive across all spend steps of one approved sequence until it ends. */
-let sequencePass: { sessionId: string } | null = null;
+const oncePasses = new Map<string, Set<symbol>>();
+/** Sequence-level passes for "Allow this time": each grant stays alive across all spend steps of its sequence until ended. */
+const sequencePasses = new Map<string, Set<symbol>>();
+
+function addPass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
+  let tokens = store.get(sessionId);
+  if (!tokens) {
+    tokens = new Set();
+    store.set(sessionId, tokens);
+  }
+  tokens.add(token);
+}
+
+function removePass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
+  const tokens = store.get(sessionId);
+  if (!tokens) return;
+  tokens.delete(token);
+  if (tokens.size === 0) store.delete(sessionId);
+}
+
+function runWithPass<T>(end: () => void, action: () => T): T {
+  let result: T;
+  try { result = action(); } catch (e) { end(); throw e; }
+  if (result instanceof Promise) return result.finally(end) as T;
+  end();
+  return result;
+}
 /**
  * "Don't ask again until next session" (user decision 2026-11-14): covers every session while the chat the user was in
  * when they chose it stays the open one. It ends when the user opens a chat in another session, when the spending limit
@@ -73,12 +97,12 @@ export function overLimitAccepted(sessionId?: string): boolean {
 }
 
 function passFor(sessionId: string): boolean {
-  return pass?.sessionId === sessionId || sequencePass?.sessionId === sessionId;
+  return (oncePasses.get(sessionId)?.size ?? 0) > 0 || (sequencePasses.get(sessionId)?.size ?? 0) > 0;
 }
 
 /** The approved action started spending: the pass is used up. */
 export function consumeOnce(sessionId: string): void {
-  if (pass?.sessionId === sessionId) pass = null;
+  oncePasses.delete(sessionId);
 }
 
 /** This run would go over an active limit nobody agreed to go past. An unknown price cannot be checked against it, so it asks too. */
@@ -100,36 +124,22 @@ export function overLimitText(e: Estimate, choices = '“Continue once” lets o
  * or fails, whether or not it created a generation. The next run that goes over asks again.
  */
 export function withOncePass<T>(sessionId: string, action: () => T): T {
-  const mine = { sessionId };
-  pass = mine;
-  const end = () => { if (pass === mine) pass = null; };
-  let result: T;
-  try { result = action(); } catch (e) { end(); throw e; }
-  if (result instanceof Promise) return result.finally(end) as T;
-  end();
-  return result;
+  const token = Symbol();
+  addPass(oncePasses, sessionId, token);
+  return runWithPass(() => removePass(oncePasses, sessionId, token), action);
 }
 
 /**
  * "Allow this time": grants a sequence-level pass for `sessionId` until the returned cleanup function is called.
  */
 export function beginOncePass(sessionId: string): () => void {
-  const mine = { sessionId };
-  pass = mine;
-  sequencePass = mine;
-  return () => {
-    if (pass === mine) pass = null;
-    if (sequencePass === mine) sequencePass = null;
-  };
+  const token = Symbol();
+  addPass(sequencePasses, sessionId, token);
+  return () => removePass(sequencePasses, sessionId, token);
 }
 
 export function allowThisTime<T>(sessionId: string, action: () => T): T {
-  const end = beginOncePass(sessionId);
-  let result: T;
-  try { result = action(); } catch (e) { end(); throw e; }
-  if (result instanceof Promise) return result.finally(end) as T;
-  end();
-  return result;
+  return runWithPass(beginOncePass(sessionId), action);
 }
 
 /** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
@@ -153,8 +163,8 @@ export function dontAskUntilNextSession(): void {
 
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
-  pass = null;
-  sequencePass = null;
+  oncePasses.delete(sessionId);
+  sequencePasses.delete(sessionId);
   endUntilNextSession();
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }
