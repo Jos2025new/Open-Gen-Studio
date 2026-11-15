@@ -15,7 +15,7 @@ const [, , variant = 'base', outFile] = process.argv;
 const ROOT = '/tmp/ogs-sqlite-spike-data';
 const dir = join(ROOT, `r3-${variant}`);
 const SERVER = fileURLToPath(new URL('./bench3-server.mjs', import.meta.url));
-const N_EDIT = 100, N_GEN = 20, N_GESTURE = 40;
+const N_EDIT = Number(process.env.N_EDIT ?? 100), N_GEN = Number(process.env.N_GEN ?? 20), N_GESTURE = Number(process.env.N_GESTURE ?? 40);
 const delta = variant === 'b' || variant === 'c';
 
 rmSync(dir, { recursive: true, force: true });
