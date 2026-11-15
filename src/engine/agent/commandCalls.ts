@@ -75,7 +75,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
   const heldAtLimit = hasSpend && overLimit(entry.request.estimate, sessionId);
   if (heldAtLimit && decision === 'approve') return false;
   if (decision === 'session') allowForSession(sessionId);
-  else if (decision === 'until-next-session') dontAskUntilNextSession(sessionId);
+  else if (decision === 'until-next-session') dontAskUntilNextSession();
   else if (decision === 'once') entry.setReleasePass(beginOncePass(sessionId));
   pending.delete(itemId);
   updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));

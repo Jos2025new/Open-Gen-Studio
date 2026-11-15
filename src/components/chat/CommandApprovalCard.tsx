@@ -6,7 +6,7 @@ import { useStore } from '../../store/store';
 import { CircleAlert, Trash, Wand } from '../ui/icons';
 import { Button, costLabel } from '../ui/primitives';
 
-const LIMIT_CHOICES = '“Allow this time” lets only this sequence through; “Allow for the whole session” stops asking in this session; “Don’t ask again until next session” stops asking until a new session starts or the limit changes. Nothing is stopped.';
+const LIMIT_CHOICES = '“Allow this time” lets only this sequence through; “Allow for the whole session” stops asking in this session; “Don’t ask again until next session” stops asking until you open a chat in another session or the limit changes. Nothing is stopped.';
 
 function stepArgSummary(step: CommandApprovalStep): string {
   if (!step.args || typeof step.args !== 'object') return '';

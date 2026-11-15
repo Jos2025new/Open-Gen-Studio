@@ -25,22 +25,39 @@ let pass: { sessionId: string } | null = null;
 /** Sequence-level pass for "Allow this time": stays alive across all spend steps of one approved sequence until it ends. */
 let sequencePass: { sessionId: string } | null = null;
 /**
- * "Don't ask again until next session": covers every session open when it was chosen.
- * DECISION PENDING (user): should it cover all open sessions until a new one is created (today), or last until the app restarts?
- * The rule lives in `untilNextSessionStillHolds`; changing it is a one-line edit there.
+ * "Don't ask again until next session" (user decision 2026-11-14): covers every session while the chat the user was in
+ * when they chose it stays the open one. It ends when the user opens a chat in another session, when the spending limit
+ * changes, or when the user turns it off (`askAgain`). The rule is `untilNextSessionStillHolds`: change it there.
  */
-let untilNextSession: { knownSessions: Set<string>; budgetOn: boolean; budgetUsd: number } | null = null;
+let untilNextSession: { chat: string; budgetOn: boolean; budgetUsd: number } | null = null;
+const untilNextListeners = new Set<() => void>();
+const notifyUntilNext = () => untilNextListeners.forEach((fn) => fn());
 
-/** Does a granted "until next session" still hold? Ends when a new session appears or the spending limit is changed. */
 function untilNextSessionStillHolds(grant: NonNullable<typeof untilNextSession>): boolean {
-  const { settings, sessions } = get();
-  if (settings.budgetOn !== grant.budgetOn || settings.budgetUsd !== grant.budgetUsd) return false;
-  return Object.keys(sessions).every((id) => grant.knownSessions.has(id));
+  const { settings, activeSessionId } = get();
+  return activeSessionId === grant.chat && settings.budgetOn === grant.budgetOn && settings.budgetUsd === grant.budgetUsd;
 }
 
-function untilNextSessionActive(): boolean {
-  if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) untilNextSession = null;
+let unwatchUntilNext: (() => void) | null = null;
+function endUntilNextSession(): void {
+  unwatchUntilNext?.();
+  unwatchUntilNext = null;
+  if (untilNextSession) {
+    untilNextSession = null;
+    notifyUntilNext();
+  }
+}
+
+/** Is "until next session" on right now? */
+export function untilNextSessionActive(): boolean {
+  if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) endUntilNextSession();
   return untilNextSession !== null;
+}
+
+/** For `useSyncExternalStore`: tells when "until next session" turns on or off. */
+export function subscribeUntilNextSession(fn: () => void): () => void {
+  untilNextListeners.add(fn);
+  return () => void untilNextListeners.delete(fn);
 }
 
 /** The session whose runs no longer ask (the active one by default). */
@@ -123,18 +140,22 @@ export function dontAskAgain(sessionId: string = get().activeSessionId): void {
 export const allowForSession = dontAskAgain;
 
 /** "Don't ask again until next session": see `untilNextSessionStillHolds` for how long it lasts. */
-export function dontAskUntilNextSession(sessionId: string = get().activeSessionId): void {
-  const { sessions, settings } = get();
-  const ids = new Set(Object.keys(sessions));
-  if (sessionId) ids.add(sessionId);
-  untilNextSession = { knownSessions: ids, budgetOn: settings.budgetOn, budgetUsd: settings.budgetUsd };
+export function dontAskUntilNextSession(): void {
+  endUntilNextSession();
+  const { settings, activeSessionId } = get();
+  untilNextSession = { chat: activeSessionId, budgetOn: settings.budgetOn, budgetUsd: settings.budgetUsd };
+  // Eager end: leaving the chat and coming back must not bring it back.
+  unwatchUntilNext = useStore.subscribe(() => {
+    if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) endUntilNextSession();
+  });
+  notifyUntilNext();
 }
 
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
   pass = null;
   sequencePass = null;
-  untilNextSession = null;
+  endUntilNextSession();
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }
 

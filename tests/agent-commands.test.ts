@@ -274,13 +274,19 @@ describe('run_commands', () => {
     useStore.setState((cur) => ({ settings: { ...cur.settings, budgetUsd: 1.5 } }));
     expect(overLimit({ usd: 0.60, approximate: false }, sid)).toBe(true);
     useStore.setState((cur) => ({ settings: { ...cur.settings, budgetUsd: 1.0 } }));
-    dontAskUntilNextSession(sid);
+    dontAskUntilNextSession();
+    expect(overLimit({ usd: 0.10, approximate: false }, sid)).toBe(false);
+    // The user can switch it back on.
+    askAgain(sid);
+    expect(overLimit({ usd: 0.10, approximate: false }, sid)).toBe(true);
+    dontAskUntilNextSession();
     expect(overLimit({ usd: 0.10, approximate: false }, sid)).toBe(false);
 
-    // Starting a new session resets "until next session".
+    // Opening a chat in another session ends "until next session", and coming back does not revive it.
     const nextSession = createSession('Next session');
-    useStore.setState((cur) => ({ sessions: { ...cur.sessions, [nextSession.id]: nextSession } }));
+    useStore.setState((cur) => ({ sessions: { ...cur.sessions, [nextSession.id]: nextSession }, activeSessionId: nextSession.id }));
     expect(overLimit({ usd: 0.10, approximate: false }, nextSession.id)).toBe(true);
+    useStore.setState({ activeSessionId: sid });
     expect(overLimit({ usd: 0.10, approximate: false }, sid)).toBe(true);
   });
 
