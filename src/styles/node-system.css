@@ -24,3 +24,18 @@
 .node-canvas .react-flow__edge.edge-link-ref.selected .react-flow__edge-path,
 .node-canvas .react-flow__edge.edge-link-control.selected .react-flow__edge-path { stroke: var(--accent); }
 .node-canvas .react-flow__arrowhead polyline { stroke: var(--text-2); fill: var(--text-2); }
+
+/* Omnicanvas nodes (step 12): layout only; colours, radii and fonts are the theme's. */
+.omni-look { display: flex; align-items: center; justify-content: space-between; gap: 0.375rem; padding: 0.25rem 0; }
+.omni-open { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 5px; color: var(--text-2); }
+.omni-open:hover { color: var(--text); background: var(--surface-2); }
+.omni-snap-empty { display: grid; place-items: center; min-height: 6rem; }
+.omni-map { width: 100%; max-height: 8rem; fill: var(--text-4); }
+.omni-chips { padding-top: 0.25rem; }
+.omni-params { display: flex; flex-direction: column; gap: 0.25rem; }
+.omni-param { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: var(--fs-xs); background: var(--surface-2); border-radius: 6px; padding: 0.125rem 0.5rem; }
+.omni-param select { max-width: 60%; font-size: var(--fs-xs); }
+.omni-chat-feed { max-height: 22rem; overflow-y: auto; }
+.omni-chat-composer { padding-top: 0.375rem; }
+.omni-chat-composer .composer-dock { position: static; transform: none; width: 100%; left: auto; bottom: auto; }
+.omni-connections { padding-top: 0.375rem; }

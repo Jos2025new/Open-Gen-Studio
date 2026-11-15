@@ -13,6 +13,7 @@ import {
 } from '@xyflow/react';
 import { Copy, Film, Image as ImageIcon, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
+import { addOmniSpace, ensureOmniNodes, ordinaryGraph, type OmniSpace } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
@@ -25,6 +26,9 @@ import { Button, MenuItem } from '../ui/primitives';
 import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems } from './AddNodeItems';
 import { AddNodeMenu, RunAll } from './NodeCanvasParts';
+import { omniWidth } from '../omni/RefNode';
+import { addSystemNode } from '../../engine/nodes/system';
+import type { OmniEntries } from './AddNodeItems';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
 import { CanvasPanels } from './SelectionPanel';
@@ -41,11 +45,15 @@ import { useBoardFocus } from '../studio/useBoardFocus';
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
-function Canvas({ embedded = false }: { embedded?: boolean }) {
+function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?: boolean }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const insideRef = useBoardFocus(embedded ? canvasRef : undefined);
   const sessionId = useStore((s) => s.activeSessionId);
-  const graph = useStore((s) => s.sessions[s.activeSessionId].graph);
+  const fullGraph = useStore((s) => s.sessions[s.activeSessionId].graph);
+  // The ordinary canvas draws what it always drew: the omnicanvas-only nodes (system parts, Spaces) stay out of it.
+  const graph = useMemo(() => (omni ? fullGraph : ordinaryGraph(fullGraph)), [fullGraph, omni]);
+  // Opening the omnicanvas brings the session's parts in as nodes (idempotent; no undo step).
+  useEffect(() => { if (omni) ensureOmniNodes(sessionId); }, [omni, sessionId]);
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const feed = useStore((s) => s.sessions[s.activeSessionId].feed);
@@ -157,10 +165,10 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         position: n.position,
         data: { node: n, solo, panel: !embedded },
         selected: selected.has(n.id),
-        width: NODE_WIDTH,
+        width: omni ? omniWidth(n.data, NODE_WIDTH) : NODE_WIDTH,
         measured: measured.get(n.id),
       } as FlowNode))];
-  }, [graph.nodes, selected, measured, groupFrames, sessionId, embedded]);
+  }, [graph.nodes, selected, measured, groupFrames, sessionId, embedded, omni]);
 
   const running = useMemo(() => {
     const set = new Set<string>();
@@ -255,6 +263,17 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
     const id = addNode(sessionId, data, { x: center.x - NODE_WIDTH / 2 + (Math.random() - 0.5) * 40, y: center.y + (Math.random() - 0.5) * 40 });
     setSelected(new Set([id]));
   };
+
+  // The omnicanvas library also lists the three Spaces (one node each) and the system parts.
+  const omniEntries = useMemo((): OmniEntries | undefined => {
+    if (!omni) return undefined;
+    const center = () => { const r = canvasRef.current?.getBoundingClientRect(); return r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 }; };
+    return {
+      has: (space: OmniSpace) => useStore.getState().sessions[sessionId]?.graph.nodes.some((n) => n.data.kind === 'ref' && n.data.type === 'space' && n.data.ref === space) ?? false,
+      onSpace: (space) => { const c = center(); setSelected(new Set([addOmniSpace(sessionId, space, { x: c.x - 160, y: c.y }).id])); },
+      onSystem: (type) => { const c = center(); setSelected(new Set([addSystemNode(sessionId, { type, position: { x: c.x - NODE_WIDTH / 2, y: c.y } })])); },
+    };
+  }, [omni, sessionId, rf]);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -425,7 +444,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
-          add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} />}
+          add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
           onAutoLayout={() => {
             layoutAll(sessionId);
             window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
@@ -486,7 +505,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         </div>
       </Popover>
       {menuOpen && menu?.from ? <ConnectionPreview from={menu.from} menu={connectionMenu} /> : null}
-      {embedded ? null : <ImportFromChat
+      {embedded || omni ? null : <ImportFromChat
         sessionId={sessionId}
         canvas="node"
         items={fromChat}
@@ -496,7 +515,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
         }}
       />}
-      {!graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
+      {!graph.nodes.length && omni ? null : !graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
         <div className="node-empty">
           <h2>Build a flow</h2>
           <p className="faint">Ask the agent in the composer — it creates, connects and lays out the nodes — or add them yourself.</p>
@@ -532,6 +551,16 @@ export function EmbeddedNodeCanvas() {
   return (
     <ReactFlowProvider key={sessionId}>
       <Canvas embedded />
+    </ReactFlowProvider>
+  );
+}
+
+/** The omnicanvas: the same node canvas (select, edit, add from the library), showing the session's parts as nodes. */
+export function OmniCanvas() {
+  const sessionId = useStore((s) => s.activeSessionId);
+  return (
+    <ReactFlowProvider key={sessionId}>
+      <Canvas omni />
     </ReactFlowProvider>
   );
 }

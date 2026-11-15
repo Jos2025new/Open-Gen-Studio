@@ -3,7 +3,7 @@ import { ChevronDown, Sparkles, Wrench, type LucideIcon } from '../ui/icons';
 import { useStore } from '../../store/store';
 import { usePref } from '../ui/hooks';
 import { Popover, usePopover } from '../ui/Popover';
-import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, openCreate, openSpace, openTool } from './navModel';
+import { CREATE, OMNI_ITEM, SPACES, TOOLS_MAIN, TOOLS_MORE, openCreate, openOmni, openSpace, openTool } from './navModel';
 
 /*
  * Sidebar destinations: Spaces, Create, Tools. Wide: collapsible sections with icon + text. Narrow: the three spaces
@@ -20,10 +20,11 @@ function useEntries(): { spaces: Entry[]; create: Entry[]; tools: Entry[]; moreT
   const space = useStore((s) => s.ui.space);
   const mode = useStore((s) => s.composer.mode);
   const toolOp = useStore((s) => s.ui.toolOp);
+  const omni = useStore((s) => !!s.ui.omni);
   const toTool = (t: (typeof TOOLS_MAIN)[number]): Entry => ({ key: t.id, label: t.label, icon: t.icon, active: !home && space === 'tools' && toolOp === t.id, run: () => openTool(t) });
   const all = [...TOOLS_MAIN, ...TOOLS_MORE].map(toTool);
   return {
-    spaces: SPACES.map((s) => ({ key: s.id, label: s.label, hint: s.hint, icon: s.icon, active: !home && !space && s.workspace === workspace, run: () => openSpace(s) })),
+    spaces: SPACES.map((s): Entry => ({ key: s.id, label: s.label, hint: s.hint, icon: s.icon, active: !home && !space && !omni && s.workspace === workspace, run: () => openSpace(s) })).concat([{ key: OMNI_ITEM.id, label: OMNI_ITEM.label, hint: OMNI_ITEM.hint, icon: OMNI_ITEM.icon, active: !home && !space && omni, run: openOmni }]),
     create: CREATE.map((c) => ({ key: c.id, label: c.label, hint: c.soon ? 'Soon' : c.hint, icon: c.icon, soon: c.soon, active: !home && space === 'create' && mode === c.mode, run: () => openCreate(c) })),
     tools: all.slice(0, TOOLS_FIRST),
     moreTools: all.slice(TOOLS_FIRST),

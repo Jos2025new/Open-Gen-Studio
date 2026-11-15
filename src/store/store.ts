@@ -132,6 +132,8 @@ export interface UiState extends PageUiPrefs {
   home?: boolean;
   /** A Space (Panel + Board) shown over the workspace in place of Home; the workspace stays mounted. */
   space?: 'create' | 'tools';
+  /** The omnicanvas (a node canvas of the session's parts) shows over the workspace; not remembered across reloads. Any other destination clears it. */
+  omni?: boolean;
   /** The operation selected in the Tools space. */
   toolOp?: import('../engine/types').OpId;
   /** An asset the Tools space starts with as its input (set by "Go" from the board). */
