@@ -22,7 +22,7 @@ import { FeedList } from '../src/components/chat/FeedList';
 import { ThreadPeek } from '../src/components/composer/ThreadPeek';
 import { DesignerCorner, useCorner } from '../src/components/node/NodeSide';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
-import { buildMessageMetaSummary } from '../src/engine/feedMeta';
+import { buildMessageMetaSummary, formatMessageDateTime } from '../src/engine/feedMeta';
 import { useStore } from '../src/store/store';
 
 function resetStore(opts: { provider?: 'openrouter' | 'offline'; model?: string } = {}) {
@@ -189,6 +189,28 @@ describe('chat message metadata (step 10)', () => {
     expect(assistant?.meta?.model).toBe('Local planner');
     expect(assistant?.meta?.space).toBe('canvas');
     expect(assistant?.meta?.runId).toBe(user?.meta?.runId);
+  });
+
+  it('caches one Intl.DateTimeFormat per time zone in formatMessageDateTime', () => {
+    const OrigDateTimeFormat = Intl.DateTimeFormat;
+    const seenZones: Array<string | undefined> = [];
+    const spy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (this: unknown, locales?: Intl.LocalesArgument, options?: Intl.DateTimeFormatOptions) {
+      seenZones.push(options?.timeZone);
+      return new OrigDateTimeFormat(locales, options);
+    } as unknown as typeof Intl.DateTimeFormat);
+    try {
+      const a1 = formatMessageDateTime(Date.UTC(2026, 5, 1, 12, 0), 'Asia/Tokyo');
+      const a2 = formatMessageDateTime(Date.UTC(2026, 5, 2, 12, 0), 'Asia/Tokyo');
+      const b1 = formatMessageDateTime(Date.UTC(2026, 5, 1, 12, 0), 'Europe/Madrid');
+      const b2 = formatMessageDateTime(Date.UTC(2026, 5, 2, 12, 0), 'Europe/Madrid');
+      expect(a1).toBeTruthy();
+      expect(a2).toBeTruthy();
+      expect(b1).toBeTruthy();
+      expect(b2).toBeTruthy();
+      expect(seenZones).toEqual(['Asia/Tokyo', 'Europe/Madrid']);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('builds summaries cleanly for legacy messages that have no saved meta field', () => {

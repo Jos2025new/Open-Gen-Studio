@@ -58,23 +58,35 @@ export function spaceLabelOf(item: { workspace: Workspace; meta?: ChatMessageMet
   return PLACE_LABEL[spaceOfFeedItem(item)];
 }
 
-export function formatMessageDateTime(ts: number, timeZone?: string): string {
-  const opts: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  };
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZoneName: 'short',
+};
+
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+let defaultDateTimeFormatter: Intl.DateTimeFormat | undefined;
+
+function dateTimeFormatterFor(timeZone?: string): Intl.DateTimeFormat {
   if (timeZone) {
+    const cached = dateTimeFormatters.get(timeZone);
+    if (cached) return cached;
     try {
-      return new Date(ts).toLocaleString(undefined, { ...opts, timeZone });
+      const fmt = new Intl.DateTimeFormat(undefined, { ...DATE_TIME_OPTIONS, timeZone });
+      dateTimeFormatters.set(timeZone, fmt);
+      return fmt;
     } catch {
       // Unknown or invalid IANA time zone falls back to local time zone.
     }
   }
-  return new Date(ts).toLocaleString(undefined, opts);
+  return (defaultDateTimeFormatter ??= new Intl.DateTimeFormat(undefined, DATE_TIME_OPTIONS));
+}
+
+export function formatMessageDateTime(ts: number, timeZone?: string): string {
+  return dateTimeFormatterFor(timeZone).format(ts);
 }
 
 export function shortModelName(model: string): string {
