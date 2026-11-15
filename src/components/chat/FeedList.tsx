@@ -174,7 +174,7 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
           <div className="agent-text">
             <RichText text={item.text} />
             {item.streaming ? <span className="caret" /> : null}
-            <MessageMeta item={item} className="agent-meta" />
+            <MessageMeta item={item} className="agent-meta faint" />
           </div>
         </div>
       );
