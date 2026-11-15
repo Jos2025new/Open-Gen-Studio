@@ -11,20 +11,20 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { Copy, Film, Image as ImageIcon, Play, Plus, Trash, Type } from '../ui/icons';
+import { Copy, Film, Image as ImageIcon, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
-import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
+import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
-import { Popover, usePopover } from '../ui/Popover';
-import { Button, IconButton, MenuItem } from '../ui/primitives';
-import { SpendConfirm } from '../ui/SpendConfirm';
+import { Popover } from '../ui/Popover';
+import { Button, MenuItem } from '../ui/primitives';
 import { StudioNode, type FlowNode } from './nodes';
-import { AddNodeItems, NodeLibrary } from './AddNodeItems';
+import { AddNodeItems } from './AddNodeItems';
+import { AddNodeMenu, RunAll } from './NodeCanvasParts';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
 import { CanvasPanels } from './SelectionPanel';
@@ -39,61 +39,6 @@ import { EmbeddedControls } from '../studio/EmbeddedControls';
 import { useBoardFocus } from '../studio/useBoardFocus';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
-
-/** Add node: the first tool of the canvas toolbox; its list opens to the right. */
-function AddNodeMenu({ onAdd, onImport }: { onAdd: (data: GraphNodeData) => void; onImport: () => void }) {
-  const pop = usePopover();
-  return (
-    <>
-      <IconButton ref={pop.ref} icon={Plus} label="Add node" aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={pop.toggle} />
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={340} label="Add node" className="node-lib-pop">
-        <NodeLibrary
-          onPick={(data) => {
-            onAdd(data);
-            pop.close();
-          }}
-          onAsset={() => {
-            pop.close();
-            setUi({ panel: 'gallery' });
-          }}
-          onImport={() => {
-            pop.close();
-            onImport();
-          }}
-        />
-      </Popover>
-    </>
-  );
-}
-
-function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
-  const pop = usePopover();
-  useStore(s => s); // Keep the reviewed request and price current.
-  const preview = pop.open ? previewRun(sessionId, ids, false) : null;
-  return (
-    <>
-      <Button ref={pop.ref} size="sm" variant="primary" icon={Play} disabled={!ids.length} onClick={() => void prepareNodeRun(sessionId, ids, false).then(pop.toggle)}>
-        Run all
-      </Button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Run all nodes">
-        {preview ? (
-          <SpendConfirm
-            title={`Run ${preview.count} node${preview.count === 1 ? '' : 's'}`}
-            lines={preview.runIds.map(id => `${id} · ${useStore.getState().sessions[sessionId].graph.nodes.find(n => n.id === id)?.data.title}`)}
-            estimate={preview.estimate}
-            blocked={preview.errors[0] ?? null}
-            sessionId={sessionId}
-            onCancel={pop.close}
-            onConfirm={() => {
-              if (previewRun(sessionId, ids, false).signature !== preview.signature) return;
-              return runNodes(sessionId, ids, preview, false).then(result => { if (result) pop.close(); });
-            }}
-          />
-        ) : null}
-      </Popover>
-    </>
-  );
-}
 
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
 function Canvas({ embedded = false }: { embedded?: boolean }) {

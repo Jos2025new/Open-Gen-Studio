@@ -23,12 +23,12 @@ const ICONS: Record<SystemNodeType, LucideIcon> = {
 };
 
 /** One handle per port. The link class shows in the shape (data: dot, ref: ring, control: diamond), not only in the colour. */
-export function PortDot({ port, top }: { port: PortSpec; top: string }) {
+export function PortDot({ port, top, labels = true }: { port: PortSpec; top: string; labels?: boolean }) {
   const side = port.direction === 'in' ? Position.Left : Position.Right;
   return (
     <>
       <Handle id={port.id} type={port.direction === 'in' ? 'target' : 'source'} position={side} className={`port port-link-${port.kind} port-${port.type}`} style={{ top }} />
-      <span className={`port-label ${side === Position.Left ? 'is-left' : 'is-right'}`} style={{ top }}>{port.label ?? port.id}</span>
+      {labels ? <span className={`port-label ${side === Position.Left ? 'is-left' : 'is-right'}`} style={{ top }}>{port.label ?? port.id}</span> : null}
     </>
   );
 }
@@ -52,7 +52,7 @@ export function LinkHandles() {
   );
 }
 
-function useLive(sessionId: string, node: FlowNode['data']['node']): LiveSystemSummary | null {
+export function useLive(sessionId: string, node: FlowNode['data']['node']): LiveSystemSummary | null {
   // A primitive key keeps the selector stable: the summary is rebuilt only when what the card shows changes.
   const key = useStore((_s) => {
     const live = resolveSystemNodeLive(sessionId, node);

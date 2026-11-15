@@ -24,7 +24,7 @@ import { OP_ICONS } from '../assets/AssetActions';
 import { AddNext, ResultPorts } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { KeyTools, PanelToggle } from './NodeBarExtras';
-import { LinkHandles, SystemNode } from './SystemNode';
+import { LinkHandles, RefNode as SystemNode } from '../omni/RefNode';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. `panel`: the canvas shows the Selection panel, which holds the result's tools. */
 export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean };
@@ -830,7 +830,7 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   );
 }
 
-/** Creative nodes (and system ones) share this entry: system parts have their own card, the rest keep theirs. */
+/** Creative and system nodes share this entry. */
 export const StudioNode = memo(function StudioNode(props: NodeProps<FlowNode>) {
   return props.data.node.data.kind === 'ref' ? <SystemNode {...props} /> : <CreativeNode {...props} />;
 });

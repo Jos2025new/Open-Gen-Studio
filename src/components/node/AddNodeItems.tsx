@@ -1,23 +1,42 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Box, ChevronRight, FileImage, Film, Image as ImageIcon, Music, Search, Type, Upload, Wand, type LucideIcon } from '../ui/icons';
+import { Bot, Box, ChevronRight, Cpu, Database, FileImage, FileText, Film, Image as ImageIcon, MessageSquare, Music, PenTool, Search, Sparkles, Type, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
-import type { GraphNodeData, OpId, PortType } from '../../engine/types';
+import type { GraphNodeData, OpId, PortType, SystemNodeType } from '../../engine/types';
+import { OMNI_SPACES, OMNI_SPACE_TITLES, type OmniSpace } from '../../engine/nodes/omniSpaces';
+import { SYSTEM_NODE_TYPES } from '../../engine/nodes/spec';
 import { OP_ICONS } from '../assets/AssetActions';
 import { MenuItem } from '../ui/primitives';
 
 const MENU_TIP_DELAY = 2500;
 
 type Kind = 'image' | 'video' | 'audio' | 'model3d' | 'text';
-interface Entry { id: string; section: 'media' | 'nodes' | 'tools'; kind?: Kind; icon: LucideIcon; label: string; sub: string; keywords: string; run: () => void }
+interface Entry { id: string; section: 'spaces' | 'system' | 'media' | 'nodes' | 'tools'; kind?: Kind; icon: LucideIcon; label: string; sub: string; keywords: string; run: () => void }
 const KIND_LABEL: Record<Kind, string> = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
-const SECTION_LABEL = { media: 'Media', nodes: 'Nodes', tools: 'Tools' } as const;
+const SECTION_LABEL = { spaces: 'Spaces', system: 'System', media: 'Media', nodes: 'Nodes', tools: 'Tools' } as const;
+
+/** The omnicanvas also takes the session's own parts as nodes (a library where everything is a node). `has`: that Space already has its one node. */
+export interface OmniEntries { has: (space: OmniSpace) => boolean; onSpace: (space: OmniSpace) => void; onSystem: (type: SystemNodeType) => void }
+const SPACE_ICON: Record<OmniSpace, LucideIcon> = { studio: MessageSquare, nodes: Workflow, designer: PenTool };
+const SPACE_SUB: Record<OmniSpace, string> = { studio: 'Chat and results', nodes: 'Connected flows of cards', designer: 'Layers: raster, vector and text' };
+/** System parts as nodes: they point to the data where it lives (nothing is copied). */
+const SYSTEM_ENTRIES: Array<[SystemNodeType, LucideIcon, string, string]> = [
+  ['agent', Bot, 'The agent that answers in the chat', 'agent assistant director'],
+  ['model', Sparkles, 'A model to attach to the agent or chat', 'model provider llm'],
+  ['provider', Cpu, 'A provider and its catalog', 'provider catalog openrouter'],
+  ['designer.doc', FileText, 'A Designer document', 'designer doc canvas layers'],
+  ['library', Database, 'Characters, objects and styles', 'library subjects characters'],
+  ['toolset', Wand, 'The operations catalog', 'tools operations catalog'],
+  ['session', MessageSquare, 'This session', 'session'],
+];
 
 /** The same node kinds and tools as AddNodeItems, as one flat list for the library panel. */
-function libraryEntries({ onPick, onAsset, onImport }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void }): Entry[] {
+function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }): Entry[] {
   const node = (kind: Exclude<Kind, 'text'> | 'text', icon: LucideIcon, label: string, sub: string, keywords: string): Entry => ({ id: kind, section: 'nodes', kind, icon, label, sub, keywords, run: () => onPick(newNodeData(kind)) });
   return [
+    ...(omni ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
+    ...(omni ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
     ...(onImport ? [{ id: 'import', section: 'media' as const, icon: Upload, label: 'Import images', sub: 'From your computer', keywords: 'upload import images files', run: onImport }] : []),
     ...(onAsset ? [{ id: 'asset', section: 'media' as const, icon: FileImage, label: 'Asset', sub: 'Drag one from the Library', keywords: 'asset gallery library', run: onAsset }] : []),
     node('text', Type, 'Text', 'Prompt or copy that feeds other nodes', 'text prompt copy'),
@@ -32,7 +51,7 @@ function libraryEntries({ onPick, onAsset, onImport }: { onPick: (data: GraphNod
 /** Add node from the canvas toolbox (2026-10-31): a library panel. A search field, kind chips, Media / Nodes / Tools
  *  sections with each entry's kind tinted on its icon and a line under its name, and the keyboard: type to filter,
  *  ↑↓ to move, Enter to add. Same entries as AddNodeItems (one list of node kinds). */
-export function NodeLibrary({ onPick, onAsset, onImport }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void }) {
+export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind | 'all'>('all');
   const [at, setAt] = useState(0);
@@ -40,7 +59,7 @@ export function NodeLibrary({ onPick, onAsset, onImport }: { onPick: (data: Grap
   const field = useRef<HTMLInputElement>(null);
   // The popover places itself after mounting, so the field takes the focus on the next frame (autoFocus is lost).
   useEffect(() => { const t = window.setTimeout(() => field.current?.focus(), 0); return () => window.clearTimeout(t); }, []);
-  const entries = useMemo(() => libraryEntries({ onPick, onAsset, onImport }), [onPick, onAsset, onImport]);
+  const entries = useMemo(() => libraryEntries({ onPick, onAsset, onImport, omni }), [onPick, onAsset, onImport, omni]);
   const q = query.trim().toLowerCase();
   const shown = entries.filter((e) => (kind === 'all' || e.kind === kind) && (!q || `${e.label} ${e.keywords}`.toLowerCase().includes(q)));
   useEffect(() => setAt(0), [query, kind]);
@@ -56,7 +75,7 @@ export function NodeLibrary({ onPick, onAsset, onImport }: { onPick: (data: Grap
       {chips.map((c) => <button key={c} type="button" className={`node-lib-chip${kind === c ? ' is-on' : ''}`} aria-pressed={kind === c} onClick={() => setKind(c)}>{c === 'all' ? 'All' : KIND_LABEL[c]}</button>)}
     </div>
     <div ref={list} className="node-lib-list" role="listbox" aria-label="Nodes and tools">
-      {(['media', 'nodes', 'tools'] as const).map((section) => {
+      {(['spaces', 'system', 'media', 'nodes', 'tools'] as const).map((section) => {
         const items = shown.filter((e) => e.section === section);
         return items.length ? <div key={section} className="node-lib-sec" role="group" aria-label={SECTION_LABEL[section]}>
           <div className="node-lib-head">{SECTION_LABEL[section]}<span className="num">{items.length}</span></div>
