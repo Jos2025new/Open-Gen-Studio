@@ -444,4 +444,99 @@ describe('chat message metadata (step 10)', () => {
       host.remove();
     }
   });
+
+  it('attaches usage and cost to the questions card when a model call ends in ask_questions without a text bubble', async () => {
+    const sid = resetStore();
+    mockChat.mockImplementationOnce(async () => ({
+      text: '',
+      toolCalls: [
+        {
+          id: 'call_q1',
+          name: 'ask_questions',
+          arguments: JSON.stringify({
+            intro: 'Quick check',
+            questions: [
+              {
+                id: 'style',
+                question: 'Which style?',
+                options: ['Bold', 'Clean'],
+                allow_custom: true,
+                multi: false,
+              },
+            ],
+          }),
+        },
+      ],
+      timing: { ttfbMs: 15, totalMs: 90, reasoningMs: 0, outputMs: 75 },
+      usage: { inputTokens: 210, outputTokens: 55, cachedTokens: 10, costUsd: 0.0021 },
+      finishReason: 'tool_calls',
+    }));
+
+    await sendAgentMessage('Make something cool');
+
+    const feed = useStore.getState().sessions[sid].feed;
+    const user = feed.find((f): f is UserFeedItem => f.type === 'user');
+    const assistants = feed.filter((f): f is AssistantFeedItem => f.type === 'assistant');
+    const questions = feed.find((f) => f.type === 'questions');
+
+    expect(assistants).toHaveLength(0);
+    expect(questions?.meta).toBeDefined();
+    expect(questions?.meta?.runId).toBe(user?.meta?.runId);
+    expect(questions?.meta?.agent).toBe('Director');
+    expect(questions?.meta?.space).toBe('canvas');
+    expect(questions?.meta?.provider).toBe('openrouter');
+    expect(questions?.meta?.model).toBe('anthropic/claude-sonnet-4');
+    expect(questions?.meta?.timeZone).toBeTruthy();
+    expect(questions?.meta?.usage).toEqual({ inputTokens: 210, outputTokens: 55, cachedTokens: 10 });
+    expect(questions?.meta?.costUsd).toBeCloseTo(0.0021, 6);
+    expect(questions?.meta?.costEstimated).toBe(false);
+  });
+
+  it('accumulates pending usage and cost onto the plan card when a tool loop ends in propose_plan without a text bubble', async () => {
+    const sid = resetStore();
+    mockChat
+      .mockImplementationOnce(async () => ({
+        text: '',
+        toolCalls: [{ id: 'call_probe', name: 'unknown_probe_tool', arguments: '{}' }],
+        timing: { ttfbMs: 10, totalMs: 50, reasoningMs: 0, outputMs: 40 },
+        usage: { inputTokens: 100, outputTokens: 20, cachedTokens: 0, costUsd: 0.001 },
+        finishReason: 'tool_calls',
+      }))
+      .mockImplementationOnce(async () => ({
+        text: '',
+        toolCalls: [
+          {
+            id: 'call_plan',
+            name: 'propose_plan',
+            arguments: JSON.stringify({
+              title: 'Text plan',
+              summary: 'Write short copy',
+              steps: [{ id: 's1', kind: 'text', title: 'Write copy', text: 'Hello world' }],
+            }),
+          },
+        ],
+        timing: { ttfbMs: 12, totalMs: 80, reasoningMs: 0, outputMs: 68 },
+        usage: { inputTokens: 150, outputTokens: 40, cachedTokens: 5, costUsd: 0.0015 },
+        finishReason: 'tool_calls',
+      }));
+
+    await sendAgentMessage('Draft short copy');
+
+    const feed = useStore.getState().sessions[sid].feed;
+    const user = feed.find((f): f is UserFeedItem => f.type === 'user');
+    const assistants = feed.filter((f): f is AssistantFeedItem => f.type === 'assistant');
+    const plan = feed.find((f) => f.type === 'plan');
+
+    expect(assistants).toHaveLength(0);
+    expect(plan?.meta).toBeDefined();
+    expect(plan?.meta?.runId).toBe(user?.meta?.runId);
+    expect(plan?.meta?.agent).toBe('Director');
+    expect(plan?.meta?.space).toBe('canvas');
+    expect(plan?.meta?.provider).toBe('openrouter');
+    expect(plan?.meta?.model).toBe('anthropic/claude-sonnet-4');
+    expect(plan?.meta?.timeZone).toBeTruthy();
+    expect(plan?.meta?.usage).toEqual({ inputTokens: 250, outputTokens: 60, cachedTokens: 5 });
+    expect(plan?.meta?.costUsd).toBeCloseTo(0.0025, 6);
+    expect(plan?.meta?.costEstimated).toBe(false);
+  });
 });

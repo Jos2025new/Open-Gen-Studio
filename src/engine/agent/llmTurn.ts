@@ -88,6 +88,26 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
   };
   const turnMeta = () => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
+  const clearPending = () => {
+    pendingUsage = undefined;
+    pendingCost = 0;
+    pendingHasCost = false;
+    pendingEstimated = false;
+  };
+  const pendingMeta = (hasBubble: boolean): ChatMessageMeta => {
+    const m = turnMeta();
+    if (hasBubble || (!pendingUsage && !pendingHasCost)) return m;
+    return {
+      ...m,
+      ...(pendingUsage ? { usage: pendingUsage } : {}),
+      ...(pendingHasCost ? { costUsd: pendingCost, costEstimated: pendingEstimated } : {}),
+    };
+  };
+  const takePendingMeta = (hasBubble: boolean): ChatMessageMeta => {
+    const m = pendingMeta(hasBubble);
+    if (!hasBubble) clearPending();
+    return m;
+  };
   const limitNote = () => notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {}, turnMeta());
   // The end of the turn, once: Stop and the cap call it; the turn's own exit finds it done and leaves a newer turn alone.
   const finish = (say?: () => void) => {
@@ -123,6 +143,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       }
       let textItemId: string | null = null;
       let textItemMeta: ChatMessageMeta | undefined;
+      const hasTextBubble = () => Boolean(textItemId && session(sessionId).feed.some((f) => f.id === textItemId));
       let result: ChatResult;
       try {
         if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
@@ -182,7 +203,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         // The call happened and cost time: it is a call in the metrics even though it produced nothing (T2).
         recordMetric(sessionId, { type: 'failedCall', error: (err as Error).message, ms: clock.elapsed() });
         outcome = 'error';
-        notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry, turnMeta());
+        notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry, takePendingMeta(hasTextBubble()));
         return;
       }
       log.callEnded(result.timing.reasoningMs, result.timing.outputMs ?? result.timing.totalMs);
@@ -211,7 +232,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           text: 'The model wrote its action as text the app cannot read, so nothing ran.',
           retry: textItemId ? { partialItemId: textItemId } : {},
           ...(textItemId ? { garbledItemId: textItemId } : {}),
-          meta: turnMeta(),
+          meta: takePendingMeta(hasTextBubble()),
         });
         outcome = 'error';
         return;
@@ -247,9 +268,9 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           pendingEstimated = pendingEstimated || u.costUsd == null;
         }
       }
-      const meta = textItemMeta ?? messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
-      if (textItemId && (pendingUsage || pendingHasCost)) {
-        updateFeedItem<AssistantFeedItem>(sessionId, textItemId, {
+      const meta = textItemMeta ?? turnMeta();
+      if (hasTextBubble() && (pendingUsage || pendingHasCost)) {
+        updateFeedItem<AssistantFeedItem>(sessionId, textItemId!, {
           meta: {
             ...meta,
             ...(pendingUsage ? { usage: pendingUsage } : {}),
@@ -269,7 +290,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         if (!result.text.trim()) {
           outcome = 'empty';
           const cut = result.finishReason === 'length';
-          notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {}, turnMeta());
+          notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {}, takePendingMeta(hasTextBubble()));
         }
         return;
       }
@@ -313,7 +334,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           flushToolResults(sessionId, toolResults);
           const sw = await switchSection(sections, ag().settings, ag().settingsParts, parts[0]?.user_requested === true, parts[0]?.model, undefined, parts[0]);
           const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }), meta: turnMeta() };
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }), meta: takePendingMeta(hasTextBubble()) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
@@ -352,12 +373,12 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
               default: q.default && q.options.includes(q.default) ? q.default : undefined,
             })),
             call.id,
-            turnMeta(),
+            takePendingMeta(hasTextBubble()),
           );
           outcome = 'questions';
           return;
         }
-        const canvas = await runCanvasCall({ sessionId, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools, cardMeta: turnMeta });
+        const canvas = await runCanvasCall({ sessionId, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools, cardMeta: () => pendingMeta(hasTextBubble()), onCardCommitted: () => { if (!hasTextBubble()) clearPending(); } });
         workspace = canvas.workspace;
         if (canvas.stop) return;
         if (canvas.handled) continue;
@@ -396,7 +417,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           }
           patchAgent(sessionId, { phase: 'checking' });
           const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn), action: (entry) => log.action(entry) });
-          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal, turnMeta()), waits);
+          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal, pendingMeta(hasTextBubble())), waits);
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
             if (textItemId) removeFeedItem(sessionId, textItemId);
@@ -415,6 +436,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             continue;
           }
           log.action({ icon: 'plan', label: v.data.revision ? 'Revised the plan' : 'Drafted the plan', detail: v.data.title });
+          if (!hasTextBubble()) clearPending();
           // This call's result is sent when the user approves or cancels.
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
@@ -427,18 +449,13 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       for (const m of afterTools) pushHistory(sessionId, m);
       if (planFailures >= 3) {
         outcome = 'error';
-        notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.', 'error', undefined, turnMeta());
+        notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.', 'error', undefined, takePendingMeta(hasTextBubble()));
         return;
       }
-      if (textItemId && session(sessionId).feed.some((f) => f.id === textItemId)) {
-        pendingUsage = undefined;
-        pendingCost = 0;
-        pendingHasCost = false;
-        pendingEstimated = false;
-      }
+      if (hasTextBubble()) clearPending();
     }
     outcome = 'error';
-    notice(sessionId, workspace, stoppedText(lastBlock), 'error', undefined, turnMeta());
+    notice(sessionId, workspace, stoppedText(lastBlock), 'error', undefined, takePendingMeta(false));
   } catch (err) {
     if (!isAbort(err)) throw err; // Stop during a tool: finish() already ended the turn
   } finally {

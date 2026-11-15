@@ -47,6 +47,7 @@ type CallCtx = {
   toolResults: LlmMessage[];
   afterTools: LlmMessage[];
   cardMeta?: () => ChatMessageMeta;
+  onCardCommitted?: () => void;
 };
 
 /** Runs one of the tool calls answered by the canvas, finder and read tools. Each branch either handles its call ("handled"), ends the turn ("stop"), or leaves the call for the next branch (propose_plan). */
@@ -91,6 +92,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   if (!v.success) { respond(`Invalid run_nodes: ${v.error.message}`); return { handled: true, workspace: c.workspace }; }
   const proposed = await until(presentNodeRun(sessionId, v.data.node_ids, call.id, c.cardMeta?.()));
   if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); return { handled: true, workspace: c.workspace }; }
+  c.onCardCommitted?.();
   log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
   ignoreRest(index); flushToolResults(sessionId, toolResults); return { handled: true, stop: true, workspace: c.workspace };
           }
