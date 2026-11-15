@@ -26,6 +26,7 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
 | 9 | Ronda 3 (Sonnet), variantes A, B y C | Arranque y memoria | **Fuga:** el diseño de la ronda 2 crecía 24,5 MB por guardado (733 MB); la recomendación de Fable era errónea. B arregla la memoria; B+A, el arranque |
 | 10 | Ronda 4 (Argon, cuenta nueva de Gemini, con permiso para delegar en Hydrogen) | Medir B+A, rebase tras 409, cortes de red y migración | B+A gana en todo salvo disco (+53 MB). 0 de 100 a medias; 300 pasos aleatorios sin pérdidas ni duplicados; migración verificada por huella |
 | 11 | Propuesta escrita (Fable) | El usuario: «Escríbela» | [propuesta-persistencia-sqlite.md](../propuesta-persistencia-sqlite.md), sin autorizar |
+| 12 | Revisión independiente (Grok en Cursor, por el bus; el usuario le pasó el encargo) | Regla 5 antes de cualquier fase | 4 fallos en el spike (409 que ya no frena, rebase que pisa ediciones concurrentes, reorden de biblioteca perdido, migración relanzada que borra lo nuevo) y cifras de la propuesta mal citadas por Fable |
 
 ## Problemas y cómo se resolvieron
 
@@ -41,5 +42,7 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
 - **Delegación:** Argon no delegó en Hydrogen; lanzó pruebas en segundo plano y esperó avisos, contra el encargo.
 
 ## Pendiente
+
+Corregir los cuatro fallos de la revisión en el spike y volver a medir.
 
 Autorización del usuario por fases, revisión independiente de cada fase y prueba con datos reales del usuario.
