@@ -3,7 +3,6 @@ import { registerHistory } from '../commands/history';
 import { defineCommand, type Availability, type CommandContext, type CommandSpec, type Target } from '../commands/types';
 import { patchSession, useStore } from '../../store/store';
 import type { Graph, GraphNode } from '../types';
-import { ensureSystemNodes } from '../nodes/system';
 import { openHistoryGroup } from './history';
 
 /*
@@ -52,13 +51,10 @@ export function hasTarget(ctx: CommandContext, args?: Named): Availability {
   if (!useStore.getState().sessions[sessionId]) return NO_SESSION;
   const mentionedNodes = strings(args?.node, args?.source, args?.target, args?.nodes, args?.targets);
   const mentionedEdges = strings(args?.edge, args?.edges);
-  if ([...mentionedNodes, ...mentionedEdges].some((id) => id.startsWith('sys_'))) {
-    ensureSystemNodes(sessionId);
-  }
   const graph = useStore.getState().sessions[sessionId]?.graph;
   if (!graph) return NO_SESSION;
   const missingNode = mentionedNodes.find((id) => !graph.nodes.some((n) => n.id === id));
-  if (missingNode) return `No such node: ${missingNode}.`;
+  if (missingNode) return missingNode.startsWith('sys_') && !graph.nodes.some((n) => n.data.kind === 'ref') ? 'The system nodes are not on the canvas yet: run nodes.system.ensure first.' : `No such node: ${missingNode}.`;
   const missingEdge = mentionedEdges.find((id) => !graph.edges.some((e) => e.id === id));
   return missingEdge ? `No such edge: ${missingEdge}.` : true;
 }

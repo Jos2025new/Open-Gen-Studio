@@ -16,6 +16,8 @@ import { allCommands, collected, command, run } from '../src/engine/commands';
 import { graphHistory, travelGraph } from '../src/engine/flow/history';
 import { connectionError, executionOrder } from '../src/engine/flow/graph';
 import { ensureSystemNodes } from '../src/engine/nodes/system';
+import { deleteNodes } from '../src/engine/flow/actions';
+import { flowEdges } from '../src/components/node/LinkBar';
 import { createSession, setGraph, useStore } from '../src/store/store';
 import type { Graph, GraphNode } from '../src/engine/types';
 
@@ -145,7 +147,7 @@ describe('commands', () => {
   it('are found by the automatic index with strict schemas', () => {
     expect(collected.loaded.map((l) => l.file)).toEqual(expect.arrayContaining(['/src/engine/nodes/commands.ts']));
     const ids = allCommands().filter((c) => c.id.startsWith('nodes.system.')).map((c) => c.id).sort();
-    expect(ids).toEqual(['nodes.system.add', 'nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.ensure', 'nodes.system.execution_order', 'nodes.system.link', 'nodes.system.list', 'nodes.system.unlink']);
+    expect(ids).toEqual(['nodes.system.add', 'nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.ensure', 'nodes.system.execution_order', 'nodes.system.link', 'nodes.system.list', 'nodes.system.set_link', 'nodes.system.unlink']);
     expect(command('nodes.system.link')!.effect).toBe('write');
   });
 
@@ -154,7 +156,7 @@ describe('commands', () => {
     const result = await run({
       on: on(),
       seq: [
-        { cmd: 'nodes.system.list', args: {} },
+        { cmd: 'nodes.system.ensure', args: {} },
         { cmd: 'nodes.system.add', args: { type: 'library' } },
         { cmd: 'nodes.system.link', args: { source: '$2.node', target: 'sys_agent', kind: 'ref' } },
       ],
@@ -162,5 +164,53 @@ describe('commands', () => {
     expect(result.ok).toBe(true);
     expect(graph().edges.some((e) => e.source.startsWith('sys_library') && e.kind === 'ref')).toBe(true);
     expect(graphHistory(sid, 'undo').length).toBe(steps + 1);
+  });
+});
+
+describe('layout, removal and link edits', () => {
+  it('lays the system nodes out without overlap and to the left of the user\'s nodes', () => {
+    const own: GraphNode = { id: 'mine', position: { x: 100, y: 50 }, data: { kind: 'text', title: 'Prompt', text: '' } };
+    setGraph(sid, (g) => ({ ...g, nodes: [own] }));
+    ensureSystemNodes(sid);
+    const sys = refs();
+    for (const n of sys) expect(n.position.x + 260).toBeLessThan(100);
+    for (const [i, a] of sys.entries()) for (const b of sys.slice(i + 1)) {
+      const apart = Math.abs(a.position.x - b.position.x) >= 520 || Math.abs(a.position.y - b.position.y) >= 300;
+      expect(apart, `${a.id} / ${b.id}`).toBe(true);
+    }
+  });
+
+  it('removing a system node is one undo step that restores the same position and its links', () => {
+    ensureSystemNodes(sid);
+    const agent = graph().nodes.find((n) => n.id === 'sys_agent')!;
+    const edges = graph().edges.length;
+    const steps = graphHistory(sid, 'undo').length;
+    expect(deleteNodes(sid, ['sys_agent'])).toBeNull();
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps + 1);
+    expect(undo()).toBe(true);
+    expect(graph().nodes.find((n) => n.id === 'sys_agent')!.position).toEqual(agent.position);
+    expect(graph().edges).toHaveLength(edges);
+  });
+
+  it('toggles both on a ref or control link only, one undo step each, and draws them differently', async () => {
+    ensureSystemNodes(sid);
+    const ref = graph().edges.find((e) => e.kind === 'ref')!;
+    const steps = graphHistory(sid, 'undo').length;
+    const off = await run({ cmd: 'nodes.system.set_link', args: { edge: ref.id, both: !ref.both }, on: on() }, { caller: 'agent' });
+    expect(off.ok).toBe(true);
+    expect(graph().edges.find((e) => e.id === ref.id)!.both).toBe(!ref.both || undefined);
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps + 1);
+    const data: Graph = { nodes: graph().nodes, edges: [{ id: 'd', source: 'sys_chat', target: 'sys_agent', targetHandle: 'in', sourceHandle: 'out' }] };
+    const flow = flowEdges({ ...graph(), edges: [...graph().edges, ...data.edges] }, {}, new Set(), new Set());
+    expect(flow.find((e) => e.id === 'd')!.className).not.toContain('edge-link');
+    expect(flow.find((e) => e.id === ref.id)!.className).toContain('edge-link-ref');
+  });
+
+  it('naming a system node before they exist does not create them', async () => {
+    const res = await run({ cmd: 'nodes.system.link', args: { source: 'sys_agent', target: 'sys_chat', kind: 'ref' }, on: on() }, { caller: 'agent' });
+    expect(res).toMatchObject({ ok: false });
+    expect(refs()).toHaveLength(0);
+    expect((await run({ cmd: 'nodes.system.list', args: {}, on: on() }, { caller: 'agent' })).ok).toBe(true);
+    expect(refs()).toHaveLength(0);
   });
 });

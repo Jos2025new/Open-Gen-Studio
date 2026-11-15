@@ -14,7 +14,7 @@ import {
 import { Copy, Film, Image as ImageIcon, Play, Plus, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, outputPort, NODE_WIDTH, resultHandle, runsGeneration, NO_RESULT, GONE_HANDLE } from '../../engine/flow/graph';
+import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -31,7 +31,7 @@ import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations, type GroupFlowNode } from './Operations';
-import { linkClassProps, useSystemNodes } from './SystemNode';
+import { flowEdges, LinkBar, useDeleteRequest } from './LinkBar';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
@@ -109,8 +109,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
     () => chatWorkNotInNodes(sessionId).map((g) => ({ id: g.id, assetId: g.assetIds[0], label: g.op ? g.op.id.replace(/_/g, ' ') : g.prompt.split(/[.,\n]/)[0].slice(0, 60) || g.kind })),
     [sessionId, graph, generations, feed],
   );
-  useSystemNodes(sessionId, !embedded);
-  const mine = graph.nodes.some((n) => n.data.kind !== 'ref');
+  const del = useDeleteRequest(sessionId, () => setSelected(new Set()));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
@@ -230,24 +229,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
     return set;
   }, [graph.nodes, generations]);
 
-  const edges: Edge[] = useMemo(
-    () =>
-      graph.edges.map((e) => {
-        const src = graph.nodes.find((n) => n.id === e.source);
-        const type = src ? outputPort(src.data, assets) : null;
-        return {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          sourceHandle: e.outputIndex == null ? e.sourceHandle : e.outputIndex === NO_RESULT ? GONE_HANDLE : resultHandle(e.outputIndex),
-          targetHandle: e.targetHandle,
-          ...linkClassProps(e, type),
-          animated: running.has(e.target),
-          selected: selectedEdges.has(e.id),
-        };
-      }),
-    [graph.edges, graph.nodes, assets, running, selectedEdges],
-  );
+  const edges: Edge[] = useMemo(() => flowEdges(graph, assets, running, selectedEdges), [graph.edges, graph.nodes, assets, running, selectedEdges]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
@@ -481,6 +463,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
         minZoom={NODE_MIN_ZOOM}
         maxZoom={NODE_MAX_ZOOM}
+        onBeforeDelete={del.before}
         deleteKeyCode={insideRef.current ? ['Backspace', 'Delete'] : null}
         selectionOnDrag={tool === 'select'}
         panOnDrag={tool === 'pan' ? true : [1, 2]}
@@ -506,11 +489,10 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           tool={tool}
           onTool={pickTool}
           selectedCount={selected.size}
-          onDelete={() => {
-            deleteNodes(sessionId, [...selected]);
-            setSelected(new Set());
-          }}
+          onDelete={() => del.request([...selected])}
         /></>}
+        <LinkBar sessionId={sessionId} graph={graph} selected={selectedEdges} />
+        {del.card}
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={menuOpen} placement={menu?.from ? 'right-start' : 'top-start'} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
@@ -525,8 +507,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
               detail="Del"
               danger
               onClick={() => {
-                deleteNodes(sessionId, [menuNode.id]);
-                setSelected(new Set());
+                del.request([menuNode.id]);
                 setMenu(null);
               }}
             />
@@ -570,7 +551,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
         }}
       />}
-      {!mine && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !mine ? (
+      {!graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
         <div className="node-empty">
           <h2>Build a flow</h2>
           <p className="faint">Ask the agent in the composer — it creates, connects and lays out the nodes — or add them yourself.</p>

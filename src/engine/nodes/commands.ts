@@ -8,6 +8,7 @@ import {
   detachModelFromNode,
   ensureSystemNodes,
   linkSystemNodes,
+  setLinkBoth,
   resolveSystemNodeLive,
   SYSTEM_NODE_TYPES,
   unlinkSystemNodes,
@@ -45,14 +46,14 @@ export const commands = [
   nodeCommand({
     id: 'nodes.system.list',
     title: 'List system nodes and links',
-    description: 'Returns the session\'s system reference nodes (chat, agent, models, Designer docs, Spaces, library, tools), their live store summary, and all typed links.',
+    description: 'Read only: returns the session\'s system reference nodes (chat, agent, models, Designer docs, Spaces, library, tools), their live store summary, and all typed links.',
     args: none,
     effect: 'read',
     undo: false,
     run: (on) => {
-      ensureSystemNodes(on.session);
       const graph = graphOf(on);
       return {
+        materialized: graph.nodes.some((n) => n.data.kind === 'ref'),
         types: Object.keys(SYSTEM_NODE_TYPES),
         nodes: graph.nodes
           .filter((n) => n.data.kind === 'ref')
@@ -142,10 +143,7 @@ export const commands = [
       })
       .strict(),
     effect: 'write',
-    available: (ctx, args) => {
-      ensureSystemNodes(ctx.on.session ?? '');
-      return hasTarget(ctx, args);
-    },
+    available: (ctx, args) => hasTarget(ctx, args),
     run: (on, args) => {
       const res = unlinkSystemNodes(on.session, {
         edgeId: args.edge,
@@ -155,6 +153,18 @@ export const commands = [
       });
       throwIf(res.error);
       return { edges: res.removed };
+    },
+  }),
+  nodeCommand({
+    id: 'nodes.system.set_link',
+    title: 'Set a link bidirectional',
+    description: 'Makes a ref or control link bidirectional (both: true) or one-way (both: false). Data links cannot be both. One undo step.',
+    args: z.object({ edge: edgeRef, both: z.boolean() }).strict(),
+    effect: 'write',
+    available: (ctx, args) => hasTarget(ctx, args),
+    run: (on, args) => {
+      throwIf(setLinkBoth(on.session, args.edge, args.both));
+      return { edge: args.edge, both: args.both };
     },
   }),
   nodeCommand({
@@ -171,10 +181,7 @@ export const commands = [
       })
       .strict(),
     effect: 'write',
-    available: (ctx, args) => {
-      ensureSystemNodes(ctx.on.session ?? '');
-      return hasTarget(ctx, { target: args?.target, node: args?.model_node });
-    },
+    available: (ctx, args) => hasTarget(ctx, { target: args?.target, node: args?.model_node }),
     run: (on, args) => {
       const res = attachModelToNode(on.session, {
         targetNodeId: args.target,
@@ -204,10 +211,7 @@ export const commands = [
       })
       .strict(),
     effect: 'write',
-    available: (ctx, args) => {
-      ensureSystemNodes(ctx.on.session ?? '');
-      return hasTarget(ctx, { target: args?.target, node: args?.model_node });
-    },
+    available: (ctx, args) => hasTarget(ctx, { target: args?.target, node: args?.model_node }),
     run: (on, args) => {
       const res = detachModelFromNode(on.session, {
         targetNodeId: args.target,

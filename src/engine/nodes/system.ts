@@ -34,12 +34,24 @@ export {
   type LiveSystemSummary,
 };
 
+/* Tidy layout, left of the user's own nodes: models | chat and agent | docs and Spaces. The pitch leaves room for port labels. */
+const COL = 560;
+const ROW = 340;
+const sysOrigin = (graph: Graph): number => {
+  const own = graph.nodes.filter((n) => n.data.kind !== 'ref');
+  const sys = graph.nodes.filter((n) => n.data.kind === 'ref');
+  if (sys.length) return Math.min(...sys.map((n) => n.position.x));
+  return own.length ? Math.min(...own.map((n) => n.position.x)) - 3 * COL - 200 : -(2 * COL + 260) / 2;
+};
+
 function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: GraphNode[]; edges: GraphEdge[]; addedIds: string[] } {
   const st = useStore.getState();
   const session = st.sessions[sessionId];
   if (!session) return { nodes: graph.nodes, edges: graph.edges, addedIds: [] };
 
   const hasAnyRefNode = graph.nodes.some((n) => n.data.kind === 'ref');
+  const ox = sysOrigin(graph);
+  const at = (col: number, row: number) => ({ x: ox + col * COL, y: row * ROW });
   const nodes = [...graph.nodes];
   const edges = [...graph.edges];
   const addedIds: string[] = [];
@@ -59,19 +71,19 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
     const llmRef = st.settings.agent.provider === 'offline' ? 'offline' : st.settings.agent.model || 'offline';
     const imgRef = session.agent.settings?.image?.modelRef ?? st.composer.image.modelRef;
 
-    ensureNode('sys_chat', { x: -680, y: -220 }, {
+    ensureNode('sys_chat', at(1, 0), {
       kind: 'ref',
       type: 'chat',
       ref: sessionId,
       title: 'Chat',
     });
-    ensureNode('sys_agent', { x: -340, y: -220 }, {
+    ensureNode('sys_agent', at(1, 1), {
       kind: 'ref',
       type: 'agent',
       ref: sessionId,
       title: 'Agent',
     });
-    ensureNode('sys_model_llm', { x: -340, y: -380 }, {
+    ensureNode('sys_model_llm', at(0, 0), {
       kind: 'ref',
       type: 'model',
       ref: llmRef,
@@ -80,7 +92,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
       attachMode: 'docked',
       dockedTo: 'sys_agent',
     });
-    ensureNode('sys_model_image', { x: -680, y: 40 }, {
+    ensureNode('sys_model_image', at(0, 1), {
       kind: 'ref',
       type: 'model',
       ref: imgRef,
@@ -91,7 +103,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
 
     if (session.agent.settings?.video?.modelRef) {
       const vidRef = session.agent.settings.video.modelRef;
-      ensureNode('sys_model_video', { x: -680, y: 260 }, {
+      ensureNode('sys_model_video', at(0, 2), {
         kind: 'ref',
         type: 'model',
         ref: vidRef,
@@ -111,7 +123,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
 
     if (session.docs.length > 0) {
       session.docs.forEach((doc, idx) => {
-        ensureNode(`sys_doc_${doc.id}`, { x: 20, y: -240 + idx * 210 }, {
+        ensureNode(`sys_doc_${doc.id}`, at(2, idx), {
           kind: 'ref',
           type: 'designer.doc',
           ref: doc.id,
@@ -119,7 +131,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
         });
       });
     } else {
-      ensureNode('sys_doc_active', { x: 20, y: -240 }, {
+      ensureNode('sys_doc_active', at(2, 0), {
         kind: 'ref',
         type: 'designer.doc',
         ref: session.activeDocId ?? 'active',
@@ -127,13 +139,13 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
       });
     }
 
-    ensureNode('sys_space_create', { x: 20, y: 0 }, {
+    ensureNode('sys_space_create', at(2, Math.max(session.docs.length, 1)), {
       kind: 'ref',
       type: 'space',
       ref: 'create',
       title: 'Create Space',
     });
-    ensureNode('sys_space_tools', { x: 20, y: 200 }, {
+    ensureNode('sys_space_tools', at(2, Math.max(session.docs.length, 1) + 1), {
       kind: 'ref',
       type: 'space',
       ref: 'tools',
@@ -191,7 +203,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
         (n) => n.data.kind === 'ref' && n.data.type === 'designer.doc' && (n.data.ref === doc.id || n.data.ref === 'active'),
       );
       if (!alreadyRepresented) {
-        ensureNode(`sys_doc_${doc.id}`, { x: 20, y: -240 + (idx + 1) * 210 }, {
+        ensureNode(`sys_doc_${doc.id}`, at(2, nodes.filter((n) => n.data.kind === 'ref').length + idx), {
           kind: 'ref',
           type: 'designer.doc',
           ref: doc.id,
@@ -283,7 +295,7 @@ export function addSystemNode(
         : SYSTEM_NODE_TYPES[spec.type].title);
   const id = spec.id ?? uid(`sys_${spec.type.replace('.', '_')}`);
   const count = session?.graph.nodes.length ?? 0;
-  const position = spec.position ?? { x: -320 + (count % 3) * 300, y: -120 + Math.floor(count / 3) * 200 };
+  const position = spec.position ?? { x: sysOrigin(session?.graph ?? { nodes: [], edges: [] }) + 3 * COL, y: ROW * (count % 6) };
   const data: RefNodeData = {
     kind: 'ref',
     type: spec.type,
@@ -353,7 +365,7 @@ export function attachModelToNode(
       attachMode: opts.mode,
       ...(opts.mode === 'docked' || opts.mode === 'merged' ? { dockedTo: hostId } : {}),
     };
-    const modelPos = existingModelNode?.position ?? { x: host.position.x - 320, y: host.position.y + 80 };
+    const modelPos = existingModelNode?.position ?? { x: host.position.x - COL, y: host.position.y + ROW * g.nodes.filter((n) => n.data.kind === 'ref' && n.data.type === 'model').length };
     const hasModelNode = g.nodes.some((n) => n.id === modelNodeId);
     const nodes = (hasModelNode ? g.nodes : [...g.nodes, { id: modelNodeId, position: modelPos, data: modelData }]).map((n) => {
       if (n.id === modelNodeId) return { ...n, data: modelData };
@@ -564,4 +576,20 @@ export function unlinkSystemNodes(
     edges: g.edges.filter((e) => !toRemove.includes(e.id)),
   }));
   return { error, removed: error ? [] : toRemove };
+}
+
+/** Make a ref or control link bidirectional, or one-way again. One undo step; data links cannot be both. */
+export function setLinkBoth(sessionId: string, edgeId: string, both: boolean): string | null {
+  const graph = useStore.getState().sessions[sessionId]?.graph;
+  const edge = graph?.edges.find((e) => e.id === edgeId);
+  if (!graph || !edge) return `No such edge: ${edgeId}.`;
+  if (both && (edge.kind ?? 'data') === 'data') return 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
+  return commitSystemGraph(sessionId, (g) => ({
+    ...g,
+    edges: g.edges.map((e) => {
+      if (e.id !== edgeId) return e;
+      const { both: _old, ...rest } = e;
+      return both ? { ...rest, both: true } : rest;
+    }),
+  }));
 }

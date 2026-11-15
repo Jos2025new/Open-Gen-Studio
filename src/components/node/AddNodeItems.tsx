@@ -1,32 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Bot, Box, ChevronRight, FileText, Layers, MessageSquare, Cpu, Database, Sparkles, FileImage, Film, Image as ImageIcon, Music, Search, Type, Upload, Wand, type LucideIcon } from '../ui/icons';
+import { Box, ChevronRight, FileImage, Film, Image as ImageIcon, Music, Search, Type, Upload, Wand, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
-import type { GraphNodeData, OpId, PortType, SystemNodeType } from '../../engine/types';
-import { SYSTEM_NODE_TYPES } from '../../engine/nodes/spec';
+import type { GraphNodeData, OpId, PortType } from '../../engine/types';
 import { OP_ICONS } from '../assets/AssetActions';
 import { MenuItem } from '../ui/primitives';
 
 const MENU_TIP_DELAY = 2500;
 
 type Kind = 'image' | 'video' | 'audio' | 'model3d' | 'text';
-interface Entry { id: string; section: 'media' | 'nodes' | 'system' | 'tools'; kind?: Kind; icon: LucideIcon; label: string; sub: string; keywords: string; run: () => void }
+interface Entry { id: string; section: 'media' | 'nodes' | 'tools'; kind?: Kind; icon: LucideIcon; label: string; sub: string; keywords: string; run: () => void }
 const KIND_LABEL: Record<Kind, string> = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
-const SECTION_LABEL = { media: 'Media', nodes: 'Nodes', system: 'System', tools: 'Tools' } as const;
-
-/** System parts as nodes: they point to the data where it lives (nothing is copied). */
-const SYSTEM_ENTRIES: Array<[SystemNodeType, LucideIcon, string, string]> = [
-  ['chat', MessageSquare, 'This session\'s conversation', 'chat conversation messages'],
-  ['agent', Bot, 'The agent that answers in the chat', 'agent assistant director'],
-  ['model', Sparkles, 'A model to attach to the agent or chat', 'model provider llm'],
-  ['provider', Cpu, 'A provider and its catalog', 'provider catalog openrouter'],
-  ['designer.doc', FileText, 'A Designer document', 'designer doc canvas layers'],
-  ['space', Layers, 'Create or Tools Space', 'space board create tools'],
-  ['library', Database, 'Characters, objects and styles', 'library subjects characters'],
-  ['toolset', Wand, 'The operations catalog', 'tools operations catalog'],
-  ['session', MessageSquare, 'This session', 'session'],
-];
+const SECTION_LABEL = { media: 'Media', nodes: 'Nodes', tools: 'Tools' } as const;
 
 /** The same node kinds and tools as AddNodeItems, as one flat list for the library panel. */
 function libraryEntries({ onPick, onAsset, onImport }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void }): Entry[] {
@@ -39,7 +25,6 @@ function libraryEntries({ onPick, onAsset, onImport }: { onPick: (data: GraphNod
     node('video', Film, 'Video', 'Generate video', 'video generation first frame motion'),
     node('audio', Music, 'Audio', 'Generate music or song lyrics', 'audio music song lyrics voice'),
     node('model3d', Box, '3D model', 'Generate a GLB model from text or image', '3d model glb'),
-    ...SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => onPick(newNodeData('ref', { type })) })),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
   ];
 }
@@ -71,7 +56,7 @@ export function NodeLibrary({ onPick, onAsset, onImport }: { onPick: (data: Grap
       {chips.map((c) => <button key={c} type="button" className={`node-lib-chip${kind === c ? ' is-on' : ''}`} aria-pressed={kind === c} onClick={() => setKind(c)}>{c === 'all' ? 'All' : KIND_LABEL[c]}</button>)}
     </div>
     <div ref={list} className="node-lib-list" role="listbox" aria-label="Nodes and tools">
-      {(['media', 'nodes', 'system', 'tools'] as const).map((section) => {
+      {(['media', 'nodes', 'tools'] as const).map((section) => {
         const items = shown.filter((e) => e.section === section);
         return items.length ? <div key={section} className="node-lib-sec" role="group" aria-label={SECTION_LABEL[section]}>
           <div className="node-lib-head">{SECTION_LABEL[section]}<span className="num">{items.length}</span></div>

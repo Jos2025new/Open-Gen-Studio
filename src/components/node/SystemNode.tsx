@@ -1,9 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Handle, MarkerType, Position, type NodeProps } from '@xyflow/react';
 import { Bot, Cpu, Database, FileText, Layers, MessageSquare, Sparkles, Wand } from '../ui/icons';
 import type { LucideIcon } from '../ui/icons';
 import { resolveSystemNodeLive, systemNodePorts, type LiveSystemSummary } from '../../engine/nodes/spec';
-import { ensureSystemNodes } from '../../engine/nodes/system';
 import type { GraphEdge, PortSpec, PortType, SystemNodeType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import type { FlowNode } from './nodes';
@@ -76,7 +75,7 @@ export function SystemNode({ data, selected }: NodeProps<FlowNode>) {
     <>
       {ins.map((p, i) => <PortDot key={p.id} port={p} top={`${((i + 1) / (ins.length + 1)) * 100}%`} />)}
       {outs.map((p, i) => <PortDot key={p.id} port={p} top={`${((i + 1) / (outs.length + 1)) * 100}%`} />)}
-      <div className={`nc k-ref k-sys-${d.type.replace('.', '-')} ${selected ? 'is-selected' : ''}`} data-system-type={d.type}>
+      <div className={`nc k-ref k-sys-${d.type.replace('.', '-')} ${selected ? 'is-selected' : ''}`} data-system-type={d.type} style={{ minHeight: `${(Math.max(ins.length, outs.length) + 1) * 1.5}rem` }}>
         <div className="nc-label">
           <Icon size={12} />
           <span className="nc-title-text">{live?.title ?? d.title}</span>
@@ -95,12 +94,6 @@ export function SystemNode({ data, selected }: NodeProps<FlowNode>) {
       </div>
     </>
   );
-}
-
-/** The system's parts (chat, agent, models, docs, Spaces) are born as nodes that point to where the data lives.
- *  Added once per session without an undo step; the user's own edits to them are undoable as usual. */
-export function useSystemNodes(sessionId: string, enabled: boolean): void {
-  useEffect(() => { if (enabled) ensureSystemNodes(sessionId); }, [sessionId, enabled]);
 }
 
 /** Edge class and arrowheads for a link: data keeps its typed colour; ref and control are drawn by stroke and point the way (both ends when bidirectional). */
