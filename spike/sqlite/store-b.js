@@ -4,6 +4,7 @@
 //     small?: '<json text>',             // the scalar part of globals (settings, ui, composer, ...), only when it changed
 //     up?:  { generations: {id: text}, assets: {id: text}, library: {id: text} },   // records created or changed
 //     del?: { generations: [id], assets: [id], library: [id] },                     // records removed
+//     order?: { generations: [id], assets: [id], library: [id] },                   // full order of each collection; positions are rewritten to match
 //     spend?: { append: [text], len: n } } // spendLog entries added at the end; len = length of the log after the commit
 // baseAt makes the delta sound: the server applies it to exactly the state the client last saw (a stale baseAt is a 409).
 // The server keeps NO mirror: each record row carries a small fingerprint (fp, 11 chars of md5) used to skip a record
@@ -75,6 +76,7 @@ export function createStoreB(dir, opts = {}) {
     recIds: db.prepare('SELECT id FROM records WHERE coll = ?'),
     recIns: db.prepare('INSERT INTO records (coll, id, pos, meta, fp) VALUES (?, ?, ?, ?, ?)'),
     recUpd: db.prepare('UPDATE records SET meta = ?, fp = ? WHERE coll = ? AND id = ?'),
+    recPos: db.prepare('UPDATE records SET pos = ? WHERE coll = ? AND id = ?'),
     recDel: db.prepare('DELETE FROM records WHERE coll = ? AND id = ?'),
     histPut: db.prepare('INSERT INTO gen_history (id, ts, meta, deleted) VALUES (?, ?, ?, ?)'),
     spendPut: db.prepare('INSERT INTO spend (meta) VALUES (?)'),
@@ -173,6 +175,15 @@ export function createStoreB(dir, opts = {}) {
         if (!q.recFp.get(coll, id)) continue;
         q.recDel.run(coll, id);
         if (coll === 'generations') q.histPut.run(id, savedAt, '{}', 1);
+      }
+      const ids = delta.order?.[coll];
+      if (Array.isArray(ids)) {
+        let pos = 0;
+        for (const id of ids) {
+          if (!q.recFp.get(coll, id)) continue;
+          q.recPos.run(pos, coll, id);
+          pos++;
+        }
       }
     }
     let spend = { len: head?.spend_len ?? 0, last: head?.spend_last ?? 0 };

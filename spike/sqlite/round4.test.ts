@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sha256 } from '../../server/save-guard.js';
-import { assembleText, createStoreV2 } from '../../server/store-v2.js';
+import { createStoreV2 } from '../../server/store-v2.js';
 import { createStoreBA } from './store-ba.js';
 import { createDeltaClient } from './delta-client.mjs';
 import { createResilientDeltaClient } from './delta-sync.mjs';
@@ -84,10 +84,32 @@ describe('Part 1: B+A combined store (store-ba.js)', () => {
 
     store.close();
   });
+
+  it('persists a library reorder and a session reorder', () => {
+    const dir = mkdtempSync(join(ROOT, 'ord-'));
+    const store = createStoreBA(dir);
+    const fx = buildFixture({ sessions: 4, items: 4, generations: 6, spend: 3, assets: 3 });
+    const g = JSON.parse(fx.globals);
+    g.library = [{ id: 'lib_a', name: 'A' }, { id: 'lib_b', name: 'B' }, { id: 'lib_c', name: 'C' }];
+    const client = createDeltaClient();
+    expect(store.commit({
+      savedAt: fx.savedAt, baseAt: 0, version: 1, order: fx.order, sessions: fx.sessions, delta: client.diff(g),
+    }).status).toBe(204);
+    client.ack();
+    g.library = [{ id: 'lib_c', name: 'C' }, { id: 'lib_a', name: 'A' }, { id: 'lib_b', name: 'B' }];
+    const order = [fx.order[2], fx.order[0], fx.order[1], fx.order[3]];
+    expect(store.commit({
+      savedAt: fx.savedAt + 1000, baseAt: fx.savedAt, version: 1, order, sessions: {}, delta: client.diff(g),
+    }).status).toBe(204);
+    const state = JSON.parse(store.read()).state;
+    expect(state.library.map((item) => item.id)).toEqual(['lib_c', 'lib_a', 'lib_b']);
+    expect(Object.keys(state.sessions)).toEqual(order);
+    store.close();
+  });
 });
 
-describe('Part 2: Robustness of B (409 rebase, network abort idempotency, randomized test)', () => {
-  it('rebases pending delta on 409 conflict without losing or duplicating records', async () => {
+describe('Part 2: Robustness of B (409 holds, network abort idempotency, randomized conflicts)', () => {
+  it('holds the local copy on a 409 and does not overwrite a concurrent edit of the same record', async () => {
     const dir = mkdtempSync(join(ROOT, 'rebase-'));
     const store = createStoreBA(dir);
     const fx = buildFixture({ sessions: 6, items: 16, generations: 30, spend: 20, assets: 15 });
@@ -128,49 +150,39 @@ describe('Part 2: Robustness of B (409 rebase, network abort idempotency, random
     expect(resB.status).toBe(204);
     expect(resB.rebases).toBe(0);
 
-    // Meanwhile Client A (still at baseAt = fx.savedAt) makes its own local edits:
-    const stateA = clientA.getLocalState();
-    stateA.globals.generations.gen_a1 = makeGeneration(2001, rng(2001), 6);
-    stateA.globals.generations.gen_1 = { ...stateA.globals.generations.gen_1, prompt: 'updated by A' };
-    delete stateA.globals.generations.gen_4;
-    stateA.globals.assets.ast_a1 = makeAsset(2001, rng(2001));
-    stateA.globals.library.push({ id: 'lib_a1', title: 'Library A1' });
-    stateA.globals.spendLog.push(makeSpend(2001));
-    stateA.globals.spentUsd = Number(stateA.globals.spendLog.reduce((a, e) => a + e.usd, 0).toFixed(4));
-    stateA.globals.ui = { ...stateA.globals.ui, zoom: 2.25 };
-    stateA.sessions[sessionId(2)] = makeSession(2, 77, { items: 16 });
+    const serverAfterB = store.read();
 
-    // First attempt by Client A must hit 409 conflict, rebase on B's state, and succeed on retry.
+    // Meanwhile Client A (still at baseAt = fx.savedAt) edits the SAME generation B already changed, and reorders sessions.
+    const stateA = clientA.getLocalState();
+    stateA.globals.generations.gen_2 = { ...stateA.globals.generations.gen_2, prompt: 'updated by A' };
+    stateA.order = [stateA.order[1], stateA.order[0], ...stateA.order.slice(2)];
+
+    let sends = 0;
     const resA = await clientA.sync({
-      sendCommit: async (b) => store.commit(b),
+      sendCommit: async (b) => { sends++; return store.commit(b); },
       readServer: async () => store.read(),
       nextSavedAt: fx.savedAt + 1000,
     });
-    expect(resA.status).toBe(204);
-    expect(resA.rebases).toBe(1);
-    expect(resA.savedAt).toBe(fx.savedAt + 2000);
+    expect(resA.status).toBe(409);
+    expect(resA.reason).toBe('conflict');
+    expect(resA.held).toBe(true);
+    expect(sends).toBe(1);
+    expect(store.read()).toBe(serverAfterB);
+    expect(clientA.getLocalState().globals.generations.gen_2.prompt).toBe('updated by A');
+    expect(resA.copy.globals.generations.gen_2.prompt).toBe('updated by A');
+    expect(resA.copy.order).toEqual(stateA.order);
 
-    const finalObj = JSON.parse(store.read());
-    const finalG = finalObj.state;
-    // Both B's and A's creations and updates are present; both deletions took effect.
-    expect(finalG.generations.gen_b1).toBeDefined();
-    expect(finalG.generations.gen_a1).toBeDefined();
-    expect(finalG.generations.gen_2.prompt).toBe('updated by B');
-    expect(finalG.generations.gen_1.prompt).toBe('updated by A');
-    expect(finalG.generations.gen_3).toBeUndefined();
-    expect(finalG.generations.gen_4).toBeUndefined();
-    expect(finalG.assets.ast_b1).toBeDefined();
-    expect(finalG.assets.ast_a1).toBeDefined();
-    expect(finalG.library.map((x) => x.id)).toEqual(['lib_b1', 'lib_a1']);
-    expect(finalG.spendLog).toHaveLength(22);
-    expect(finalG.ui.zoom).toBe(2.25);
-    expect(finalG.sessions[sessionId(1)].updatedAt).toBe(makeSession(1, 50, { items: 16 }).updatedAt);
-    expect(finalG.sessions[sessionId(2)].updatedAt).toBe(makeSession(2, 77, { items: 16 }).updatedAt);
+    const again = await clientA.sync({
+      sendCommit: async () => { sends++; return { status: 204 }; },
+      readServer: async () => store.read(),
+      nextSavedAt: fx.savedAt + 5000,
+    });
+    expect(again.held).toBe(true);
+    expect(sends).toBe(1);
+    expect(JSON.parse(store.read()).state.generations.gen_2.prompt).toBe('updated by B');
 
-    // Check SQLite tables directly: no duplicate spend rows, no duplicate records.
     const db = new DatabaseSync(store.file, { readOnly: true });
-    expect(db.prepare('SELECT COUNT(*) AS n FROM spend').get().n).toBe(22);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM records WHERE coll = 'generations'").get().n).toBe(30);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM spend').get().n).toBe(21);
     db.close();
     store.close();
   });
@@ -199,7 +211,7 @@ describe('Part 2: Robustness of B (409 rebase, network abort idempotency, random
     let calls = 0;
     // Call 1: pre-commit abort (throws before reaching store.commit).
     // Call 2: post-commit abort (reaches store.commit and commits 204, then throws network error before client gets ack!).
-    // Call 3: sees 409 because call 2 actually committed on the server, rebases idempotently, and commits 204!
+    // Call 3: the ack was lost, so baseAt is stale. That 409 holds the local copy and does not send again.
     const res = await client.sync({
       sendCommit: async (body) => {
         calls++;
@@ -215,220 +227,104 @@ describe('Part 2: Robustness of B (409 rebase, network abort idempotency, random
       nextSavedAt: fx.savedAt + 1000,
     });
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(409);
+    expect(res.held).toBe(true);
     expect(res.aborts).toBe(2);
-    expect(res.rebases).toBe(1);
+    expect(calls).toBe(3);
+    expect(res.copy.globals.generations.gen_net1).toBeDefined();
 
     const db = new DatabaseSync(store.file, { readOnly: true });
-    // Even though gen_net1 and spend 501 were sent in Call 2 (committed) and rebased in Call 3:
-    // 0 duplicate spend rows, 0 duplicate gen_history rows!
+    // Call 2 committed once. Call 3 did not rebase and did not insert again.
     expect(db.prepare('SELECT COUNT(*) AS n FROM spend').get().n).toBe(11);
     expect(db.prepare("SELECT COUNT(*) AS n FROM gen_history WHERE id = 'gen_net1'").get().n).toBe(1);
     db.close();
     store.close();
   });
 
-  it('randomized test: interleaved edits, 409 conflicts and pre/post-commit aborts match reference state sha256', async () => {
+  it('randomized test includes same-record edits and session reorders, and a 409 keeps both sides', async () => {
+    let sameHits = 0;
+    let reorderHits = 0;
+    let conflicts = 0;
     for (const seed of [101, 202, 303, 404, 505]) {
       const pick = rng(seed);
       const dir = mkdtempSync(join(ROOT, `rand-${seed}-`));
       const store = createStoreBA(dir);
       const fx = buildFixture({ sessions: 6, items: 10, generations: 25, spend: 15, assets: 12, seed });
-
-      // Reference state tracker: maintains exact server insertion order and state without aborts or conflicts.
-      const refDir = mkdtempSync(join(ROOT, `ref-${seed}-`));
-      const refStore = createStoreBA(refDir);
-      const refClient = createDeltaClient();
-
-      const initG = JSON.parse(fx.globals);
+      const seedClient = createDeltaClient();
       expect(store.commit({
-        savedAt: fx.savedAt,
-        baseAt: 0,
-        version: 1,
-        order: fx.order,
-        sessions: fx.sessions,
-        delta: createDeltaClient().diff(initG),
+        savedAt: fx.savedAt, baseAt: 0, version: 1, order: fx.order, sessions: fx.sessions,
+        delta: seedClient.diff(JSON.parse(fx.globals)),
       }).status).toBe(204);
+      seedClient.ack();
+      let client = createResilientDeltaClient({ initialServerText: store.read() });
 
-      const refState = {
-        savedAt: fx.savedAt,
-        version: 1,
-        globals: JSON.parse(fx.globals),
-        order: [...fx.order],
-        sessions: Object.fromEntries(Object.entries(fx.sessions).map(([id, t]) => [id, JSON.parse(t)])),
-      };
-      const commitToRef = (savedAt) => {
-        refState.savedAt = savedAt;
-        const sessionsText = Object.fromEntries(refState.order.map((id) => [id, json(refState.sessions[id])]));
-        const r = refStore.commit({
-          savedAt,
-          baseAt: refStore.read() ? JSON.parse(refStore.read()).savedAt : 0,
-          version: 1,
-          order: [...refState.order],
-          sessions: sessionsText,
-          delta: refClient.diff(refState.globals),
-        });
-        expect(r.status).toBe(204);
-        refClient.ack();
-      };
-      commitToRef(fx.savedAt);
-
-      const clientA = createResilientDeltaClient({ initialServerText: store.read() });
-      let nextSeq = 1000;
-      let total409 = 0, totalPreAbort = 0, totalPostAbort = 0;
-
-      // Apply an edit function to a state object { globals, order, sessions }.
-      const applyEdit = (target, op) => {
-        const g = target.globals;
-        if (op.type === 'addGen') {
-          g.generations[op.id] = op.val;
-        } else if (op.type === 'updGen') {
-          if (g.generations[op.id]) g.generations[op.id] = { ...g.generations[op.id], ...op.patch };
-        } else if (op.type === 'delGen') {
-          delete g.generations[op.id];
-        } else if (op.type === 'addAsset') {
-          g.assets[op.id] = op.val;
-        } else if (op.type === 'delAsset') {
-          delete g.assets[op.id];
-        } else if (op.type === 'addLib') {
-          if (!g.library.some((x) => x.id === op.val.id)) g.library.push(op.val);
-        } else if (op.type === 'addSpend') {
-          if (!g.spendLog.some((x) => x.at === op.val.at && x.sessionId === op.val.sessionId)) {
-            g.spendLog.push(op.val);
-            g.spentUsd = g.spendLog.reduce((a, e) => a + e.usd, 0);
+      for (let step = 1; step <= 12; step++) {
+        const local = client.getLocalState();
+        const mark = `a_${seed}_${step}`;
+        local.globals.generations.gen_1 = { ...local.globals.generations.gen_1, prompt: mark };
+        let reordered = false;
+        if (step % 2 === 0) {
+          const shifted = [...local.order];
+          shifted.unshift(shifted.pop());
+          local.order = shifted;
+          reordered = true;
+        }
+        const peer = pick() < 0.65;
+        if (peer) {
+          const before = store.read();
+          const other = createResilientDeltaClient({ initialServerText: before });
+          const st = other.getLocalState();
+          st.globals.generations.gen_1 = { ...st.globals.generations.gen_1, prompt: `b_${seed}_${step}` };
+          if (reordered) {
+            const shifted = [...st.order];
+            shifted.push(shifted.shift());
+            st.order = shifted;
           }
-        } else if (op.type === 'zoom') {
-          g.ui = { ...g.ui, zoom: op.zoom };
-        } else if (op.type === 'sess') {
-          target.sessions[op.id] = op.val;
-        }
-      };
-
-      const randomOp = (tag, stateSource, forbiddenIds = new Set()) => {
-        const idNum = ++nextSeq;
-        const roll = pick();
-        const g = stateSource.globals;
-        if (roll < 0.24) {
-          return { type: 'addGen', id: `gen_${tag}_${idNum}`, val: makeGeneration(idNum, pick, 6) };
-        }
-        if (roll < 0.38) {
-          const keys = Object.keys(g.generations).filter((k) => !forbiddenIds.has(k));
-          if (keys.length > 0) {
-            const id = keys[Math.floor(pick() * keys.length)];
-            return { type: 'updGen', id, patch: { prompt: `edited_${tag}_${idNum}`, status: 'done' } };
-          }
-          return { type: 'addGen', id: `gen_${tag}_${idNum}`, val: makeGeneration(idNum, pick, 6) };
-        }
-        if (roll < 0.46) {
-          const keys = Object.keys(g.generations).filter((k) => !forbiddenIds.has(k));
-          if (keys.length > 5) {
-            const id = keys[Math.floor(pick() * keys.length)];
-            return { type: 'delGen', id };
-          }
-          return { type: 'addGen', id: `gen_${tag}_${idNum}`, val: makeGeneration(idNum, pick, 6) };
-        }
-        if (roll < 0.60) {
-          return { type: 'addAsset', id: `ast_${tag}_${idNum}`, val: makeAsset(idNum, pick) };
-        }
-        if (roll < 0.68) {
-          const keys = Object.keys(g.assets).filter((k) => !forbiddenIds.has(k));
-          if (keys.length > 4) {
-            const id = keys[Math.floor(pick() * keys.length)];
-            return { type: 'delAsset', id };
-          }
-          return { type: 'addAsset', id: `ast_${tag}_${idNum}`, val: makeAsset(idNum, pick) };
-        }
-        if (roll < 0.78) {
-          return { type: 'addLib', val: { id: `lib_${tag}_${idNum}`, name: `Item ${idNum}` } };
-        }
-        if (roll < 0.88) {
-          return { type: 'addSpend', val: makeSpend(idNum) };
-        }
-        if (roll < 0.94 && !forbiddenIds.has('__zoom__')) {
-          return { type: 'zoom', zoom: Number((0.5 + pick() * 2).toFixed(3)) };
-        }
-        const sCandidates = [0, 1, 2, 3, 4, 5].map((i) => sessionId(i)).filter((id) => !forbiddenIds.has(id));
-        const sId = sCandidates.length ? sCandidates[Math.floor(pick() * sCandidates.length)] : sessionId(0);
-        const sIdx = Number.parseInt(sId.slice(4), 36);
-        return { type: 'sess', id: sId, val: makeSession(sIdx, idNum, { items: 10 }) };
-      };
-
-      // Queue of pending ops on clientA not yet committed to refState.
-      let pendingOpsA = [];
-
-      for (let step = 1; step <= 60; step++) {
-        // Client A performs 1..3 local edits before attempting to sync.
-        const nLocal = 1 + Math.floor(pick() * 3);
-        for (let j = 0; j < nLocal; j++) {
-          const op = randomOp('a', clientA.getLocalState());
-          applyEdit(clientA.getLocalState(), op);
-          pendingOpsA.push(op);
-        }
-
-        // With 40% probability, another writer (Client B) commits an edit directly on the server first -> forces 409!
-        if (pick() < 0.4) {
-          const serverText = store.read();
-          const peer = createResilientDeltaClient({ initialServerText: serverText });
-          const touchedByA = new Set(pendingOpsA.map((o) => o.id ?? (o.type === 'zoom' ? '__zoom__' : '')));
-          const opB = randomOp('b', peer.getLocalState(), touchedByA);
-          applyEdit(peer.getLocalState(), opB);
-          const peerAt = JSON.parse(serverText).savedAt + 1000;
-          const rPeer = await peer.sync({
+          const at = JSON.parse(before).savedAt + 400;
+          const peerRes = await other.sync({
             sendCommit: async (b) => store.commit(b),
             readServer: async () => store.read(),
-            nextSavedAt: peerAt,
+            nextSavedAt: at,
           });
-          expect(rPeer.status).toBe(204);
-          applyEdit(refState, opB);
-          commitToRef(rPeer.savedAt);
+          expect(peerRes.status).toBe(204);
         }
-
-        // Decide fault injection for Client A's sync attempt.
-        const faultRoll = pick();
-        let injectPreAbort = faultRoll < 0.25;
-        let injectPostAbort = !injectPreAbort && faultRoll < 0.45;
-
-        const res = await clientA.sync({
-          sendCommit: async (body) => {
-            if (injectPreAbort) {
-              injectPreAbort = false;
-              totalPreAbort++;
-              throw new Error('simulated pre-commit abort');
-            }
-            const r = store.commit(body);
-            if (r.status === 204) {
-              for (const op of pendingOpsA) applyEdit(refState, op);
-              pendingOpsA = [];
-              commitToRef(body.savedAt);
-            }
-            if (r.status === 204 && injectPostAbort) {
-              injectPostAbort = false;
-              totalPostAbort++;
-              throw new Error('simulated post-commit abort (ack lost)');
-            }
-            if (r.status === 409) total409++;
-            return r;
-          },
+        const serverBefore = store.read();
+        const res = await client.sync({
+          sendCommit: async (b) => store.commit(b),
           readServer: async () => store.read(),
           nextSavedAt: (base) => base + 1000,
         });
-
-        expect(res.status).toBe(204);
+        if (peer) {
+          expect(res.status).toBe(409);
+          expect(res.held).toBe(true);
+          expect(store.read()).toBe(serverBefore);
+          expect(JSON.parse(serverBefore).state.generations.gen_1.prompt).toBe(`b_${seed}_${step}`);
+          expect(client.getLocalState().globals.generations.gen_1.prompt).toBe(mark);
+          let sent = false;
+          const again = await client.sync({
+            sendCommit: async () => { sent = true; return { status: 204 }; },
+            readServer: async () => store.read(),
+            nextSavedAt: 1,
+          });
+          expect(sent).toBe(false);
+          expect(again.held).toBe(true);
+          conflicts++;
+          sameHits++;
+          if (reordered) reorderHits++;
+          client = createResilientDeltaClient({ initialServerText: store.read() });
+        } else {
+          expect(res.status).toBe(204);
+          expect(JSON.parse(store.read()).state.generations.gen_1.prompt).toBe(mark);
+          if (reordered) expect(Object.keys(JSON.parse(store.read()).state.sessions)[0]).toBe(local.order[0]);
+        }
       }
-
-      expect(total409).toBeGreaterThan(5);
-      expect(totalPreAbort).toBeGreaterThan(3);
-      expect(totalPostAbort).toBeGreaterThan(2);
-
-      // Final state sha256 must match the reference store sha256 byte-for-byte!
-      const actualText = store.read();
-      const refText = refStore.read();
-      expect(sha256(actualText)).toBe(sha256(refText));
-
       store.close();
-      refStore.close();
     }
+    expect(conflicts).toBeGreaterThan(5);
+    expect(sameHits).toBeGreaterThan(5);
+    expect(reorderHits).toBeGreaterThan(2);
   });
+
 });
 
 describe('Part 3: Migration from format 2 (store-v2 -> store-ba)', () => {
@@ -524,5 +420,32 @@ describe('Part 3: Migration from format 2 (store-v2 -> store-ba)', () => {
     expect(stateSha(ba.read())).toBe(v2Sha);
     expect(ba.lastReadSource()).toBe('copy');
     ba.close();
+  });
+
+  it('stops a second migration when sqlite differs and does not delete it', async () => {
+    const dir = mkdtempSync(join(ROOT, 'mig-keep-'));
+    const v2 = createStoreV2(dir);
+    const fx = buildFixture({ sessions: 4, items: 6, generations: 12, spend: 4, assets: 4 });
+    expect((await v2.commit(fx)).status).toBe(204);
+    await migrateFromV2(dir);
+    const ba = createStoreBA(dir);
+    const client = createResilientDeltaClient({ initialServerText: ba.read() });
+    client.getLocalState().globals.ui.zoom = 3.5;
+    const savedAt = JSON.parse(ba.read()).savedAt;
+    const synced = await client.sync({
+      sendCommit: async (b) => ba.commit(b),
+      readServer: async () => ba.read(),
+      nextSavedAt: savedAt + 1000,
+    });
+    expect(synced.status).toBe(204);
+    ba.close();
+    const dbPath = join(dir, 'ogs.sqlite');
+    const before = readFileSync(dbPath);
+    await expect(migrateFromV2(dir)).rejects.toThrow(/left intact/);
+    expect(existsSync(dbPath)).toBe(true);
+    expect(readFileSync(dbPath).equals(before)).toBe(true);
+    const again = createStoreBA(dir);
+    expect(JSON.parse(again.read()).state.ui.zoom).toBe(3.5);
+    again.close();
   });
 });

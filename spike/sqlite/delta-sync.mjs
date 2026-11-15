@@ -3,11 +3,9 @@
 // 1. Network failure / killed server / aborted request mid-commit:
 //    `acked` and `baseAt` only advance on a confirmed 204. If a request fails before or after the server commits,
 //    the pending delta remains staged against the last confirmed state and is resent idempotently.
-// 2. Stale `baseAt` -> 409 conflict:
-//    The client reads the new server state, computes its own pending changes relative to its last `acked` baseline
-//    (created/updated/deleted records by id in generations/assets/library, changed scalar globals, newly appended
-//    spend entries, and changed/added/removed sessions), rebases them onto the server state without losing or
-//    duplicating records, updates `acked`/`baseAt` to the server state, and retries the commit.
+// 2. Stale `baseAt` -> 409 conflict (same rule as src/lib/idb.ts hold):
+//    The client does NOT rebase and does NOT send again. It keeps a copy of the local state and stays held
+//    until the user decides. A later sync() sends nothing. Same-id edits are never overwritten with the local copy.
 import { splitText } from '../../server/store-v2.js';
 
 const COLLS = ['generations', 'assets', 'library'];
@@ -61,11 +59,12 @@ function snapshotFromGlobals(g, prevRecords = null) {
   return { records, smallText, smallProps, spendTexts, spendSet: new Set(spendTexts) };
 }
 
-export function createResilientDeltaClient({ initialServerText = null, spendCap = Infinity } = {}) {
+export function createResilientDeltaClient({ initialServerText = null } = {}) {
   let baseAt = 0;
   let version = 1;
   let acked = null; // { records, smallText, smallProps, spendTexts, spendSet, order, sessions: Map<id, text> }
   let inFlight = null;
+  let held = null; // { copy } once a 409 conflict has stopped sending
 
   // Working local state held by the client: { globals, order, sessions: { id: obj } }
   let local = {
@@ -147,11 +146,14 @@ export function createResilientDeltaClient({ initialServerText = null, spendCap 
       ? snap.spendTexts
       : snap.spendTexts.filter((t) => !acked.spendSet.has(t));
 
+    const recordOrder = {};
+    for (const coll of COLLS) recordOrder[coll] = [...snap.records[coll].keys()];
     const delta = {
       ...(first ? { full: true } : {}),
       ...(smallChanged ? { small: snap.smallText } : {}),
       up,
       del,
+      order: recordOrder,
       spend: { append: appendSpend, len: snap.spendTexts.length },
     };
 
@@ -199,153 +201,12 @@ export function createResilientDeltaClient({ initialServerText = null, spendCap 
   }
 
   /**
-   * Rebases the client's unacknowledged local changes (from `acked` to `local`) onto the new `serverText`
-   * read from the server after a 409 conflict. Updates `acked` and `baseAt` to match the server state, and
-   * updates `local` to the merged state so the next `prepareCommit()` produces only the rebased delta.
+   * Synchronizes `local` to the server using `sendCommit(body)`. Retries when the request fails before a decision.
+   * A 409 conflict keeps the local copy and stops: nothing is rebased and nothing is sent again until the user decides.
    */
-  function rebaseOnServer(serverText) {
-    if (!serverText) throw new Error('cannot rebase on empty server state');
-    const prevAcked = acked;
-    const curSnap = snapshotFromGlobals(local.globals, prevAcked?.records ?? null);
-
-    // 1. Compute local pending changes relative to prevAcked before updating acked to serverText.
-    const localUp = { generations: new Map(), assets: new Map(), library: new Map() };
-    const localDel = { generations: new Set(), assets: new Set(), library: new Set() };
-
-    for (const coll of COLLS) {
-      const curMap = curSnap.records[coll];
-      const oldMap = prevAcked?.records[coll];
-      for (const [id, entry] of curMap.entries()) {
-        const old = oldMap?.get(id);
-        if (!old || old.text !== entry.text) {
-          localUp[coll].set(id, JSON.parse(entry.text));
-        }
-      }
-      if (oldMap) {
-        for (const id of oldMap.keys()) {
-          if (!curMap.has(id)) localDel[coll].add(id);
-        }
-      }
-    }
-
-    const changedSmallKeys = {};
-    for (const [k, text] of Object.entries(curSnap.smallProps)) {
-      if (!prevAcked || prevAcked.smallProps[k] !== text) {
-        changedSmallKeys[k] = JSON.parse(text);
-      }
-    }
-
-    const pendingSpendTexts = prevAcked
-      ? curSnap.spendTexts.filter((t) => !prevAcked.spendSet.has(t))
-      : curSnap.spendTexts;
-
-    const localSessUp = new Map();
-    const localSessDel = new Set();
-    const curSessSet = new Set(local.order);
-    for (const id of local.order) {
-      const s = local.sessions[id];
-      const text = typeof s === 'string' ? s : json(s);
-      if (!prevAcked || prevAcked.sessions.get(id) !== text) {
-        localSessUp.set(id, JSON.parse(text));
-      }
-    }
-    if (prevAcked) {
-      for (const id of prevAcked.sessions.keys()) {
-        if (!curSessSet.has(id)) localSessDel.add(id);
-      }
-    }
-
-    // 2. Parse server state and set `acked` + `baseAt` to the server state.
-    const srv = setAckedFromServerText(serverText);
-    const srvG = srv.globals;
-
-    // 3. Merge collections onto server state: preserve server order for existing records, apply localDel and localUp.
-    const mergedGenerations = {};
-    for (const [id, val] of Object.entries(srvG.generations ?? {})) {
-      if (localDel.generations.has(id)) continue;
-      mergedGenerations[id] = localUp.generations.has(id) ? localUp.generations.get(id) : val;
-    }
-    for (const [id, val] of localUp.generations.entries()) {
-      if (!(id in mergedGenerations)) mergedGenerations[id] = val;
-    }
-
-    const mergedAssets = {};
-    for (const [id, val] of Object.entries(srvG.assets ?? {})) {
-      if (localDel.assets.has(id)) continue;
-      mergedAssets[id] = localUp.assets.has(id) ? localUp.assets.get(id) : val;
-    }
-    for (const [id, val] of localUp.assets.entries()) {
-      if (!(id in mergedAssets)) mergedAssets[id] = val;
-    }
-
-    const mergedLibrary = [];
-    const seenLib = new Set();
-    for (let i = 0; i < (srvG.library ?? []).length; i++) {
-      const r = srvG.library[i];
-      const id = String(r.id ?? `#${i}`);
-      if (localDel.library.has(id)) continue;
-      seenLib.add(id);
-      mergedLibrary.push(localUp.library.has(id) ? localUp.library.get(id) : r);
-    }
-    for (const [id, val] of localUp.library.entries()) {
-      if (!seenLib.has(id)) mergedLibrary.push(val);
-    }
-
-    // 4. Merge spendLog: deduplicate against server's spendSet so post-commit aborts never duplicate spend rows.
-    const mergedSpend = [...(srvG.spendLog ?? [])];
-    for (const t of pendingSpendTexts) {
-      if (!acked.spendSet.has(t)) {
-        mergedSpend.push(JSON.parse(t));
-      }
-    }
-    const cappedSpend = Number.isFinite(spendCap) && mergedSpend.length > spendCap
-      ? mergedSpend.slice(-spendCap)
-      : mergedSpend;
-
-    // 5. Merge scalar globals.
-    const mergedSmall = { ...extractSmallObj(srvG), ...changedSmallKeys };
-    if ('spentUsd' in mergedSmall) {
-      mergedSmall.spentUsd = cappedSpend.reduce((a, e) => a + (e.usd ?? 0), 0);
-    }
-
-    // 6. Merge sessions and order.
-    const mergedOrder = srv.order.filter((id) => !localSessDel.has(id));
-    const orderSet = new Set(mergedOrder);
-    for (const id of local.order) {
-      if (!localSessDel.has(id) && !orderSet.has(id)) {
-        mergedOrder.push(id);
-        orderSet.add(id);
-      }
-    }
-    const mergedSessions = {};
-    for (const id of mergedOrder) {
-      if (localSessUp.has(id)) mergedSessions[id] = localSessUp.get(id);
-      else if (srv.sessions[id] != null) mergedSessions[id] = JSON.parse(srv.sessions[id]);
-      else mergedSessions[id] = local.sessions[id];
-    }
-
-    local = {
-      globals: {
-        ...mergedSmall,
-        spendLog: cappedSpend,
-        generations: mergedGenerations,
-        assets: mergedAssets,
-        library: mergedLibrary,
-      },
-      order: mergedOrder,
-      sessions: mergedSessions,
-    };
-    inFlight = null;
-    return local;
-  }
-
-  /**
-   * Synchronizes `local` to the server using `sendCommit(body)` and `readServer()`, automatically retrying on
-   * network aborts and rebasing on 409 conflict until confirmed (204).
-   */
-  async function sync({ sendCommit, readServer, nextSavedAt, maxAttempts = 20 }) {
+  async function sync({ sendCommit, nextSavedAt, maxAttempts = 20 }) {
+    if (held) return { status: 409, reason: 'conflict', held: true, attempts: 0, rebases: 0, aborts: 0, copy: held.copy };
     let attempts = 0;
-    let rebases = 0;
     let aborts = 0;
     let lastAt = typeof nextSavedAt === 'function' ? nextSavedAt(baseAt) : nextSavedAt;
 
@@ -363,14 +224,12 @@ export function createResilientDeltaClient({ initialServerText = null, spendCap 
       }
       if (res.status === 204) {
         ack();
-        return { status: 204, savedAt: lastAt, attempts, rebases, aborts };
+        return { status: 204, savedAt: lastAt, attempts, rebases: 0, aborts };
       }
       if (res.status === 409 && res.reason === 'conflict') {
-        rebases++;
-        const serverText = await readServer();
-        rebaseOnServer(serverText);
-        lastAt = Math.max(lastAt, baseAt + 1000);
-        continue;
+        held = { copy: JSON.parse(JSON.stringify(local)) };
+        inFlight = null;
+        return { status: 409, reason: 'conflict', held: true, attempts, rebases: 0, aborts, copy: held.copy };
       }
       throw new Error(`unexpected commit response: ${JSON.stringify(res)}`);
     }
@@ -380,11 +239,11 @@ export function createResilientDeltaClient({ initialServerText = null, spendCap 
   return {
     get baseAt() { return baseAt; },
     get hasPending() { return inFlight !== null; },
+    get held() { return held !== null; },
     setLocalState,
     getLocalState,
     prepareCommit,
     ack,
-    rebaseOnServer,
     sync,
   };
 }

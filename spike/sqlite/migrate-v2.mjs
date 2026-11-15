@@ -5,6 +5,7 @@
 // 3. Builds the full initial delta and commits it into `createStoreBA(dir)` in ONE SQLite transaction (`BEGIN IMMEDIATE ... COMMIT`).
 // 4. Verifies `stateSha(store.read()) === stateSha(v2Text)` (both from SQLite tables and, after `idle()`, from `state-cache.txt`).
 // 5. Leaves `store-v2/` completely untouched so rolling back is just pointing the server back to `createStoreV2(dir)`.
+//    A SQLite file that already exists and does not match is left in place: the import stops and deletes nothing.
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { assembleText, createStoreV2, splitText } from '../../server/store-v2.js';
@@ -84,14 +85,10 @@ export async function migrateFromV2(dir, opts = {}) {
   let store = createStoreBA(dir, { synchronous: opts.synchronous ?? 'FULL', fault: opts.fault });
   try {
     const existingText = store.read();
-    if (existingText == null || stateSha(existingText) !== v2Sha) {
-      if (existingText != null) {
-        // Stale or mismatched SQLite file from an older state: reset cleanly before single-transaction import.
-        store.close();
-        for (const ext of ['', '-wal', '-shm']) rmSync(join(dir, `ogs.sqlite${ext}`), { force: true });
-        rmSync(join(dir, 'state-cache.txt'), { force: true });
-        store = createStoreBA(dir, { synchronous: opts.synchronous ?? 'FULL', fault: opts.fault });
-      }
+    if (existingText != null && stateSha(existingText) !== v2Sha) {
+      throw new Error('sqlite already exists and differs from store-v2; left intact');
+    }
+    if (existingText == null) {
       const client = createDeltaClient();
       const delta = client.diff(globalsObj);
       const r = store.commit({

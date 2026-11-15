@@ -32,7 +32,9 @@ export function createDeltaClient() {
     const texts = log.map((e) => JSON.stringify(e));
     let start = 0;
     if (lastSpendText != null) { let i = texts.length - 1; while (i >= 0 && texts[i] !== lastSpendText) i--; start = i + 1; }
-    const delta = { ...(first ? { full: true } : {}), ...(smallText !== small ? { small: smallText } : {}), up, del, spend: { append: texts.slice(start), len: texts.length } };
+    const order = {};
+    for (const coll of COLLS) order[coll] = [...staged[coll].keys()];
+    const delta = { ...(first ? { full: true } : {}), ...(smallText !== small ? { small: smallText } : {}), up, del, order, spend: { append: texts.slice(start), len: texts.length } };
     pending = { staged, smallText, lastSpend: texts.length ? texts[texts.length - 1] : null };
     return delta;
   }
