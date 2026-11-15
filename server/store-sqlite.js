@@ -5,24 +5,23 @@ import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { SAFE_ID, splitText } from './store-v2.js';
-import { createStoreBA } from '../spike/sqlite/store-ba.js';
-import { createDeltaClient } from '../spike/sqlite/delta-client.mjs';
+import { createStoreBA } from './sqlite/store-ba.js';
+import { createDeltaClient } from './sqlite/delta-client.mjs';
 
 const dbFile = (dir) => join(dir, 'ogs.sqlite');
 
-/** Head row, or null when this folder has no SQLite store yet. Does not create the file. */
+/** Head row, or null when this folder has no SQLite file. A file that cannot be read, or has no head, throws:
+ * that is not the same as "no store", and the caller must not serve another copy instead. */
 export function sqliteHead(dir) {
   const file = dbFile(dir);
   if (!existsSync(file)) return null;
-  let db;
+  const db = new DatabaseSync(file, { readOnly: true });
   try {
-    db = new DatabaseSync(file, { readOnly: true });
     const row = db.prepare('SELECT saved_at AS savedAt, version, order_json AS orderJson FROM head WHERE id = 1').get();
-    return row ? { savedAt: row.savedAt, version: row.version, order: JSON.parse(row.orderJson) } : null;
-  } catch {
-    return null;
+    if (!row) throw new Error('ogs.sqlite has no head');
+    return { savedAt: row.savedAt, version: row.version, order: JSON.parse(row.orderJson) };
   } finally {
-    db?.close();
+    db.close();
   }
 }
 

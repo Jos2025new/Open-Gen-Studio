@@ -7,6 +7,7 @@ El guardado protegido ([ADR 0022](decisions/0022-guardado-local-first-sin-bloque
 ## Archivos
 
 - Servidor: `server/save-guard.js`, `server/store-v2.js` y el cuerpo del 409 en `server/local-store.js`.
+- SQLite de la fase 1 (autorizado el 2026-11-15): [store-sqlite.js](../server/store-sqlite.js), [store-b.js](../server/sqlite/store-b.js), [store-ba.js](../server/sqlite/store-ba.js) y [delta-client.mjs](../server/sqlite/delta-client.mjs). El spike solo reexporta estos archivos.
 - Cliente: `src/lib/idb.ts`, `disk.ts`, `saveGuard.ts` y `writerLock.ts`; en `src/store/`, `writerHandoff.ts`, `saveRecovery.ts`, `saveReport.ts` y `saveStatus.ts`.
 - Solo estas funciones de dos archivos más grandes: `flushWrite` y `saveNow` de `src/store/store.ts`; `writeLayer`, `flushRaster`, `deleteBuffers`, `schedulePersist`, `storeCanvas`, `beginEdit`, `restoreBuffers` y `ensureBuffers` de `src/engine/design/raster.ts` (las cinco últimas deciden si se guardan o se descartan píxeles: D30).
 
@@ -26,6 +27,7 @@ El guardado protegido ([ADR 0022](decisions/0022-guardado-local-first-sin-bloque
 | [writer-lock](../tests/writer-lock.test.ts), [writer-lock-handoff](../tests/writer-lock-handoff.test.ts), [writer-lock-panel](../tests/writer-lock-panel.test.ts), [writer-lock-raster](../tests/writer-lock-raster.test.ts) | Una pestaña activa, traspaso seguro, sin `steal` |
 | [prompt-history-wipe](../tests/prompt-history-wipe.test.ts) | Borrar todos los datos incluye `ogs-prompts`, también con una conexión abierta hasta recargar |
 | [state-conflict](../tests/state-conflict.test.ts), [state-copies](../tests/state-copies.test.ts) | Conflictos y copias al arrancar |
+| [store-sqlite](../tests/store-sqlite.test.ts) | Fase 1: el cuerpo de hoy, el formato 1 no se esconde, un SQLite roto no se sirve, la exportación, la copia y el costo de una edición pequeña |
 
 ## Revisiones
 

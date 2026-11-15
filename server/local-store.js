@@ -2,7 +2,7 @@
 // The app has no backend: this only exists while `npm run dev` / `npm run preview` runs. Files live in
 // <project>/data (git-ignored): state.json (mode 600; API keys live in the system keyring, see keys.js) and <ns>/<id>.<ext> media files.
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } from 'node:fs/promises';
+import { copyFile, chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -121,11 +121,13 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
   let sqlite = null;
   const sqliteStore = () => (sqlite ??= createSqliteStore(dir));
   const v2Files = () => stat(join(dir, 'store-v2', 'HEAD.json')).then(() => true, () => false);
-  // Existing format-2 folders stay on their files until phase 2 migrates them. A new commit, or one
-  // whose folder already has SQLite, is one transaction. The commit body does not change.
+  const legacyFile = () => stat(stateFile).then(() => true, () => false);
+  // Format 1 (state.json) and format 2 (HEAD.json) stay on their files until phase 2 imports them.
+  // SQLite is only for a folder that does not have those files yet, or that already has a readable head.
+  // A broken ogs.sqlite throws here: it is never treated as "no store".
   async function commitStore() {
     if (sqliteHead(dir)) return sqliteStore();
-    if (await v2Files()) return v2;
+    if (await v2Files() || await legacyFile()) return v2;
     return sqliteStore();
   }
   // API keys (keys.js): keyring or keys.json, never in the saved state. Keys still in the state files move out once, at start.
@@ -235,6 +237,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       const store = await commitStore();
       const r = await serialState(() => store.commit(payload));
       if (r.status === 409) return send(409, conflictBody(r), 'application/json');
+      if (r.snapshotError) res.setHeader('X-OGS-Snapshot', 'failed');
       return send(r.status, r.reason ?? '');
     }
 
@@ -416,7 +419,14 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       const out = join(dir, 'tmp', `export-${stamp}.zip`);
       await mkdir(work, { recursive: true });
       try {
-        const raw = await readFile(join(dir, 'state.json'), 'utf8').catch(() => '');
+        const sqlite = sqliteHead(dir);
+        let raw = '';
+        if (sqlite) {
+          const store = sqliteStore();
+          store.idle();
+          raw = store.read() ?? '';
+          await copyFile(join(dir, 'ogs.sqlite'), join(work, 'ogs.sqlite'));
+        } else raw = await readFile(join(dir, 'state.json'), 'utf8').catch(() => '');
         if (raw) {
           const saved = JSON.parse(raw);
           const keys = saved?.state?.settings?.keys;
@@ -428,7 +438,8 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
           if (ns !== 'tmp' && SAFE.test(ns) && (await stat(join(dir, ns))).isDirectory()) folders.push(ns);
         }
         if (folders.length) await run('zip', ['-rq', out, ...folders, '-x', '*.tmp'], { cwd: dir, maxBuffer: 1 << 24 });
-        if (raw) await run('zip', ['-jq', out, join(work, 'state.json')]);
+        if (raw) await run('zip', ['-0', '-jq', out, join(work, 'state.json')]);
+        if (sqlite) await run('zip', ['-0', '-jq', out, join(work, 'ogs.sqlite')]);
         res.setHeader('Content-Disposition', `attachment; filename="open-gen-studio-${stamp.slice(0, 10)}.zip"`);
         return send(200, await readFile(out), 'application/zip');
       } catch (err) {

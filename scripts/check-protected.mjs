@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url';
 export const PROTECTED_TESTS = [
   'save-guard-review', 'save-guard-server', 'save-guard-client', 'save-guard-banner', 'save-now', 'raster-persist',
   'writer-lock', 'writer-lock-handoff', 'writer-lock-panel', 'writer-lock-raster', 'state-conflict', 'state-copies',
+  'store-sqlite',
 ].map((name) => `tests/${name}.test.ts`);
+export const PROTECTED_SOURCES = [
+  'server/store-sqlite.js', 'server/sqlite/store-b.js', 'server/sqlite/store-ba.js', 'server/sqlite/delta-client.mjs',
+];
 export const DOC = 'docs/persistencia-protegida.md';
 // it.skip, describe.only, test.todo, it.concurrent.skip, xit, xdescribe, fit, fdescribe.
 const EXCLUDED = /\b(?:(?:it|test|describe|suite|bench)(?:\.\w+)*\.(?:skip|only|todo|skipIf|runIf)\b|(?:x|f)(?:it|test|describe)\s*\()/;
@@ -16,7 +20,7 @@ export function protectedViolations(read) {
   const errors = [];
   const doc = read(DOC);
   if (doc == null) return [`${DOC}: missing`];
-  for (const path of PROTECTED_TESTS) {
+  for (const path of [...PROTECTED_TESTS, ...PROTECTED_SOURCES]) {
     if (!doc.includes(`../${path}`)) errors.push(`${DOC}: does not link ${path}`);
     const text = read(path);
     if (text == null) { errors.push(`${path}: missing`); continue; }
