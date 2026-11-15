@@ -8,9 +8,6 @@ import type { AgentRequestMetrics, Workspace } from '../types';
  * Nothing here reaches the model; it only records. The user's reading and answering time is not counted.
  */
 
-/** Requests kept per session; older ones are dropped. */
-export const MAX_METRICS = 50;
-
 function patchOpen(sessionId: string, fn: (m: AgentRequestMetrics) => Partial<AgentRequestMetrics>): void {
   patchSession(sessionId, (s) => {
     const list = s.agentMetrics ?? [];
@@ -46,7 +43,7 @@ export function startRequest(sessionId: string, info: { request: string; workspa
     findModels: 0,
     models: [],
   };
-  patchSession(sessionId, (s) => ({ ...s, agentMetrics: [...(s.agentMetrics ?? []), m].slice(-MAX_METRICS) }));
+  patchSession(sessionId, (s) => ({ ...s, agentMetrics: [...(s.agentMetrics ?? []), m] }));
 }
 
 /** Clock for one agent turn; `elapsed()` is the request's agent time so far (earlier turns included). */
