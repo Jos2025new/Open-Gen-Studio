@@ -56,7 +56,7 @@ test excluía las ediciones concurrentes del mismo registro, así que no cubre e
 
 ## Revisión independiente (Grok en Cursor, 2026-11-15, solo lectura, 17/17 tests del spike)
 
-Hallazgos que hay que corregir en el spike antes de autorizar nada:
+Hallazgos, corregidos en el spike por Grok en `46d8f9db` (19/19 tests; 30 cortes sin guardados a medias ni perdidos):
 
 1. El 409 dejaba de frenar: `delta-sync.mjs:368` rebasa y reintenta, mientras hoy `idb.ts:143` e `idb.ts:171` esperan
    al usuario.

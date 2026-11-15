@@ -27,6 +27,7 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
 | 10 | Ronda 4 (Argon, cuenta nueva de Gemini, con permiso para delegar en Hydrogen) | Medir B+A, rebase tras 409, cortes de red y migración | B+A gana en todo salvo disco (+53 MB). 0 de 100 a medias; 300 pasos aleatorios sin pérdidas ni duplicados; migración verificada por huella |
 | 11 | Propuesta escrita (Fable) | El usuario: «Escríbela» | [propuesta-persistencia-sqlite.md](../propuesta-persistencia-sqlite.md), sin autorizar |
 | 12 | Revisión independiente (Grok en Cursor, por el bus; el usuario le pasó el encargo) | Regla 5 antes de cualquier fase | 4 fallos en el spike (409 que ya no frena, rebase que pisa ediciones concurrentes, reorden de biblioteca perdido, migración relanzada que borra lo nuevo) y cifras de la propuesta mal citadas por Fable |
+| 13 | Arreglos de los cuatro hallazgos (Grok, `46d8f9db`); Fable volvió a correr los tests y comparó sus nombres | Cerrar la revisión | El 409 conserva la copia local y no pisa; el orden de biblioteca y sesiones se guarda; una segunda migración se detiene sin borrar. 19/19 tests; 30 cortes: 23 correctos, 7 antes del primer guardado, 0 a medias, 0 perdidos |
 
 ## Problemas y cómo se resolvieron
 
@@ -43,6 +44,6 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
 
 ## Pendiente
 
-Corregir los cuatro fallos de la revisión en el spike y volver a medir.
+Volver a medir las cifras de B+A con los arreglos (el envío ahora lleva el orden).
 
 Autorización del usuario por fases, revisión independiente de cada fase y prueba con datos reales del usuario.
