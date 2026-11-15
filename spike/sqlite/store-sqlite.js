@@ -1,9 +1,19 @@
-// SPIKE, not production. SQLite version of server/store-v2.js with the same read() / commit(body) contract:
+// SPIKE, not production. SQLite version of server/store-v2.js, round 2. Same read() / commit(body) contract:
 // same body, same 409 on a stale baseAt, same loss guard (server/save-guard.js, imported unchanged), and sessions +
-// globals + head written in ONE transaction. Generations and spend live in append-only tables instead of globals.
-// Layout: <dir>/ogs.sqlite (+ -wal, -shm) and <dir>/backups/ (periodic VACUUM INTO copies, like v2-* snapshots).
+// globals + head written in ONE transaction (BEGIN IMMEDIATE .. COMMIT, WAL, synchronous=FULL).
+//
+// Round 2 design (see RESULTADO.md):
+// - globals are split by a structural scan of the body's text (no JSON.parse of the whole globals): scalars
+//   (settings, ui, composer, ...) in one small row; generations, assets and library as one row per record; spendLog
+//   as an append-only table with a window recorded in head. The body's text is the only input: a record is compared
+//   by its raw text with the text stored before, and only changed records are written.
+// - the store keeps the raw text of every record in memory (loaded at the first commit, not at open), like
+//   persistJson.ts. A body whose globals text equals the last committed one is not scanned at all.
+// - generations also keep an append-only history (gen_history): one row per change, never rewritten.
+// - rejected and kept copies are files under backups/ (like store-v2), not rows; snapshots are VACUUM INTO every 10 min.
+// Assumes the app's compact JSON (JSON.stringify output: no whitespace between tokens).
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { looksLost, sha256 } from '../../server/save-guard.js';
 import { assembleText } from '../../server/store-v2.js';
@@ -13,23 +23,21 @@ const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 const KEPT = 20;
 const SNAPSHOT_EVERY_MS = 10 * 60_000;
 const JOURNAL_LIMIT = 64 * 1024 * 1024;
+const DICT = ['generations', 'assets'];
+const LIST = ['library'];
+const SPEND = 'spendLog';
 const json = (v) => JSON.stringify(v);
 
 const MIGRATION_1 = `
 CREATE TABLE head (id INTEGER PRIMARY KEY CHECK (id = 1), saved_at INTEGER NOT NULL, version INTEGER NOT NULL,
   order_json TEXT NOT NULL, spend_len INTEGER NOT NULL, spend_last INTEGER NOT NULL);
-CREATE TABLE globals (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL);
+CREATE TABLE small (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL);
 CREATE TABLE sessions (id TEXT PRIMARY KEY, json TEXT NOT NULL);
--- Append-only history of generations: every change is a new row; deleted = tombstone row (deleted = 1).
-CREATE TABLE generations (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, ts INTEGER NOT NULL,
-  session_id TEXT, refs TEXT NOT NULL, meta TEXT NOT NULL, deleted INTEGER NOT NULL);
--- Current view: one row per live generation, pointing at its newest event and keeping the object order (pos).
-CREATE TABLE gen_head (id TEXT PRIMARY KEY, pos INTEGER NOT NULL, hash TEXT NOT NULL, seq INTEGER NOT NULL);
--- Append-only spend log: rows are never updated; the window of the app's spendLog is head.spend_len rows ending at spend_last.
-CREATE TABLE spend (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, ts INTEGER NOT NULL,
-  session_id TEXT, refs TEXT NOT NULL, meta TEXT NOT NULL);
+CREATE TABLE records (coll TEXT NOT NULL, id TEXT NOT NULL, pos INTEGER NOT NULL, meta TEXT NOT NULL, PRIMARY KEY (coll, id));
+CREATE INDEX records_pos ON records (coll, pos);
+CREATE TABLE gen_history (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, ts INTEGER NOT NULL, meta TEXT NOT NULL, deleted INTEGER NOT NULL);
+CREATE TABLE spend (seq INTEGER PRIMARY KEY AUTOINCREMENT, meta TEXT NOT NULL);
 CREATE TABLE removed_sessions (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, removed_at INTEGER NOT NULL, json TEXT NOT NULL);
-CREATE TABLE copies (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL);
 `;
 
 function migrate(db) {
@@ -45,14 +53,129 @@ function migrate(db) {
   } catch (e) { db.exec('ROLLBACK'); throw e; }
 }
 
-/** Keys for a spend window: content hash + occurrence index inside the array (identical entries stay distinct). */
-function spendKeys(list) {
-  const occ = new Map();
-  return list.map((e) => {
-    const h = sha256(json(e));
-    const n = occ.get(h) ?? 0;
-    occ.set(h, n + 1);
-    return `${h}#${n}`;
+// ---- Structural scan of compact JSON text: finds member boundaries without parsing the values. ----
+
+/** Index just after the string that starts at t[i] (a double quote). */
+function skipString(t, i) {
+  for (let j = i + 1; ; j++) {
+    const c = t.charCodeAt(j);
+    if (c === 92) j++; // backslash: skip the escaped character
+    else if (c === 34) return j + 1;
+  }
+}
+
+/** Index of the ',' or closing bracket that ends the value starting at t[i] (nested brackets and strings skipped). */
+function skipValue(t, i) {
+  let depth = 0;
+  for (let j = i; ; j++) {
+    const c = t.charCodeAt(j);
+    if (c === 34) { j = skipString(t, j) - 1; continue; }
+    if (c === 123 || c === 91) depth++;
+    else if (c === 125 || c === 93) { if (depth === 0) return j; depth--; }
+    else if (c === 44 && depth === 0) return j;
+  }
+}
+
+/** Members of the object or array at t[from]: { k: raw key text or null, v: raw value text }. Values are not parsed. */
+function members(t, from, isObject) {
+  const closer = isObject ? 125 : 93;
+  const out = [];
+  let i = from + 1;
+  if (t.charCodeAt(i) === closer) return out;
+  for (;;) {
+    let k = null;
+    if (isObject) {
+      const ks = i;
+      i = skipString(t, i);
+      k = t.slice(ks, i);
+      i++; // the ':'
+    }
+    const vs = i;
+    i = skipValue(t, i);
+    out.push({ k, v: t.slice(vs, i) });
+    if (t.charCodeAt(i) !== 44) return out;
+    i++;
+  }
+}
+
+const BLOCK = 1 << 20;
+
+/** Length of the common prefix of a and b, compared in blocks (memcmp) and char by char only inside the mismatching block. */
+function commonPrefix(a, b) {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n;) {
+    const m = Math.min(n, i + BLOCK);
+    if (a.slice(i, m) === b.slice(i, m)) { i = m; continue; }
+    let j = i;
+    while (j < m && a.charCodeAt(j) === b.charCodeAt(j)) j++;
+    return j;
+  }
+  return n;
+}
+
+/** Length of the common suffix of a and b, at most `limit`. */
+function commonSuffix(a, b, limit) {
+  for (let s = 0; s < limit;) {
+    const m = Math.min(limit, s + BLOCK);
+    if (a.slice(a.length - m, a.length - s) === b.slice(b.length - m, b.length - s)) { s = m; continue; }
+    let t = s;
+    while (t < m && a.charCodeAt(a.length - 1 - t) === b.charCodeAt(b.length - 1 - t)) t++;
+    return t;
+  }
+  return limit;
+}
+
+/** Top-level members of the globals object in [from, to): { name, rawKey, start, vStart, end } (absolute offsets). */
+function scanRegion(t, from, to) {
+  const out = [];
+  let i = from;
+  while (i < to) {
+    const start = i;
+    const ks = i;
+    i = skipString(t, i);
+    const rawKey = t.slice(ks, i);
+    i++; // the ':'
+    const vStart = i;
+    i = skipValue(t, i);
+    out.push({ name: JSON.parse(rawKey), rawKey, start, vStart, end: i });
+    i++; // the ',' between members
+  }
+  return out;
+}
+
+/**
+ * Layout of the new globals text, rescanning only the top-level members the change touches. The previous text and its
+ * layout are the cache: members before the first changed character (end < p) and after the last one (start > oldEnd)
+ * keep their text and offsets (shifted by the length change). Returns { top, mid }: the full layout and the rescanned members.
+ */
+function locateChanges(c, globals) {
+  if (!c.top) { const top = scanRegion(globals, 1, globals.length - 1); return { top, mid: top }; }
+  const prev = c.globals;
+  const p = commonPrefix(prev, globals);
+  const s = commonSuffix(prev, globals, Math.min(prev.length, globals.length) - p);
+  const oldEnd = prev.length - s;
+  const delta = globals.length - prev.length;
+  let i0 = -1, i1 = -1;
+  c.top.forEach((e, i) => {
+    if (!(e.end < p) && !(e.start > oldEnd)) { if (i0 < 0) i0 = i; i1 = i; }
+  });
+  if (i0 < 0) { const top = scanRegion(globals, 1, globals.length - 1); return { top, mid: top }; }
+  const mid = scanRegion(globals, c.top[i0].start, c.top[i1].end + delta);
+  const after = c.top.slice(i1 + 1).map((e) => ({ ...e, start: e.start + delta, vStart: e.vStart + delta, end: e.end + delta }));
+  return { top: [...c.top.slice(0, i0), ...mid, ...after], mid };
+}
+
+/** [id, text] pairs of a dict or list collection, in the body's order. Lists take item.id, or #index when there is none. */
+function entriesOf(coll, raw) {
+  if (raw == null) return [];
+  if (DICT.includes(coll)) return members(raw, 0, true).map((m) => [JSON.parse(m.k), m.v]);
+  const seen = new Set();
+  return members(raw, 0, false).map((m, i) => {
+    const id = JSON.parse(m.v)?.id;
+    let key = id != null ? String(id) : `#${i}`;
+    if (seen.has(key)) key = `#${i}`;
+    seen.add(key);
+    return [key, m.v];
   });
 }
 
@@ -70,39 +193,65 @@ export function createStoreSqlite(dir, opts = {}) {
   const q = {
     headGet: db.prepare('SELECT saved_at, version, order_json, spend_len, spend_last FROM head WHERE id = 1'),
     headPut: db.prepare('INSERT OR REPLACE INTO head (id, saved_at, version, order_json, spend_len, spend_last) VALUES (1, ?, ?, ?, ?, ?)'),
-    globalsGet: db.prepare('SELECT json FROM globals WHERE id = 1'),
-    globalsPut: db.prepare('INSERT OR REPLACE INTO globals (id, json) VALUES (1, ?)'),
+    smallGet: db.prepare('SELECT json FROM small WHERE id = 1'),
+    smallPut: db.prepare('INSERT OR REPLACE INTO small (id, json) VALUES (1, ?)'),
     sessGet: db.prepare('SELECT json FROM sessions WHERE id = ?'),
     sessIds: db.prepare('SELECT id FROM sessions'),
     sessPut: db.prepare('INSERT INTO sessions (id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json'),
     sessDel: db.prepare('DELETE FROM sessions WHERE id = ?'),
     removedPut: db.prepare('INSERT INTO removed_sessions (id, removed_at, json) VALUES (?, ?, ?)'),
-    copyPut: db.prepare('INSERT INTO copies (ts, kind, payload) VALUES (?, ?, ?)'),
-    genHeads: db.prepare('SELECT id, pos, hash, seq FROM gen_head'),
-    genEvent: db.prepare('INSERT INTO generations (id, ts, session_id, refs, meta, deleted) VALUES (?, ?, ?, ?, ?, ?)'),
-    genHeadPut: db.prepare('INSERT OR REPLACE INTO gen_head (id, pos, hash, seq) VALUES (?, ?, ?, ?)'),
-    genHeadDel: db.prepare('DELETE FROM gen_head WHERE id = ?'),
-    genRead: db.prepare('SELECT h.id AS id, e.meta AS meta FROM gen_head h JOIN generations e ON e.seq = h.seq ORDER BY h.pos'),
-    spendPut: db.prepare('INSERT OR IGNORE INTO spend (id, ts, session_id, refs, meta) VALUES (?, ?, ?, ?, ?)'),
-    spendSeqOf: db.prepare('SELECT seq FROM spend WHERE id = ?'),
-    spendIdOf: db.prepare('SELECT id FROM spend WHERE seq = ?'),
+    recAll: db.prepare('SELECT coll, id, pos, meta FROM records ORDER BY coll, pos'),
+    // Startup: one row per collection, already in the text form of the globals (ids quoted in SQL for dicts).
+    bodies: db.prepare(`SELECT coll, group_concat(piece, ',') AS body FROM
+      (SELECT coll, CASE WHEN coll IN ('generations', 'assets') THEN json_quote(id) || ':' || meta ELSE meta END AS piece
+       FROM records ORDER BY coll, pos) GROUP BY coll`),
+    recIns: db.prepare('INSERT INTO records (coll, id, pos, meta) VALUES (?, ?, ?, ?)'),
+    recUpd: db.prepare('UPDATE records SET meta = ? WHERE coll = ? AND id = ?'),
+    recDel: db.prepare('DELETE FROM records WHERE coll = ? AND id = ?'),
+    histPut: db.prepare('INSERT INTO gen_history (id, ts, meta, deleted) VALUES (?, ?, ?, ?)'),
+    spendPut: db.prepare('INSERT INTO spend (meta) VALUES (?)'),
+    spendOne: db.prepare('SELECT meta FROM spend WHERE seq = ?'),
     spendTail: db.prepare('SELECT meta FROM spend WHERE seq <= ? ORDER BY seq DESC LIMIT ?'),
   };
   const fault = (point) => opts.fault?.(point);
   let lastSnapshot = 0;
+  // In-memory mirror of the stored records (raw text), loaded at the first commit: a read does not pay for it.
+  let cache = null;
+
+  function loadCache() {
+    const c = {
+      globals: null, // globals text of the last commit: a body that repeats it is not scanned
+      top: null, // its top-level layout (see locateChanges); null means "scan in full at the next commit"
+      small: q.smallGet.get()?.json ?? null,
+      coll: { generations: new Map(), assets: new Map(), library: new Map() },
+      maxPos: {},
+      spendLast: 0,
+      spendLastText: null,
+    };
+    for (const r of q.recAll.all()) {
+      c.coll[r.coll].set(r.id, { text: r.meta, pos: r.pos });
+      c.maxPos[r.coll] = Math.max(c.maxPos[r.coll] ?? -1, r.pos);
+    }
+    const h = q.headGet.get();
+    if (h?.spend_last) {
+      c.spendLast = h.spend_last;
+      c.spendLastText = q.spendOne.get(h.spend_last)?.meta ?? null;
+    }
+    cache = c;
+    return c;
+  }
 
   /** Whole state as format-1 text (same text as store-v2 read()), or null when no commit has happened yet. */
   function read() {
     const h = q.headGet.get();
     if (!h) return null;
-    const rest = q.globalsGet.get()?.json;
-    if (rest == null) throw new Error('store corrupt: head without globals');
-    const order = JSON.parse(h.order_json);
-    // Generations and spend are assembled as text: their rows already hold JSON.
-    const gens = q.genRead.all().map((r) => `${json(r.id)}:${r.meta}`).join(',');
+    const smallText = q.smallGet.get()?.json;
+    if (smallText == null) throw new Error('store corrupt: head without the small row');
+    const bodies = Object.fromEntries(q.bodies.all().map((r) => [r.coll, r.body ?? '']));
     const spend = h.spend_len ? q.spendTail.all(h.spend_last, h.spend_len).reverse().map((r) => r.meta).join(',') : '';
-    const inner = rest.slice(1, -1);
-    const globals = `{${inner}${inner ? ',' : ''}"generations":{${gens}},"spendLog":[${spend}]}`;
+    const inner = smallText.slice(1, -1);
+    const globals = `{${inner}${inner ? ',' : ''}"generations":{${bodies.generations ?? ''}},"assets":{${bodies.assets ?? ''}},"library":[${bodies.library ?? ''}],"spendLog":[${spend}]}`;
+    const order = JSON.parse(h.order_json);
     const sessions = {};
     for (const id of order) {
       const row = q.sessGet.get(id);
@@ -112,49 +261,62 @@ export function createStoreSqlite(dir, opts = {}) {
     return assembleText({ savedAt: h.saved_at, version: h.version, globals, order, sessions });
   }
 
-  function writeGenerations(gens, savedAt) {
-    const heads = new Map(q.genHeads.all().map((r) => [r.id, r]));
-    let nextPos = 0;
-    for (const r of heads.values()) nextPos = Math.max(nextPos, r.pos + 1);
+  /** Writes only the records whose raw text changed; deletes the ones that left; generations keep a history row per change. */
+  function writeCollection(c, coll, entries, savedAt) {
+    const cc = c.coll[coll];
     const seen = new Set();
-    for (const [id, g] of Object.entries(gens)) {
+    let next = (c.maxPos[coll] ?? -1) + 1;
+    for (const [id, text] of entries) {
       seen.add(id);
-      const meta = json(g);
-      const hash = sha256(meta);
-      const cur = heads.get(id);
-      if (cur && cur.hash === hash) continue;
-      const seq = Number(q.genEvent.run(id, savedAt, g?.sessionId ?? null, json(g?.inputs?.refs ?? []), meta, 0).lastInsertRowid);
-      q.genHeadPut.run(id, cur ? cur.pos : nextPos++, hash, seq);
+      const cur = cc.get(id);
+      if (cur && cur.text === text) continue;
+      if (cur) {
+        q.recUpd.run(text, coll, id);
+        cc.set(id, { text, pos: cur.pos });
+      } else {
+        q.recIns.run(coll, id, next, text);
+        cc.set(id, { text, pos: next });
+        c.maxPos[coll] = next++;
+      }
+      if (coll === 'generations') q.histPut.run(id, savedAt, text, 0);
     }
-    for (const id of heads.keys()) {
-      if (seen.has(id)) continue;
-      q.genEvent.run(id, savedAt, null, '[]', '{}', 1);
-      q.genHeadDel.run(id);
+    if (cc.size > seen.size) {
+      for (const id of [...cc.keys()]) {
+        if (seen.has(id)) continue;
+        q.recDel.run(coll, id);
+        cc.delete(id);
+        if (coll === 'generations') q.histPut.run(id, savedAt, '{}', 1);
+      }
     }
   }
 
-  function writeSpend(list) {
-    const keys = spendKeys(list);
-    const h = q.headGet.get();
-    // The stored window ends at spend_last; only the entries after that key are new (the app only appends and trims the front).
+  /** Appends the spend entries after the last stored one (found by scanning from the end). Returns the window. */
+  function writeSpend(c, texts) {
     let start = 0;
-    if (h && h.spend_len && h.spend_last) {
-      const lastKey = q.spendIdOf.get(h.spend_last)?.id;
-      const at = keys.indexOf(lastKey);
-      if (at >= 0) start = at + 1;
+    if (c.spendLastText != null) {
+      let i = texts.length - 1;
+      while (i >= 0 && texts[i] !== c.spendLastText) i--;
+      start = i + 1;
     }
-    for (let i = start; i < list.length; i++) {
-      const e = list[i];
-      q.spendPut.run(keys[i], e.at, e.sessionId ?? null, '[]', json(e));
+    for (let i = start; i < texts.length; i++) {
+      c.spendLast = Number(q.spendPut.run(texts[i]).lastInsertRowid);
+      c.spendLastText = texts[i];
     }
-    return {
-      len: list.length,
-      last: list.length ? Number(q.spendSeqOf.get(keys[keys.length - 1]).seq) : 0,
-    };
+    if (texts.length === 0) { c.spendLast = 0; c.spendLastText = null; }
+    return { len: texts.length, last: c.spendLast };
+  }
+
+  /** A refused or kept payload goes to a file under backups/ (store-v2 does the same); returns the file name. */
+  function keepCopy(kind, payload) {
+    mkdirSync(backups, { recursive: true });
+    const name = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+    writeFileSync(join(backups, name), payload, { mode: 0o600 });
+    return name;
   }
 
   function commitTx(body) {
     const { savedAt, baseAt, version, globals, order, sessions = {}, keep } = body;
+    const c = cache ?? loadCache();
     const head = q.headGet.get();
     const current = head ? head.saved_at : 0;
     if (current && current !== baseAt) return { status: 409, reason: 'conflict', savedAt: current };
@@ -176,34 +338,49 @@ export function createStoreSqlite(dir, opts = {}) {
       if (k && k.diskHash === diskHash && k.candidateHash === sha256(text)) kept.push([id, prev]);
       else losses.push({ sessionId: id, diskHash, text });
     }
-    const now = Date.now();
     if ((total && !totalOk) || losses.length) {
-      // Refused: the payload is kept in copies (the only write of this transaction); the state is not touched.
       const first = losses[0];
-      const copyId = Number(q.copyPut.run(now, first ? `rejected-session-${first.sessionId}` : 'rejected', first ? first.text : json(body)).lastInsertRowid);
-      for (const l of losses.slice(1)) q.copyPut.run(now, `rejected-session-${l.sessionId}`, l.text);
+      const rejectedFile = first ? keepCopy(`rejected-session-${first.sessionId}`, first.text) : keepCopy('rejected', json(body));
+      for (const l of losses.slice(1)) keepCopy(`rejected-session-${l.sessionId}`, l.text);
       return {
         status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}),
         losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}),
-        rejectedFile: `copies/${copyId}`, savedAt: current,
+        rejectedFile, savedAt: current,
       };
     }
-    if (totalOk) q.copyPut.run(now, 'kept-before-order', json(head ?? {}));
-    for (const [id, prev] of kept) q.copyPut.run(now, `kept-before-${id}`, prev);
+    if (totalOk) keepCopy('kept-before-order', json(head ?? {}));
+    for (const [id, prev] of kept) keepCopy(`kept-before-${id}`, prev);
 
-    const parsedGlobals = JSON.parse(globals);
-    const { generations = {}, spendLog = [], ...rest } = parsedGlobals;
-    for (const [id, text] of Object.entries(sessions)) q.sessPut.run(id, text);
+    for (const [id, text] of Object.entries(sessions)) {
+      if (q.sessGet.get(id)?.json !== text) q.sessPut.run(id, text);
+    }
     fault('sessions');
-    writeGenerations(generations, savedAt);
-    const spend = writeSpend(spendLog);
-    q.globalsPut.run(json(rest));
-    fault('globals');
+
+    let spend = { len: head?.spend_len ?? 0, last: head?.spend_last ?? 0 };
+    if (globals !== c.globals) {
+      const { top, mid } = locateChanges(c, globals);
+      const rawOf = (name) => { const e = top.find((x) => x.name === name); return e ? globals.slice(e.vStart, e.end) : null; };
+      const small = top.filter((e) => !(DICT.includes(e.name) || LIST.includes(e.name) || e.name === SPEND))
+        .map((e) => `${e.rawKey}:${globals.slice(e.vStart, e.end)}`);
+      const smallText = `{${small.join(',')}}`;
+      if (smallText !== c.small) { q.smallPut.run(smallText); c.small = smallText; }
+      const touched = new Set(mid.map((e) => e.name));
+      for (const name of [...DICT, ...LIST]) {
+        if (touched.has(name) || !top.some((e) => e.name === name)) writeCollection(c, name, entriesOf(name, rawOf(name)), savedAt);
+      }
+      fault('globals');
+      if (touched.has(SPEND) || !top.some((e) => e.name === SPEND)) {
+        spend = writeSpend(c, members(rawOf(SPEND) ?? '[]', 0, false).map((m) => m.v));
+      }
+      c.top = top;
+      c.globals = globals;
+    }
+
     // Sessions no longer in the order move to removed_sessions: nothing is deleted.
     const known = new Set(order);
     for (const { id } of q.sessIds.all()) {
       if (known.has(id)) continue;
-      q.removedPut.run(id, now, q.sessGet.get(id).json);
+      q.removedPut.run(id, Date.now(), q.sessGet.get(id).json);
       q.sessDel.run(id);
     }
     fault('head');
@@ -211,7 +388,7 @@ export function createStoreSqlite(dir, opts = {}) {
     return { status: 204, savedAt };
   }
 
-  /** One commit = one transaction (BEGIN IMMEDIATE .. COMMIT). Returns { status, savedAt } like store-v2 commit(). */
+  /** One commit = one transaction. Returns { status, savedAt } like store-v2 commit(). */
   function commit(body) {
     const { savedAt, version, globals, order, sessions = {} } = body;
     if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
@@ -229,6 +406,7 @@ export function createStoreSqlite(dir, opts = {}) {
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');
+      cache = null; // the mirror may differ from the disk now: reload it at the next commit
       throw e;
     }
     if (r.status === 204) snapshot();
@@ -244,11 +422,16 @@ export function createStoreSqlite(dir, opts = {}) {
     for (const f of kept.slice(0, -KEPT)) rmSync(join(backups, f), { force: true });
   }
 
+  /** Idle maintenance: moves the WAL back into the database and truncates the file. */
+  function checkpoint() {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  }
+
   /** Sizes in bytes: the database, its WAL and its shared memory file (0 when absent). */
   function sizes() {
     const size = (f) => { try { return statSync(f).size; } catch { return 0; } };
     return { db: size(file), wal: size(`${file}-wal`), shm: size(`${file}-shm`) };
   }
 
-  return { read, commit, sizes, close: () => db.close(), file, schemaVersion: () => db.prepare('PRAGMA user_version').get().user_version };
+  return { read, commit, checkpoint, sizes, close: () => db.close(), file, schemaVersion: () => db.prepare('PRAGMA user_version').get().user_version };
 }

@@ -35,7 +35,8 @@ function dirBytes(p, skip = []) {
   return total;
 }
 
-rmSync(dir, { recursive: true, force: true });
+const FRESH = phase === 'all' || (phase === 'wal' && Number(process.env.WAL_FROM ?? 1) === 1);
+if (FRESH) rmSync(dir, { recursive: true, force: true });
 mkdirSync(dir, { recursive: true });
 const fx = buildFixture();
 const globalsObj = JSON.parse(fx.globals);
@@ -60,6 +61,14 @@ function smallEdit(i, cur) {
 }
 
 if (phase === 'all') {
+  // Lower bound of any store that takes the body's globals text: parse + stringify of the 25 MB text (no DB involved).
+  const base = [];
+  for (let i = 0; i < 3; i++) {
+    const t = performance.now();
+    JSON.stringify(JSON.parse(fx.globals));
+    base.push(performance.now() - t);
+  }
+  out.parseStringifyGlobalsMs = stats(base);
   let store = open();
   out.importMs = Number((await importFixture(store)).toFixed(1));
   out.disk = { afterImportWithBackups: dirBytes(dir), afterImportDataOnly: dirBytes(dir, ['backups']) };
@@ -91,9 +100,13 @@ if (phase === 'all') {
     cur = next;
   }
   out.gestureEndMs = stats(gesture);
+  if (which === 'sqlite') {
+    out.sqliteFilesBeforeCheckpoint = store.sizes();
+    store.checkpoint();
+    out.sqliteFilesAfterCheckpoint = store.sizes();
+  }
   out.disk.afterEditsWithBackups = dirBytes(dir);
   out.disk.afterEditsDataOnly = dirBytes(dir, ['backups']);
-  if (which === 'sqlite') out.sqliteFiles = store.sizes();
   close(store);
 
   const reads = [];
@@ -110,30 +123,32 @@ if (phase === 'all') {
   out.disk.finalWithBackups = dirBytes(dir);
 }
 
+// WAL phase in chunks (each chunk is one foreground command): WAL_FROM..WAL_TO, the store carries on from the previous
+// chunk. Commit i has savedAt = fixture savedAt + i*1000, so the chunk starts at (WAL_FROM-1)*1000 after the import.
 if (phase === 'wal') {
   if (which !== 'sqlite') throw new Error('the WAL phase is for sqlite only');
+  const from = Number(process.env.WAL_FROM ?? 1), to = Number(process.env.WAL_TO ?? N_WAL);
   const store = open();
-  await importFixture(store);
-  let cur = fx.savedAt;
-  const times = [], wal = [];
+  if (from === 1) await importFixture(store);
+  let cur = fx.savedAt + (from - 1) * 1000;
+  const times = [], samples = [];
   let maxWal = 0;
-  for (let i = 1; i <= N_WAL; i++) {
+  for (let i = from; i <= to; i++) {
     const { body, next } = smallEdit(i, cur);
     const t = performance.now();
     const r = await store.commit(body);
     times.push(performance.now() - t);
     if (r.status !== 204) throw new Error(`wal edit ${i} refused: ${JSON.stringify(r)}`);
     cur = next;
-    const s = store.sizes();
-    maxWal = Math.max(maxWal, s.wal);
-    if (i === 100 || i === 500 || i === N_WAL) wal.push({ commit: i, walBytes: s.wal, dbBytes: s.db });
+    maxWal = Math.max(maxWal, store.sizes().wal);
   }
-  out.walCommitMs = stats(times);
-  out.walSamples = wal;
-  out.walMaxBytes = maxWal;
-  out.sqliteFilesAfter = store.sizes();
+  const beforeCheckpoint = store.sizes();
+  store.checkpoint();
+  out.walChunk = { from, to, commitMs: stats(times), walBeforeCheckpoint: beforeCheckpoint.wal, walMaxInChunk: maxWal, afterCheckpoint: store.sizes() };
+  out.walSamples = samples;
   close(store);
+  if (to === N_WAL) rmSync(dir, { recursive: true, force: true });
 }
 
-rmSync(dir, { recursive: true, force: true });
+if (phase === 'all') rmSync(dir, { recursive: true, force: true });
 console.log(JSON.stringify(out, null, 2));
