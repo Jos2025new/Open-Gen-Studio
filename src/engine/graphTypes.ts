@@ -123,4 +123,6 @@ export interface Graph {
   viewport?: { x: number; y: number; zoom: number };
   /** When the omnicanvas last brought the session's assets in: older ones the user removed do not come back. */
   omniAt?: number;
+  /** Asset ids already seen at `omniAt`, so new assets sharing that timestamp are not discarded. */
+  omniAtIds?: string[];
 }

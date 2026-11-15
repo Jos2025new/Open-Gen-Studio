@@ -98,6 +98,18 @@ describe('what the omnicanvas shows', () => {
     ensureOmniNodes(sid);
     expect(graph().nodes.filter((n) => n.omni).map((n) => n.id)).toEqual(['omni_asset_y']);
   });
+
+  it('brings in new assets sharing the latest timestamp without reviving removed ones', () => {
+    addAssets(asset('first', 500));
+    ensureOmniNodes(sid);
+    setGraph(sid, (g) => ({ ...g, nodes: g.nodes.filter((n) => n.id !== 'omni_asset_first') }));
+    addAssets(asset('second', 500));
+    ensureOmniNodes(sid);
+    const ids = graph().nodes.filter((n) => n.omni).map((n) => n.id);
+    expect(ids).not.toContain('omni_asset_first');
+    expect(ids).toContain('omni_asset_second');
+    expect(ensureOmniNodes(sid)).toEqual([]);
+  });
 });
 
 describe('the ordinary Nodes canvas', () => {

@@ -54,7 +54,10 @@ export function ensureOmniNodes(sessionId: string): string[] {
   const mine = Object.values(st.assets)
     .filter((a) => a.sessionId === sessionId && a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d')
     .sort((a, b) => b.createdAt - a.createdAt);
-  const fresh = mine.filter((a) => (graph.omniAt === undefined || a.createdAt > graph.omniAt) && !shown.has(a.id)).slice(0, ASSETS_AT_ONCE);
+  const seenAt = new Set(graph.omniAtIds);
+  const isNew = (createdAt: number, id: string) =>
+    graph.omniAt === undefined || createdAt > graph.omniAt || (createdAt === graph.omniAt && !seenAt.has(id));
+  const fresh = mine.filter((a) => isNew(a.createdAt, a.id) && !shown.has(a.id)).slice(0, ASSETS_AT_ONCE);
   const rows = Math.max(session.docs.length, 1) + 3;
   fresh.forEach((a, i) => {
     put({
@@ -64,9 +67,12 @@ export function ensureOmniNodes(sessionId: string): string[] {
       omni: true,
     });
   });
-  const omniAt = mine[0] ? Math.max(mine[0].createdAt, graph.omniAt ?? 0) : graph.omniAt;
-  if (nodes.length !== graph.nodes.length || edges.length !== graph.edges.length || omniAt !== graph.omniAt) {
-    writeGraph(sessionId, { ...graph, nodes, edges, ...(omniAt !== undefined ? { omniAt } : {}) });
+  const omniAt = mine[0] ? (graph.omniAt === undefined ? mine[0].createdAt : Math.max(mine[0].createdAt, graph.omniAt)) : graph.omniAt;
+  const omniAtIds = omniAt !== undefined ? mine.filter((a) => a.createdAt === omniAt).map((a) => a.id) : graph.omniAtIds;
+  const idsChanged = (omniAtIds?.length ?? 0) !== (graph.omniAtIds?.length ?? 0)
+    || Boolean(omniAtIds?.some((id, i) => id !== graph.omniAtIds?.[i]));
+  if (nodes.length !== graph.nodes.length || edges.length !== graph.edges.length || omniAt !== graph.omniAt || idsChanged) {
+    writeGraph(sessionId, { ...graph, nodes, edges, ...(omniAt !== undefined ? { omniAt, omniAtIds } : {}) });
   }
   return added;
 }
