@@ -93,7 +93,6 @@ Código nuevo: `store-a.js`, `store-b.js` (B y C), `delta-client.mjs`, `bench3.m
 - **A** copia del texto armado (`state-cache.txt`, cabecera savedAt/version/bytes), escrita en `idle()`, validada contra HEAD al leer; si no cuadra, lee de tablas.
 - **B** el cliente envía `delta` por id (registros nuevos/cambiados, borrados, escalares solo si cambian, spend añadido); `baseAt` hace sólido el delta. El servidor guarda `fp` (11 car. de md5) por fila, sin espejo.
 - **C** B + `readPartial()` (sesiones, escalares, 2000 generaciones, 1000 assets, 500 spend recientes) y `readPage()` por páginas. Necesita el protocolo de B: sin globals enteros en el cliente no puede enviarlos.
-
 ## Números: mediana [mín–máx], 5 rondas (ms salvo indicación)
 
 | Medida | store-v2 | base | A | B | C |
@@ -111,14 +110,12 @@ Código nuevo: `store-a.js`, `store-b.js` (B y C), `delta-client.mjs`, `bench3.m
 | JSON.parse de ese cuerpo | 90 | 85 | 101 | 0,2 | 0,2 |
 | Mantenimiento en inactividad | 0 | 26 | **407** (+30 MB escritos) | 27 | 24 |
 
-Página de historial en C: 500 generaciones en 2,6 ms; las 81 páginas (40 020 registros) en 102 ms.
-
+Páginas en C: 500 generaciones en 2,6 ms; las 81 páginas en 102 ms.
 ## Hallazgos no esperados
 
 - El «espejo ~2×» de la ronda 2 estaba mal: el RSS de base crece **~24,5 MB por cada commit que cambia un registro** (heap 38 MB tras importar, 160 con 5 commits así, 282 con 10, 528 con 20). Causa probable: los textos de registro son porciones (`slice`) del texto de globals de cada cuerpo y retienen ese cuerpo entero de 26 MB. Con uso real crece sin tope hasta que se reescribe cada registro. No se probó el arreglo (copiar el texto); B no tiene espejo y no lo sufre.
 - Un commit con una generación nueva cuesta 319 ms en base y A (reescanea la colección entera de 40k) frente a 24 ms en B.
 - A no toca memoria ni edición: solo el arranque. Su coste: 407 ms bloqueantes por cada reconstrucción de la copia (25 en 100 cortes la copia estaba vigente; 52 veces estaba vieja y cayó a tablas), +30 MB de disco y 30 MB reescritos cada vez.
-
 ## Cortes kill -9, 100 por variante
 
 | Variante | OK | Vacío | Torn | Commit reconocido perdido | Guardas / parcial |
@@ -127,17 +124,14 @@ Página de historial en C: 500 generaciones en 2,6 ms; las 81 páginas (40 020 r
 | B | 79 | 21 | 0 | 0 | 0 fallos |
 | C | 80 | 20 | 0 | 0 | 0 fallos; `readPartial` y página coherentes con el paso k en las 80 |
 
-«Vacío»: corte antes del primer commit. Las guardas (baseAt, pérdida total, pérdida de sesión) se comprueban sobre cada tienda reabierta.
-
+«Vacío»: corte antes del primer commit. Guardas (baseAt, pérdida total y de sesión) comprobadas en cada tienda reabierta.
 ## Archivos protegidos que cambiaría cada una (docs/persistencia-protegida.md)
 
 - **A:** ninguno del cliente. Solo el servidor (store-v2.js se sustituye en la fase 2 de todos modos); la ruta `/v2/commit` y el 409 no cambian.
 - **B:** `src/lib/disk.ts` (`setCommit` envía delta), `flushWrite`/`saveNow` de `store.ts` (seguir qué registros cambiaron), `saveRecovery.ts` y `writerHandoff.ts` (tras un 409, un envío fallido o un traspaso hay que recalcular el delta contra el último estado confirmado, no contra el último intento), la ruta `/v2/commit` de `local-store.js`. `save-guard.js` y el 409 no cambian (las guardas son las mismas). Fuera de la lista: `persistJson.ts`, `formatV2.ts`.
 - **C:** lo de B más `idb.ts` (la copia del navegador pasaría a ser parcial), `saveGuard.ts`, el arranque con copias (`state-copies`) y la lectura de `/state`; además la interfaz que hoy lee historiales completos debe paginar.
-
 ## Recomendación
 
-- Lo que resuelve el problema es **B**: es la única que baja la memoria (733 → 167 MB), la edición con generación (319 → 24 ms) y el cuerpo (29 MB → 45 KB). Pero deja el arranque en 263 ms.
+- Lo que resuelve el problema es **B**: es la única que baja la memoria (733 → 167 MB), la edición con generación (319 → 24 ms) y el cuerpo (29 MB → 45 KB). Deja el arranque en 263 ms; A sola no basta (deja 733 MB de RSS).
 - Para el arranque, la más simple es **B + A** (A es solo servidor y se compone con B; la copia se construye con `read()`, igual en ambos). La combinación **no se midió**: se espera ~70 ms por ser el mismo camino de lectura de A, a confirmar. C llega a 39 ms y 6 MB, pero toca `idb.ts` y la interfaz: solo si el arranque con 30 MB sigue sin bastar.
-- A sola no basta: deja 733 MB de RSS.
 - Pendiente antes de adoptar B: probar el rebase del delta tras un 409 o un fallo de red, y la migración desde formato 2 (no hay importador).
