@@ -37,7 +37,7 @@ async function child(which, dir) {
   for (let k = 1; ; k++) {
     const r = store.commit(bodyFor(which, k, k === 1 ? 0 : S(k - 1), client));
     if (r.status !== 204) { console.error(`refused ${k}: ${JSON.stringify(r)}`); process.exit(2); }
-    client.ack();
+    if (isDelta(which)) client.ack();
     process.stdout.write(`ack ${k}\n`);
     if (which === 'a' && k % 3 === 0) store.idle();
   }
