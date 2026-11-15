@@ -15,7 +15,7 @@ import { Copy, Film, Image as ImageIcon, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addOmniSpace, ensureOmniNodes, ordinaryGraph, type OmniSpace } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
+import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -262,11 +262,22 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     [sessionId],
   );
 
+  const liveOccupied = useCallback(() => {
+    const g = useStore.getState().sessions[sessionId]?.graph;
+    return (g?.nodes ?? []).map((n) => nodeRect(n, measuredRef.current));
+  }, [sessionId]);
+
+  const freePos = useCallback((desired: { x: number; y: number }, data: GraphNodeData) => {
+    const width = omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data);
+    return findFreePosition(desired, { width, height: estimatedHeight(data) }, liveOccupied(), { gapX: 48, gapY: 56 });
+  }, [omni, liveOccupied]);
+
   const addAtCenter = (data: GraphNodeData) => {
     const el = canvasRef.current;
     const r = el?.getBoundingClientRect();
     const center = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 };
-    const id = addNode(sessionId, data, { x: center.x - NODE_WIDTH / 2 + (Math.random() - 0.5) * 40, y: center.y + (Math.random() - 0.5) * 40 });
+    const pos = freePos({ x: center.x - NODE_WIDTH / 2, y: center.y }, data);
+    const id = addNode(sessionId, data, pos);
     selectNodes([id]);
   };
 
@@ -276,10 +287,18 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const center = () => { const r = canvasRef.current?.getBoundingClientRect(); return r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 }; };
     return {
       has: (space: OmniSpace) => useStore.getState().sessions[sessionId]?.graph.nodes.some((n) => n.data.kind === 'ref' && n.data.type === 'space' && n.data.ref === space) ?? false,
-      onSpace: (space) => { const c = center(); selectNodes([addOmniSpace(sessionId, space, { x: c.x - 160, y: c.y }).id]); },
-      onSystem: (type) => { const c = center(); selectNodes([addSystemNode(sessionId, { type, position: { x: c.x - NODE_WIDTH / 2, y: c.y } })]); },
+      onSpace: (space) => {
+        const c = center();
+        const pos = freePos({ x: c.x - 160, y: c.y }, { kind: 'ref', type: 'space', ref: space, title: space });
+        selectNodes([addOmniSpace(sessionId, space, pos).id]);
+      },
+      onSystem: (type) => {
+        const c = center();
+        const pos = freePos({ x: c.x - NODE_WIDTH / 2, y: c.y }, { kind: 'ref', type, ref: type, title: type });
+        selectNodes([addSystemNode(sessionId, { type, position: pos })]);
+      },
     };
-  }, [omni, sessionId, rf]);
+  }, [omni, sessionId, rf, freePos]);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -301,9 +320,16 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const r = canvasRef.current?.getBoundingClientRect();
     const pos = position ?? (r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
     const ids = await uploadFiles(images);
-    const added = ids.map((assetId, i) => addNode(sessionId, { kind: 'asset', title: 'Image', assetId }, { x: pos.x - NODE_WIDTH / 2 + i * (NODE_WIDTH + 30), y: pos.y }));
+    const occ = liveOccupied();
+    const added = ids.map((assetId, i) => {
+      const data: GraphNodeData = { kind: 'asset', title: 'Image', assetId };
+      const h = estimatedHeight(data);
+      const p = findFreePosition({ x: pos.x - NODE_WIDTH / 2 + i * (NODE_WIDTH + 30), y: pos.y }, { width: NODE_WIDTH, height: h }, occ, { gapX: 48, gapY: 56 });
+      occ.push({ x: p.x, y: p.y, width: NODE_WIDTH, height: h });
+      return addNode(sessionId, data, p);
+    });
     if (added.length) selectNodes(added);
-  }, [sessionId, rf]);
+  }, [sessionId, rf, liveOccupied]);
 
   useEffect(() => {
     if (embedded) return;
@@ -406,7 +432,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         if (!assetId) return;
         e.preventDefault();
         const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        addAssetAsNode(sessionId, assetId, { x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 });
+        const data: GraphNodeData = { kind: 'asset', title: 'Asset', assetId };
+        addAssetAsNode(sessionId, assetId, freePos({ x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 }, data));
       }}
     >
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg,image/heic,image/heif,.heic,.heif,.eps,application/postscript" multiple hidden onChange={e => {
@@ -506,7 +533,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
               const r = canvasRef.current?.getBoundingClientRect();
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
               // From a dropped connection: the new node lands there, wired to the port that takes the source.
-              const id = menu.from ? addConnected(sessionId, menu.from, data, { x: pos.x, y: pos.y - 40 }, menu.handle) : addNode(sessionId, data, pos);
+              const id = menu.from ? addConnected(sessionId, menu.from, data, freePos({ x: pos.x, y: pos.y - 40 }, data), menu.handle) : addNode(sessionId, data, freePos(pos, data));
               if (id) selectNodes([id]);
               setMenu(null);
             }}

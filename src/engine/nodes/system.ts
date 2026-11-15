@@ -36,7 +36,7 @@ export {
 };
 
 /* Tidy layout, left of the user's own nodes: models | chat and agent | docs and Spaces. The pitch leaves room for port labels. */
-export const COL = 560;
+export const COL = 600;
 export const ROW = 340;
 export const sysOrigin = (graph: Graph): number => {
   const own = graph.nodes.filter((n) => n.data.kind !== 'ref');
@@ -78,7 +78,8 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
       ref: sessionId,
       title: 'Chat',
     });
-    ensureNode('sys_agent', at(1, 1), {
+    // Place Agent well below the full Chat card (feed + composer ~560px) so they never overlap.
+    ensureNode('sys_agent', { x: ox + COL, y: 620 }, {
       kind: 'ref',
       type: 'agent',
       ref: sessionId,

@@ -16,6 +16,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { useDeleteRequest } from '../src/components/node/LinkBar';
 import { ensureOmniNodes, omniSpaceNodeId } from '../src/engine/nodes/omni';
 import { addNode, deleteNodes } from '../src/engine/flow/actions';
+import { estimatedHeight, findFreePosition, nodeRect, NODE_WIDTH, rectsOverlap } from '../src/engine/flow/graph';
 import { travelGraph } from '../src/engine/flow/history';
 import { appendFeed, newSession, reconcileDeletionNotices, setGraph, useStore } from '../src/store/store';
 
@@ -118,5 +119,47 @@ describe('omnicanvas deletion and undo', () => {
       return true;
     });
     expect(get().sessions[sid].feed.some((f) => f.type === 'notice' && f.undoNodes)).toBe(false);
+  });
+
+  it('lays out initial omni nodes and legacy overlapping sessions without overlaps, and places new nodes clear of headers', () => {
+    // 1. Fresh omnicanvas layout has zero overlaps across all pairs.
+    const freshSid = newSession();
+    ensureOmniNodes(freshSid);
+    const freshNodes = get().sessions[freshSid].graph.nodes;
+    for (let i = 0; i < freshNodes.length; i++) {
+      for (let j = i + 1; j < freshNodes.length; j++) {
+        expect(rectsOverlap(nodeRect(freshNodes[i]), nodeRect(freshNodes[j]), 20, 20), `${freshNodes[i].id} vs ${freshNodes[j].id}`).toBe(false);
+      }
+    }
+
+    // 2. Legacy overlapping nodes (Chat, Local Sketch, offline-llm, Designer Doc) are separated on open.
+    const legacySid = newSession();
+    setGraph(legacySid, (g) => ({
+      ...g,
+      nodes: [
+        { id: 'sys_chat', position: { x: -340, y: 0 }, data: { kind: 'ref', type: 'chat', ref: legacySid, title: 'Chat' } },
+        { id: 'sys_model_image', position: { x: -340, y: 120 }, data: { kind: 'ref', type: 'model', ref: 'local::sketch', title: 'Local Sketch', mediaKind: 'image' } },
+        { id: 'sys_model_llm', position: { x: -300, y: 20 }, data: { kind: 'ref', type: 'model', ref: 'offline', title: 'offline-llm', mediaKind: 'llm' } },
+        { id: 'sys_doc_active', position: { x: -200, y: 80 }, data: { kind: 'ref', type: 'designer.doc', ref: 'active', title: 'Designer Doc' } },
+        { id: 'sys_agent', position: { x: -340, y: 340 }, data: { kind: 'ref', type: 'agent', ref: legacySid, title: 'Agent' } },
+      ],
+    }));
+    ensureOmniNodes(legacySid);
+    const fixedNodes = get().sessions[legacySid].graph.nodes;
+    for (let i = 0; i < fixedNodes.length; i++) {
+      for (let j = i + 1; j < fixedNodes.length; j++) {
+        expect(rectsOverlap(nodeRect(fixedNodes[i]), nodeRect(fixedNodes[j]), 20, 20), `legacy ${fixedNodes[i].id} vs ${fixedNodes[j].id}`).toBe(false);
+      }
+    }
+    expect(ensureOmniNodes(legacySid)).toEqual([]);
+
+    // 3. Adding a new Prompt node at Create Space's position finds a free spot clear of its header.
+    const createSpace = freshNodes.find((n) => n.id === 'sys_space_create')!;
+    expect(createSpace).toBeDefined();
+    const occ = freshNodes.map((n) => nodeRect(n));
+    const h = estimatedHeight({ kind: 'text', title: 'Prompt', text: '' });
+    const placed = findFreePosition(createSpace.position, { width: NODE_WIDTH, height: h }, occ, { gapX: 48, gapY: 56 });
+    const promptRect = { x: placed.x, y: placed.y, width: NODE_WIDTH, height: h };
+    expect(occ.some((o) => rectsOverlap(promptRect, o, 48, 56))).toBe(false);
   });
 });
