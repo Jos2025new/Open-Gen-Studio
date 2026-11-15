@@ -7,27 +7,43 @@
 //    The client does NOT rebase and does NOT send again. It keeps a copy of the local state and stays held
 //    until the user decides. A later sync() sends nothing. Same-id edits are never overwritten with the local copy.
 import { splitText } from '../../server/store-v2.js';
+import { computeOrderDiff } from './fractional-index.mjs';
 
 const COLLS = ['generations', 'assets', 'library'];
 const SMALL_SKIP = new Set([...COLLS, 'spendLog']);
 const json = (v) => JSON.stringify(v);
 
+function sameMapOrder(a, b) {
+  if (!a || a.size !== b.size) return false;
+  const itA = a.keys();
+  const itB = b.keys();
+  for (let i = 0; i < a.size; i++) {
+    if (itA.next().value !== itB.next().value) return false;
+  }
+  return true;
+}
+
 function extractSmallObj(g) {
   return Object.fromEntries(Object.entries(g).filter(([k]) => !SMALL_SKIP.has(k)));
 }
 
-function collToMap(coll, g) {
+function collToMap(coll, g, prevMap = null) {
   const m = new Map();
   if (coll === 'library') {
-    for (let i = 0; i < (g.library ?? []).length; i++) {
-      const r = g.library[i];
+    const list = g.library ?? [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
       const id = String(r.id ?? `#${i}`);
-      m.set(id, { ref: r, text: json(r) });
+      const p = prevMap?.get(id);
+      if (p && p.ref === r) m.set(id, p);
+      else m.set(id, { ref: r, text: json(r) });
     }
   } else {
     const obj = g[coll] ?? {};
     for (const id of Object.keys(obj)) {
-      m.set(id, { ref: obj[id], text: json(obj[id]) });
+      const p = prevMap?.get(id);
+      if (p && p.ref === obj[id]) m.set(id, p);
+      else m.set(id, { ref: obj[id], text: json(obj[id]) });
     }
   }
   return m;
@@ -36,21 +52,7 @@ function collToMap(coll, g) {
 function snapshotFromGlobals(g, prevRecords = null) {
   const records = {};
   for (const coll of COLLS) {
-    if (!prevRecords) {
-      records[coll] = collToMap(coll, g);
-    } else {
-      const cur = coll === 'library'
-        ? Object.fromEntries((g.library ?? []).map((r, i) => [String(r.id ?? `#${i}`), r]))
-        : (g[coll] ?? {});
-      const prev = prevRecords[coll];
-      const next = new Map();
-      for (const id of Object.keys(cur)) {
-        const p = prev.get(id);
-        if (p && p.ref === cur[id]) next.set(id, p);
-        else next.set(id, { ref: cur[id], text: json(cur[id]) });
-      }
-      records[coll] = next;
-    }
+    records[coll] = collToMap(coll, g, prevRecords?.[coll] ?? null);
   }
   const smallObj = extractSmallObj(g);
   const smallProps = Object.fromEntries(Object.entries(smallObj).map(([k, v]) => [k, json(v)]));
@@ -146,14 +148,21 @@ export function createResilientDeltaClient({ initialServerText = null } = {}) {
       ? snap.spendTexts
       : snap.spendTexts.filter((t) => !acked.spendSet.has(t));
 
-    const recordOrder = {};
-    for (const coll of COLLS) recordOrder[coll] = [...snap.records[coll].keys()];
+    let recordOrder = null;
+    for (const coll of COLLS) {
+      const prevMap = acked?.records[coll];
+      const curMap = snap.records[coll];
+      if (!sameMapOrder(prevMap, curMap)) {
+        const moves = computeOrderDiff(prevMap ? [...prevMap.keys()] : [], [...curMap.keys()], Object.keys(up[coll]));
+        if (moves) (recordOrder ??= {})[coll] = moves;
+      }
+    }
     const delta = {
       ...(first ? { full: true } : {}),
       ...(smallChanged ? { small: snap.smallText } : {}),
       up,
       del,
-      order: recordOrder,
+      ...(recordOrder ? { order: recordOrder } : {}),
       spend: { append: appendSpend, len: snap.spendTexts.length },
     };
 

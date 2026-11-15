@@ -106,6 +106,74 @@ describe('Part 1: B+A combined store (store-ba.js)', () => {
     expect(Object.keys(state.sessions)).toEqual(order);
     store.close();
   });
+
+  it('small edit sends no order data and touches no other rows; reorder updates only moved rows', () => {
+    const dir = mkdtempSync(join(ROOT, 'frac-'));
+    const store = createStoreBA(dir);
+    const fx = buildFixture({ sessions: 4, items: 6, generations: 40, spend: 10, assets: 20 });
+    const g = JSON.parse(fx.globals);
+    g.library = Array.from({ length: 10 }, (_, i) => ({ id: `lib_${i}`, name: `Lib ${i}` }));
+    const client = createDeltaClient();
+    expect(store.commit({
+      savedAt: fx.savedAt, baseAt: 0, version: 1, order: fx.order, sessions: fx.sessions, delta: client.diff(g),
+    }).status).toBe(204);
+    client.ack();
+
+    const db = new DatabaseSync(store.file, { readOnly: true });
+    const snapPos = () => Object.fromEntries(
+      db.prepare('SELECT coll, id, pos FROM records ORDER BY coll, id').all().map((r) => [`${r.coll}/${r.id}`, r.pos]),
+    );
+    const posBeforeEdit = snapPos();
+
+    // Small edit: no order data sent on the wire and zero record rows touched on the server.
+    g.ui.zoom = 2.25;
+    const smallDelta = client.diff(g);
+    expect(smallDelta.order).toBeUndefined();
+    expect('order' in smallDelta).toBe(false);
+    expect(store.commit({
+      savedAt: fx.savedAt + 1000, baseAt: fx.savedAt, version: 1, order: fx.order, sessions: {}, delta: smallDelta,
+    }).status).toBe(204);
+    client.ack();
+    expect(store.lastStats()).toEqual({ recGets: 0, recWrites: 0, posUpdates: 0 });
+    expect(snapPos()).toEqual(posBeforeEdit);
+
+    // Same check with resilient delta client: small edit omits delta.order.
+    const resilient = createResilientDeltaClient({ initialServerText: store.read() });
+    resilient.getLocalState().globals.ui.zoom = 2.5;
+    const preparedSmall = resilient.prepareCommit(fx.savedAt + 1500);
+    expect(preparedSmall.delta.order).toBeUndefined();
+
+    // Move a single item (lib_0 -> end): only lib_0 is sent in delta.order and only 1 row changes pos.
+    g.library = [...g.library.slice(1), g.library[0]];
+    const moveDelta = client.diff(g);
+    expect(Object.keys(moveDelta.order)).toEqual(['library']);
+    expect(moveDelta.order.library.flatMap((m) => m.ids)).toEqual(['lib_0']);
+    expect(store.commit({
+      savedAt: fx.savedAt + 2000, baseAt: fx.savedAt + 1000, version: 1, order: fx.order, sessions: {}, delta: moveDelta,
+    }).status).toBe(204);
+    client.ack();
+    expect(store.lastStats().posUpdates).toBe(1);
+    const posAfterMove1 = snapPos();
+    expect(posAfterMove1['library/lib_0']).not.toBe(posBeforeEdit['library/lib_0']);
+    for (const [k, v] of Object.entries(posBeforeEdit)) {
+      if (k !== 'library/lib_0') expect(posAfterMove1[k]).toBe(v);
+    }
+
+    // Move lib_8 to the front and insert a new lib_new between lib_3 and lib_4.
+    g.library = [g.library[7], ...g.library.slice(0, 3), { id: 'lib_new', name: 'New' }, ...g.library.slice(3, 7), ...g.library.slice(8)];
+    const moveDelta2 = client.diff(g);
+    expect(moveDelta2.order.library.flatMap((m) => m.ids).sort()).toEqual(['lib_8', 'lib_new']);
+    expect(store.commit({
+      savedAt: fx.savedAt + 3000, baseAt: fx.savedAt + 2000, version: 1, order: fx.order, sessions: {}, delta: moveDelta2,
+    }).status).toBe(204);
+    client.ack();
+    expect(store.lastStats().posUpdates).toBe(2);
+    const state = JSON.parse(store.read()).state;
+    expect(state.library.map((x) => x.id)).toEqual(g.library.map((x) => x.id));
+
+    db.close();
+    store.close();
+  });
 });
 
 describe('Part 2: Robustness of B (409 holds, network abort idempotency, randomized conflicts)', () => {

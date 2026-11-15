@@ -4,7 +4,7 @@
 //     small?: '<json text>',             // the scalar part of globals (settings, ui, composer, ...), only when it changed
 //     up?:  { generations: {id: text}, assets: {id: text}, library: {id: text} },   // records created or changed
 //     del?: { generations: [id], assets: [id], library: [id] },                     // records removed
-//     order?: { generations: [id], assets: [id], library: [id] },                   // full order of each collection; positions are rewritten to match
+//     order?: { generations: [{ after, before, ids }], ... },             // moved/inserted-in-place ids only; fractional pos keys
 //     spend?: { append: [text], len: n } } // spendLog entries added at the end; len = length of the log after the commit
 // baseAt makes the delta sound: the server applies it to exactly the state the client last saw (a stale baseAt is a 409).
 // The server keeps NO mirror: each record row carries a small fingerprint (fp, 11 chars of md5) used to skip a record
@@ -16,6 +16,7 @@ import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs
 import { join } from 'node:path';
 import { looksLost, sha256 } from '../../server/save-guard.js';
 import { assembleText } from '../../server/store-v2.js';
+import { generateKeyBetween, generateNKeysBetween } from './fractional-index.mjs';
 
 export const SCHEMA_VERSION = 1;
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;
@@ -31,7 +32,7 @@ CREATE TABLE head (id INTEGER PRIMARY KEY CHECK (id = 1), saved_at INTEGER NOT N
   order_json TEXT NOT NULL, spend_len INTEGER NOT NULL, spend_last INTEGER NOT NULL);
 CREATE TABLE small (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL);
 CREATE TABLE sessions (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-CREATE TABLE records (coll TEXT NOT NULL, id TEXT NOT NULL, pos INTEGER NOT NULL, meta TEXT NOT NULL, fp TEXT NOT NULL, PRIMARY KEY (coll, id));
+CREATE TABLE records (coll TEXT NOT NULL, id TEXT NOT NULL, pos TEXT NOT NULL, meta TEXT NOT NULL, fp TEXT NOT NULL, PRIMARY KEY (coll, id));
 CREATE INDEX records_pos ON records (coll, pos);
 CREATE TABLE gen_history (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, ts INTEGER NOT NULL, meta TEXT NOT NULL, deleted INTEGER NOT NULL);
 CREATE TABLE spend (seq INTEGER PRIMARY KEY AUTOINCREMENT, meta TEXT NOT NULL);
@@ -72,7 +73,7 @@ export function createStoreB(dir, opts = {}) {
       (SELECT coll, CASE WHEN coll IN ('generations', 'assets') THEN json_quote(id) || ':' || meta ELSE meta END AS piece
        FROM records ORDER BY coll, pos) GROUP BY coll`),
     recFp: db.prepare('SELECT pos, fp FROM records WHERE coll = ? AND id = ?'),
-    recMax: db.prepare('SELECT COALESCE(MAX(pos), -1) AS m FROM records WHERE coll = ?'),
+    recMax: db.prepare('SELECT pos FROM records WHERE coll = ? ORDER BY pos DESC LIMIT 1'),
     recIds: db.prepare('SELECT id FROM records WHERE coll = ?'),
     recIns: db.prepare('INSERT INTO records (coll, id, pos, meta, fp) VALUES (?, ?, ?, ?, ?)'),
     recUpd: db.prepare('UPDATE records SET meta = ?, fp = ? WHERE coll = ? AND id = ?'),
@@ -89,6 +90,7 @@ export function createStoreB(dir, opts = {}) {
   };
   const fault = (point) => opts.fault?.(point);
   let lastSnapshot = 0;
+  let lastStats = { recGets: 0, recWrites: 0, posUpdates: 0 };
 
   const spendText = (h) => (h.spend_len ? q.spendTail.all(h.spend_last, h.spend_len).reverse().map((r) => r.meta).join(',') : '');
 
@@ -124,7 +126,7 @@ export function createStoreB(dir, opts = {}) {
     const part = {};
     for (const [coll, n] of [['generations', gens], ['assets', assets], ['library', 1e9]]) {
       const rows = q.recRecent.all(coll, n).reverse();
-      part[coll] = { total: q.recCount.get(coll).n, from: rows.length ? rows[0].pos : 0, text: rows.map((r) => (coll === 'library' ? r.meta : `${json(r.id)}:${r.meta}`)).join(',') };
+      part[coll] = { total: q.recCount.get(coll).n, from: rows.length ? rows[0].pos : '', text: rows.map((r) => (coll === 'library' ? r.meta : `${json(r.id)}:${r.meta}`)).join(',') };
     }
     const spendTail = h.spend_len ? q.spendTail.all(h.spend_last, Math.min(spend, h.spend_len)).reverse().map((r) => r.meta).join(',') : '';
     const inner = smallText.slice(1, -1);
@@ -156,33 +158,62 @@ export function createStoreB(dir, opts = {}) {
   }
 
   /** Applies the delta. Returns the new spend window. */
-  function applyDelta(delta, head, savedAt) {
+  function applyDelta(delta, head, savedAt, stats) {
     if (delta.small != null) q.smallPut.run(delta.small);
     for (const coll of COLLS) {
       const up = delta.up?.[coll] ?? {};
-      let next = null;
-      for (const [id, text] of Object.entries(up)) {
+      const upEntries = Object.entries(up);
+      let maxPos = upEntries.length ? (q.recMax.get(coll)?.pos ?? null) : null;
+      for (const [id, text] of upEntries) {
         const fp = fpOf(text);
+        stats.recGets++;
         const cur = q.recFp.get(coll, id);
         if (cur && cur.fp === fp) continue;
-        if (cur) q.recUpd.run(text, fp, coll, id);
-        else { next ??= q.recMax.get(coll).m + 1; q.recIns.run(coll, id, next++, text, fp); }
+        if (cur) {
+          q.recUpd.run(text, fp, coll, id);
+          stats.recWrites++;
+        } else {
+          maxPos = generateKeyBetween(maxPos, null);
+          q.recIns.run(coll, id, maxPos, text, fp);
+          stats.recWrites++;
+        }
         if (coll === 'generations') q.histPut.run(id, savedAt, text, 0);
       }
       const gone = new Set(delta.del?.[coll] ?? []);
       if (delta.full) for (const { id } of q.recIds.all(coll)) if (!(id in up)) gone.add(id);
       for (const id of gone) {
+        stats.recGets++;
         if (!q.recFp.get(coll, id)) continue;
         q.recDel.run(coll, id);
+        stats.recWrites++;
         if (coll === 'generations') q.histPut.run(id, savedAt, '{}', 1);
       }
-      const ids = delta.order?.[coll];
-      if (Array.isArray(ids)) {
-        let pos = 0;
-        for (const id of ids) {
-          if (!q.recFp.get(coll, id)) continue;
-          q.recPos.run(pos, coll, id);
-          pos++;
+      const moves = delta.order?.[coll];
+      if (Array.isArray(moves)) {
+        for (const m of moves) {
+          const valid = [];
+          for (const id of m.ids) {
+            stats.recGets++;
+            if (q.recFp.get(coll, id)) valid.push(id);
+          }
+          if (!valid.length) continue;
+          let afterPos = null;
+          if (m.after != null) {
+            stats.recGets++;
+            afterPos = q.recFp.get(coll, m.after)?.pos ?? null;
+            if (afterPos == null) throw new Error(`missing order anchor ${coll}/${m.after}`);
+          }
+          let beforePos = null;
+          if (m.before != null) {
+            stats.recGets++;
+            beforePos = q.recFp.get(coll, m.before)?.pos ?? null;
+            if (beforePos == null) throw new Error(`missing order anchor ${coll}/${m.before}`);
+          }
+          const keys = generateNKeysBetween(afterPos, beforePos, valid.length);
+          for (let i = 0; i < valid.length; i++) {
+            q.recPos.run(keys[i], coll, valid[i]);
+            stats.posUpdates++;
+          }
         }
       }
     }
@@ -234,7 +265,8 @@ export function createStoreB(dir, opts = {}) {
       if (q.sessGet.get(id)?.json !== text) q.sessPut.run(id, text);
     }
     fault('sessions');
-    const spend = applyDelta(delta ?? {}, head, savedAt);
+    const stats = { recGets: 0, recWrites: 0, posUpdates: 0 };
+    const spend = applyDelta(delta ?? {}, head, savedAt, stats);
     fault('globals');
 
     const known = new Set(order);
@@ -245,6 +277,7 @@ export function createStoreB(dir, opts = {}) {
     }
     fault('head');
     q.headPut.run(savedAt, version, json(order), spend.len, spend.last);
+    lastStats = stats;
     return { status: 204, savedAt };
   }
 
@@ -261,6 +294,13 @@ export function createStoreB(dir, opts = {}) {
     for (const coll of COLLS) {
       for (const [id, text] of Object.entries(delta?.up?.[coll] ?? {})) {
         if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: `record ${coll}/${id} must be a JSON text` };
+      }
+      const moves = delta?.order?.[coll];
+      if (moves != null) {
+        if (!Array.isArray(moves) || !moves.every((m) => m && typeof m === 'object' && Array.isArray(m.ids)
+          && (m.after == null || typeof m.after === 'string') && (m.before == null || typeof m.before === 'string'))) {
+          return { status: 400, reason: `order for ${coll} must be an array of { after, before, ids }` };
+        }
       }
     }
     db.exec('BEGIN IMMEDIATE');
@@ -290,5 +330,5 @@ export function createStoreB(dir, opts = {}) {
     const size = (f) => { try { return statSync(f).size; } catch { return 0; } };
     return { db: size(file), wal: size(`${file}-wal`), shm: size(`${file}-shm`) };
   }
-  return { read, readPartial, readPage, commit, checkpoint, idle: () => { checkpoint(); return 0; }, sizes, close: () => db.close(), file };
+  return { read, readPartial, readPage, commit, checkpoint, idle: () => { checkpoint(); return 0; }, sizes, lastStats: () => lastStats, close: () => db.close(), file };
 }
