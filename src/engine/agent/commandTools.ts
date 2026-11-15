@@ -41,8 +41,10 @@ export const COMMAND_TOOLS: ToolSpec[] = [
                 cmd: { type: 'string', description: 'A command id, e.g. designer.layer.set.' },
                 args: { type: 'object' },
                 on: {
-                  type: ['object', 'string'],
-                  properties: { doc: { type: 'string' } },
+                  anyOf: [
+                    { type: 'object', properties: { doc: { type: 'string' } }, required: ['doc'] },
+                    { type: 'string' },
+                  ],
                   description: 'Target document, e.g. {"doc": "$1.doc"} or "$1.doc" for a doc created in step 1.',
                 },
               },
