@@ -50,7 +50,7 @@ describe('find_commands', () => {
     const answer = findCommandsTool(sid, {});
     const lines = answer.text.split('\n');
     expect(answer.done).toBe(true);
-    expect(lines).toHaveLength(2 + 7);
+    expect(lines).toHaveLength(2 + 8);
     expect(lines[0]).not.toContain('Document on screen');
     expect(lines.find((l) => l.startsWith('nodes '))).toMatch(/^nodes \(32\) — /);
     expect(lines.find((l) => l.startsWith('models '))).toMatch(/^models \(3\) — /);

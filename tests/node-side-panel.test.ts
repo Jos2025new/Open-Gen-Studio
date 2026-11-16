@@ -97,7 +97,7 @@ it('Nodes keeps the floating prompt box; Create attaches through its picker; the
   expect(readFileSync('src/components/node/SelectionPanel.tsx', 'utf8')).toMatch(/<NodeSide sessionId=\{sessionId\} \/>/);
   const css = readFileSync('src/styles/node-side.css', 'utf8');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock\.dock-node::before, \.composer-dock\.dock-designer::before \{ content: ''[^}]*inset: -0\.75rem -100vw -2\.5rem; background: var\(--bg-canvas\); pointer-events: none; \}/);
-  expect(readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8')).toMatch(/\{add\}\s*<CornerButtons sessionId=\{sessionId\} \/>\s*<span className="canvas-nav-sep" \/>/);
+  expect(readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8')).toMatch(/\{add\}\s*\{omni \? null : <CornerButtons sessionId=\{sessionId\} \/>\}\s*<span className="canvas-nav-sep" \/>/);
   expect(css).toMatch(/body:has\(\.canvas-nav-pop, \.node-lib-pop\) \.react-flow__panel\.node-side, \.react-flow:has\(\.canvas-map\) \.react-flow__panel\.node-side \{ display: none; \}/);
   const node = readFileSync('src/styles/node.css', 'utf8');
   expect(node).toMatch(/:root \{ --canvas-pop-gap: 0\.375rem; \}/);
