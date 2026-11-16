@@ -42,7 +42,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
 /** The canvas toolbox (2026-10-31): one vertical bar on the left, in the Designer's toolbar style, with every canvas
  *  tool: Add node (`add`), Select, Pan, Cut and Auto layout, Fit view and Map, Undo, Redo and Delete, zoom, Search. Its
  *  popovers open to the right. `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
-export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: NodeTool; onTool: (t: NodeTool) => void; selectedCount: number; onDelete: () => void }) {
+export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete, omni = false }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: NodeTool; onTool: (t: NodeTool) => void; selectedCount: number; onDelete: () => void; /** The omnicanvas keeps only the tools that move around the canvas (see the omni notes in docs). */ omni?: boolean }) {
   const graph = useStore(s => s.sessions[sessionId].graph);
   const generations = useStore(s => s.generations);
   const assets = useStore(s => s.assets);
@@ -98,34 +98,36 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
       {mapOpen ? <MiniMap pannable zoomable position="top-left" className="canvas-map" maskColor="var(--overlay)" nodeColor="var(--text-4)" /> : null}
       <Panel position="top-left" className="canvas-navigation" role="toolbar" aria-label="Canvas tools" aria-orientation="vertical">
         {add}
-        <CornerButtons sessionId={sessionId} />
+        {omni ? null : <CornerButtons sessionId={sessionId} />}
         <span className="canvas-nav-sep" />
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
         <IconButton icon={Scissors} label="Cut connections (X): drag across links to cut them" active={tool === 'cut'} disabled={!graph.edges.length && tool !== 'cut'} onClick={() => onTool('cut')} />
-        {onAutoLayout ? <IconButton icon={LayoutDashboard} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
+        {onAutoLayout && !omni ? <IconButton icon={LayoutDashboard} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
         <span className="canvas-nav-sep" />
         <IconButton icon={Maximize} label="Fit view" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
         <span className="canvas-nav-sep" />
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />
         <IconButton ref={redoPop.ref} icon={Redo2} label="Redo · right-click for history" disabled={blocked || !future.length} onClick={() => travel('redo')} onContextMenu={e => showHistory(e, 'redo')} />
-        <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />
+        {omni ? null : <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />}
         <span className="canvas-nav-sep" />
         <IconButton icon={Plus} label="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })} />
-        <button ref={zoomPop.ref} type="button" className="canvas-zoom num" aria-label="Zoom" aria-expanded={zoomPop.open} onClick={zoomPop.toggle}>{Math.round(zoom * 100)}%</button>
+        {omni ? null : <button ref={zoomPop.ref} type="button" className="canvas-zoom num" aria-label="Zoom" aria-expanded={zoomPop.open} onClick={zoomPop.toggle}>{Math.round(zoom * 100)}%</button>}
         <IconButton icon={Minus} label="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })} />
-        <span className="canvas-nav-sep" />
-        <IconButton ref={searchPop.ref} icon={Search} label="Search canvas" active={searchPop.open} onClick={searchPop.toggle} />
+        {omni ? null : <>
+          <span className="canvas-nav-sep" />
+          <IconButton ref={searchPop.ref} icon={Search} label="Search canvas" active={searchPop.open} onClick={searchPop.toggle} />
+        </>}
       </Panel>
       <Popover open={history.open} anchor={direction === 'undo' ? undoPop.ref : redoPop.ref} onClose={history.close} placement="right-start" width={300} label={`${direction} history`} className="canvas-nav-pop">
         <PopoverHeader title={direction === 'undo' ? 'Undo history' : 'Redo history'} />
         <div className="canvas-history-list">{(direction === 'undo' ? past : future).map((entry, i) => <MenuItem key={i} label={entry.label} detail={`${direction === 'undo' ? 'Undo' : 'Redo'} ${i + 1} action${i ? 's' : ''}`} disabled={blocked} onClick={() => travel(direction, i + 1)} />)}</div>
       </Popover>
-      <Popover open={zoomPop.open} anchor={zoomPop.ref} onClose={zoomPop.close} placement="right-start" width={220} label="Zoom canvas" className="canvas-nav-pop">
+      {omni ? null : <Popover open={zoomPop.open} anchor={zoomPop.ref} onClose={zoomPop.close} placement="right-start" width={220} label="Zoom canvas" className="canvas-nav-pop">
         <ZoomControls zoom={zoom} onZoom={z => void rf.zoomTo(z, { duration: 0 })} />
-      </Popover>
-      <Popover open={searchPop.open} anchor={searchPop.ref} onClose={searchPop.close} placement="right-start" width={340} label="Search canvas" className="canvas-nav-pop">
+      </Popover>}
+      {omni ? null : <Popover open={searchPop.open} anchor={searchPop.ref} onClose={searchPop.close} placement="right-start" width={340} label="Search canvas" className="canvas-nav-pop">
         <PopoverHeader title="Search canvas" right={<IconButton icon={X} label="Close search" size="sm" onClick={searchPop.close} />} />
         <form className="search-input" onSubmit={e => { e.preventDefault(); setSubmitted(query.trim()); }}>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search prompts and names" aria-label="Search canvas text" />
@@ -135,7 +137,7 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
           {results.map((r, i) => <button key={`${r.id}-${i}`} className="canvas-search-result" type="button" onClick={() => { onSelect(r.id); void rf.fitView({ nodes: [{ id: r.id }], padding: 0.4, maxZoom: 1, duration: 200 }); }}><span className="faint">{r.title}</span><span><Highlight text={r.text} query={submitted} /></span></button>)}
           {submitted && !results.length ? <div className="empty-block">No matches in this canvas.</div> : null}
         </div>
-      </Popover>
+      </Popover>}
     </>
   );
 }
