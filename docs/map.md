@@ -20,11 +20,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 361 | 275 |
-| [store.ts](../src/store/store.ts) | 244 | 252 |
-| [icons.tsx](../src/components/ui/icons.tsx) | 141 | 1 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 99 | 0 |
-| [actions.ts](../src/engine/design/actions.ts) | 73 | 45 |
+| [types.ts](../src/engine/types.ts) | 362 | 275 |
+| [store.ts](../src/store/store.ts) | 245 | 253 |
+| [icons.tsx](../src/components/ui/icons.tsx) | 142 | 1 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 100 | 0 |
+| [actions.ts](../src/engine/design/actions.ts) | 74 | 45 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 5 |
 | [media.ts](../src/lib/media.ts) | 58 | 50 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
@@ -52,13 +52,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 101 | 56 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 13 | 12 |
-| `src/components/shell` | 35 | 24 |
+| `src/components/shell` | 37 | 25 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 17 |
 | `src/engine` | 68 | 338 |
 | `src/engine/agent` | 56 | 117 |
-| `src/engine/commands` | 7 | 11 |
+| `src/engine/commands` | 7 | 12 |
 | `src/engine/design` | 163 | 202 |
 | `src/engine/flow` | 14 | 28 |
 | `src/engine/fx` | 8 | 10 |
@@ -66,10 +66,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 34 | 351 |
-| `src/store` | 17 | 254 |
+| `src/lib` | 34 | 352 |
+| `src/store` | 17 | 255 |
 
-207 de 652 módulos no tienen ningún test que los importe directamente.
+207 de 654 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

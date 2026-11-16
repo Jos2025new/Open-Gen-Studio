@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './store/store';
+import { CommandPalette } from './components/shell/CommandPalette';
 import { ensureSchema, loadCatalogs, loadLlmCatalog } from './engine/catalog';
 import { adoptRemoteAssets, resumeInterrupted } from './engine/jobs';
 import { startJobTrace } from './engine/jobTrace';
@@ -85,6 +86,7 @@ export function App() {
         <TextLightbox />
         <SketchEditor />
         <TraceControl />
+        <CommandPalette />
         <Toasts />
         <TooltipLayer />
         <WriterLockPanel />
