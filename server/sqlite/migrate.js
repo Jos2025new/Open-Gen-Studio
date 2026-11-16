@@ -123,23 +123,43 @@ export async function migrateFromV2(dir, opts = {}) {
   const sourceRawSha = sha256(sourceText);
   const sourceSha = stateSha(sourceText);
 
-  // 2. Copy the source files to backups/ first (atomic swap of tmp folder).
+  // 2. If SQLite already exists, check it before touching or overwriting any backup.
+  const sqliteFile = join(dir, 'ogs.sqlite');
+  let alreadyImported = false;
+  if (existsSync(sqliteFile)) {
+    const existingStore = createStoreBA(dir, { synchronous: opts.synchronous ?? 'FULL' });
+    try {
+      const existingText = existingStore.read();
+      if (existingText != null) {
+        if (stateSha(existingText) !== sourceSha) {
+          throw new Error('sqlite already exists and differs from store-v2; left intact');
+        }
+        alreadyImported = true;
+      }
+    } finally {
+      existingStore.close();
+    }
+  }
+
+  // 3. Copy the source files to backups/ (atomic swap of tmp folder), preserving any existing initial backup when resuming.
   const backupsDir = join(dir, 'backups');
   const backupName = hasV2 ? 'v2-pre-sqlite' : 'v1-pre-sqlite';
   const backupTarget = join(backupsDir, backupName);
-  const backupTmp = join(backupsDir, `${backupName}.${process.pid}.tmp`);
-  mkdirSync(backupsDir, { recursive: true });
-  rmSync(backupTmp, { recursive: true, force: true });
-  if (hasV2) {
-    cpSync(v2Root, backupTmp, { recursive: true });
-  } else {
-    mkdirSync(backupTmp, { recursive: true });
-    writeFileSync(join(backupTmp, 'state.json'), sourceText, { mode: 0o600 });
+  if (!alreadyImported || !existsSync(backupTarget)) {
+    const backupTmp = join(backupsDir, `${backupName}.${process.pid}.tmp`);
+    mkdirSync(backupsDir, { recursive: true });
+    rmSync(backupTmp, { recursive: true, force: true });
+    if (hasV2) {
+      cpSync(v2Root, backupTmp, { recursive: true });
+    } else {
+      mkdirSync(backupTmp, { recursive: true });
+      writeFileSync(join(backupTmp, 'state.json'), sourceText, { mode: 0o600 });
+    }
+    opts.fault?.('after-copy-tmp');
+    rmSync(backupTarget, { recursive: true, force: true });
+    renameSync(backupTmp, backupTarget);
+    opts.fault?.('after-copy');
   }
-  opts.fault?.('after-copy-tmp');
-  rmSync(backupTarget, { recursive: true, force: true });
-  renameSync(backupTmp, backupTarget);
-  opts.fault?.('after-copy');
 
   // 3. Parse source files to build the one-transaction SQLite commit body.
   let savedAt, version, order, globalsObj, sessions;

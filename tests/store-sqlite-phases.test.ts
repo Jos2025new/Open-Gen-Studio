@@ -134,6 +134,24 @@ describe('phase 2: migration from format 1 and format 2 folders', () => {
     await expect(migrateFromV2(dir)).rejects.toThrow(/incomplete store-v2/);
     expect(sqliteHead(dir)).toBeNull();
   });
+
+  it('checks existing ogs.sqlite before touching or overwriting any backup on repeated migration', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-mig-repeat-'));
+    const dir = join(root, 'data');
+    const v2 = createStoreV2(dir);
+    expect((await v2.commit({ savedAt: 1000, baseAt: 0, version: 1, globals: globals(1), order: ['ses_a'], sessions: { ses_a: session } })).status).toBe(204);
+    const initialGlobals = readFileSync(join(dir, 'store-v2', 'globals.json'), 'utf8');
+
+    const res = await migrateFromV2(dir);
+    expect(readFileSync(join(res.backupDir, 'globals.json'), 'utf8')).toBe(initialGlobals);
+
+    // Source changes later: repeated migration must reject without overwriting the original backup.
+    writeFileSync(join(dir, 'store-v2', 'globals.json'), globals(99));
+    await expect(migrateFromV2(dir, {
+      fault: (p) => { if (p === 'after-copy-tmp' || p === 'after-copy') throw new Error('backup was touched'); },
+    })).rejects.toThrow(/left intact/);
+    expect(readFileSync(join(res.backupDir, 'globals.json'), 'utf8')).toBe(initialGlobals);
+  });
 });
 
 describe('phase 4: asset revisions and append-only event journal in SQLite', () => {
