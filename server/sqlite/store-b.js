@@ -27,6 +27,34 @@ const COLLS = ['generations', 'assets', 'library'];
 const json = (v) => JSON.stringify(v);
 const fpOf = (text) => createHash('md5').update(text).digest('base64url').slice(0, 11);
 
+const JOURNAL_ALLOW = {
+  generations: ['id', 'sessionId', 'kind', 'modelRef', 'modelName', 'provider', 'origin', 'status', 'createdAt', 'finishedAt', 'usd'],
+  assets: ['id', 'kind', 'mime', 'width', 'height', 'duration', 'sessionId', 'generationId', 'origin', 'copiedFromAssetId', 'revertedAt', 'createdAt'],
+  library: ['id', 'kind', 'frontalAssetId', 'videoAssetId', 'revertedAt'],
+  spend: ['id', 'at', 'usd', 'estimated', 'category', 'provider', 'model', 'sessionId'],
+  event: [
+    'id', 'at', 'ts', 'kind', 'coll', 'sessionId', 'generationId', 'assetId', 'copiedFromAssetId',
+    'frontalAssetId', 'videoAssetId', 'revertedAt', 'createdAt', 'finishedAt', 'mime', 'width', 'height',
+    'duration', 'origin', 'status', 'provider', 'model', 'modelRef', 'modelName', 'category', 'usd',
+    'estimated', 'generations', 'assets', 'library',
+  ],
+};
+
+function pickAllowedMeta(raw, keys) {
+  let obj = raw;
+  if (typeof raw === 'string') {
+    try { obj = JSON.parse(raw); } catch { return '{}'; }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return '{}';
+  const out = {};
+  for (const k of keys) {
+    if (!Object.hasOwn(obj, k)) continue;
+    const v = obj[k];
+    if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') out[k] = v;
+  }
+  return json(out);
+}
+
 const MIGRATION_1 = `
 CREATE TABLE head (id INTEGER PRIMARY KEY CHECK (id = 1), saved_at INTEGER NOT NULL, version INTEGER NOT NULL,
   order_json TEXT NOT NULL, spend_len INTEGER NOT NULL, spend_last INTEGER NOT NULL);
@@ -212,18 +240,18 @@ export function createStoreB(dir, opts = {}) {
         }
         if (coll === 'generations') {
           q.histPut.run(id, savedAt, text, 0);
-          if (!bulkImport) q.journalPut.run(savedAt, cur ? 'edit' : 'generation', id, text);
+          if (!bulkImport) q.journalPut.run(savedAt, cur ? 'edit' : 'generation', id, pickAllowedMeta(text, JOURNAL_ALLOW.generations));
         } else if (coll === 'assets') {
           if (!bulkImport || cur || text.includes('"originalRevision":') || text.includes('"copiedFromAssetId":') || text.includes('"revertedAt":')) {
             const isRevert = Boolean(cur && text.includes('"revertedAt":') && !text.includes('"originalRevision":'));
             const revKind = !cur ? 'create' : isRevert ? 'revert' : 'edit';
             q.revPut.run(id, savedAt, revKind, text);
             const jKind = !cur ? (text.includes('"origin":"upload"') ? 'import' : 'edit') : revKind;
-            q.journalPut.run(savedAt, jKind, id, text);
+            q.journalPut.run(savedAt, jKind, id, pickAllowedMeta(text, JOURNAL_ALLOW.assets));
           }
         } else if (coll === 'library' && !bulkImport) {
           const jKind = text.includes('"revertedAt":') ? 'revert' : 'edit';
-          q.journalPut.run(savedAt, jKind, id, text);
+          q.journalPut.run(savedAt, jKind, id, pickAllowedMeta(text, JOURNAL_ALLOW.library));
         }
       }
       const gone = new Set(delta.del?.[coll] ?? []);
@@ -236,7 +264,7 @@ export function createStoreB(dir, opts = {}) {
         stats.recWrites++;
         if (coll === 'generations') q.histPut.run(id, savedAt, '{}', 1);
         if (coll === 'assets') q.revPut.run(id, savedAt, 'delete', prevMeta);
-        q.journalPut.run(savedAt, 'delete', id, prevMeta);
+        q.journalPut.run(savedAt, 'delete', id, pickAllowedMeta(prevMeta, JOURNAL_ALLOW[coll]));
       }
       const moves = delta.order?.[coll];
       if (Array.isArray(moves)) {
@@ -277,7 +305,7 @@ export function createStoreB(dir, opts = {}) {
       if (!already) {
         for (const t of app) {
           spend.last = Number(q.spendPut.run(t).lastInsertRowid);
-          if (!bulkImport) q.journalPut.run(savedAt, 'spend', String(spend.last), t);
+          if (!bulkImport) q.journalPut.run(savedAt, 'spend', String(spend.last), pickAllowedMeta(t, JOURNAL_ALLOW.spend));
         }
       }
       spend.len = delta.spend.len;
@@ -285,7 +313,7 @@ export function createStoreB(dir, opts = {}) {
     if (Array.isArray(delta.events)) {
       for (const ev of delta.events) {
         if (ev && typeof ev.kind === 'string') {
-          q.journalPut.run(ev.ts ?? savedAt, ev.kind, String(ev.id ?? ''), typeof ev.meta === 'string' ? ev.meta : json(ev.meta ?? {}));
+          q.journalPut.run(ev.ts ?? savedAt, ev.kind, String(ev.id ?? ''), pickAllowedMeta(ev.meta ?? {}, JOURNAL_ALLOW.event));
         }
       }
     }
@@ -417,7 +445,7 @@ export function createStoreB(dir, opts = {}) {
   }
 
   function recordEvent(kind, id, meta = {}, ts = Date.now()) {
-    q.journalPut.run(ts, String(kind), String(id ?? ''), typeof meta === 'string' ? meta : json(meta));
+    q.journalPut.run(ts, String(kind), String(id ?? ''), pickAllowedMeta(meta, JOURNAL_ALLOW.event));
   }
 
   const checkpoint = () => db.exec('PRAGMA wal_checkpoint(TRUNCATE)');

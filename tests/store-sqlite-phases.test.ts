@@ -216,4 +216,62 @@ describe('phase 4: asset revisions and append-only event journal in SQLite', () 
     }
     store.close();
   });
+
+  it('stores only allowed metadata in event_journal, never prompts, keys, or arbitrary fields', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-phase4-journal-allow-'));
+    const data = join(root, 'data');
+    mkdirSync(data);
+    const store = createSqliteStore(data);
+    const g1 = {
+      settings: {}, spentUsd: 0, spendLog: [],
+      generations: {
+        gen_p: { id: 'gen_p', sessionId: 'ses_a', kind: 'image', provider: 'fal', status: 'done', prompt: 'privado-gen-prompt', keys: { fal: 'sk-secret-gen' }, inputs: { refs: ['ast_p'] } },
+      },
+      assets: {
+        ast_p: { id: 'ast_p', kind: 'image', origin: 'upload', mime: 'image/png', width: 64, height: 64, prompt: 'privado-asset-prompt', remoteUrl: 'https://x.test?token=secret-url', keys: { openrouter: 'sk-secret-ast' } },
+      },
+      library: [
+        { id: 'lib_p', name: 'Private Subject', kind: 'character', frontalAssetId: 'ast_p', description: 'privado-lib-desc', prompt: 'privado-lib-prompt', keys: { atlas: 'sk-secret-lib' } },
+      ],
+    };
+    expect(store.commit({ savedAt: 1000, baseAt: 0, version: 1, globals: json(g1), order: ['ses_a'], sessions: { ses_a: session } }).status).toBe(204);
+
+    // Spend, delta.events, recordEvent, and delete with prompt/keys/arbitrary fields.
+    const g2 = {
+      settings: {}, spentUsd: 0.04,
+      spendLog: [{ id: 'sp_p', at: 1500, usd: 0.04, provider: 'fal', prompt: 'privado-spend-prompt', keys: { fal: 'sk-secret-spend' } }],
+      generations: {},
+      assets: {},
+      library: [],
+    };
+    expect(store.commit({
+      savedAt: 2000, baseAt: 1000, version: 1, order: ['ses_a'], sessions: {},
+      delta: {
+        del: { generations: ['gen_p'], assets: ['ast_p'], library: ['lib_p'] },
+        spend: { append: [json(g2.spendLog[0])], len: 1 },
+        events: [{ kind: 'custom', id: 'ev_1', ts: 2000, meta: { at: 2000, prompt: 'privado-ev-prompt', keys: { fal: 'sk-secret-ev' }, extraSecret: 'leak' } }],
+      } as never,
+    }).status).toBe(204);
+    store.recordEvent('manual', 'm_1', JSON.stringify({ at: 2500, prompt: 'privado-rec-prompt', keys: { nanogpt: 'sk-secret-rec' }, nested: { a: 1 } }), 2500);
+
+    const journalText = JSON.stringify(store.readJournal());
+    for (const forbidden of [
+      'privado-gen-prompt', 'privado-asset-prompt', 'privado-lib-desc', 'privado-lib-prompt',
+      'privado-spend-prompt', 'privado-ev-prompt', 'privado-rec-prompt',
+      'sk-secret-gen', 'sk-secret-ast', 'sk-secret-lib', 'sk-secret-spend', 'sk-secret-ev', 'sk-secret-rec',
+      'secret-url', 'extraSecret', '"prompt"', '"keys"',
+    ]) {
+      expect(journalText).not.toContain(forbidden);
+    }
+
+    const genEntry = store.readJournal('generation').find((e) => e.id === 'gen_p');
+    expect(genEntry?.meta).toEqual({ id: 'gen_p', sessionId: 'ses_a', kind: 'image', provider: 'fal', status: 'done' });
+    const spendEntry = store.readJournal('spend')[0];
+    expect(spendEntry?.meta).toEqual({ id: 'sp_p', at: 1500, usd: 0.04, provider: 'fal' });
+    const evEntry = store.readJournal('custom')[0];
+    expect(evEntry?.meta).toEqual({ at: 2000 });
+    const recEntry = store.readJournal('manual')[0];
+    expect(recEntry?.meta).toEqual({ at: 2500 });
+    store.close();
+  });
 });
