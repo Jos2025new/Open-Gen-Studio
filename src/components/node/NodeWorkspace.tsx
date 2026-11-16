@@ -44,6 +44,8 @@ import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
+/** The omnicanvas opens at no less than this zoom, so the cards are readable. */
+const OMNI_OPEN_MIN_ZOOM = 0.6;
 
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
 function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?: boolean }) {
@@ -126,6 +128,15 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
+  // The omnicanvas opens framed on the session's main parts (Studio, Nodes, Designer, chat), never below 60 %.
+  useEffect(() => {
+    if (!omni) return;
+    const t = window.setTimeout(() => {
+      const main = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => n.data.kind === 'ref' && (n.data.type === 'space' || n.data.type === 'chat')).map((n) => ({ id: n.id })) ?? [];
+      if (main.length) void rf.fitView({ nodes: main, padding: 0.2, minZoom: OMNI_OPEN_MIN_ZOOM, maxZoom: 1, duration: 0 });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [omni, sessionId]);
   // Nodes the agent just added: frame them once they are measured.
   const focus = useNodeFocus();
   useEffect(() => {

@@ -10,6 +10,8 @@ export { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, omniOnly,
 /** The most assets the omnicanvas brings in at once; the user adds the rest from the library. */
 const ASSETS_AT_ONCE = 8;
 const PER_ROW = 5;
+/** A loose asset this far (flow px) from the main parts is brought next to them when the omnicanvas opens. */
+const FAR_FROM_MAIN = 900;
 
 function writeGraph(sessionId: string, graph: Graph): void {
   useStore.setState((s) => {
@@ -72,6 +74,24 @@ export function ensureOmniNodes(sessionId: string): string[] {
     } else {
       occupied.push(r);
     }
+  }
+
+  // Loose assets (no link) left far from the session's main parts come next to them, right of the cluster.
+  const mainRects = nodes.filter((n) => n.data.kind === 'ref').map((n) => nodeRect(n));
+  if (mainRects.length) {
+    const bx1 = Math.max(...mainRects.map((r) => r.x + r.width));
+    const by0 = Math.min(...mainRects.map((r) => r.y));
+    const linked = new Set(edges.flatMap((e) => [e.source, e.target]));
+    nodes.forEach((n, idx) => {
+      if (n.data.kind !== 'asset' || linked.has(n.id) || n.omni) return;
+      const r = nodeRect(n);
+      const far = r.x > bx1 + FAR_FROM_MAIN || r.x + r.width < Math.min(...mainRects.map((m) => m.x)) - FAR_FROM_MAIN || r.y > Math.max(...mainRects.map((m) => m.y + m.height)) + FAR_FROM_MAIN || r.y + r.height < by0 - FAR_FROM_MAIN;
+      if (!far) return;
+      const others = nodes.filter((_, j) => j !== idx).map((m) => nodeRect(m));
+      const pos = findFreePosition({ x: bx1 + 120, y: by0 }, { width: r.width, height: r.height }, others, { gapX: 48, gapY: 56 });
+      nodes[idx] = { ...n, position: pos };
+      moved = true;
+    });
   }
 
   // Assets made since the last time, newest first, that no node shows yet. Ones the user took off do not come back.

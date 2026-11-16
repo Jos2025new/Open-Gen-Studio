@@ -105,6 +105,23 @@ describe('the Space and chat cards', () => {
   });
 });
 
+describe('loose assets on the omnicanvas', () => {
+  it('a loose asset far from the main parts is brought next to them; a linked one is not moved', () => {
+    ensureOmniNodes(sid);
+    const put = (nodes: unknown[]) => useStore.setState((st) => {
+      const g = st.sessions[sid].graph;
+      return { sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph: { ...g, nodes: [...g.nodes, ...nodes] as typeof g.nodes } } } };
+    });
+    put([{ id: 'far', position: { x: 9000, y: 9000 }, data: { kind: 'asset', title: 'Image', assetId: 'x1' } }]);
+    ensureOmniNodes(sid);
+    const main = useStore.getState().sessions[sid].graph.nodes.filter((n) => n.data.kind === 'ref');
+    const far = useStore.getState().sessions[sid].graph.nodes.find((n) => n.id === 'far')!;
+    const right = Math.max(...main.map((n) => n.position.x + omniWidth(n.data, 260)));
+    expect(far.position.x).toBeLessThan(right + 900);
+    expect(far.position.y).toBeLessThan(9000);
+  });
+});
+
 describe('the ordinary Nodes canvas', () => {
   it('draws none of the omnicanvas nodes after the omnicanvas was opened', () => {
     ensureOmniNodes(sid);
