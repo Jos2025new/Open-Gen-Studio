@@ -140,6 +140,12 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | --- | --- |
 | Mod + Alt + P | Start or stop a performance trace (logs/trace-…jsonl) |
 
+**Everywhere**
+
+| Teclas | Acción |
+| --- | --- |
+| Mod + K | Open the command palette |
+
 **Prompt and chat**
 
 | Teclas | Acción |

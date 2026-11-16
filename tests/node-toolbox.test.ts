@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 
 const nav = readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8');
 const ws = readFileSync('src/components/node/NodeWorkspace.tsx', 'utf8');
+const parts = readFileSync('src/components/node/NodeCanvasParts.tsx', 'utf8');
 
 it('Nodes has one vertical canvas toolbox with every canvas tool, in order (Create and Conversation under Add node, Auto layout under Pan, Delete with Undo and Redo), its popovers opening to the right', () => {
   expect(nav).toMatch(/<Panel position="top-left" className="canvas-navigation" role="toolbar" aria-label="Canvas tools" aria-orientation="vertical">/);
@@ -18,8 +19,8 @@ it('the top bar keeps only Run all; Add node, Auto layout and Fit view live in t
   const top = ws.slice(ws.indexOf('<TopbarActions>'), ws.indexOf('</TopbarActions>'));
   expect(top).toContain('<RunAll');
   expect(top).not.toMatch(/AddNodeMenu|Auto layout|Fit view/);
-  expect(ws).toMatch(/add=\{<AddNodeMenu onAdd=\{addAtCenter\} onImport=\{importAtCenter\} \/>\}/);
-  expect(ws).toMatch(/<IconButton ref=\{pop\.ref\} icon=\{Plus\} label="Add node"/);
+  expect(ws).toMatch(/add=\{<AddNodeMenu onAdd=\{addAtCenter\} onImport=\{importAtCenter\} omni=\{omniEntries\} \/>\}/);
+  expect(parts).toMatch(/<IconButton ref=\{pop\.ref\} icon=\{Plus\} label="Add node"/);
 });
 
 it('Nodes zooms as far as the Designer, and the zoom popover uses the app’s one slider (log scale, typed percent), no Fit view', () => {
