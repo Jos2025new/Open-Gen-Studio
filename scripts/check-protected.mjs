@@ -10,7 +10,7 @@ export const PROTECTED_TESTS = [
   'store-sqlite',
 ].map((name) => `tests/${name}.test.ts`);
 export const PROTECTED_SOURCES = [
-  'server/store-sqlite.js', 'server/sqlite/store-b.js', 'server/sqlite/store-ba.js', 'server/sqlite/delta-client.mjs',
+  'server/store-sqlite.js', 'server/sqlite/store-b.js', 'server/sqlite/store-ba.js', 'server/sqlite/delta-client.mjs', 'server/sqlite/fractional-index.mjs',
 ];
 export const DOC = 'docs/persistencia-protegida.md';
 // it.skip, describe.only, test.todo, it.concurrent.skip, xit, xdescribe, fit, fdescribe.

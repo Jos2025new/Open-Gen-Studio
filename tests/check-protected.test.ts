@@ -39,3 +39,10 @@ it('does not flag ordinary words that contain the marks', () => {
   const text = `${real(first)}\nconst skipped = state.only; // "it.skipping" is prose\n`;
   expect(protectedViolations(withFile(first, text))).toEqual([]);
 });
+
+it('protects the fractional index source and its documentation link', () => {
+  const path = 'server/sqlite/fractional-index.mjs';
+  expect(protectedViolations(withFile(path, null))).toContain(`${path}: missing`);
+  const doc = real(DOC)!.replace(`../${path}`, '../server/sqlite/not-protected.mjs');
+  expect(protectedViolations(withFile(DOC, doc))).toContain(`${DOC}: does not link ${path}`);
+});

@@ -7,7 +7,7 @@ El guardado protegido ([ADR 0022](decisions/0022-guardado-local-first-sin-bloque
 ## Archivos
 
 - Servidor: `server/save-guard.js`, `server/store-v2.js` y el cuerpo del 409 en `server/local-store.js`.
-- SQLite de la fase 1 (autorizado el 2026-11-15): [store-sqlite.js](../server/store-sqlite.js), [store-b.js](../server/sqlite/store-b.js), [store-ba.js](../server/sqlite/store-ba.js) y [delta-client.mjs](../server/sqlite/delta-client.mjs). El spike solo reexporta estos archivos.
+- SQLite de la fase 1 (autorizado el 2026-11-15): [store-sqlite.js](../server/store-sqlite.js), [store-b.js](../server/sqlite/store-b.js), [store-ba.js](../server/sqlite/store-ba.js) y [delta-client.mjs](../server/sqlite/delta-client.mjs) y [fractional-index.mjs](../server/sqlite/fractional-index.mjs). El spike solo reexporta estos archivos.
 - Cliente: `src/lib/idb.ts`, `disk.ts`, `saveGuard.ts` y `writerLock.ts`; en `src/store/`, `writerHandoff.ts`, `saveRecovery.ts`, `saveReport.ts` y `saveStatus.ts`.
 - Solo estas funciones de dos archivos más grandes: `flushWrite` y `saveNow` de `src/store/store.ts`; `writeLayer`, `flushRaster`, `deleteBuffers`, `schedulePersist`, `storeCanvas`, `beginEdit`, `restoreBuffers` y `ensureBuffers` de `src/engine/design/raster.ts` (las cinco últimas deciden si se guardan o se descartan píxeles: D30).
 
