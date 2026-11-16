@@ -266,18 +266,24 @@ export async function jumpToAssetRevision(assetId: string, targetIndex: number):
   if (targetIndex < 0 || targetIndex >= mat.versions.length) return false;
   if (targetIndex === mat.index) return true;
   const target = mat.versions[targetIndex];
+  let previousBlob: Blob | undefined;
+  let writeAttempted = false;
   try {
     const targetBlob = await getAssetBlob(target.assetId);
     if (!targetBlob || targetBlob.size === 0) {
       toast('Falta la copia de esa versión; se mantiene la versión actual', 'error');
       return false;
     }
-    if (!(await writeVerifiedBlob(assetId, targetBlob))) {
-      toast('No se pudo verificar la versión restaurada; se mantiene la actual', 'error');
-      return false;
-    }
+    previousBlob = await getAssetBlob(assetId);
+    if (!previousBlob || previousBlob.size === 0) previousBlob = await getAssetBlob(mat.versions[mat.index].assetId);
+    writeAttempted = true;
+    if (!(await writeVerifiedBlob(assetId, targetBlob))) throw new Error('Verification failed');
   } catch {
-    toast('No se pudo restaurar la versión; se mantiene la actual', 'error');
+    let restored = !writeAttempted;
+    if (writeAttempted && previousBlob) {
+      try { restored = await writeVerifiedBlob(assetId, previousBlob); } catch { restored = false; }
+    }
+    toast(restored ? 'No se pudo restaurar la versión; se mantiene la actual' : 'No se pudo recuperar la imagen actual; las versiones guardadas siguen disponibles', 'error');
     return false;
   }
   let updated = false;

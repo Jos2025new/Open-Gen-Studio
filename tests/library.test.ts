@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-const { blobs } = vi.hoisted(() => ({ blobs: new Map<string, Blob>() }));
+const { blobs, writes } = vi.hoisted(() => ({ blobs: new Map<string, Blob>(), writes: { corruptNext: '' } }));
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
   getAssetBlob: async (id: string) => blobs.get(id),
-  putAssetBlob: async (id: string, b: Blob) => { blobs.set(id, b); return `blob:${id}`; },
+  putAssetBlob: async (id: string, b: Blob) => { if (writes.corruptNext === id) { writes.corruptNext = ''; blobs.set(id, new Blob(['corrupt-bytes'])); } else blobs.set(id, b); return `blob:${id}`; },
   deleteAssetBlobs: async (ids: string[]) => ids.forEach((id) => blobs.delete(id)),
 }));
 
@@ -121,6 +121,22 @@ describe('global library', () => {
     expect(saved2?.revisions?.map((r) => r.label)).toEqual(['Original', 'Pintura', 'Pintura 2']);
     expect(await blobs.get(saved2!.revisions![1].assetId)?.text()).toBe('edited-bytes');
     expect(await blobs.get('hero')?.text()).toBe('edited-2-bytes');
+  });
+
+  it('keeps the displayed bytes and pointer when a jump cannot be verified', async () => {
+    const id = 'failed-jump';
+    const original = new Blob(['original-bytes']);
+    const edit = new Blob(['edited-bytes']);
+    blobs.set(id, original);
+    useStore.setState((st) => ({ assets: { ...st.assets, [id]: { id, kind: 'image', origin: 'upload', createdAt: 1, stored: true } as Asset } }));
+    expect(await saveAssetEdit(id, edit, 'original')).not.toBeNull();
+    writes.corruptNext = id;
+    expect(await undoAssetRevision(id)).toBe(false);
+    expect(useStore.getState().assets[id].revisionIndex).toBe(1);
+    expect(await blobs.get(id)?.text()).toBe('edited-bytes');
+    blobs.delete(id);
+    expect(await undoAssetRevision(id)).toBe(true);
+    expect(await blobs.get(id)?.text()).toBe('original-bytes');
   });
 
   it('migrates legacy originalRevision/revisions in code, persists through SQLite store reload, and handles missing blobs safely', async () => {
