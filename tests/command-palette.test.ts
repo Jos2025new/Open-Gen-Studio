@@ -14,6 +14,8 @@ import { register, resetRegistry } from '../src/engine/commands/registry';
 import { CommandPalette } from '../src/components/shell/CommandPalette';
 import { buildArgs, clearRecent, fieldsOf, offered, paletteSections, rememberRun } from '../src/components/shell/commandPaletteModel';
 import { useStore } from '../src/store/store';
+import { commands as themeCommands } from '../src/lib/theme.commands';
+import { SEARCH_MAX } from '../src/components/shell/commandPaletteModel';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.fetch = (() => { throw new Error('no network in tests'); }) as typeof fetch;
@@ -32,7 +34,7 @@ const fails = defineCommand({ id: 'studio.test.fail', title: 'Fails always', arg
 
 beforeAll(() => {
   resetRegistry();
-  for (const spec of [noArgs, withArgs, doomed, costly, blocked, complex, fails]) register(spec);
+  for (const spec of [noArgs, withArgs, doomed, costly, blocked, complex, fails, ...themeCommands]) register(spec);
 });
 afterEach(() => { clearRecent(); calls.length = 0; });
 
@@ -149,5 +151,20 @@ describe('component', () => {
     key({ key: 'Escape' }, search());
     expect(panel()).toBeNull();
     act(() => root.unmount());
+  });
+});
+
+describe('search reads well', () => {
+  it('finds the theme and accent commands by theme or tema', () => {
+    expect(ids('theme')).toEqual(expect.arrayContaining(['appearance.theme.set', 'appearance.accent.set']));
+    expect(ids('tema')).toEqual(expect.arrayContaining(['appearance.theme.set', 'appearance.accent.set']));
+    expect(paletteSections({ query: 'theme', on, workspace: 'chat' })[0].rows.find((r) => r.id === 'appearance.theme.set')?.title).toBe('Set base theme');
+  });
+  it('caps a broad search and shows labels, never raw ids', () => {
+    resetRegistry();
+    for (const spec of [...themeCommands, ...Array.from({ length: 16 }, (_, i) => defineCommand({ id: `nodes.test.many${i}`, title: `Nodes thing ${i}`, args: z.object({}), effect: 'write', run: () => undefined }))]) register(spec);
+    const rows = paletteSections({ query: 'nodes', on, workspace: 'chat' }).flatMap((s) => s.rows);
+    expect(rows.length).toBeLessThanOrEqual(SEARCH_MAX);
+    expect(rows.every((r) => !/^[a-z]+\.[a-z.]+$/.test(r.title))).toBe(true);
   });
 });

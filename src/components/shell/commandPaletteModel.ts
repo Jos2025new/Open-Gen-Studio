@@ -89,17 +89,21 @@ export interface PaletteSection { label?: string; rows: PaletteRow[] }
 const SUFFIX: Partial<Record<AnyCommand['effect'], string>> = { spend: ' · spends', delete: ' · deletes' };
 export const effectNote = (effect: AnyCommand['effect']): string => SUFFIX[effect] ?? '';
 
+/** A label a person can read: the title, or the id's last words when a command has none. Never shown as a raw id. */
+export const labelOf = (spec: AnyCommand): string => spec.title?.trim() || spec.id.split('.').slice(1).join(' ').replace(/[._-]+/g, ' ').trim();
+
 function rowOf(spec: AnyCommand, on: Target, mode: 'plain' | 'search'): PaletteRow | null {
   const fields = fieldsOf(spec);
   if (!fields) return null;
   const available = availability(spec, { on, caller: 'ui' });
   const base = mode === 'search' ? (COMMAND_SHORTCUTS[spec.id] ?? areaName(spec.id)) : '';
   const detail = available !== true ? available : `${base}${effectNote(spec.effect)}`.replace(/^ · /, '');
-  return { id: spec.id, title: spec.title, area: areaOf(spec.id), effect: spec.effect, available, detail, needsStep: fields.length > 0 || spec.effect === 'spend' || spec.effect === 'delete', fields };
+  return { id: spec.id, title: labelOf(spec), area: areaOf(spec.id), effect: spec.effect, available, detail, needsStep: fields.length > 0 || spec.effect === 'spend' || spec.effect === 'delete', fields };
 }
 
 export const HERE_MAX = 6;
 export const RECENT_MAX = 4;
+export const SEARCH_MAX = 12;
 const recent: string[] = [];
 /** Remembers a command run from the palette (memory only). */
 export function rememberRun(id: string): void {
@@ -145,7 +149,8 @@ export function paletteSections(input: { query: string; on: Target; workspace: W
     if (rank >= 0) ranked.push({ rank, spec });
   }
   ranked.sort((a, b) => a.rank - b.rank || a.spec.id.localeCompare(b.spec.id));
-  const rows = ranked.map(({ spec }) => rowOf(spec, input.on, 'search')).filter((row): row is PaletteRow => row !== null);
+  // Broad words match many commands: the best ranked come first, and the list is capped so it stays useful.
+  const rows = ranked.map(({ spec }) => rowOf(spec, input.on, 'search')).filter((row): row is PaletteRow => row !== null).slice(0, SEARCH_MAX);
   return rows.length ? [{ rows }] : [];
 }
 
