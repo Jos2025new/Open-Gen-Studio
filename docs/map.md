@@ -20,18 +20,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 362 | 275 |
-| [store.ts](../src/store/store.ts) | 245 | 253 |
-| [icons.tsx](../src/components/ui/icons.tsx) | 142 | 1 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 100 | 0 |
-| [actions.ts](../src/engine/design/actions.ts) | 74 | 45 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 5 |
+| [types.ts](../src/engine/types.ts) | 376 | 277 |
+| [store.ts](../src/store/store.ts) | 254 | 258 |
+| [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
+| [actions.ts](../src/engine/design/actions.ts) | 75 | 45 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 65 | 5 |
 | [media.ts](../src/lib/media.ts) | 58 | 50 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
-| [ops.ts](../src/engine/ops.ts) | 46 | 18 |
-| [id.ts](../src/lib/id.ts) | 44 | 0 |
+| [ops.ts](../src/engine/ops.ts) | 47 | 18 |
+| [id.ts](../src/lib/id.ts) | 45 | 0 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 28 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
@@ -51,25 +51,27 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 15 | 15 |
 | `src/components/designer` | 101 | 56 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 13 | 12 |
-| `src/components/shell` | 37 | 25 |
+| `src/components/node` | 19 | 15 |
+| `src/components/omni` | 4 | 1 |
+| `src/components/shell` | 37 | 27 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 68 | 338 |
-| `src/engine/agent` | 56 | 117 |
-| `src/engine/commands` | 7 | 12 |
+| `src/engine` | 69 | 340 |
+| `src/engine/agent` | 57 | 117 |
+| `src/engine/commands` | 7 | 14 |
 | `src/engine/design` | 163 | 202 |
-| `src/engine/flow` | 14 | 28 |
+| `src/engine/flow` | 15 | 31 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
+| `src/engine/nodes` | 6 | 5 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 34 | 352 |
-| `src/store` | 17 | 255 |
+| `src/lib` | 34 | 357 |
+| `src/store` | 18 | 260 |
 
-207 de 654 módulos no tienen ningún test que los importe directamente.
+220 de 674 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -82,9 +84,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [LayerUnreadable.tsx](../src/components/designer/LayerUnreadable.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
+- [OmniWorkspace.tsx](../src/components/omni/OmniWorkspace.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
+- [commands.ts](../src/engine/nodes/commands.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)
 - [designerBenchProfessionalRun.ts](../src/lib/designerBenchProfessionalRun.ts)

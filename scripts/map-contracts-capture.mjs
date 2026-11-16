@@ -65,7 +65,7 @@ export default [
       ['src/engine/peopleLook.ts', 'export const LOOK_RULE'],
       ['src/engine/agent/context.ts', '${LOOK_RULE}'],
       ['src/engine/agent/context.ts', 'peopleLookLine(st.settings)'],
-      ['src/store/store.ts', 'peopleLook?: string'],
+      ['src/store/storeTypes.ts', 'peopleLook?: string'],
       ['src/components/shell/PeopleLookRow.tsx', 'export function PeopleLookRow'],
       ['src/components/shell/settings/AgentTab.tsx', '<PeopleLookRow />'],
       ['src/engine/guides/seedream.md', 'default look for people'],

@@ -22,7 +22,7 @@ export default [
     sides: [
       ['src/engine/retryPartial.ts', 'export function estimateForRetry'],
       ['src/engine/jobs.ts', 'export function retryGeneration'],
-      ['src/engine/agent/planRun.ts', 'planRetryEstimate('],
+      ['src/engine/agent/planRecovery.ts', 'planRetryEstimate('],
       ['src/components/chat/RecoveryActions.tsx', 'estimateForRetry(g)'],
       ['src/engine/types.ts', 'export interface Generation'],
     ],
