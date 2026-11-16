@@ -137,6 +137,15 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
 
   return (
     <div className="asset-actions">
+      {!menuOnly && asset.kind === 'image' ? (
+        compact ? (
+          <IconButton icon={Brush} label="Pintar" size="sm" onClick={() => beginAssetEdit(assetId)} />
+        ) : (
+          <Chip icon={Brush} onClick={() => beginAssetEdit(assetId)} data-tip="Pintar sobre la imagen">
+            Pintar
+          </Chip>
+        )
+      ) : null}
       {quick.map((o) => (
         <OpChip key={o.id} assetId={assetId} op={o.id} parentId={parentId} compact={compact} />
       ))}
@@ -178,15 +187,17 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
             ))}
             {asset.kind === 'image' ? (
               <>
-                <MenuItem
-                  icon={Brush}
-                  label="Paint / Edit image"
-                  tip="Paint over the image on a copy, then save as a copy or apply to original"
-                  onClick={() => {
-                    close();
-                    beginAssetEdit(assetId);
-                  }}
-                />
+                {menuOnly ? (
+                  <MenuItem
+                    icon={Brush}
+                    label="Paint / Edit image"
+                    tip="Paint over the image on a copy, then save as a copy or apply to original"
+                    onClick={() => {
+                      close();
+                      beginAssetEdit(assetId);
+                    }}
+                  />
+                ) : null}
                 <MenuItem
                   icon={Eraser}
                   label="Edit region / Remove object"

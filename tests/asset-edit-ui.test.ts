@@ -114,15 +114,21 @@ describe('AssetActions and SketchEditor library editing flow', () => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor), createElement(Toasts)));
     });
 
+    const openPaint = () => {
+      const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'));
+      expect(paintBtn).toBeTruthy();
+      act(() => paintBtn!.click());
+    };
+
     const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
     moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
     act(() => moreBtn.click());
 
     const menuButtons = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')];
     expect(menuButtons.some((b) => b.textContent?.includes('Revertir'))).toBe(false);
-    const editBtn = menuButtons.find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''));
-    expect(editBtn).toBeTruthy();
-    act(() => editBtn!.click());
+    expect(menuButtons.some((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))).toBe(false);
+    act(() => moreBtn.click());
+    openPaint();
 
     // beginAssetEdit sets ui.sketch to paint mode without mutating the original asset
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'hero', mode: 'paint' });
@@ -163,10 +169,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(await blobs.get(copyAsset!.id)?.text()).toBe('painted-png-bytes');
 
     // 2) Aplicar al original updates hero in place with a verifiable backup revision
-    act(() => moreBtn.click());
-    const editBtn2 = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
-      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
-    act(() => editBtn2.click());
+    openPaint();
     await paintStroke();
     const saveBtn2 = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
       .find((b) => b.textContent === 'Save')!;
@@ -224,12 +227,8 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     });
     expect(host.textContent).not.toContain('Revertir');
 
-    const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
-    moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
-    act(() => moreBtn.click());
-    const editBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
-      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
-    act(() => editBtn.click());
+    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'))!;
+    act(() => paintBtn.click());
     await paintStroke();
     const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
       .find((b) => b.textContent === 'Save')!;
@@ -261,12 +260,8 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     act(() => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
     });
-    const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
-    moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
-    act(() => moreBtn.click());
-    const editBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
-      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
-    act(() => editBtn.click());
+    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'))!;
+    act(() => paintBtn.click());
     await paintStroke();
 
     // Remove original blob before clicking Aplicar al original
@@ -299,12 +294,8 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     act(() => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
     });
-    const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
-    moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
-    act(() => moreBtn.click());
-    const editBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
-      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
-    act(() => editBtn.click());
+    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'))!;
+    act(() => paintBtn.click());
     await paintStroke();
 
     const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]

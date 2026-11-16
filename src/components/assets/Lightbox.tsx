@@ -1,16 +1,16 @@
 import { Model3DViewer } from './Model3DViewer';
 import { useEffect } from 'react';
-import { ChevronsLeft, ChevronsRight, Download, X } from '../ui/icons';
+import { ChevronsLeft, ChevronsRight, Info, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
-import { downloadAsset } from '../../engine/actions';
 import { AssetMedia } from '../ui/AssetMedia';
-import { Button, IconButton } from '../ui/primitives';
-import { AssetActions, AttachButton, FavoriteButton, SendToMenu } from './AssetActions';
+import { IconButton } from '../ui/primitives';
+import { AssetActions, AttachButton, DownloadButton, FavoriteButton, SendToMenu } from './AssetActions';
 import { GenerationInfo } from './GenerationInfo';
 import { Viewer3DControls, Viewer3DDock } from './Viewer3DControls';
 
 export function Lightbox() {
   const lb = useStore((s) => s.ui.lightbox);
+  const infoOpen = useStore((s) => Boolean(s.ui.lightboxInfo));
   const ids = lb?.assetIds ?? [];
   const index = lb ? Math.min(lb.index, ids.length - 1) : 0;
   const assetId = ids[index];
@@ -32,6 +32,7 @@ export function Lightbox() {
 
   if (!lb || !assetId || !asset) return null;
   const close = () => setUi({ lightbox: lb.back ?? null });
+  const toggleInfo = () => setUi({ lightboxInfo: !infoOpen });
   return (
     <div className="lightbox" role="dialog" aria-label="Viewer">
       <div className="lb-stage" onClick={(e) => e.target === e.currentTarget && close()}>
@@ -54,28 +55,26 @@ export function Lightbox() {
             {index + 1} / {ids.length}
           </span>
         ) : null}
+        <div className="lb-top-actions">
+          <DownloadButton assetId={assetId} />
+          <FavoriteButton assetId={assetId} />
+          <AttachButton assetId={assetId} />
+          <SendToMenu assetId={assetId} />
+          <IconButton icon={Info} label="Info" size="sm" active={infoOpen} aria-pressed={infoOpen} onClick={toggleInfo} />
+          <IconButton icon={X} label="Close (Esc)" size="sm" onClick={close} />
+        </div>
+        {infoOpen ? (
+          <aside className="lb-info-panel" aria-label="Details">
+            {asset.kind === 'model3d' ? <Viewer3DControls /> : null}
+            <GenerationInfo key={assetId} generation={generation} asset={asset} />
+          </aside>
+        ) : null}
         {/* Operations under the picture, as a floating bar. */}
         <div className="lb-dock">
           {asset.kind === 'model3d' ? <Viewer3DDock /> : null}
           <AssetActions assetId={assetId} parentId={generation?.id} />
         </div>
       </div>
-      <aside className="lb-side">
-        <div className="lb-head">
-          <Button size="sm" icon={Download} onClick={() => void downloadAsset(assetId)}>
-            Download
-          </Button>
-          <FavoriteButton assetId={assetId} />
-          <AttachButton assetId={assetId} />
-          <SendToMenu assetId={assetId} />
-          <span className="spacer" />
-          <IconButton icon={X} label="Close (Esc)" size="sm" onClick={close} />
-        </div>
-        <div className="lb-body">
-          {asset.kind === 'model3d' ? <Viewer3DControls /> : null}
-          <GenerationInfo key={assetId} generation={generation} asset={asset} />
-        </div>
-      </aside>
     </div>
   );
 }

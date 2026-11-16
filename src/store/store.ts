@@ -146,6 +146,8 @@ export interface UiState extends PageUiPrefs {
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
   lightbox: { assetIds: string[]; index: number; back?: { assetIds: string[]; index: number } } | null;
+  /** Viewer details panel: closed by default, remembered for the current app session. */
+  lightboxInfo?: boolean;
   /** Sketch editor: paint a node's image, or a mask for Edit region / Remove object. */
   sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;
   toasts: Toast[];
@@ -299,6 +301,7 @@ const initial: AppState = {
     panel: null,
     panelExpanded: false,
     lightbox: null,
+    lightboxInfo: false,
     sketch: null,
     toasts: [],
     ...DEFAULT_UI,
