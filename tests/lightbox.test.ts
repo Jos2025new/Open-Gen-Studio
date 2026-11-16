@@ -253,4 +253,95 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
 
     cleanup();
   });
+
+  it('shows undo, redo and floating history panel in top-right cluster only when asset has >1 version', async () => {
+    const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+    const sessionId = useStore.getState().activeSessionId;
+    blobs.set('rev0', new Blob(['v0-orig'], { type: 'image/png' }));
+    blobs.set('rev1', new Blob(['v1-paint'], { type: 'image/png' }));
+    blobs.set('rev2', new Blob(['v2-paint'], { type: 'image/png' }));
+    blobs.set('img1', new Blob(['v2-paint'], { type: 'image/png' }));
+
+    act(() => {
+      useStore.setState((st) => ({
+        assets: {
+          ...st.assets,
+          img1: {
+            ...st.assets.img1,
+            sessionId,
+            revisionIndex: 2,
+            revisions: [
+              { assetId: 'rev0', width: 512, height: 512, mime: 'image/png', createdAt: 1000, label: 'Original' },
+              { assetId: 'rev1', width: 512, height: 512, mime: 'image/png', createdAt: 2000, label: 'Pintura' },
+              { assetId: 'rev2', width: 512, height: 512, mime: 'image/png', createdAt: 3000, label: 'Pintura 2' },
+            ],
+          },
+        },
+      }));
+      root.render(createElement(Lightbox));
+    });
+
+    const topLabels = [...host.querySelectorAll<HTMLButtonElement>('.lb-top-actions button')].map((b) => b.getAttribute('aria-label'));
+    expect(topLabels).toEqual(['Deshacer versión', 'Rehacer versión', 'Historial de versiones', 'Download', 'Favorite', 'Attach to prompt', 'Send to', 'Info', 'Close (Esc)']);
+
+    const undoBtn = host.querySelector<HTMLButtonElement>('[aria-label="Deshacer versión"]')!;
+    const redoBtn = host.querySelector<HTMLButtonElement>('[aria-label="Rehacer versión"]')!;
+    const histBtn = host.querySelector<HTMLButtonElement>('[aria-label="Historial de versiones"]')!;
+    expect(undoBtn.disabled).toBe(false);
+    expect(redoBtn.disabled).toBe(true);
+
+    // Undo moves pointer back to v1 and enables Redo
+    await act(async () => {
+      undoBtn.click();
+      await flush();
+    });
+    expect(useStore.getState().assets.img1.revisionIndex).toBe(1);
+    expect(await blobs.get('img1')?.text()).toBe('v1-paint');
+    expect(redoBtn.disabled).toBe(false);
+
+    // Redo moves pointer forward to v2
+    await act(async () => {
+      redoBtn.click();
+      await flush();
+    });
+    expect(useStore.getState().assets.img1.revisionIndex).toBe(2);
+    expect(await blobs.get('img1')?.text()).toBe('v2-paint');
+
+    // Open History floating panel -> newest first, thumbnails, time, labels, current marked
+    act(() => histBtn.click());
+    await act(async () => {
+      await flush();
+    });
+    const histPanel = host.querySelector<HTMLElement>('.lb-history-panel')!;
+    expect(histPanel).toBeTruthy();
+    const items = [...histPanel.querySelectorAll<HTMLButtonElement>('.lb-history-item')];
+    expect(items).toHaveLength(3);
+    expect(items.map((el) => el.querySelector('.lb-history-label')?.textContent)).toEqual(['Pintura 2', 'Pintura', 'Original']);
+    expect(items[0].getAttribute('aria-current')).toBe('true');
+    expect(items[0].textContent).toContain('Actual');
+    expect(items[0].querySelector('.lb-history-thumb img')).toBeTruthy();
+    expect(items[0].querySelector('.lb-history-time')?.textContent).toBeTruthy();
+
+    // Click an older version (Pintura, index 1) -> jumps to it
+    await act(async () => {
+      items[1].click();
+      await flush();
+    });
+    expect(useStore.getState().assets.img1.revisionIndex).toBe(1);
+    expect(await blobs.get('img1')?.text()).toBe('v1-paint');
+    expect(items[1].getAttribute('aria-current')).toBe('true');
+
+    // Click «Volver al original» at bottom of list -> jumps to Original (0), redo still works
+    const origBtn = [...histPanel.querySelectorAll<HTMLButtonElement>('.lb-history-foot button')].find((b) => b.textContent?.includes('Volver al original'))!;
+    expect(origBtn).toBeTruthy();
+    await act(async () => {
+      origBtn.click();
+      await flush();
+    });
+    expect(useStore.getState().assets.img1.revisionIndex).toBe(0);
+    expect(await blobs.get('img1')?.text()).toBe('v0-orig');
+    expect(redoBtn.disabled).toBe(false);
+
+    cleanup();
+  });
 });

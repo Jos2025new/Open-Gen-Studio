@@ -13,6 +13,7 @@ export function useAssetSource(assetId: string | null | undefined): { url: strin
   const remote = useStore((s) => (assetId ? s.assets[assetId]?.remoteUrl : undefined));
   const stored = useStore((s) => (assetId ? s.assets[assetId]?.stored : undefined));
   const revCount = useStore((s) => (assetId ? s.assets[assetId]?.revisions?.length ?? 0 : 0));
+  const revIndex = useStore((s) => (assetId ? s.assets[assetId]?.revisionIndex : undefined));
   const revertedAt = useStore((s) => (assetId ? s.assets[assetId]?.revertedAt : undefined));
   const [url, setUrl] = useState<string | null>(() => (assetId ? peekAssetUrl(assetId) ?? null : null));
   const [lost, setLost] = useState(false);
@@ -40,7 +41,7 @@ export function useAssetSource(assetId: string | null | undefined): { url: strin
     return () => {
       alive = false;
     };
-  }, [assetId, remote, stored, revCount, revertedAt]);
+  }, [assetId, remote, stored, revCount, revIndex, revertedAt]);
   return { url, lost };
 }
 

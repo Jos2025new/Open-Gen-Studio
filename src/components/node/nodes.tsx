@@ -20,7 +20,7 @@ import { ModelList } from '../composer/ModelList';
 import { AspectGlyph } from '../composer/MediaControls';
 import { VideoUpscaleControls } from '../assets/VideoUpscaleControls';
 import { GenerationInfo } from '../assets/GenerationInfo';
-import { OP_ICONS, RevertAssetMenuItem } from '../assets/AssetActions';
+import { OP_ICONS } from '../assets/AssetActions';
 import { AddNext, ResultPorts } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { KeyTools, PanelToggle } from './NodeBarExtras';
@@ -264,7 +264,7 @@ function Preview({ node }: { node: GraphNode }) {
 }
 
 /** The tools that do not fit in the bar, plus Panorama (Reframe at 21:9). Each adds a connected tool node. */
-function MoreTools({ node, out, skip, assetId }: { node: GraphNode; out: PortType; skip: OpId[]; assetId?: string }) {
+function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: OpId[] }) {
   const sessionId = useSessionId();
   const pop = usePopover();
   const add = (op: OpId, patch: Partial<ToolNodeData> = {}) => {
@@ -284,7 +284,6 @@ function MoreTools({ node, out, skip, assetId }: { node: GraphNode; out: PortTyp
           {rest.map((id) => (
             <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} tip={OPS[id].description} onClick={() => add(id)} />
           ))}
-          <RevertAssetMenuItem assetId={assetId} onDone={pop.close} />
         </div>
       </Popover>
     </>
@@ -312,7 +311,7 @@ function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | nu
           </button>
         );
       })}
-      {assetId && out && !panel ? <MoreTools node={node} out={out} skip={quick} assetId={assetId} /> : null}
+      {assetId && out && !panel ? <MoreTools node={node} out={out} skip={quick} /> : null}
       {runnable || quick.length ? <span className="nt-sep" /> : null}
       {assetId ? (
         <>

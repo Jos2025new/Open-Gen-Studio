@@ -36,7 +36,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 28 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 36 | 27 |
-| [format.ts](../src/lib/format.ts) | 35 | 1 |
+| [format.ts](../src/lib/format.ts) | 36 | 1 |
 | [render.ts](../src/engine/design/render.ts) | 31 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 29 | 9 |
 | [pathNodes.ts](../src/engine/design/pathNodes.ts) | 27 | 15 |

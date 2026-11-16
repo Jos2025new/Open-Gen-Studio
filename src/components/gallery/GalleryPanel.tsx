@@ -1,9 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { Box, Eye, EyeOff, Funnel, Grid2X2, LayoutGrid, Maximize2, Minimize2, Palette, RotateCcw, Shapes, Tag, Trash, UserRound, X } from '../ui/icons';
+import { Box, Eye, EyeOff, Funnel, Grid2X2, LayoutGrid, Maximize2, Minimize2, Palette, Shapes, Tag, Trash, UserRound, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
-import { revertAssetToOriginal } from '../../engine/assetRevisions';
 import { Button, IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Subject, SubjectKind } from '../../engine/types';
@@ -98,17 +97,15 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
 
 function LibraryTile({ item, view }: { item: Subject; view: ItemView }) {
   const cover = item.frontalAssetId ?? item.videoAssetId;
-  const canRevert = useStore((s) => Boolean(cover && s.assets[cover]?.originalRevision));
   const open = () => cover && setUi({ lightbox: { assetIds: [cover, ...item.refAssetIds], index: 0 } });
   const tap = useTapReveal(open);
   const [confirming, setConfirming] = useState(false);
   const kindLabel = SUBJECT_KINDS.find((k) => k.value === (item.kind ?? 'character'))?.label;
   const hiddenMark = item.userHidden ? <span className="pc-hidden-badge" title="Hidden"><EyeOff size={12} /></span> : null;
-  // Open is the main action on every view, so the menu keeps Hide and Remove (plus Revertir when edited in place).
+  // Open is the main action on every view, so the menu keeps Hide and Remove.
   const menu = <CardMenu label={`More actions for @${item.name}`} className="pc-hover">{(close) => confirming
     ? <MenuConfirm text={`Remove @${item.name} from the library? Its images stay in Generated.`} action="Remove" onCancel={() => setConfirming(false)} onConfirm={() => { deleteSubject(item.id); close(); }} />
     : <>
-      {canRevert && cover ? <MenuItem icon={RotateCcw} onClick={() => { void revertAssetToOriginal(cover); close(); }}>Revertir</MenuItem> : null}
       <MenuItem icon={item.userHidden ? Eye : EyeOff} onClick={() => { setUserHidden('subject', [item.id], !item.userHidden); close(); }}>{item.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
       <MenuItem icon={Trash} tone="danger" onClick={() => setConfirming(true)}>{`Remove @${item.name} from the library`}</MenuItem>
     </>}</CardMenu>;

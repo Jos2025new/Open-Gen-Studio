@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const { blobs } = vi.hoisted(() => ({ blobs: new Map<string, Blob>() }));
@@ -13,7 +16,8 @@ vi.mock('../src/lib/idb', () => ({
 import { local, LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../src/engine/providers/demo';
 import { normalizePlan, type PlanContext } from '../src/engine/plan';
 import { deleteSession, subjectFromAsset } from '../src/engine/actions';
-import { beginAssetEdit, revertAssetToOriginal, saveAssetEdit } from '../src/engine/assetRevisions';
+import { beginAssetEdit, jumpToAssetRevision, normalizeAssetRevisions, redoAssetRevision, revertAssetToOriginal, saveAssetEdit, undoAssetRevision } from '../src/engine/assetRevisions';
+import { persistState } from '../src/store/persistJson';
 import { legacySubjects, newSession, useStore } from '../src/store/store';
 import type { Asset, MediaKind, Session } from '../src/engine/types';
 
@@ -73,29 +77,53 @@ describe('global library', () => {
     const copied = await saveAssetEdit('hero', editedBlob);
     expect(copied?.id).not.toBe('hero');
     expect(copied?.copiedFromAssetId).toBe('hero');
-    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(useStore.getState().assets.hero.revisions).toBeUndefined();
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
     expect(await blobs.get(copied!.id)?.text()).toBe('edited-bytes');
 
-    // 3. «Aplicar al original» ('original') updates hero in place while preserving originalRevision.
+    // 3. «Guardar» ('original') appends versions [Original, Pintura] and moves revisionIndex to 1.
     const applied = await saveAssetEdit('hero', editedBlob, 'original', { width: 240, height: 160 });
     expect(applied?.id).toBe('hero');
     expect(useStore.getState().assets.hero.width).toBe(240);
-    expect(useStore.getState().assets.hero.originalRevision).toMatchObject({ width: 120, height: 80 });
+    expect(useStore.getState().assets.hero.revisionIndex).toBe(1);
+    expect(useStore.getState().assets.hero.revisions?.map((r) => r.label)).toEqual(['Original', 'Pintura']);
     expect(await blobs.get('hero')?.text()).toBe('edited-bytes');
 
-    // 4. «Revertir» restores the original bytes and dimensions while keeping revision history.
+    // 4. Undo / Redo / jump to original never delete any version, and saving from an older version appends at the end.
+    expect(await undoAssetRevision('hero')).toBe(true);
+    expect(useStore.getState().assets.hero.revisionIndex).toBe(0);
+    expect(useStore.getState().assets.hero.width).toBe(120);
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+
+    expect(await redoAssetRevision('hero')).toBe(true);
+    expect(useStore.getState().assets.hero.revisionIndex).toBe(1);
+    expect(useStore.getState().assets.hero.width).toBe(240);
+    expect(await blobs.get('hero')?.text()).toBe('edited-bytes');
+
+    // Jump to original (revertAssetToOriginal = jump to 0), then redo still works.
     expect(await revertAssetToOriginal('hero')).toBe(true);
     const restored = useStore.getState().assets.hero;
     expect(restored.width).toBe(120);
     expect(restored.height).toBe(80);
-    expect(restored.originalRevision).toBeUndefined();
-    expect(restored.revisions).toHaveLength(1);
+    expect(restored.revisionIndex).toBe(0);
+    expect(restored.revisions).toHaveLength(2);
     expect(restored.revertedAt).toBeTypeOf('number');
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+    expect(await redoAssetRevision('hero')).toBe(true);
+    expect(useStore.getState().assets.hero.revisionIndex).toBe(1);
+    expect(await blobs.get('hero')?.text()).toBe('edited-bytes');
+
+    // Saving from an older version (index 0) appends v2 at the end without deleting v1.
+    expect(await jumpToAssetRevision('hero', 0)).toBe(true);
+    const edit2Blob = new Blob(['edited-2-bytes'], { type: 'image/png' });
+    const saved2 = await saveAssetEdit('hero', edit2Blob, 'original', { width: 320, height: 240 }, 'Pintura 2');
+    expect(saved2?.revisionIndex).toBe(2);
+    expect(saved2?.revisions?.map((r) => r.label)).toEqual(['Original', 'Pintura', 'Pintura 2']);
+    expect(await blobs.get(saved2!.revisions![1].assetId)?.text()).toBe('edited-bytes');
+    expect(await blobs.get('hero')?.text()).toBe('edited-2-bytes');
   });
 
-  it('requires a verifiable saved copy of the original before applying, and keeps the revision without claiming success if revert fails', async () => {
+  it('migrates legacy originalRevision/revisions in code, persists through SQLite store reload, and handles missing blobs safely', async () => {
     const first = useStore.getState().activeSessionId;
     const origBlob = new Blob(['original-bytes'], { type: 'image/png' });
     const editedBlob = new Blob(['edited-bytes'], { type: 'image/png' });
@@ -103,37 +131,85 @@ describe('global library', () => {
     const missingOrig: Asset = { id: 'no-blob', kind: 'image', mime: 'image/png', width: 100, height: 100, sessionId: first, origin: 'upload', createdAt: 10, stored: true, favorite: false };
     const intactOrig: Asset = { id: 'hero2', kind: 'image', mime: 'image/png', width: 120, height: 80, sessionId: first, origin: 'upload', createdAt: 10, stored: true, favorite: false };
     blobs.set('hero2', origBlob);
+    blobs.set('legacy_orig_blob', new Blob(['legacy-orig'], { type: 'image/png' }));
+    blobs.set('legacy1', new Blob(['legacy-edited'], { type: 'image/png' }));
+    const legacyAsset: Asset = {
+      id: 'legacy1',
+      kind: 'image',
+      mime: 'image/png',
+      width: 200,
+      height: 150,
+      sessionId: first,
+      origin: 'upload',
+      createdAt: 10,
+      stored: true,
+      favorite: false,
+      originalRevision: { assetId: 'legacy_orig_blob', width: 100, height: 75, mime: 'image/png', createdAt: 5 },
+      revisions: [{ assetId: 'legacy_orig_blob', width: 100, height: 75, mime: 'image/png', createdAt: 5 }],
+    };
     useStore.setState((st) => ({
       library: [],
-      assets: { ...st.assets, 'no-blob': missingOrig, hero2: intactOrig },
+      assets: { ...st.assets, 'no-blob': missingOrig, hero2: intactOrig, legacy1: legacyAsset },
       ui: { ...st.ui, toasts: [] },
     }));
+
+    // Legacy shape normalizes to 2 versions pointing at the latest without losing anything on undo/redo.
+    const norm = normalizeAssetRevisions(legacyAsset);
+    expect(norm.index).toBe(1);
+    expect(norm.versions.map((v) => v.label)).toEqual(['Original', 'Guardado']);
+    expect(await undoAssetRevision('legacy1')).toBe(true);
+    expect(await blobs.get('legacy1')?.text()).toBe('legacy-orig');
+    expect(await redoAssetRevision('legacy1')).toBe(true);
+    expect(await blobs.get('legacy1')?.text()).toBe('legacy-edited');
 
     // 1. Apply refuses when the original blob is missing and leaves asset/blobs untouched.
     const rejected = await saveAssetEdit('no-blob', editedBlob, 'original', { width: 200, height: 200 });
     expect(rejected).toBeNull();
     expect(blobs.get('no-blob')).toBeUndefined();
-    expect(useStore.getState().assets['no-blob'].originalRevision).toBeUndefined();
+    expect(useStore.getState().assets['no-blob'].revisions).toBeUndefined();
     expect(useStore.getState().assets['no-blob'].width).toBe(100);
     expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
 
-    // 2. Apply succeeds when original blob is saved and verifiable, then Revert fails cleanly if backup blob is lost.
+    // 2. Apply succeeds when original blob is saved and verifiable, then Undo fails cleanly if target backup blob is lost.
     const applied = await saveAssetEdit('hero2', editedBlob, 'original', { width: 240, height: 160 });
-    expect(applied?.originalRevision).toBeTruthy();
-    const revId = applied!.originalRevision!.assetId;
+    expect(applied?.revisions).toHaveLength(2);
+    const revId = applied!.revisions![0].assetId;
     expect(await blobs.get(revId)?.text()).toBe('original-bytes');
 
-    // Simulate missing backup blob before Revertir.
     blobs.delete(revId);
     useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
-    expect(await revertAssetToOriginal('hero2')).toBe(false);
+    expect(await undoAssetRevision('hero2')).toBe(false);
     const kept = useStore.getState().assets.hero2;
-    expect(kept.originalRevision).toEqual(applied!.originalRevision);
-    expect(kept.revertedAt).toBeUndefined();
+    expect(kept.revisionIndex).toBe(1);
     expect(kept.width).toBe(240);
     expect(await blobs.get('hero2')?.text()).toBe('edited-bytes');
     expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
-    expect(useStore.getState().ui.toasts.some((t) => t.text === 'Original restored')).toBe(false);
+
+    // 3. Versions survive SQLite delta store commit + reload and record asset_revisions.
+    const { createSqliteStore } = await import('../server/store-sqlite.js');
+    const root = mkdtempSync(join(tmpdir(), 'ogs-asset-versions-'));
+    try {
+      const store1 = createSqliteStore(root);
+      const snap1 = persistState({ state: { ...useStore.getState(), assets: { legacy1: useStore.getState().assets.legacy1 } }, version: 1 }).v2!;
+      const r1 = store1.commit({ savedAt: 1000, baseAt: 0, version: snap1.version, globals: snap1.globals, order: snap1.order, sessions: Object.fromEntries(snap1.sessions.entries()) });
+      expect(r1.status).toBe(204);
+
+      await undoAssetRevision('legacy1');
+      const snap2 = persistState({ state: { ...useStore.getState(), assets: { legacy1: useStore.getState().assets.legacy1 } }, version: 1 }).v2!;
+      const r2 = store1.commit({ savedAt: 2000, baseAt: 1000, version: snap2.version, globals: snap2.globals, order: snap2.order, sessions: Object.fromEntries(snap2.sessions.entries()) });
+      expect(r2.status).toBe(204);
+      store1.close();
+
+      // Simulate fresh reload from SQLite store.
+      const store2 = createSqliteStore(root);
+      const loaded = JSON.parse(store2.read()!);
+      expect(loaded.state.assets.legacy1.revisionIndex).toBe(0);
+      expect(loaded.state.assets.legacy1.revisions).toHaveLength(2);
+      expect(store2.readAssetRevisions('legacy1').map((r: { kind: string }) => r.kind)).toEqual(['create', 'revert']);
+      store2.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

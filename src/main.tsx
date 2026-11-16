@@ -18,6 +18,7 @@ import './styles/hierarchy.css';
 import './styles/base.css';
 import './styles/ui.css';
 import './styles/shell.css';
+import './styles/lightbox.css';
 import './styles/shell-tail.css';
 import './styles/composer.css';
 import './styles/chat.css';

@@ -205,7 +205,7 @@ export function createStoreB(dir, opts = {}) {
           q.histPut.run(id, savedAt, text, 0);
           if (!bulkImport) q.journalPut.run(savedAt, cur ? 'edit' : 'generation', id, pickAllowedMeta(text, JOURNAL_ALLOW.generations));
         } else if (coll === 'assets') {
-          if (!bulkImport || cur || text.includes('"originalRevision":') || text.includes('"copiedFromAssetId":') || text.includes('"revertedAt":')) {
+          if (!bulkImport || cur || text.includes('"originalRevision":') || text.includes('"revisions":') || text.includes('"copiedFromAssetId":') || text.includes('"revertedAt":')) {
             const isRevert = Boolean(cur && text.includes('"revertedAt":') && !text.includes('"originalRevision":'));
             const revKind = !cur ? 'create' : isRevert ? 'revert' : 'edit';
             q.revPut.run(id, savedAt, revKind, text);

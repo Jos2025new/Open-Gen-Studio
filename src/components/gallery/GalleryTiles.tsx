@@ -2,7 +2,6 @@ import { useState, type MouseEvent, type ReactNode } from 'react';
 import { AudioLines, Box, Clock, Copy, Download, Eye, EyeOff, FileText, Film, MessageSquare, Paperclip, RotateCcw, Star, Trash } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { copyText, deleteAssets, downloadAsset, toggleFavorite } from '../../engine/actions';
-import { revertAssetToOriginal } from '../../engine/assetRevisions';
 import { canReuse, reuseGeneration } from '../../store/reuse';
 import { setUserHidden } from '../../store/userHidden';
 import { formatDuration, formatRelative } from '../../lib/format';
@@ -33,7 +32,6 @@ function AssetMenuItems({ asset, close, inRow }: { asset: Asset; close: () => vo
   if (confirming) return <MenuConfirm text="Delete this asset? The file is removed from this browser." action="Delete" onCancel={() => setConfirming(false)} onConfirm={() => { deleteAssets([asset.id]); close(); }} />;
   const run = (f: () => void) => () => { f(); close(); };
   return <>
-    {asset.originalRevision ? <MenuItem icon={RotateCcw} onClick={run(() => void revertAssetToOriginal(asset.id))}>Revertir</MenuItem> : null}
     {inRow ? null : <>
       <MenuItem icon={Download} onClick={run(() => void downloadAsset(asset.id))}>Download</MenuItem>
       <MenuItem icon={asset.userHidden ? Eye : EyeOff} onClick={run(() => setUserHidden('asset', [asset.id], !asset.userHidden))}>{asset.userHidden ? 'Unhide' : 'Hide'}</MenuItem>

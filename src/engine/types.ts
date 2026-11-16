@@ -234,7 +234,7 @@ export interface Estimate {
 // ---------------------------------------------------------------------------
 // Assets & generations
 
-export interface AssetRevision { assetId: string; width: number; height: number; mime: string; createdAt: number }
+export interface AssetRevision { assetId: string; width: number; height: number; mime: string; createdAt: number; label?: string }
 
 export interface Asset {
   id: string;
@@ -254,8 +254,12 @@ export interface Asset {
   view3d?: SavedView3D;
   viewImageId?: string;
   thumbKey?: string;
-  originalRevision?: AssetRevision;
+  /** Ordered list of versions (index 0 = Original, last = newest saved state). */
   revisions?: AssetRevision[];
+  /** Pointer to the currently active version in `revisions`. */
+  revisionIndex?: number;
+  /** Legacy field kept for reading older persisted assets; migrated in code by `assetRevisions.ts`. */
+  originalRevision?: AssetRevision;
   copiedFromAssetId?: string;
   revertedAt?: number;
   stored: boolean;

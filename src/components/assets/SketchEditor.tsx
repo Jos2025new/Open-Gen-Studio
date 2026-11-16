@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Brush, Eraser, Redo2, RotateCcw, Undo2, WandSparkles, X } from '../ui/icons';
+import { Brush, Eraser, Redo2, Undo2, WandSparkles, X } from '../ui/icons';
 import { opEstimate, runAssetOp } from '../../engine/actions';
-import { revertAssetToOriginal, saveAssetEdit } from '../../engine/assetRevisions';
+import { saveAssetEdit } from '../../engine/assetRevisions';
 import { opModelFor } from '../../engine/catalog';
 import { assetCanvas, canvasToAsset } from '../../engine/design/actions';
 import { strokeSegment } from '../../engine/design/raster';
@@ -29,7 +29,6 @@ const SWATCHES = ['#ffffff', '#111111', '#ff4d4d', '#ffb020', '#d4f25a', '#3fd0a
 /** Paint over an image without leaving the flow. Strokes stay vectors until saved, so undo is cheap. */
 export function SketchEditor() {
   const target = useStore((s) => s.ui.sketch);
-  const canRevert = useStore((s) => Boolean(target && s.assets[target.assetId]?.originalRevision));
   const sessionId = useStore((s) => s.activeSessionId);
   const brush = useStore((s) => s.ui.brush);
   const baseRef = useRef<HTMLCanvasElement>(null);
@@ -39,7 +38,6 @@ export function SketchEditor() {
   const [redo, setRedo] = useState<Stroke[]>([]);
   const [erase, setErase] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
   const drawing = useRef<Stroke | null>(null);
   const confirm = usePopover();
   const saveMenu = usePopover();
@@ -83,7 +81,7 @@ export function SketchEditor() {
     return () => {
       alive = false;
     };
-  }, [target, reloadKey]);
+  }, [target]);
 
   const redraw = useCallback((list: Stroke[]) => {
     const c = paintRef.current;
@@ -218,21 +216,6 @@ export function SketchEditor() {
       setSaving(false);
     }
   };
-  const revert = async () => {
-    if (!target || saving) return;
-    setSaving(true);
-    try {
-      const ok = await revertAssetToOriginal(target.assetId);
-      if (ok) {
-        setStrokes([]);
-        setRedo([]);
-        redraw([]);
-        setReloadKey((k) => k + 1);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
 
   useEffect(() => {
     if (!target) return;
@@ -290,11 +273,6 @@ export function SketchEditor() {
         <IconButton icon={Undo2} label="Deshacer (Ctrl+Z)" size="sm" disabled={!strokes.length} onClick={undo} />
         <IconButton icon={Redo2} label="Rehacer (Ctrl+Shift+Z)" size="sm" disabled={!redo.length} onClick={redoOne} />
         <span className="spacer" />
-        {canRevert ? (
-          <Button size="sm" variant="ghost" icon={RotateCcw} disabled={saving} onClick={() => void revert()}>
-            Revertir
-          </Button>
-        ) : null}
         {mode === 'mask' ? (
           <>
             <input className="sketch-change" placeholder="Describe el cambio (vacío = quitar objeto)" value={change} onChange={(e) => setChange(e.target.value)} aria-label="Cambio para el área marcada" />
@@ -333,7 +311,7 @@ export function SketchEditor() {
             </Button>
             <Popover open={saveMenu.open} anchor={saveMenu.ref} onClose={saveMenu.close} width="content" label="Guardar imagen">
               <div className="menu">
-                <MenuItem active label="Guardar" detail="Siempre puedes revertir" disabled={saving} onClick={() => void save('original')} />
+                <MenuItem active label="Guardar" detail="Se guarda en el historial de versiones" disabled={saving} onClick={() => void save('original')} />
                 <MenuItem label="Guardar como copia" detail="El original no cambia" disabled={saving} onClick={() => void save('copy')} />
               </div>
             </Popover>

@@ -38,7 +38,7 @@ vi.mock('../src/engine/flow/actions', () => ({
   setSketch: vi.fn(),
 }));
 
-import { AssetActions, RevertAssetMenuItem } from '../src/components/assets/AssetActions';
+import { AssetActions } from '../src/components/assets/AssetActions';
 import { SketchEditor } from '../src/components/assets/SketchEditor';
 import { Toasts } from '../src/components/ui/Toasts';
 import { subjectFromAsset } from '../src/engine/actions';
@@ -126,7 +126,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar > button')]
       .find((b) => b.textContent?.trim() === 'Guardar')!;
 
-  it('opens Sketch in paint mode from Pintar, offers Guardar (default, original) and Guardar como copia with notes, and reverts', async () => {
+  it('opens Sketch in paint mode from Pintar, offers Guardar (default, versioned) and Guardar como copia, and offers Deshacer toast', async () => {
     act(() => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor), createElement(Toasts)));
     });
@@ -159,7 +159,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     // Paint a stroke; original asset and blob remain untouched
     await paintStroke();
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
-    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(useStore.getState().assets.hero.revisions).toBeUndefined();
 
     // Save opens Google Photos style sheet with Guardar (first & default) and Guardar como copia
     const saveBtn = getSaveBtn();
@@ -173,7 +173,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     const sheetBtns = [...savePop.querySelectorAll('button')];
     expect(sheetBtns).toHaveLength(2);
     expect(sheetBtns[0].textContent).toContain('Guardar');
-    expect(sheetBtns[0].textContent).toContain('Siempre puedes revertir');
+    expect(sheetBtns[0].textContent).toContain('Se guarda en el historial de versiones');
     expect(sheetBtns[0].classList.contains('is-active')).toBe(true);
     expect(sheetBtns[1].textContent).toContain('Guardar como copia');
     expect(sheetBtns[1].textContent).toContain('El original no cambia');
@@ -189,7 +189,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(copyAsset).toBeTruthy();
     expect(await blobs.get(copyAsset!.id)?.text()).toBe('painted-png-bytes');
 
-    // 2) Guardar applies to original in place with a verifiable backup revision
+    // 2) Guardar appends a new version and keeps verifiable original backup
     openPaintFromDock();
     await paintStroke();
     const saveBtn2 = getSaveBtn();
@@ -202,28 +202,18 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     });
     expect(useStore.getState().ui.sketch).toBeNull();
     expect(await blobs.get('hero')?.text()).toBe('painted-png-bytes');
-    const rev = useStore.getState().assets.hero.originalRevision;
-    expect(rev).toBeTruthy();
-    expect(await blobs.get(rev!.assetId)?.text()).toBe('original-bytes');
+    const heroAfter = useStore.getState().assets.hero;
+    expect(heroAfter.revisionIndex).toBe(1);
+    expect(heroAfter.revisions).toHaveLength(2);
+    expect(await blobs.get(heroAfter.revisions![0].assetId)?.text()).toBe('original-bytes');
 
-    // Toast includes Revertir action button
-    const toastRevertBtn = host.querySelector<HTMLButtonElement>('.toast-action');
-    expect(toastRevertBtn?.textContent).toBe('Revertir');
-
-    // 3) Reopening editor shows Revertir in the editor top bar and clicking it restores the original
+    // Toast includes Deshacer action button (and no standalone Revertir button exists in SketchEditor)
+    const toastUndoBtn = host.querySelector<HTMLButtonElement>('.toast-action');
+    expect(toastUndoBtn?.textContent).toBe('Deshacer');
     openPaintFromDock();
     await act(async () => {
       await flush();
     });
-    const editorRevertBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar button')]
-      .find((b) => b.textContent?.includes('Revertir'));
-    expect(editorRevertBtn).toBeTruthy();
-    await act(async () => {
-      editorRevertBtn!.click();
-      await flush();
-    });
-    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
-    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
     expect(
       [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar button')]
         .some((b) => b.textContent?.includes('Revertir')),
@@ -294,14 +284,13 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     cleanup();
   });
 
-  it('restores the original via the toast Revertir button and hides RevertAssetMenuItem when nothing to revert', async () => {
+  it('undoes back to the previous version via the toast Deshacer button without deleting versions', async () => {
     act(() => {
       root.render(
         createElement(
           'div',
           null,
           createElement(AssetActions, { assetId: 'hero' }),
-          createElement(RevertAssetMenuItem, { assetId: 'hero' }),
           createElement(SketchEditor),
           createElement(Toasts),
         ),
@@ -320,17 +309,17 @@ describe('AssetActions and SketchEditor library editing flow', () => {
       await flush();
     });
 
-    const toastRevertBtn = host.querySelector<HTMLButtonElement>('.toast-action')!;
-    expect(toastRevertBtn).toBeTruthy();
-    expect(toastRevertBtn.textContent).toBe('Revertir');
+    const toastUndoBtn = host.querySelector<HTMLButtonElement>('.toast-action')!;
+    expect(toastUndoBtn).toBeTruthy();
+    expect(toastUndoBtn.textContent).toBe('Deshacer');
     await act(async () => {
-      toastRevertBtn.click();
+      toastUndoBtn.click();
       await flush();
     });
-    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(useStore.getState().assets.hero.revisionIndex).toBe(0);
+    expect(useStore.getState().assets.hero.revisions).toHaveLength(2);
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
     expect(host.querySelector('.toast-action')).toBeNull();
-    expect(host.textContent).not.toContain('Revertir');
 
     cleanup();
   });
@@ -356,7 +345,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
 
     // Editor stays open with strokes preserved, no success toast emitted
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'hero', mode: 'paint' });
-    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(useStore.getState().assets.hero.revisions).toBeUndefined();
     expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
     expect(useStore.getState().ui.toasts.some((t) => t.level === 'error')).toBe(true);
 
