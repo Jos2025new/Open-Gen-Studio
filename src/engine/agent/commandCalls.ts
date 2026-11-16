@@ -32,8 +32,21 @@ const AREAS: Record<string, string> = {
   sessions: 'list, rename, pin and title sessions',
 };
 const NEEDS_APPROVAL = 'needs the user\'s approval: not available from here yet';
+const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset']);
+const ON_DOC_HINT = ' (target a new doc from an earlier step with "on": "$1.doc", or pass an id from designer.doc.list)';
 const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
 const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
+const formatLine = (f: { id: string; signature?: string; description?: string; title: string; effect: string; available?: unknown }) =>
+  `${f.id} ${f.signature} — ${f.description ?? f.title}${f.effect === 'spend' || f.effect === 'delete' ? ` [${NEEDS_APPROVAL}]` : ''}${typeof f.available === 'string' ? ` [not now: ${f.available}]` : ''}`;
+
+let catalogCache: string | undefined;
+/** Static one-line reference of every command the agent may call, for the cached system prompt. Byte-identical across calls. */
+export function commandCatalog(): string {
+  return (catalogCache ??= [
+    'COMMANDS FOR run_commands (all command ids and arguments; call run_commands directly without calling find_commands first):',
+    ...visible(findCommands({ signatures: true })).map(formatLine),
+  ].join('\n'));
+}
 
 /** The commands of an area, one line each, with whether each can run now; with neither area nor text, an index of the areas. */
 export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer {
@@ -52,7 +65,7 @@ export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer 
   if ((!area && !text) || (area && !everything.some((c) => areaOf(c.id) === area))) return { text: index(), done: true };
   const found = visible(findCommands({ area, text, signatures: true, caller: 'agent', ...(doc ? { on: { session: sessionId, doc: doc.id } } : { on: { session: sessionId } }) }));
   if (!found.length) return { text: `No command matches. Areas: ${Object.keys(AREAS).join(', ')}.`, done: false };
-  const lines = found.map((f) => `${f.id} ${f.signature} — ${f.description ?? f.title}${f.effect === 'spend' || f.effect === 'delete' ? ` [${NEEDS_APPROVAL}]` : ''}${typeof f.available === 'string' ? ` [not now: ${f.available}]` : ''}`);
+  const lines = found.map(formatLine);
   return { text: [context, ...lines].join('\n'), done: true };
 }
 
@@ -60,19 +73,27 @@ export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer 
 export async function runCommandsTool(sessionId: string, input: unknown, signal?: AbortSignal): Promise<ToolAnswer> {
   const v = runCommandsSchema.safeParse(input);
   if (!v.success) return { text: `Invalid run_commands input: ${problems(v.error)}`, done: false };
-  for (const [i, step] of v.data.seq.entries()) {
+  let docRef: string | undefined;
+  const seq = v.data.seq.map((step, i) => {
+    const spec = command(step.cmd);
+    const next = !step.on?.doc && docRef && spec?.needs?.includes('doc') ? { ...step, on: { doc: docRef } } : step;
+    if (spec && DOC_CREATORS.has(spec.id)) docRef = `$${i + 1}.doc`;
+    return next;
+  });
+  for (const [i, step] of seq.entries()) {
     const reason = AGENT_HIDDEN[command(step.cmd)?.id ?? step.cmd];
     if (reason) return { text: `Step ${i + 1}: "${step.cmd}" is not available to the agent: ${reason}. Nothing ran.`, done: false };
   }
   const doc = activeDoc(sessionId);
-  const result = await run({ seq: v.data.seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal });
+  const result = await run({ seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal });
   const ran = result.results.length;
   if (!result.ok) {
     const kept = ran === 0 ? 'Nothing ran.'
       : result.kept ? `Steps 1 to ${ran} ran and stay, as one undo step: the sequence waited on a step and the user may have edited meanwhile, so nothing was taken back. Read the document before going on.`
       : result.rolledBack ? `Steps 1 to ${ran} ran and were taken back: the documents are as before.` : `Steps 1 to ${ran} ran and stay.`;
     if (result.error.code === 'denied') return { text: `Step ${result.error.step ?? 1} ${NEEDS_APPROVAL} (it spends or deletes). Nothing ran.`, done: false };
-    return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${result.error.message} ${kept}`, done: false };
+    const msg = result.error.code === 'target' && result.error.message.includes('on.doc') ? `${result.error.message.replace(/\.$/, '')}${ON_DOC_HINT}.` : result.error.message;
+    return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${msg} ${kept}`, done: false };
   }
   // The agent's edit glows on the canvas for a moment (in memory only: never saved, undone or exported).
   const after = doc ? getDoc(sessionId, doc.id) : undefined;

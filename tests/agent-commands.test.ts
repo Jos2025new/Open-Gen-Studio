@@ -12,7 +12,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 import { sendAgentMessage } from '../src/engine/agent/runtime';
-import { AGENT_HIDDEN, findCommandsTool, runCommandsTool } from '../src/engine/agent/commandCalls';
+import { AGENT_HIDDEN, commandCatalog, findCommandsTool, runCommandsTool } from '../src/engine/agent/commandCalls';
 import { COMMAND_TOOLS } from '../src/engine/agent/commandTools';
 import { allCommands, argsSchema, command } from '../src/engine/commands';
 import { graphHistory } from '../src/engine/flow/history';
@@ -133,5 +133,47 @@ describe('what the model reads', () => {
     expect(twoTools).toBeLessThan(2000);
     expect(twoTools * 4).toBeLessThan(oneEach);
     expect(index).toBeLessThan(1200);
+  });
+
+  it('includes a byte-identical static command catalog in the cached system prompt, eliminating the find_commands round-trip', async () => {
+    const catalog = commandCatalog();
+    const visibleIds = allCommands().map((c) => c.id).filter((id) => !AGENT_HIDDEN[id]).sort();
+    const lines = catalog.split('\n').slice(1);
+    expect(lines).toHaveLength(visibleIds.length);
+    expect(lines.map((l) => l.slice(0, l.indexOf(' ')))).toEqual(visibleIds);
+    expect(catalog).not.toContain('[not now:');
+    expect(catalog).not.toContain('Document on screen');
+    for (const id of Object.keys(AGENT_HIDDEN)) expect(catalog).not.toMatch(new RegExp(`^${id.replace(/\./g, '\\.')} `, 'm'));
+
+    // Replays the evidence Nodes request (2 connected nodes) in 2 model calls (down from 3: no find_commands call).
+    const systems: string[] = [];
+    const replies = [{
+      name: 'run_commands',
+      args: {
+        seq: [
+          { cmd: 'nodes.node.new_data', args: { kind: 'text' } },
+          { cmd: 'nodes.node.add', args: { data: '$1', position: { x: 100, y: 200 } } },
+          { cmd: 'nodes.node.new_data', args: { kind: 'image' } },
+          { cmd: 'nodes.node.add_connected', args: { source: '$2.node', data: '$3', at: { x: 500, y: 200 } } },
+        ],
+      },
+    }];
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+      systems.push(JSON.stringify(body.messages[0]));
+      const call = replies.shift();
+      const delta = call ? { tool_calls: [{ index: 0, id: `c${systems.length}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] } : { content: 'Listo.' };
+      return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: call ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+    });
+    const st = useStore.getState();
+    useStore.setState({ ui: { ...st.ui, workspace: 'node' }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
+    await sendAgentMessage('Añade dos nodos al lienzo de nodos y conéctalos entre sí.');
+    expect(systems).toHaveLength(2);
+    expect(systems[0]).toBe(systems[1]);
+    expect(systems[0]).toContain('nodes.node.add_connected');
+    expect(graph().nodes).toHaveLength(2);
+    expect(graph().edges).toMatchObject([{ source: graph().nodes[0].id, target: graph().nodes[1].id, sourceHandle: 'out', targetHandle: 'prompt' }]);
+    expect(graphHistory(sid, 'undo')).toHaveLength(1);
   });
 });
