@@ -7,6 +7,11 @@ export const OP_GROUP_ORDER: OpGroupId[] = ['explore', 'edit', 'reuse', 'finaliz
 
 export const OP_GROUP_LABEL: Record<OpGroupId, string> = { explore: 'Explore', edit: 'Edit', reuse: 'Reuse', finalize: 'Finalize' };
 
+/** Bottom viewer dock tabs, in Google Photos order: Editar, Explorar, Reutilizar, Finalizar. */
+export const DOCK_GROUP_ORDER: OpGroupId[] = ['edit', 'explore', 'reuse', 'finalize'];
+
+export const DOCK_GROUP_LABEL: Record<OpGroupId, string> = { edit: 'Editar', explore: 'Explorar', reuse: 'Reutilizar', finalize: 'Finalizar' };
+
 /** Every op with one input has a section, so a new op cannot silently vanish from the panel (a test checks it). */
 export const OP_GROUPS: Record<Exclude<OpId, 'join_clips'>, OpGroupId> = {
   variations: 'explore',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LucideIcon } from '../ui/icons';
 import {
   Camera,
@@ -18,6 +18,7 @@ import {
   Frame,
   Grid3x3,
   IdCard,
+  Layers,
   LayoutGrid,
   Maximize,
   Paperclip,
@@ -42,6 +43,7 @@ import type { OpId, SubjectKind } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, Chip, IconButton, MenuItem, Segmented } from '../ui/primitives';
+import { DOCK_GROUP_LABEL, DOCK_GROUP_ORDER, opGroup, type OpGroupId } from './opGroups';
 import { OpForm } from './OpForm';
 import { SaveStyleForm } from './SaveStyleForm';
 import { captureOfAsset } from '../../engine/captureLibrary';
@@ -79,7 +81,14 @@ export const QUICK_LABEL: Partial<Record<OpId, string>> = {
   continue: 'Continue',
 };
 
-export function OpChip({ assetId, op, parentId, compact }: { assetId: string; op: OpId; parentId?: string; compact?: boolean }) {
+const GROUP_ICONS: Record<OpGroupId, LucideIcon> = {
+  edit: WandSparkles,
+  explore: Shuffle,
+  reuse: Layers,
+  finalize: Maximize,
+};
+
+export function OpChip({ assetId, op, parentId, compact, fullLabel }: { assetId: string; op: OpId; parentId?: string; compact?: boolean; fullLabel?: boolean }) {
   const pop = usePopover();
   const Icon = OP_ICONS[op];
   const def = OPS[op];
@@ -89,7 +98,7 @@ export function OpChip({ assetId, op, parentId, compact }: { assetId: string; op
         <IconButton ref={pop.ref} icon={Icon} label={def.label} size="sm" active={pop.open} onClick={pop.toggle} />
       ) : (
         <Chip ref={pop.ref} icon={Icon} active={pop.open} onClick={pop.toggle} data-tip={def.description}>
-          {QUICK_LABEL[op] ?? def.label}
+          {fullLabel ? def.label : (QUICK_LABEL[op] ?? def.label)}
         </Chip>
       )}
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={320} label={def.label}>
@@ -116,16 +125,20 @@ export function RevertAssetMenuItem({ assetId, onDone }: { assetId?: string; onD
   );
 }
 
-/** Operations available for an asset, by type: quick chips plus a menu with the rest. */
-/** `menuOnly`: no quick chips, every operation in the menu behind one "Tools ▾" button (overlaid on a card's picture). */
-export function AssetActions({ assetId, parentId, compact = false, showQuick = true, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean; menuOnly?: boolean }) {
+/** Operations available for an asset, by type: grouped dock tabs (or one "Tools ▾" menu when `menuOnly` on cards). */
+export function AssetActions({ assetId, parentId, compact = false, showQuick: _showQuick = true, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean; menuOnly?: boolean }) {
   const asset = useStore((s) => s.assets[assetId]);
   const more = usePopover();
   const [view, setView] = useState<'menu' | OpId>('menu');
+  const [activeGroup, setActiveGroup] = useState<OpGroupId | null>(null);
+  useEffect(() => {
+    setActiveGroup(null);
+  }, [assetId]);
   if (!asset) return null;
   const ops = opsFor(asset.kind);
-  const quick = showQuick && !menuOnly ? ops.filter((o) => o.quick) : [];
-  const rest = ops.filter((o) => !quick.includes(o));
+  const grouped = DOCK_GROUP_ORDER.map((id) => ({ id, ops: ops.filter((o) => opGroup(o.id) === id) })).filter((g) => g.ops.length > 0);
+  const activeOps = activeGroup ? grouped.find((g) => g.id === activeGroup)?.ops ?? [] : [];
+  const rest = menuOnly ? ops : [];
   // Only operations live here; sending, favorite and download have their own buttons (SendToMenu, card and viewer).
   const hasMenu = rest.length > 0 || asset.kind === 'image' || Boolean(asset.originalRevision);
   if (menuOnly && !hasMenu) return null;
@@ -136,86 +149,106 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
   };
 
   return (
-    <div className="asset-actions">
-      {!menuOnly && asset.kind === 'image' ? (
-        compact ? (
-          <IconButton icon={Brush} label="Pintar" size="sm" onClick={() => beginAssetEdit(assetId)} />
-        ) : (
-          <Chip icon={Brush} onClick={() => beginAssetEdit(assetId)} data-tip="Pintar sobre la imagen">
-            Pintar
+    <>
+      {!menuOnly && activeGroup && activeOps.length ? (
+        <div className="lb-dock-sub" role="group" aria-label={DOCK_GROUP_LABEL[activeGroup]}>
+          {activeOps.map((o) => (
+            <OpChip key={o.id} assetId={assetId} op={o.id} parentId={parentId} compact={compact} fullLabel />
+          ))}
+        </div>
+      ) : null}
+      <div className="asset-actions">
+        {!menuOnly && asset.kind === 'image' ? (
+          compact ? (
+            <IconButton icon={Brush} label="Pintar" size="sm" onClick={() => (setActiveGroup(null), beginAssetEdit(assetId))} />
+          ) : (
+            <Chip icon={Brush} onClick={() => (setActiveGroup(null), beginAssetEdit(assetId))} data-tip="Pintar sobre la imagen">
+              Pintar
+            </Chip>
+          )
+        ) : null}
+        {!menuOnly
+          ? grouped.map((g) => (
+              <Chip
+                key={g.id}
+                icon={GROUP_ICONS[g.id]}
+                active={activeGroup === g.id}
+                aria-expanded={activeGroup === g.id}
+                onClick={() => setActiveGroup((cur) => (cur === g.id ? null : g.id))}
+              >
+                {DOCK_GROUP_LABEL[g.id]}
+              </Chip>
+            ))
+          : null}
+        {menuOnly ? (
+          <Chip
+            ref={more.ref}
+            icon={WandSparkles}
+            className="tools-chip"
+            active={more.open}
+            data-tip="Operations"
+            onClick={() => {
+              setView('menu');
+              more.toggle();
+            }}
+          >
+            Tools
+            <ChevronDown size={13} />
           </Chip>
-        )
-      ) : null}
-      {quick.map((o) => (
-        <OpChip key={o.id} assetId={assetId} op={o.id} parentId={parentId} compact={compact} />
-      ))}
-      {menuOnly ? (
-        <Chip
-          ref={more.ref}
-          icon={WandSparkles}
-          className="tools-chip"
-          active={more.open}
-          data-tip="Operations"
-          onClick={() => {
-            setView('menu');
-            more.toggle();
-          }}
-        >
-          Tools
-          <ChevronDown size={13} />
-        </Chip>
-      ) : hasMenu ? (
-        <IconButton
-          ref={more.ref}
-          icon={Ellipsis}
-          label="More"
-          size="sm"
-          active={more.open}
-          onClick={() => {
-            setView('menu');
-            more.toggle();
-          }}
-        />
-      ) : null}
-      <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="Operations">
-        {view === 'menu' ? (
-          <div className="menu">
-            {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : asset.kind === 'video' ? 'Video operations' : '3D model operations'}</div> : null}
-            {rest.map((o) => (
-              // Icon and label only; the description is the hover tooltip (the form repeats it).
-              <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} tip={o.description} onClick={() => setView(o.id)} />
-            ))}
-            {asset.kind === 'image' ? (
-              <>
-                {menuOnly ? (
+        ) : hasMenu ? (
+          <IconButton
+            ref={more.ref}
+            icon={Ellipsis}
+            label="More"
+            size="sm"
+            active={more.open}
+            onClick={() => {
+              setActiveGroup(null);
+              setView('menu');
+              more.toggle();
+            }}
+          />
+        ) : null}
+        <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="Operations">
+          {view === 'menu' ? (
+            <div className="menu">
+              {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : asset.kind === 'video' ? 'Video operations' : '3D model operations'}</div> : null}
+              {rest.map((o) => (
+                // Icon and label only; the description is the hover tooltip (the form repeats it).
+                <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} tip={o.description} onClick={() => setView(o.id)} />
+              ))}
+              {asset.kind === 'image' ? (
+                <>
+                  {menuOnly ? (
+                    <MenuItem
+                      icon={Brush}
+                      label="Paint / Edit image"
+                      tip="Paint over the image on a copy, then save as a copy or apply to original"
+                      onClick={() => {
+                        close();
+                        beginAssetEdit(assetId);
+                      }}
+                    />
+                  ) : null}
                   <MenuItem
-                    icon={Brush}
-                    label="Paint / Edit image"
-                    tip="Paint over the image on a copy, then save as a copy or apply to original"
+                    icon={Eraser}
+                    label="Edit region / Remove object"
+                    tip="Paint the area in Sketch, then describe the change"
                     onClick={() => {
                       close();
-                      beginAssetEdit(assetId);
+                      setUi({ sketch: { assetId, mode: 'mask' } });
                     }}
                   />
-                ) : null}
-                <MenuItem
-                  icon={Eraser}
-                  label="Edit region / Remove object"
-                  tip="Paint the area in Sketch, then describe the change"
-                  onClick={() => {
-                    close();
-                    setUi({ sketch: { assetId, mode: 'mask' } });
-                  }}
-                />
-              </>
-            ) : null}
-            <RevertAssetMenuItem assetId={assetId} onDone={close} />
-          </div>
-        ) : (
-          <OpForm op={view} target={{ kind: 'asset', assetId, parentId }} onClose={close} onBack={() => setView('menu')} />
-        )}
-      </Popover>
-    </div>
+                </>
+              ) : null}
+              <RevertAssetMenuItem assetId={assetId} onDone={close} />
+            </div>
+          ) : (
+            <OpForm op={view} target={{ kind: 'asset', assetId, parentId }} onClose={close} onBack={() => setView('menu')} />
+          )}
+        </Popover>
+      </div>
+    </>
   );
 }
 

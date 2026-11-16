@@ -159,7 +159,7 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     cleanup();
   });
 
-  it('puts Pintar first as a visible button in the bottom dock and keeps the rest in More', () => {
+  it('renders grouped bottom dock tabs in order, opens/closes sub-row above dock, opens op form with price, and filters by asset kind', () => {
     act(() => {
       root.render(createElement(Lightbox));
     });
@@ -167,7 +167,39 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     const dock = host.querySelector<HTMLElement>('.lb-dock .asset-actions')!;
     expect(dock).toBeTruthy();
     const dockButtons = [...dock.querySelectorAll<HTMLButtonElement>(':scope > button')];
-    expect(dockButtons[0].textContent).toContain('Pintar');
+    expect(dockButtons.map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual([
+      'Pintar',
+      'Editar',
+      'Explorar',
+      'Reutilizar',
+      'Finalizar',
+      'More',
+    ]);
+    expect(host.querySelector('.lb-dock-sub')).toBeNull();
+
+    // Tap Editar -> shows sub-row above dock with Editar ops (icon + label, .chip)
+    const editarBtn = dockButtons[1];
+    act(() => editarBtn.click());
+    expect(editarBtn.getAttribute('aria-expanded')).toBe('true');
+    const sub = host.querySelector<HTMLElement>('.lb-dock-sub')!;
+    expect(sub).toBeTruthy();
+    const subButtons = [...sub.querySelectorAll<HTMLButtonElement>('button.chip')];
+    expect(subButtons.some((b) => b.textContent?.includes('Remove background'))).toBe(true);
+    expect(subButtons.some((b) => b.textContent?.includes('Edit with prompt'))).toBe(true);
+
+    // Tap an op -> opens its existing OpForm popover with SpendConfirm price
+    const fxBtn = subButtons.find((b) => b.textContent?.includes('Filters & effects'))!;
+    fxBtn.getBoundingClientRect = () => ({ left: 100, top: 200, right: 200, bottom: 230, width: 100, height: 30, x: 100, y: 200, toJSON() {} });
+    act(() => fxBtn.click());
+    const opDialog = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Filters & effects"]')!;
+    expect(opDialog).toBeTruthy();
+    expect(opDialog.querySelector('.spend')).toBeTruthy();
+    expect(opDialog.querySelector('.cost-tag')).toBeTruthy();
+
+    // Tap active group again -> closes the sub-row
+    act(() => editarBtn.click());
+    expect(host.querySelector('.lb-dock-sub')).toBeNull();
+    expect(editarBtn.getAttribute('aria-expanded')).toBe('false');
 
     // Open More -> Pintar is NOT hidden in More, while Edit region / Remove object stays
     const moreBtn = dock.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
@@ -181,6 +213,21 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     // Clicking Pintar directly opens SketchEditor in paint mode
     act(() => dockButtons[0].click());
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'img1', mode: 'paint' });
+
+    // Audio asset shows only groups that have audio ops (Reutilizar)
+    const sessionId = useStore.getState().activeSessionId;
+    blobs.set('aud1', new Blob(['aud'], { type: 'audio/mpeg' }));
+    act(() => {
+      useStore.setState((st) => ({
+        assets: {
+          ...st.assets,
+          aud1: { id: 'aud1', kind: 'audio', mime: 'audio/mpeg', width: 0, height: 0, duration: 5, sessionId, origin: 'upload', createdAt: 120, stored: true, favorite: false },
+        },
+        ui: { ...st.ui, sketch: null, lightbox: { assetIds: ['aud1'], index: 0 } },
+      }));
+    });
+    const audioButtons = [...host.querySelectorAll<HTMLButtonElement>('.lb-dock .asset-actions > button')].map((b) => b.textContent || b.getAttribute('aria-label'));
+    expect(audioButtons).toEqual(['Reutilizar']);
 
     cleanup();
   });
