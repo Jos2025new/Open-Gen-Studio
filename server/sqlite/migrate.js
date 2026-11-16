@@ -108,6 +108,9 @@ export async function migrateFromV2(dir, opts = {}) {
   }
 
   const hasV2 = existsSync(headFile);
+  if (!hasV2 && existsSync(v2Root)) {
+    throw new Error(`incomplete store-v2 folder in ${dir}: missing HEAD.json`);
+  }
   const hasV1 = !hasV2 && existsSync(stateFile);
   if (!hasV2 && !hasV1) {
     throw new Error(`store-v2/HEAD.json not found in ${dir}`);

@@ -119,6 +119,21 @@ describe('phase 2: migration from format 1 and format 2 folders', () => {
     symlinkSync(join(process.cwd(), 'data', 'store-v2'), join(safeDir, 'store-v2'));
     await expect(migrateFromV2(safeDir)).rejects.toThrow(/refusing to migrate protected folder/);
   });
+
+  it('stops on an incomplete store-v2 folder instead of importing an old state.json', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-mig-incomplete-'));
+    const dir = join(root, 'data');
+    mkdirSync(join(dir, 'store-v2'), { recursive: true });
+    writeFileSync(join(dir, 'store-v2', 'globals.json'), globals(9));
+    writeFileSync(join(dir, 'state.json'), json({
+      savedAt: 500,
+      state: { settings: { theme: 'dark' }, spentUsd: 0, spendLog: [], generations: {}, assets: {}, library: [], sessions: { ses_a: JSON.parse(session) } },
+      version: 1,
+    }));
+
+    await expect(migrateFromV2(dir)).rejects.toThrow(/incomplete store-v2/);
+    expect(sqliteHead(dir)).toBeNull();
+  });
 });
 
 describe('phase 4: asset revisions and append-only event journal in SQLite', () => {
