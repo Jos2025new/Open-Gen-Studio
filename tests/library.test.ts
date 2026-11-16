@@ -94,6 +94,47 @@ describe('global library', () => {
     expect(restored.revertedAt).toBeTypeOf('number');
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
   });
+
+  it('requires a verifiable saved copy of the original before applying, and keeps the revision without claiming success if revert fails', async () => {
+    const first = useStore.getState().activeSessionId;
+    const origBlob = new Blob(['original-bytes'], { type: 'image/png' });
+    const editedBlob = new Blob(['edited-bytes'], { type: 'image/png' });
+    blobs.clear();
+    const missingOrig: Asset = { id: 'no-blob', kind: 'image', mime: 'image/png', width: 100, height: 100, sessionId: first, origin: 'upload', createdAt: 10, stored: true, favorite: false };
+    const intactOrig: Asset = { id: 'hero2', kind: 'image', mime: 'image/png', width: 120, height: 80, sessionId: first, origin: 'upload', createdAt: 10, stored: true, favorite: false };
+    blobs.set('hero2', origBlob);
+    useStore.setState((st) => ({
+      library: [],
+      assets: { ...st.assets, 'no-blob': missingOrig, hero2: intactOrig },
+      ui: { ...st.ui, toasts: [] },
+    }));
+
+    // 1. Apply refuses when the original blob is missing and leaves asset/blobs untouched.
+    const rejected = await saveAssetEdit('no-blob', editedBlob, 'original', { width: 200, height: 200 });
+    expect(rejected).toBeNull();
+    expect(blobs.get('no-blob')).toBeUndefined();
+    expect(useStore.getState().assets['no-blob'].originalRevision).toBeUndefined();
+    expect(useStore.getState().assets['no-blob'].width).toBe(100);
+    expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
+
+    // 2. Apply succeeds when original blob is saved and verifiable, then Revert fails cleanly if backup blob is lost.
+    const applied = await saveAssetEdit('hero2', editedBlob, 'original', { width: 240, height: 160 });
+    expect(applied?.originalRevision).toBeTruthy();
+    const revId = applied!.originalRevision!.assetId;
+    expect(await blobs.get(revId)?.text()).toBe('original-bytes');
+
+    // Simulate missing backup blob before Revertir.
+    blobs.delete(revId);
+    useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
+    expect(await revertAssetToOriginal('hero2')).toBe(false);
+    const kept = useStore.getState().assets.hero2;
+    expect(kept.originalRevision).toEqual(applied!.originalRevision);
+    expect(kept.revertedAt).toBeUndefined();
+    expect(kept.width).toBe(240);
+    expect(await blobs.get('hero2')?.text()).toBe('edited-bytes');
+    expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
+    expect(useStore.getState().ui.toasts.some((t) => t.text === 'Original restored')).toBe(false);
+  });
 });
 
 describe('references first in plans', () => {

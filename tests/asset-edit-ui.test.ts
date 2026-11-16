@@ -180,4 +180,39 @@ describe('AssetActions and SketchEditor library editing flow', () => {
 
     cleanup();
   });
+
+  it('keeps SketchEditor open when Aplicar al original cannot verify a backup of the original', async () => {
+    act(() => {
+      root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
+    });
+    const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
+    moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
+    act(() => moreBtn.click());
+    const editBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
+      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
+    act(() => editBtn.click());
+    await paintStroke();
+
+    // Remove original blob before clicking Aplicar al original
+    blobs.delete('hero');
+    useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
+    const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
+      .find((b) => b.textContent === 'Save')!;
+    saveBtn.getBoundingClientRect = () => ({ left: 200, top: 20, right: 260, bottom: 50, width: 60, height: 30, x: 200, y: 20, toJSON() {} });
+    act(() => saveBtn.click());
+    const origBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Save asset"] button')]
+      .find((b) => b.textContent?.includes('Aplicar al original'))!;
+    await act(async () => {
+      origBtn.click();
+      await flush();
+    });
+
+    // Editor stays open with strokes preserved, no success toast emitted
+    expect(useStore.getState().ui.sketch).toEqual({ assetId: 'hero', mode: 'paint' });
+    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
+    expect(useStore.getState().ui.toasts.some((t) => t.level === 'error')).toBe(true);
+
+    cleanup();
+  });
 });

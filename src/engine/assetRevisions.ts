@@ -5,6 +5,24 @@ import { addAssets, setUi, toast, useStore } from '../store/store';
 
 export type { AssetRevision };
 
+async function sameBlobBytes(a: Blob, b: Blob): Promise<boolean> {
+  if (a.size !== b.size) return false;
+  if (a === b) return true;
+  if (typeof a.arrayBuffer !== 'function' || typeof b.arrayBuffer !== 'function') return true;
+  const [ba, bb] = await Promise.all([a.arrayBuffer(), b.arrayBuffer()]);
+  const va = new Uint8Array(ba);
+  const vb = new Uint8Array(bb);
+  for (let i = 0; i < va.length; i++) if (va[i] !== vb[i]) return false;
+  return true;
+}
+
+async function writeVerifiedBlob(assetId: string, blob: Blob): Promise<boolean> {
+  if (blob.size <= 0) return false;
+  await putAssetBlob(assetId, blob);
+  const stored = await getAssetBlob(assetId);
+  return Boolean(stored && (await sameBlobBytes(blob, stored)));
+}
+
 /**
  * Starts editing a library/gallery asset on a working copy so the original asset in `store.assets` and its blob
  * are untouched while editing. Opens Sketch in paint mode on `assetId`.
@@ -62,8 +80,28 @@ export async function saveAssetEdit(
     return copy;
   }
   const revId = uid('ast');
-  const prevBlob = await getAssetBlob(assetId);
-  if (prevBlob) await putAssetBlob(revId, prevBlob);
+  let prevBlob: Blob | undefined;
+  try {
+    prevBlob = await getAssetBlob(assetId);
+    if (!prevBlob || prevBlob.size === 0) {
+      toast('Original image backup unavailable; save as copy instead', 'error');
+      return null;
+    }
+    if (source.originalRevision) {
+      const origBackup = await getAssetBlob(source.originalRevision.assetId);
+      if (!origBackup || origBackup.size === 0) {
+        toast('Original image backup unavailable; save as copy instead', 'error');
+        return null;
+      }
+    }
+    if (!(await writeVerifiedBlob(revId, prevBlob))) {
+      toast('Could not save a verifiable backup of the original image', 'error');
+      return null;
+    }
+  } catch {
+    toast('Could not save a verifiable backup of the original image', 'error');
+    return null;
+  }
   const revEntry: AssetRevision = {
     assetId: revId,
     width: source.width,
@@ -71,18 +109,29 @@ export async function saveAssetEdit(
     mime: source.mime,
     createdAt: source.createdAt,
   };
-  await putAssetBlob(assetId, editedBlob);
-  const updated: Asset = {
-    ...source,
-    width,
-    height,
-    mime,
-    originalRevision: source.originalRevision ?? revEntry,
-    revisions: [...(source.revisions ?? []), revEntry],
-    revertedAt: undefined,
-    stored: true,
-  };
-  useStore.setState((st) => ({ assets: { ...st.assets, [assetId]: updated } }));
+  try {
+    await putAssetBlob(assetId, editedBlob);
+  } catch {
+    toast('Could not save the edited image', 'error');
+    return null;
+  }
+  let updated: Asset | null = null;
+  useStore.setState((st) => {
+    const cur = st.assets[assetId];
+    if (!cur) return {};
+    updated = {
+      ...cur,
+      width,
+      height,
+      mime,
+      originalRevision: cur.originalRevision ?? revEntry,
+      revisions: [...(cur.revisions ?? []), revEntry],
+      revertedAt: undefined,
+      stored: true,
+    };
+    return { assets: { ...st.assets, [assetId]: updated } };
+  });
+  if (!updated) return null;
   toast('Applied to original · Revertir restores the original', 'success');
   return updated;
 }
@@ -92,11 +141,25 @@ export async function revertAssetToOriginal(assetId: string): Promise<boolean> {
   const asset = useStore.getState().assets[assetId];
   const orig = asset?.originalRevision;
   if (!asset || !orig) return false;
-  const origBlob = await getAssetBlob(orig.assetId);
-  if (origBlob) await putAssetBlob(assetId, origBlob);
+  try {
+    const origBlob = await getAssetBlob(orig.assetId);
+    if (!origBlob || origBlob.size === 0) {
+      toast('Original backup is missing; keeping current revision', 'error');
+      return false;
+    }
+    if (!(await writeVerifiedBlob(assetId, origBlob))) {
+      toast('Could not verify restored original; keeping current revision', 'error');
+      return false;
+    }
+  } catch {
+    toast('Could not restore original; keeping current revision', 'error');
+    return false;
+  }
+  let reverted = false;
   useStore.setState((st) => {
     const cur = st.assets[assetId];
     if (!cur?.originalRevision) return {};
+    reverted = true;
     return {
       assets: {
         ...st.assets,
@@ -111,6 +174,7 @@ export async function revertAssetToOriginal(assetId: string): Promise<boolean> {
       },
     };
   });
+  if (!reverted) return false;
   toast('Original restored', 'success');
   return true;
 }
