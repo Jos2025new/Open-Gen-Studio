@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -25,8 +25,7 @@ vi.mock('node:fs/promises', async (original) => {
 });
 import { localStore } from '../server/local-store.js';
 import { createKeyStore } from '../server/keys.js';
-import { createStoreV2 } from '../server/store-v2.js';
-import { canonicalStateText, createSqliteStore, DatabaseSync, migrateFromV2, sqliteHead, stateSha } from '../server/store-sqlite.js';
+import { createSqliteStore, DatabaseSync, sqliteHead } from '../server/store-sqlite.js';
 
 const json = (v: unknown) => JSON.stringify(v);
 const bytes = (text: string) => new TextEncoder().encode(text).length;
@@ -420,73 +419,6 @@ describe('a backup copy never decides the commit', () => {
     expect(broken.read()).toContain('ses_a');
     expect(commit(broken, 2000, 1000, 2, {}).status).toBe(204);
     broken.close();
-  });
-});
-
-describe('phase 2: migration from format 1 and format 2 folders', () => {
-  it('migrates format 2 (copy first, one transaction, verified by sha, v2 untouched for rollback, second migration stops without deleting)', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'ogs-mig-v2-'));
-    const dir = join(root, 'data');
-    const v2 = createStoreV2(dir);
-    expect((await v2.commit({ savedAt: 1000, baseAt: 0, version: 1, globals: globals(1), order: ['ses_a'], sessions: { ses_a: session } })).status).toBe(204);
-    const headBefore = readFileSync(join(dir, 'store-v2', 'HEAD.json'), 'utf8');
-    const globalsBefore = readFileSync(join(dir, 'store-v2', 'globals.json'), 'utf8');
-    const v2Text = (await v2.read())!;
-
-    // Mid-transaction failure rolls back completely, leaving no head and store-v2 intact.
-    await expect(migrateFromV2(dir, { fault: (p) => { if (p === 'globals') throw new Error('cut mid-tx'); } })).rejects.toThrow('cut mid-tx');
-    expect(sqliteHead(dir)).toBeNull();
-    expect(await v2.read()).toBe(v2Text);
-
-    const res = await migrateFromV2(dir);
-    expect(res).toMatchObject({ ok: true, format: 2, savedAt: 1000, sessions: 1, sha: stateSha(v2Text), readSource: 'copy' });
-    expect(readFileSync(join(res.backupDir, 'HEAD.json'), 'utf8')).toBe(headBefore);
-    expect(readFileSync(join(res.backupDir, 'globals.json'), 'utf8')).toBe(globalsBefore);
-    expect(readFileSync(join(dir, 'store-v2', 'HEAD.json'), 'utf8')).toBe(headBefore);
-
-    const store = createSqliteStore(dir);
-    expect(store.read()).toBe(canonicalStateText(v2Text));
-    expect(commit(store, 2000, 1000, 2, {}).status).toBe(204);
-    store.close();
-
-    // Second migration after SQLite advanced stops and deletes nothing.
-    const dbBytesBefore = new Uint8Array(readFileSync(join(dir, 'ogs.sqlite')));
-    await expect(migrateFromV2(dir)).rejects.toThrow(/left intact/);
-    expect(new Uint8Array(readFileSync(join(dir, 'ogs.sqlite')))).toEqual(dbBytesBefore);
-
-    // Rollback: removing ogs.sqlite falls right back to untouched store-v2.
-    rmSync(join(dir, 'ogs.sqlite'), { force: true });
-    rmSync(join(dir, 'state-cache.txt'), { force: true });
-    const { callBody } = mount(root);
-    expect((await callBody('GET', '/x/store/state')).body).toBe(v2Text);
-  });
-
-  it('migrates format 1 (state.json) and refuses protected data/ or .sandbox/ folders', async () => {
-    await expect(migrateFromV2('data')).rejects.toThrow(/refusing to migrate protected folder/);
-    await expect(migrateFromV2('.sandbox/data')).rejects.toThrow(/refusing to migrate protected folder/);
-
-    const root = mkdtempSync(join(tmpdir(), 'ogs-mig-v1-'));
-    const dir = join(root, 'data');
-    mkdirSync(dir, { recursive: true });
-    const v1Text = json({
-      savedAt: 500,
-      state: {
-        settings: { theme: 'dark' }, spentUsd: 0, spendLog: [], generations: {}, assets: {}, library: [{ id: 'lib_a', name: 'A' }],
-        ui: { zoom: 1.25 }, sessions: { ses_a: JSON.parse(session) },
-      },
-      version: 1,
-    });
-    writeFileSync(join(dir, 'state.json'), v1Text);
-
-    const res = await migrateFromV2(dir);
-    expect(res).toMatchObject({ ok: true, format: 1, savedAt: 500, sessions: 1, sha: stateSha(v1Text), readSource: 'copy' });
-    expect(readFileSync(join(res.backupDir, 'state.json'), 'utf8')).toBe(v1Text);
-    expect(readFileSync(join(dir, 'state.json'), 'utf8')).toBe(v1Text);
-
-    const { callBody } = mount(root);
-    expect(stateSha((await callBody('GET', '/x/store/state')).body)).toBe(stateSha(v1Text));
-    expect((await callBody('PUT', '/x/store/v2/commit', json({ savedAt: 1500, baseAt: 500, version: 1, globals: globals(3), order: ['ses_a'], sessions: {} }))).status).toBe(204);
-    await expect(migrateFromV2(dir)).rejects.toThrow(/left intact/);
   });
 });
 

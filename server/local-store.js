@@ -429,6 +429,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
         if (sqlite) {
           raw = await serialState(async () => {
             const store = sqliteStore();
+            store.recordEvent('export', stamp, { at: stamp });
             store.idle();
             const state = store.read() ?? '';
             const exportedSqlite = join(work, 'ogs.sqlite');

@@ -234,9 +234,10 @@ export interface Estimate {
 // ---------------------------------------------------------------------------
 // Assets & generations
 
+export interface AssetRevision { assetId: string; width: number; height: number; mime: string; createdAt: number }
+
 export interface Asset {
   id: string;
-  /** File name chosen by the user, without extension (the extension always comes from the file's type). */
   name?: string;
   kind: AssetKind;
   mime: string;
@@ -245,20 +246,18 @@ export interface Asset {
   duration?: number;
   sessionId: string;
   generationId?: string;
-  /** 'sketch' and 'mask' are working copies hidden from the gallery. */
   origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask' | 'view3d';
-  /** Where it was created and in what mode (see placeTypes.ts); absent in older data. */
   place?: Place;
   mode?: Mode;
-  /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
   thumbnailUrl?: string;
-  /** 3D: the view and look the viewer left it in (never changes the file). */
   view3d?: SavedView3D;
-  /** 3D: hidden image of that view (origin 'view3d'); what image inputs receive. */
   viewImageId?: string;
-  /** 3D: which view rendered the thumbnail; a different one re-renders it. */
   thumbKey?: string;
+  originalRevision?: AssetRevision;
+  revisions?: AssetRevision[];
+  copiedFromAssetId?: string;
+  revertedAt?: number;
   stored: boolean;
   favorite: boolean;
   createdAt: number;

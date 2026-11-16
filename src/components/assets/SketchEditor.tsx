@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Brush, Eraser, Redo2, Undo2, WandSparkles, X } from '../ui/icons';
 import { opEstimate, runAssetOp } from '../../engine/actions';
+import { saveAssetEdit } from '../../engine/assetRevisions';
 import { opModelFor } from '../../engine/catalog';
 import { assetCanvas, canvasToAsset } from '../../engine/design/actions';
 import { strokeSegment } from '../../engine/design/raster';
@@ -39,6 +40,7 @@ export function SketchEditor() {
   const [saving, setSaving] = useState(false);
   const drawing = useRef<Stroke | null>(null);
   const confirm = usePopover();
+  const saveMenu = usePopover();
   // Mask mode: paint the area, then Edit region (with a description) or Remove object (without one).
   const [mode, setMode] = useState<'paint' | 'mask'>('paint');
   const [change, setChange] = useState('');
@@ -53,7 +55,7 @@ export function SketchEditor() {
     setRedo([]);
     setSize(null);
     setChange('');
-    setMode(target?.mode === 'mask' || !target?.nodeId ? 'mask' : 'paint');
+    setMode(target?.mode ?? (target?.nodeId ? 'paint' : 'mask'));
     if (!target) return;
     let alive = true;
     assetCanvas(target.assetId)
@@ -176,10 +178,9 @@ export function SketchEditor() {
       setSaving(false);
     }
   };
-  const save = async () => {
-    // Painting is saved on the node it came from; mask mode has its own actions.
-    if (!target?.nodeId || !baseRef.current || !paintRef.current) return;
-    const nodeId = target.nodeId;
+  const save = async (choice: 'copy' | 'original' = 'copy') => {
+    // Painting is saved on the node it came from, or for a library/gallery asset with the chosen mode ('copy' default or 'original').
+    if (!target || !baseRef.current || !paintRef.current) return;
     setSaving(true);
     try {
       const out = document.createElement('canvas');
@@ -188,9 +189,15 @@ export function SketchEditor() {
       const ctx = out.getContext('2d')!;
       ctx.drawImage(baseRef.current, 0, 0);
       ctx.drawImage(paintRef.current, 0, 0);
-      const asset = await canvasToAsset(sessionId, out, 'sketch');
-      setSketch(sessionId, nodeId, asset.id);
-      toast('Sketch applied · Reset image restores the original', 'success');
+      if (target.nodeId) {
+        const asset = await canvasToAsset(sessionId, out, 'sketch');
+        setSketch(sessionId, target.nodeId, asset.id);
+        toast('Sketch applied · Reset image restores the original', 'success');
+      } else {
+        const blob = await new Promise<Blob>((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png'));
+        await saveAssetEdit(target.assetId, blob, choice, { width: out.width, height: out.height });
+      }
+      saveMenu.close();
       close();
     } catch (err) {
       toast((err as Error).message, 'error');
@@ -223,7 +230,7 @@ export function SketchEditor() {
     <div className="sketch" role="dialog" aria-label="Sketch">
       <div className="sketch-bar">
         <div className="segmented" aria-label="Mode">
-          <button type="button" className={mode === 'paint' ? 'is-active' : ''} disabled={!target.nodeId} onClick={() => setMode('paint')} data-tip={target.nodeId ? 'Paint over the image' : 'Painting is saved on nodes; open Sketch from a node'}>
+          <button type="button" className={mode === 'paint' ? 'is-active' : ''} onClick={() => setMode('paint')} data-tip="Paint over the image">
             Paint
           </button>
           <button type="button" className={mode === 'mask' ? 'is-active' : ''} onClick={() => setMode('mask')} data-tip="Mark an area to change or remove">
@@ -282,10 +289,29 @@ export function SketchEditor() {
               ) : null}
             </Popover>
           </>
-        ) : (
-          <Button size="sm" variant="primary" disabled={!dirty || saving} onClick={() => void save()}>
+        ) : target.nodeId ? (
+          <Button size="sm" variant="primary" disabled={!dirty || saving} onClick={() => void save('copy')}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
+        ) : (
+          <>
+            <Button ref={saveMenu.ref} size="sm" variant="primary" disabled={!dirty || saving} onClick={saveMenu.toggle}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+            <Popover open={saveMenu.open} anchor={saveMenu.ref} onClose={saveMenu.close} width={280} label="Save asset">
+              <div className="confirm">
+                <p>How would you like to save this edit?</p>
+                <div className="spend-actions">
+                  <Button variant="secondary" disabled={saving} onClick={() => void save('original')}>
+                    Aplicar al original
+                  </Button>
+                  <Button variant="primary" disabled={saving} onClick={() => void save('copy')}>
+                    Guardar como copia
+                  </Button>
+                </div>
+              </div>
+            </Popover>
+          </>
         )}
         <IconButton ref={confirm.ref} icon={X} label="Close" size="sm" onClick={() => (dirty ? confirm.toggle() : close())} />
         <Popover open={confirm.open} anchor={confirm.ref} onClose={confirm.close} width={260} label="Unsaved sketch">
@@ -295,7 +321,7 @@ export function SketchEditor() {
               <Button variant="ghost" onClick={() => (confirm.close(), close())}>
                 Discard
               </Button>
-              <Button variant="primary" disabled={saving} onClick={() => (confirm.close(), void save())}>
+              <Button variant="primary" disabled={saving} onClick={() => (confirm.close(), void save('copy'))}>
                 Save
               </Button>
             </div>

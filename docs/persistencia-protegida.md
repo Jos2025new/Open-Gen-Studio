@@ -27,7 +27,7 @@ El guardado protegido ([ADR 0022](decisions/0022-guardado-local-first-sin-bloque
 | [writer-lock](../tests/writer-lock.test.ts), [writer-lock-handoff](../tests/writer-lock-handoff.test.ts), [writer-lock-panel](../tests/writer-lock-panel.test.ts), [writer-lock-raster](../tests/writer-lock-raster.test.ts) | Una pestaña activa, traspaso seguro, sin `steal` |
 | [prompt-history-wipe](../tests/prompt-history-wipe.test.ts) | Borrar todos los datos incluye `ogs-prompts`, también con una conexión abierta hasta recargar |
 | [state-conflict](../tests/state-conflict.test.ts), [state-copies](../tests/state-copies.test.ts) | Conflictos y copias al arrancar |
-| [store-sqlite](../tests/store-sqlite.test.ts) | Fase 1: el cuerpo de hoy, el formato 1 no se esconde, un SQLite roto no se sirve, la exportación, la copia y el costo de una edición pequeña |
+| [store-sqlite](../tests/store-sqlite.test.ts), [store-sqlite-phases](../tests/store-sqlite-phases.test.ts) | Fases 1–4: el almacén SQLite, la migración verificada, el envío de cambios con índice fraccionario, las revisiones de assets y el diario de eventos |
 
 ## Revisiones
 

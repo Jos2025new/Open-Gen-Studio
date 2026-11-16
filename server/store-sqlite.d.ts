@@ -30,6 +30,9 @@ export function createSqliteStore(dir: string, opts?: { synchronous?: string; fa
   commitLegacy(text: string): { status: number; reason?: string; savedAt?: number };
   lastStats(): { recGets: number; recWrites: number; posUpdates: number };
   lastDelta(): { order?: unknown } | null;
+  readAssetRevisions(assetId: string): Array<{ seq: number; assetId: string; ts: number; kind: string; meta: Record<string, unknown> }>;
+  readJournal(kind?: string): Array<{ seq: number; ts: number; kind: string; id: string; meta: Record<string, unknown> }>;
+  recordEvent(kind: string, id: string, meta?: unknown, ts?: number): void;
   sizes(): { wal: number };
   idle(): number;
   close(): void;

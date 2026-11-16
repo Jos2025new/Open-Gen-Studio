@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 export const PROTECTED_TESTS = [
   'save-guard-review', 'save-guard-server', 'save-guard-client', 'save-guard-banner', 'save-now', 'raster-persist',
   'writer-lock', 'writer-lock-handoff', 'writer-lock-panel', 'writer-lock-raster', 'state-conflict', 'state-copies',
-  'store-sqlite',
+  'store-sqlite', 'store-sqlite-phases',
 ].map((name) => `tests/${name}.test.ts`);
 export const PROTECTED_SOURCES = [
   'server/store-sqlite.js', 'server/sqlite/store-b.js', 'server/sqlite/store-ba.js', 'server/sqlite/delta-client.mjs', 'server/sqlite/fractional-index.mjs', 'server/sqlite/migrate.js',

@@ -1,17 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const { blobs } = vi.hoisted(() => ({ blobs: new Map<string, Blob>() }));
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
-  getAssetBlob: async () => undefined,
-  putAssetBlob: async () => undefined,
-  deleteAssetBlobs: async () => undefined,
+  getAssetBlob: async (id: string) => blobs.get(id),
+  putAssetBlob: async (id: string, b: Blob) => { blobs.set(id, b); return `blob:${id}`; },
+  deleteAssetBlobs: async (ids: string[]) => ids.forEach((id) => blobs.delete(id)),
 }));
 
 import { local, LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../src/engine/providers/demo';
 import { normalizePlan, type PlanContext } from '../src/engine/plan';
 import { deleteSession, subjectFromAsset } from '../src/engine/actions';
+import { beginAssetEdit, revertAssetToOriginal, saveAssetEdit } from '../src/engine/assetRevisions';
 import { legacySubjects, newSession, useStore } from '../src/store/store';
 import type { Asset, MediaKind, Session } from '../src/engine/types';
 
@@ -49,6 +51,48 @@ describe('global library', () => {
     expect(st.library.map((x) => x.name)).toEqual(['Hero']);
     expect(st.assets.hero).toBeTruthy();
     expect(st.assets.tmp).toBeUndefined();
+  });
+
+  it('editing a library asset works on a copy, defaults to Guardar como copia, and Aplicar al original stays recoverable with Revertir', async () => {
+    const first = useStore.getState().activeSessionId;
+    const origBlob = new Blob(['original-bytes'], { type: 'image/png' });
+    const editedBlob = new Blob(['edited-bytes'], { type: 'image/png' });
+    blobs.set('hero', origBlob);
+    const img: Asset = { id: 'hero', kind: 'image', mime: 'image/png', width: 120, height: 80, sessionId: first, origin: 'upload', createdAt: 10, stored: true, favorite: false };
+    useStore.setState((st) => ({ library: [], assets: { ...st.assets, hero: img } }));
+    subjectFromAsset('hero', 'Hero', 'character');
+
+    // 1. Editing works on a working copy and leaves the original untouched.
+    const working = beginAssetEdit('hero');
+    expect(working?.copiedFromAssetId).toBe('hero');
+    expect(working?.id).not.toBe('hero');
+    expect(useStore.getState().assets.hero.width).toBe(120);
+    expect(useStore.getState().ui.sketch).toEqual({ assetId: 'hero', mode: 'paint' });
+
+    // 2. Default save ('copy' / «Guardar como copia») creates a new asset and leaves hero untouched.
+    const copied = await saveAssetEdit('hero', editedBlob);
+    expect(copied?.id).not.toBe('hero');
+    expect(copied?.copiedFromAssetId).toBe('hero');
+    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+    expect(await blobs.get(copied!.id)?.text()).toBe('edited-bytes');
+
+    // 3. «Aplicar al original» ('original') updates hero in place while preserving originalRevision.
+    const applied = await saveAssetEdit('hero', editedBlob, 'original', { width: 240, height: 160 });
+    expect(applied?.id).toBe('hero');
+    expect(useStore.getState().assets.hero.width).toBe(240);
+    expect(useStore.getState().assets.hero.originalRevision).toMatchObject({ width: 120, height: 80 });
+    expect(await blobs.get('hero')?.text()).toBe('edited-bytes');
+
+    // 4. «Revertir» restores the original bytes and dimensions while keeping revision history.
+    expect(await revertAssetToOriginal('hero')).toBe(true);
+    const restored = useStore.getState().assets.hero;
+    expect(restored.width).toBe(120);
+    expect(restored.height).toBe(80);
+    expect(restored.originalRevision).toBeUndefined();
+    expect(restored.revisions).toHaveLength(1);
+    expect(restored.revertedAt).toBeTypeOf('number');
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
   });
 });
 

@@ -37,6 +37,17 @@ CREATE INDEX records_pos ON records (coll, pos);
 CREATE TABLE gen_history (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, ts INTEGER NOT NULL, meta TEXT NOT NULL, deleted INTEGER NOT NULL);
 CREATE TABLE spend (seq INTEGER PRIMARY KEY AUTOINCREMENT, meta TEXT NOT NULL);
 CREATE TABLE removed_sessions (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, removed_at INTEGER NOT NULL, json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS asset_revisions (seq INTEGER PRIMARY KEY AUTOINCREMENT, asset_id TEXT NOT NULL, ts INTEGER NOT NULL, kind TEXT NOT NULL, meta TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS asset_revisions_asset ON asset_revisions (asset_id, seq);
+CREATE TABLE IF NOT EXISTS event_journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, meta TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS event_journal_kind ON event_journal (kind, seq);
+`;
+
+const PHASE4_TABLES = `
+CREATE TABLE IF NOT EXISTS asset_revisions (seq INTEGER PRIMARY KEY AUTOINCREMENT, asset_id TEXT NOT NULL, ts INTEGER NOT NULL, kind TEXT NOT NULL, meta TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS asset_revisions_asset ON asset_revisions (asset_id, seq);
+CREATE TABLE IF NOT EXISTS event_journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, meta TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS event_journal_kind ON event_journal (kind, seq);
 `;
 
 function migrate(db) {
@@ -47,6 +58,8 @@ function migrate(db) {
     if (db.prepare('PRAGMA user_version').get().user_version === 0) {
       db.exec(MIGRATION_1);
       db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    } else {
+      db.exec(PHASE4_TABLES);
     }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
@@ -73,6 +86,7 @@ export function createStoreB(dir, opts = {}) {
       (SELECT coll, CASE WHEN coll IN ('generations', 'assets') THEN json_quote(id) || ':' || meta ELSE meta END AS piece
        FROM records ORDER BY coll, pos) GROUP BY coll`),
     recFp: db.prepare('SELECT pos, fp FROM records WHERE coll = ? AND id = ?'),
+    recMeta: db.prepare('SELECT meta FROM records WHERE coll = ? AND id = ?'),
     recMax: db.prepare('SELECT pos FROM records WHERE coll = ? ORDER BY pos DESC LIMIT 1'),
     recIds: db.prepare('SELECT id FROM records WHERE coll = ?'),
     recIns: db.prepare('INSERT INTO records (coll, id, pos, meta, fp) VALUES (?, ?, ?, ?, ?)'),
@@ -82,6 +96,11 @@ export function createStoreB(dir, opts = {}) {
     histPut: db.prepare('INSERT INTO gen_history (id, ts, meta, deleted) VALUES (?, ?, ?, ?)'),
     spendPut: db.prepare('INSERT INTO spend (meta) VALUES (?)'),
     spendTail: db.prepare('SELECT meta FROM spend WHERE seq <= ? ORDER BY seq DESC LIMIT ?'),
+    revPut: db.prepare('INSERT INTO asset_revisions (asset_id, ts, kind, meta) VALUES (?, ?, ?, ?)'),
+    revByAsset: db.prepare('SELECT seq, asset_id, ts, kind, meta FROM asset_revisions WHERE asset_id = ? ORDER BY seq ASC'),
+    journalPut: db.prepare('INSERT INTO event_journal (ts, kind, id, meta) VALUES (?, ?, ?, ?)'),
+    journalAll: db.prepare('SELECT seq, ts, kind, id, meta FROM event_journal ORDER BY seq ASC'),
+    journalByKind: db.prepare('SELECT seq, ts, kind, id, meta FROM event_journal WHERE kind = ? ORDER BY seq ASC'),
     // C: most recent records of a collection, and pages of history older than a position.
     recRecent: db.prepare('SELECT id, pos, meta FROM records WHERE coll = ? ORDER BY pos DESC LIMIT ?'),
     recPage: db.prepare('SELECT id, pos, meta FROM records WHERE coll = ? AND pos < ? ORDER BY pos DESC LIMIT ?'),
@@ -166,6 +185,14 @@ export function createStoreB(dir, opts = {}) {
   /** Applies the delta. Returns the new spend window. */
   function applyDelta(delta, head, savedAt, stats) {
     if (delta.small != null) q.smallPut.run(delta.small);
+    const bulkImport = Boolean(delta.full && (Object.keys(delta.up?.generations ?? {}).length + Object.keys(delta.up?.assets ?? {}).length > 500));
+    if (delta.full) {
+      q.journalPut.run(savedAt, 'import', 'store', json({
+        generations: Object.keys(delta.up?.generations ?? {}).length,
+        assets: Object.keys(delta.up?.assets ?? {}).length,
+        library: Object.keys(delta.up?.library ?? {}).length,
+      }));
+    }
     for (const coll of COLLS) {
       const up = delta.up?.[coll] ?? {};
       const upEntries = Object.entries(up);
@@ -183,16 +210,33 @@ export function createStoreB(dir, opts = {}) {
           q.recIns.run(coll, id, maxPos, text, fp);
           stats.recWrites++;
         }
-        if (coll === 'generations') q.histPut.run(id, savedAt, text, 0);
+        if (coll === 'generations') {
+          q.histPut.run(id, savedAt, text, 0);
+          if (!bulkImport) q.journalPut.run(savedAt, cur ? 'edit' : 'generation', id, text);
+        } else if (coll === 'assets') {
+          if (!bulkImport || cur || text.includes('"originalRevision":') || text.includes('"copiedFromAssetId":') || text.includes('"revertedAt":')) {
+            const isRevert = Boolean(cur && text.includes('"revertedAt":') && !text.includes('"originalRevision":'));
+            const revKind = !cur ? 'create' : isRevert ? 'revert' : 'edit';
+            q.revPut.run(id, savedAt, revKind, text);
+            const jKind = !cur ? (text.includes('"origin":"upload"') ? 'import' : 'edit') : revKind;
+            q.journalPut.run(savedAt, jKind, id, text);
+          }
+        } else if (coll === 'library' && !bulkImport) {
+          const jKind = text.includes('"revertedAt":') ? 'revert' : 'edit';
+          q.journalPut.run(savedAt, jKind, id, text);
+        }
       }
       const gone = new Set(delta.del?.[coll] ?? []);
       if (delta.full) for (const { id } of q.recIds.all(coll)) if (!(id in up)) gone.add(id);
       for (const id of gone) {
         stats.recGets++;
-        if (!q.recFp.get(coll, id)) continue;
+        const prevMeta = q.recMeta.get(coll, id)?.meta;
+        if (prevMeta == null) continue;
         q.recDel.run(coll, id);
         stats.recWrites++;
         if (coll === 'generations') q.histPut.run(id, savedAt, '{}', 1);
+        if (coll === 'assets') q.revPut.run(id, savedAt, 'delete', prevMeta);
+        q.journalPut.run(savedAt, 'delete', id, prevMeta);
       }
       const moves = delta.order?.[coll];
       if (Array.isArray(moves)) {
@@ -231,9 +275,19 @@ export function createStoreB(dir, opts = {}) {
         return tail.length === app.length && tail.every((m, i) => m === app[i]);
       })();
       if (!already) {
-        for (const t of app) spend.last = Number(q.spendPut.run(t).lastInsertRowid);
+        for (const t of app) {
+          spend.last = Number(q.spendPut.run(t).lastInsertRowid);
+          if (!bulkImport) q.journalPut.run(savedAt, 'spend', String(spend.last), t);
+        }
       }
       spend.len = delta.spend.len;
+    }
+    if (Array.isArray(delta.events)) {
+      for (const ev of delta.events) {
+        if (ev && typeof ev.kind === 'string') {
+          q.journalPut.run(ev.ts ?? savedAt, ev.kind, String(ev.id ?? ''), typeof ev.meta === 'string' ? ev.meta : json(ev.meta ?? {}));
+        }
+      }
     }
     return spend;
   }
@@ -353,10 +407,23 @@ export function createStoreB(dir, opts = {}) {
     for (const f of kept.slice(0, -KEPT)) rmSync(join(backups, f), { force: true });
   }
 
+  function readAssetRevisions(assetId) {
+    return q.revByAsset.all(assetId).map((r) => ({ seq: r.seq, assetId: r.asset_id, ts: r.ts, kind: r.kind, meta: JSON.parse(r.meta) }));
+  }
+
+  function readJournal(kind) {
+    const rows = kind ? q.journalByKind.all(kind) : q.journalAll.all();
+    return rows.map((r) => ({ seq: r.seq, ts: r.ts, kind: r.kind, id: r.id, meta: JSON.parse(r.meta) }));
+  }
+
+  function recordEvent(kind, id, meta = {}, ts = Date.now()) {
+    q.journalPut.run(ts, String(kind), String(id ?? ''), typeof meta === 'string' ? meta : json(meta));
+  }
+
   const checkpoint = () => db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
   function sizes() {
     const size = (f) => { try { return statSync(f).size; } catch { return 0; } };
     return { db: size(file), wal: size(`${file}-wal`), shm: size(`${file}-shm`) };
   }
-  return { read, readPartial, readPage, commit, checkpoint, idle: () => { checkpoint(); return 0; }, sizes, lastStats: () => lastStats, close: () => db.close(), file };
+  return { read, readPartial, readPage, readAssetRevisions, readJournal, recordEvent, commit, checkpoint, idle: () => { checkpoint(); return 0; }, sizes, lastStats: () => lastStats, close: () => db.close(), file };
 }
