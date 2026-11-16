@@ -14,6 +14,7 @@ vi.mock('../src/lib/idb', () => ({
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { NodeLibrary } from '../src/components/node/AddNodeItems';
+import { AddNodeMenu } from '../src/components/node/NodeCanvasParts';
 import { useDeleteRequest } from '../src/components/node/LinkBar';
 import { ensureOmniNodes, omniSpaceNodeId } from '../src/engine/nodes/omni';
 import { addNode, deleteNodes } from '../src/engine/flow/actions';
@@ -209,5 +210,22 @@ describe('new nodes learn their real size and step off their neighbours', () => 
     const moves = settleFresh(stacked, new Set(['new']), new Map());
     expect(moves.has('old')).toBe(false);
     expect(moves.has('new')).toBe(true);
+  });
+});
+
+describe('Add node on the omnicanvas: one click adds and closes the menu', () => {
+  it('a Provider entry calls the omnicanvas add and closes the menu', async () => {
+    vi.stubGlobal('ResizeObserver', class { observe() { /* jsdom has none */ } unobserve() { /* none */ } disconnect() { /* none */ } });
+    const onSystem = vi.fn();
+    await act(async () => {
+      root.render(createElement(AddNodeMenu, { onAdd: vi.fn(), onImport: vi.fn(), omni: { has: () => false, onSpace: vi.fn(), onSystem } }));
+    });
+    const open = host.querySelector<HTMLButtonElement>('button[aria-label="Add node"]')!;
+    await act(async () => { open.click(); });
+    const provider = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((el) => el.querySelector('.node-lib-text > span')?.textContent === 'Provider')!;
+    expect(provider).toBeDefined();
+    await act(async () => { provider.click(); });
+    expect(onSystem).toHaveBeenCalledWith('provider');
+    expect(document.querySelector('.node-lib')).toBeNull();
   });
 });
