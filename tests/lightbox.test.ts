@@ -159,14 +159,15 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     cleanup();
   });
 
-  it('renders grouped bottom dock tabs in order, opens/closes sub-row above dock, opens op form with price, and filters by asset kind', () => {
+  it('renders one bottom dock row of plain group tabs, swaps it for a back arrow plus ops, opens op form with price, and filters by asset kind', () => {
     act(() => {
       root.render(createElement(Lightbox));
     });
 
-    const dock = host.querySelector<HTMLElement>('.lb-dock .asset-actions')!;
-    expect(dock).toBeTruthy();
-    const dockButtons = [...dock.querySelectorAll<HTMLButtonElement>(':scope > button')];
+    // One row only: the dock is the single .asset-actions row, groups are plain tabs.
+    const dock = () => host.querySelector<HTMLElement>('.lb-dock .asset-actions')!;
+    const groupBtn = (label: string) => [...dock().querySelectorAll<HTMLButtonElement>(':scope > button')].find((b) => b.textContent === label)!;
+    const dockButtons = [...dock().querySelectorAll<HTMLButtonElement>(':scope > button')];
     expect(dockButtons.map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual([
       'Pintar',
       'Editar',
@@ -175,15 +176,16 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
       'Finalizar',
       'More',
     ]);
+    expect(dockButtons.slice(0, 5).every((b) => b.classList.contains('lb-tab'))).toBe(true);
+    expect(host.querySelector('.lb-dock-back')).toBeNull();
     expect(host.querySelector('.lb-dock-sub')).toBeNull();
 
-    // Tap Editar -> shows sub-row above dock with Editar ops (icon + label, .chip)
-    const editarBtn = dockButtons[1];
-    act(() => editarBtn.click());
-    expect(editarBtn.getAttribute('aria-expanded')).toBe('true');
-    const sub = host.querySelector<HTMLElement>('.lb-dock-sub')!;
-    expect(sub).toBeTruthy();
-    const subButtons = [...sub.querySelectorAll<HTMLButtonElement>('button.chip')];
+    // Tap Editar -> the same row becomes a back arrow plus Editar ops (no second row, no More)
+    act(() => groupBtn('Editar').click());
+    expect(host.querySelectorAll('.lb-dock .asset-actions')).toHaveLength(1);
+    expect(host.querySelector('.lb-dock-back')).toBeTruthy();
+    expect(dock().querySelector('[aria-label="More"]')).toBeNull();
+    const subButtons = [...dock().querySelectorAll<HTMLButtonElement>('button.chip')].filter((b) => !b.classList.contains('lb-dock-back'));
     expect(subButtons.some((b) => b.textContent?.includes('Remove background'))).toBe(true);
     expect(subButtons.some((b) => b.textContent?.includes('Edit with prompt'))).toBe(true);
 
@@ -196,13 +198,13 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     expect(opDialog.querySelector('.spend')).toBeTruthy();
     expect(opDialog.querySelector('.cost-tag')).toBeTruthy();
 
-    // Tap active group again -> closes the sub-row
-    act(() => editarBtn.click());
-    expect(host.querySelector('.lb-dock-sub')).toBeNull();
-    expect(editarBtn.getAttribute('aria-expanded')).toBe('false');
+    // Back arrow -> the groups come back in the same row
+    act(() => host.querySelector<HTMLButtonElement>('.lb-dock-back')!.click());
+    expect(host.querySelector('.lb-dock-back')).toBeNull();
+    expect(groupBtn('Editar')).toBeTruthy();
 
+    const moreBtn = dock().querySelector<HTMLButtonElement>('[aria-label="More"]')!;
     // Open More -> Pintar is NOT hidden in More, while Edit region / Remove object stays
-    const moreBtn = dock.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
     moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
     act(() => moreBtn.click());
 
@@ -211,7 +213,7 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     expect(menuItems.some((b) => b.textContent?.includes('Edit region / Remove object'))).toBe(true);
 
     // Clicking Pintar directly opens SketchEditor in paint mode
-    act(() => dockButtons[0].click());
+    act(() => groupBtn('Pintar').click());
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'img1', mode: 'paint' });
 
     // Audio asset shows only groups that have audio ops (Reutilizar)

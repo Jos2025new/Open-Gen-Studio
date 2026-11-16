@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LucideIcon } from '../ui/icons';
 import {
+  ArrowLeft,
   Camera,
   AudioLines,
   Image as ImageIcon,
@@ -18,7 +19,6 @@ import {
   Frame,
   Grid3x3,
   IdCard,
-  Layers,
   LayoutGrid,
   Maximize,
   Paperclip,
@@ -80,13 +80,6 @@ export const QUICK_LABEL: Partial<Record<OpId, string>> = {
   continue: 'Continue',
 };
 
-const GROUP_ICONS: Record<OpGroupId, LucideIcon> = {
-  edit: WandSparkles,
-  explore: Shuffle,
-  reuse: Layers,
-  finalize: Maximize,
-};
-
 export function OpChip({ assetId, op, parentId, compact, fullLabel }: { assetId: string; op: OpId; parentId?: string; compact?: boolean; fullLabel?: boolean }) {
   const pop = usePopover();
   const Icon = OP_ICONS[op];
@@ -132,36 +125,35 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick: _s
 
   return (
     <>
-      {!menuOnly && activeGroup && activeOps.length ? (
-        <div className="lb-dock-sub" role="group" aria-label={DOCK_GROUP_LABEL[activeGroup]}>
-          {activeOps.map((o) => (
-            <OpChip key={o.id} assetId={assetId} op={o.id} parentId={parentId} compact={compact} fullLabel />
-          ))}
-        </div>
-      ) : null}
+      {/* One row only: the group tabs, or (inside an open group) a back arrow and that group's ops. */}
       <div className="asset-actions">
-        {!menuOnly && asset.kind === 'image' ? (
-          compact ? (
-            <IconButton icon={Brush} label="Pintar" size="sm" onClick={() => (setActiveGroup(null), beginAssetEdit(assetId))} />
-          ) : (
-            <Chip icon={Brush} onClick={() => (setActiveGroup(null), beginAssetEdit(assetId))} data-tip="Pintar sobre la imagen">
-              Pintar
-            </Chip>
-          )
-        ) : null}
-        {!menuOnly
-          ? grouped.map((g) => (
-              <Chip
-                key={g.id}
-                icon={GROUP_ICONS[g.id]}
-                active={activeGroup === g.id}
-                aria-expanded={activeGroup === g.id}
-                onClick={() => setActiveGroup((cur) => (cur === g.id ? null : g.id))}
-              >
-                {DOCK_GROUP_LABEL[g.id]}
-              </Chip>
-            ))
-          : null}
+        {!menuOnly && activeGroup ? (
+          <>
+            <IconButton icon={ArrowLeft} label="Volver a los grupos" size="sm" className="lb-dock-back" onClick={() => setActiveGroup(null)} />
+            {activeOps.map((o) => (
+              <OpChip key={o.id} assetId={assetId} op={o.id} parentId={parentId} compact={compact} fullLabel />
+            ))}
+          </>
+        ) : (
+          <>
+            {!menuOnly && asset.kind === 'image' ? (
+              compact ? (
+                <IconButton icon={Brush} label="Pintar" size="sm" onClick={() => beginAssetEdit(assetId)} />
+              ) : (
+                <Chip className="lb-tab" onClick={() => beginAssetEdit(assetId)} data-tip="Pintar sobre la imagen">
+                  Pintar
+                </Chip>
+              )
+            ) : null}
+            {!menuOnly
+              ? grouped.map((g) => (
+                  <Chip key={g.id} className="lb-tab" onClick={() => setActiveGroup(g.id)}>
+                    {DOCK_GROUP_LABEL[g.id]}
+                  </Chip>
+                ))
+              : null}
+          </>
+        )}
         {menuOnly ? (
           <Chip
             ref={more.ref}
@@ -177,7 +169,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick: _s
             Tools
             <ChevronDown size={13} />
           </Chip>
-        ) : hasMenu ? (
+        ) : hasMenu && !activeGroup ? (
           <IconButton
             ref={more.ref}
             icon={Ellipsis}
