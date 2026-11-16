@@ -16,7 +16,7 @@ import { ActivityBlock } from './ActivityBlock';
 import { QuestionsCard } from './QuestionsCard';
 import { SettingsCard } from './SettingsCard';
 
-type MetaFeedItem = Extract<FeedItem, { type: 'user' | 'assistant' | 'notice' | 'plan' | 'questions' | 'settings' }>;
+type MetaFeedItem = Extract<FeedItem, { type: 'user' | 'assistant' | 'notice' | 'plan' | 'questions' | 'settings' | 'commands' }>;
 
 function MessageMeta({ item, className = '' }: { item: MetaFeedItem; className?: string }) {
   const s = buildMessageMetaSummary(item);

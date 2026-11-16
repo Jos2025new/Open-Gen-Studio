@@ -120,7 +120,7 @@ export interface MessageMetaSummary {
 }
 
 export function buildMessageMetaSummary(item: {
-  type: 'user' | 'assistant' | 'notice' | 'plan' | 'questions' | 'settings';
+  type: 'user' | 'assistant' | 'notice' | 'plan' | 'questions' | 'settings' | 'commands';
   createdAt: number;
   workspace: Workspace;
   engine?: string;
