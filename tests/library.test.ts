@@ -187,16 +187,24 @@ describe('global library', () => {
 
     // 3. Versions survive SQLite delta store commit + reload and record asset_revisions.
     const { createSqliteStore } = await import('../server/store-sqlite.js');
+    const { createDeltaClient } = await import('../server/sqlite/delta-client.mjs');
     const root = mkdtempSync(join(tmpdir(), 'ogs-asset-versions-'));
     try {
       const store1 = createSqliteStore(root);
       const snap1 = persistState({ state: { ...useStore.getState(), assets: { legacy1: useStore.getState().assets.legacy1 } }, version: 1 }).v2!;
-      const r1 = store1.commit({ savedAt: 1000, baseAt: 0, version: snap1.version, globals: snap1.globals, order: snap1.order, sessions: Object.fromEntries(snap1.sessions.entries()) });
+      const client = createDeltaClient();
+      const sessions1 = Object.fromEntries(snap1.sessions.entries());
+      const delta1 = client.diff(JSON.parse(snap1.globals), snap1.order, Object.keys(sessions1));
+      const r1 = store1.commit({ savedAt: 1000, baseAt: 0, version: snap1.version, order: snap1.order, sessions: sessions1, delta: delta1 });
       expect(r1.status).toBe(204);
+      client.ack();
 
       await undoAssetRevision('legacy1');
       const snap2 = persistState({ state: { ...useStore.getState(), assets: { legacy1: useStore.getState().assets.legacy1 } }, version: 1 }).v2!;
-      const r2 = store1.commit({ savedAt: 2000, baseAt: 1000, version: snap2.version, globals: snap2.globals, order: snap2.order, sessions: Object.fromEntries(snap2.sessions.entries()) });
+      const sessions2 = Object.fromEntries(snap2.sessions.entries());
+      const delta2 = client.diff(JSON.parse(snap2.globals), snap2.order, Object.keys(sessions2));
+      expect(JSON.parse(delta2.up.assets.legacy1).revisionIndex).toBe(0);
+      const r2 = store1.commit({ savedAt: 2000, baseAt: 1000, version: snap2.version, order: snap2.order, sessions: sessions2, delta: delta2 });
       expect(r2.status).toBe(204);
       store1.close();
 
@@ -205,6 +213,10 @@ describe('global library', () => {
       const loaded = JSON.parse(store2.read()!);
       expect(loaded.state.assets.legacy1.revisionIndex).toBe(0);
       expect(loaded.state.assets.legacy1.revisions).toHaveLength(2);
+      useStore.setState((st) => ({ assets: { ...st.assets, legacy1: loaded.state.assets.legacy1 } }));
+      expect(await blobs.get('legacy1')?.text()).toBe('legacy-orig');
+      expect(await redoAssetRevision('legacy1')).toBe(true);
+      expect(await blobs.get('legacy1')?.text()).toBe('legacy-edited');
       expect(store2.readAssetRevisions('legacy1').map((r: { kind: string }) => r.kind)).toEqual(['create', 'revert']);
       store2.close();
     } finally {
