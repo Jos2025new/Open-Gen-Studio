@@ -30,6 +30,11 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
 | 13 | Arreglos de los cuatro hallazgos (Grok, `46d8f9db`); Fable volvió a correr los tests y comparó sus nombres | Cerrar la revisión | El 409 conserva la copia local y no pisa; el orden de biblioteca y sesiones se guarda; una segunda migración se detiene sin borrar. 19/19 tests; 30 cortes: 23 correctos, 7 antes del primer guardado, 0 a medias, 0 perdidos |
 | 14 | Remedición (Hydrogen, `d1a68e3c`) | Las cifras eran de antes de los arreglos | **Regresión:** el orden de los 60 000 ids viajaba en cada guardado; edición pequeña de 28 a 493 ms y envío de 45 a 726 KB |
 | 15 | Índice fraccionario, como Figma (Hydrogen, `58a20cce`, `0ddfeba7`); Fable repitió los tests | Arreglar la regresión | Edición pequeña 29 ms, reorden de biblioteca 25 ms y 848 B, arranque 56 ms, memoria 164 MB; 20/20 tests; 100 cortes: 0 a medias, 0 perdidos |
+| 16 | Adopción autorizada por el usuario («TODAS LAS FASES»), rama `task/sqlite-adopt`; fase 1 por Grok | — | Revisión de Terra: 6 hallazgos (1 crítico: carpetas antiguas invisibles); segunda vuelta de Grok: 2 de 6 a medias y 1 alto nuevo. El usuario pasó la fase a GPT |
+| 17 | Fase 1c (Terra, `ee9e74ca`, `6aa90ded`) y revisión de Sonnet | Cerrar la fase 1 | Sonnet: 1 alto (carpeta inutilizable tras un primer guardado fallido) y 1 medio (claves en la exportación) |
+| 18 | Fases 1d a 4 seguidas (Argon, encargo pesado, 89 min) | Prueba de alto calibre pedida por el usuario | Revisión de Terra: 6 altos (claves, prompt en el diario, migración repetida, guarda de rutas, respuesta perdida, edición sin conectar), 2 medios, 1 de rendimiento. Tokens: estimó 150k, gastó 749k |
+| 19 | Arreglos en tres tandas y verificación (Hydrogen) | Corregir la revisión | 9 de 9 arreglados; banco dentro de la referencia; 100 cortes sin pérdidas; `npm test` en verde salvo dos tests de tiempo que pasan solos |
+| 20 | Revisión independiente de los arreglos (Grok) | Regla 5 | **Aprobada**: los 9 hallazgos con su test |
 
 ## Problemas y cómo se resolvieron
 
@@ -48,4 +53,4 @@ flexible» y pidió que la interfaz siga volando y que sirva para escritorio y m
 ## Pendiente
 
 
-Autorización del usuario por fases, revisión independiente de cada fase y prueba con datos reales del usuario.
+Prueba de usuario nuevo en el sandbox, fusión con el «sí, fusiona» del usuario y migración de sus datos reales con copia previa y su aprobación.

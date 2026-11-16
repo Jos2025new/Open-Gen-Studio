@@ -52,3 +52,4 @@ El detalle está en [043](history/043-2026-10-W42.md). Cada cambio futuro añade
 ## Fase 2: dirección propuesta
 
 SQLite sustituiría los JSON del servidor, con sesiones, orden, globales y revisión en una sola transacción. Se conservan `baseAt`, las comprobaciones de pérdida y las copias. Los archivos multimedia siguen fuera. Antes de sustituir nada hay que verificar la migración y la recuperación. Ver [la propuesta](propuesta-zonas-protegidas.md#dirección-propuesta-para-la-fase-2-sqlite).
+| SQLite, 2026-11-15/16 (autorización explícita del usuario: «TODAS LAS FASES») | `server/sqlite/`, `server/store-sqlite.js`, rutas de `local-store.js`, `disk.ts` (envío de cambios), biblioteca con revisiones; `save-guard.js` y el cuerpo del 409 sin cambios | Terra (fase 1, dos vueltas), Sonnet (fase 1), Terra (fases 1d-4) y Grok (arreglos, aprobada) | [historial 065](history/065-2026-11-W46-persistencia-sqlite.md) |
