@@ -1,17 +1,18 @@
 import { activeDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import type { Workspace } from '../types';
+import { uid } from '../../lib/id';
 import { appendFeed } from '../../store/store';
 import { offlinePlan } from './offline';
 import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
-import { designerDims, feedBase, get, notice, presentPlan, session, showQuestions } from './runtimeShared';
+import { designerDims, feedBase, get, messageMeta, notice, presentPlan, session, showQuestions } from './runtimeShared';
 
-export async function offlineTurn(sessionId: string, workspace: Workspace, route: TurnRoute): Promise<void> {
-  const end = startTurnLog(sessionId, 'offline', route);
-  end(await offlinePass(sessionId, workspace));
+export async function offlineTurn(sessionId: string, workspace: Workspace, route: TurnRoute, runId = uid('turn')): Promise<void> {
+  const end = startTurnLog(sessionId, 'offline', route, runId);
+  end(await offlinePass(sessionId, workspace, runId));
 }
 
-async function offlinePass(sessionId: string, workspace: Workspace): Promise<TurnOutcome> {
+async function offlinePass(sessionId: string, workspace: Workspace, runId: string): Promise<TurnOutcome> {
   const s = session(sessionId);
   const draft = s.agent.draft ?? { request: '', answers: {}, attachments: [] };
   const st = get();
@@ -28,15 +29,22 @@ async function offlinePass(sessionId: string, workspace: Workspace): Promise<Tur
     workflow: workflowById(st.composer.workflowId),
     doc: docDims ? { width: docDims.width, height: docDims.height } : undefined,
   });
+  const meta = messageMeta(workspace, { agent: 'Local planner', provider: 'offline', model: 'Local planner', runId });
   if (action.kind === 'reply') {
-    appendFeed(sessionId, { ...feedBase(workspace), type: 'assistant', text: action.text, engine: 'Local planner' });
+    appendFeed(sessionId, {
+      ...feedBase(workspace),
+      type: 'assistant',
+      text: action.text,
+      engine: 'Local planner',
+      meta,
+    });
     return 'text';
   }
   if (action.kind === 'questions') {
-    showQuestions(sessionId, workspace, action.intro, action.questions, null);
+    showQuestions(sessionId, workspace, action.intro, action.questions, null, meta);
     return 'questions';
   }
-  const result = await presentPlan(sessionId, workspace, action.plan, null);
-  if (result.errors.length) notice(sessionId, workspace, `The plan could not be built: ${result.errors.join(' ')}`);
+  const result = await presentPlan(sessionId, workspace, action.plan, null, false, undefined, undefined, meta);
+  if (result.errors.length) notice(sessionId, workspace, `The plan could not be built: ${result.errors.join(' ')}`, 'error', undefined, meta);
   return result.errors.length ? 'error' : 'plan';
 }

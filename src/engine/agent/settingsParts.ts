@@ -48,9 +48,9 @@ export async function sectionsOfParts(sessionId: string, parts: SettingsPart[], 
 }
 
 /** Auto confirms these sections itself: what the agent reads (values, guide), plus a line for a resolution the model lacks. */
-export async function autoAnswer(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[], log?: Parameters<typeof sectionsOfParts>[3]): Promise<string> {
+export async function autoAnswer(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[], log?: Parameters<typeof sectionsOfParts>[3], meta?: import('../feedMeta').ChatMessageMeta): Promise<string> {
   const request = offerRequest(useStore.getState().sessions[sessionId].agent);
-  const text = await autoConfirmSettings(sessionId, workspace, toolCallId, summary, sections, parts);
+  const text = await autoConfirmSettings(sessionId, workspace, toolCallId, summary, sections, parts, meta);
   // What follows reads the model the app chose (a composer pick or another provider may replace the recommended one).
   const effective = useStore.getState().sessions[sessionId].agent.settingsParts;
   const lines = await Promise.all(sections.map(async (x, i) => {
@@ -98,11 +98,11 @@ export async function modelsNeedSettings(sessionId: string, steps: Parameters<ty
  * Auto: a plan with image or video steps came before any settings were confirmed. The app runs the confirm path itself
  * and answers with the effective settings; the plan sent is not shown, so the prompts are written for them first.
  */
-export async function settingsForPlan(sessionId: string, workspace: Workspace, toolCallId: string, steps: Parameters<typeof partsOfSteps>[0], until: <T>(work: Promise<T>) => Promise<T>, log: Parameters<typeof sectionsOfParts>[3]): Promise<string | null> {
+export async function settingsForPlan(sessionId: string, workspace: Workspace, toolCallId: string, steps: Parameters<typeof partsOfSteps>[0], until: <T>(work: Promise<T>) => Promise<T>, log: Parameters<typeof sectionsOfParts>[3], meta?: import('../feedMeta').ChatMessageMeta): Promise<string | null> {
   const parts = partsOfSteps(steps);
   const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
   if (failed || !sections.length) return failed || 'The plan has no image or video step to confirm settings for.';
-  const text = await autoAnswer(sessionId, workspace, toolCallId, undefined, sections, parts, log);
+  const text = await autoAnswer(sessionId, workspace, toolCallId, undefined, sections, parts, log, meta);
   // The prompts already fit what the app chose (same model, length and frame): the plan is shown as sent, written once.
   return await fitsChosen(sessionId, parts) ? null : `${text}\nThe plan you sent was not shown. Now write the prompts for these settings and call propose_plan again.`;
 }

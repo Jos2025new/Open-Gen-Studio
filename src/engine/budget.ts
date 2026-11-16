@@ -1,3 +1,5 @@
+import { localTimeZone } from './feedMeta';
+import { placeFor } from './place';
 import { formatUsd } from '../lib/format';
 import { uid } from '../lib/id';
 import { appendFeed, patchSession, setUi, updateFeedItem, useStore } from '../store/store';
@@ -187,7 +189,8 @@ export function noteExcess(generationId: string): void {
   if (session.feed.some((f) => f.type === 'notice' && f.overLimitFor?.gen === g.id)) return;
   const what = g.prompt.trim().slice(0, 40) || g.kind;
   const text = `“${what}” had no published price. Its real cost (${formatUsd(g.actualUsd)}) took your spending to ${formatUsd(spentUsd)}, over your ${formatUsd(settings.budgetUsd)} limit.`;
-  appendFeed(g.sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: get().ui.workspace, type: 'notice', level: 'error', text, overLimitFor: { gen: g.id } });
+  const ws = get().ui.workspace;
+  appendFeed(g.sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: ws, type: 'notice', level: 'error', text, overLimitFor: { gen: g.id }, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, ws) } });
 }
 
 /** "Ignore" on that warning: it stays as a record, without its actions. */

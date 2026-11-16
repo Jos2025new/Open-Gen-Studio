@@ -10,7 +10,9 @@ import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { isCreditError, onAgentCredit } from '../credit';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, loadLlmCatalog, modelSummary } from '../catalog';
-import type { AgentStyle, FeedItem, LlmMessage, SettingsFeedItem, Workspace } from '../types';
+import { uid } from '../../lib/id';
+import type { ChatMessageMeta, ChatMessageUsage } from '../feedMeta';
+import type { AgentStyle, AssistantFeedItem, FeedItem, LlmMessage, SettingsFeedItem, Workspace } from '../types';
 import { addSpend, appendFeed, patchSession, removeFeedItem, updateFeedItem } from '../../store/store';
 import { SYSTEM_PROMPT } from './context';
 import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
@@ -26,7 +28,7 @@ import { activityLog } from './activityLog';
 import { waitHooks } from './schemaWait';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
-import { agentEngine, controllers, ending, engineLabel, feedBase, get, keepCommentedPlan, llmCallUsd, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
+import { agentEngine, controllers, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
@@ -45,13 +47,14 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean }): Promise<void> {
+export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
   const engine = agentEngine();
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
-  const endLog = startTurnLog(sessionId, 'llm', opts.route);
+  const runId = opts.runId ?? uid('turn');
+  const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   let outcome: TurnOutcome = 'text';
   patchAgent(sessionId, { busy: true, phase: 'working' });
   const log = activityLog(sessionId, rowCanvas(workspace));
@@ -68,6 +71,10 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   // Auto confirming the settings itself is the app's step, not the agent's: once per turn it gives the round back.
   let settled = false;
   let hurryNoted = false;
+  let pendingUsage: ChatMessageUsage | undefined;
+  let pendingCost = 0;
+  let pendingHasCost = false;
+  let pendingEstimated = false;
   // If nothing comes out for a minute the activity block says so (Stop is in the composer); output re-arms it.
   // The five-minute cap is the only thing that ends a turn by force (T3).
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -82,7 +89,28 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     clearTimeout(silenceTimer);
     silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
   };
-  const limitNote = () => notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
+  const turnMeta = () => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
+  const clearPending = () => {
+    pendingUsage = undefined;
+    pendingCost = 0;
+    pendingHasCost = false;
+    pendingEstimated = false;
+  };
+  const pendingMeta = (hasBubble: boolean): ChatMessageMeta => {
+    const m = turnMeta();
+    if (hasBubble || (!pendingUsage && !pendingHasCost)) return m;
+    return {
+      ...m,
+      ...(pendingUsage ? { usage: pendingUsage } : {}),
+      ...(pendingHasCost ? { costUsd: pendingCost, costEstimated: pendingEstimated } : {}),
+    };
+  };
+  const takePendingMeta = (hasBubble: boolean): ChatMessageMeta => {
+    const m = pendingMeta(hasBubble);
+    if (!hasBubble) clearPending();
+    return m;
+  };
+  const limitNote = () => notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {}, turnMeta());
   // The end of the turn, once: Stop and the cap call it; the turn's own exit finds it done and leaves a newer turn alone.
   const finish = (say?: () => void) => {
     if (done) return;
@@ -105,7 +133,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     finish(limitNote);
   };
   const capTimer = setTimeout(cut, TURN_CAP_MS);
-  ending.set(controller, () => { outcome = 'canceled'; finish(() => notice(sessionId, workspace, 'Stopped.', 'info')); });
+  ending.set(controller, () => { outcome = 'canceled'; finish(() => notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta())); });
   armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
@@ -116,6 +144,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         return;
       }
       let textItemId: string | null = null;
+      let textItemMeta: ChatMessageMeta | undefined;
+      const hasTextBubble = () => Boolean(textItemId && session(sessionId).feed.some((f) => f.id === textItemId));
       let result: ChatResult;
       try {
         if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
@@ -133,7 +163,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           tools: toolsFor(get().composer.agentStyle),
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
-          onNotice: (text) => !done && notice(sessionId, workspace, text, 'info'),
+          onNotice: (text) => !done && notice(sessionId, workspace, text, 'info', undefined, turnMeta()),
           onReasoning: showThinking ? (_d, full) => !done && (armSilence(), log.thinking(full)) : undefined,
           signal,
           onToolCall: () => {
@@ -147,7 +177,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             armSilence();
             if (!textItemId) {
               firstOutput();
-              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel() };
+              textItemMeta = messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
+              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel(), meta: textItemMeta };
               textItemId = item.id;
               appendFeed(sessionId, item);
             } else {
@@ -160,21 +191,21 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         if (isAbort(err)) {
           // Stop and the cap already said so and ended the turn; this is an abort from elsewhere.
           outcome = cutTurn ? 'cut' : 'canceled';
-          if (!done) (cutTurn ? limitNote : () => notice(sessionId, workspace, 'Stopped.', 'info'))();
+          if (!done) (cutTurn ? limitNote : () => notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta()))();
           return;
         }
         // No credit for the agent's model: the same model elsewhere (same price or less) takes over and the call runs
         // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
         if (isCreditError(err) && !opts.creditRetried) {
           if (textItemId) removeFeedItem(sessionId, textItemId);
-          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, creditRetried: true }); }
+          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }); }
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
         // The call happened and cost time: it is a call in the metrics even though it produced nothing (T2).
         recordMetric(sessionId, { type: 'failedCall', error: (err as Error).message, ms: clock.elapsed() });
         outcome = 'error';
-        notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry);
+        notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry, takePendingMeta(hasTextBubble()));
         return;
       }
       log.callEnded(result.timing.reasoningMs, result.timing.outputMs ?? result.timing.totalMs);
@@ -203,6 +234,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           text: 'The model wrote its action as text the app cannot read, so nothing ran.',
           retry: textItemId ? { partialItemId: textItemId } : {},
           ...(textItemId ? { garbledItemId: textItemId } : {}),
+          meta: takePendingMeta(hasTextBubble()),
         });
         outcome = 'error';
         return;
@@ -225,6 +257,29 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           ...s,
           usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + llmUsd },
         }));
+        const cachedTokens = (pendingUsage?.cachedTokens ?? 0) + (u.cachedTokens ?? 0);
+        const reasoningTokens = (pendingUsage?.reasoningTokens ?? 0) + (u.reasoningTokens ?? 0);
+        pendingUsage = {
+          inputTokens: (pendingUsage?.inputTokens ?? 0) + u.inputTokens,
+          outputTokens: (pendingUsage?.outputTokens ?? 0) + u.outputTokens,
+          ...(cachedTokens > 0 ? { cachedTokens } : {}),
+          ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
+        };
+        if (u.costUsd != null || hasLlmCatalogPrice(engine.provider, engine.model)) {
+          pendingCost += llmUsd;
+          pendingHasCost = true;
+          pendingEstimated = pendingEstimated || u.costUsd == null;
+        }
+      }
+      const meta = textItemMeta ?? turnMeta();
+      if (hasTextBubble() && (pendingUsage || pendingHasCost)) {
+        updateFeedItem<AssistantFeedItem>(sessionId, textItemId!, {
+          meta: {
+            ...meta,
+            ...(pendingUsage ? { usage: pendingUsage } : {}),
+            ...(pendingHasCost ? { costUsd: pendingCost, costEstimated: pendingEstimated } : {}),
+          },
+        });
       }
       // An empty answer stays out of the history: a Retry would otherwise end the request with an empty assistant message.
       if (result.text || result.toolCalls.length) pushHistory(sessionId, {
@@ -238,7 +293,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         if (!result.text.trim()) {
           outcome = 'empty';
           const cut = result.finishReason === 'length';
-          notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {});
+          notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {}, takePendingMeta(hasTextBubble()));
         }
         return;
       }
@@ -276,13 +331,13 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const parts = imagesFirst(v.data.parts);
           const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
-          if (get().composer.agentStyle === 'auto') { respond(await autoAnswer(sessionId, rowCanvas(workspace), call.id, v.data.summary, sections, parts, log)); continue; }
+          if (get().composer.agentStyle === 'auto') { respond(await autoAnswer(sessionId, rowCanvas(workspace), call.id, v.data.summary, sections, parts, log, turnMeta())); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
           const sw = await switchSection(sections, ag().settings, ag().settingsParts, parts[0]?.user_requested === true, parts[0]?.model, undefined, parts[0]);
           const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }) };
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }), meta: takePendingMeta(hasTextBubble()) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
@@ -321,11 +376,12 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
               default: q.default && q.options.includes(q.default) ? q.default : undefined,
             })),
             call.id,
+            takePendingMeta(hasTextBubble()),
           );
           outcome = 'questions';
           return;
         }
-        const canvas = await runCanvasCall({ sessionId, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools });
+        const canvas = await runCanvasCall({ sessionId, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools, cardMeta: () => pendingMeta(hasTextBubble()), onCardCommitted: () => { if (!hasTextBubble()) clearPending(); } });
         workspace = canvas.workspace;
         if (canvas.stop) return;
         if (canvas.handled) continue;
@@ -354,7 +410,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
           if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, v.data.steps))) {
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
-            const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log) : (gate ?? draft)!;
+            const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log, turnMeta()) : (gate ?? draft)!;
             if (told !== null) {
               if (get().composer.agentStyle !== 'auto') recordMetric(sessionId, { type: 'rejected' });
               else if (!settled) { settled = true; iteration--; }
@@ -364,7 +420,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           }
           patchAgent(sessionId, { phase: 'checking' });
           const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn), action: (entry) => log.action(entry) });
-          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal), waits);
+          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal, pendingMeta(hasTextBubble())), waits);
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
             if (textItemId) removeFeedItem(sessionId, textItemId);
@@ -383,6 +439,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             continue;
           }
           log.action({ icon: 'plan', label: v.data.revision ? 'Revised the plan' : 'Drafted the plan', detail: v.data.title });
+          if (!hasTextBubble()) clearPending();
           // This call's result is sent when the user approves or cancels.
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
@@ -395,12 +452,13 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       for (const m of afterTools) pushHistory(sessionId, m);
       if (planFailures >= 3) {
         outcome = 'error';
-        notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.');
+        notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.', 'error', undefined, takePendingMeta(hasTextBubble()));
         return;
       }
+      if (hasTextBubble()) clearPending();
     }
     outcome = 'error';
-    notice(sessionId, workspace, stoppedText(lastBlock));
+    notice(sessionId, workspace, stoppedText(lastBlock), 'error', undefined, takePendingMeta(false));
   } catch (err) {
     if (!isAbort(err)) throw err; // Stop during a tool: finish() already ended the turn
   } finally {

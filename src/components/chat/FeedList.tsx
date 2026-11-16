@@ -1,13 +1,13 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useState } from 'react';
 import { ignoreExcess, openBudgetSettings } from '../../engine/budget';
 import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from '../ui/icons';
+import { buildMessageMetaSummary } from '../../engine/feedMeta';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
 import { copyText } from '../../engine/actions';
 import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
-import { studioCanvases, useStudioBoard } from '../../lib/studioBoard';
 import { StudioGeneration } from './StudioGeneration';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
@@ -16,7 +16,20 @@ import { ActivityBlock } from './ActivityBlock';
 import { QuestionsCard } from './QuestionsCard';
 import { SettingsCard } from './SettingsCard';
 
-const WS = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
+type MetaFeedItem = Extract<FeedItem, { type: 'user' | 'assistant' | 'notice' | 'plan' | 'questions' | 'settings' }>;
+
+function MessageMeta({ item, className = '' }: { item: MetaFeedItem; className?: string }) {
+  const s = buildMessageMetaSummary(item);
+  return (
+    <div className={`msg-meta ${className}`.trim()} data-tip={s.tooltip}>
+      <span className="ws-badge">{s.spaceLabel}</span>
+      <time className="msg-time num" dateTime={new Date(item.createdAt).toISOString()}>
+        {s.dateTime}
+      </time>
+      {s.detailParts.length ? <span className="msg-meta-detail">{s.detailParts.join(' · ')}</span> : null}
+    </div>
+  );
+}
 
 /** Minimal inline formatting: paragraphs, **bold**, `code` and "- " lists. */
 function RichText({ text }: { text: string }) {
@@ -51,7 +64,7 @@ function RichText({ text }: { text: string }) {
 }
 
 /** One of the user's messages; copy, edit and delete show on hover or focus. Editing makes the answer again. */
-function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type: 'user' }>; sessionId: string; tag: React.ReactNode }) {
+function UserMessage({ item, sessionId }: { item: Extract<FeedItem, { type: 'user' }>; sessionId: string }) {
   const busy = useStore((s) => Boolean(s.sessions[sessionId]?.agent.busy));
   const later = useStore((s) => {
     const feed = s.sessions[sessionId]?.feed ?? [];
@@ -105,13 +118,15 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
         ) : null}
       </div>
       {!editing ? (
-        <div className="msg-actions">
-          {tag}
-          <IconButton icon={Copy} label="Copy" size="sm" onClick={() => void copyText(item.text)} />
-          {editable ? (
-            <IconButton icon={Pencil} label="Edit" size="sm" disabled={busy} onClick={() => { setDraft(item.text); setEditing(true); }} />
-          ) : null}
-          <IconButton icon={Trash} label="Delete" size="sm" tone="danger" disabled={busy} onClick={() => deleteUserMessage(sessionId, item.id)} />
+        <div className="msg-foot">
+          <MessageMeta item={item} />
+          <div className="msg-actions">
+            <IconButton icon={Copy} label="Copy" size="sm" onClick={() => void copyText(item.text)} />
+            {editable ? (
+              <IconButton icon={Pencil} label="Edit" size="sm" disabled={busy} onClick={() => { setDraft(item.text); setEditing(true); }} />
+            ) : null}
+            <IconButton icon={Trash} label="Delete" size="sm" tone="danger" disabled={busy} onClick={() => deleteUserMessage(sessionId, item.id)} />
+          </div>
         </div>
       ) : null}
     </div>
@@ -144,18 +159,16 @@ export function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionI
           Retry
         </button>
       ) : null}
+      <MessageMeta item={item} className="notice-meta faint" />
     </div>
   );
 }
 
 /** One row. Memoized: while the agent writes only its own bubble changes, so the rest of the conversation is not redrawn. */
 export const FeedItemView = memo(function FeedItemView({ item, sessionId, compact, studio }: { item: FeedItem; sessionId: string; compact?: boolean; studio?: boolean }) {
-  const current = useStore((s) => s.ui.workspace);
-  // Studio's chat is the whole conversation, whatever its board shows, so rows carry no canvas tag.
-  const tag = !studio && item.workspace !== current ? <span className="ws-badge">{WS[item.workspace]}</span> : null;
   switch (item.type) {
     case 'user':
-      return <UserMessage item={item} sessionId={sessionId} tag={tag} />;
+      return <UserMessage item={item} sessionId={sessionId} />;
     case 'assistant':
       // A turn that ended with no words (only tool calls) leaves nothing to show.
       if (!item.streaming && !item.text.trim()) return null;
@@ -165,23 +178,40 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
           <div className="agent-text">
             <RichText text={item.text} />
             {item.streaming ? <span className="caret" /> : null}
-            <span className="agent-meta faint">
-              {item.engine}
-              {tag}
-            </span>
+            <MessageMeta item={item} className="agent-meta faint" />
           </div>
         </div>
       );
     case 'activity':
       return <ActivityBlock item={item} sessionId={sessionId} />;
     case 'questions':
-      return <QuestionsCard item={item} sessionId={sessionId} />;
+      return (
+        <div className="feed-card-wrap">
+          <QuestionsCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'settings':
-      return item.inline ? null : <SettingsCard item={item} sessionId={sessionId} />;
+      return item.inline ? null : (
+        <div className="feed-card-wrap">
+          <SettingsCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'plan':
-      return <PlanCard item={item} sessionId={sessionId} />;
+      return (
+        <div className="feed-card-wrap">
+          <PlanCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'commands':
-      return <CommandApprovalCard item={item} sessionId={sessionId} />;
+      return (
+        <div className="feed-card-wrap">
+          <CommandApprovalCard item={item} sessionId={sessionId} />
+          <MessageMeta item={item} className="card-meta faint" />
+        </div>
+      );
     case 'generation':
       if (studio) return <StudioGeneration generationId={item.generationId} fallback={<GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />} />;
       return <GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />;
@@ -192,16 +222,8 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
 
 /** `studio`: Studio's chat, where generations show as small inline results instead of cards. */
 export function FeedList({ sessionId, compact, studio }: { sessionId: string; compact?: boolean; studio?: boolean }) {
-  // Each canvas shows its own messages; the agent's conversation is one per session, so the others can be shown too.
-  const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
-  const canvas = useStore((s) => s.ui.workspace);
-  const [everywhere, setEverywhere] = useState(false);
-  // Studio's chat shows every canvas's messages; the board only views a canvas and does not change where the agent works.
-  const board = useStudioBoard();
-  const shown: string[] = studio ? studioCanvases(board) : [canvas];
-  const shownKey = shown.join();
-  const others = useMemo(() => all.filter((f) => !shownKey.split(',').includes(f.workspace)).length, [all, shownKey]);
-  const feed = useMemo(() => (everywhere ? all : all.filter((f) => shownKey.split(',').includes(f.workspace))), [all, shownKey, everywhere]);
+  // The conversation is continuous across Spaces; every message carries its own Space badge instead of hiding others.
+  const feed = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
   const last = feed[feed.length - 1];
   // While text streams, its caret already shows activity; an open activity block shows its own progress (L3).
@@ -209,11 +231,6 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
   const showStatus = phase && !liveActivity && !(last?.type === 'assistant' && last.streaming);
   return (
     <div className={`feed ${compact ? 'is-compact' : ''}`}>
-      {others ? (
-        <button type="button" className="feed-everywhere faint" onClick={() => setEverywhere((v) => !v)}>
-          {everywhere ? 'Show only this canvas' : `Show the other canvases too (${others})`}
-        </button>
-      ) : null}
       {(studio ? studioRuns(feed) : feed).map((row) =>
         Array.isArray(row) ? (
           <StudioRun key={row[0].id} items={row} />
