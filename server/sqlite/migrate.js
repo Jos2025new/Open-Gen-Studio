@@ -7,8 +7,8 @@
 // 5. Builds the full initial delta and commits it into `createStoreBA(dir)` in ONE SQLite transaction (`BEGIN IMMEDIATE ... COMMIT`).
 // 6. Verifies `stateSha(store.read()) === sourceSha` (both from SQLite tables and, after `idle()`, from `state-cache.txt`).
 // 7. Leaves `store-v2/` and `state.json` completely untouched so rolling back is just pointing back to the files.
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assembleText, createStoreV2, splitText } from '../store-v2.js';
 import { sha256 } from '../save-guard.js';
@@ -19,12 +19,53 @@ const COLL_KEYS = new Set(['generations', 'assets', 'library', 'spendLog']);
 const json = (v) => JSON.stringify(v);
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
+function resolveReal(targetPath) {
+  let cur = resolve(targetPath);
+  const tail = [];
+  const seen = new Set();
+  while (true) {
+    try {
+      const st = lstatSync(cur);
+      if (st.isSymbolicLink()) {
+        if (seen.has(cur) || seen.size > 40) throw new Error(`symlink loop at ${cur}`);
+        seen.add(cur);
+        cur = resolve(dirname(cur), readlinkSync(cur));
+        continue;
+      }
+      const real = realpathSync(cur);
+      return tail.length ? join(real, ...tail.reverse()) : real;
+    } catch (err) {
+      if (err?.code === 'ENOENT') {
+        const parent = dirname(cur);
+        if (parent === cur) return tail.length ? join(cur, ...tail.reverse()) : cur;
+        tail.push(basename(cur));
+        cur = parent;
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+function isSameOrInside(target, base) {
+  const rel = relative(base, target);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
 function assertMigratableDir(dir) {
   const abs = resolve(dir);
-  const realData = resolve(REPO_ROOT, 'data');
-  const sandbox = resolve(REPO_ROOT, '.sandbox');
-  if (abs === realData || abs.startsWith(`${realData}/`) || abs === sandbox || abs.startsWith(`${sandbox}/`)) {
-    throw new Error(`refusing to migrate protected folder ${abs}`);
+  const real = resolveReal(dir);
+  const repoReal = resolveReal(REPO_ROOT);
+  const protectedBases = [
+    resolve(REPO_ROOT, 'data'),
+    resolve(REPO_ROOT, '.sandbox'),
+    resolveReal(join(repoReal, 'data')),
+    resolveReal(join(repoReal, '.sandbox')),
+  ];
+  for (const base of protectedBases) {
+    if (isSameOrInside(abs, base) || isSameOrInside(real, base)) {
+      throw new Error(`refusing to migrate protected folder ${real}`);
+    }
   }
 }
 
@@ -62,6 +103,9 @@ export async function migrateFromV2(dir, opts = {}) {
   const globalsFile = join(v2Root, 'globals.json');
   const sessionsDir = join(v2Root, 'sessions');
   const stateFile = join(dir, 'state.json');
+  for (const p of [v2Root, headFile, globalsFile, sessionsDir, stateFile, join(dir, 'backups'), join(dir, 'ogs.sqlite')]) {
+    assertMigratableDir(p);
+  }
 
   const hasV2 = existsSync(headFile);
   const hasV1 = !hasV2 && existsSync(stateFile);

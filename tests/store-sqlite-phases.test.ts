@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -97,6 +97,27 @@ describe('phase 2: migration from format 1 and format 2 folders', () => {
     expect(stateSha((await callBody('GET', '/x/store/state')).body)).toBe(stateSha(v1Text));
     expect((await callBody('PUT', '/x/store/v2/commit', json({ savedAt: 1500, baseAt: 500, version: 1, globals: globals(3), order: ['ses_a'], sessions: {} }))).status).toBe(204);
     await expect(migrateFromV2(dir)).rejects.toThrow(/left intact/);
+  });
+
+  it('refuses symlinks outside the repository pointing to protected data/ or .sandbox/ folders', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-mig-sym-'));
+    const linkData = join(root, 'link-data');
+    const linkSandbox = join(root, 'link-sandbox');
+    const linkRepo = join(root, 'link-repo');
+    symlinkSync(join(process.cwd(), 'data'), linkData);
+    symlinkSync(join(process.cwd(), '.sandbox', 'data'), linkSandbox);
+    symlinkSync(process.cwd(), linkRepo);
+
+    await expect(migrateFromV2(linkData)).rejects.toThrow(/refusing to migrate protected folder/);
+    await expect(migrateFromV2(join(linkData, 'nested'))).rejects.toThrow(/refusing to migrate protected folder/);
+    await expect(migrateFromV2(linkSandbox)).rejects.toThrow(/refusing to migrate protected folder/);
+    await expect(migrateFromV2(join(linkRepo, 'data'))).rejects.toThrow(/refusing to migrate protected folder/);
+    await expect(migrateFromV2(join(linkRepo, '.sandbox', 'data'))).rejects.toThrow(/refusing to migrate protected folder/);
+
+    const safeDir = join(root, 'safe');
+    mkdirSync(safeDir);
+    symlinkSync(join(process.cwd(), 'data', 'store-v2'), join(safeDir, 'store-v2'));
+    await expect(migrateFromV2(safeDir)).rejects.toThrow(/refusing to migrate protected folder/);
   });
 });
 
