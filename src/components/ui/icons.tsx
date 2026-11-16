@@ -161,6 +161,7 @@ export const MousePointerClick = makeIcon('lucide-mouse-pointer-click', LU.Mouse
 export const MoveHorizontal = makeIcon('lucide-move-horizontal', LU.MoveHorizontal, PH.MoveHorizontal, undefined);
 export const MoveUpRight = makeIcon('lucide-move-up-right', LU.MoveUpRight, PH.MoveUpRight, OB.MoveUpRight);
 export const Music = makeIcon('lucide-music', LU.Music, PH.Music, OB.Music);
+export const Network = makeIcon('lucide-network', LU.Network, PH.Network, undefined);
 export const PaintBucket = makeIcon('lucide-paint-bucket', LU.PaintBucket, PH.PaintBucket, OB.PaintBucket);
 export const Paintbrush = makeIcon('lucide-paintbrush', LU.Paintbrush, PH.Paintbrush, OB.Paintbrush);
 export const Palette = makeIcon('lucide-palette', LU.Palette, PH.Palette, OB.Palette);

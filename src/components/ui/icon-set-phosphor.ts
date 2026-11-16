@@ -140,6 +140,7 @@ export { CursorClickIcon as MousePointerClick } from '@phosphor-icons/react';
 export { ArrowsHorizontalIcon as MoveHorizontal } from '@phosphor-icons/react';
 export { ArrowUpRightIcon as MoveUpRight } from '@phosphor-icons/react';
 export { MusicNoteIcon as Music } from '@phosphor-icons/react';
+export { NetworkIcon as Network } from '@phosphor-icons/react';
 export { PaintBucketIcon as PaintBucket } from '@phosphor-icons/react';
 export { PaintBrushIcon as Paintbrush } from '@phosphor-icons/react';
 export { PaletteIcon as Palette } from '@phosphor-icons/react';
