@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -142,6 +143,9 @@ describe('AssetActions and SketchEditor library editing flow', () => {
 
     const savePop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Save asset"]')!;
     expect(savePop).toBeTruthy();
+    expect(savePop.style.width).toBe('');
+    expect(Number.parseFloat(savePop.style.maxWidth)).toBeLessThanOrEqual(window.innerWidth - 16);
+    expect(Number.parseFloat(savePop.style.left)).toBeGreaterThanOrEqual(8);
     const copyBtn = [...savePop.querySelectorAll('button')].find((b) => b.textContent?.includes('Guardar como copia'))!;
     const origBtn = [...savePop.querySelectorAll('button')].find((b) => b.textContent?.includes('Aplicar al original'))!;
     expect(copyBtn.classList.contains('btn-primary')).toBe(true);
@@ -284,6 +288,47 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
     expect(useStore.getState().ui.toasts.some((t) => t.level === 'success')).toBe(false);
     expect(useStore.getState().ui.toasts.some((t) => t.level === 'error')).toBe(true);
+
+    cleanup();
+  });
+
+  it('sizes the save popover to its content without clipping Aplicar al original on the left', async () => {
+    const uiCss = readFileSync('src/styles/ui.css', 'utf8');
+    expect(uiCss).toMatch(/\.spend-actions\s*\{[^}]*flex-wrap:\s*wrap/);
+
+    act(() => {
+      root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
+    });
+    const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
+    moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
+    act(() => moreBtn.click());
+    const editBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
+      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
+    act(() => editBtn.click());
+    await paintStroke();
+
+    const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
+      .find((b) => b.textContent === 'Save')!;
+    // Simulate Save near the right edge of the sketch toolbar; content width (e.g. 360px) must stay within bounds without negative offset.
+    saveBtn.getBoundingClientRect = () => ({ left: 900, top: 20, right: 960, bottom: 50, width: 60, height: 30, x: 900, y: 20, toJSON() {} });
+    act(() => saveBtn.click());
+
+    const savePop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Save asset"]')!;
+    expect(savePop).toBeTruthy();
+    expect(savePop.style.width).toBe('');
+    expect(Number.parseFloat(savePop.style.left)).toBeGreaterThanOrEqual(8);
+    expect(savePop.scrollWidth).toBeLessThanOrEqual(savePop.clientWidth);
+
+    // Also verify Popover placement math when content measures wider than the old 280px cap
+    const { boundPopoverLeft, boundPopoverWidth } = await import('../src/components/ui/Popover');
+    const contentWidth = 360;
+    const vw = 1280;
+    const boundedW = boundPopoverWidth(contentWidth, 8, vw - 8);
+    const boundedLeft = boundPopoverLeft(960 - boundedW, boundedW, 8, vw - 8);
+    expect(boundedW).toBe(360);
+    expect(boundedLeft).toBe(600);
+    expect(boundedLeft).toBeGreaterThanOrEqual(8);
+    expect(boundedLeft + boundedW).toBeLessThanOrEqual(vw - 8);
 
     cleanup();
   });

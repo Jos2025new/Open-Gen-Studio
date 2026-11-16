@@ -302,7 +302,7 @@ export function SketchEditor() {
             <Button ref={saveMenu.ref} size="sm" variant="primary" disabled={!dirty || saving} onClick={saveMenu.toggle}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
-            <Popover open={saveMenu.open} anchor={saveMenu.ref} onClose={saveMenu.close} width={280} label="Save asset">
+            <Popover open={saveMenu.open} anchor={saveMenu.ref} onClose={saveMenu.close} width="content" label="Save asset">
               <div className="confirm">
                 <p>How would you like to save this edit?</p>
                 <div className="spend-actions">

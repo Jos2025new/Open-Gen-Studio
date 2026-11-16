@@ -25,7 +25,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [icons.tsx](../src/components/ui/icons.tsx) | 140 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 98 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 73 | 45 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 4 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 64 | 5 |
 | [media.ts](../src/lib/media.ts) | 58 | 50 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
