@@ -11,7 +11,6 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { Copy, Film, Image as ImageIcon, Trash, Type } from '../ui/icons';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addOmniSpace, ensureOmniNodes, ordinaryGraph, type OmniSpace } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
@@ -22,7 +21,6 @@ import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover } from '../ui/Popover';
-import { Button, MenuItem } from '../ui/primitives';
 import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems } from './AddNodeItems';
 import { AddNodeMenu, RunAll } from './NodeCanvasParts';
@@ -40,6 +38,9 @@ import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGro
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
+import { chatItem, loadNodeTool, saveNodeTool } from './nodeToolStorage';
+import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
+import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
@@ -59,7 +60,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const feed = useStore((s) => s.sessions[s.activeSessionId].feed);
   // Chat results not on this canvas yet: one click (or "continue here" to the agent) brings them as connected nodes.
   const fromChat = useMemo(
-    () => chatWorkNotInNodes(sessionId).map((g) => ({ id: g.id, assetId: g.assetIds[0], label: g.op ? g.op.id.replace(/_/g, ' ') : g.prompt.split(/[.,\n]/)[0].slice(0, 60) || g.kind })),
+    () => chatWorkNotInNodes(sessionId).map(chatItem),
     [sessionId, graph, generations, feed],
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -72,9 +73,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
   // Cut (scissors, X) is a passing tool: it is not remembered, and X or Escape returns to the last one.
-  const [tool, setTool] = useState<NodeTool>(() => { try { return localStorage.getItem('ogs.nodeTool.v2') === 'select' ? 'select' : 'pan'; } catch { return 'pan'; } });
+  const [tool, setTool] = useState<NodeTool>(loadNodeTool);
   const lastTool = useRef<'select' | 'pan'>(tool === 'select' ? 'select' : 'pan');
-  const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
+  const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; saveNodeTool(t); };
   const cut = useCutTool({ active: tool === 'cut', canvasRef, onCut: (ids) => void disconnectEdges(sessionId, ids) });
   // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
   const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -479,7 +480,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         defaultEdgeOptions={{ type: 'default' }}
         proOptions={{ hideAttribution: false }}
       >
-        {box ? <div className="node-box-select" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} /> : null}
+        {box ? <BoxSelectRect box={box} /> : null}
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={graph.nodes.filter((n) => selected.has(n.id))} />}
@@ -505,19 +506,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         <div ref={connectionMenu}>
         {menu?.from ? <div className="menu-sep-label">Add connected node</div> : null}
         {menuNode ? (
-          <div className="menu">
-            <MenuItem icon={Copy} label="Duplicate" onClick={() => (duplicateNode(sessionId, menuNode), setMenu(null))} />
-            <MenuItem
-              icon={Trash}
-              label="Delete"
-              detail="Del"
-              danger
-              onClick={() => {
-                del.request([menuNode.id]);
-                setMenu(null);
-              }}
-            />
-          </div>
+          <NodeContextMenu onDuplicate={() => (duplicateNode(sessionId, menuNode), setMenu(null))} onDelete={() => { del.request([menuNode.id]); setMenu(null); }} />
         ) : menu ? (
           <>
           <AddNodeItems
@@ -558,21 +547,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         }}
       />}
       {!graph.nodes.length && omni ? null : !graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
-        <div className="node-empty">
-          <h2>Build a flow</h2>
-          <p className="faint">Ask the agent in the composer — it creates, connects and lays out the nodes — or add them yourself.</p>
-          <div className="node-empty-actions">
-            <Button size="sm" icon={Type} onClick={() => addAtCenter(newNodeData('text'))}>
-              Text
-            </Button>
-            <Button size="sm" icon={ImageIcon} onClick={() => addAtCenter(newNodeData('image'))}>
-              Image
-            </Button>
-            <Button size="sm" icon={Film} onClick={() => addAtCenter(newNodeData('video'))}>
-              Video
-            </Button>
-          </div>
-        </div>
+        <NodeEmptyState onAdd={(kind) => addAtCenter(newNodeData(kind))} />
       ) : null}
     </div>
   );
