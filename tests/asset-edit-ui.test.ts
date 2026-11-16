@@ -21,7 +21,7 @@ vi.mock('../src/lib/idb', () => ({
 
 vi.mock('../src/engine/design/actions', () => ({
   openAssetInDesigner: vi.fn(),
-  canvasToAsset: vi.fn(),
+  canvasToAsset: vi.fn(async () => ({ id: 'node-sketch-copy' })),
   assetCanvas: vi.fn(async () => {
     const c = document.createElement('canvas');
     c.width = 120;
@@ -34,10 +34,16 @@ vi.mock('../src/engine/design/raster', () => ({
   strokeSegment: vi.fn(),
 }));
 
+vi.mock('../src/engine/flow/actions', () => ({
+  setSketch: vi.fn(),
+}));
+
 import { AssetActions, RevertAssetMenuItem } from '../src/components/assets/AssetActions';
 import { SketchEditor } from '../src/components/assets/SketchEditor';
 import { Toasts } from '../src/components/ui/Toasts';
 import { subjectFromAsset } from '../src/engine/actions';
+import { canvasToAsset } from '../src/engine/design/actions';
+import { setSketch } from '../src/engine/flow/actions';
 import type { Asset } from '../src/engine/types';
 import { setUi, useStore } from '../src/store/store';
 
@@ -53,6 +59,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
 
   beforeEach(() => {
     blobs.clear();
+    vi.clearAllMocks();
     const sessionId = useStore.getState().activeSessionId;
     const origBlob = new Blob(['original-bytes'], { type: 'image/png' });
     blobs.set('hero', origBlob);
@@ -70,7 +77,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     };
     useStore.setState((st) => ({
       library: [],
-      assets: { ...st.assets, hero },
+      assets: { hero },
       ui: { ...st.ui, sketch: null, toasts: [] },
     }));
     subjectFromAsset('hero', 'Hero', 'character');
@@ -109,16 +116,20 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     });
   };
 
-  it('opens Sketch in paint mode on a working copy from AssetActions and offers Guardar como copia (default) or Aplicar al original', async () => {
+  const openPaintFromDock = () => {
+    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'));
+    expect(paintBtn).toBeTruthy();
+    act(() => paintBtn!.click());
+  };
+
+  const getSaveBtn = () =>
+    [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar > button')]
+      .find((b) => b.textContent?.trim() === 'Guardar')!;
+
+  it('opens Sketch in paint mode from Pintar, offers Guardar (default, original) and Guardar como copia with notes, and reverts', async () => {
     act(() => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor), createElement(Toasts)));
     });
-
-    const openPaint = () => {
-      const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'));
-      expect(paintBtn).toBeTruthy();
-      act(() => paintBtn!.click());
-    };
 
     const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
     moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
@@ -128,38 +139,45 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(menuButtons.some((b) => b.textContent?.includes('Revertir'))).toBe(false);
     expect(menuButtons.some((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))).toBe(false);
     act(() => moreBtn.click());
-    openPaint();
+    openPaintFromDock();
 
     // beginAssetEdit sets ui.sketch to paint mode without mutating the original asset
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'hero', mode: 'paint' });
-    const sketchDialog = host.querySelector<HTMLElement>('[role="dialog"][aria-label="Sketch"]')!;
+    const sketchDialog = host.querySelector<HTMLElement>('[role="dialog"][aria-label="Editor de imagen"]')!;
     expect(sketchDialog).toBeTruthy();
-    const paintTab = [...sketchDialog.querySelectorAll('button')].find((b) => b.textContent === 'Paint')!;
+    const paintTab = [...sketchDialog.querySelectorAll('button')].find((b) => b.textContent === 'Pintar')!;
     expect(paintTab.classList.contains('is-active')).toBe(true);
+    expect([...sketchDialog.querySelectorAll('button')].some((b) => b.textContent?.includes('Revertir'))).toBe(false);
+
+    // Save disabled until there are changes
+    const saveBtn0 = getSaveBtn();
+    expect(saveBtn0.disabled).toBe(true);
 
     // Paint a stroke; original asset and blob remain untouched
     await paintStroke();
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
     expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
 
-    // Save offers Guardar como copia (primary/default) and Aplicar al original
-    const saveBtn = [...sketchDialog.querySelectorAll('button')].find((b) => b.textContent === 'Save')!;
+    // Save opens Google Photos style sheet with Guardar (first & default) and Guardar como copia
+    const saveBtn = getSaveBtn();
+    expect(saveBtn.disabled).toBe(false);
     saveBtn.getBoundingClientRect = () => ({ left: 200, top: 20, right: 260, bottom: 50, width: 60, height: 30, x: 200, y: 20, toJSON() {} });
     act(() => saveBtn.click());
 
-    const savePop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Save asset"]')!;
+    const savePop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Guardar imagen"]')!;
     expect(savePop).toBeTruthy();
     expect(savePop.style.width).toBe('');
-    expect(Number.parseFloat(savePop.style.maxWidth)).toBeLessThanOrEqual(window.innerWidth - 16);
-    expect(Number.parseFloat(savePop.style.left)).toBeGreaterThanOrEqual(8);
-    const copyBtn = [...savePop.querySelectorAll('button')].find((b) => b.textContent?.includes('Guardar como copia'))!;
-    const origBtn = [...savePop.querySelectorAll('button')].find((b) => b.textContent?.includes('Aplicar al original'))!;
-    expect(copyBtn.classList.contains('btn-primary')).toBe(true);
-    expect(origBtn.classList.contains('btn-secondary')).toBe(true);
+    const sheetBtns = [...savePop.querySelectorAll('button')];
+    expect(sheetBtns).toHaveLength(2);
+    expect(sheetBtns[0].textContent).toContain('Guardar');
+    expect(sheetBtns[0].textContent).toContain('Siempre puedes revertir');
+    expect(sheetBtns[0].classList.contains('is-active')).toBe(true);
+    expect(sheetBtns[1].textContent).toContain('Guardar como copia');
+    expect(sheetBtns[1].textContent).toContain('El original no cambia');
 
     // 1) Guardar como copia creates a new asset and leaves hero untouched
     await act(async () => {
-      copyBtn.click();
+      sheetBtns[1].click();
       await flush();
     });
     expect(useStore.getState().ui.sketch).toBeNull();
@@ -168,15 +186,13 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(copyAsset).toBeTruthy();
     expect(await blobs.get(copyAsset!.id)?.text()).toBe('painted-png-bytes');
 
-    // 2) Aplicar al original updates hero in place with a verifiable backup revision
-    openPaint();
+    // 2) Guardar applies to original in place with a verifiable backup revision
+    openPaintFromDock();
     await paintStroke();
-    const saveBtn2 = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
-      .find((b) => b.textContent === 'Save')!;
+    const saveBtn2 = getSaveBtn();
     saveBtn2.getBoundingClientRect = () => ({ left: 200, top: 20, right: 260, bottom: 50, width: 60, height: 30, x: 200, y: 20, toJSON() {} });
     act(() => saveBtn2.click());
-    const origBtn2 = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Save asset"] button')]
-      .find((b) => b.textContent?.includes('Aplicar al original'))!;
+    const origBtn2 = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Guardar imagen"] button')][0];
     await act(async () => {
       origBtn2.click();
       await flush();
@@ -187,27 +203,90 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(rev).toBeTruthy();
     expect(await blobs.get(rev!.assetId)?.text()).toBe('original-bytes');
 
-    // Toast includes a real Revertir action button
+    // Toast includes Revertir action button
     const toastRevertBtn = host.querySelector<HTMLButtonElement>('.toast-action');
     expect(toastRevertBtn?.textContent).toBe('Revertir');
 
-    // Revertir appears in the image menu after apply, restores the original, and disappears
-    act(() => moreBtn.click());
-    const revertMenuBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
-      .find((b) => b.textContent?.includes('Revertir'));
-    expect(revertMenuBtn).toBeTruthy();
+    // 3) Reopening editor shows Revertir in the editor top bar and clicking it restores the original
+    openPaintFromDock();
     await act(async () => {
-      revertMenuBtn!.click();
+      await flush();
+    });
+    const editorRevertBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar button')]
+      .find((b) => b.textContent?.includes('Revertir'));
+    expect(editorRevertBtn).toBeTruthy();
+    await act(async () => {
+      editorRevertBtn!.click();
       await flush();
     });
     expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
     expect(await blobs.get('hero')?.text()).toBe('original-bytes');
-
-    act(() => moreBtn.click());
     expect(
-      [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
+      [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar button')]
         .some((b) => b.textContent?.includes('Revertir')),
     ).toBe(false);
+
+    // Close editor cleanly (no changes)
+    const closeBtn = host.querySelector<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] [aria-label="Cerrar"]')!;
+    act(() => closeBtn.click());
+    expect(useStore.getState().ui.sketch).toBeNull();
+
+    cleanup();
+  });
+
+  it('asks ¿Descartar cambios? when closing with unsaved strokes and never saves implicitly', async () => {
+    act(() => {
+      root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
+    });
+    openPaintFromDock();
+    await paintStroke();
+
+    const closeBtn = host.querySelector<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] [aria-label="Cerrar"]')!;
+    closeBtn.getBoundingClientRect = () => ({ left: 300, top: 20, right: 330, bottom: 50, width: 30, height: 30, x: 300, y: 20, toJSON() {} });
+    act(() => closeBtn.click());
+
+    const discardPop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Descartar cambios"]')!;
+    expect(discardPop).toBeTruthy();
+    expect(discardPop.textContent).toContain('¿Descartar cambios?');
+    expect(discardPop.textContent).toContain('Tus cambios no se guardarán');
+    const keepBtn = [...discardPop.querySelectorAll('button')].find((b) => b.textContent === 'Seguir editando')!;
+    const dropBtn = [...discardPop.querySelectorAll('button')].find((b) => b.textContent === 'Descartar')!;
+    expect(keepBtn).toBeTruthy();
+    expect(dropBtn).toBeTruthy();
+
+    // Seguir editando keeps editor open and image untouched
+    act(() => keepBtn.click());
+    expect(useStore.getState().ui.sketch).toEqual({ assetId: 'hero', mode: 'paint' });
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+
+    // Descartar closes without saving
+    act(() => closeBtn.click());
+    const dropBtn2 = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Descartar cambios"] button')]
+      .find((b) => b.textContent === 'Descartar')!;
+    act(() => dropBtn2.click());
+    expect(useStore.getState().ui.sketch).toBeNull();
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+    expect(Object.values(useStore.getState().assets).some((a) => a.copiedFromAssetId === 'hero')).toBe(false);
+
+    cleanup();
+  });
+
+  it('keeps node targets saving directly as a copy without opening the save sheet', async () => {
+    act(() => {
+      setUi({ sketch: { assetId: 'hero', nodeId: 'node-1', mode: 'paint' } });
+      root.render(createElement(SketchEditor));
+    });
+    await paintStroke();
+    const saveBtn = getSaveBtn();
+    await act(async () => {
+      saveBtn.click();
+      await flush();
+    });
+
+    expect(document.querySelector('[role="dialog"][aria-label="Guardar imagen"]')).toBeNull();
+    expect(canvasToAsset).toHaveBeenCalledTimes(1);
+    expect(setSketch).toHaveBeenCalledWith(useStore.getState().activeSessionId, 'node-1', 'node-sketch-copy');
+    expect(useStore.getState().ui.sketch).toBeNull();
 
     cleanup();
   });
@@ -227,15 +306,12 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     });
     expect(host.textContent).not.toContain('Revertir');
 
-    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'))!;
-    act(() => paintBtn.click());
+    openPaintFromDock();
     await paintStroke();
-    const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
-      .find((b) => b.textContent === 'Save')!;
+    const saveBtn = getSaveBtn();
     saveBtn.getBoundingClientRect = () => ({ left: 200, top: 20, right: 260, bottom: 50, width: 60, height: 30, x: 200, y: 20, toJSON() {} });
     act(() => saveBtn.click());
-    const origBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Save asset"] button')]
-      .find((b) => b.textContent?.includes('Aplicar al original'))!;
+    const origBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Guardar imagen"] button')][0];
     await act(async () => {
       origBtn.click();
       await flush();
@@ -256,23 +332,20 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     cleanup();
   });
 
-  it('keeps SketchEditor open when Aplicar al original cannot verify a backup of the original', async () => {
+  it('keeps SketchEditor open when Guardar (original) cannot verify a backup of the original', async () => {
     act(() => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
     });
-    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'))!;
-    act(() => paintBtn.click());
+    openPaintFromDock();
     await paintStroke();
 
-    // Remove original blob before clicking Aplicar al original
+    // Remove original blob before clicking Guardar (original)
     blobs.delete('hero');
     useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
-    const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
-      .find((b) => b.textContent === 'Save')!;
+    const saveBtn = getSaveBtn();
     saveBtn.getBoundingClientRect = () => ({ left: 200, top: 20, right: 260, bottom: 50, width: 60, height: 30, x: 200, y: 20, toJSON() {} });
     act(() => saveBtn.click());
-    const origBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Save asset"] button')]
-      .find((b) => b.textContent?.includes('Aplicar al original'))!;
+    const origBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Guardar imagen"] button')][0];
     await act(async () => {
       origBtn.click();
       await flush();
@@ -287,30 +360,26 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     cleanup();
   });
 
-  it('sizes the save popover to its content without clipping Aplicar al original on the left', async () => {
+  it('sizes the save popover to its content without clipping on the left', async () => {
     const uiCss = readFileSync('src/styles/ui.css', 'utf8');
     expect(uiCss).toMatch(/\.spend-actions\s*\{[^}]*flex-wrap:\s*wrap/);
 
     act(() => {
       root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
     });
-    const paintBtn = [...host.querySelectorAll<HTMLButtonElement>('.asset-actions > button')].find((b) => b.textContent?.includes('Pintar'))!;
-    act(() => paintBtn.click());
+    openPaintFromDock();
     await paintStroke();
 
-    const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
-      .find((b) => b.textContent === 'Save')!;
-    // Simulate Save near the right edge of the sketch toolbar; content width (e.g. 360px) must stay within bounds without negative offset.
+    const saveBtn = getSaveBtn();
     saveBtn.getBoundingClientRect = () => ({ left: 900, top: 20, right: 960, bottom: 50, width: 60, height: 30, x: 900, y: 20, toJSON() {} });
     act(() => saveBtn.click());
 
-    const savePop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Save asset"]')!;
+    const savePop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Guardar imagen"]')!;
     expect(savePop).toBeTruthy();
     expect(savePop.style.width).toBe('');
     expect(Number.parseFloat(savePop.style.left)).toBeGreaterThanOrEqual(8);
     expect(savePop.scrollWidth).toBeLessThanOrEqual(savePop.clientWidth);
 
-    // Also verify Popover placement math when content measures wider than the old 280px cap
     const { boundPopoverLeft, boundPopoverWidth } = await import('../src/components/ui/Popover');
     const contentWidth = 360;
     const vw = 1280;

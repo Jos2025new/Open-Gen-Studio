@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Brush, Eraser, Redo2, Undo2, WandSparkles, X } from '../ui/icons';
+import { Brush, Eraser, Redo2, RotateCcw, Undo2, WandSparkles, X } from '../ui/icons';
 import { opEstimate, runAssetOp } from '../../engine/actions';
-import { saveAssetEdit } from '../../engine/assetRevisions';
+import { revertAssetToOriginal, saveAssetEdit } from '../../engine/assetRevisions';
 import { opModelFor } from '../../engine/catalog';
 import { assetCanvas, canvasToAsset } from '../../engine/design/actions';
 import { strokeSegment } from '../../engine/design/raster';
 import { setSketch } from '../../engine/flow/actions';
 import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
-import { Button, IconButton, Range } from '../ui/primitives';
+import { Button, IconButton, MenuItem, Range } from '../ui/primitives';
 import { InlineColor } from '../designer/InlineControls';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import type { Estimate } from '../../engine/types';
@@ -29,6 +29,7 @@ const SWATCHES = ['#ffffff', '#111111', '#ff4d4d', '#ffb020', '#d4f25a', '#3fd0a
 /** Paint over an image without leaving the flow. Strokes stay vectors until saved, so undo is cheap. */
 export function SketchEditor() {
   const target = useStore((s) => s.ui.sketch);
+  const canRevert = useStore((s) => Boolean(target && s.assets[target.assetId]?.originalRevision));
   const sessionId = useStore((s) => s.activeSessionId);
   const brush = useStore((s) => s.ui.brush);
   const baseRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +39,7 @@ export function SketchEditor() {
   const [redo, setRedo] = useState<Stroke[]>([]);
   const [erase, setErase] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const drawing = useRef<Stroke | null>(null);
   const confirm = usePopover();
   const saveMenu = usePopover();
@@ -49,13 +51,16 @@ export function SketchEditor() {
   const maskOp = change.trim() ? 'edit_region' : 'remove_object';
   const maskModel = opModelFor(maskOp === 'edit_region' ? 'inpaint' : 'remove_object').ref;
 
-  // Load the image into the base canvas; reset the drawing for every new target.
+  // Load the image into the base canvas; reset the drawing for every new target or after reverting.
+  useEffect(() => {
+    setChange('');
+    setMode(target?.mode ?? (target?.nodeId ? 'paint' : 'mask'));
+  }, [target]);
+
   useEffect(() => {
     setStrokes([]);
     setRedo([]);
     setSize(null);
-    setChange('');
-    setMode(target?.mode ?? (target?.nodeId ? 'paint' : 'mask'));
     if (!target) return;
     let alive = true;
     assetCanvas(target.assetId)
@@ -75,7 +80,7 @@ export function SketchEditor() {
     return () => {
       alive = false;
     };
-  }, [target]);
+  }, [target, reloadKey]);
 
   const redraw = useCallback((list: Stroke[]) => {
     const c = paintRef.current;
@@ -178,8 +183,8 @@ export function SketchEditor() {
       setSaving(false);
     }
   };
-  const save = async (choice: 'copy' | 'original' = 'copy') => {
-    // Painting is saved on the node it came from, or for a library/gallery asset with the chosen mode ('copy' default or 'original').
+  const save = async (choice: 'copy' | 'original' = 'original') => {
+    // Painting is saved on the node it came from (as copy), or for a library/gallery asset with the chosen mode ('original' default or 'copy').
     if (!target || !baseRef.current || !paintRef.current) return;
     setSaving(true);
     try {
@@ -192,9 +197,9 @@ export function SketchEditor() {
       if (target.nodeId) {
         const asset = await canvasToAsset(sessionId, out, 'sketch');
         setSketch(sessionId, target.nodeId, asset.id);
-        toast('Sketch applied · Reset image restores the original', 'success');
+        toast('Boceto aplicado · Restablecer imagen recupera el original', 'success');
       } else {
-        const blob = await new Promise<Blob>((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png'));
+        const blob = await new Promise<Blob>((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Error al exportar'))), 'image/png'));
         const saved = await saveAssetEdit(target.assetId, blob, choice, { width: out.width, height: out.height });
         if (!saved) {
           saveMenu.close();
@@ -205,6 +210,21 @@ export function SketchEditor() {
       close();
     } catch (err) {
       toast((err as Error).message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  const revert = async () => {
+    if (!target || saving) return;
+    setSaving(true);
+    try {
+      const ok = await revertAssetToOriginal(target.assetId);
+      if (ok) {
+        setStrokes([]);
+        setRedo([]);
+        redraw([]);
+        setReloadKey((k) => k + 1);
+      }
     } finally {
       setSaving(false);
     }
@@ -231,21 +251,21 @@ export function SketchEditor() {
   const setBrush = (patch: Partial<typeof brush>) => setUi((u) => ({ brush: { ...u.brush, ...patch } }));
 
   return (
-    <div className="sketch" role="dialog" aria-label="Sketch">
+    <div className="sketch" role="dialog" aria-label="Editor de imagen">
       <div className="sketch-bar">
-        <div className="segmented" aria-label="Mode">
-          <button type="button" className={mode === 'paint' ? 'is-active' : ''} onClick={() => setMode('paint')} data-tip="Paint over the image">
-            Paint
+        <div className="segmented" aria-label="Modo">
+          <button type="button" className={mode === 'paint' ? 'is-active' : ''} onClick={() => setMode('paint')} data-tip="Pintar sobre la imagen">
+            Pintar
           </button>
-          <button type="button" className={mode === 'mask' ? 'is-active' : ''} onClick={() => setMode('mask')} data-tip="Mark an area to change or remove">
-            Mask
+          <button type="button" className={mode === 'mask' ? 'is-active' : ''} onClick={() => setMode('mask')} data-tip="Marcar un área para cambiar o quitar">
+            Máscara
           </button>
         </div>
         <div className="segmented">
-          <button type="button" className={!erase ? 'is-active' : ''} aria-pressed={!erase} onClick={() => setErase(false)} data-tip="Brush">
+          <button type="button" aria-label="Pincel" className={!erase ? 'is-active' : ''} aria-pressed={!erase} onClick={() => setErase(false)} data-tip="Pincel">
             <Brush size={15} />
           </button>
-          <button type="button" className={erase ? 'is-active' : ''} aria-pressed={erase} onClick={() => setErase(true)} data-tip="Eraser (only your strokes)">
+          <button type="button" aria-label="Borrador" className={erase ? 'is-active' : ''} aria-pressed={erase} onClick={() => setErase(true)} data-tip="Borrador (solo tus trazos)">
             <Eraser size={15} />
           </button>
         </div>
@@ -254,39 +274,44 @@ export function SketchEditor() {
             {SWATCHES.map((c) => (
               <button key={c} type="button" className={`sketch-swatch ${brush.color === c && !erase ? 'is-active' : ''}`} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => (setBrush({ color: c }), setErase(false))} />
             ))}
-            <label className="sketch-swatch sketch-custom" data-tip="Custom color">
-              <InlineColor label="Custom color" value={brush.color} onChange={(color) => (setBrush({ color }), setErase(false))} />
+            <label className="sketch-swatch sketch-custom" data-tip="Color personalizado">
+              <InlineColor label="Color personalizado" value={brush.color} onChange={(color) => (setBrush({ color }), setErase(false))} />
             </label>
           </div>
         ) : null}
-        <label className="sketch-size" data-tip="Brush size">
+        <label className="sketch-size" data-tip="Tamaño del pincel">
           <span className="sketch-dot" style={{ width: Math.min(22, Math.max(4, brush.size / 2)), height: Math.min(22, Math.max(4, brush.size / 2)) }} />
-          <Range min={2} max={120} value={brush.size} onChange={(e) => setBrush({ size: Number(e.target.value) })} aria-label="Brush size" />
+          <Range min={2} max={120} value={brush.size} onChange={(e) => setBrush({ size: Number(e.target.value) })} aria-label="Tamaño del pincel" />
         </label>
-        <IconButton icon={Undo2} label="Undo (Ctrl+Z)" size="sm" disabled={!strokes.length} onClick={undo} />
-        <IconButton icon={Redo2} label="Redo (Ctrl+Shift+Z)" size="sm" disabled={!redo.length} onClick={redoOne} />
+        <IconButton icon={Undo2} label="Deshacer (Ctrl+Z)" size="sm" disabled={!strokes.length} onClick={undo} />
+        <IconButton icon={Redo2} label="Rehacer (Ctrl+Shift+Z)" size="sm" disabled={!redo.length} onClick={redoOne} />
         <span className="spacer" />
+        {canRevert ? (
+          <Button size="sm" variant="ghost" icon={RotateCcw} disabled={saving} onClick={() => void revert()}>
+            Revertir
+          </Button>
+        ) : null}
         {mode === 'mask' ? (
           <>
-            <input className="sketch-change" placeholder="Describe the change (empty = remove the object)" value={change} onChange={(e) => setChange(e.target.value)} aria-label="Change for the masked area" />
+            <input className="sketch-change" placeholder="Describe el cambio (vacío = quitar objeto)" value={change} onChange={(e) => setChange(e.target.value)} aria-label="Cambio para el área marcada" />
             <Button
               ref={apply.ref}
               size="sm"
               variant="primary"
               icon={WandSparkles}
               disabled={!dirty || saving || !maskModel}
-              data-tip={maskModel ? undefined : 'No connected model takes masks (fal.ai or Atlas GPT Image)'}
+              data-tip={maskModel ? undefined : 'Ningún modelo conectado admite máscaras (fal.ai o Atlas GPT Image)'}
               onClick={() => void quoteMask()}
             >
-              {change.trim() ? 'Edit region' : 'Remove object'}
+              {change.trim() ? 'Editar región' : 'Quitar objeto'}
             </Button>
-            <Popover open={apply.open} anchor={apply.ref} onClose={apply.close} width={300} label="Apply mask">
+            <Popover open={apply.open} anchor={apply.ref} onClose={apply.close} width={300} label="Aplicar máscara">
               {quote ? (
                 <SpendConfirm
-                  title={change.trim() ? 'Edit the painted area' : 'Remove the painted object'}
-                  lines={[quote.modelName, change.trim() || 'Fill with the surrounding background']}
+                  title={change.trim() ? 'Editar el área pintada' : 'Quitar el objeto pintado'}
+                  lines={[quote.modelName, change.trim() || 'Rellenar con el fondo alrededor']}
                   estimate={quote.estimate}
-                  confirmLabel={change.trim() ? 'Edit region' : 'Remove object'}
+                  confirmLabel={change.trim() ? 'Editar región' : 'Quitar objeto'}
                   onConfirm={() => (apply.close(), runMask())}
                   onCancel={apply.close}
                 />
@@ -295,38 +320,32 @@ export function SketchEditor() {
           </>
         ) : target.nodeId ? (
           <Button size="sm" variant="primary" disabled={!dirty || saving} onClick={() => void save('copy')}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Guardando…' : 'Guardar'}
           </Button>
         ) : (
           <>
             <Button ref={saveMenu.ref} size="sm" variant="primary" disabled={!dirty || saving} onClick={saveMenu.toggle}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Guardando…' : 'Guardar'}
             </Button>
-            <Popover open={saveMenu.open} anchor={saveMenu.ref} onClose={saveMenu.close} width="content" label="Save asset">
-              <div className="confirm">
-                <p>How would you like to save this edit?</p>
-                <div className="spend-actions">
-                  <Button variant="secondary" disabled={saving} onClick={() => void save('original')}>
-                    Aplicar al original
-                  </Button>
-                  <Button variant="primary" disabled={saving} onClick={() => void save('copy')}>
-                    Guardar como copia
-                  </Button>
-                </div>
+            <Popover open={saveMenu.open} anchor={saveMenu.ref} onClose={saveMenu.close} width="content" label="Guardar imagen">
+              <div className="menu">
+                <MenuItem active label="Guardar" detail="Siempre puedes revertir" disabled={saving} onClick={() => void save('original')} />
+                <MenuItem label="Guardar como copia" detail="El original no cambia" disabled={saving} onClick={() => void save('copy')} />
               </div>
             </Popover>
           </>
         )}
-        <IconButton ref={confirm.ref} icon={X} label="Close" size="sm" onClick={() => (dirty ? confirm.toggle() : close())} />
-        <Popover open={confirm.open} anchor={confirm.ref} onClose={confirm.close} width={260} label="Unsaved sketch">
+        <IconButton ref={confirm.ref} icon={X} label="Cerrar" size="sm" onClick={() => (dirty ? confirm.toggle() : close())} />
+        <Popover open={confirm.open} anchor={confirm.ref} onClose={confirm.close} width={280} label="Descartar cambios">
           <div className="confirm">
-            <p>Save your changes before closing?</p>
+            <p className="spend-title">¿Descartar cambios?</p>
+            <p className="pop-sub">Tus cambios no se guardarán</p>
             <div className="spend-actions">
-              <Button variant="ghost" onClick={() => (confirm.close(), close())}>
-                Discard
+              <Button variant="ghost" onClick={confirm.close}>
+                Seguir editando
               </Button>
-              <Button variant="primary" disabled={saving} onClick={() => (confirm.close(), void save('copy'))}>
-                Save
+              <Button variant="danger" onClick={() => (confirm.close(), close())}>
+                Descartar
               </Button>
             </div>
           </div>
