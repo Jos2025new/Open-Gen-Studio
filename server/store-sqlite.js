@@ -7,8 +7,9 @@ import { join } from 'node:path';
 import { SAFE_ID, splitText } from './store-v2.js';
 import { createStoreBA } from './sqlite/store-ba.js';
 import { createDeltaClient } from './sqlite/delta-client.mjs';
+import { canonicalStateText, migrateFromV2, migrateToSqlite, stateSha } from './sqlite/migrate.js';
 
-export { DatabaseSync };
+export { canonicalStateText, DatabaseSync, migrateFromV2, migrateToSqlite, stateSha };
 const dbFile = (dir) => join(dir, 'ogs.sqlite');
 
 /** Head row, or null when this folder has no SQLite file. A file that cannot be read, or has no head, throws:

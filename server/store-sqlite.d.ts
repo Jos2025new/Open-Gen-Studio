@@ -5,6 +5,23 @@ export class DatabaseSync {
 }
 export function sqliteHead(dir: string): { savedAt: number; version: number; order: string[] } | null;
 export function stripSqliteKeys(file: string): void;
+export function canonicalStateText(text: string): string;
+export function stateSha(text: string): string;
+export function migrateFromV2(
+  dir: string,
+  opts?: { synchronous?: string; fault?: (point: string) => void },
+): Promise<{
+  ok: boolean;
+  format: 1 | 2;
+  savedAt: number;
+  sessions: number;
+  bytes: number;
+  sha: string;
+  rawShaMatch: boolean;
+  backupDir: string;
+  readSource: string | null;
+}>;
+export const migrateToSqlite: typeof migrateFromV2;
 
 export function createSqliteStore(dir: string, opts?: { synchronous?: string; fault?: (point: string) => void }): {
   read(): string | null;

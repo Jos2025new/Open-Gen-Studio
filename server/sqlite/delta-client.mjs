@@ -5,6 +5,13 @@ import { computeOrderDiff } from './fractional-index.mjs';
 
 const COLLS = ['generations', 'assets', 'library'];
 const SMALL_SKIP = new Set([...COLLS, 'spendLog']);
+const spendCache = new WeakMap();
+function spendJson(e) {
+  if (!e || typeof e !== 'object') return JSON.stringify(e);
+  let t = spendCache.get(e);
+  if (t === undefined) { t = JSON.stringify(e); spendCache.set(e, t); }
+  return t;
+}
 
 function sameMapOrder(a, b) {
   if (a.size !== b.size) return false;
@@ -64,7 +71,7 @@ export function createDeltaClient() {
     const smallObj = Object.fromEntries(Object.entries(g).filter(([k]) => !SMALL_SKIP.has(k)));
     const smallText = JSON.stringify(smallObj);
     const log = g.spendLog ?? [];
-    const texts = log.map((e) => JSON.stringify(e));
+    const texts = log.map(spendJson);
     let start = 0;
     for (let k = Math.min(knownSpend.length, texts.length); k > 0; k--) {
       let ok = true;
