@@ -9,7 +9,7 @@ import { hasVisibleContent, isNearUniform, parseColor } from '../src/engine/desi
 import { BUILTIN_EXPORTS, DEFAULT_EXPORT } from '../src/engine/design/exportSettings';
 import { setSettings, useStore } from '../src/store/store';
 
-const preview = vi.hoisted(() => ({ promise: new Promise<Blob>(() => undefined), sample: null as Uint8ClampedArray | null }));
+const preview = vi.hoisted(() => ({ promise: new Promise<HTMLCanvasElement>(() => undefined), sample: null as Uint8ClampedArray | null }));
 vi.mock('../src/lib/idb', async (original) => ({ ...await original<typeof import('../src/lib/idb')>(), stateDb: { get: async () => undefined, set: async () => undefined } }));
 vi.mock('../src/engine/design/exportDesign', async (original) => ({
   ...await original<typeof import('../src/engine/design/exportDesign')>(),
@@ -17,7 +17,7 @@ vi.mock('../src/engine/design/exportDesign', async (original) => ({
 }));
 vi.mock('../src/engine/design/exportContrast', async (original) => ({
   ...await original<typeof import('../src/engine/design/exportContrast')>(),
-  samplePreview: async () => preview.sample,
+  samplePreview: () => preview.sample,
 }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -162,7 +162,7 @@ describe('export panel', () => {
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:p', revokeObjectURL: () => undefined });
     vi.useFakeTimers();
     try {
-      preview.promise = Promise.resolve(new Blob(['x']));
+      preview.promise = Promise.resolve(document.createElement('canvas'));
       preview.sample = white64;
       mount(doc);
       await act(async () => { await vi.advanceTimersByTimeAsync(600); });

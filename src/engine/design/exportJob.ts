@@ -7,7 +7,7 @@ import type { DesignDoc, Layer } from '../types';
 import { unionBox, type Box } from './doc';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
-import { checkRasterExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
+import { checkRasterExport, drawExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
 import { collectFonts, fontFaceCss, woffToSfnt } from './exportText';
 import { printPixelRatio, printPreflight } from './exportPrint';
 import { autoSuffix, DEFAULT_JPEG_QUALITY, pageLayout, pdfPage, type ExportSettings } from './exportSettings';
@@ -188,8 +188,8 @@ function rasterLayout(doc: DesignDoc, settings: ExportSettings, target: ExportTa
   return { renderDoc, options, selection };
 }
 
-/** One small raster frame, with the same crop, paper fit and background as the selected output. */
-export async function exportPreview(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal): Promise<Blob> {
+/** One small frame drawn straight onto a canvas (no PNG round trip), with the same crop, paper fit and background as the selected output. */
+export function exportPreview(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, signal?: AbortSignal): HTMLCanvasElement {
   const output = exportOutputs(settings)[0];
   const { renderDoc, options } = rasterLayout(doc, output, target, signal);
   const paper = output.format === 'pdf' ? pdfPage(output.pdf) : undefined;
@@ -203,7 +203,7 @@ export async function exportPreview(doc: DesignDoc, settings: ExportSettings, ta
       (layout.trim!.w + 2 * layout.bleed) / layout.scale / options.scale, (layout.trim!.h + 2 * layout.bleed) / layout.scale / options.scale);
     ctx.clip();
   });
-  return exportDoc(renderDoc, 'image/png', {
+  return drawExport(renderDoc, 'image/png', {
     // Both clips apply: the bleed box and the selection's own shape (the preview matches the exported area).
     ...options, clip: bleedClip || options.clip ? (ctx: CanvasRenderingContext2D) => { if (bleedClip) bleedClip(ctx); options.clip?.(ctx); } : undefined, preview: true, whiteBase: output.format === 'jpg',
     width: Math.max(1, Math.round(width * shrink)), height: Math.max(1, Math.round(height * shrink)),
@@ -211,7 +211,7 @@ export async function exportPreview(doc: DesignDoc, settings: ExportSettings, ta
     offsetX: ((layout?.x ?? 0) + (options.offsetX ?? 0) * (layout?.scale ?? 1)) * shrink,
     offsetY: ((layout?.y ?? 0) + (options.offsetY ?? 0) * (layout?.scale ?? 1)) * shrink,
     background: output.format === 'pdf' || output.format === 'jpg' ? options.background ?? '#ffffff' : options.background,
-  });
+  }).canvas;
 }
 
 async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: ExportTarget, deps: SvgDeps, base: string, signal?: AbortSignal): Promise<ExportFile> {

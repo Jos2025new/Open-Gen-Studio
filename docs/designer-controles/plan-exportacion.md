@@ -109,3 +109,4 @@ Hecho en `task/export`; motor en `exportSettings.ts`/`exportJob.ts`, campos en `
 - Informe final: qué hiciste, qué quedó fuera y por qué, decisiones tomadas, resultados de pruebas exactos.
 
 - **Disposición (2026-11-08)**: orden preset · área (una fila) · vista previa · tamaño An/Al/DPI enlazados · fondo + Transparent · nombre/prefijo · formato + engranaje (opciones por formato en un popover). PNG sin profundidad de bits ni antialias: el renderizador compartido no los admite sin tocarlo.
+- **Vista previa directa (2026-11-16)**: `exportPreview` devuelve un `HTMLCanvasElement` (`drawExport`, sin codificar PNG); el panel lo copia a su canvas y `samplePreview` lo lee sin `createImageBitmap`. De ~1015 ms a ~3 ms de dibujo en un documento de 40 capas.

@@ -43,7 +43,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   const [progress, setProgress] = useState<string>();
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<string>();
-  const [preview, setPreview] = useState<{ request: object; image?: Blob; error?: string; blank?: boolean }>();
+  const [preview, setPreview] = useState<{ request: object; image?: HTMLCanvasElement; error?: string; blank?: boolean }>();
   const running = useRef<AbortController | null>(null);
   const [delivery, setDelivery] = useState<{ request: object; kb: number; notices: string[] }>();
   const [folder, setFolder] = useState<FolderHandle>();
@@ -64,7 +64,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   }, [doc, settings, target]);
 
   const image = preview?.request === request ? preview.image : undefined;
-  const [lastImage, setLastImage] = useState<Blob>();
+  const [lastImage, setLastImage] = useState<HTMLCanvasElement>();
   useEffect(() => { if (image) setLastImage(image); }, [image]);
   const delivered = delivery?.request === request ? delivery : undefined;
   const previewError = preview?.request === request ? preview.error : undefined;
@@ -79,7 +79,7 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
     const timer = setTimeout(async () => {
       try {
         const image = await prepareDesignPreview(doc, settings, target, controller.signal);
-        const sample = hasVisibleContent(doc) ? await samplePreview(image) : null;
+        const sample = hasVisibleContent(doc) ? samplePreview(image) : null;
         if (!controller.signal.aborted) setPreview({ request, image, blank: !!sample && isNearUniform(sample, parseColor(pageColor)) });
       } catch (error) {
         if (!controller.signal.aborted) setPreview({ request, error: message(error) });
@@ -252,18 +252,20 @@ export function ExportPanel({ sessionId, doc, onBack }: { sessionId: string; doc
   </div>;
 }
 
-function ExportPreview({ image, transparent, ratio, stale, layout }: { image?: Blob; transparent: boolean; ratio: number; stale: boolean; layout?: ReturnType<typeof pageLayout> }) {
-  const [preview, setPreview] = useState<{ image: Blob; url: string }>();
+function ExportPreview({ image, transparent, ratio, stale, layout }: { image?: HTMLCanvasElement; transparent: boolean; ratio: number; stale: boolean; layout?: ReturnType<typeof pageLayout> }) {
+  // The frame is copied onto the visible canvas as it is: no encoding and no second decoding.
+  const shown = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (!image) return;
-    const url = URL.createObjectURL(image);
-    setPreview({ image, url });
-    return () => URL.revokeObjectURL(url);
+    const target = shown.current;
+    if (!image || !target) return;
+    target.width = image.width;
+    target.height = image.height;
+    target.getContext('2d')?.drawImage(image, 0, 0);
   }, [image]);
   const trim = layout?.trim;
   return <div className={`design-export-frame${stale ? ' is-stale' : ''}`} aria-busy={stale}>
     <div className={`design-export-page${transparent ? ' is-transparent' : ''}`} style={{ '--ratio': ratio } as React.CSSProperties}>
-      {image && preview?.image === image && <img className="design-export-preview" src={preview.url} alt="Export preview" />}
+      {image && <canvas ref={shown} className="design-export-preview" role="img" aria-label="Export preview" />}
       {layout && trim && <span className="design-export-trim" style={{ left: `${trim.x / layout.pageWidth * 100}%`, top: `${trim.y / layout.pageHeight * 100}%`, width: `${trim.w / layout.pageWidth * 100}%`, height: `${trim.h / layout.pageHeight * 100}%` }} />}
     </div>
   </div>;

@@ -33,13 +33,10 @@ export function isNearUniform(data: ArrayLike<number>, page: [number, number, nu
 }
 
 /** The preview bitmap shrunk to 64×64 RGBA, or null where the browser cannot decode it. */
-export async function samplePreview(blob: Blob): Promise<Uint8ClampedArray | null> {
-  if (typeof createImageBitmap !== 'function') return null;
+export function samplePreview(frame: HTMLCanvasElement): Uint8ClampedArray | null {
   try {
-    const bitmap = await createImageBitmap(blob);
     const ctx = ctx2d(createCanvas(SAMPLE, SAMPLE));
-    ctx.drawImage(bitmap, 0, 0, SAMPLE, SAMPLE);
-    bitmap.close?.();
+    ctx.drawImage(frame, 0, 0, SAMPLE, SAMPLE);
     return ctx.getImageData(0, 0, SAMPLE, SAMPLE).data;
   } catch {
     return null;

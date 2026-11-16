@@ -77,18 +77,16 @@ describe('raster export pipeline (browser encoder double)', () => {
     expect(fillColors.includes('#ffffff')).toBe(format === 'jpg');
   });
 
-  it('encodes one small PNG with the export proportions even for 3× and print', async () => {
+  it('draws one small frame straight onto a canvas with the export proportions, encoding nothing', async () => {
     const doc = { ...design, width: 2000, height: 1000 };
-    const jpg = await exportPreview(doc, { ...DEFAULT_EXPORT, size: 3, format: 'jpg' }, {});
-    expect(jpg.type).toBe('image/png');
-    expect(encodes).toEqual([{ width: 512, height: 256, mime: 'image/png', quality: undefined }]);
+    const size = (c: HTMLCanvasElement) => [c.width, c.height];
+    expect(size(exportPreview(doc, { ...DEFAULT_EXPORT, size: 3, format: 'jpg' }, {}))).toEqual([512, 256]);
     expect(fillColors).toContain('#ffffff');
-    await exportPreview(doc, { ...settings('home-print'), pdf: { paper: 'letter', orientation: 'landscape' } }, {});
-    expect(encodes.at(-1)).toMatchObject({ width: 512, height: 396, mime: 'image/png' });
-    await exportPreview(doc, settings('brand'), {});
-    expect(encodes.at(-1)).toMatchObject({ width: 512, height: 256, mime: 'image/png' });
-    expect(encodes).toHaveLength(3);
+    expect(size(exportPreview(doc, { ...settings('home-print'), pdf: { paper: 'letter', orientation: 'landscape' } }, {}))).toEqual([512, 396]);
+    expect(size(exportPreview(doc, settings('brand'), {}))).toEqual([512, 256]);
+    expect(encodes).toHaveLength(0);
   });
+
 
   it('supports explicit transparency and a solid background without editing the document', async () => {
     const blue = { ...design, background: '#0000ff' };

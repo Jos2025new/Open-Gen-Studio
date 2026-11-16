@@ -37,7 +37,10 @@ export function checkRasterExport(doc: DesignDoc, { width, height, scale }: Pick
   if (hasFx) checkExportSize(Math.max(1, Math.ceil(doc.width * scale)), Math.max(1, Math.ceil(doc.height * scale)), true);
 }
 
-export async function exportDoc(doc: DesignDoc, type: RasterMime = 'image/png', options?: RasterExport): Promise<Blob> {
+/** The finished frame before any encoding: a preview shows it as it is, a file encodes it. */
+export interface DrawnExport { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; background: string | undefined }
+
+export function drawExport(doc: DesignDoc, type: RasterMime = 'image/png', options?: RasterExport): DrawnExport {
   const width = options?.width ?? doc.width;
   const height = options?.height ?? doc.height;
   const scale = options?.scale ?? 1;
@@ -76,6 +79,18 @@ export async function exportDoc(doc: DesignDoc, type: RasterMime = 'image/png', 
       ctx.fillRect(0, 0, width, height);
     }
     if (ctx.isContextLost?.()) throw new ExportError('The browser lost the canvas, so try a smaller size or reopen the design.');
+    return { canvas, ctx, background };
+  } catch (error) {
+    if (options?.signal?.aborted) throw error;
+    throw exportError(error, `No file was created at ${width} × ${height}, so try a smaller size or fewer effects.`);
+  }
+}
+
+export async function exportDoc(doc: DesignDoc, type: RasterMime = 'image/png', options?: RasterExport): Promise<Blob> {
+  const width = options?.width ?? doc.width;
+  const height = options?.height ?? doc.height;
+  const { canvas, ctx, background } = drawExport(doc, type, options);
+  try {
     let quality = options?.quality ?? DEFAULT_JPEG_QUALITY;
     for (;;) {
       options?.signal?.throwIfAborted();

@@ -10,7 +10,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rendimiento. Los seis marcados *nuevo* no estaban en ningún archivo.
 
-1. **Vista previa de exportación lenta** (*nuevo*, 2026-11-08): se renderiza, se codifica a PNG y se decodifica dos veces. Propuesta sin respuesta: dibujar directo en un canvas pequeño y medir antes y después. [plan](designer-controles/plan-exportacion.md)
+1. ~~**Vista previa de exportación lenta**~~ **Hecho 2026-11-16**: `exportPreview` dibuja directo en un canvas pequeño y el panel lo copia tal cual; sin PNG ni decodificar dos veces. Medido en sandbox (doc 2000×1500, 40 capas, 512 px): antes ~1015 ms por vista previa (casi todo `toBlob` PNG) + 5–18 ms de muestreo; después 1.5–3 ms de dibujo + 2–5 ms de muestreo. Cifras con el navegador integrado de la app (panel posiblemente en segundo plano, que alarga `toBlob`). Diseño del panel intacto. [plan](designer-controles/plan-exportacion.md)
 2. **Panel de exportación confuso** (*nuevo*, 2026-11-08): «no sé dónde cambiar el nombre». El usuario hará su propio diseño; no tocar el panel hasta que llegue y luego implementarlo fiel, con los campos compartidos y viendo cada paso.
 3. ~~**Omnicanvas: el nodo del agente sale cortado por abajo al abrir**~~ **Hecho 2026-11-16**: el encuadre inicial incluye el nodo del agente. Evidencia: prueba visual en sandbox (borde inferior del agente a 814 de 850 px, antes cortado); código en `useOmniFraming.ts`.
 4. ~~**Barra inferior del visor**~~ **Hecho 2026-11-16**: pestañas con icono (Pintar, Editar, Variaciones, Convertir, Mejorar). Evidencia: código y `tests/lightbox.test.ts`; prueba visual en sandbox al final.
