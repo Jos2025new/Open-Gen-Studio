@@ -25,10 +25,12 @@ export interface GlobalsDelta {
   spend: {
     append: string[];
     len: number;
+    from?: number;
   };
 }
 
 export function createDeltaClient(): {
   diff(g: Record<string, unknown>): GlobalsDelta;
   ack(): void;
+  markUnconfirmed(): void;
 };

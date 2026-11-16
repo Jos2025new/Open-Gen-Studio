@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS asset_revisions (seq INTEGER PRIMARY KEY AUTOINCREMEN
 CREATE INDEX IF NOT EXISTS asset_revisions_asset ON asset_revisions (asset_id, seq);
 CREATE TABLE IF NOT EXISTS event_journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, meta TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS event_journal_kind ON event_journal (kind, seq);
+CREATE TABLE IF NOT EXISTS commit_ack (id INTEGER PRIMARY KEY CHECK (id = 1), commit_id TEXT NOT NULL, saved_at INTEGER NOT NULL);
 `;
 
 const PHASE4_TABLES = `
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS asset_revisions (seq INTEGER PRIMARY KEY AUTOINCREMEN
 CREATE INDEX IF NOT EXISTS asset_revisions_asset ON asset_revisions (asset_id, seq);
 CREATE TABLE IF NOT EXISTS event_journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, meta TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS event_journal_kind ON event_journal (kind, seq);
+CREATE TABLE IF NOT EXISTS commit_ack (id INTEGER PRIMARY KEY CHECK (id = 1), commit_id TEXT NOT NULL, saved_at INTEGER NOT NULL);
 `;
 
 function migrate(db) {
@@ -104,6 +106,8 @@ export function createStoreB(dir, opts = {}) {
   const q = {
     headGet: db.prepare('SELECT saved_at, version, order_json, spend_len, spend_last FROM head WHERE id = 1'),
     headPut: db.prepare('INSERT OR REPLACE INTO head (id, saved_at, version, order_json, spend_len, spend_last) VALUES (1, ?, ?, ?, ?, ?)'),
+    ackGet: db.prepare('SELECT commit_id, saved_at FROM commit_ack WHERE id = 1'),
+    ackPut: db.prepare('INSERT OR REPLACE INTO commit_ack (id, commit_id, saved_at) VALUES (1, ?, ?)'),
     smallGet: db.prepare('SELECT json FROM small WHERE id = 1'),
     smallPut: db.prepare('INSERT OR REPLACE INTO small (id, json) VALUES (1, ?)'),
     sessGet: db.prepare('SELECT json FROM sessions WHERE id = ?'),
@@ -212,10 +216,10 @@ export function createStoreB(dir, opts = {}) {
   }
 
   /** Applies the delta. Returns the new spend window. */
-  function applyDelta(delta, head, savedAt, stats) {
+  function applyDelta(delta, head, savedAt, stats, retriedHead = false) {
     if (delta.small != null) q.smallPut.run(sanitizeKeysInText(delta.small));
     const bulkImport = Boolean(delta.full && (Object.keys(delta.up?.generations ?? {}).length + Object.keys(delta.up?.assets ?? {}).length > 500));
-    if (delta.full) {
+    if (delta.full && !retriedHead) {
       q.journalPut.run(savedAt, 'import', 'store', json({
         generations: Object.keys(delta.up?.generations ?? {}).length,
         assets: Object.keys(delta.up?.assets ?? {}).length,
@@ -299,15 +303,21 @@ export function createStoreB(dir, opts = {}) {
     let spend = { len: head?.spend_len ?? 0, last: head?.spend_last ?? 0 };
     if (delta.spend) {
       const app = delta.spend.append ?? [];
-      const already = head && head.spend_len === delta.spend.len && app.length > 0 && (() => {
-        const tail = q.spendTail.all(head.spend_last, app.length).reverse().map((r) => r.meta);
-        return tail.length === app.length && tail.every((m, i) => m === app[i]);
-      })();
-      if (!already) {
-        for (const t of app) {
-          spend.last = Number(q.spendPut.run(t).lastInsertRowid);
-          if (!bulkImport) q.journalPut.run(savedAt, 'spend', String(spend.last), pickAllowedMeta(t, JOURNAL_ALLOW.spend));
+      let skip = 0;
+      if (retriedHead && head && Number.isInteger(delta.spend.from) && head.spend_len > delta.spend.from) {
+        const extra = head.spend_len - delta.spend.from;
+        if (extra <= app.length) {
+          const tail = q.spendTail.all(head.spend_last, extra).reverse().map((r) => r.meta);
+          if (tail.length === extra && tail.every((m, i) => m === app[i])) skip = extra;
         }
+      } else if (head && head.spend_len === delta.spend.len && app.length > 0) {
+        const tail = q.spendTail.all(head.spend_last, app.length).reverse().map((r) => r.meta);
+        if (tail.length === app.length && tail.every((m, i) => m === app[i])) skip = app.length;
+      }
+      for (let i = skip; i < app.length; i++) {
+        const t = app[i];
+        spend.last = Number(q.spendPut.run(t).lastInsertRowid);
+        if (!bulkImport) q.journalPut.run(savedAt, 'spend', String(spend.last), pickAllowedMeta(t, JOURNAL_ALLOW.spend));
       }
       spend.len = delta.spend.len;
     }
@@ -322,10 +332,16 @@ export function createStoreB(dir, opts = {}) {
   }
 
   function commitTx(body) {
-    const { savedAt, baseAt, version, order, sessions = {}, keep, delta } = body;
+    const { savedAt, baseAt, version, order, sessions = {}, keep, delta, commitId, retryOf } = body;
     const head = q.headGet.get();
+    const ack = q.ackGet.get();
     const current = head ? head.saved_at : 0;
-    if (current && current !== baseAt) return { status: 409, reason: 'conflict', savedAt: current };
+    if (commitId && ack && ack.commit_id === commitId) {
+      if (ack.saved_at === savedAt) return { status: 204, savedAt: current };
+      return { status: 409, reason: 'conflict', savedAt: current };
+    }
+    const retriedHead = Boolean(current && current !== baseAt && ack?.commit_id && Array.isArray(retryOf) && retryOf.includes(ack.commit_id));
+    if (current && current !== baseAt && !retriedHead) return { status: 409, reason: 'conflict', savedAt: current };
     if (!head && !(delta && delta.full)) return { status: 400, reason: 'the first commit must carry the whole state (delta.full)' };
 
     for (const id of order) {
@@ -362,7 +378,7 @@ export function createStoreB(dir, opts = {}) {
     }
     fault('sessions');
     const stats = { recGets: 0, recWrites: 0, posUpdates: 0 };
-    const spend = applyDelta(delta ?? {}, head, savedAt, stats);
+    const spend = applyDelta(delta ?? {}, head, savedAt, stats, retriedHead);
     fault('globals');
 
     const known = new Set(order);
@@ -384,14 +400,17 @@ export function createStoreB(dir, opts = {}) {
     }
     fault('head');
     q.headPut.run(savedAt, version, json(order), spend.len, spend.last);
+    q.ackPut.run(commitId ?? '', savedAt);
     lastStats = stats;
     return { status: 204, savedAt };
   }
 
   function commit(body) {
-    const { savedAt, version, order, sessions = {}, delta } = body;
+    const { savedAt, version, order, sessions = {}, delta, commitId, retryOf } = body;
     if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
     if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
+    if (commitId != null && (typeof commitId !== 'string' || commitId.length > 128)) return { status: 400, reason: 'invalid commitId' };
+    if (retryOf != null && (!Array.isArray(retryOf) || retryOf.some((x) => typeof x !== 'string' || x.length > 128))) return { status: 400, reason: 'invalid retryOf' };
     if (delta != null && (typeof delta !== 'object' || (delta.small != null && typeof delta.small !== 'string'))) return { status: 400, reason: 'delta must be an object' };
     if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
     for (const [id, text] of Object.entries(sessions)) {

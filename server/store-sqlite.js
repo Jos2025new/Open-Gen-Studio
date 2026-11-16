@@ -60,9 +60,11 @@ export function stripSqliteKeys(file) {
 
 export function validateSqliteCommit(body, fresh = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { status: 400, reason: 'not a commit' };
-  const { savedAt, version, globals, order, sessions = {}, delta } = body;
+  const { savedAt, version, globals, order, sessions = {}, delta, commitId, retryOf } = body;
   if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
   if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
+  if (commitId != null && (typeof commitId !== 'string' || commitId.length > 128)) return { status: 400, reason: 'invalid commitId' };
+  if (retryOf != null && (!Array.isArray(retryOf) || retryOf.some((x) => typeof x !== 'string' || x.length > 128))) return { status: 400, reason: 'invalid retryOf' };
   const hasDelta = delta != null && typeof delta === 'object' && !Array.isArray(delta);
   if (!hasDelta && (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}'))) {
     return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
@@ -119,7 +121,7 @@ export function createSqliteStore(dir, opts = {}) {
   function commit(body) {
     const invalid = validateSqliteCommit(body);
     if (invalid) return invalid;
-    const { savedAt, baseAt, version, globals, order, sessions = {}, keep, delta: bodyDelta } = body;
+    const { savedAt, baseAt, version, globals, order, sessions = {}, keep, delta: bodyDelta, commitId, retryOf } = body;
     let diff = bodyDelta;
     const usedLocalDelta = !diff;
     if (!diff) {
@@ -133,7 +135,7 @@ export function createSqliteStore(dir, opts = {}) {
       diff = delta.diff(parsed);
     }
     lastDelta = diff;
-    const result = ba.commit({ savedAt, baseAt, version, order, sessions, keep, delta: diff });
+    const result = ba.commit({ savedAt, baseAt, version, order, sessions, keep, delta: diff, commitId, retryOf });
     if (result.status === 204) {
       if (usedLocalDelta) delta.ack();
       else deltaStale = true;

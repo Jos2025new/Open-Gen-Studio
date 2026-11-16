@@ -23,9 +23,18 @@ function sameMapOrder(a, b) {
   return true;
 }
 
+function sameSequence(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 export function createDeltaClient() {
   const known = { generations: new Map(), assets: new Map(), library: new Map() };
+  const unconfirmedUp = { generations: new Map(), assets: new Map(), library: new Map() };
+  const unconfirmedOrder = { generations: null, assets: null, library: null };
   let small = null;
+  let unconfirmedSmall = false;
   let knownSpend = [];
   let first = true;
 
@@ -35,6 +44,7 @@ export function createDeltaClient() {
     let order = null;
     for (const coll of COLLS) {
       const prev = known[coll];
+      const uncUp = unconfirmedUp[coll];
       up[coll] = {}; del[coll] = []; staged[coll] = new Map();
       const present = new Set();
       if (coll === 'library') {
@@ -46,25 +56,38 @@ export function createDeltaClient() {
           for (let dup = 2; present.has(id); dup++) id = `${baseId}#${dup}`;
           present.add(id);
           const p = prev.get(id);
-          if (p && p.ref === item) { staged[coll].set(id, p); continue; }
+          if (p && p.ref === item) {
+            staged[coll].set(id, p);
+            if (uncUp.has(id) && uncUp.get(id) !== p.text) up[coll][id] = p.text;
+            continue;
+          }
           const text = JSON.stringify(item);
           staged[coll].set(id, { ref: item, text });
-          if (!p || p.text !== text) up[coll][id] = text;
+          if (!p || p.text !== text || (uncUp.has(id) && uncUp.get(id) !== text)) up[coll][id] = text;
         }
       } else {
         const cur = g[coll] ?? {};
         for (const id of Object.keys(cur)) {
           present.add(id);
           const p = prev.get(id);
-          if (p && p.ref === cur[id]) { staged[coll].set(id, p); continue; }
+          if (p && p.ref === cur[id]) {
+            staged[coll].set(id, p);
+            if (uncUp.has(id) && uncUp.get(id) !== p.text) up[coll][id] = p.text;
+            continue;
+          }
           const text = JSON.stringify(cur[id]);
           staged[coll].set(id, { ref: cur[id], text });
-          if (!p || p.text !== text) up[coll][id] = text;
+          if (!p || p.text !== text || (uncUp.has(id) && uncUp.get(id) !== text)) up[coll][id] = text;
         }
       }
       for (const id of prev.keys()) if (!present.has(id)) del[coll].push(id);
+      for (const id of uncUp.keys()) if (!present.has(id) && !prev.has(id)) del[coll].push(id);
+      const curOrder = [...staged[coll].keys()];
       if (!sameMapOrder(prev, staged[coll])) {
-        const moves = computeOrderDiff([...prev.keys()], [...staged[coll].keys()], Object.keys(up[coll]));
+        const moves = computeOrderDiff([...prev.keys()], curOrder, Object.keys(up[coll]));
+        if (moves) (order ??= {})[coll] = moves;
+      } else if (unconfirmedOrder[coll] && !sameSequence(unconfirmedOrder[coll], curOrder)) {
+        const moves = computeOrderDiff(unconfirmedOrder[coll], curOrder, Object.keys(up[coll]));
         if (moves) (order ??= {})[coll] = moves;
       }
     }
@@ -81,16 +104,36 @@ export function createDeltaClient() {
       }
       if (ok) { start = k; break; }
     }
-    const delta = { ...(first ? { full: true } : {}), ...(smallText !== small ? { small: smallText } : {}), up, del, ...(order ? { order } : {}), spend: { append: texts.slice(start), len: texts.length } };
-    pending = { staged, smallText, spend: texts };
+    const delta = {
+      ...(first ? { full: true } : {}),
+      ...(smallText !== small || unconfirmedSmall ? { small: smallText } : {}),
+      up,
+      del,
+      ...(order ? { order } : {}),
+      spend: { append: texts.slice(start), len: texts.length, from: start },
+    };
+    pending = { staged, smallText, spend: texts, up, order };
     return delta;
   }
   let pending = null;
+  function markUnconfirmed() {
+    if (!pending) return;
+    if (pending.smallText !== small) unconfirmedSmall = true;
+    for (const coll of COLLS) {
+      for (const [id, text] of Object.entries(pending.up[coll])) unconfirmedUp[coll].set(id, text);
+      if (pending.order?.[coll]) unconfirmedOrder[coll] = [...pending.staged[coll].keys()];
+    }
+  }
   function ack() {
-    for (const coll of COLLS) known[coll] = pending.staged[coll];
+    for (const coll of COLLS) {
+      known[coll] = pending.staged[coll];
+      unconfirmedUp[coll].clear();
+      unconfirmedOrder[coll] = null;
+    }
     small = pending.smallText;
+    unconfirmedSmall = false;
     knownSpend = pending.spend;
     first = false;
   }
-  return { diff, ack };
+  return { diff, ack, markUnconfirmed };
 }

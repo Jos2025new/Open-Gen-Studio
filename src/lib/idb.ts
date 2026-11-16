@@ -169,6 +169,8 @@ async function hold(key: string, local: string): Promise<void> {
 
 // Disk sends of the state, one at a time: each computes its diff and settles its ack before the next one starts.
 let sendChain: Promise<void> = Promise.resolve();
+// Sessions sent (or removed) in failed commits whose server outcome is uncertain until the next 204.
+const unconfirmedSessions = new Map<string, string>();
 
 async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, keep: boolean): Promise<DiskWriteResult> {
   // The lock is asked again at send time: a tab that lost it while this send waited sends nothing (pending stays, so
@@ -177,12 +179,14 @@ async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, 
   // The disk version is being adopted: a send queued before that must not reach the disk.
   if (guard.discarding) return 'fail';
   if (guard.held) return 'conflict';
-  const differs = (id: string) => guard.acked.get(id) !== parts.sessions.get(id);
+  const differs = (id: string) => guard.acked.get(id) !== parts.sessions.get(id)
+    || (unconfirmedSessions.has(id) && unconfirmedSessions.get(id) !== parts.sessions.get(id));
   const changed = parts.order.filter(differs).map((id) => [id, parts.sessions.get(id)!] as [string, string]);
   const all = parts.order.map((id) => [id, parts.sessions.get(id)!] as [string, string]);
   const approval = keep ? await approvalFor(parts) : undefined;
   const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, globalsObj: parts.globalsObj, order: parts.order, changed, all, keep: approval });
   if (result === 'ok') {
+    unconfirmedSessions.clear();
     await settle(rev, at, parts, true);
     setProblem(null);
   } else if (result === 'browser-only' && holdsWriterLock()) await settle(rev, at, parts, false);
@@ -193,6 +197,9 @@ async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, 
       await set(`${key}:conflict-${at}`, assembleText(parts), stateStore);
       setProblem({ reason: 'conflict' });
     }
+  } else if (result === 'fail') {
+    for (const [id, text] of changed) unconfirmedSessions.set(id, text);
+    for (const id of guard.acked.keys()) if (!parts.sessions.has(id)) unconfirmedSessions.set(id, '');
   }
   return result;
 }
@@ -224,6 +231,7 @@ export const stateDb = {
     if (!holdsWriterLock()) return undefined; // a tab without the lock loads nothing and adopts or pushes nothing
     // Each load (the first one, or taking the lock back) starts clean: nothing of an earlier holding period is kept.
     disk.reset();
+    unconfirmedSessions.clear();
     Object.assign(guard, { acked: new Map(), ackedRev: 0, held: false, discarding: false });
     setProblem(null);
     committed.clear();

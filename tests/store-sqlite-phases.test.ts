@@ -1,7 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('../src/lib/writerLock', () => ({ holdsWriterLock: () => true }));
 import { localStore } from '../server/local-store.js';
 import { createStoreV2 } from '../server/store-v2.js';
 import { canonicalStateText, createSqliteStore, migrateFromV2, sqliteHead, stateSha } from '../server/store-sqlite.js';
@@ -273,5 +274,92 @@ describe('phase 4: asset revisions and append-only event journal in SQLite', () 
     const recEntry = store.readJournal('manual')[0];
     expect(recEntry?.meta).toEqual({ at: 2500 });
     store.close();
+  });
+});
+
+describe('idempotent retry when server already committed and response was lost', () => {
+  it('recognizes own committed save after dropped response without self-conflict while rejecting foreign writes', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-drop-after-commit-'));
+    const data = join(root, 'data');
+    mkdirSync(data);
+    const { callBody } = mount(root);
+    const order = ['ses_a'];
+    const all = [['ses_a', session]] as Array<[string, string]>;
+    let dropNextAfterCommit = false;
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url === '/x/store/ping') return new Response('ok');
+      const result = await callBody(init?.method ?? 'GET', url, String(init?.body ?? ''));
+      if (url === '/x/store/v2/commit' && dropNextAfterCommit) {
+        dropNextAfterCommit = false;
+        throw new TypeError('response lost after commit');
+      }
+      return new Response(result.status === 204 ? null : result.body, { status: result.status });
+    });
+    try {
+      vi.resetModules();
+      const { disk } = await import('../src/lib/disk');
+      disk.reset();
+      const g1 = {
+        settings: {}, spentUsd: 0.1, spendLog: [{ id: 's1', usd: 0.1 }],
+        generations: { g1: { id: 'g1', prompt: 'one' } }, assets: {}, library: [{ id: 'lib_a', name: 'A' }], ui: { zoom: 1 },
+      };
+      expect(await disk.setCommit({ savedAt: 1000, version: 1, globals: json(g1), order, changed: all })).toBe('ok');
+
+      // 1. Server commits savedAt=2000 (adds g2, tempGen, s2, changes zoom=2), then HTTP response is dropped.
+      dropNextAfterCommit = true;
+      const g2 = {
+        ...g1, spentUsd: 0.2, spendLog: [{ id: 's1', usd: 0.1 }, { id: 's2', usd: 0.1 }],
+        generations: { ...g1.generations, g2: { id: 'g2', prompt: 'two' }, tempGen: { id: 'tempGen', prompt: 'tmp' } },
+        ui: { zoom: 2 },
+      };
+      expect(await disk.setCommit({ savedAt: 2000, version: 1, globals: json(g2), order, changed: [] })).toBe('fail');
+      expect(sqliteHead(data)?.savedAt).toBe(2000);
+
+      // Foreign stale write at baseAt=1000 must still get 409 conflict and must NOT overwrite savedAt=2000.
+      const foreign = await callBody('PUT', '/x/store/v2/commit', json({
+        savedAt: 2500, baseAt: 1000, version: 1, globals: json({ ...g1, ui: { zoom: 99 } }), order, sessions: {},
+      }));
+      expect(foreign.status).toBe(409);
+      expect(JSON.parse(foreign.body)).toMatchObject({ reason: 'conflict', savedAt: 2000 });
+
+      // 2. Exact retry of savedAt=2000 (same commit) is recognized idempotently without 409.
+      expect(await disk.setCommit({ savedAt: 2000, version: 1, globals: json(g2), order, changed: [] })).toBe('ok');
+      expect(disk.isStale()).toBe(false);
+
+      // 3. Drop response on savedAt=3000 (adds s3, g3, tempGen2, zoom=3), then follow up with a NEW savedAt=4000
+      //    that appends s4, deletes tempGen2, and reverts zoom back to 1.
+      dropNextAfterCommit = true;
+      const g3 = {
+        ...g2, spentUsd: 0.3, spendLog: [...g2.spendLog, { id: 's3', usd: 0.1 }],
+        generations: { g1: g1.generations.g1, g2: g2.generations.g2, g3: { id: 'g3', prompt: 'three' }, tempGen2: { id: 'tempGen2', prompt: 'tmp2' } },
+        ui: { zoom: 3 },
+      };
+      expect(await disk.setCommit({ savedAt: 3000, version: 1, globals: json(g3), order, changed: [] })).toBe('fail');
+      expect(sqliteHead(data)?.savedAt).toBe(3000);
+
+      const g4 = {
+        ...g3, spentUsd: 0.4, spendLog: [...g3.spendLog, { id: 's4', usd: 0.1 }],
+        generations: { g1: g1.generations.g1, g2: g2.generations.g2, g3: g3.generations.g3 },
+        ui: { zoom: 1 },
+      };
+      expect(await disk.setCommit({ savedAt: 4000, version: 1, globals: json(g4), order, changed: [] })).toBe('ok');
+      expect(disk.isStale()).toBe(false);
+
+      const stateAfter = JSON.parse((await callBody('GET', '/x/store/state')).body).state;
+      expect(Object.keys(stateAfter.generations).sort()).toEqual(['g1', 'g2', 'g3']);
+      expect(stateAfter.spendLog.map((x: { id: string }) => x.id)).toEqual(['s1', 's2', 's3', 's4']);
+      expect(stateAfter.ui.zoom).toBe(1);
+
+      // 4. If a foreign client advances the server AFTER our lost commit, our follow-up MUST get 409 conflict.
+      dropNextAfterCommit = true;
+      const g5 = { ...g4, ui: { zoom: 5 } };
+      expect(await disk.setCommit({ savedAt: 5000, version: 1, globals: json(g5), order, changed: [] })).toBe('fail');
+      expect((await callBody('PUT', '/x/store/v2/commit', json({
+        savedAt: 5500, baseAt: 5000, version: 1, globals: json({ ...g5, ui: { zoom: 77 } }), order, sessions: {},
+      }))).status).toBe(204);
+      expect(await disk.setCommit({ savedAt: 6000, version: 1, globals: json({ ...g5, ui: { zoom: 6 } }), order, changed: [] })).toBe('conflict');
+      expect(disk.isStale()).toBe(true);
+      expect(JSON.parse((await callBody('GET', '/x/store/state')).body).state.ui.zoom).toBe(77);
+    } finally { vi.unstubAllGlobals(); }
   });
 });

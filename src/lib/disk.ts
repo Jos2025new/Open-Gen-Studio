@@ -56,6 +56,15 @@ let stale = false;
 let onStale: (() => void) | null = null;
 let lastRejection: Rejection | null = null;
 let deltaClient = createDeltaClient();
+let unconfirmedCommits: string[] = [];
+let lastAttempt: { savedAt: number; core: string; commitId: string } | null = null;
+const newCommitId = () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+function clearUnconfirmed(): void {
+  unconfirmedCommits = [];
+  lastAttempt = null;
+}
 
 function seedDeltaFromText(text: string): void {
   try {
@@ -90,6 +99,7 @@ export const disk = {
     const res = await fetch('/x/store/state', { cache: 'no-store' }).catch(() => null);
     const text = res?.ok ? await res.text() : '';
     baseAt = savedAtOf(text);
+    clearUnconfirmed();
     if (text) seedDeltaFromText(text);
     else deltaClient = createDeltaClient();
     return text || null;
@@ -106,6 +116,7 @@ export const disk = {
     if (res?.status === 409) return refusal(res);
     if (!res?.ok) return 'fail';
     baseAt = savedAtOf(body);
+    clearUnconfirmed();
     seedDeltaFromText(value);
     return 'ok';
   },
@@ -119,6 +130,7 @@ export const disk = {
     lastRejection = null;
     available = null;
     deltaClient = createDeltaClient();
+    clearUnconfirmed();
   },
 
   /** True once another tab saved newer work: this tab stops sending to the disk (it keeps saving in the browser). */
@@ -140,27 +152,41 @@ export const disk = {
   setCommit(c: { savedAt: number; version: number; globals: string; globalsObj?: Record<string, unknown>; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]>; keep?: KeepVersion }): Promise<DiskWriteResult> {
     if (!holdsWriterLock()) return Promise.resolve('browser-only');
     if (stale) return Promise.resolve('conflict');
-    const send = async (list: Array<[string, string]>, full = false): Promise<Response> => {
+    const build = (list: Array<[string, string]>, full = false) => {
       if (full) deltaClient = createDeltaClient();
       const parsed = c.globalsObj ?? (JSON.parse(c.globals) as Record<string, unknown>);
       const delta = deltaClient.diff(parsed);
       const sessions = list.map(([id, text]) => `${JSON.stringify(id)}:${JSON.stringify(text)}`).join(',');
-      const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"delta":${JSON.stringify(delta)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}}`;
-      return fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: byteLength(body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
+      const core = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"delta":${JSON.stringify(delta)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}`;
+      const sameRetry = !full && lastAttempt && lastAttempt.savedAt === c.savedAt && lastAttempt.core === core;
+      const commitId = sameRetry ? lastAttempt!.commitId : newCommitId();
+      const retryOf = sameRetry ? unconfirmedCommits.filter((id) => id !== commitId) : unconfirmedCommits;
+      const body = `${core},"commitId":${JSON.stringify(commitId)}${retryOf.length ? `,"retryOf":${JSON.stringify(retryOf)}` : ''}}`;
+      return { body, core, commitId };
     };
+    const send = (built: { body: string }) => fetch('/x/store/v2/commit', {
+      method: 'PUT', body: built.body, keepalive: byteLength(built.body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE },
+    });
     const receipt = new Promise<DiskWriteResult>((resolve) => { commitChain = commitChain.then(async () => {
       let result: DiskWriteResult = 'fail';
+      let attempt: { core: string; commitId: string } | null = null;
       try {
         if (stale) result = 'conflict';
         else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
         // Asked again at send time: the lock may have been handed over while this commit waited in the chain.
         else if (!holdsWriterLock()) result = 'browser-only';
         else {
-          let res = await send(c.changed);
+          let built = build(c.changed);
+          attempt = built;
+          let res = await send(built);
           // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session and full delta.
           if (res.status === 400 && c.all) {
             const reason = await res.clone().text();
-            if (reason.startsWith('missing session') || reason.includes('delta.full')) res = await send(c.all, true);
+            if (reason.startsWith('missing session') || reason.includes('delta.full')) {
+              built = build(c.all, true);
+              attempt = built;
+              res = await send(built);
+            }
           }
           if (res.status === 409) {
             result = await refusal(res);
@@ -168,10 +194,28 @@ export const disk = {
           } else if (res.ok) {
             baseAt = c.savedAt;
             deltaClient.ack();
+            clearUnconfirmed();
             result = 'ok';
+          } else if (res.status !== 400) {
+            if (!unconfirmedCommits.includes(attempt.commitId)) {
+              unconfirmedCommits.push(attempt.commitId);
+              if (unconfirmedCommits.length > 64) unconfirmedCommits.shift();
+            }
+            lastAttempt = { savedAt: c.savedAt, core: attempt.core, commitId: attempt.commitId };
+            deltaClient.markUnconfirmed();
           }
         }
-      } catch (err) { report('save state')(err); }
+      } catch (err) {
+        if (attempt) {
+          if (!unconfirmedCommits.includes(attempt.commitId)) {
+            unconfirmedCommits.push(attempt.commitId);
+            if (unconfirmedCommits.length > 64) unconfirmedCommits.shift();
+          }
+          lastAttempt = { savedAt: c.savedAt, core: attempt.core, commitId: attempt.commitId };
+          deltaClient.markUnconfirmed();
+        }
+        report('save state')(err);
+      }
       resolve(result);
     }); });
     return receipt;
@@ -203,6 +247,7 @@ export const disk = {
             if (result === 'conflict') { stale = true; onStale?.(); }
           } else if (res.ok) {
             baseAt = at;
+            clearUnconfirmed();
             if (typeof next === 'string') seedDeltaFromText(next);
             result = 'ok';
           }
