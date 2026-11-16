@@ -33,6 +33,8 @@ import {
   WandSparkles,
   UserPlus,
   Workflow,
+  Pencil,
+  Sparkles,
 } from '../ui/icons';
 import { OPS, opsFor } from '../../engine/ops';
 import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
@@ -79,6 +81,8 @@ export const QUICK_LABEL: Partial<Record<OpId, string>> = {
   extract_frame: 'Frame',
   continue: 'Continue',
 };
+
+const DOCK_GROUP_ICON: Record<OpGroupId, LucideIcon> = { edit: Pencil, explore: Shuffle, reuse: Clapperboard, finalize: Sparkles };
 
 export function OpChip({ assetId, op, parentId, compact, fullLabel }: { assetId: string; op: OpId; parentId?: string; compact?: boolean; fullLabel?: boolean }) {
   const pop = usePopover();
@@ -140,14 +144,14 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick: _s
               compact ? (
                 <IconButton icon={Brush} label="Pintar" size="sm" onClick={() => beginAssetEdit(assetId)} />
               ) : (
-                <Chip className="lb-tab" onClick={() => beginAssetEdit(assetId)} data-tip="Pintar sobre la imagen">
+                <Chip icon={Brush} className="lb-tab" onClick={() => beginAssetEdit(assetId)} data-tip="Pintar sobre la imagen">
                   Pintar
                 </Chip>
               )
             ) : null}
             {!menuOnly
               ? grouped.map((g) => (
-                  <Chip key={g.id} className="lb-tab" onClick={() => setActiveGroup(g.id)}>
+                  <Chip key={g.id} icon={DOCK_GROUP_ICON[g.id]} className="lb-tab" onClick={() => setActiveGroup(g.id)}>
                     {DOCK_GROUP_LABEL[g.id]}
                   </Chip>
                 ))

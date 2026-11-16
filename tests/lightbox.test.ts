@@ -171,9 +171,9 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     expect(dockButtons.map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual([
       'Pintar',
       'Editar',
-      'Explorar',
-      'Reutilizar',
-      'Finalizar',
+      'Variaciones',
+      'Convertir',
+      'Mejorar',
       'More',
     ]);
     expect(dockButtons.slice(0, 5).every((b) => b.classList.contains('lb-tab'))).toBe(true);
@@ -216,7 +216,7 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     act(() => groupBtn('Pintar').click());
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'img1', mode: 'paint' });
 
-    // Audio asset shows only groups that have audio ops (Reutilizar)
+    // Audio asset shows only groups that have audio ops (Convertir)
     const sessionId = useStore.getState().activeSessionId;
     blobs.set('aud1', new Blob(['aud'], { type: 'audio/mpeg' }));
     act(() => {
@@ -229,7 +229,7 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
       }));
     });
     const audioButtons = [...host.querySelectorAll<HTMLButtonElement>('.lb-dock .asset-actions > button')].map((b) => b.textContent || b.getAttribute('aria-label'));
-    expect(audioButtons).toEqual(['Reutilizar']);
+    expect(audioButtons).toEqual(['Convertir']);
 
     cleanup();
   });

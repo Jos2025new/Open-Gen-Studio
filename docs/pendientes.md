@@ -13,7 +13,7 @@ Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rend
 1. **Vista previa de exportación lenta** (*nuevo*, 2026-11-08): se renderiza, se codifica a PNG y se decodifica dos veces. Propuesta sin respuesta: dibujar directo en un canvas pequeño y medir antes y después. [plan](designer-controles/plan-exportacion.md)
 2. **Panel de exportación confuso** (*nuevo*, 2026-11-08): «no sé dónde cambiar el nombre». El usuario hará su propio diseño; no tocar el panel hasta que llegue y luego implementarlo fiel, con los campos compartidos y viendo cada paso.
 3. **Omnicanvas: el nodo del agente sale cortado por abajo al abrir** (*nuevo*, 2026-11-15).
-4. **Barra inferior del visor** (*nuevo*, 2026-11-15): volver a poner los iconos y cambiar Explorar, Reutilizar y Finalizar por nombres habituales en otras apps.
+4. ~~**Barra inferior del visor**~~ **Hecho 2026-11-16**: pestañas con icono (Pintar, Editar, Variaciones, Convertir, Mejorar). Evidencia: código y `tests/lightbox.test.ts`; prueba visual en sandbox al final.
 5. **Idioma mezclado inglés/español** (*nuevo*, 2026-11-15): decisión del usuario pendiente.
 6. **C0 · «Disk copy: could not save state … Failed to fetch» al recargar.** [detalle](pendientes-sistema.md)
 7. **Nodos del sistema fuera del lienzo de Nodes normal** (hoy solo en el omnicanvas). [plan](propuesta-todo-es-un-nodo-plan.md)
