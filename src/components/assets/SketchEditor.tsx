@@ -195,7 +195,11 @@ export function SketchEditor() {
         toast('Sketch applied · Reset image restores the original', 'success');
       } else {
         const blob = await new Promise<Blob>((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png'));
-        await saveAssetEdit(target.assetId, blob, choice, { width: out.width, height: out.height });
+        const saved = await saveAssetEdit(target.assetId, blob, choice, { width: out.width, height: out.height });
+        if (!saved) {
+          saveMenu.close();
+          return;
+        }
       }
       saveMenu.close();
       close();

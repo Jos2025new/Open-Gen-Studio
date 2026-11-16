@@ -35,6 +35,7 @@ import {
 } from '../ui/icons';
 import { OPS, opsFor } from '../../engine/ops';
 import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
+import { beginAssetEdit } from '../../engine/assetRevisions';
 import { openAssetInDesigner } from '../../engine/design/actions';
 import type { OpId, SubjectKind } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -158,15 +159,26 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
               <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} tip={o.description} onClick={() => setView(o.id)} />
             ))}
             {asset.kind === 'image' ? (
-              <MenuItem
-                icon={Brush}
-                label="Edit region / Remove object"
-                tip="Paint the area in Sketch, then describe the change"
-                onClick={() => {
-                  close();
-                  setUi({ sketch: { assetId, mode: 'mask' } });
-                }}
-              />
+              <>
+                <MenuItem
+                  icon={Brush}
+                  label="Paint / Edit image"
+                  tip="Paint over the image on a copy, then save as a copy or apply to original"
+                  onClick={() => {
+                    close();
+                    beginAssetEdit(assetId);
+                  }}
+                />
+                <MenuItem
+                  icon={Eraser}
+                  label="Edit region / Remove object"
+                  tip="Paint the area in Sketch, then describe the change"
+                  onClick={() => {
+                    close();
+                    setUi({ sketch: { assetId, mode: 'mask' } });
+                  }}
+                />
+              </>
             ) : null}
           </div>
         ) : (

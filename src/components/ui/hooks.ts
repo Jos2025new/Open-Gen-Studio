@@ -12,6 +12,8 @@ export function useAssetUrl(assetId: string | null | undefined): string | null {
 export function useAssetSource(assetId: string | null | undefined): { url: string | null; lost: boolean } {
   const remote = useStore((s) => (assetId ? s.assets[assetId]?.remoteUrl : undefined));
   const stored = useStore((s) => (assetId ? s.assets[assetId]?.stored : undefined));
+  const revCount = useStore((s) => (assetId ? s.assets[assetId]?.revisions?.length ?? 0 : 0));
+  const revertedAt = useStore((s) => (assetId ? s.assets[assetId]?.revertedAt : undefined));
   const [url, setUrl] = useState<string | null>(() => (assetId ? peekAssetUrl(assetId) ?? null : null));
   const [lost, setLost] = useState(false);
   useEffect(() => {
@@ -38,7 +40,7 @@ export function useAssetSource(assetId: string | null | undefined): { url: strin
     return () => {
       alive = false;
     };
-  }, [assetId, remote, stored]);
+  }, [assetId, remote, stored, revCount, revertedAt]);
   return { url, lost };
 }
 
