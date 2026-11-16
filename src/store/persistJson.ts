@@ -24,7 +24,7 @@ export interface StateJson {
   text(open?: string): string;
   blob(open?: string): Blob;
   /** Format 2 parts (ADR 0014) when the state has sessions: the global record and each session's text. */
-  v2?: { version: number; globals: string; order: string[]; sessions: Map<string, string> };
+  v2?: { version: number; globals: string; globalsObj?: Record<string, unknown>; order: string[]; sessions: Map<string, string> };
 }
 
 function sessionParts(sessions: Record<string, unknown>, fresh: boolean): Array<{ id: string; key: string; rec: Kept }> {
@@ -62,7 +62,7 @@ export function persistState(value: { state?: unknown; version?: number }, now =
   const parts = sessionParts(sessions as Record<string, unknown>, fresh);
   const { sessions: _sessions, ...globals } = state as Record<string, unknown>;
   return {
-    v2: { version: value.version ?? 1, globals: JSON.stringify(globals), order: parts.map((p) => p.id), sessions: new Map(parts.map((p) => [p.id, p.rec.text])) },
+    v2: { version: value.version ?? 1, globals: JSON.stringify(globals), globalsObj: globals, order: parts.map((p) => p.id), sessions: new Map(parts.map((p) => [p.id, p.rec.text])) },
     text: (open = '{') => `${open}${pre}{${parts.map((p) => p.key + p.rec.text).join(',')}}${post}`,
     blob: (open = '{') => {
       const bits: BlobPart[] = [open + pre, '{'];

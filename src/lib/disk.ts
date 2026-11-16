@@ -4,6 +4,7 @@
  */
 
 import { holdsWriterLock } from './writerLock';
+import { createDeltaClient } from '../../server/sqlite/delta-client.mjs';
 
 // Every function here that writes (PUT, DELETE, POST) first asks holdsWriterLock(): only the active tab changes the disk.
 let available: Promise<boolean> | null = null;
@@ -54,6 +55,20 @@ let baseAt = 0;
 let stale = false;
 let onStale: (() => void) | null = null;
 let lastRejection: Rejection | null = null;
+let deltaClient = createDeltaClient();
+
+function seedDeltaFromText(text: string): void {
+  try {
+    const obj = JSON.parse(text) as { state?: Record<string, unknown> };
+    if (!obj?.state || typeof obj.state !== 'object') return;
+    const { sessions: _sessions, ...globals } = obj.state;
+    deltaClient = createDeltaClient();
+    deltaClient.diff(globals);
+    deltaClient.ack();
+  } catch {
+    /* ignore malformed text */
+  }
+}
 /** Why a 409 was sent: 'rejected' for a possible-loss (kept in `lastRejection`), else 'conflict' (also a 409 with no reason). */
 async function refusal(res: Response): Promise<'conflict' | 'rejected'> {
   const body = await (async () => JSON.parse(await res.text()) as Rejection & { reason?: string })().catch(() => null);
@@ -75,6 +90,8 @@ export const disk = {
     const res = await fetch('/x/store/state', { cache: 'no-store' }).catch(() => null);
     const text = res?.ok ? await res.text() : '';
     baseAt = savedAtOf(text);
+    if (text) seedDeltaFromText(text);
+    else deltaClient = createDeltaClient();
     return text || null;
   },
 
@@ -89,6 +106,7 @@ export const disk = {
     if (res?.status === 409) return refusal(res);
     if (!res?.ok) return 'fail';
     baseAt = savedAtOf(body);
+    seedDeltaFromText(value);
     return 'ok';
   },
 
@@ -100,6 +118,7 @@ export const disk = {
     stale = false;
     lastRejection = null;
     available = null;
+    deltaClient = createDeltaClient();
   },
 
   /** True once another tab saved newer work: this tab stops sending to the disk (it keeps saving in the browser). */
@@ -114,16 +133,19 @@ export const disk = {
   },
 
   /**
-   * Format-2 commit (ADR 0014): the global record, the session order and only the sessions that changed. The server
-   * writes those files and publishes the new manifest; a stale baseAt is refused (409) like a whole-state write.
+   * Format-2 / SQLite delta commit (ADR 0014 + Phase 3): sends only changed records (`delta` with fractional index)
+   * and changed sessions. A stale baseAt is refused (409) and stops further disk writes; a network abort leaves
+   * `deltaClient` unacked so the next send resends idempotently.
    */
-  setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]>; keep?: KeepVersion }): Promise<DiskWriteResult> {
+  setCommit(c: { savedAt: number; version: number; globals: string; globalsObj?: Record<string, unknown>; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]>; keep?: KeepVersion }): Promise<DiskWriteResult> {
     if (!holdsWriterLock()) return Promise.resolve('browser-only');
     if (stale) return Promise.resolve('conflict');
-    // The body carries JSON TEXT as strings: globals and each session are strings the server stores as they are.
-    const send = async (list: Array<[string, string]>): Promise<Response> => {
+    const send = async (list: Array<[string, string]>, full = false): Promise<Response> => {
+      if (full) deltaClient = createDeltaClient();
+      const parsed = c.globalsObj ?? (JSON.parse(c.globals) as Record<string, unknown>);
+      const delta = deltaClient.diff(parsed);
       const sessions = list.map(([id, text]) => `${JSON.stringify(id)}:${JSON.stringify(text)}`).join(',');
-      const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${JSON.stringify(c.globals)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}}`;
+      const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"delta":${JSON.stringify(delta)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}}`;
       return fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: byteLength(body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
     };
     const receipt = new Promise<DiskWriteResult>((resolve) => { commitChain = commitChain.then(async () => {
@@ -135,12 +157,19 @@ export const disk = {
         else if (!holdsWriterLock()) result = 'browser-only';
         else {
           let res = await send(c.changed);
-          // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session.
-          if (res.status === 400 && c.all && (await res.clone().text()).startsWith('missing session')) res = await send(c.all);
+          // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session and full delta.
+          if (res.status === 400 && c.all) {
+            const reason = await res.clone().text();
+            if (reason.startsWith('missing session') || reason.includes('delta.full')) res = await send(c.all, true);
+          }
           if (res.status === 409) {
             result = await refusal(res);
             if (result === 'conflict') { stale = true; onStale?.(); }
-          } else if (res.ok) { baseAt = c.savedAt; result = 'ok'; }
+          } else if (res.ok) {
+            baseAt = c.savedAt;
+            deltaClient.ack();
+            result = 'ok';
+          }
         }
       } catch (err) { report('save state')(err); }
       resolve(result);
@@ -172,7 +201,11 @@ export const disk = {
           if (res.status === 409) {
             result = await refusal(res);
             if (result === 'conflict') { stale = true; onStale?.(); }
-          } else if (res.ok) { baseAt = at; result = 'ok'; }
+          } else if (res.ok) {
+            baseAt = at;
+            if (typeof next === 'string') seedDeltaFromText(next);
+            result = 'ok';
+          }
         }
       } catch (err) { report('save state')(err); }
       waiters.forEach((resolve) => resolve(result));

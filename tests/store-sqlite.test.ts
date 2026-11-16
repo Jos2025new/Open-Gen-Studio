@@ -132,12 +132,64 @@ describe('sqlite store behind the current commit body', () => {
       expect(await disk.setCommit({ savedAt: 1000, version: 1, globals: globalsAt(1), order, changed: all })).toBe('ok');
       expect(await disk.setCommit({ savedAt: 2000, version: 1, globals: globalsAt(2), order, changed: [] })).toBe('ok');
       const body = JSON.parse(sent);
+      expect(body.globals).toBeUndefined();
+      expect(body.delta).toBeDefined();
       expect(body.order).toEqual(order);
       expect(body.sessions).toEqual({});
-      expect(bytes(sent)).toBeLessThan(bytes(json(globalsAt(2))) + 512);
+      expect(bytes(sent)).toBeLessThan(1024);
       expect(calls.delta.order).toBeUndefined();
       expect(bytes(json(calls.delta))).toBeLessThan(1024);
       expect(calls.stats).toMatchObject({ recGets: 0, recWrites: 0, posUpdates: 0 });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('phase 3: client resends unacknowledged delta idempotently after a network abort and stops on a 409 conflict', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-phase3-net-'));
+    const { callBody } = mount(root);
+    const order = ['ses_a'];
+    const all = [['ses_a', session]] as Array<[string, string]>;
+    let failNext = false;
+    let commitsSent = 0;
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url === '/x/store/ping') return new Response('ok');
+      if (url === '/x/store/v2/commit') {
+        commitsSent++;
+        if (failNext) {
+          failNext = false;
+          throw new TypeError('network abort');
+        }
+      }
+      const result = await callBody(init?.method ?? 'GET', url, String(init?.body ?? ''));
+      return new Response(result.status === 204 ? null : result.body, { status: result.status });
+    });
+    try {
+      const { disk } = await import('../src/lib/disk');
+      disk.reset();
+      const g1 = { settings: {}, spentUsd: 0.1, spendLog: [{ id: 's1', usd: 0.1 }], generations: { g1: { id: 'g1', prompt: 'one' } }, assets: {}, library: [{ id: 'lib_a', name: 'A' }, { id: 'lib_b', name: 'B' }], ui: { zoom: 1 } };
+      expect(await disk.setCommit({ savedAt: 1000, version: 1, globals: json(g1), order, changed: all })).toBe('ok');
+
+      // Abort a commit that adds g2, appends spend s2, and reorders library: deltaClient stays unacked.
+      failNext = true;
+      const g2 = { ...g1, spentUsd: 0.2, spendLog: [{ id: 's1', usd: 0.1 }, { id: 's2', usd: 0.1 }], generations: { ...g1.generations, g2: { id: 'g2', prompt: 'two' } }, library: [{ id: 'lib_b', name: 'B' }, { id: 'lib_a', name: 'A' }], ui: { zoom: 2 } };
+      expect(await disk.setCommit({ savedAt: 2000, version: 1, globals: json(g2), order, changed: [] })).toBe('fail');
+
+      // Subsequent small edit resends g2, s2, and library reorder idempotently.
+      const g3 = { ...g2, ui: { zoom: 3 } };
+      expect(await disk.setCommit({ savedAt: 3000, version: 1, globals: json(g3), order, changed: [] })).toBe('ok');
+      const stateAfter = JSON.parse((await callBody('GET', '/x/store/state')).body).state;
+      expect(Object.keys(stateAfter.generations).sort()).toEqual(['g1', 'g2']);
+      expect(stateAfter.spendLog).toHaveLength(2);
+      expect(stateAfter.library.map((x: { id: string }) => x.id)).toEqual(['lib_b', 'lib_a']);
+      expect(stateAfter.ui.zoom).toBe(3);
+
+      // Concurrent commit on the server advances savedAt to 4000 -> client gets 409 conflict and stops sending.
+      expect((await callBody('PUT', '/x/store/v2/commit', json({ savedAt: 4000, baseAt: 3000, version: 1, globals: json({ ...g3, ui: { zoom: 9 } }), order, sessions: {} }))).status).toBe(204);
+      const beforeConflict = commitsSent;
+      expect(await disk.setCommit({ savedAt: 5000, version: 1, globals: json({ ...g3, ui: { zoom: 4 } }), order, changed: [] })).toBe('conflict');
+      expect(disk.isStale()).toBe(true);
+      expect(commitsSent).toBe(beforeConflict + 1);
+      expect(await disk.setCommit({ savedAt: 6000, version: 1, globals: json({ ...g3, ui: { zoom: 5 } }), order, changed: [] })).toBe('conflict');
+      expect(commitsSent).toBe(beforeConflict + 1);
     } finally { vi.unstubAllGlobals(); }
   });
 

@@ -22,12 +22,12 @@ describe('disk commit body and retry', () => {
     ...(all ? { all: [['ses_a', '{"id":"ses_a"}'], ['ses_b', '{"id":"ses_b"}']] as Array<[string, string]> } : {}),
   });
 
-  it('globals and sessions are sent as strings the server can read', async () => {
+  it('delta small and sessions are sent as strings the server can read', async () => {
     const { disk } = await import('../src/lib/disk');
     answers = [{ status: 204 }];
     await disk.setCommit(commit());
     const body = JSON.parse(puts[0]);
-    expect(typeof body.globals).toBe('string');
+    expect(typeof body.delta.small).toBe('string');
     expect(body.sessions.ses_b).toBe('{"id":"ses_b"}');
   });
 

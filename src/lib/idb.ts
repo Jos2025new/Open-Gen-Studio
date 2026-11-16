@@ -19,9 +19,28 @@ const cacheStore = createStore('ogs-cache', 'kv');
 // The saved state is one JSON document; a leading `savedAt` stamp tells which copy (browser or disk) is newer.
 const savedAt = (value: string | null | undefined) => Number(/^\{"savedAt":(\d+)/.exec(value ?? '')?.[1] ?? 0);
 
+const COLL_KEYS = new Set(['generations', 'assets', 'library', 'spendLog']);
+function canonicalGlobals(text: string): string {
+  try {
+    const g = JSON.parse(text) as Record<string, unknown>;
+    const small = Object.entries(g).filter(([k]) => !COLL_KEYS.has(k));
+    return JSON.stringify({
+      ...Object.fromEntries(small),
+      generations: g.generations ?? {},
+      assets: g.assets ?? {},
+      library: g.library ?? [],
+      spendLog: g.spendLog ?? [],
+    });
+  } catch {
+    return text;
+  }
+}
+
 /** The same state in two copies: the same globals, order and session texts (the savedAt stamp is not part of it). */
 function sameContent(a: V2Parts, b: V2Parts): boolean {
-  return a.globals === b.globals && a.order.length === b.order.length && a.order.every((id, i) => b.order[i] === id && a.sessions.get(id) === b.sessions.get(id));
+  return (a.globals === b.globals || canonicalGlobals(a.globals) === canonicalGlobals(b.globals))
+    && a.order.length === b.order.length
+    && a.order.every((id, i) => b.order[i] === id && a.sessions.get(id) === b.sessions.get(id));
 }
 
 // Format 2 (ADR 0014): one record per session in its own database. The format-1 keys (`ogs-app` and `ogs-app:b`) are
@@ -162,7 +181,7 @@ async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, 
   const changed = parts.order.filter(differs).map((id) => [id, parts.sessions.get(id)!] as [string, string]);
   const all = parts.order.map((id) => [id, parts.sessions.get(id)!] as [string, string]);
   const approval = keep ? await approvalFor(parts) : undefined;
-  const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, order: parts.order, changed, all, keep: approval });
+  const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, globalsObj: parts.globalsObj, order: parts.order, changed, all, keep: approval });
   if (result === 'ok') {
     await settle(rev, at, parts, true);
     setProblem(null);
@@ -255,7 +274,7 @@ export const stateDb = {
     const parts: V2Parts = typeof value === 'string'
       ? { ...splitText(value), savedAt: at }
       : value.v2
-        ? { savedAt: at, version: value.v2.version, globals: value.v2.globals, order: value.v2.order, sessions: value.v2.sessions }
+        ? { savedAt: at, version: value.v2.version, globals: value.v2.globals, globalsObj: value.v2.globalsObj, order: value.v2.order, sessions: value.v2.sessions }
         : { ...splitText(value.text()), savedAt: at };
     const rev = ++guard.rev;
     // The disk state the unsent work was built on: the oldest one still unsent, else what the disk holds now.

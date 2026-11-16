@@ -225,7 +225,14 @@ export function createStoreB(dir, opts = {}) {
     }
     let spend = { len: head?.spend_len ?? 0, last: head?.spend_last ?? 0 };
     if (delta.spend) {
-      for (const t of delta.spend.append ?? []) spend.last = Number(q.spendPut.run(t).lastInsertRowid);
+      const app = delta.spend.append ?? [];
+      const already = head && head.spend_len === delta.spend.len && app.length > 0 && (() => {
+        const tail = q.spendTail.all(head.spend_last, app.length).reverse().map((r) => r.meta);
+        return tail.length === app.length && tail.every((m, i) => m === app[i]);
+      })();
+      if (!already) {
+        for (const t of app) spend.last = Number(q.spendPut.run(t).lastInsertRowid);
+      }
       spend.len = delta.spend.len;
     }
     return spend;

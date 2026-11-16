@@ -9,6 +9,8 @@ export interface V2Parts {
   version: number;
   /** The state without sessions, as JSON (`{...}`). */
   globals: string;
+  /** Optional in-memory globals object so the delta client can skip unchanged record references without re-parsing. */
+  globalsObj?: Record<string, unknown>;
   /** Session ids in order. */
   order: string[];
   /** Each session's JSON text by id. */

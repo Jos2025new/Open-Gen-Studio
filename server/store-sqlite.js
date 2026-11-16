@@ -60,10 +60,16 @@ export function stripSqliteKeys(file) {
 
 export function validateSqliteCommit(body, fresh = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { status: 400, reason: 'not a commit' };
-  const { savedAt, version, globals, order, sessions = {} } = body;
+  const { savedAt, version, globals, order, sessions = {}, delta } = body;
   if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
   if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
-  if (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}')) return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
+  const hasDelta = delta != null && typeof delta === 'object' && !Array.isArray(delta);
+  if (!hasDelta && (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}'))) {
+    return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
+  }
+  if (hasDelta && delta.small != null && (typeof delta.small !== 'string' || !delta.small.startsWith('{') || !delta.small.endsWith('}'))) {
+    return { status: 400, reason: 'delta.small must be a JSON text' };
+  }
   if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
   if (!sessions || typeof sessions !== 'object' || Array.isArray(sessions)) return { status: 400, reason: 'invalid sessions' };
   if (body.keep?.sessions != null && (!Array.isArray(body.keep.sessions) || body.keep.sessions.some((k) => !k || typeof k !== 'object'))) return { status: 400, reason: 'invalid keep sessions' };
@@ -71,18 +77,29 @@ export function validateSqliteCommit(body, fresh = false) {
     if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
     if (!order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
   }
+  if (hasDelta) {
+    for (const coll of ['generations', 'assets', 'library']) {
+      for (const text of Object.values(delta.up?.[coll] ?? {})) {
+        if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: 'invalid record' };
+      }
+    }
+  }
   if (fresh) {
     for (const id of order) {
       if (!Object.hasOwn(sessions, id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
     }
-    try {
-      const candidate = createDeltaClient().diff(JSON.parse(globals));
-      for (const coll of ['generations', 'assets', 'library']) {
-        for (const text of Object.values(candidate.up[coll])) {
-          if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: 'invalid record' };
+    if (hasDelta) {
+      if (!delta.full) return { status: 400, reason: 'the first commit must carry the whole state (delta.full)' };
+    } else {
+      try {
+        const candidate = createDeltaClient().diff(JSON.parse(globals));
+        for (const coll of ['generations', 'assets', 'library']) {
+          for (const text of Object.values(candidate.up[coll])) {
+            if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: 'invalid record' };
+          }
         }
-      }
-    } catch { return { status: 400, reason: 'invalid globals' }; }
+      } catch { return { status: 400, reason: 'invalid globals' }; }
+    }
   }
   return null;
 }
@@ -96,18 +113,32 @@ export function createSqliteStore(dir, opts = {}) {
     delta.diff(JSON.parse(splitText(existing).globals));
     delta.ack();
   }
+  let deltaStale = false;
   let lastDelta = null;
 
   function commit(body) {
     const invalid = validateSqliteCommit(body);
     if (invalid) return invalid;
-    const { savedAt, baseAt, version, globals, order, sessions = {}, keep } = body;
-    let parsed;
-    try { parsed = JSON.parse(globals); } catch { return { status: 400, reason: 'globals must be a JSON text (a string), not an object' }; }
-    const diff = delta.diff(parsed);
+    const { savedAt, baseAt, version, globals, order, sessions = {}, keep, delta: bodyDelta } = body;
+    let diff = bodyDelta;
+    const usedLocalDelta = !diff;
+    if (!diff) {
+      if (deltaStale) {
+        const cur = ba.read();
+        if (cur) { delta.diff(JSON.parse(splitText(cur).globals)); delta.ack(); }
+        deltaStale = false;
+      }
+      let parsed;
+      try { parsed = JSON.parse(globals); } catch { return { status: 400, reason: 'globals must be a JSON text (a string), not an object' }; }
+      diff = delta.diff(parsed);
+    }
     lastDelta = diff;
     const result = ba.commit({ savedAt, baseAt, version, order, sessions, keep, delta: diff });
-    if (result.status === 204) { delta.ack(); existing = null; }
+    if (result.status === 204) {
+      if (usedLocalDelta) delta.ack();
+      else deltaStale = true;
+      existing = null;
+    }
     return result;
   }
 
