@@ -80,7 +80,7 @@
 .sketch-size { display: flex; align-items: center; gap: 0.5rem; }.sketch-size input { width: 6.875rem; }.sketch-dot { display: inline-block; border-radius: 50%; background: var(--text-2); }
 .sketch-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 16px 24px 24px; }
 .sketch-frame { position: relative; max-width: min(68.75rem, 100%); max-height: 100%; width: 100%; box-shadow: var(--shadow-pop); border-radius: 6px; overflow: hidden; }
-.sketch-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; }.sketch-base { position: static!important; display: block; }.sketch-paint { cursor: crosshair; touch-action: none; }.sketch-paint.is-erase { cursor: cell; }.sketch-paint.is-mask { opacity: .6; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }.sketch-change { flex: 1; min-width: 10rem; max-width: 22.5rem; font-size: var(--fs-s); }.sketch-bar .segmented button:disabled { opacity: .45; cursor: default; }
+.sketch-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; }.sketch-base { position: static!important; display: block; }.sketch-paint { cursor: crosshair; touch-action: none; }.sketch-paint.is-erase { cursor: cell; }.sketch-paint.is-mask { opacity: .6; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }.sketch-change { flex: 1; min-width: 10rem; max-width: 22.5rem; font-size: var(--fs-s); }.sketch-bar .segmented button:disabled { opacity: .45; cursor: default; }.sketch-bar .btn-primary:disabled { background: var(--surface-3); color: var(--text-3); border-color: var(--border); opacity: 1; cursor: not-allowed; }
 
 /* Spending panel */
 .spending { display: flex; flex-direction: column; height: 100%; }
@@ -131,9 +131,10 @@
 /* Money left with the providers, in green so it is noticed. */
 .side-budget, .pool-total { color: var(--money); }
 
-/* Viewer frame: the size of the picture; « » sit 10px outside it (inside it on narrow screens and for 3D). */
-.lb-frame { position: relative; display: flex; align-items: center; justify-content: center; max-width: 100%; max-height: 100%; }
-.lb-frame > .lb-media { width: auto; height: auto; max-width: 100%; max-height: calc(100vh - var(--lb-pad-y)); }
+/* Viewer frame: fills the available stage; « » sit 10px outside it (inside it on narrow screens and for 3D). */
+.lb-frame { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
+.lb-frame > .lb-media { width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; }
+.lb-frame > .media-audio { width: auto; height: auto; }
 .lb-frame.is-3d { width: 100%; height: 100%; }
 .lb-frame .lb-prev { right: calc(100% + 0.625rem); }
 .lb-frame .lb-next { left: calc(100% + 0.625rem); }

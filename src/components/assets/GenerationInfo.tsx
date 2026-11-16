@@ -22,8 +22,8 @@ function clock(t: number): string {
 }
 
 /** A section whose title folds it, with a chevron; `extra` stays visible on the right. */
-function Fold({ id, icon: Icon, title, extra, aside, children }: { id: keyof typeof opened; icon: typeof Info; title: string; extra?: React.ReactNode; aside?: React.ReactNode; children: React.ReactNode }) {
-  const [open, setOpen] = useState(opened[id]);
+function Fold({ id, icon: Icon, title, extra, aside, defaultOpen, children }: { id: keyof typeof opened; icon: typeof Info; title: string; extra?: React.ReactNode; aside?: React.ReactNode; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen ? true : opened[id]);
   const toggle = () => setOpen((v) => (opened[id] = !v));
   return (
     <section className="info-sect">
@@ -75,7 +75,7 @@ export function openInputs(ids: string[], index: number): void {
   setUi({ lightbox: { assetIds: ids, index, ...(lb ? { back: { assetIds: lb.assetIds, index: lb.index } } : {}) } });
 }
 
-export function GenerationInfo({ generation: g, asset }: { generation?: Generation; asset?: Asset }) {
+export function GenerationInfo({ generation: g, asset, defaultDetailsOpen = false }: { generation?: Generation; asset?: Asset; defaultDetailsOpen?: boolean }) {
   const title = useStore((s) => (g ? s.sessions[g.sessionId]?.title : asset ? s.sessions[asset.sessionId]?.title : undefined));
   const place = g?.place ?? asset?.place;
   // A Space result names its Space, never the hidden container.
@@ -179,6 +179,7 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
         id="details"
         icon={Info}
         title="Details"
+        defaultOpen={defaultDetailsOpen}
         aside={g?.sent ? (
             <Button size="sm" variant="secondary" icon={Wrench} onClick={() => void copyText(debugText(g))}>
               Copy debug info

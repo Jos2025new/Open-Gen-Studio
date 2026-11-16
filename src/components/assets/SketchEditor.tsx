@@ -55,6 +55,9 @@ export function SketchEditor() {
   useEffect(() => {
     setChange('');
     setMode(target?.mode ?? (target?.nodeId ? 'paint' : 'mask'));
+    saveMenu.close();
+    confirm.close();
+    apply.close();
   }, [target]);
 
   useEffect(() => {
@@ -128,6 +131,7 @@ export function SketchEditor() {
     setRedo([...redo, strokes[strokes.length - 1]]);
     setStrokes(next);
     redraw(next);
+    if (!next.length) saveMenu.close();
   };
   const redoOne = () => {
     if (!redo.length) return;

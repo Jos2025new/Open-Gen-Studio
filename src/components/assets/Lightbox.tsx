@@ -37,7 +37,7 @@ export function Lightbox() {
     <div className="lightbox" role="dialog" aria-label="Viewer">
       <div className="lb-stage" onClick={(e) => e.target === e.currentTarget && close()}>
         {/* The frame is as big as the picture, so « » sit right beside it. */}
-        <div className={`lb-frame ${asset.kind === 'model3d' ? 'is-3d' : ''}`}>
+        <div className={`lb-frame ${asset.kind === 'model3d' ? 'is-3d' : ''}`} onClick={(e) => e.target === e.currentTarget && close()}>
           {asset.kind === 'model3d' ? <Model3DViewer key={assetId} assetId={assetId} /> : <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />}
           {index > 0 ? (
             <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { ...lb, index: index - 1 } })}>
@@ -66,7 +66,7 @@ export function Lightbox() {
         {infoOpen ? (
           <aside className="lb-info-panel" aria-label="Details">
             {asset.kind === 'model3d' ? <Viewer3DControls /> : null}
-            <GenerationInfo key={assetId} generation={generation} asset={asset} />
+            <GenerationInfo key={assetId} generation={generation} asset={asset} defaultDetailsOpen />
           </aside>
         ) : null}
         {/* Operations under the picture, as a floating bar. */}

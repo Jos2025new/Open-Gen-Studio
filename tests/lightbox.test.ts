@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -116,11 +117,14 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     const infoBtn = topCluster.querySelector<HTMLButtonElement>('[aria-label="Info"]')!;
     expect(infoBtn.getAttribute('aria-pressed')).toBe('false');
 
-    // Toggle open -> floating details panel anchored top-right with GenerationInfo
+    // Toggle open -> floating details panel anchored top-right with GenerationInfo and Details already expanded
     act(() => infoBtn.click());
     const panel = host.querySelector<HTMLElement>('.lb-info-panel')!;
     expect(panel).toBeTruthy();
     expect(panel.textContent).toContain('A quiet studio portrait');
+    const detailsFold = [...panel.querySelectorAll<HTMLButtonElement>('button.info-fold')].find((b) => b.textContent?.includes('Details'))!;
+    expect(detailsFold.getAttribute('aria-expanded')).toBe('true');
+    expect(panel.querySelector('.info-rows')?.textContent).toContain('Local Image');
     expect(infoBtn.getAttribute('aria-pressed')).toBe('true');
     expect(useStore.getState().ui.lightboxInfo).toBe(true);
 
@@ -177,6 +181,28 @@ describe('Lightbox viewer layout, floating info panel and bottom dock', () => {
     // Clicking Pintar directly opens SketchEditor in paint mode
     act(() => dockButtons[0].click());
     expect(useStore.getState().ui.sketch).toEqual({ assetId: 'img1', mode: 'paint' });
+
+    cleanup();
+  });
+
+  it('fills the viewer frame with contain scaling up to available stage space', () => {
+    const css = readFileSync('src/styles/shell.css', 'utf8');
+    expect(css).toMatch(/\.lb-frame\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/);
+    expect(css).toMatch(/\.lb-frame\s*>\s*\.lb-media\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;[^}]*object-fit:\s*contain;/);
+
+    // 1280x640 stage minus padding (3.75rem=60px top, 5.75rem=92px bottom, 4rem=64px left/right) => 1152x488 available.
+    // An 800x600 (4:3) image contained in 1152x488 renders at ~650.7x488 (> 400x300).
+    const availW = 1280 - 2 * 64;
+    const availH = 640 - 60 - 92;
+    const scale = Math.min(availW / 800, availH / 600);
+    expect(Math.round(800 * scale)).toBeGreaterThan(400);
+    expect(Math.round(600 * scale)).toBeGreaterThan(300);
+
+    act(() => {
+      root.render(createElement(Lightbox));
+    });
+    const media = host.querySelector<HTMLElement>('.lb-frame > .lb-media');
+    expect(media).toBeTruthy();
 
     cleanup();
   });

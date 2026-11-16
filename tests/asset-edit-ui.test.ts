@@ -149,9 +149,12 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(paintTab.classList.contains('is-active')).toBe(true);
     expect([...sketchDialog.querySelectorAll('button')].some((b) => b.textContent?.includes('Revertir'))).toBe(false);
 
-    // Save disabled until there are changes
+    // Save disabled until there are changes and uses muted disabled primary styling
     const saveBtn0 = getSaveBtn();
     expect(saveBtn0.disabled).toBe(true);
+    expect(saveBtn0.classList.contains('btn-primary')).toBe(true);
+    const shellCss = readFileSync('src/styles/shell.css', 'utf8');
+    expect(shellCss).toMatch(/\.sketch-bar\s+\.btn-primary:disabled\s*\{[^}]*background:\s*var\(--surface-3\);[^}]*color:\s*var\(--text-3\);/);
 
     // Paint a stroke; original asset and blob remain untouched
     await paintStroke();
