@@ -11,6 +11,7 @@ import { studioCanvases, useStudioBoard } from '../../lib/studioBoard';
 import { StudioGeneration } from './StudioGeneration';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
+import { CommandApprovalCard } from './CommandApprovalCard';
 import { ActivityBlock } from './ActivityBlock';
 import { QuestionsCard } from './QuestionsCard';
 import { SettingsCard } from './SettingsCard';
@@ -179,6 +180,8 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
       return item.inline ? null : <SettingsCard item={item} sessionId={sessionId} />;
     case 'plan':
       return <PlanCard item={item} sessionId={sessionId} />;
+    case 'commands':
+      return <CommandApprovalCard item={item} sessionId={sessionId} />;
     case 'generation':
       if (studio) return <StudioGeneration generationId={item.generationId} fallback={<GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />} />;
       return <GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />;

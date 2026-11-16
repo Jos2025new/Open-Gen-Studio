@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { registerHistory } from '../commands/history';
 import { defineCommand, type Availability, type CommandContext, type CommandSpec, type Target } from '../commands/types';
 import { patchSession, useStore } from '../../store/store';
-import type { Graph, GraphNode } from '../types';
+import type { Estimate, Graph, GraphNode } from '../types';
 import { openHistoryGroup } from './history';
 
 /*
@@ -55,20 +55,22 @@ export function hasTarget(ctx: CommandContext, args?: Named): Availability {
   return missingEdge ? `No such edge: ${missingEdge}.` : true;
 }
 
-type GraphSpec<A, R> = Omit<CommandSpec<A, R>, 'needs' | 'history' | 'run'> & {
+type GraphSpec<A, R> = Omit<CommandSpec<A, R>, 'needs' | 'history' | 'estimate' | 'run'> & {
   /** `false` for what the graph does not record in undo. */
   undo?: false;
+  estimate?: (on: GraphTarget, args: A, ctx: CommandContext) => Estimate;
   run: (on: GraphTarget, args: A, ctx: CommandContext) => R;
 };
 
 /** A command on one session's graph: it needs `on.session`, and is one undo step in that graph. */
 export function nodeCommand<A, R>(spec: GraphSpec<A, R>): CommandSpec<A, R> {
-  const { undo, run, ...rest } = spec;
+  const { undo, estimate, run, ...rest } = spec;
   return defineCommand<A, R>({
     available: hasTarget as CommandSpec<A, R>['available'],
     ...rest,
     needs: ['session'],
     ...(undo === false ? {} : { history: (on: Target) => `nodes:${on.session}` }),
+    ...(estimate ? { estimate: (ctx, args) => estimate(ctx.on as GraphTarget, args, ctx) } : {}),
     run: (ctx, args) => run(ctx.on as GraphTarget, args, ctx),
   });
 }

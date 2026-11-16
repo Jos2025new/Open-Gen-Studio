@@ -54,7 +54,14 @@ const bring = defineCommand({ id: 'toy.layer.import', title: 'Import layer', arg
   if (args.fail) throw new Error('import failed');
   layers.push({ id: `l${layers.length + 1}`, name: args.name, opacity: 1 });
 } });
-const generate = defineCommand({ id: 'toy.generate', title: 'Generate', args: z.object({ prompt: z.string() }).strict(), effect: 'spend', run: (_ctx, args) => ({ image: `img:${args.prompt}` }) });
+const generate = defineCommand({
+  id: 'toy.generate',
+  title: 'Generate',
+  args: z.object({ prompt: z.string() }).strict(),
+  effect: 'spend',
+  estimate: (_ctx, args) => ({ usd: args.prompt === 'Sky' ? 0.04 : 0.02, approximate: false }),
+  run: (_ctx, args) => ({ image: `img:${args.prompt}` }),
+});
 const remove = defineCommand({ id: 'toy.layer.delete', title: 'Delete layer', args: z.object({ layer: z.string() }).strict(), effect: 'delete', run: (_ctx, args) => { layers = layers.filter((l) => l.id !== args.layer); } });
 const other = defineCommand({ id: 'toy.other.touch', title: 'Touch the graph', args: z.object({}).strict(), effect: 'write', needs: ['session'], history: (on) => `graph:${on.session}`, run: () => 'touched' });
 
@@ -333,6 +340,51 @@ describe('approval by effect', () => {
     expect(ask).toHaveBeenCalledTimes(1);
     await run({ cmd: 'toy.layer.count' }, { caller: 'external' });
     expect(ask).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves $n on spend and delete steps before asking, computes the real total cost, and rolls back on denial', async () => {
+    const seqWithRefs = {
+      on: { doc: 'd1' },
+      seq: [
+        { cmd: 'toy.layer.add', args: { name: 'Sky' } },
+        { cmd: 'toy.generate', args: { prompt: '$1.layer.name' } },
+        { cmd: 'toy.generate', args: { prompt: 'clouds' } },
+        { cmd: 'toy.layer.delete', args: { layer: '$1.layer.id' } },
+      ],
+    };
+    const asked: ApprovalRequest[] = [];
+    setApprover((request) => {
+      asked.push(request);
+      return false;
+    });
+    const denied = await run(seqWithRefs, { caller: 'agent' });
+    expect(denied).toMatchObject({ ok: false, error: { code: 'denied', step: 2 }, results: [] });
+    expect(asked).toHaveLength(1);
+    expect(asked[0].steps.map((s) => ({ step: s.step, cmd: s.cmd, args: s.args, estimate: s.estimate }))).toEqual([
+      { step: 2, cmd: 'toy.generate', args: { prompt: 'Sky' }, estimate: { usd: 0.04, approximate: false } },
+      { step: 3, cmd: 'toy.generate', args: { prompt: 'clouds' }, estimate: { usd: 0.02, approximate: false } },
+      { step: 4, cmd: 'toy.layer.delete', args: { layer: 'l1' }, estimate: { usd: 0, approximate: false } },
+    ]);
+    expect(asked[0].estimate).toEqual({ usd: 0.06, approximate: false });
+    expect(layers).toEqual([]);
+    expect(log).toEqual(['begin toy:d1', 'rollback toy:d1']);
+    expect(lastCommands()).toEqual([]);
+
+    log = [];
+    setApprover(() => true);
+    const approved = await run(seqWithRefs, { caller: 'agent' });
+    expect(approved).toMatchObject({
+      ok: true,
+      results: [
+        { layer: { id: 'l1', name: 'Sky', opacity: 1 } },
+        { image: 'img:Sky' },
+        { image: 'img:clouds' },
+        null,
+      ],
+    });
+    expect(layers).toEqual([]);
+    expect(log).toEqual(['begin toy:d1', 'commit toy:d1']);
+    expect(lastCommands()).toHaveLength(4);
   });
 });
 

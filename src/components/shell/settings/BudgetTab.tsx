@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
 import { formatUsd } from '../../../lib/format';
-import { askAgain } from '../../../engine/budget';
+import { askAgain, subscribeUntilNextSession, untilNextSessionActive } from '../../../engine/budget';
 import { priceMargin } from '../../../engine/priceAuthorization';
 import { setSettings, setUi, useStore } from '../../../store/store';
 import { Button, Segmented } from '../../ui/primitives';
@@ -11,6 +11,7 @@ import { SetGroup, SetRow } from './SettingsRows';
 export function BudgetTab() {
   const settings = useStore((s) => s.settings);
   const sessionNoAsk = useStore((s) => Boolean(s.sessions[s.activeSessionId]?.noAskOverLimit));
+  const untilNext = useSyncExternalStore(subscribeUntilNextSession, untilNextSessionActive);
   const spent = useStore((s) => s.spentUsd);
   const [budget, setBudget] = useState(String(settings.budgetUsd));
   useEffect(() => setBudget(String(settings.budgetUsd)), [settings.budgetUsd]);
@@ -45,9 +46,9 @@ export function BudgetTab() {
           />
         </SetRow>
       ) : null}
-      {settings.budgetOn && !settings.budgetNoAsk && sessionNoAsk ? (
+      {settings.budgetOn && !settings.budgetNoAsk && (sessionNoAsk || untilNext) ? (
         <SetRow label="This session" className="set-row-3">
-          <span>not asking</span>
+          <span>{untilNext && !sessionNoAsk ? 'not asking until you open another chat' : 'not asking'}</span>
           <Button size="sm" variant="ghost" onClick={() => askAgain()}>Ask again</Button>
         </SetRow>
       ) : null}

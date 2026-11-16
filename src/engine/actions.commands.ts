@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineCommand } from './commands/types';
 import { useStore } from '../store/store';
+import { estimateOp } from './costs';
 import { OP_IDS } from './ops';
 import type { OpId } from './types';
 import * as A from './actions';
@@ -207,8 +208,9 @@ export const commands = [
     effect: 'spend',
     needs: ['session'],
     available: (ctx) => onScreen(ctx),
+    estimate: (_ctx, args) => A.checkDirect(args.kind).estimate,
     debt: 'Reads the active session, composer and screen; the action reports some failures only as notices.',
-    run: async (_ctx, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); await A.generateDirect(args.kind); },
+    run: async ({ on }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session); if (problem) throw new Error(problem); await A.generateDirect(args.kind); },
   }),
   defineCommand({
     id: 'studio.generation.regenerate',
@@ -218,6 +220,7 @@ export const commands = [
     effect: 'spend',
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
+    estimate: (_ctx, args) => A.regenerateEstimate(args.generationId) ?? useStore.getState().generations[args.generationId]?.estimate ?? { usd: null, approximate: true },
     debt: 'The action reports some failures only as notices.',
     run: async (_ctx, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId); if (problem) throw new Error(problem); await A.regenerate(args.generationId); },
   }),
@@ -229,8 +232,9 @@ export const commands = [
     effect: 'spend',
     needs: ['session'],
     available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
+    estimate: (_ctx, args) => { const st = useStore.getState(); return estimateOp(args.op, args.params, st.assets[args.assetId], st.composer.video.settings, args.modelRef); },
     debt: 'Reads the active session and screen; failures can be reported only as notices.',
-    run: async (_ctx, args) => { const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
+    run: async ({ on }, args) => { const st = useStore.getState(); const e = estimateOp(args.op, args.params, st.assets[args.assetId], st.composer.video.settings, args.modelRef); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
   }),
   defineCommand({
     id: 'studio.layer.run_op',
@@ -240,8 +244,9 @@ export const commands = [
     effect: 'spend',
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : layer(ctx, args),
+    estimate: ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); return estimateOp(args.op, args.params, l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, st.composer.video.settings); },
     debt: 'The action catches failures and reports them only as notices.',
-    run: async ({ on }, args) => { await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params); },
+    run: async ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateOp(args.op, args.params, l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, st.composer.video.settings); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params); },
   }),
   defineCommand({
     id: 'studio.generation.delete',

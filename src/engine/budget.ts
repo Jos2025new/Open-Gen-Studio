@@ -17,11 +17,72 @@ export function remainingBudget(): number | null {
 }
 
 /**
- * "Continue once": a pass for ONE session that lives exactly as long as the approved action (withOncePass). It is also spent
+ * "Continue once": a pass per session that lives exactly as long as the approved action (withOncePass). It is also spent
  * when that action creates its first generation (so a batch such as Run all, approved once, is one run). Painting never
  * spends it. If the action ends without creating one (the graph changed, a recovery was refused, an error), it dies with it.
  */
-let pass: { sessionId: string } | null = null;
+const oncePasses = new Map<string, Set<symbol>>();
+/** Sequence-level passes for "Allow this time": each grant stays alive across all spend steps of its sequence until ended. */
+const sequencePasses = new Map<string, Set<symbol>>();
+
+function addPass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
+  let tokens = store.get(sessionId);
+  if (!tokens) {
+    tokens = new Set();
+    store.set(sessionId, tokens);
+  }
+  tokens.add(token);
+}
+
+function removePass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
+  const tokens = store.get(sessionId);
+  if (!tokens) return;
+  tokens.delete(token);
+  if (tokens.size === 0) store.delete(sessionId);
+}
+
+function runWithPass<T>(end: () => void, action: () => T): T {
+  let result: T;
+  try { result = action(); } catch (e) { end(); throw e; }
+  if (result instanceof Promise) return result.finally(end) as T;
+  end();
+  return result;
+}
+/**
+ * "Don't ask again until next session" (user decision 2026-11-14): covers every session while the chat the user was in
+ * when they chose it stays the open one. It ends when the user opens a chat in another session, when the spending limit
+ * changes, or when the user turns it off (`askAgain`). The rule is `untilNextSessionStillHolds`: change it there.
+ */
+let untilNextSession: { chat: string; budgetOn: boolean; budgetUsd: number } | null = null;
+const untilNextListeners = new Set<() => void>();
+const notifyUntilNext = () => untilNextListeners.forEach((fn) => fn());
+
+function untilNextSessionStillHolds(grant: NonNullable<typeof untilNextSession>): boolean {
+  const { settings, activeSessionId } = get();
+  return activeSessionId === grant.chat && settings.budgetOn === grant.budgetOn && settings.budgetUsd === grant.budgetUsd;
+}
+
+let unwatchUntilNext: (() => void) | null = null;
+function endUntilNextSession(): void {
+  unwatchUntilNext?.();
+  unwatchUntilNext = null;
+  if (untilNextSession) {
+    untilNextSession = null;
+    notifyUntilNext();
+  }
+}
+
+/** Is "until next session" on right now? */
+export function untilNextSessionActive(): boolean {
+  if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) endUntilNextSession();
+  return untilNextSession !== null;
+}
+
+/** For `useSyncExternalStore`: tells when "until next session" turns on or off. */
+export function subscribeUntilNextSession(fn: () => void): () => void {
+  untilNextListeners.add(fn);
+  return () => void untilNextListeners.delete(fn);
+}
 
 /** The session whose runs no longer ask (the active one by default). */
 function sessionNoAsk(sessionId?: string): boolean {
@@ -29,19 +90,19 @@ function sessionNoAsk(sessionId?: string): boolean {
   return Boolean(s.sessions[sessionId ?? s.activeSessionId]?.noAskOverLimit);
 }
 
-/** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", or a "Continue once" just given. */
+/** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", "Don't ask again until next session", or a pass just given. */
 export function overLimitAccepted(sessionId?: string): boolean {
   const { budgetOn, budgetUsd, budgetAccepted, budgetNoAsk } = get().settings;
-  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
+  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || untilNextSessionActive() || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
 }
 
 function passFor(sessionId: string): boolean {
-  return pass?.sessionId === sessionId;
+  return (oncePasses.get(sessionId)?.size ?? 0) > 0 || (sequencePasses.get(sessionId)?.size ?? 0) > 0;
 }
 
 /** The approved action started spending: the pass is used up. */
 export function consumeOnce(sessionId: string): void {
-  if (pass?.sessionId === sessionId) pass = null;
+  oncePasses.delete(sessionId);
 }
 
 /** This run would go over an active limit nobody agreed to go past. An unknown price cannot be checked against it, so it asks too. */
@@ -51,10 +112,9 @@ export function overLimit(e: Estimate, sessionId?: string): boolean {
 }
 
 /** What the confirmation says when a run goes over the limit. */
-export function overLimitText(e: Estimate): string {
+export function overLimitText(e: Estimate, choices = '“Continue once” lets only this run through; “Don\u2019t ask again” stops asking in this session. Nothing running is stopped.'): string {
   const { budgetUsd } = get().settings;
   const left = Math.max(0, remainingBudget() ?? 0);
-  const choices = '“Continue once” lets only this run through; “Don\u2019t ask again” stops asking in this session. Nothing running is stopped.';
   if (e.usd == null) return `The price of this run is not published, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
@@ -64,24 +124,48 @@ export function overLimitText(e: Estimate): string {
  * or fails, whether or not it created a generation. The next run that goes over asks again.
  */
 export function withOncePass<T>(sessionId: string, action: () => T): T {
-  const mine = { sessionId };
-  pass = mine;
-  const end = () => { if (pass === mine) pass = null; };
-  let result: T;
-  try { result = action(); } catch (e) { end(); throw e; }
-  if (result instanceof Promise) return result.finally(end) as T;
-  end();
-  return result;
+  const token = Symbol();
+  addPass(oncePasses, sessionId, token);
+  return runWithPass(() => removePass(oncePasses, sessionId, token), action);
 }
 
-/** "Don't ask again": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
+/**
+ * "Allow this time": grants a sequence-level pass for `sessionId` until the returned cleanup function is called.
+ */
+export function beginOncePass(sessionId: string): () => void {
+  const token = Symbol();
+  addPass(sequencePasses, sessionId, token);
+  return () => removePass(sequencePasses, sessionId, token);
+}
+
+export function allowThisTime<T>(sessionId: string, action: () => T): T {
+  return runWithPass(beginOncePass(sessionId), action);
+}
+
+/** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
 export function dontAskAgain(sessionId: string = get().activeSessionId): void {
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: true }));
 }
 
+export const allowForSession = dontAskAgain;
+
+/** "Don't ask again until next session": see `untilNextSessionStillHolds` for how long it lasts. */
+export function dontAskUntilNextSession(): void {
+  endUntilNextSession();
+  const { settings, activeSessionId } = get();
+  untilNextSession = { chat: activeSessionId, budgetOn: settings.budgetOn, budgetUsd: settings.budgetUsd };
+  // Eager end: leaving the chat and coming back must not bring it back.
+  unwatchUntilNext = useStore.subscribe(() => {
+    if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) endUntilNextSession();
+  });
+  notifyUntilNext();
+}
+
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
-  pass = null;
+  oncePasses.delete(sessionId);
+  sequencePasses.delete(sessionId);
+  endUntilNextSession();
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }
 

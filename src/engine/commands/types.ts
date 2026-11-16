@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { Estimate } from '../types';
 
 /*
  * The command contract (ADR 0030). A command is one thing the app can do, callable the same way by the interface, the
@@ -47,11 +48,12 @@ export interface CommandSpec<A = unknown, R = unknown> {
   needs?: readonly TargetKey[];
   /** The undo histories this call changes, as `kind:id` ("designer:doc_1"). One call or sequence = one step in each. */
   history?: (on: Target, args: A) => string | readonly string[] | null | undefined;
-  /**
-   * `true`, or why it cannot run now. Without `args` it answers for the target in general (a palette, a list); with
+  /** `true`, or why it cannot run now. Without `args` it answers for the target in general (a palette, a list); with
    * them, for that exact call (a layer that does not exist). It must be cheap: the interface asks often.
    */
   available?: (ctx: CommandContext, args?: Partial<A>) => Availability;
+  /** Estimated USD cost for `spend` commands, evaluated after earlier steps and `$n` references resolve. */
+  estimate?: (ctx: CommandContext, args: A) => Estimate;
   /** What still keeps this command from the contract (it reads something "active" by itself). The check lists it. */
   debt?: string;
   /** The result must be data that survives JSON: a later step of a sequence, the agent or a CLI reads it. */

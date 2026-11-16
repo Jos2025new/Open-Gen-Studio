@@ -99,7 +99,7 @@ Dos herramientas, en `src/engine/agent/commandTools.ts` y `commandCalls.ts`. Des
 - `run_commands { seq }`: la secuencia sobre la sesión del agente; los pasos del Designer actúan sobre el doc en pantalla, salvo que un paso nombre otro en `on` (`"on": "$1.doc"` o `{"doc": "$1.doc"}`). Si un paso de la secuencia crea el documento en pantalla (`designer.doc.new`, `designer.doc.ensure`, `designer.doc.from_asset`), los pasos siguientes que necesitan `on.doc` y omiten `on` apuntan a `"$1.doc"` automáticamente. El agente no puede nombrar otra sesión.
 - **Catálogo estático en el prompt cacheado** (`commandCatalog()` en `commandCalls.ts`, incluido por `agentSystem()` en `llmTurn.ts`): los 86 comandos visibles con su firma en una línea van en el prompt de sistema (idéntico byte a byte entre llamadas y sesiones, sin `[not now: …]` ni estado de sesión) para que el modelo llame a `run_commands` en la primera vuelta sin gastar una llamada previa en `find_commands`.
 - **Ocultos al agente** (`AGENT_HIDDEN` en `commandCalls.ts`; no se listan y `run_commands` los rechaza con el motivo, sin ejecutar nada): `models.composer.pick`, `models.composer.reset`, `models.agent.pick`, `models.agent.reset` y `skills.skill.select`, `skills.workflow.select` (los elige el usuario); `sessions.select`, `sessions.new`, `sessions.archive` (llevarían al usuario a otra sesión a mitad del turno del agente).
-- **Gasto y borrado:** no hay quien apruebe, así que fallan con `denied`. El listado los marca y la respuesta dice que hace falta la aprobación del usuario y que no se ejecutó nada. Seguirá así hasta la tarjeta de aprobación (paso 7).
+- **Gasto y borrado:** no hay quien apruebe, así que fallan con `denied`. El listado los marca y la respuesta dice que hace falta la aprobación del usuario y que no se ejecutó nada. Eso cambió con el paso 7: ahora piden aprobación (ver «Aprobación con coste y límite»).
 
 Las herramientas anteriores (nodos, Designer, generación) no cambian. Las guías `app:designer`, `app:nodes` y `app:canvas` ganan una línea.
 
@@ -205,14 +205,20 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente llega a todo esto
 
 - `invoke` no aplica los valores por defecto del esquema; `run` sí. Un esquema con `.default()` se comporta distinto en cada entrada: los comandos no deben usarlo.
 - Dos comandos asíncronos que se solapan sobre el mismo historial acaban en un solo paso de deshacer. Regla del plan: nunca dos escrituras a la vez sobre el mismo destino.
-- La aprobación todavía no lleva coste. Llega con el nodo de comando (paso 7 del plan).
 - El adaptador del Designer (paso 2) tiene que agrupar las llamadas a `record()` de sus acciones en una sola. `history.ts` del Designer no está en [persistencia protegida](../persistencia-protegida.md); si el adaptador necesitara tocar una zona protegida, se para y se pide autorización.
 - La puerta externa no existe. `caller: 'external'` solo fija la regla de aprobación; [seguridad](../seguridad.md) sigue rechazando peticiones de fuera.
 - **Crear y borrar documentos queda fuera de deshacer**, como en la app: una secuencia que falla no quita el doc que creó.
-- `designer.doc.delete` es `delete`: desde el agente se rechaza siempre hasta que exista la tarjeta de aprobación (paso 7).
+- `designer.doc.delete` es `delete`: desde el agente pide la tarjeta de aprobación.
 - En una secuencia, un paso con gasto cuyos argumentos llevan `$n` llega al aprobador sin resolver: la tarjeta no puede mostrar el coste real. Lo resuelve el paso 7.
 - Si el usuario edita el doc mientras una secuencia del agente espera, su cambio cae en el mismo paso de deshacer que los del agente. Nunca se pierde (regla 5), pero un Ctrl+Z quita ambos. Separarlos pide un bloqueo de escritura por doc o que la interfaz pase por comandos; queda para el paso de ventanas.
 - **Sin comprobar:**
   - Los comandos que tocan píxeles (`place_asset`, `flatten`, `merge_down`, `rasterize`, `to_asset`, `replace_pixels`, `place_above`, `ensure_paint`, y `add` o `duplicate` de una capa raster): node no tiene canvas. Los tests cubren capas vectoriales y de texto.
   - El agente con un modelo real, y todo ello en el sandbox.
   - El índice dentro de la app compilada: `canvasCalls.ts` ya lo importa, pero solo se ha ejecutado en vitest.
+
+## Aprobación con coste y límite (paso 7)
+
+- Una sola tarjeta por secuencia (`CommandApprovalCard`, mismo estilo que el plan). Antes de preguntar, `run` ejecuta los pasos que no gastan ni borran y cuyos `$n` ya se pueden resolver, para que los pasos de gasto lleven sus argumentos reales; si el usuario no aprueba, o algo falla, se deshace el estado (`takeStateSnapshot`). El total suma las estimaciones de los pasos `spend` (`sumEstimates`); un precio desconocido hace el total aproximado.
+- Borrar pide aprobación sin coste. Sin límite activo, o por debajo de él, hay un solo botón «Approve».
+- Al tope del límite la solicitud queda retenida salvo que el usuario elija: «Allow this time» (solo esta secuencia, `beginOncePass`), «Allow for the whole session» (`allowForSession`) o «Don’t ask again until next session» (`dontAskUntilNextSession`). No hay modo automático y la app no inventa topes.
+- «Don’t ask again until next session» (decisión del usuario, 2026-11-14): vale mientras el chat abierto sea el mismo; termina al abrir un chat en otra sesión, al cambiar el límite o cuando el usuario lo apaga («Ask again» en Ajustes → Budget, fila «This session»). La regla está en `untilNextSessionStillHolds` (`src/engine/budget.ts`).

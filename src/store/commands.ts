@@ -1,8 +1,27 @@
 import { z } from 'zod';
+import { registerStateSnapshot } from '../engine/commands/history';
 import { defineCommand } from '../engine/commands/types';
 import { useStore, newSession, selectSession, renameSession, togglePinSession, autoTitleSession } from './store';
 import { setSessionsArchived } from './sessionArchive';
 import { visibleSessions } from './spaceSession';
+
+registerStateSnapshot(() => {
+  const before = useStore.getState();
+  const { sessions, activeSessionId, library, composer, settings, assets, generations, ui } = before;
+  return () => {
+    const cur = useStore.getState();
+    const restoredSessions: typeof sessions = {};
+    for (const [id, s] of Object.entries(sessions)) {
+      const live = cur.sessions[id];
+      const commandCards = live ? live.feed.filter((item) => item.type === 'commands' && !s.feed.some((old) => old.id === item.id)) : [];
+      const noAskChanged = live && live.noAskOverLimit !== s.noAskOverLimit;
+      restoredSessions[id] = commandCards.length || noAskChanged
+        ? { ...s, ...(commandCards.length ? { feed: [...s.feed, ...commandCards] } : {}), ...(noAskChanged ? { noAskOverLimit: live.noAskOverLimit } : {}) }
+        : s;
+    }
+    useStore.setState({ sessions: restoredSessions, activeSessionId, library, composer, settings, assets, generations, ui });
+  };
+});
 
 /* The sessions as commands (ADR 0030, step 5). Each wraps the store function the interface already calls. */
 
