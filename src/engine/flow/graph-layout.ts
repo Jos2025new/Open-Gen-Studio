@@ -85,6 +85,26 @@ export function findFreePosition(
   return { x: desired.x, y: bottom + gapY };
 }
 
+/** Nodes whose size is known only now (first measurement) move off the nodes they stack on. Placement before the
+ *  measurement works with estimated sizes, which are smaller than the cards, so new nodes landed on each other.
+ *  `fresh`: ids measured for the first time. Returns new positions for those that overlap; the rest stay put. */
+export function settleFresh(nodes: readonly GraphNode[], fresh: ReadonlySet<string>, measured: Map<string, { width: number; height: number }>): Map<string, { x: number; y: number }> {
+  const moves = new Map<string, { x: number; y: number }>();
+  const occupied: NodeRect[] = nodes.filter((n) => !fresh.has(n.id)).map((n) => nodeRect(n, measured));
+  for (const n of nodes) {
+    if (!fresh.has(n.id)) continue;
+    const r = nodeRect(n, measured);
+    if (occupied.some((o) => rectsOverlap(r, o, 48, 56))) {
+      const at = findFreePosition(n.position, { width: r.width, height: r.height }, occupied, { gapX: 48, gapY: 56 });
+      moves.set(n.id, at);
+      occupied.push({ ...r, x: at.x, y: at.y });
+    } else {
+      occupied.push(r);
+    }
+  }
+  return moves;
+}
+
 /** Layered left-to-right layout by dependency depth. Returns new positions for the given node ids. */
 export function autoLayout(nodes: GraphNode[], edges: GraphEdge[], origin = { x: 0, y: 0 }): Map<string, { x: number; y: number }> {
   const ids = new Set(nodes.map((n) => n.id));

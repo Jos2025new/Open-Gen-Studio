@@ -17,7 +17,7 @@ import { NodeLibrary } from '../src/components/node/AddNodeItems';
 import { useDeleteRequest } from '../src/components/node/LinkBar';
 import { ensureOmniNodes, omniSpaceNodeId } from '../src/engine/nodes/omni';
 import { addNode, deleteNodes } from '../src/engine/flow/actions';
-import { estimatedHeight, findFreePosition, nodeRect, NODE_WIDTH, rectsOverlap } from '../src/engine/flow/graph';
+import { estimatedHeight, findFreePosition, nodeRect, NODE_WIDTH, rectsOverlap, settleFresh } from '../src/engine/flow/graph';
 import { travelGraph } from '../src/engine/flow/history';
 import { appendFeed, newSession, reconcileDeletionNotices, setGraph, useStore } from '../src/store/store';
 
@@ -187,5 +187,27 @@ describe('omnicanvas deletion and undo', () => {
     await act(async () => { textBtn.click(); });
     expect(onPick).toHaveBeenCalledTimes(1);
     expect(onPick.mock.calls[0][0]).toMatchObject({ kind: 'text' });
+  });
+});
+
+describe('new nodes learn their real size and step off their neighbours', () => {
+  const card = (id: string, x: number, y: number) => ({ id, position: { x, y }, data: { kind: 'asset' as const, title: 'Image', assetId: id } });
+  it('three imported images placed with estimated heights do not stack once measured', () => {
+    // Placed side by side with the estimated 220 px height; the real cards are taller (320 px).
+    const nodes = [card('a', 0, 0), card('b', NODE_WIDTH + 60, 0), card('c', 2 * (NODE_WIDTH + 60), 0)];
+    const measured = new Map(nodes.map((n) => [n.id, { width: NODE_WIDTH, height: 320 }]));
+    const moves = settleFresh(nodes, new Set(['a', 'b', 'c']), measured);
+    const placed = nodes.map((n) => ({ ...n, position: moves.get(n.id) ?? n.position }));
+    for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+      expect(rectsOverlap(nodeRect(placed[i], measured), nodeRect(placed[j], measured), 0, 0)).toBe(false);
+    }
+  });
+  it('a fresh node that does not touch anything stays where it is; settled nodes are not moved', () => {
+    const nodes = [card('old', 0, 0), card('new', 0, 2000)];
+    expect(settleFresh(nodes, new Set(['new']), new Map()).size).toBe(0);
+    const stacked = [card('old', 0, 0), card('new', 40, 40)];
+    const moves = settleFresh(stacked, new Set(['new']), new Map());
+    expect(moves.has('old')).toBe(false);
+    expect(moves.has('new')).toBe(true);
   });
 });

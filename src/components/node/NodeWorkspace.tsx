@@ -14,7 +14,7 @@ import {
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addOmniSpace, ensureOmniNodes, ordinaryGraph, type OmniSpace } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
+import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration, settleFresh } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -230,6 +230,17 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         });
       }
       if (sizes.length) setMeasured((prev) => new Map([...prev, ...sizes]));
+      // First sizes of nodes (new, imported, or opened): settle them off their neighbours. No undo step of its own.
+      const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id)).map(([id]) => id));
+      if (fresh.size) {
+        const all = new Map([...measuredRef.current, ...sizes]);
+        const cur = useStore.getState().sessions[sessionId]?.graph;
+        const moved = cur ? settleFresh(cur.nodes, fresh, all) : new Map();
+        if (moved.size) useStore.setState((s) => {
+          const g = s.sessions[sessionId]?.graph;
+          return g ? { sessions: { ...s.sessions, [sessionId]: { ...s.sessions[sessionId], graph: { ...g, nodes: g.nodes.map((n) => (moved.has(n.id) ? { ...n, position: moved.get(n.id)! } : n)) } } } } : s;
+        });
+      }
     },
     [sessionId],
   );
