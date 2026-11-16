@@ -26,6 +26,7 @@ import { AddNodeItems } from './AddNodeItems';
 import { AddNodeMenu, RunAll } from './NodeCanvasParts';
 import { omniWidth } from '../omni/RefNode';
 import { useOmniFraming } from '../omni/useOmniFraming';
+import { revealRect } from '../omni/revealNode';
 import { useOmniEntries } from '../omni/useOmniEntries';
 import { settleNewNodes } from '../../engine/flow/settle';
 import { ConnectionPreview } from './ConnectedNodeMenu';
@@ -285,6 +286,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const pos = freePos({ x: center.x - NODE_WIDTH / 2, y: center.y }, data);
     const id = addNode(sessionId, data, pos);
     selectNodes([id]);
+    revealRect(rf, canvasRef.current, { ...pos, width: omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data), height: Math.min(estimatedHeight(data), 160) });
   };
 
   const omniEntries = useOmniEntries({ omni, sessionId, rf, canvasRef, freePos, selectNodes });

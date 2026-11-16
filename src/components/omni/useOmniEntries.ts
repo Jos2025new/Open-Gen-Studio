@@ -3,7 +3,8 @@ import type { ReactFlowInstance } from '@xyflow/react';
 import { useStore } from '../../store/store';
 import { addOmniSpace, type OmniSpace } from '../../engine/nodes/omni';
 import { addSystemNode } from '../../engine/nodes/system';
-import { NODE_WIDTH } from '../../engine/flow/graph';
+import { estimatedHeight, NODE_WIDTH, nodeWidth } from '../../engine/flow/graph';
+import { revealRect } from './revealNode';
 import type { GraphNodeData } from '../../engine/types';
 import type { OmniEntries } from '../node/AddNodeItems';
 
@@ -25,12 +26,15 @@ export function useOmniEntries(args: {
       onSpace: (space) => {
         const c = center();
         const pos = freePos({ x: c.x - 160, y: c.y }, { kind: 'ref', type: 'space', ref: space, title: space });
-        selectNodes([addOmniSpace(sessionId, space, pos).id]);
+        const r = addOmniSpace(sessionId, space, pos);
+        selectNodes([r.id]);
+        if (!r.existed) revealRect(rf, canvasRef.current, { ...pos, width: nodeWidth({ kind: 'ref', type: 'space', ref: space, title: space }), height: 162 });
       },
       onSystem: (type) => {
         const c = center();
         const pos = freePos({ x: c.x - NODE_WIDTH / 2, y: c.y }, { kind: 'ref', type, ref: type, title: type });
         selectNodes([addSystemNode(sessionId, { type, position: pos })]);
+        revealRect(rf, canvasRef.current, { ...pos, width: NODE_WIDTH, height: Math.min(estimatedHeight({ kind: 'ref', type, ref: type, title: type }), 160) });
       },
     };
   }, [omni, sessionId, rf, freePos]);
