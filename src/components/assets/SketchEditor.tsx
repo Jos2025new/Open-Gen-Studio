@@ -241,10 +241,10 @@ export function SketchEditor() {
     <div className="sketch" role="dialog" aria-label="Editor de imagen">
       <div className="sketch-bar">
         <div className="segmented" aria-label="Modo">
-          <button type="button" className={mode === 'paint' ? 'is-active' : ''} onClick={() => setMode('paint')} data-tip="Pintar sobre la imagen">
+          <button type="button" className={mode === 'paint' ? 'is-active' : ''} aria-pressed={mode === 'paint'} onClick={() => setMode('paint')} data-tip="Pintar sobre la imagen">
             Pintar
           </button>
-          <button type="button" className={mode === 'mask' ? 'is-active' : ''} onClick={() => setMode('mask')} data-tip="Marcar un área para cambiar o quitar">
+          <button type="button" className={mode === 'mask' ? 'is-active' : ''} aria-pressed={mode === 'mask'} onClick={() => setMode('mask')} data-tip="Marcar un área para cambiar o quitar">
             Máscara
           </button>
         </div>

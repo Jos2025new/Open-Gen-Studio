@@ -147,6 +147,9 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(sketchDialog).toBeTruthy();
     const paintTab = [...sketchDialog.querySelectorAll('button')].find((b) => b.textContent === 'Pintar')!;
     expect(paintTab.classList.contains('is-active')).toBe(true);
+    expect(paintTab.getAttribute('aria-pressed')).toBe('true');
+    const maskTab = [...sketchDialog.querySelectorAll('button')].find((b) => b.textContent === 'Máscara')!;
+    expect(maskTab.getAttribute('aria-pressed')).toBe('false');
     expect([...sketchDialog.querySelectorAll('button')].some((b) => b.textContent?.includes('Revertir'))).toBe(false);
 
     // Save disabled until there are changes and uses muted disabled primary styling
