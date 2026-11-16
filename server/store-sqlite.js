@@ -25,11 +25,40 @@ export function sqliteHead(dir) {
   }
 }
 
+export function validateSqliteCommit(body, fresh = false) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { status: 400, reason: 'not a commit' };
+  const { savedAt, version, globals, order, sessions = {} } = body;
+  if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
+  if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
+  if (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}')) return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
+  if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
+  if (!sessions || typeof sessions !== 'object' || Array.isArray(sessions)) return { status: 400, reason: 'invalid sessions' };
+  if (body.keep?.sessions != null && (!Array.isArray(body.keep.sessions) || body.keep.sessions.some((k) => !k || typeof k !== 'object'))) return { status: 400, reason: 'invalid keep sessions' };
+  for (const [id, text] of Object.entries(sessions)) {
+    if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
+    if (!order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
+  }
+  if (fresh) {
+    for (const id of order) {
+      if (!Object.hasOwn(sessions, id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+    }
+    try {
+      const candidate = createDeltaClient().diff(JSON.parse(globals));
+      for (const coll of ['generations', 'assets', 'library']) {
+        for (const text of Object.values(candidate.up[coll])) {
+          if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: 'invalid record' };
+        }
+      }
+    } catch { return { status: 400, reason: 'invalid globals' }; }
+  }
+  return null;
+}
+
 /** Same commit contract as createStoreV2, with one SQLite transaction per commit. */
 export function createSqliteStore(dir) {
   const ba = createStoreBA(dir);
   const delta = createDeltaClient();
-  const existing = ba.read();
+  let existing = ba.read();
   if (existing) {
     delta.diff(JSON.parse(splitText(existing).globals));
     delta.ack();
@@ -37,21 +66,15 @@ export function createSqliteStore(dir) {
   let lastDelta = null;
 
   function commit(body) {
+    const invalid = validateSqliteCommit(body);
+    if (invalid) return invalid;
     const { savedAt, baseAt, version, globals, order, sessions = {}, keep } = body;
-    if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
-    if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
-    if (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}')) return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
-    if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
-    for (const [id, text] of Object.entries(sessions)) {
-      if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
-      if (!order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
-    }
     let parsed;
     try { parsed = JSON.parse(globals); } catch { return { status: 400, reason: 'globals must be a JSON text (a string), not an object' }; }
     const diff = delta.diff(parsed);
     lastDelta = diff;
     const result = ba.commit({ savedAt, baseAt, version, order, sessions, keep, delta: diff });
-    if (result.status === 204) delta.ack();
+    if (result.status === 204) { delta.ack(); existing = null; }
     return result;
   }
 
@@ -69,7 +92,10 @@ export function createSqliteStore(dir) {
   }
 
   return {
-    read: () => ba.read(),
+    read: () => {
+      if (existing !== null) { const first = existing; existing = null; return first; }
+      return ba.read();
+    },
     readHead: async () => sqliteHead(dir),
     commit,
     commitLegacy,

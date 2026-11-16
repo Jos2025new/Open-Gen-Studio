@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createStoreV2 } from './store-v2.js';
-import { createSqliteStore, sqliteHead } from './store-sqlite.js';
+import { createSqliteStore, sqliteHead, validateSqliteCommit } from './store-sqlite.js';
 import { EPS_MAX_BYTES, handleEps } from './eps.js';
 import { PROVIDERS, createKeyStore, maskOf } from './keys.js';
 import { handleProxy } from './provider-proxy.js';
@@ -234,8 +234,13 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     if (path === '/v2/commit' && req.method === 'PUT') {
       let payload;
       try { payload = JSON.parse((await body(req)).toString('utf8')); } catch { return send(400, 'not a commit'); }
-      const store = await commitStore();
-      const r = await serialState(() => store.commit(payload));
+      const r = await serialState(async () => {
+        if (!sqliteHead(dir) && !(await v2Files()) && !(await legacyFile())) {
+          const invalid = validateSqliteCommit(payload, true);
+          if (invalid) return invalid;
+        }
+        return (await commitStore()).commit(payload);
+      });
       if (r.status === 409) return send(409, conflictBody(r), 'application/json');
       if (r.snapshotError) res.setHeader('X-OGS-Snapshot', 'failed');
       return send(r.status, r.reason ?? '');
@@ -422,10 +427,13 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
         const sqlite = sqliteHead(dir);
         let raw = '';
         if (sqlite) {
-          const store = sqliteStore();
-          store.idle();
-          raw = store.read() ?? '';
-          await copyFile(join(dir, 'ogs.sqlite'), join(work, 'ogs.sqlite'));
+          raw = await serialState(async () => {
+            const store = sqliteStore();
+            store.idle();
+            const state = store.read() ?? '';
+            await copyFile(join(dir, 'ogs.sqlite'), join(work, 'ogs.sqlite'));
+            return state;
+          });
         } else raw = await readFile(join(dir, 'state.json'), 'utf8').catch(() => '');
         if (raw) {
           const saved = JSON.parse(raw);

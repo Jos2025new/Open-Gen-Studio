@@ -11,8 +11,8 @@
 // resent unchanged (no write, no history row). Nothing but the open database lives in memory.
 // Variant C adds readPartial() (sessions + scalars + the most recent records) and readPage() (history by pages).
 import { DatabaseSync } from 'node:sqlite';
-import { createHash } from 'node:crypto';
-import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { looksLost, sha256 } from '../save-guard.js';
 import { assembleText } from '../store-v2.js';
@@ -239,7 +239,7 @@ export function createStoreB(dir, opts = {}) {
     if (!head && !(delta && delta.full)) return { status: 400, reason: 'the first commit must carry the whole state (delta.full)' };
 
     for (const id of order) {
-      if (!(id in sessions) && !q.sessGet.get(id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+      if (!Object.hasOwn(sessions, id) && !q.sessGet.get(id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
     }
     const prevOrder = head ? JSON.parse(head.order_json) : [];
     const had = prevOrder.length, has = order.length;
@@ -278,7 +278,18 @@ export function createStoreB(dir, opts = {}) {
     const known = new Set(order);
     for (const { id } of q.sessIds.all()) {
       if (known.has(id)) continue;
-      q.removedPut.run(id, Date.now(), q.sessGet.get(id).json);
+      const text = q.sessGet.get(id).json;
+      const removed = join(backups, 'removed-sessions');
+      mkdirSync(removed, { recursive: true });
+      const nameId = id.length > 160 ? sha256(id) : id;
+      const backup = join(removed, `${Date.now()}-${randomUUID()}-${nameId}.json`);
+      const fd = openSync(backup, 'wx', 0o600);
+      try { writeFileSync(fd, text); fsyncSync(fd); } finally { closeSync(fd); }
+      for (const directory of [removed, backups, dir]) {
+        const folder = openSync(directory, 'r');
+        try { fsyncSync(folder); } finally { closeSync(folder); }
+      }
+      q.removedPut.run(id, Date.now(), text);
       q.sessDel.run(id);
     }
     fault('head');

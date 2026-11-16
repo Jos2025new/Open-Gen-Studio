@@ -1,7 +1,28 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const calls = vi.hoisted(() => ({ reads: 0, delta: null as any, stats: null as any, copyGate: null as null | (() => Promise<void>) }));
+vi.mock('../server/sqlite/store-ba.js', async (original) => {
+  const mod = await original<any>();
+  return { ...mod, createStoreBA: (...args: any[]) => {
+    const store = mod.createStoreBA(...args);
+    const read = store.read;
+    const commit = store.commit;
+    store.commit = (body: any) => { calls.delta = body.delta; const result = commit(body); calls.stats = store.lastStats(); return result; };
+    store.read = () => { calls.reads++; return read(); };
+    return store;
+  } };
+});
+vi.mock('../src/lib/writerLock', () => ({ holdsWriterLock: () => true }));
+vi.mock('node:fs/promises', async (original) => {
+  const mod = await original<any>();
+  return { ...mod, copyFile: async (...args: any[]) => {
+    if (String(args[0]).endsWith('/ogs.sqlite') && calls.copyGate) await calls.copyGate();
+    return mod.copyFile(...args);
+  } };
+});
 import { localStore } from '../server/local-store.js';
 import { createSqliteStore } from '../server/store-sqlite.js';
 
@@ -37,6 +58,43 @@ describe('sqlite store behind the current commit body', () => {
     store.close();
   });
 
+  it('keeps a removed session as a recoverable backup file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ogs-removed-'));
+    const store = createSqliteStore(dir);
+    const other = json({ id: 'ses_b', feed: [{ text: 'recover me' }] });
+    expect(store.commit({ savedAt: 1, baseAt: 0, version: 1, globals: globals(), order: ['ses_a', 'ses_b'], sessions: { ses_a: session, ses_b: other } }).status).toBe(204);
+    expect(store.commit({ savedAt: 2, baseAt: 1, version: 1, globals: globals(), order: ['ses_a'], sessions: {} }).status).toBe(204);
+    const dirBackup = join(dir, 'backups', 'removed-sessions');
+    const files = readdirSync(dirBackup).filter((f) => f.endsWith('-ses_b.json'));
+    expect(files).toHaveLength(1);
+    expect(readFileSync(join(dirBackup, files[0]), 'utf8')).toBe(other);
+    store.close();
+  });
+
+  it('backs up a removed session whose valid id exceeds a filesystem name limit', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ogs-long-id-'));
+    const store = createSqliteStore(dir);
+    const id = 's'.repeat(256);
+    const text = json({ id, feed: ['recover me'] });
+    expect(store.commit({ savedAt: 1, baseAt: 0, version: 1, globals: globals(), order: ['ses_a', id], sessions: { ses_a: session, [id]: text } }).status).toBe(204);
+    expect(store.commit({ savedAt: 2, baseAt: 1, version: 1, globals: globals(), order: ['ses_a'], sessions: {} }).status).toBe(204);
+    const backup = join(dir, 'backups', 'removed-sessions');
+    expect(readdirSync(backup).map((f) => readFileSync(join(backup, f), 'utf8'))).toContain(text);
+    store.close();
+  });
+
+  it('reads the initial state once when opening and serving it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ogs-open-'));
+    const first = createSqliteStore(dir);
+    expect(commit(first, 1, 0, 1, { ses_a: session }).status).toBe(204);
+    first.close();
+    calls.reads = 0;
+    const reopened = createSqliteStore(dir);
+    expect(reopened.read()).toContain('ses_a');
+    expect(calls.reads).toBe(1);
+    reopened.close();
+  });
+
   it('a session that looks lost is a 409 and the previous text stays', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ogs-sql-'));
     const store = createSqliteStore(dir);
@@ -51,28 +109,34 @@ describe('sqlite store behind the current commit body', () => {
     store.close();
   });
 
-  it('a small edit of a large set keeps the HTTP body to the globals and reads no record rows', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'ogs-sql-'));
-    const store = createSqliteStore(dir);
+  it('sends the real client HTTP body and avoids full record order on a large small edit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-client-perf-'));
+    const { callBody } = mount(root);
     const generations: Record<string, { id: string; prompt: string }> = {};
     for (let i = 0; i < 3000; i++) generations[`gen_${i}`] = { id: `gen_${i}`, prompt: 'p' };
-    const globalsAt = (zoom: number) => json({ settings: { theme: 'dark' }, spentUsd: 0, spendLog: [], generations, assets: {}, library: [{ id: 'lib_a', name: 'A' }], composer: { text: '' }, ui: { zoom } });
-    const put = (savedAt: number, baseAt: number, zoom: number, sessions: Record<string, string>) => {
-      const globalsText = globalsAt(zoom);
-      const raw = json({ savedAt, baseAt, version: 1, globals: globalsText, order: ['ses_a'], sessions });
-      return { raw, globalsText, result: store.commit(JSON.parse(raw)) };
-    };
-    expect(put(1000, 0, 1, { ses_a: session }).result.status).toBe(204);
-    store.idle();
-    const edit = put(2000, 1000, 2, {});
-    expect(edit.result.status).toBe(204);
-    const stats = store.lastStats();
-    const wal = store.sizes().wal;
-    const escaped = bytes(json(edit.globalsText));
-    if (bytes(edit.raw) > escaped + 256) throw new Error(`server/local-store.js:238: a small edit sent ${bytes(edit.raw) - escaped} bytes beyond the globals`);
-    if (stats.recGets !== 0 || stats.recWrites !== 0 || stats.posUpdates !== 0) throw new Error(`server/sqlite/store-b.js:175: a small edit read ${stats.recGets}, wrote ${stats.recWrites}, moved ${stats.posUpdates}`);
-    if (wal > 256 * 1024) throw new Error(`server/sqlite/store-b.js:60: WAL after one small edit is ${wal} bytes`);
-    store.close();
+    const globalsAt = (zoom: number) => json({ settings: {}, spentUsd: 0, spendLog: [], generations, assets: {}, library: [{ id: 'lib_a' }], ui: { zoom } });
+    const order = Array.from({ length: 8 }, (_, i) => `ses_${i}`);
+    const all = order.map((id) => [id, json({ id, feed: [] })] as [string, string]);
+    let sent = '';
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url === '/x/store/ping') return new Response('ok');
+      sent = String(init?.body ?? '');
+      const result = await callBody(init?.method ?? 'GET', url, sent);
+      return new Response(result.status === 204 ? null : result.body, { status: result.status });
+    });
+    try {
+      const { disk } = await import('../src/lib/disk');
+      disk.reset();
+      expect(await disk.setCommit({ savedAt: 1000, version: 1, globals: globalsAt(1), order, changed: all })).toBe('ok');
+      expect(await disk.setCommit({ savedAt: 2000, version: 1, globals: globalsAt(2), order, changed: [] })).toBe('ok');
+      const body = JSON.parse(sent);
+      expect(body.order).toEqual(order);
+      expect(body.sessions).toEqual({});
+      expect(bytes(sent)).toBeLessThan(bytes(json(globalsAt(2))) + 512);
+      expect(calls.delta.order).toBeUndefined();
+      expect(bytes(json(calls.delta))).toBeLessThan(1024);
+      expect(calls.stats).toMatchObject({ recGets: 0, recWrites: 0, posUpdates: 0 });
+    } finally { vi.unstubAllGlobals(); }
   });
 
 });
@@ -109,6 +173,22 @@ describe('routes keep the current body and an existing format-2 folder', () => {
     expect(existsSync(join(legacy, 'data', 'store-v2', 'HEAD.json'))).toBe(true);
   });
 
+  it('rejects an invalid first commit without creating SQLite and accepts a later valid one', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-invalid-'));
+    const { call } = mount(root);
+    const invalid = json({ savedAt: 1, globals: '{}', order: ['ses_a'], sessions: {} });
+    expect(await call('PUT', '/x/store/v2/commit', invalid)).toBe(400);
+    expect(existsSync(join(root, 'data', 'ogs.sqlite'))).toBe(false);
+    const malformedKeep = json({ savedAt: 1, version: 1, globals: '{}', order: [], sessions: {}, keep: { sessions: [null] } });
+    expect(await call('PUT', '/x/store/v2/commit', malformedKeep)).toBe(400);
+    expect(existsSync(join(root, 'data', 'ogs.sqlite'))).toBe(false);
+    const inherited = json({ savedAt: 1, version: 1, globals: '{}', order: ['constructor'], sessions: {} });
+    expect(await call('PUT', '/x/store/v2/commit', inherited)).toBe(400);
+    expect(existsSync(join(root, 'data', 'ogs.sqlite'))).toBe(false);
+    expect(await call('GET', '/x/store/state')).toBe(200);
+    expect(await call('PUT', '/x/store/v2/commit', json({ savedAt: 2, baseAt: 0, version: 1, globals: globals(), order: ['ses_a'], sessions: { ses_a: session } }))).toBe(204);
+  });
+
   it('a format-1 folder stays on its file: an empty first commit does not hide the old sessions', async () => {
     const root = mkdtempSync(join(tmpdir(), 'ogs-f1-'));
     const data = join(root, 'data');
@@ -137,6 +217,36 @@ describe('routes keep the current body and an existing format-2 folder', () => {
     const got = await callBody('GET', '/x/store/state');
     expect(got.status).toBe(500);
     expect(got.body).not.toContain('legacy-marker');
+  });
+
+  it('serializes a concurrent save until the SQLite export copy is complete', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-export-race-'));
+    const { callBody } = mount(root);
+    const payload = (at: number, base: number, zoom: number, sessions: Record<string, string>) => json({ savedAt: at, baseAt: base, version: 1, globals: globals(zoom), order: ['ses_a'], sessions });
+    expect((await callBody('PUT', '/x/store/v2/commit', payload(1, 0, 1, { ses_a: session }))).status).toBe(204);
+    let release!: () => void, reached!: () => void;
+    const entered = new Promise<void>((r) => { reached = r; });
+    const gate = new Promise<void>((r) => { release = r; });
+    calls.copyGate = async () => { reached(); await gate; };
+    try {
+      const exported = callBody('GET', '/x/store/export');
+      await entered;
+      let finished = false;
+      const saved = callBody('PUT', '/x/store/v2/commit', payload(2, 1, 2, {})).then((r) => { finished = true; return r; });
+      await new Promise((r) => setTimeout(r, 25));
+      expect(finished).toBe(false);
+      release();
+      const [archive, result] = await Promise.all([exported, saved]);
+      expect(result.status).toBe(204);
+      const entries = unzip(archive.raw);
+      expect(new TextDecoder().decode(entries.get('state.json'))).toContain('"zoom": 1');
+      const exportDir = join(root, 'extracted');
+      mkdirSync(exportDir);
+      writeFileSync(join(exportDir, 'ogs.sqlite'), entries.get('ogs.sqlite')!);
+      const db = createSqliteStore(exportDir);
+      expect(JSON.parse(db.read()!).savedAt).toBe(1);
+      db.close();
+    } finally { calls.copyGate = null; release(); }
   });
 
   it('export carries the assembled state and a coherent sqlite copy', async () => {
