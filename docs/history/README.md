@@ -67,6 +67,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [063: claves fuera del navegador y en el llavero (2026-11-13)](063-2026-11-W46-claves.md).
 - [064: menos llamadas del agente con `run_commands` (2026-11-14)](064-2026-11-W46-menos-llamadas.md).
 - [065: persistencia en SQLite, mediciones y pruebas (2026-11-15)](065-2026-11-W46-persistencia-sqlite.md).
+- [066: visor, historial de versiones y fusión (2026-11-16)](066-2026-11-W47-visor-historial-fusion.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
 - [Informe parcial: objetos y profundidad](informe-gpt-objetos-y-z.md).
