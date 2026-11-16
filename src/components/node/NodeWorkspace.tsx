@@ -38,7 +38,7 @@ import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGro
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
-import { chatItem, loadNodeTool, saveNodeTool } from './nodeToolStorage';
+import { chatItem, loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
@@ -75,7 +75,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Cut (scissors, X) is a passing tool: it is not remembered, and X or Escape returns to the last one.
   const [tool, setTool] = useState<NodeTool>(loadNodeTool);
   const lastTool = useRef<'select' | 'pan'>(tool === 'select' ? 'select' : 'pan');
-  const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; saveNodeTool(t); };
+  const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
   const cut = useCutTool({ active: tool === 'cut', canvasRef, onCut: (ids) => void disconnectEdges(sessionId, ids) });
   // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
   const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);

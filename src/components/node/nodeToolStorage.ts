@@ -8,10 +8,6 @@ export function loadNodeTool(): NodeTool {
   try { return localStorage.getItem(TOOL_KEY) === 'select' ? 'select' : 'pan'; } catch { return 'pan'; }
 }
 
-export function saveNodeTool(t: NodeTool): void {
-  try { localStorage.setItem(TOOL_KEY, t); } catch { /* storage blocked */ }
-}
-
 /** A chat result offered for import into the canvas. */
 export function chatItem(g: Generation): { id: string; assetId: string; label: string } {
   return { id: g.id, assetId: g.assetIds[0], label: g.op ? g.op.id.replace(/_/g, ' ') : g.prompt.split(/[.,\n]/)[0].slice(0, 60) || g.kind };
