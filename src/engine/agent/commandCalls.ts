@@ -43,13 +43,17 @@ const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
 const formatLine = (f: { id: string; signature?: string; description?: string; title: string; effect: string; available?: unknown }) =>
   `${f.id} ${f.signature} — ${f.description ?? f.title}${f.effect === 'spend' || f.effect === 'delete' ? ` [${NEEDS_APPROVAL}]` : ''}${typeof f.available === 'string' ? ` [not now: ${f.available}]` : ''}`;
 
-let catalogCache: string | undefined;
+let catalogCache: { size: number; text: string } | undefined;
 /** Static one-line reference of every command the agent may call, for the cached system prompt. Byte-identical across calls. */
 export function commandCatalog(): string {
-  return (catalogCache ??= [
+  const entries = visible(findCommands({ signatures: true }));
+  if (catalogCache?.size === entries.length) return catalogCache.text;
+  const text = [
     'COMMANDS FOR run_commands (all command ids and arguments; call run_commands directly without calling find_commands first):',
-    ...visible(findCommands({ signatures: true })).map(formatLine),
-  ].join('\n'));
+    ...entries.map(formatLine),
+  ].join('\n');
+  catalogCache = { size: entries.length, text };
+  return text;
 }
 
 export type CommandApprovalDecision = 'approve' | 'once' | 'session' | 'until-next-session' | 'cancel';
