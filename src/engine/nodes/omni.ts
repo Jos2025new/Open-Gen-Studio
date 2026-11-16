@@ -10,6 +10,8 @@ export { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, omniOnly,
 /** The most assets the omnicanvas brings in at once; the user adds the rest from the library. */
 const ASSETS_AT_ONCE = 8;
 const PER_ROW = 5;
+/** The Studio, Nodes and Designer row sits right above the chat, clear of its estimated height (360 + 56 gap), so the opening view fits all of them. */
+export const OMNI_SPACE_Y = -420;
 /** A loose asset this far (flow px) from the main parts is brought next to them when the omnicanvas opens. */
 const FAR_FROM_MAIN = 900;
 
@@ -40,7 +42,7 @@ export function ensureOmniNodes(sessionId: string): string[] {
   OMNI_SPACES.forEach((space, i) => {
     if (nodes.some((n) => isRef(n, 'space') && n.data.kind === 'ref' && n.data.ref === space)) return;
     const id = omniSpaceNodeId(space);
-    put({ id, position: { x: ox + i * COL, y: -460 }, data: { kind: 'ref', type: 'space', ref: space, title: OMNI_SPACE_TITLES[space], view: 'thumb' } });
+    put({ id, position: { x: ox + i * COL, y: OMNI_SPACE_Y }, data: { kind: 'ref', type: 'space', ref: space, title: OMNI_SPACE_TITLES[space], view: 'thumb' } });
     const agent = nodes.find((n) => isRef(n, 'agent'));
     // The agent works in every Space: a reference link, drawn dotted.
     if (agent) edges.push({ id: `sys_edge_agent_${space}`, source: agent.id, target: id, sourceHandle: 'target', targetHandle: 'ref', kind: 'ref' });
