@@ -51,7 +51,7 @@ export function extractBaseline(saved) {
       'Sin clasificación persistida de sesión nueva/continuación; no se deduce del orden.',
       'Primera salida incluye texto o herramienta; primer texto visible y respuesta terminada son desconocidos.',
       'agentMs es trabajo acumulado, excluye espera del usuario; llmUsd puede ser estimado.',
-      'callTimings conserva hasta 12 llamadas; agentMetrics hasta 50 peticiones por sesión.',
+      'callTimings conserva hasta 12 llamadas por petición; agentMetrics conserva hasta 50 peticiones recientes por sesión (las anteriores se acumulan en agentMetricsAggregate).',
       'Los acumuladores de tokens/coste usan cero cuando falta usage; no permiten distinguir ausencia de un cero real.',
       'No demuestra comparación control/aviso, ni distribución por tipo o por variante exacta de modelo.',
     ],

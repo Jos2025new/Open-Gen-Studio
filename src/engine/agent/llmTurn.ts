@@ -213,6 +213,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         inputTokens: result.usage?.inputTokens ?? 0,
         outputTokens: result.usage?.outputTokens ?? 0,
         usd: llmUsd,
+        wrapUp: opts.route === 'wrap-up',
         timing: { ...result.timing, reasoningTokens: result.usage?.reasoningTokens, cachedTokens: result.usage?.cachedTokens },
       });
       addSpend(llmUsd, { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
