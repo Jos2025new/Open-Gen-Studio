@@ -1,5 +1,5 @@
 import { uid } from '../lib/id';
-import { getAssetBlob, putAssetBlob } from '../lib/idb';
+import { deleteAssetBlobs, getAssetBlob, putAssetBlob } from '../lib/idb';
 import type { Asset, AssetRevision } from './types';
 import { addAssets, setUi, toast, useStore } from '../store/store';
 
@@ -14,6 +14,15 @@ async function sameBlobBytes(a: Blob, b: Blob): Promise<boolean> {
   const vb = new Uint8Array(bb);
   for (let i = 0; i < va.length; i++) if (va[i] !== vb[i]) return false;
   return true;
+}
+
+/** One save or jump at a time per asset, so two clicks cannot drop a version or move the pointer over a write still in flight. */
+const revisionTails = new Map<string, Promise<void>>();
+function enqueueRevision<T>(assetId: string, task: () => Promise<T>): Promise<T> {
+  const prev = revisionTails.get(assetId) ?? Promise.resolve();
+  const run = prev.then(task, task);
+  revisionTails.set(assetId, run.then(() => undefined, () => undefined));
+  return run;
 }
 
 async function writeVerifiedBlob(assetId: string, blob: Blob): Promise<boolean> {
@@ -133,10 +142,20 @@ export function beginAssetEdit(assetId: string): Asset | null {
  * - `'original'` («Guardar»): appends a new version at the end of `revisions` (never deleting prior versions, even when
  *   saving from an older version) and moves `revisionIndex` to the new version.
  */
-export async function saveAssetEdit(
+export function saveAssetEdit(
   assetId: string,
   editedBlob: Blob,
   choice: 'copy' | 'original' = 'copy',
+  dims?: { width: number; height: number },
+  label = 'Pintura',
+): Promise<Asset | null> {
+  return enqueueRevision(assetId, () => saveAssetEditNow(assetId, editedBlob, choice, dims, label));
+}
+
+async function saveAssetEditNow(
+  assetId: string,
+  editedBlob: Blob,
+  choice: 'copy' | 'original',
   dims?: { width: number; height: number },
   label = 'Pintura',
 ): Promise<Asset | null> {
@@ -147,7 +166,11 @@ export async function saveAssetEdit(
   const mime = editedBlob.type || source.mime || 'image/png';
   if (choice === 'copy') {
     const copyId = uid('ast');
-    await putAssetBlob(copyId, editedBlob);
+    if (!(await writeVerifiedBlob(copyId, editedBlob))) {
+      await deleteAssetBlobs([copyId]).catch(() => undefined);
+      toast('No se pudo guardar la imagen editada', 'error');
+      return null;
+    }
     const copy: Asset = {
       ...structuredClone(source),
       id: copyId,
@@ -219,13 +242,21 @@ export async function saveAssetEdit(
     createdAt: Date.now(),
     label: label || 'Pintura',
   };
+  const previousVisible = await getAssetBlob(assetId);
   try {
     if (!(await writeVerifiedBlob(newRevId, editedBlob))) {
       toast('No se pudo guardar la imagen editada', 'error');
       return null;
     }
-    await putAssetBlob(assetId, editedBlob);
+    if (!(await writeVerifiedBlob(assetId, editedBlob))) {
+      await deleteAssetBlobs([newRevId]).catch(() => undefined);
+      if (previousVisible) await writeVerifiedBlob(assetId, previousVisible);
+      toast('No se pudo guardar la imagen editada', 'error');
+      return null;
+    }
   } catch {
+    await deleteAssetBlobs([newRevId]).catch(() => undefined);
+    if (previousVisible) await writeVerifiedBlob(assetId, previousVisible).catch(() => undefined);
     toast('No se pudo guardar la imagen editada', 'error');
     return null;
   }
@@ -249,7 +280,11 @@ export async function saveAssetEdit(
     };
     return { assets: { ...st.assets, [assetId]: updated } };
   });
-  if (!updated) return null;
+  if (!updated) {
+    if (previousVisible) await writeVerifiedBlob(assetId, previousVisible);
+    await deleteAssetBlobs([newRevId]).catch(() => undefined);
+    return null;
+  }
   toast('Guardado', 'success', 5000, {
     label: 'Deshacer',
     run: () => void undoAssetRevision(assetId),
@@ -258,7 +293,11 @@ export async function saveAssetEdit(
 }
 
 /** Jumps the displayed bytes and metadata of `assetId` to `targetIndex` without deleting any version in history. */
-export async function jumpToAssetRevision(assetId: string, targetIndex: number): Promise<boolean> {
+export function jumpToAssetRevision(assetId: string, targetIndex: number): Promise<boolean> {
+  return enqueueRevision(assetId, () => jumpToAssetRevisionNow(assetId, targetIndex));
+}
+
+async function jumpToAssetRevisionNow(assetId: string, targetIndex: number): Promise<boolean> {
   const asset = useStore.getState().assets[assetId];
   if (!asset) return false;
   const mat = await ensureMaterializedRevisions(assetId);
@@ -311,17 +350,21 @@ export async function jumpToAssetRevision(assetId: string, targetIndex: number):
 }
 
 /** Moves the version pointer one step back without deleting any version. */
-export async function undoAssetRevision(assetId: string): Promise<boolean> {
-  const { versions, index } = normalizeAssetRevisions(useStore.getState().assets[assetId]);
-  if (versions.length < 2 || index <= 0) return false;
-  return jumpToAssetRevision(assetId, index - 1);
+export function undoAssetRevision(assetId: string): Promise<boolean> {
+  return enqueueRevision(assetId, async () => {
+    const { versions, index } = normalizeAssetRevisions(useStore.getState().assets[assetId]);
+    if (versions.length < 2 || index <= 0) return false;
+    return jumpToAssetRevisionNow(assetId, index - 1);
+  });
 }
 
 /** Moves the version pointer one step forward without deleting any version. */
-export async function redoAssetRevision(assetId: string): Promise<boolean> {
-  const { versions, index } = normalizeAssetRevisions(useStore.getState().assets[assetId]);
-  if (versions.length < 2 || index >= versions.length - 1) return false;
-  return jumpToAssetRevision(assetId, index + 1);
+export function redoAssetRevision(assetId: string): Promise<boolean> {
+  return enqueueRevision(assetId, async () => {
+    const { versions, index } = normalizeAssetRevisions(useStore.getState().assets[assetId]);
+    if (versions.length < 2 || index >= versions.length - 1) return false;
+    return jumpToAssetRevisionNow(assetId, index + 1);
+  });
 }
 
 /** Collects asset IDs plus any preserved revision blob IDs when deleting assets. */

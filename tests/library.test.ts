@@ -139,6 +139,36 @@ describe('global library', () => {
     expect(await blobs.get(id)?.text()).toBe('original-bytes');
   });
 
+  it('does not move the pointer or the visible bytes when the visible write cannot be verified', async () => {
+    const id = 'save-fail';
+    const original = new Blob(['original-bytes']);
+    blobs.set(id, original);
+    useStore.setState((st) => ({ assets: { ...st.assets, [id]: { id, kind: 'image', origin: 'upload', createdAt: 1, stored: true, width: 10, height: 10 } as Asset } }));
+    writes.corruptNext = id;
+    expect(await saveAssetEdit(id, new Blob(['edited-bytes']), 'original')).toBeNull();
+    const asset = useStore.getState().assets[id];
+    expect(asset.revisions).toBeUndefined();
+    expect(asset.revisionIndex).toBeUndefined();
+    expect(await blobs.get(id)?.text()).toBe('original-bytes');
+  });
+
+  it('keeps both versions when two saves of the same asset overlap', async () => {
+    const id = 'save-race';
+    blobs.set(id, new Blob(['original-bytes']));
+    useStore.setState((st) => ({ assets: { ...st.assets, [id]: { id, kind: 'image', origin: 'upload', createdAt: 1, stored: true, width: 10, height: 10 } as Asset } }));
+    const [first, second] = await Promise.all([
+      saveAssetEdit(id, new Blob(['edit-a']), 'original', undefined, 'A'),
+      saveAssetEdit(id, new Blob(['edit-b']), 'original', undefined, 'B'),
+    ]);
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    const asset = useStore.getState().assets[id];
+    expect(asset.revisions?.map((r) => r.label)).toEqual(['Original', 'A', 'B']);
+    expect(asset.revisionIndex).toBe(2);
+    expect(await blobs.get(id)?.text()).toBe('edit-b');
+    expect(await blobs.get(asset.revisions![1].assetId)?.text()).toBe('edit-a');
+  });
+
   it('migrates legacy originalRevision/revisions in code, persists through SQLite store reload, and handles missing blobs safely', async () => {
     const first = useStore.getState().activeSessionId;
     const origBlob = new Blob(['original-bytes'], { type: 'image/png' });
