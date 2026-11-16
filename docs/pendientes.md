@@ -6,6 +6,24 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 **Cómo se mantiene.** Una fila por ítem, con ID estable (A1, B2…) que usan los archivos de detalle. Al cerrar uno: se quita de aquí y de su detalle y se añade a [cerrados](pendientes-cerrados.md) con commit o test. Un ítem nuevo lleva su fecha de hoy. Evidencia: **código** (leído), **test**, **sandbox** (puerto 5183), **usuario**, **informe** (prueba de GPT del 2026-10-21), **propuesta** (sin implementar).
 
+## Por impacto visible (2026-11-16)
+
+Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rendimiento. Los seis marcados *nuevo* no estaban en ningún archivo.
+
+1. **Vista previa de exportación lenta** (*nuevo*, 2026-11-08): se renderiza, se codifica a PNG y se decodifica dos veces. Propuesta sin respuesta: dibujar directo en un canvas pequeño y medir antes y después. [plan](designer-controles/plan-exportacion.md)
+2. **Panel de exportación confuso** (*nuevo*, 2026-11-08): «no sé dónde cambiar el nombre». El usuario hará su propio diseño; no tocar el panel hasta que llegue y luego implementarlo fiel, con los campos compartidos y viendo cada paso.
+3. **Omnicanvas: el nodo del agente sale cortado por abajo al abrir** (*nuevo*, 2026-11-15).
+4. **Barra inferior del visor** (*nuevo*, 2026-11-15): volver a poner los iconos y cambiar Explorar, Reutilizar y Finalizar por nombres habituales en otras apps.
+5. **Idioma mezclado inglés/español** (*nuevo*, 2026-11-15): decisión del usuario pendiente.
+6. **C0 · «Disk copy: could not save state … Failed to fetch» al recargar.** [detalle](pendientes-sistema.md)
+7. **Nodos del sistema fuera del lienzo de Nodes normal** (hoy solo en el omnicanvas). [plan](propuesta-todo-es-un-nodo-plan.md)
+8. **Paso 13 · puertos propios y cables entre ventanas.** [plan](propuesta-todo-es-un-nodo-plan.md)
+9. **Pasos 10 y 11** (dos agentes en un chat; ejecutar y parar por nodo): los hace el usuario. [plan](propuesta-todo-es-un-nodo-plan.md)
+10. **Migrar datos reales a SQLite**: necesita aprobación expresa. [detalle](pendientes-sistema.md)
+11. **Tests intermitentes en la suite completa**: `writer-lock-panel` y `path-boolean` (*nuevo* para este último: reabierto, figuraba cerrado en D36) fallan a veces juntos y pasan solos. [detalle](pendientes-sistema.md)
+12. **Tabla del plan con filas 8–10 duplicadas; añadir la biblioteca como paso 16.**
+13. **Pasos 14 y 15** (JSON, CLI, MCP): pueden esperar.
+
 ## Lo más crítico ahora
 
 1. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
