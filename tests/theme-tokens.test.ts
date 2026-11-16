@@ -183,7 +183,7 @@ describe('app CSS and canvas drawing follow the theme', () => {
   it('the active session actions, the Soon pill and the viewer dock use tokens', () => {
     expect(rule('shell.css', '.session-row.is-active .session-actions')).toContain('var(--active-solid)');
     expect(rule('home.css', '.home-pill')).toMatch(/background: var\(--surface-2\)/);
-    expect(rule('shell.css', '.lb-dock')).toContain('box-shadow: var(--shadow-float)');
+    expect(rule('lightbox.css', '.lb-dock, .lb-top-actions, .lb-info-panel')).toContain('box-shadow: var(--shadow-float)');
     for (const b of ['claro', 'blanco']) expect(themeOf(b, 'lima')['--shadow-float']).toContain('60, 64, 67');
   });
   it('finished states use --ok, not the accent; text selection follows the highlight', () => {
