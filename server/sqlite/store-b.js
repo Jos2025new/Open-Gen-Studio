@@ -16,6 +16,7 @@ import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, rmSync, statSyn
 import { join } from 'node:path';
 import { looksLost, sha256 } from '../save-guard.js';
 import { assembleText } from '../store-v2.js';
+import { sanitizeKeysInText } from '../keys.js';
 import { generateKeyBetween, generateNKeysBetween } from './fractional-index.mjs';
 
 export const SCHEMA_VERSION = 1;
@@ -212,7 +213,7 @@ export function createStoreB(dir, opts = {}) {
 
   /** Applies the delta. Returns the new spend window. */
   function applyDelta(delta, head, savedAt, stats) {
-    if (delta.small != null) q.smallPut.run(delta.small);
+    if (delta.small != null) q.smallPut.run(sanitizeKeysInText(delta.small));
     const bulkImport = Boolean(delta.full && (Object.keys(delta.up?.generations ?? {}).length + Object.keys(delta.up?.assets ?? {}).length > 500));
     if (delta.full) {
       q.journalPut.run(savedAt, 'import', 'store', json({
@@ -409,10 +410,14 @@ export function createStoreB(dir, opts = {}) {
         }
       }
     }
+    const safeSmall = delta?.small != null ? sanitizeKeysInText(delta.small) : delta?.small;
+    const safeBody = delta?.small != null && safeSmall !== delta.small
+      ? { ...body, delta: { ...delta, small: safeSmall } }
+      : body;
     db.exec('BEGIN IMMEDIATE');
     let r;
     try {
-      r = commitTx(body);
+      r = commitTx(safeBody);
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');

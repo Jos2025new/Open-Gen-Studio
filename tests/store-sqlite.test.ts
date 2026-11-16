@@ -365,14 +365,18 @@ describe('routes keep the current body and an existing format-2 folder', () => {
     const data = join(root, 'data');
     mkdirSync(data);
     const secret = 'sk-or-v1-supersecret9876';
-    const gWithKey = json({
-      settings: { theme: 'dark', keys: { openrouter: secret, fal: '' } },
+    const gWithoutKey = json({
+      settings: { theme: 'dark', keys: { openrouter: '', fal: '' } },
       spentUsd: 0, spendLog: [], generations: {}, assets: {}, library: [],
     });
     const store = createSqliteStore(data);
-    expect(store.commit({ savedAt: 1000, baseAt: 0, version: 1, globals: gWithKey, order: ['ses_a'], sessions: { ses_a: session } }).status).toBe(204);
+    expect(store.commit({ savedAt: 1000, baseAt: 0, version: 1, globals: gWithoutKey, order: ['ses_a'], sessions: { ses_a: session } }).status).toBe(204);
     store.idle();
     store.close();
+    // Simulate a legacy ogs.sqlite created before commit-time key sanitization.
+    const legacyDb = new DatabaseSync(join(data, 'ogs.sqlite'));
+    legacyDb.exec(`UPDATE small SET json = '${json({ settings: { theme: 'dark', keys: { openrouter: secret, fal: '' } }, spentUsd: 0 })}' WHERE id = 1`);
+    legacyDb.close();
 
     const ks = createKeyStore(data, { tool: '/nonexistent/secret-tool' });
     const migrated = await ks.migrate();
@@ -396,6 +400,85 @@ describe('routes keep the current body and an existing format-2 folder', () => {
     const entries = unzip(got.raw);
     expect(new TextDecoder().decode(entries.get('state.json'))).not.toContain(secret2);
     expect(new TextDecoder().decode(entries.get('ogs.sqlite'))).not.toContain(secret2);
+  });
+
+  it('sanitizes settings.keys before persisting delta.small and excludes backups from export', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-sql-sanitize-'));
+    const data = join(root, 'data');
+    mkdirSync(data);
+
+    // 1. Direct store commit with delta.small containing a real key and a marker.
+    const secretDirect = 'sk-or-v1-directsecret1234';
+    const marker = 'ogs:****9999';
+    const store = createSqliteStore(data);
+    expect(store.commit({
+      savedAt: 1000,
+      baseAt: 0,
+      version: 1,
+      order: ['ses_a'],
+      sessions: { ses_a: session },
+      delta: {
+        full: true,
+        small: json({ settings: { theme: 'dark', keys: { openrouter: secretDirect, fal: marker } }, spentUsd: 0 }),
+        up: { generations: {}, assets: {}, library: {} },
+        del: { generations: [], assets: [], library: [] },
+        spend: { append: [], len: 0 },
+      },
+    } as never).status).toBe(204);
+    store.idle();
+    const readAfterDirect = store.read()!;
+    expect(readAfterDirect).not.toContain(secretDirect);
+    expect(readAfterDirect).toContain(marker);
+    expect(new TextDecoder().decode(readFileSync(join(data, 'ogs.sqlite')))).not.toContain(secretDirect);
+    expect(readFileSync(join(data, 'state-cache.txt'), 'utf8')).not.toContain(secretDirect);
+    const snaps = readdirSync(join(data, 'backups')).filter((f) => f.startsWith('v2sqlite-'));
+    expect(snaps.length).toBeGreaterThan(0);
+    for (const s of snaps) {
+      expect(new TextDecoder().decode(readFileSync(join(data, 'backups', s)))).not.toContain(secretDirect);
+    }
+    store.close();
+
+    // 2. Through localStore HTTP after startup migration has already run once.
+    const { callBody } = mount(root);
+    expect((await callBody('GET', '/x/store/state')).status).toBe(200);
+    const secretLate = 'sk-or-v1-latesecret5678';
+    expect((await callBody('PUT', '/x/store/v2/commit', json({
+      savedAt: 2000,
+      baseAt: 1000,
+      version: 1,
+      order: ['ses_a'],
+      sessions: {},
+      delta: {
+        small: json({ settings: { theme: 'dark', keys: { openrouter: secretLate, fal: marker } }, spentUsd: 0 }),
+        up: { generations: {}, assets: {}, library: {} },
+        del: { generations: [], assets: [], library: [] },
+        spend: { append: [], len: 0 },
+      },
+    }))).status).toBe(204);
+    expect(new TextDecoder().decode(readFileSync(join(data, 'ogs.sqlite')))).not.toContain(secretLate);
+
+    // 3. Export must exclude backups/ and store-v2/ (even if they contain secrets) while keeping media.
+    mkdirSync(join(data, 'asset'), { recursive: true });
+    writeFileSync(join(data, 'asset', 'ast_1.png'), 'pngbytes');
+    mkdirSync(join(data, 'backups', 'v1-pre-sqlite'), { recursive: true });
+    writeFileSync(join(data, 'backups', 'v1-pre-sqlite', 'state.json'), json({ secret: 'sk-backup-leak-1' }));
+    writeFileSync(join(data, 'backups', 'rejected-1.json'), json({ secret: 'sk-backup-leak-2' }));
+    mkdirSync(join(data, 'store-v2'), { recursive: true });
+    writeFileSync(join(data, 'store-v2', 'globals.json'), json({ settings: { keys: { fal: 'sk-v2-leak-3' } } }));
+
+    const got = await callBody('GET', '/x/store/export');
+    expect(got.status).toBe(200);
+    const entries = unzip(got.raw);
+    expect(entries.has('asset/ast_1.png')).toBe(true);
+    for (const [name, content] of entries) {
+      expect(name.startsWith('backups/')).toBe(false);
+      expect(name.startsWith('store-v2/')).toBe(false);
+      const text = new TextDecoder().decode(content);
+      expect(text).not.toContain('sk-backup-leak-1');
+      expect(text).not.toContain('sk-backup-leak-2');
+      expect(text).not.toContain('sk-v2-leak-3');
+      expect(text).not.toContain(secretLate);
+    }
   });
 });
 

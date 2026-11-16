@@ -15,6 +15,29 @@ export const KEY_MARKER = 'ogs:';
 export const maskOf = (key) => `${KEY_MARKER}****${String(key).slice(-4)}`;
 export const isMarker = (v) => typeof v === 'string' && v.startsWith(KEY_MARKER);
 
+/** Strips real (non-marker) API keys from a parsed object's `settings.keys` in place. */
+export function sanitizeSettingsKeys(obj) {
+  const keys = obj?.settings?.keys;
+  if (!keys || typeof keys !== 'object' || Array.isArray(keys)) return false;
+  let changed = false;
+  for (const [k, v] of Object.entries(keys)) {
+    if (typeof v === 'string') {
+      if (v.trim() && !isMarker(v)) { keys[k] = ''; changed = true; }
+    } else if (v != null && v !== '') {
+      keys[k] = ''; changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Strips real API keys from JSON text (`nestedState: true` for format-1 `{ state: { settings: { keys } } }`). */
+export function sanitizeKeysInText(text, nestedState = false) {
+  if (typeof text !== 'string' || (!text.includes('"keys"') && !text.includes('\\u'))) return text;
+  let obj;
+  try { obj = JSON.parse(text); } catch { return text; }
+  return sanitizeSettingsKeys(nestedState ? obj?.state : obj) ? JSON.stringify(obj) : text;
+}
+
 /** Runs `secret-tool` with `args`; `input` goes to stdin. Resolves { ok, out }; never throws and never echoes the input. */
 function secretTool(bin, args, input) {
   return new Promise((resolve) => {

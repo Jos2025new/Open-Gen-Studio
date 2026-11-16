@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 import { createStoreV2 } from './store-v2.js';
 import { createSqliteStore, sqliteHead, stripSqliteKeys, validateSqliteCommit } from './store-sqlite.js';
 import { EPS_MAX_BYTES, handleEps } from './eps.js';
-import { PROVIDERS, createKeyStore, maskOf } from './keys.js';
+import { PROVIDERS, createKeyStore, maskOf, sanitizeKeysInText } from './keys.js';
 import { handleProxy } from './provider-proxy.js';
 
 const run = promisify(execFile);
@@ -234,6 +234,10 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     if (path === '/v2/commit' && req.method === 'PUT') {
       let payload;
       try { payload = JSON.parse((await body(req)).toString('utf8')); } catch { return send(400, 'not a commit'); }
+      if (payload && typeof payload === 'object') {
+        if (typeof payload.globals === 'string') payload.globals = sanitizeKeysInText(payload.globals);
+        if (typeof payload.delta?.small === 'string') payload.delta.small = sanitizeKeysInText(payload.delta.small);
+      }
       const r = await serialState(async () => {
         if (!sqliteHead(dir) && !(await v2Files()) && !(await legacyFile())) {
           const invalid = validateSqliteCommit(payload, true);
@@ -258,7 +262,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       if (req.method === 'GET' && (await v2.readHead())) return send(200, await v2.read(), 'application/json');
       if (req.method === 'GET') return send(200, await readFile(stateFile).catch(() => ''), 'application/json');
       if (req.method === 'PUT' && (sqliteHead(dir) || await v2.readHead())) {
-        const text = (await body(req)).toString('utf8');
+        const text = sanitizeKeysInText((await body(req)).toString('utf8'), true);
         const store = sqliteHead(dir) ? sqliteStore() : v2;
         const r = await serialState(() => store.commitLegacy(text));
         if (r.status === 409) return send(409, conflictBody(r), 'application/json');
@@ -267,12 +271,16 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       if (req.method === 'PUT') {
         // A tab says which saved state it worked from (baseAt). If the file has moved on since (another tab saved),
         // the write is refused instead of overwriting newer work with an older copy.
-        const next = await body(req);
+        let next = await body(req);
         const base = /^\{"savedAt":\d+,"baseAt":(\d+),/.exec(next.toString('utf8', 0, 80))?.[1];
         // Only a whole state the app wrote replaces the file: it starts with its stamps and ends its object. A cheap
         // check (no parse of the whole document): a truncated or foreign body would leave the app unable to load.
         if (base == null || next.toString('utf8', Math.max(0, next.length - 16)).trimEnd().slice(-1) !== '}') {
           return send(400, 'not a saved state');
+        }
+        if (next.includes('"keys"') || next.includes('\\u')) {
+          const sanitized = sanitizeKeysInText(next.toString('utf8'), true);
+          next = Buffer.from(sanitized, 'utf8');
         }
         const conflict = await serialState(async () => {
           const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
@@ -446,7 +454,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
         }
         const folders = [];
         for (const ns of await readdir(dir).catch(() => [])) {
-          if (ns !== 'tmp' && SAFE.test(ns) && (await stat(join(dir, ns))).isDirectory()) folders.push(ns);
+          if (ns !== 'tmp' && ns !== 'backups' && ns !== 'store-v2' && SAFE.test(ns) && (await stat(join(dir, ns))).isDirectory()) folders.push(ns);
         }
         if (folders.length) await run('zip', ['-rq', out, ...folders, '-x', '*.tmp'], { cwd: dir, maxBuffer: 1 << 24 });
         if (raw) await run('zip', ['-0', '-jq', out, join(work, 'state.json')]);
