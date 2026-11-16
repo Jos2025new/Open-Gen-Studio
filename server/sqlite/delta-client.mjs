@@ -19,7 +19,7 @@ function sameMapOrder(a, b) {
 export function createDeltaClient() {
   const known = { generations: new Map(), assets: new Map(), library: new Map() };
   let small = null;
-  let lastSpendText = null;
+  let knownSpend = [];
   let first = true;
 
   /** Delta between what was last acknowledged and `g` (the globals object). Call ack() when the server accepted it. */
@@ -34,7 +34,9 @@ export function createDeltaClient() {
         const list = g.library ?? [];
         for (let i = 0; i < list.length; i++) {
           const item = list[i];
-          const id = String(item.id ?? `#${i}`);
+          const baseId = String(item.id ?? `#${i}`);
+          let id = baseId;
+          for (let dup = 2; present.has(id); dup++) id = `${baseId}#${dup}`;
           present.add(id);
           const p = prev.get(id);
           if (p && p.ref === item) { staged[coll].set(id, p); continue; }
@@ -64,16 +66,23 @@ export function createDeltaClient() {
     const log = g.spendLog ?? [];
     const texts = log.map((e) => JSON.stringify(e));
     let start = 0;
-    if (lastSpendText != null) { let i = texts.length - 1; while (i >= 0 && texts[i] !== lastSpendText) i--; start = i + 1; }
+    for (let k = Math.min(knownSpend.length, texts.length); k > 0; k--) {
+      let ok = true;
+      const offset = knownSpend.length - k;
+      for (let i = 0; i < k; i++) {
+        if (knownSpend[offset + i] !== texts[i]) { ok = false; break; }
+      }
+      if (ok) { start = k; break; }
+    }
     const delta = { ...(first ? { full: true } : {}), ...(smallText !== small ? { small: smallText } : {}), up, del, ...(order ? { order } : {}), spend: { append: texts.slice(start), len: texts.length } };
-    pending = { staged, smallText, lastSpend: texts.length ? texts[texts.length - 1] : null };
+    pending = { staged, smallText, spend: texts };
     return delta;
   }
   let pending = null;
   function ack() {
     for (const coll of COLLS) known[coll] = pending.staged[coll];
     small = pending.smallText;
-    lastSpendText = pending.lastSpend;
+    knownSpend = pending.spend;
     first = false;
   }
   return { diff, ack };

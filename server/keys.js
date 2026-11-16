@@ -5,6 +5,8 @@
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { chmod, copyFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { dirname, join } from 'node:path';
 
 export const PROVIDERS = ['openrouter', 'fal', 'nanogpt', 'atlas'];
@@ -150,6 +152,38 @@ export function createKeyStore(dir, opts = {}) {
       await writeFile(tmp, JSON.stringify(obj), { mode: 0o600 });
       await rename(tmp, file);
       await chmod(file, 0o600);
+    }
+    const sqliteFile = join(dir, 'ogs.sqlite');
+    if (existsSync(sqliteFile)) {
+      let holder = null;
+      try {
+        const db = new DatabaseSync(sqliteFile, { readOnly: true });
+        try {
+          const row = db.prepare('SELECT json FROM small WHERE id = 1').get();
+          if (row?.json) holder = JSON.parse(row.json);
+        } finally { db.close(); }
+      } catch { holder = null; }
+      const found = realKeys(holder?.settings?.keys);
+      if (found.length) {
+        const backup = `${sqliteFile}.bak-keys-${stamp}`;
+        await copyFile(sqliteFile, backup);
+        await chmod(backup, 0o600);
+        out.backups.push(backup);
+        for (const [p, v] of found) {
+          const known = await get(p);
+          if (known === v.trim()) { holder.settings.keys[p] = maskOf(v.trim()); out.migrated.push(p); continue; }
+          if (known) { holder.settings.keys[p] = maskOf(known); out.migrated.push(p); continue; }
+          const where = await set(p, v).catch(() => null);
+          if (where && (await get(p)) === v.trim()) { holder.settings.keys[p] = maskOf(v.trim()); out.migrated.push(p); } else out.failed.push(p);
+        }
+        const db = new DatabaseSync(sqliteFile);
+        try {
+          db.prepare('UPDATE small SET json = ? WHERE id = 1').run(JSON.stringify(holder));
+          db.exec('VACUUM');
+        } finally { db.close(); }
+        await chmod(sqliteFile, 0o600);
+        await rm(join(dir, 'state-cache.txt'), { force: true }).catch(() => undefined);
+      }
     }
     return out;
   }

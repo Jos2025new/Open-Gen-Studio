@@ -8,6 +8,7 @@ import { SAFE_ID, splitText } from './store-v2.js';
 import { createStoreBA } from './sqlite/store-ba.js';
 import { createDeltaClient } from './sqlite/delta-client.mjs';
 
+export { DatabaseSync };
 const dbFile = (dir) => join(dir, 'ogs.sqlite');
 
 /** Head row, or null when this folder has no SQLite file. A file that cannot be read, or has no head, throws:
@@ -17,9 +18,40 @@ export function sqliteHead(dir) {
   if (!existsSync(file)) return null;
   const db = new DatabaseSync(file, { readOnly: true });
   try {
+    const v = db.prepare('PRAGMA user_version').get().user_version;
+    if (v === 0) {
+      const anyTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' LIMIT 1").get();
+      if (!anyTable) return null;
+      throw new Error('ogs.sqlite has no schema version');
+    }
     const row = db.prepare('SELECT saved_at AS savedAt, version, order_json AS orderJson FROM head WHERE id = 1').get();
-    if (!row) throw new Error('ogs.sqlite has no head');
+    if (!row) {
+      const dataRows = db.prepare(
+        'SELECT (SELECT COUNT(*) FROM small) + (SELECT COUNT(*) FROM sessions) + (SELECT COUNT(*) FROM records) + (SELECT COUNT(*) FROM spend) AS n',
+      ).get().n;
+      if (dataRows === 0) return null;
+      throw new Error('ogs.sqlite has no head');
+    }
     return { savedAt: row.savedAt, version: row.version, order: JSON.parse(row.orderJson) };
+  } finally {
+    db.close();
+  }
+}
+
+/** Wipes settings.keys in an exported copy of ogs.sqlite and compacts freelist pages so secrets never leave in a ZIP. */
+export function stripSqliteKeys(file) {
+  const db = new DatabaseSync(file);
+  try {
+    const row = db.prepare('SELECT json FROM small WHERE id = 1').get();
+    if (row?.json) {
+      const small = JSON.parse(row.json);
+      const keys = small?.settings?.keys;
+      if (keys && typeof keys === 'object') {
+        for (const k of Object.keys(keys)) keys[k] = '';
+        db.prepare('UPDATE small SET json = ? WHERE id = 1').run(JSON.stringify(small));
+      }
+    }
+    db.exec('VACUUM');
   } finally {
     db.close();
   }
@@ -55,8 +87,8 @@ export function validateSqliteCommit(body, fresh = false) {
 }
 
 /** Same commit contract as createStoreV2, with one SQLite transaction per commit. */
-export function createSqliteStore(dir) {
-  const ba = createStoreBA(dir);
+export function createSqliteStore(dir, opts = {}) {
+  const ba = createStoreBA(dir, opts);
   const delta = createDeltaClient();
   let existing = ba.read();
   if (existing) {

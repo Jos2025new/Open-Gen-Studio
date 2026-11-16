@@ -24,7 +24,8 @@ vi.mock('node:fs/promises', async (original) => {
   } };
 });
 import { localStore } from '../server/local-store.js';
-import { createSqliteStore } from '../server/store-sqlite.js';
+import { createKeyStore } from '../server/keys.js';
+import { createSqliteStore, DatabaseSync, sqliteHead } from '../server/store-sqlite.js';
 
 const json = (v: unknown) => JSON.stringify(v);
 const bytes = (text: string) => new TextEncoder().encode(text).length;
@@ -137,6 +138,22 @@ describe('sqlite store behind the current commit body', () => {
       expect(bytes(json(calls.delta))).toBeLessThan(1024);
       expect(calls.stats).toMatchObject({ recGets: 0, recWrites: 0, posUpdates: 0 });
     } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('preserves identical consecutive spendLog entries and duplicate library ids', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ogs-dup-spend-'));
+    const store = createSqliteStore(dir);
+    const spendA = { id: 'sp_1', usd: 0.05 };
+    const spendB = { id: 'sp_2', usd: 0.1 };
+    const dupLib = [{ id: 'lib_a', name: 'A1' }, { id: 'lib_a', name: 'A2' }, { name: 'no-id-1' }, { name: 'no-id-2' }];
+    const g1 = json({ settings: {}, spentUsd: 0.15, spendLog: [spendA, spendB], generations: {}, assets: {}, library: dupLib });
+    expect(store.commit({ savedAt: 1, baseAt: 0, version: 1, globals: g1, order: ['ses_a'], sessions: { ses_a: session } }).status).toBe(204);
+    const g2 = json({ settings: {}, spentUsd: 0.25, spendLog: [spendA, spendB, spendB], generations: {}, assets: {}, library: dupLib });
+    expect(store.commit({ savedAt: 2, baseAt: 1, version: 1, globals: g2, order: ['ses_a'], sessions: {} }).status).toBe(204);
+    const parsed = JSON.parse(store.read()!).state;
+    expect(parsed.spendLog).toEqual([spendA, spendB, spendB]);
+    expect(parsed.library).toEqual(dupLib);
+    store.close();
   });
 
 });
@@ -262,6 +279,71 @@ describe('routes keep the current body and an existing format-2 folder', () => {
     expect(state).toContain('ses_a');
     expect(new TextDecoder().decode(entries.get('ogs.sqlite')!.subarray(0, 15))).toBe('SQLite format 3');
     expect(new TextDecoder().decode(entries.get('ogs.sqlite'))).toContain('ses_a');
+  });
+
+  it('an empty ogs.sqlite after a rolled-back first commit does not brick the folder, while missing head with data still errors', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-first-fail-'));
+    const data = join(root, 'data');
+    mkdirSync(data);
+    let fail = true;
+    const store = createSqliteStore(data, { fault: (p: string) => { if (fail && p === 'globals') throw new Error('disk full'); } });
+    const payload = { savedAt: 1000, baseAt: 0, version: 1, globals: globals(), order: ['ses_a'], sessions: { ses_a: session } };
+    expect(() => store.commit(payload)).toThrow('disk full');
+    store.close();
+    expect(existsSync(join(data, 'ogs.sqlite'))).toBe(true);
+    expect(sqliteHead(data)).toBeNull();
+
+    const { call, callBody } = mount(root);
+    const emptyState = await callBody('GET', '/x/store/state');
+    expect(emptyState.status).toBe(200);
+    expect(emptyState.body).toBe('');
+    fail = false;
+    expect(await call('PUT', '/x/store/v2/commit', json(payload))).toBe(204);
+    expect(sqliteHead(data)?.savedAt).toBe(1000);
+
+    const db = new DatabaseSync(join(data, 'ogs.sqlite'));
+    db.exec('DELETE FROM head');
+    db.close();
+    expect(() => sqliteHead(data)).toThrow('ogs.sqlite has no head');
+    expect((await callBody('GET', '/x/store/state')).status).toBe(500);
+  });
+
+  it('strips settings.keys from exported ogs.sqlite and migrates real keys out of ogs.sqlite', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-sql-keys-'));
+    const data = join(root, 'data');
+    mkdirSync(data);
+    const secret = 'sk-or-v1-supersecret9876';
+    const gWithKey = json({
+      settings: { theme: 'dark', keys: { openrouter: secret, fal: '' } },
+      spentUsd: 0, spendLog: [], generations: {}, assets: {}, library: [],
+    });
+    const store = createSqliteStore(data);
+    expect(store.commit({ savedAt: 1000, baseAt: 0, version: 1, globals: gWithKey, order: ['ses_a'], sessions: { ses_a: session } }).status).toBe(204);
+    store.idle();
+    store.close();
+
+    const ks = createKeyStore(data, { tool: '/nonexistent/secret-tool' });
+    const migrated = await ks.migrate();
+    expect(migrated.migrated).toContain('openrouter');
+    expect(await ks.get('openrouter')).toBe(secret);
+    const reopened = createSqliteStore(data);
+    const after = reopened.read()!;
+    expect(after).not.toContain(secret);
+    expect(after).toContain('ogs:****9876');
+    reopened.close();
+
+    const { callBody } = mount(root);
+    const secret2 = 'sk-or-v1-exportsecret5432';
+    const gWithKey2 = json({
+      settings: { theme: 'dark', keys: { openrouter: secret2, fal: '' } },
+      spentUsd: 0, spendLog: [], generations: {}, assets: {}, library: [],
+    });
+    expect((await callBody('PUT', '/x/store/v2/commit', json({ savedAt: 2000, baseAt: 1000, version: 1, globals: gWithKey2, order: ['ses_a'], sessions: {} }))).status).toBe(204);
+    const got = await callBody('GET', '/x/store/export');
+    expect(got.status).toBe(200);
+    const entries = unzip(got.raw);
+    expect(new TextDecoder().decode(entries.get('state.json'))).not.toContain(secret2);
+    expect(new TextDecoder().decode(entries.get('ogs.sqlite'))).not.toContain(secret2);
   });
 });
 
