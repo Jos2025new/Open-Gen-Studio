@@ -12,9 +12,9 @@ import {
   type EdgeChange,
 } from '@xyflow/react';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
-import { addOmniSpace, ensureOmniNodes, ordinaryGraph, type OmniSpace } from '../../engine/nodes/omni';
+import { ensureOmniNodes, ordinaryGraph } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration, settleFresh } from '../../engine/flow/graph';
+import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration, } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -25,8 +25,9 @@ import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems } from './AddNodeItems';
 import { AddNodeMenu, RunAll } from './NodeCanvasParts';
 import { omniWidth } from '../omni/RefNode';
-import { addSystemNode } from '../../engine/nodes/system';
-import type { OmniEntries } from './AddNodeItems';
+import { useOmniFraming } from '../omni/useOmniFraming';
+import { useOmniEntries } from '../omni/useOmniEntries';
+import { settleNewNodes } from '../../engine/flow/settle';
 import { ConnectionPreview } from './ConnectedNodeMenu';
 import { connectionDrop } from './connectionDrop';
 import { CanvasPanels } from './SelectionPanel';
@@ -44,8 +45,6 @@ import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
-/** The omnicanvas opens at no less than this zoom, so the cards are readable. */
-const OMNI_OPEN_MIN_ZOOM = 0.6;
 
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
 function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?: boolean }) {
@@ -128,15 +127,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
-  // The omnicanvas opens framed on the session's main parts (Studio, Nodes, Designer, chat), never below 60 %.
-  useEffect(() => {
-    if (!omni) return;
-    const t = window.setTimeout(() => {
-      const main = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => n.data.kind === 'ref' && (n.data.type === 'space' || n.data.type === 'chat')).map((n) => ({ id: n.id })) ?? [];
-      if (main.length) void rf.fitView({ nodes: main, padding: 0.2, minZoom: OMNI_OPEN_MIN_ZOOM, maxZoom: 1, duration: 0 });
-    }, 150);
-    return () => window.clearTimeout(t);
-  }, [omni, sessionId]);
+  useOmniFraming(omni, sessionId, rf);
   // Nodes the agent just added: frame them once they are measured.
   const focus = useNodeFocus();
   useEffect(() => {
@@ -241,17 +232,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         });
       }
       if (sizes.length) setMeasured((prev) => new Map([...prev, ...sizes]));
-      // First sizes of nodes (new, imported, or opened): settle them off their neighbours. No undo step of its own.
+      // First sizes of nodes (new, imported, or opened): settle them off their neighbours (no undo step of its own).
       const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id)).map(([id]) => id));
-      if (fresh.size) {
-        const all = new Map([...measuredRef.current, ...sizes]);
-        const cur = useStore.getState().sessions[sessionId]?.graph;
-        const moved = cur ? settleFresh(cur.nodes, fresh, all) : new Map();
-        if (moved.size) useStore.setState((s) => {
-          const g = s.sessions[sessionId]?.graph;
-          return g ? { sessions: { ...s.sessions, [sessionId]: { ...s.sessions[sessionId], graph: { ...g, nodes: g.nodes.map((n) => (moved.has(n.id) ? { ...n, position: moved.get(n.id)! } : n)) } } } } : s;
-        });
-      }
+      if (fresh.size) settleNewNodes(sessionId, fresh, new Map([...measuredRef.current, ...sizes]));
     },
     [sessionId],
   );
@@ -304,24 +287,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     selectNodes([id]);
   };
 
-  // The omnicanvas library also lists the three Spaces (one node each) and the system parts.
-  const omniEntries = useMemo((): OmniEntries | undefined => {
-    if (!omni) return undefined;
-    const center = () => { const r = canvasRef.current?.getBoundingClientRect(); return r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 }; };
-    return {
-      has: (space: OmniSpace) => useStore.getState().sessions[sessionId]?.graph.nodes.some((n) => n.data.kind === 'ref' && n.data.type === 'space' && n.data.ref === space) ?? false,
-      onSpace: (space) => {
-        const c = center();
-        const pos = freePos({ x: c.x - 160, y: c.y }, { kind: 'ref', type: 'space', ref: space, title: space });
-        selectNodes([addOmniSpace(sessionId, space, pos).id]);
-      },
-      onSystem: (type) => {
-        const c = center();
-        const pos = freePos({ x: c.x - NODE_WIDTH / 2, y: c.y }, { kind: 'ref', type, ref: type, title: type });
-        selectNodes([addSystemNode(sessionId, { type, position: pos })]);
-      },
-    };
-  }, [omni, sessionId, rf, freePos]);
+  const omniEntries = useOmniEntries({ omni, sessionId, rf, canvasRef, freePos, selectNodes });
 
   const fileInput = useRef<HTMLInputElement>(null);
   const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
