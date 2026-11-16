@@ -47,6 +47,7 @@
 
 - [agente: variantes automáticas por entradas y ajustes confirmados](features/agente.md).
 - [agente: Auto, una tarjeta (ajustes dentro del plan, prompt adaptado al modelo)](features/agente-auto-tarjeta.md).
+- [agente: cambio de modelo (delicado)](features/agente-cambio-modelo.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
 - [apariencia: bases, resaltados y su selector en Ajustes](features/apariencia.md).
