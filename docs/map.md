@@ -55,7 +55,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/shell` | 35 | 24 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
-| `src/components/ui` | 24 | 16 |
+| `src/components/ui` | 24 | 17 |
 | `src/engine` | 67 | 334 |
 | `src/engine/agent` | 56 | 114 |
 | `src/engine/commands` | 7 | 11 |
@@ -69,7 +69,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 34 | 347 |
 | `src/store` | 17 | 250 |
 
-212 de 650 módulos no tienen ningún test que los importe directamente.
+211 de 650 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -88,7 +88,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
-- [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)

@@ -132,7 +132,10 @@ export async function saveAssetEdit(
     return { assets: { ...st.assets, [assetId]: updated } };
   });
   if (!updated) return null;
-  toast('Applied to original · Revertir restores the original', 'success');
+  toast('Applied to original', 'success', 5000, {
+    label: 'Revertir',
+    run: () => void revertAssetToOriginal(assetId),
+  });
   return updated;
 }
 

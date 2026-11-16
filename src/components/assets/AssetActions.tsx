@@ -23,6 +23,7 @@ import {
   Paperclip,
   PenTool,
   Rotate3d,
+  RotateCcw,
   Scissors,
   Send,
   Shuffle,
@@ -35,7 +36,7 @@ import {
 } from '../ui/icons';
 import { OPS, opsFor } from '../../engine/ops';
 import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
-import { beginAssetEdit } from '../../engine/assetRevisions';
+import { beginAssetEdit, revertAssetToOriginal } from '../../engine/assetRevisions';
 import { openAssetInDesigner } from '../../engine/design/actions';
 import type { OpId, SubjectKind } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -98,6 +99,23 @@ export function OpChip({ assetId, op, parentId, compact }: { assetId: string; op
   );
 }
 
+/** Menu action to restore an asset edited in place back to its preserved original revision. */
+export function RevertAssetMenuItem({ assetId, onDone }: { assetId?: string; onDone?: () => void }) {
+  const canRevert = useStore((s) => Boolean(assetId && s.assets[assetId]?.originalRevision));
+  if (!canRevert || !assetId) return null;
+  return (
+    <MenuItem
+      icon={RotateCcw}
+      label="Revertir"
+      tip="Revert to original"
+      onClick={() => {
+        onDone?.();
+        void revertAssetToOriginal(assetId);
+      }}
+    />
+  );
+}
+
 /** Operations available for an asset, by type: quick chips plus a menu with the rest. */
 /** `menuOnly`: no quick chips, every operation in the menu behind one "Tools ▾" button (overlaid on a card's picture). */
 export function AssetActions({ assetId, parentId, compact = false, showQuick = true, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean; menuOnly?: boolean }) {
@@ -109,7 +127,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
   const quick = showQuick && !menuOnly ? ops.filter((o) => o.quick) : [];
   const rest = ops.filter((o) => !quick.includes(o));
   // Only operations live here; sending, favorite and download have their own buttons (SendToMenu, card and viewer).
-  const hasMenu = rest.length > 0 || asset.kind === 'image';
+  const hasMenu = rest.length > 0 || asset.kind === 'image' || Boolean(asset.originalRevision);
   if (menuOnly && !hasMenu) return null;
 
   const close = () => {
@@ -180,6 +198,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
                 />
               </>
             ) : null}
+            <RevertAssetMenuItem assetId={assetId} onDone={close} />
           </div>
         ) : (
           <OpForm op={view} target={{ kind: 'asset', assetId, parentId }} onClose={close} onBack={() => setView('menu')} />

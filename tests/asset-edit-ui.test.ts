@@ -33,8 +33,9 @@ vi.mock('../src/engine/design/raster', () => ({
   strokeSegment: vi.fn(),
 }));
 
-import { AssetActions } from '../src/components/assets/AssetActions';
+import { AssetActions, RevertAssetMenuItem } from '../src/components/assets/AssetActions';
 import { SketchEditor } from '../src/components/assets/SketchEditor';
+import { Toasts } from '../src/components/ui/Toasts';
 import { subjectFromAsset } from '../src/engine/actions';
 import type { Asset } from '../src/engine/types';
 import { setUi, useStore } from '../src/store/store';
@@ -109,7 +110,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
 
   it('opens Sketch in paint mode on a working copy from AssetActions and offers Guardar como copia (default) or Aplicar al original', async () => {
     act(() => {
-      root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor)));
+      root.render(createElement('div', null, createElement(AssetActions, { assetId: 'hero' }), createElement(SketchEditor), createElement(Toasts)));
     });
 
     const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
@@ -117,6 +118,7 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     act(() => moreBtn.click());
 
     const menuButtons = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')];
+    expect(menuButtons.some((b) => b.textContent?.includes('Revertir'))).toBe(false);
     const editBtn = menuButtons.find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''));
     expect(editBtn).toBeTruthy();
     act(() => editBtn!.click());
@@ -177,6 +179,76 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     const rev = useStore.getState().assets.hero.originalRevision;
     expect(rev).toBeTruthy();
     expect(await blobs.get(rev!.assetId)?.text()).toBe('original-bytes');
+
+    // Toast includes a real Revertir action button
+    const toastRevertBtn = host.querySelector<HTMLButtonElement>('.toast-action');
+    expect(toastRevertBtn?.textContent).toBe('Revertir');
+
+    // Revertir appears in the image menu after apply, restores the original, and disappears
+    act(() => moreBtn.click());
+    const revertMenuBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
+      .find((b) => b.textContent?.includes('Revertir'));
+    expect(revertMenuBtn).toBeTruthy();
+    await act(async () => {
+      revertMenuBtn!.click();
+      await flush();
+    });
+    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+
+    act(() => moreBtn.click());
+    expect(
+      [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
+        .some((b) => b.textContent?.includes('Revertir')),
+    ).toBe(false);
+
+    cleanup();
+  });
+
+  it('restores the original via the toast Revertir button and hides RevertAssetMenuItem when nothing to revert', async () => {
+    act(() => {
+      root.render(
+        createElement(
+          'div',
+          null,
+          createElement(AssetActions, { assetId: 'hero' }),
+          createElement(RevertAssetMenuItem, { assetId: 'hero' }),
+          createElement(SketchEditor),
+          createElement(Toasts),
+        ),
+      );
+    });
+    expect(host.textContent).not.toContain('Revertir');
+
+    const moreBtn = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!;
+    moreBtn.getBoundingClientRect = () => ({ left: 100, top: 100, right: 130, bottom: 130, width: 30, height: 30, x: 100, y: 100, toJSON() {} });
+    act(() => moreBtn.click());
+    const editBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Operations"] button')]
+      .find((b) => /paint/i.test(b.textContent ?? '') && !/region/i.test(b.textContent ?? ''))!;
+    act(() => editBtn.click());
+    await paintStroke();
+    const saveBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Sketch"] button')]
+      .find((b) => b.textContent === 'Save')!;
+    saveBtn.getBoundingClientRect = () => ({ left: 200, top: 20, right: 260, bottom: 50, width: 60, height: 30, x: 200, y: 20, toJSON() {} });
+    act(() => saveBtn.click());
+    const origBtn = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Save asset"] button')]
+      .find((b) => b.textContent?.includes('Aplicar al original'))!;
+    await act(async () => {
+      origBtn.click();
+      await flush();
+    });
+
+    const toastRevertBtn = host.querySelector<HTMLButtonElement>('.toast-action')!;
+    expect(toastRevertBtn).toBeTruthy();
+    expect(toastRevertBtn.textContent).toBe('Revertir');
+    await act(async () => {
+      toastRevertBtn.click();
+      await flush();
+    });
+    expect(useStore.getState().assets.hero.originalRevision).toBeUndefined();
+    expect(await blobs.get('hero')?.text()).toBe('original-bytes');
+    expect(host.querySelector('.toast-action')).toBeNull();
+    expect(host.textContent).not.toContain('Revertir');
 
     cleanup();
   });
