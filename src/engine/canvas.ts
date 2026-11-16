@@ -18,7 +18,7 @@ export function canvasIndex(session: Session, generations: Record<string, Genera
   const graphGens = new Set<string>();
   for (const n of session.graph.nodes) {
     if ('generationId' in n.data && n.data.generationId) graphGens.add(n.data.generationId);
-    if (n.data.kind !== 'asset') continue;
+    if (n.data.kind !== 'asset' || n.omni) continue;
     if (n.data.assetId) inGraph.add(n.data.assetId);
     if (n.data.sketchAssetId) inGraph.add(n.data.sketchAssetId);
   }

@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, useConnection, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from '../ui/icons';
+import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip, Layers } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
@@ -24,12 +24,13 @@ import { OP_ICONS } from '../assets/AssetActions';
 import { AddNext, ResultPorts } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { KeyTools, PanelToggle } from './NodeBarExtras';
+import { LinkHandles, RefNode as SystemNode } from '../omni/RefNode';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. `panel`: the canvas shows the Selection panel, which holds the result's tools. */
 export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean };
 export type FlowNode = Node<FlowNodeData>;
 
-export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage } as const;
+export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage, ref: Layers } as const;
 
 /** `quiet`: a secondary input, shown only while a connection is being dragged (or once something is connected to it). */
 function PortHandle({ id, type, side, top, label, portType, quiet }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null; quiet?: boolean }) {
@@ -184,11 +185,11 @@ function NodeHistory({ node }: { node: GraphNode }) {
 function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
   const d = node.data;
   // A sketch replaces the result: it is what the card shows and what goes downstream.
-  const sketch = d.kind !== 'text' ? d.sketchAssetId : undefined;
+  const sketch = 'sketchAssetId' in d ? d.sketchAssetId : undefined;
   if (d.kind === 'asset') return { g: undefined, assetId: sketch ?? d.assetId ?? undefined, all: d.assetId ? [d.assetId] : [], sketch };
   const g = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
   const all = g?.status === 'done' ? g.assetIds : [];
-  const index = d.kind === 'text' ? 0 : d.outputIndex;
+  const index = 'outputIndex' in d ? d.outputIndex : 0;
   return { g, assetId: sketch ?? (all[Math.min(index, all.length - 1)] as string | undefined), all, sketch };
 }
 
@@ -766,7 +767,7 @@ function NodeTitle({ sessionId, node }: { sessionId: string; node: GraphNode }) 
   );
 }
 
-export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps<FlowNode>) {
+function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const { node, solo, panel: inPanel } = data;
   const assets = useStore((s) => s.assets);
   const sessionId = useSessionId();
@@ -797,6 +798,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
         // The prompt box already holds the prompt: its port shows only when connected or while connecting.
         <PortHandle key={p.id} id={p.id} type="target" side={Position.Left} top={`${((i + 1) / (shown.length + 1)) * 100}%`} label={connecting ? p.label : undefined} portType={p.type} quiet={p.id === 'prompt' && !wired.has('prompt') && !connecting} />
       ))}
+      {connecting ? <LinkHandles /> : null}
       <div className={`nc ${kindClass} ${selected ? 'is-selected' : ''}`}>
         <div className={`nc-label ${d.kind === 'text' ? 'nc-text-grip' : ''}`}>
           {d.kind === 'text' ? <GripVertical size={14} aria-hidden="true" /> : null}
@@ -826,4 +828,9 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
       {out ? <><AddNext node={node} out={out} /><ResultPorts node={node} out={out} /></> : null}
     </>
   );
+}
+
+/** Creative and system nodes share this entry. */
+export const StudioNode = memo(function StudioNode(props: NodeProps<FlowNode>) {
+  return props.data.node.data.kind === 'ref' ? <SystemNode {...props} /> : <CreativeNode {...props} />;
 });

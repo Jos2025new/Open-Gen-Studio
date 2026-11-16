@@ -37,14 +37,14 @@ describe('the node actions as commands', () => {
     expect(Object.keys(NODES_ACTIONS).sort()).toEqual([...declared, ...reexported].sort());
     const ids = new Set(Object.values(NODES_ACTIONS).filter((to) => !to.startsWith('- ')));
     for (const id of ids) expect(command(id), id).toBeDefined();
-    const nodes = allCommands().filter((c) => c.id.startsWith('nodes.')).map((c) => c.id);
+    const nodes = allCommands().filter((c) => c.id.startsWith('nodes.') && !c.id.startsWith('nodes.system.')).map((c) => c.id);
     expect(nodes.sort()).toEqual([...ids].sort());
     expect(nodes).toHaveLength(21);
   });
 
   it('are found by the automatic index, each with a strict schema and a session target', () => {
     expect(collected.loaded.map((l) => l.file)).toEqual(expect.arrayContaining(['/src/engine/flow/commands.ts']));
-    for (const spec of allCommands().filter((c) => c.id.startsWith('nodes.'))) {
+    for (const spec of allCommands().filter((c) => c.id.startsWith('nodes.') && !c.id.startsWith('nodes.system.'))) {
       expect(argsSchema(spec), spec.id).toMatchObject({ type: 'object', additionalProperties: false });
       if (spec.id !== 'nodes.node.new_data') expect(spec.needs, spec.id).toContain('session');
     }

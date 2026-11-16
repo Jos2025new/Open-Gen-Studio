@@ -12,4 +12,17 @@ export default [{
     ['src/styles/node.css', '.node-connection-preview path'],
   ],
   tests: ['tests/connected-node-menu.test.ts', 'tests/node-connection-drop.test.ts', 'tests/add-connected-node.test.ts'],
+}, {
+  id: 'system-nodes-and-link-classes',
+  what: 'Chat, agente, modelos, docs y Spaces son nodos `ref` que apuntan a sus datos (sin copiar). Los enlaces tienen clase (data, ref, control) y `both` solo en ref y control; el orden de ejecución sale de los enlaces data. Cambiar un lado cambia los demás.',
+  sides: [
+    ['src/engine/graphTypes.ts', 'export interface RefNodeData'],
+    ['src/engine/nodes/spec.ts', 'export const SYSTEM_NODE_TYPES'],
+    ['src/engine/nodes/system.ts', 'export function ensureSystemNodes'],
+    ['src/engine/nodes/commands.ts', 'nodes.system.link'],
+    ['src/engine/flow/graph.ts', 'export function executionOrder'],
+    ['src/components/node/SystemNode.tsx', 'export function linkClassProps'],
+    ['src/styles/node-system.css', '.edge-link-control'],
+  ],
+  tests: ['tests/system-nodes.test.ts'],
 }];

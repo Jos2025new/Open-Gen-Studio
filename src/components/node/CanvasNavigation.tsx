@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
 import { Hand, LayoutDashboard, Scissors, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from '../ui/icons';
-import { setGraph, toast, useStore } from '../../store/store';
+import { reconcileDeletionNotices, setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem, lockedNodes } from '../../engine/flow/locks';
 import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } from '../../engine/flow/history';
 import { nodeOutputAsset } from '../../engine/flow/graph';
@@ -67,6 +67,7 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
       const problem = graphEditProblem(sessionId, graph, next);
       if (problem) { toast(problem, 'error'); return false; }
       setGraph(sessionId, () => next);
+      reconcileDeletionNotices(sessionId);
       return true;
     });
     history.close();

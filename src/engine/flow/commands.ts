@@ -11,7 +11,10 @@ import { edgeRef, findNode, graphOf, hasTarget, nodeCommand, nodeOf, nodeRef } f
 /* The node graph's actions as commands (ADR 0030). Each wraps the action the interface already calls. */
 
 const none = z.object({}).strict();
-const kind = z.enum(['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset']);
+const kind = z.enum(['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset', 'ref']);
+const sysType = z.enum(['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset']);
+const linkKind = z.enum(['data', 'ref', 'control']);
+const attachMode = z.enum(['wired', 'docked', 'grouped', 'merged']);
 const op = z.enum(OP_IDS as [OpId, ...OpId[]]);
 const title = z.string().min(1).max(200);
 const asset = z.string().min(1).max(160);
@@ -38,12 +41,30 @@ const toolNode = z
   .object({ kind: z.literal('tool'), title, op, params: json, generationId: z.string().optional(), outputIndex: z.number().int().min(0), sketchAssetId: z.string().optional() })
   .strict();
 const assetNode = z.object({ kind: z.literal('asset'), title, assetId: z.string().nullable(), sketchAssetId: z.string().optional() }).strict();
+const refNode = z
+  .object({
+    kind: z.literal('ref'),
+    type: sysType,
+    ref: z.string().min(1),
+    title,
+    attachMode: attachMode.optional(),
+    dockedTo: z.string().optional(),
+    mergedModels: z.array(z.string()).optional(),
+    mediaKind: z.enum(['llm', 'image', 'video', 'audio', 'model3d']).optional(),
+  })
+  .strict();
 /** A node's data as the actions take it. The graph stores plain JSON; settings and params keep their own shape. */
-const nodeData = z.discriminatedUnion('kind', [textNode, genNode, toolNode, assetNode]);
+const nodeData = z.discriminatedUnion('kind', [textNode, genNode, toolNode, assetNode, refNode]);
 
 const nodePatch = z
   .object({
     kind: kind.optional(),
+    type: sysType.optional(),
+    ref: z.string().optional(),
+    attachMode: attachMode.optional(),
+    dockedTo: z.string().optional(),
+    mergedModels: z.array(z.string()).optional(),
+    mediaKind: z.enum(['llm', 'image', 'video', 'audio', 'model3d']).optional(),
     title: title.optional(),
     text: z.string().optional(),
     prompt: z.string().optional(),
@@ -61,7 +82,18 @@ const nodePatch = z
   .strict();
 
 const storedNode = z.object({ id: z.string().min(1), position: point, data: nodeData, planId: z.string().optional() }).strict();
-const storedEdge = z.object({ id: z.string().min(1), source: z.string().min(1), target: z.string().min(1), targetHandle: z.string(), sourceHandle: z.string(), outputIndex: z.number().int().optional() }).strict();
+const storedEdge = z
+  .object({
+    id: z.string().min(1),
+    source: z.string().min(1),
+    target: z.string().min(1),
+    targetHandle: z.string(),
+    sourceHandle: z.string(),
+    outputIndex: z.number().int().optional(),
+    kind: linkKind.optional(),
+    both: z.boolean().optional(),
+  })
+  .strict();
 
 function throwIf(error: string | null): void {
   if (error) throw new Error(error);
@@ -76,11 +108,11 @@ export const commands = [
   defineCommand({
     id: 'nodes.node.new_data',
     title: 'Default node data',
-    description: 'The data a new node starts with for this kind (tool: op; asset: assetId). Feed it to nodes.node.add.',
-    args: z.object({ kind, op: op.optional(), assetId: asset.optional() }).strict(),
+    description: 'The data a new node starts with for this kind (tool: op; asset: assetId; ref: type, ref). Feed it to nodes.node.add.',
+    args: z.object({ kind, op: op.optional(), assetId: asset.optional(), type: sysType.optional(), ref: z.string().optional() }).strict(),
     effect: 'read',
     debt: 'Reads the composer\'s current model and settings for the defaults.',
-    run: (_ctx, args) => A.newNodeData(args.kind, { op: args.op, assetId: args.assetId }) as GraphNodeData,
+    run: (_ctx, args) => A.newNodeData(args.kind, { op: args.op, assetId: args.assetId, type: args.type, ref: args.ref }) as GraphNodeData,
   }),
   nodeCommand({
     id: 'nodes.node.add',
@@ -200,7 +232,8 @@ export const commands = [
     available: (ctx, args) => {
       const target = hasTarget(ctx, args);
       if (target !== true || !args?.node) return target;
-      return findNode(ctx.on, args.node)?.data.kind !== 'text' ? true : 'A text node has no result to paint over.';
+      const k = findNode(ctx.on, args.node)?.data.kind;
+      return k !== 'text' && k !== 'ref' ? true : 'A text node has no result to paint over.';
     },
     run: (on, args) => {
       A.setSketch(on.session, args.node, args.asset ?? undefined);
@@ -246,12 +279,30 @@ export const commands = [
   nodeCommand({
     id: 'nodes.edge.connect',
     title: 'Connect nodes',
-    description: 'Connects a source to a target input port (target_handle); an occupied single-input port is replaced. Returns {edge}.',
-    args: z.object({ source: nodeRef, target: nodeRef, target_handle: z.string().min(1).max(80).nullable(), source_handle: z.string().min(1).max(80).nullable().optional() }).strict(),
+    description: 'Connects a source to a target input port (target_handle) with optional link class (data, ref, control) and bidirectional flag (both); an occupied single-input port is replaced. Returns {edge}.',
+    args: z
+      .object({
+        source: nodeRef,
+        target: nodeRef,
+        target_handle: z.string().min(1).max(80).nullable(),
+        source_handle: z.string().min(1).max(80).nullable().optional(),
+        kind: linkKind.optional(),
+        both: z.boolean().optional(),
+      })
+      .strict(),
     effect: 'write',
     run: (on, args) => {
       const before = new Set(graphOf(on).edges.map((e) => e.id));
-      throwIf(A.connectNodes(on.session, { source: args.source, target: args.target, targetHandle: args.target_handle, sourceHandle: args.source_handle ?? null }));
+      throwIf(
+        A.connectNodes(on.session, {
+          source: args.source,
+          target: args.target,
+          targetHandle: args.target_handle,
+          sourceHandle: args.source_handle ?? null,
+          kind: args.kind,
+          both: args.both,
+        }),
+      );
       return { edge: edgeAfter(on, before) };
     },
   }),

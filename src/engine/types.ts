@@ -726,84 +726,9 @@ export type FeedItem =
 // ---------------------------------------------------------------------------
 // Node graph
 
-export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset';
-export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
-
-export interface TextNodeData {
-  kind: 'text';
-  title: string;
-  text: string;
-}
-
-export interface GenNodeData {
-  /** Plan-local identities retain their source node IDs when materialized. */
-  subjects?: PlanSubject[];
-  kind: 'image' | 'video' | 'audio' | 'model3d';
-  title: string;
-  prompt: string;
-  modelRef: string;
-  settings: GenSettings;
-  generationId?: string;
-  outputIndex: number;
-  /** Painted-over copy of the result (Sketch): replaces it downstream; clearing restores the original. */
-  sketchAssetId?: string;
-  /** Audio nodes whose model answers with text (MiniMax Lyrics): the output port is text. Kept with `modelRef`. */
-  textOutput?: boolean;
-}
-
-export interface ToolNodeData {
-  kind: 'tool';
-  title: string;
-  op: OpId;
-  params: Record<string, AdvancedValue>;
-  generationId?: string;
-  outputIndex: number;
-  /** Painted-over copy of the result (Sketch), as above. */
-  sketchAssetId?: string;
-}
-
-export interface AssetNodeData {
-  kind: 'asset';
-  title: string;
-  assetId: string | null;
-  /** Painted-over copy of the result (Sketch), as above. */
-  sketchAssetId?: string;
-}
-
-export type GraphNodeData = TextNodeData | GenNodeData | ToolNodeData | AssetNodeData;
-
-export interface GraphNode {
-  id: string;
-  position: { x: number; y: number };
-  data: GraphNodeData;
-  planId?: string;
-}
-
-export interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  /** Target port: prompt, ref, first, last, input. */
-  targetHandle: string;
-  sourceHandle: string;
-  outputIndex?: number;
-}
-
-/** A named frame around some nodes (each node is in one group at most). */
-export interface GraphGroup {
-  id: string;
-  title: string;
-  nodeIds: string[];
-  /** Optional background tint (hex); none by default. */
-  color?: string;
-}
-
-export interface Graph {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  groups?: GraphGroup[];
-  viewport?: { x: number; y: number; zoom: number };
-}
+// The node graph types live in graphTypes.ts (types.ts is over the size limit and may not grow).
+import type { Graph, GraphEdge, GraphNode } from './graphTypes';
+export type { NodeKind, PortType, LinkKind, SystemNodeType, ModelAttachMode, PortSpec, NodeTypeSpec, TextNodeData, GenNodeData, ToolNodeData, AssetNodeData, RefNodeData, GraphNodeData, GraphNode, GraphEdge, GraphGroup, Graph } from './graphTypes';
 
 // ---------------------------------------------------------------------------
 // Designer

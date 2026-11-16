@@ -1,4 +1,4 @@
-import { Box, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, type LucideIcon } from '../ui/icons';
+import { Box, Layers, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, type LucideIcon } from '../ui/icons';
 import type { AssetKind, ComposerMode, OpId, Workspace } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
 import { newSession, setComposer, setUi } from '../../store/store';
@@ -13,6 +13,9 @@ export const SPACES: SpaceItem[] = [
   { id: 'canvas', label: 'Canvas', hint: 'Connected flows of cards', icon: Workflow, workspace: 'node' },
   { id: 'designer', label: 'Designer', hint: 'Layers: raster, vector and text', icon: PenTool, workspace: 'designer' },
 ];
+
+/** The omnicanvas sits next to the three Spaces: the session's parts as nodes. */
+export const OMNI_ITEM = { id: 'omni', label: 'Omnicanvas', hint: 'The session as nodes: Spaces, chat, agent, models and assets', icon: Layers } as const;
 
 export interface CreateItem { id: 'image' | 'video' | 'audio' | 'model3d'; label: string; hint: string; icon: LucideIcon; kind: AssetKind; mode: ComposerMode; soon?: boolean }
 export const CREATE: CreateItem[] = [
@@ -43,7 +46,12 @@ export function openHome(): void { setUi({ home: true, space: undefined, panel: 
 export function openLibrary(): void { setUi({ home: true, space: undefined, panel: null, homeTab: 'gallery' }); }
 export function openSpace(item: SpaceItem): void {
   if (item.id === 'studio') setComposer({ mode: 'agent' });
-  setUi({ workspace: item.workspace, home: false, space: undefined });
+  setUi({ workspace: item.workspace, home: false, space: undefined, omni: false });
+}
+/** Open the omnicanvas over the current workspace; the agent keeps its mode. */
+export function openOmni(): void {
+  setComposer({ mode: 'agent' });
+  setUi({ omni: true, home: false, space: undefined, panel: null });
 }
 export function openCreate(item: CreateItem): void {
   if (item.soon) return;
@@ -54,13 +62,13 @@ export function openCreate(item: CreateItem): void {
 /** "+ New canvas" on Home: always a new session. Home closes in the same tick as the session change. */
 export function newCanvas(): void {
   newSession();
-  setUi({ workspace: 'node', home: false, space: undefined });
+  setUi({ workspace: 'node', home: false, space: undefined, omni: false });
 }
 /** "+ New design": a new session with one square document, opened in Designer. */
 export function newDesign(): void {
   const id = newSession();
   newBlankDoc(id, DOC_PRESETS[0]);
-  setUi({ workspace: 'designer', home: false, space: undefined });
+  setUi({ workspace: 'designer', home: false, space: undefined, omni: false });
 }
 export const ALL_TOOLS: ToolItem[] = [...TOOLS_MAIN, ...TOOLS_MORE];
 /** An operation opens the Tools space with it selected; the input asset is chosen there. */

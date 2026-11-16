@@ -454,7 +454,7 @@ export async function regenerate(generationId: string): Promise<void> {
   // Node generations update their node; everything else appears in the conversation.
   const node = session?.graph.nodes.find((n) => runsGeneration(n.data) && n.data.generationId === g.id);
   if (node) {
-    if (node.data.kind !== 'text' && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
+    if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
     setGraph(g.sessionId, (gr) => ({ ...gr, nodes: gr.nodes.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, generationId: next.id, sketchAssetId: undefined } as GraphNode['data'] } : n)) }));
   } else {
     appendFeed(g.sessionId, { ...feedBase('chat'), type: 'generation', generationId: next.id });

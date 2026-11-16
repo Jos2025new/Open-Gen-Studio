@@ -74,7 +74,7 @@ export function SessionsPanel() {
       switch (sort.by) {
         case 'mode': return sessionMode(x, st);
         case 'gens': return st?.gens || undefined;
-        case 'nodes': return x.graph.nodes.length || undefined;
+        case 'nodes': return x.graph.nodes.filter((n) => n.data?.kind !== 'ref' && !n.omni).length || undefined;
         case 'designs': return x.docs.length || undefined;
         case 'spend': return st?.spend || undefined;
         default: return undefined;
@@ -113,7 +113,7 @@ export function SessionsPanel() {
   const picked = list.filter((x) => selected.has(x.id));
   const allHidden = picked.length > 0 && picked.every((x) => x.userHidden);
   const allPinned = picked.length > 0 && picked.every((x) => x.pinned);
-  const isEmpty = (x: Session) => !x.feed.length && !x.graph.nodes.length && !x.docs.some((d) => d.layers.length) && !stats.get(x.id)?.gens && !stats.get(x.id)?.assets.length;
+  const isEmpty = (x: Session) => !x.feed.length && !x.graph.nodes.some((n) => n.data?.kind !== 'ref' && !n.omni) && !x.docs.some((d) => d.layers.length) && !stats.get(x.id)?.gens && !stats.get(x.id)?.assets.length;
 
   // Pinned sessions stay on top as their own group; the rest are grouped by date when sorted by date.
   const groups = useMemo(() => {

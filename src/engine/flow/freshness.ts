@@ -23,7 +23,7 @@ export interface RequestContext { schemas?: Record<string, ModelSchema>; operati
 export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<string, Generation>, library: Subject[] = [], ctx: RequestContext = {}) {
   const d = node.data;
   const previous = 'generationId' in d && d.generationId ? generations[d.generationId] : undefined;
-  const incoming = graph.edges.filter(e => e.target === node.id).map(e => {
+  const incoming = graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === node.id).map(e => {
     const src = graph.nodes.find(n => n.id === e.source);
     const data = src?.data;
     const gen = data && 'generationId' in data && data.generationId ? generations[data.generationId] : undefined;

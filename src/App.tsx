@@ -15,6 +15,7 @@ import { Lightbox } from './components/assets/Lightbox';
 import { SketchEditor } from './components/assets/SketchEditor';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { NodeWorkspace } from './components/node/NodeWorkspace';
+import { OmniWorkspace } from './components/omni/OmniWorkspace';
 import { DesignerWorkspace } from './components/designer/DesignerWorkspace';
 import { Composer } from './components/composer/Composer';
 import { Toasts } from './components/ui/Toasts';
@@ -33,6 +34,7 @@ export function App() {
   const workspace = useStore((s) => s.ui.workspace);
   const home = useStore((s) => !!s.ui.home);
   const space = useStore((s) => s.ui.space);
+  const omni = useStore((s) => !!s.ui.omni);
   const board = useStudioBoard();
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
 
@@ -74,10 +76,12 @@ export function App() {
         <main className="main">
           <TopBar slotRef={setSlot} />
           <SaveGuardBanner />
-          <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''} ${workspace === 'chat' && board.open ? 'has-studio-board' : ''}`} style={workspace === 'chat' ? ({ ['--studio-w' as string]: `${board.open ? board.width : 0}px` }) : undefined}>
-            {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
-            <Composer />
-            {workspace === 'chat' ? <StudioBoard /> : null}
+          <div className={`workspace ws-${omni ? 'node' : workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''} ${omni ? 'is-omni' : ''} ${!omni && workspace === 'chat' && board.open ? 'has-studio-board' : ''}`} style={!omni && workspace === 'chat' ? ({ ['--studio-w' as string]: `${board.open ? board.width : 0}px` }) : undefined}>
+            {omni ? <OmniWorkspace /> : <>
+              {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
+              <Composer />
+              {workspace === 'chat' ? <StudioBoard /> : null}
+            </>}
             {home ? <HomeView /> : space === 'create' ? <CreateSpace /> : space === 'tools' ? <ToolsSpace /> : null}
           </div>
         </main>

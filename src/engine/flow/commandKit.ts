@@ -47,11 +47,15 @@ const strings = (...values: unknown[]): string[] => values.flatMap((v) => (Array
 
 /** The session exists and, when the call names nodes or edges, so do they. */
 export function hasTarget(ctx: CommandContext, args?: Named): Availability {
-  const graph = useStore.getState().sessions[ctx.on.session ?? '']?.graph;
+  const sessionId = ctx.on.session ?? '';
+  if (!useStore.getState().sessions[sessionId]) return NO_SESSION;
+  const mentionedNodes = strings(args?.node, args?.source, args?.target, args?.nodes, args?.targets);
+  const mentionedEdges = strings(args?.edge, args?.edges);
+  const graph = useStore.getState().sessions[sessionId]?.graph;
   if (!graph) return NO_SESSION;
-  const missingNode = strings(args?.node, args?.source, args?.target, args?.nodes, args?.targets).find((id) => !graph.nodes.some((n) => n.id === id));
-  if (missingNode) return `No such node: ${missingNode}.`;
-  const missingEdge = strings(args?.edge, args?.edges).find((id) => !graph.edges.some((e) => e.id === id));
+  const missingNode = mentionedNodes.find((id) => !graph.nodes.some((n) => n.id === id));
+  if (missingNode) return missingNode.startsWith('sys_') && !graph.nodes.some((n) => n.data.kind === 'ref') ? 'The system nodes are not on the canvas yet: run nodes.system.ensure first.' : `No such node: ${missingNode}.`;
+  const missingEdge = mentionedEdges.find((id) => !graph.edges.some((e) => e.id === id));
   return missingEdge ? `No such edge: ${missingEdge}.` : true;
 }
 

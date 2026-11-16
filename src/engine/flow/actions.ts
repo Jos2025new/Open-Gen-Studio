@@ -12,7 +12,8 @@ import { uid } from '../../lib/id';
 import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
-import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
+import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, MediaKind, OpId, SystemNodeType } from '../types';
+import { SYSTEM_NODE_TYPES } from '../nodes/system';
 import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
 import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
@@ -35,7 +36,7 @@ export function addAssetAsNode(sessionId: string, assetId: string, position: { x
   return id;
 }
 
-export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; assetId?: string } = {}): GraphNodeData {
+export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; assetId?: string; type?: SystemNodeType; ref?: string } = {}): GraphNodeData {
   const st = get();
   switch (kind) {
     case 'text':
@@ -55,6 +56,22 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
     }
     case 'asset':
       return { kind: 'asset', title: 'Asset', assetId: opts.assetId ?? null };
+    case 'ref': {
+      const type = opts.type ?? 'chat';
+      const session = st.sessions[st.activeSessionId];
+      const defaults: Record<SystemNodeType, string> = {
+        chat: st.activeSessionId,
+        agent: st.activeSessionId,
+        session: st.activeSessionId,
+        model: st.composer.image.modelRef,
+        provider: 'openrouter',
+        space: 'create',
+        'designer.doc': session?.activeDocId ?? session?.docs[0]?.id ?? 'active',
+        library: 'library',
+        toolset: 'toolset',
+      };
+      return { kind: 'ref', type, ref: opts.ref ?? defaults[type], title: SYSTEM_NODE_TYPES[type].title };
+    }
   }
 }
 
@@ -89,7 +106,12 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
   const groups = (g0: import('../types').Graph) => g0.groups?.map(gr => ({ ...gr, nodeIds: gr.nodeIds.filter(id => !drop.has(id)) })).filter(gr => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
   const error = editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)), ...(g.groups ? { groups: groups(g) } : {}) }));
-  if (!error && deleted.nodes.length) appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${deleted.nodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: deleted, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, 'node') } });
+  const galleryNodes = deleted.nodes.filter(n => n.data.kind !== 'ref');
+  if (!error && galleryNodes.length) {
+    const galleryIds = new Set(galleryNodes.map(n => n.id));
+    const galleryDeleted = galleryNodes.length === deleted.nodes.length ? deleted : { nodes: galleryNodes, edges: deleted.edges.filter(e => galleryIds.has(e.source) || galleryIds.has(e.target)) };
+    appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${galleryNodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: galleryDeleted, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, 'node') } });
+  }
   return error;
 }
 
@@ -121,7 +143,7 @@ export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenN
 /** Set (or clear, with `undefined`) a node's painted-over copy. The copy it replaces is deleted. */
 export function setSketch(sessionId: string, nodeId: string, assetId: string | undefined): void {
   const node = get().sessions[sessionId].graph.nodes.find((n) => n.id === nodeId);
-  if (!node || node.data.kind === 'text') return;
+  if (!node || node.data.kind === 'text' || node.data.kind === 'ref') return;
   const prev = node.data.sketchAssetId;
   if (patchNodeData(sessionId, nodeId, { sketchAssetId: assetId })) return;
   if (prev && prev !== assetId) deleteAssets([prev]);
@@ -174,15 +196,21 @@ export function renameNode(sessionId: string, nodeId: string, typed: string): vo
   if (asset && st.assets[asset]) useStore.setState((s0) => ({ assets: { ...s0.assets, [asset]: { ...s0.assets[asset], name } } }));
 }
 
-export function connectNodes(sessionId: string, c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null }): string | null {
+export function connectNodes(
+  sessionId: string,
+  c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
+): string | null {
   const st = get();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return 'No such session.';
   const err = connectionError(graph, st.assets, c);
   if (err) { toast(err, 'error'); return err; }
-  return editGraph(sessionId, g => connect(g, { ...c, targetHandle: c.targetHandle! }));
+  return editGraph(sessionId, g => connect(g, { ...c, targetHandle: c.targetHandle ?? c.kind ?? 'in' }));
 }
-export function tryConnect(sessionId: string, c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null }): boolean {
+export function tryConnect(
+  sessionId: string,
+  c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
+): boolean {
   return connectNodes(sessionId, c) === null;
 }
 export function disconnectEdges(sessionId: string, ids: string[]): string | null {
@@ -252,7 +280,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
     const subjects = n && 'subjects' in n.data ? (n.data.subjects ?? []).filter(s => !s.from.startsWith('asset:')).map(s => s.from.split('#')[0]) : [];
-    for (const source of [...graph.edges.filter(e => e.target === id).map(e => e.source), ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
+    for (const source of [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id).map(e => e.source), ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
   };
   run.runIds.forEach(visit);
   const errors = [...run.errors];
@@ -268,7 +296,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
       errors.push(...derivedRefErrors([ref]));
     }
     if (n.data.kind === 'asset' && (!n.data.assetId || !st.assets[n.data.sketchAssetId ?? n.data.assetId])) errors.push(`“${n.data.title}” needs an available asset.`);
-    if (n.data.kind !== 'text' && n.data.sketchAssetId && !st.assets[n.data.sketchAssetId]) errors.push(`“${n.data.title}”: the Sketch asset is missing.`);
+    if ('sketchAssetId' in n.data && n.data.sketchAssetId && !st.assets[n.data.sketchAssetId]) errors.push(`“${n.data.title}”: the Sketch asset is missing.`);
   }
   for (const step of run.steps) {
     for (const ref of step.kind === 'op' ? [step.input, ...Object.values(step.params).filter((v): v is string => typeof v === 'string' && v.startsWith('asset:'))] : step.kind === 'video' ? [step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((r): r is string => Boolean(r)) : 'refs' in step ? step.refs ?? [] : []) {
