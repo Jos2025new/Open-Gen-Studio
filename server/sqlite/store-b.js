@@ -17,84 +17,25 @@ import { join } from 'node:path';
 import { looksLost, sha256 } from '../save-guard.js';
 import { assembleText } from '../store-v2.js';
 import { sanitizeKeysInText } from '../keys.js';
-import { generateKeyBetween, generateNKeysBetween } from './fractional-index.mjs';
+import { computeOrderDiff, generateKeyBetween } from './fractional-index.mjs';
+import {
+  applyPosMoves,
+  buildCandidateOrder,
+  COLLS,
+  JOURNAL_ALLOW,
+  migrateSchema,
+  pickAllowedMeta,
+  SAFE_ID,
+  SCHEMA_VERSION,
+  validateOrderMoves,
+} from './store-b-helpers.js';
 
-export const SCHEMA_VERSION = 1;
-const SAFE_ID = /^[A-Za-z0-9_-]+$/;
+export { SCHEMA_VERSION };
 const KEPT = 20;
 const SNAPSHOT_EVERY_MS = 10 * 60_000;
 const JOURNAL_LIMIT = 64 * 1024 * 1024;
-const COLLS = ['generations', 'assets', 'library'];
 const json = (v) => JSON.stringify(v);
 const fpOf = (text) => createHash('md5').update(text).digest('base64url').slice(0, 11);
-
-const JOURNAL_ALLOW = {
-  generations: ['id', 'sessionId', 'kind', 'modelRef', 'modelName', 'provider', 'origin', 'status', 'createdAt', 'finishedAt', 'usd'],
-  assets: ['id', 'kind', 'mime', 'width', 'height', 'duration', 'sessionId', 'generationId', 'origin', 'copiedFromAssetId', 'revertedAt', 'createdAt'],
-  library: ['id', 'kind', 'frontalAssetId', 'videoAssetId', 'revertedAt'],
-  spend: ['id', 'at', 'usd', 'estimated', 'category', 'provider', 'model', 'sessionId'],
-  event: [
-    'id', 'at', 'ts', 'kind', 'coll', 'sessionId', 'generationId', 'assetId', 'copiedFromAssetId',
-    'frontalAssetId', 'videoAssetId', 'revertedAt', 'createdAt', 'finishedAt', 'mime', 'width', 'height',
-    'duration', 'origin', 'status', 'provider', 'model', 'modelRef', 'modelName', 'category', 'usd',
-    'estimated', 'generations', 'assets', 'library',
-  ],
-};
-
-function pickAllowedMeta(raw, keys) {
-  let obj = raw;
-  if (typeof raw === 'string') {
-    try { obj = JSON.parse(raw); } catch { return '{}'; }
-  }
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return '{}';
-  const out = {};
-  for (const k of keys) {
-    if (!Object.hasOwn(obj, k)) continue;
-    const v = obj[k];
-    if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') out[k] = v;
-  }
-  return json(out);
-}
-
-const MIGRATION_1 = `
-CREATE TABLE head (id INTEGER PRIMARY KEY CHECK (id = 1), saved_at INTEGER NOT NULL, version INTEGER NOT NULL,
-  order_json TEXT NOT NULL, spend_len INTEGER NOT NULL, spend_last INTEGER NOT NULL);
-CREATE TABLE small (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL);
-CREATE TABLE sessions (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-CREATE TABLE records (coll TEXT NOT NULL, id TEXT NOT NULL, pos TEXT NOT NULL, meta TEXT NOT NULL, fp TEXT NOT NULL, PRIMARY KEY (coll, id));
-CREATE INDEX records_pos ON records (coll, pos);
-CREATE TABLE gen_history (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, ts INTEGER NOT NULL, meta TEXT NOT NULL, deleted INTEGER NOT NULL);
-CREATE TABLE spend (seq INTEGER PRIMARY KEY AUTOINCREMENT, meta TEXT NOT NULL);
-CREATE TABLE removed_sessions (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL, removed_at INTEGER NOT NULL, json TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS asset_revisions (seq INTEGER PRIMARY KEY AUTOINCREMENT, asset_id TEXT NOT NULL, ts INTEGER NOT NULL, kind TEXT NOT NULL, meta TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS asset_revisions_asset ON asset_revisions (asset_id, seq);
-CREATE TABLE IF NOT EXISTS event_journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, meta TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS event_journal_kind ON event_journal (kind, seq);
-CREATE TABLE IF NOT EXISTS commit_ack (id INTEGER PRIMARY KEY CHECK (id = 1), commit_id TEXT NOT NULL, saved_at INTEGER NOT NULL);
-`;
-
-const PHASE4_TABLES = `
-CREATE TABLE IF NOT EXISTS asset_revisions (seq INTEGER PRIMARY KEY AUTOINCREMENT, asset_id TEXT NOT NULL, ts INTEGER NOT NULL, kind TEXT NOT NULL, meta TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS asset_revisions_asset ON asset_revisions (asset_id, seq);
-CREATE TABLE IF NOT EXISTS event_journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, meta TEXT NOT NULL);
-CREATE INDEX IF NOT EXISTS event_journal_kind ON event_journal (kind, seq);
-CREATE TABLE IF NOT EXISTS commit_ack (id INTEGER PRIMARY KEY CHECK (id = 1), commit_id TEXT NOT NULL, saved_at INTEGER NOT NULL);
-`;
-
-function migrate(db) {
-  const v = db.prepare('PRAGMA user_version').get().user_version;
-  if (v > SCHEMA_VERSION) throw new Error(`store written by a newer version (${v})`);
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    if (db.prepare('PRAGMA user_version').get().user_version === 0) {
-      db.exec(MIGRATION_1);
-      db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-    } else {
-      db.exec(PHASE4_TABLES);
-    }
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
-}
 
 export function createStoreB(dir, opts = {}) {
   mkdirSync(dir, { recursive: true });
@@ -102,7 +43,7 @@ export function createStoreB(dir, opts = {}) {
   const backups = join(dir, 'backups');
   const db = new DatabaseSync(file);
   db.exec(`PRAGMA journal_mode = WAL; PRAGMA synchronous = ${opts.synchronous ?? 'FULL'}; PRAGMA busy_timeout = 5000; PRAGMA journal_size_limit = ${JOURNAL_LIMIT};`);
-  migrate(db);
+  migrateSchema(db);
   const q = {
     headGet: db.prepare('SELECT saved_at, version, order_json, spend_len, spend_last FROM head WHERE id = 1'),
     headPut: db.prepare('INSERT OR REPLACE INTO head (id, saved_at, version, order_json, spend_len, spend_last) VALUES (1, ?, ?, ?, ?, ?)'),
@@ -111,8 +52,15 @@ export function createStoreB(dir, opts = {}) {
     smallGet: db.prepare('SELECT json FROM small WHERE id = 1'),
     smallPut: db.prepare('INSERT OR REPLACE INTO small (id, json) VALUES (1, ?)'),
     sessGet: db.prepare('SELECT json FROM sessions WHERE id = ?'),
+    sessPos: db.prepare('SELECT pos FROM sessions WHERE id = ?'),
+    sessMax: db.prepare('SELECT pos FROM sessions ORDER BY pos DESC LIMIT 1'),
+    sessCount: db.prepare('SELECT COUNT(*) AS n FROM sessions'),
+    sessOrder: db.prepare('SELECT id FROM sessions ORDER BY pos'),
+    sessAll: db.prepare('SELECT id, json FROM sessions ORDER BY pos'),
     sessIds: db.prepare('SELECT id FROM sessions'),
-    sessPut: db.prepare('INSERT INTO sessions (id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json'),
+    sessIns: db.prepare('INSERT INTO sessions (id, pos, json) VALUES (?, ?, ?)'),
+    sessUpd: db.prepare('UPDATE sessions SET json = ? WHERE id = ?'),
+    sessPosUpd: db.prepare('UPDATE sessions SET pos = ? WHERE id = ?'),
     sessDel: db.prepare('DELETE FROM sessions WHERE id = ?'),
     removedPut: db.prepare('INSERT INTO removed_sessions (id, removed_at, json) VALUES (?, ?, ?)'),
     bodies: db.prepare(`SELECT coll, group_concat(piece, ',') AS body FROM
@@ -155,13 +103,10 @@ export function createStoreB(dir, opts = {}) {
     const bodies = Object.fromEntries(q.bodies.all().map((r) => [r.coll, r.body ?? '']));
     const inner = smallText.slice(1, -1);
     const globals = `{${inner}${inner ? ',' : ''}"generations":{${bodies.generations ?? ''}},"assets":{${bodies.assets ?? ''}},"library":[${bodies.library ?? ''}],"spendLog":[${spendText(h)}]}`;
-    const order = JSON.parse(h.order_json);
+    const sessRows = q.sessAll.all();
+    const order = [];
     const sessions = {};
-    for (const id of order) {
-      const row = q.sessGet.get(id);
-      if (!row) throw new Error(`store corrupt: session ${id} is in the order but not in the table`);
-      sessions[id] = row.json;
-    }
+    for (const r of sessRows) { order.push(r.id); sessions[r.id] = r.json; }
     return assembleText({ savedAt: h.saved_at, version: h.version, globals, order, sessions });
   }
 
@@ -183,13 +128,10 @@ export function createStoreB(dir, opts = {}) {
     const spendTail = h.spend_len ? q.spendTail.all(h.spend_last, Math.min(spend, h.spend_len)).reverse().map((r) => r.meta).join(',') : '';
     const inner = smallText.slice(1, -1);
     const globals = `{${inner}${inner ? ',' : ''}"generations":{${part.generations.text}},"assets":{${part.assets.text}},"library":[${part.library.text}],"spendLog":[${spendTail}]}`;
-    const order = JSON.parse(h.order_json);
+    const sessRows = q.sessAll.all();
+    const order = [];
     const sessions = {};
-    for (const id of order) {
-      const row = q.sessGet.get(id);
-      if (!row) throw new Error(`store corrupt: session ${id} is in the order but not in the table`);
-      sessions[id] = row.json;
-    }
+    for (const r of sessRows) { order.push(r.id); sessions[r.id] = r.json; }
     const text = assembleText({ savedAt: h.saved_at, version: h.version, globals, order, sessions });
     const meta = json({ spendLen: h.spend_len, spendLoaded: Math.min(spend, h.spend_len), generations: { total: part.generations.total, from: part.generations.from }, assets: { total: part.assets.total, from: part.assets.from } });
     return `${text.slice(0, -1)},"partial":${meta}}`;
@@ -213,6 +155,22 @@ export function createStoreB(dir, opts = {}) {
     writeFileSync(join(backups, name), payload, { mode: 0o600 });
     if (kind.startsWith('rejected') && recent?.file !== name) lastRejected.set(kind, { file: name, at: Date.now() });
     return name;
+  }
+
+  function removeSession(id) {
+    const text = q.sessGet.get(id).json;
+    const removed = join(backups, 'removed-sessions');
+    mkdirSync(removed, { recursive: true });
+    const nameId = id.length > 160 ? sha256(id) : id;
+    const backup = join(removed, `${Date.now()}-${randomUUID()}-${nameId}.json`);
+    const fd = openSync(backup, 'wx', 0o600);
+    try { writeFileSync(fd, text); fsyncSync(fd); } finally { closeSync(fd); }
+    for (const directory of [removed, backups, dir]) {
+      const folder = openSync(directory, 'r');
+      try { fsyncSync(folder); } finally { closeSync(folder); }
+    }
+    q.removedPut.run(id, Date.now(), text);
+    q.sessDel.run(id);
   }
 
   /** Applies the delta. Returns the new spend window. */
@@ -271,34 +229,13 @@ export function createStoreB(dir, opts = {}) {
         if (coll === 'assets') q.revPut.run(id, savedAt, 'delete', prevMeta);
         q.journalPut.run(savedAt, 'delete', id, pickAllowedMeta(prevMeta, JOURNAL_ALLOW[coll]));
       }
-      const moves = delta.order?.[coll];
-      if (Array.isArray(moves)) {
-        for (const m of moves) {
-          const valid = [];
-          for (const id of m.ids) {
-            stats.recGets++;
-            if (q.recFp.get(coll, id)) valid.push(id);
-          }
-          if (!valid.length) continue;
-          let afterPos = null;
-          if (m.after != null) {
-            stats.recGets++;
-            afterPos = q.recFp.get(coll, m.after)?.pos ?? null;
-            if (afterPos == null) throw new Error(`missing order anchor ${coll}/${m.after}`);
-          }
-          let beforePos = null;
-          if (m.before != null) {
-            stats.recGets++;
-            beforePos = q.recFp.get(coll, m.before)?.pos ?? null;
-            if (beforePos == null) throw new Error(`missing order anchor ${coll}/${m.before}`);
-          }
-          const keys = generateNKeysBetween(afterPos, beforePos, valid.length);
-          for (let i = 0; i < valid.length; i++) {
-            q.recPos.run(keys[i], coll, valid[i]);
-            stats.posUpdates++;
-          }
-        }
-      }
+      applyPosMoves(
+        delta.order?.[coll],
+        coll,
+        (id) => { stats.recGets++; return q.recFp.get(coll, id)?.pos ?? null; },
+        (pos, id) => q.recPos.run(pos, coll, id),
+        () => { stats.posUpdates++; },
+      );
     }
     let spend = { len: head?.spend_len ?? 0, last: head?.spend_last ?? 0 };
     if (delta.spend) {
@@ -344,13 +281,40 @@ export function createStoreB(dir, opts = {}) {
     if (current && current !== baseAt && !retriedHead) return { status: 409, reason: 'conflict', savedAt: current };
     if (!head && !(delta && delta.full)) return { status: 400, reason: 'the first commit must carry the whole state (delta.full)' };
 
-    for (const id of order) {
-      if (!Object.hasOwn(sessions, id) && !q.sessGet.get(id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+    const hasOrder = Array.isArray(order);
+    const delList = Array.isArray(delta?.del?.sessions) ? delta.del.sessions : [];
+    const delSet = new Set(delList);
+    if (hasOrder) {
+      for (const id of order) {
+        if (!Object.hasOwn(sessions, id) && !q.sessGet.get(id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+      }
+    } else if (Array.isArray(delta?.order?.sessions)) {
+      for (const m of delta.order.sessions) {
+        for (const id of [...m.ids, ...(m.after != null ? [m.after] : []), ...(m.before != null ? [m.before] : [])]) {
+          if (delSet.has(id) || (!Object.hasOwn(sessions, id) && !q.sessGet.get(id))) {
+            return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+          }
+        }
+      }
     }
-    const prevOrder = head ? JSON.parse(head.order_json) : [];
-    const had = prevOrder.length, has = order.length;
-    const total = had >= 2 && has < had / 2 ? { diskOrderHash: sha256(json(prevOrder)) } : null;
-    const totalOk = total && keep?.total?.diskOrderHash === total.diskOrderHash && keep.total.candidateOrderHash === sha256(json(order));
+    const had = head ? q.sessCount.get().n : 0;
+    let has;
+    if (hasOrder) {
+      has = order.length;
+    } else if (delta?.full) {
+      has = Object.keys(sessions).length;
+    } else {
+      let existingDel = 0, newCount = 0;
+      for (const id of delSet) if (!Object.hasOwn(sessions, id) && q.sessGet.get(id)) existingDel++;
+      for (const id of Object.keys(sessions)) if (!q.sessGet.get(id)) newCount++;
+      has = had - existingDel + newCount;
+    }
+    const prevOrder = had >= 2 && has < had / 2 ? q.sessOrder.all().map((r) => r.id) : null;
+    const total = prevOrder ? { diskOrderHash: sha256(json(prevOrder)) } : null;
+    const candidateOrder = total && keep?.total
+      ? (hasOrder ? order : buildCandidateOrder(prevOrder, sessions, delList, Boolean(delta?.full), delta?.order?.sessions))
+      : null;
+    const totalOk = Boolean(total && keep?.total?.diskOrderHash === total.diskOrderHash && keep.total.candidateOrderHash === sha256(json(candidateOrder)));
     const approved = new Map((Array.isArray(keep?.sessions) ? keep.sessions : []).map((k) => [k.sessionId, k]));
     const losses = [], kept = [];
     for (const [id, text] of Object.entries(sessions)) {
@@ -370,36 +334,42 @@ export function createStoreB(dir, opts = {}) {
         rejectedFile, savedAt: current,
       };
     }
-    if (totalOk) keepCopy('kept-before-order', json(head ?? {}));
+    if (totalOk) keepCopy('kept-before-order', json({ ...(head ?? {}), order: prevOrder }));
     for (const [id, prev] of kept) keepCopy(`kept-before-${id}`, prev);
 
+    const sessionKeys = Object.keys(sessions);
+    let maxSessPos = sessionKeys.length ? (q.sessMax.get()?.pos ?? null) : null;
     for (const [id, text] of Object.entries(sessions)) {
-      if (q.sessGet.get(id)?.json !== text) q.sessPut.run(id, text);
+      const cur = q.sessGet.get(id);
+      if (!cur) {
+        maxSessPos = generateKeyBetween(maxSessPos, null);
+        q.sessIns.run(id, maxSessPos, text);
+      } else if (cur.json !== text) {
+        q.sessUpd.run(text, id);
+      }
     }
     fault('sessions');
     const stats = { recGets: 0, recWrites: 0, posUpdates: 0 };
     const spend = applyDelta(delta ?? {}, head, savedAt, stats, retriedHead);
     fault('globals');
 
-    const known = new Set(order);
-    for (const { id } of q.sessIds.all()) {
-      if (known.has(id)) continue;
-      const text = q.sessGet.get(id).json;
-      const removed = join(backups, 'removed-sessions');
-      mkdirSync(removed, { recursive: true });
-      const nameId = id.length > 160 ? sha256(id) : id;
-      const backup = join(removed, `${Date.now()}-${randomUUID()}-${nameId}.json`);
-      const fd = openSync(backup, 'wx', 0o600);
-      try { writeFileSync(fd, text); fsyncSync(fd); } finally { closeSync(fd); }
-      for (const directory of [removed, backups, dir]) {
-        const folder = openSync(directory, 'r');
-        try { fsyncSync(folder); } finally { closeSync(folder); }
-      }
-      q.removedPut.run(id, Date.now(), text);
-      q.sessDel.run(id);
+    if (hasOrder) {
+      const known = new Set(order);
+      for (const { id } of q.sessIds.all()) if (!known.has(id)) removeSession(id);
+    } else if (delta?.full) {
+      for (const { id } of q.sessIds.all()) if (!Object.hasOwn(sessions, id)) removeSession(id);
+    } else {
+      for (const id of delList) if (!Object.hasOwn(sessions, id) && q.sessGet.get(id)) removeSession(id);
+    }
+    if (hasOrder) {
+      const curOrder = q.sessOrder.all().map((r) => r.id);
+      const sessMoves = computeOrderDiff(curOrder, order, sessionKeys);
+      applyPosMoves(sessMoves, 'sessions', (id) => q.sessPos.get(id)?.pos ?? null, (pos, id) => q.sessPosUpd.run(pos, id));
+    } else if (Array.isArray(delta?.order?.sessions)) {
+      applyPosMoves(delta.order.sessions, 'sessions', (id) => q.sessPos.get(id)?.pos ?? null, (pos, id) => q.sessPosUpd.run(pos, id));
     }
     fault('head');
-    q.headPut.run(savedAt, version, json(order), spend.len, spend.last);
+    q.headPut.run(savedAt, version, '', spend.len, spend.last);
     q.ackPut.run(commitId ?? '', savedAt);
     lastStats = stats;
     return { status: 204, savedAt };
@@ -407,27 +377,29 @@ export function createStoreB(dir, opts = {}) {
 
   function commit(body) {
     const { savedAt, version, order, sessions = {}, delta, commitId, retryOf } = body;
-    if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
+    const hasDelta = delta != null && typeof delta === 'object' && !Array.isArray(delta);
+    if (!Number.isFinite(savedAt) || (order != null && !Array.isArray(order)) || (order == null && !hasDelta)) return { status: 400, reason: 'savedAt and order are required' };
     if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
     if (commitId != null && (typeof commitId !== 'string' || commitId.length > 128)) return { status: 400, reason: 'invalid commitId' };
     if (retryOf != null && (!Array.isArray(retryOf) || retryOf.some((x) => typeof x !== 'string' || x.length > 128))) return { status: 400, reason: 'invalid retryOf' };
-    if (delta != null && (typeof delta !== 'object' || (delta.small != null && typeof delta.small !== 'string'))) return { status: 400, reason: 'delta must be an object' };
-    if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
+    if (delta != null && (!hasDelta || (delta.small != null && typeof delta.small !== 'string'))) return { status: 400, reason: 'delta must be an object' };
+    if (order != null && (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id)))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
     for (const [id, text] of Object.entries(sessions)) {
       if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
-      if (!order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
+      if (order != null && !order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
     }
-    for (const coll of COLLS) {
-      for (const [id, text] of Object.entries(delta?.up?.[coll] ?? {})) {
-        if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: `record ${coll}/${id} must be a JSON text` };
-      }
-      const moves = delta?.order?.[coll];
-      if (moves != null) {
-        if (!Array.isArray(moves) || !moves.every((m) => m && typeof m === 'object' && Array.isArray(m.ids)
-          && (m.after == null || typeof m.after === 'string') && (m.before == null || typeof m.before === 'string'))) {
-          return { status: 400, reason: `order for ${coll} must be an array of { after, before, ids }` };
+    for (const coll of [...COLLS, 'sessions']) {
+      if (coll !== 'sessions') {
+        for (const [id, text] of Object.entries(delta?.up?.[coll] ?? {})) {
+          if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: `record ${coll}/${id} must be a JSON text` };
+        }
+      } else if (delta?.del?.sessions != null) {
+        if (!Array.isArray(delta.del.sessions) || !delta.del.sessions.every((id) => typeof id === 'string' && SAFE_ID.test(id))) {
+          return { status: 400, reason: 'del.sessions must be an array of safe ids' };
         }
       }
+      const ordErr = validateOrderMoves(delta?.order?.[coll], coll);
+      if (ordErr) return { status: 400, reason: ordErr };
     }
     const safeSmall = delta?.small != null ? sanitizeKeysInText(delta.small) : delta?.small;
     const safeBody = delta?.small != null && safeSmall !== delta.small

@@ -33,13 +33,16 @@ export function createDeltaClient() {
   const known = { generations: new Map(), assets: new Map(), library: new Map() };
   const unconfirmedUp = { generations: new Map(), assets: new Map(), library: new Map() };
   const unconfirmedOrder = { generations: null, assets: null, library: null };
+  let knownSessions = null;
+  const unconfirmedSessions = new Set();
+  let unconfirmedSessionOrder = null;
   let small = null;
   let unconfirmedSmall = false;
   let knownSpend = [];
   let first = true;
 
   /** Delta between what was last acknowledged and `g` (the globals object). Call ack() when the server accepted it. */
-  function diff(g) {
+  function diff(g, sessionOrder, sessionUpKeys = []) {
     const up = {}, del = {}, staged = {};
     let order = null;
     for (const coll of COLLS) {
@@ -91,6 +94,25 @@ export function createDeltaClient() {
         if (moves) (order ??= {})[coll] = moves;
       }
     }
+    let sessMoved = false;
+    if (Array.isArray(sessionOrder)) {
+      const prevSess = knownSessions ?? [];
+      const presentSess = new Set(sessionOrder);
+      const delSess = [];
+      for (const id of prevSess) if (!presentSess.has(id)) delSess.push(id);
+      for (const id of unconfirmedSessions) if (!presentSess.has(id) && !prevSess.includes(id)) delSess.push(id);
+      if (delSess.length) del.sessions = delSess;
+      let sessMoves = null;
+      if (!sameSequence(prevSess, sessionOrder)) {
+        sessMoves = computeOrderDiff(prevSess, sessionOrder, sessionUpKeys);
+      } else if (unconfirmedSessionOrder && !sameSequence(unconfirmedSessionOrder, sessionOrder)) {
+        sessMoves = computeOrderDiff(unconfirmedSessionOrder, sessionOrder, sessionUpKeys);
+      }
+      if (sessMoves) {
+        (order ??= {}).sessions = sessMoves;
+        sessMoved = true;
+      }
+    }
     const smallObj = Object.fromEntries(Object.entries(g).filter(([k]) => !SMALL_SKIP.has(k)));
     const smallText = JSON.stringify(smallObj);
     const log = g.spendLog ?? [];
@@ -112,7 +134,11 @@ export function createDeltaClient() {
       ...(order ? { order } : {}),
       spend: { append: texts.slice(start), len: texts.length, from: start },
     };
-    pending = { staged, smallText, spend: texts, up, order };
+    pending = {
+      staged, smallText, spend: texts, up, order,
+      sessionOrder: Array.isArray(sessionOrder) ? [...sessionOrder] : null,
+      sessUp: sessionUpKeys, sessMoved,
+    };
     return delta;
   }
   let pending = null;
@@ -123,6 +149,13 @@ export function createDeltaClient() {
       for (const [id, text] of Object.entries(pending.up[coll])) unconfirmedUp[coll].set(id, text);
       if (pending.order?.[coll]) unconfirmedOrder[coll] = [...pending.staged[coll].keys()];
     }
+    if (pending.sessionOrder) {
+      const prevSet = new Set(knownSessions ?? []);
+      for (const id of pending.sessUp) if (!prevSet.has(id)) unconfirmedSessions.add(id);
+      if (pending.sessMoved || (knownSessions && !sameSequence(knownSessions, pending.sessionOrder))) {
+        unconfirmedSessionOrder = pending.sessionOrder;
+      }
+    }
   }
   function ack() {
     for (const coll of COLLS) {
@@ -130,6 +163,9 @@ export function createDeltaClient() {
       unconfirmedUp[coll].clear();
       unconfirmedOrder[coll] = null;
     }
+    if (pending.sessionOrder) knownSessions = pending.sessionOrder;
+    unconfirmedSessions.clear();
+    unconfirmedSessionOrder = null;
     small = pending.smallText;
     unconfirmedSmall = false;
     knownSpend = pending.spend;

@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { SAFE_ID, splitText } from './store-v2.js';
 import { createStoreBA } from './sqlite/store-ba.js';
+import { validateOrderMoves } from './sqlite/store-b-helpers.js';
 import { createDeltaClient } from './sqlite/delta-client.mjs';
 import { canonicalStateText, migrateFromV2, migrateToSqlite, stateSha } from './sqlite/migrate.js';
 
@@ -33,7 +34,14 @@ export function sqliteHead(dir) {
       if (dataRows === 0) return null;
       throw new Error('ogs.sqlite has no head');
     }
-    return { savedAt: row.savedAt, version: row.version, order: JSON.parse(row.orderJson) };
+    let order;
+    if (row.orderJson) {
+      order = JSON.parse(row.orderJson);
+    } else {
+      const hasPos = db.prepare("PRAGMA table_info('sessions')").all().some((c) => c.name === 'pos');
+      order = db.prepare(hasPos ? 'SELECT id FROM sessions ORDER BY pos' : 'SELECT id FROM sessions').all().map((r) => r.id);
+    }
+    return { savedAt: row.savedAt, version: row.version, order };
   } finally {
     db.close();
   }
@@ -61,23 +69,23 @@ export function stripSqliteKeys(file) {
 export function validateSqliteCommit(body, fresh = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { status: 400, reason: 'not a commit' };
   const { savedAt, version, globals, order, sessions = {}, delta, commitId, retryOf } = body;
-  if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
+  const hasDelta = delta != null && typeof delta === 'object' && !Array.isArray(delta);
+  if (!Number.isFinite(savedAt) || (order != null && !Array.isArray(order)) || (order == null && !hasDelta)) return { status: 400, reason: 'savedAt and order are required' };
   if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
   if (commitId != null && (typeof commitId !== 'string' || commitId.length > 128)) return { status: 400, reason: 'invalid commitId' };
   if (retryOf != null && (!Array.isArray(retryOf) || retryOf.some((x) => typeof x !== 'string' || x.length > 128))) return { status: 400, reason: 'invalid retryOf' };
-  const hasDelta = delta != null && typeof delta === 'object' && !Array.isArray(delta);
   if (!hasDelta && (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}'))) {
     return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
   }
   if (hasDelta && delta.small != null && (typeof delta.small !== 'string' || !delta.small.startsWith('{') || !delta.small.endsWith('}'))) {
     return { status: 400, reason: 'delta.small must be a JSON text' };
   }
-  if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
+  if (order != null && (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id)))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
   if (!sessions || typeof sessions !== 'object' || Array.isArray(sessions)) return { status: 400, reason: 'invalid sessions' };
   if (body.keep?.sessions != null && (!Array.isArray(body.keep.sessions) || body.keep.sessions.some((k) => !k || typeof k !== 'object'))) return { status: 400, reason: 'invalid keep sessions' };
   for (const [id, text] of Object.entries(sessions)) {
     if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
-    if (!order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
+    if (order != null && !order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
   }
   if (hasDelta) {
     for (const coll of ['generations', 'assets', 'library']) {
@@ -85,10 +93,28 @@ export function validateSqliteCommit(body, fresh = false) {
         if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: 'invalid record' };
       }
     }
+    if (delta.del?.sessions != null && (!Array.isArray(delta.del.sessions) || !delta.del.sessions.every((id) => typeof id === 'string' && SAFE_ID.test(id)))) {
+      return { status: 400, reason: 'invalid del.sessions' };
+    }
+    for (const coll of ['generations', 'assets', 'library', 'sessions']) {
+      const ordErr = validateOrderMoves(delta.order?.[coll], coll);
+      if (ordErr) return { status: 400, reason: ordErr };
+    }
   }
   if (fresh) {
-    for (const id of order) {
-      if (!Object.hasOwn(sessions, id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+    if (order != null) {
+      for (const id of order) {
+        if (!Object.hasOwn(sessions, id)) return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+      }
+    } else if (Array.isArray(delta?.order?.sessions)) {
+      const delSet = new Set(Array.isArray(delta.del?.sessions) ? delta.del.sessions : []);
+      for (const m of delta.order.sessions) {
+        for (const id of [...m.ids, ...(m.after != null ? [m.after] : []), ...(m.before != null ? [m.before] : [])]) {
+          if (delSet.has(id) || !Object.hasOwn(sessions, id)) {
+            return { status: 400, reason: `missing session ${id}: send every session (no copy of it stored yet)` };
+          }
+        }
+      }
     }
     if (hasDelta) {
       if (!delta.full) return { status: 400, reason: 'the first commit must carry the whole state (delta.full)' };

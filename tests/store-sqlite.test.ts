@@ -110,13 +110,13 @@ describe('sqlite store behind the current commit body', () => {
     store.close();
   });
 
-  it('sends the real client HTTP body and avoids full record order on a large small edit', async () => {
+  it('sends the real client HTTP body and avoids full record and session order on a large small edit', async () => {
     const root = mkdtempSync(join(tmpdir(), 'ogs-client-perf-'));
     const { callBody } = mount(root);
     const generations: Record<string, { id: string; prompt: string }> = {};
     for (let i = 0; i < 3000; i++) generations[`gen_${i}`] = { id: `gen_${i}`, prompt: 'p' };
     const globalsAt = (zoom: number) => json({ settings: {}, spentUsd: 0, spendLog: [], generations, assets: {}, library: [{ id: 'lib_a' }], ui: { zoom } });
-    const order = Array.from({ length: 8 }, (_, i) => `ses_${i}`);
+    const order = Array.from({ length: 3000 }, (_, i) => `ses_${i}`);
     const all = order.map((id) => [id, json({ id, feed: [] })] as [string, string]);
     let sent = '';
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -133,7 +133,7 @@ describe('sqlite store behind the current commit body', () => {
       const body = JSON.parse(sent);
       expect(body.globals).toBeUndefined();
       expect(body.delta).toBeDefined();
-      expect(body.order).toEqual(order);
+      expect(body.order).toBeUndefined();
       expect(body.sessions).toEqual({});
       expect(bytes(sent)).toBeLessThan(1024);
       expect(calls.delta.order).toBeUndefined();

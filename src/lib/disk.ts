@@ -70,9 +70,10 @@ function seedDeltaFromText(text: string): void {
   try {
     const obj = JSON.parse(text) as { state?: Record<string, unknown> };
     if (!obj?.state || typeof obj.state !== 'object') return;
-    const { sessions: _sessions, ...globals } = obj.state;
+    const { sessions, ...globals } = obj.state;
+    const sessionOrder = sessions && typeof sessions === 'object' && !Array.isArray(sessions) ? Object.keys(sessions) : [];
     deltaClient = createDeltaClient();
-    deltaClient.diff(globals);
+    deltaClient.diff(globals, sessionOrder, sessionOrder);
     deltaClient.ack();
   } catch {
     /* ignore malformed text */
@@ -155,9 +156,10 @@ export const disk = {
     const build = (list: Array<[string, string]>, full = false) => {
       if (full) deltaClient = createDeltaClient();
       const parsed = c.globalsObj ?? (JSON.parse(c.globals) as Record<string, unknown>);
-      const delta = deltaClient.diff(parsed);
+      const upSessionKeys = Object.keys(Object.fromEntries(list.map(([id]) => [id, true])));
+      const delta = deltaClient.diff(parsed, c.order, upSessionKeys);
       const sessions = list.map(([id, text]) => `${JSON.stringify(id)}:${JSON.stringify(text)}`).join(',');
-      const core = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"delta":${JSON.stringify(delta)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}`;
+      const core = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"delta":${JSON.stringify(delta)}${full ? `,"order":${JSON.stringify(c.order)}` : ''},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}`;
       const sameRetry = !full && lastAttempt && lastAttempt.savedAt === c.savedAt && lastAttempt.core === core;
       const commitId = sameRetry ? lastAttempt!.commitId : newCommitId();
       const retryOf = sameRetry ? unconfirmedCommits.filter((id) => id !== commitId) : unconfirmedCommits;
@@ -182,7 +184,7 @@ export const disk = {
           // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session and full delta.
           if (res.status === 400 && c.all) {
             const reason = await res.clone().text();
-            if (reason.startsWith('missing session') || reason.includes('delta.full')) {
+            if (reason.startsWith('missing session') || reason.includes('delta.full') || reason.includes('missing order anchor')) {
               built = build(c.all, true);
               attempt = built;
               res = await send(built);

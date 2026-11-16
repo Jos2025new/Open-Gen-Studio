@@ -16,11 +16,13 @@ export interface GlobalsDelta {
     generations: string[];
     assets: string[];
     library: string[];
+    sessions?: string[];
   };
   order?: {
     generations?: OrderMove[];
     assets?: OrderMove[];
     library?: OrderMove[];
+    sessions?: OrderMove[];
   };
   spend: {
     append: string[];
@@ -30,7 +32,7 @@ export interface GlobalsDelta {
 }
 
 export function createDeltaClient(): {
-  diff(g: Record<string, unknown>): GlobalsDelta;
+  diff(g: Record<string, unknown>, sessionOrder?: string[], sessionUpKeys?: string[]): GlobalsDelta;
   ack(): void;
   markUnconfirmed(): void;
 };
