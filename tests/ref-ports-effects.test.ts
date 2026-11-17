@@ -33,3 +33,18 @@ describe('model → agent control port', () => {
     expect(agentSettings()?.image?.modelRef).toBe('atlas::port-test-image');
   });
 });
+
+import { graphToSteps } from '../src/engine/flow/graph';
+describe('chat/agent data out port', () => {
+  it('delivers the real text to a generation prompt', () => {
+    const st = useStore.getState();
+    useStore.setState({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [{ id: 'u1', type: 'user', text: 'a red fox' } as never] } } });
+    const graph = { nodes: [
+      { id: 'chat', position: { x: 0, y: 0 }, data: { kind: 'ref', type: 'chat', ref: sid, title: 'Chat' } },
+      { id: 'img', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Img', prompt: '', modelRef: 'local::studio-image', settings: { count: 1, advanced: {} }, outputIndex: 0 } },
+    ], edges: [{ id: 'e', source: 'chat', target: 'img', sourceHandle: 'out', targetHandle: 'prompt', kind: 'data' }], groups: [] } as never;
+    const plan = graphToSteps(graph, ['img'], {});
+    expect(plan.errors).toEqual([]);
+    expect(plan.steps.find((s) => s.kind === 'text')).toMatchObject({ text: 'a red fox' });
+  });
+});

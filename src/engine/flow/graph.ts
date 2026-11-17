@@ -1,6 +1,7 @@
 import { mentionSubjects } from '../params';
 import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
+import { refNodeText } from './refText';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
@@ -430,6 +431,12 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       if (!src) return undefined;
       if (src.data.kind === 'text') {
         if (!textSteps.has(src.id)) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: src.data.text });
+        return src.id;
+      }
+      if (src.data.kind === 'ref') {
+        const said = refNodeText(src);
+        if (said == null) { errors.push(`"${src.data.title}" has no text yet.`); return undefined; }
+        if (!textSteps.has(src.id)) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: said });
         return src.id;
       }
       const textual = (src.data.kind === 'tool' && OPS[src.data.op].output === 'text') || (src.data.kind === 'audio' && src.data.textOutput);

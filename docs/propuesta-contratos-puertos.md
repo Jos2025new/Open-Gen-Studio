@@ -70,3 +70,8 @@ Lecciones de otros sistemas de nodos (en parte de foros; no verificadas una a un
 | 4 | Dependencias ocultas o sin hash por contenido (Maya EG, caché de ComfyUI) | R5: la firma `nodeRequest` incluye enlaces `ref`/`control` y la revisión de contenido del asset referido (`assetRevisions`). Regla: toda dependencia es un puerto declarado. | hecho para ref/control y assets |
 | 5 | Nodos con efectos tratados como puros (ComfyUI IS_CHANGED) | chat, agent y escritura en library se marcan no idempotentes; su firma de caché incluye modelo, prompt y versión del nodo. | pendiente (parte 2) |
 | 6 | Esquema de puertos sin versión (Blender #116590) | `SYSTEM_NODE_TYPES` debe llevar versión y migración explícita al cambiar puertos; hoy no existe. | pendiente; decisión de diseño |
+
+## Estado de la parte 2 (2026-11-17)
+
+- Hecho: `model → agent` (control) cambia `session.agent.settings.<image|video>.modelRef` (`applyModelLinkToAgent`); `chat`/`agent` `out` (data) entrega el texto real a `prompt` (`flow/refText.ts`). Tests: `tests/ref-ports-effects.test.ts`.
+- Sin hacer: `designer.doc.out` y `library.out` como imagen real (el render del doc es asíncrono y necesita su propio paso en `executor.ts`), `designer.doc.in`, `library.in`, `space.in/out`, `agent.in/tools`, `model.in/out` (Q1). Error conocido 5: los nodos con efectos (chat, agent, library.in) aún no se marcan no idempotentes; error 6: el esquema de puertos aún no lleva versión. Ambos quedan en `pendientes.md`.
