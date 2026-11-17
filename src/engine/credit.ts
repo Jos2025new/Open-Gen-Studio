@@ -149,7 +149,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   const empty = PROVIDER_LABELS[cur.provider];
   const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g), g.settings);
   const switchTo = (m: ModelSummary) => {
-    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, error: undefined });
+    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: m.provider, error: undefined });
     return rerun(genId);
   };
   const auto = options.find((o) => o.same);

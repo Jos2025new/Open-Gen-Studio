@@ -43,6 +43,7 @@ describe('no credit at the provider', () => {
     expect(await onGenerationCredit('g1', rerun)).toBe(true);
     expect(useStore.getState().generations.g1.modelRef).toBe('atlas::bytedance/seedance-2.0-fast/image-to-video');
     expect(rerun).toHaveBeenCalledWith('g1');
+    expect(useStore.getState().generations.g1.provider).toBe('atlas'); // the label follows the model it was switched to
     expect(useAlerts.getState().alerts[0].text).toMatch(/NanoGPT has no credit: .* switched to the same model at Atlas/);
   });
 
