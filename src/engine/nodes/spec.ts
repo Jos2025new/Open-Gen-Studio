@@ -1,4 +1,5 @@
 import { OPS, OP_IDS } from '../ops';
+import { PROVIDER_LABELS } from '../providers/types';
 import { useStore } from '../../store/store';
 import { isOmniSpace, omniSpacePorts } from './omniSpaces';
 import { omniSpaceLive } from './omniLive';
@@ -368,6 +369,10 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
     },
     model: () => {
       const cat = st.catalog.models[d.ref];
+      // A catalog model that was removed or renamed is invalid, not swapped for the active one.
+      const provider0 = d.ref.includes('::') ? d.ref.split('::')[0] : '';
+      const loaded = Object.values(st.catalog.models).some((m) => m.provider === provider0);
+      if (provider0 && provider0 !== 'local' && !cat && (!(provider0 in PROVIDER_LABELS) || loaded)) return missingTarget(node, 'Model', 'Model');
       const provider = cat?.provider ?? (d.ref.includes('::') ? d.ref.split('::')[0] : st.settings.agent.provider);
       const kind = d.mediaKind ?? cat?.kind ?? 'llm';
       const mode = d.attachMode ?? 'wired';

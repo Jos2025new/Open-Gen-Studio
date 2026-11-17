@@ -292,6 +292,11 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     // A node this run writes must be free; an input only must not be generating.
     const busyGen = runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status);
     if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) errors.push(`“${n.data.title}” is already running.`);
+    // A required field left empty stops the run before any provider is called (every operation, from its field list).
+    if (n.data.kind === 'tool' && run.runIds.includes(id)) for (const f of OPS[n.data.op].fields ?? []) {
+      const v = n.data.params[f.key];
+      if (f.required && (v == null || (typeof v === 'string' && !v.trim()))) errors.push(`“${n.data.title}”: “${f.label}” is required.`);
+    }
     if (n.data.kind === 'tool' && n.data.op === 'video_upscale') {
       const ref = typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : opModelFor('video_upscale').ref;
       if (!st.catalog.models[ref] || !isVideoUpscaler(st.catalog.models[ref]) || !isConnected(st.catalog.models[ref].provider)) errors.push(`“${n.data.title}”: choose an available dedicated video upscaler.`);

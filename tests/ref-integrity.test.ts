@@ -50,3 +50,14 @@ describe('reference integrity', () => {
     }
   });
 });
+
+describe('model references', () => {
+  it('a model whose provider has other models loaded but not this one is invalid', () => {
+    useStore.setState((st) => ({ catalog: { ...st.catalog, models: { 'atlas::present': { ref: 'atlas::present', provider: 'atlas', id: 'present', name: 'Present', kind: 'image' } as never } } }));
+    const n = (ref: string): GraphNode => ({ id: 'm', position: { x: 0, y: 0 }, data: { kind: 'ref', type: 'model', ref, title: 'M' } });
+    expect(resolveSystemNodeLive(sid, n('atlas::present'))!.invalid).toBeUndefined();
+    expect(resolveSystemNodeLive(sid, n('atlas::renamed'))!.invalid).toBeTruthy();
+    expect(resolveSystemNodeLive(sid, n('local::studio-image'))!.invalid).toBeUndefined();
+    expect(resolveSystemNodeLive(sid, n(''))!.invalid).toBeUndefined();
+  });
+});

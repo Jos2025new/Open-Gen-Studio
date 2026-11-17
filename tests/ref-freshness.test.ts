@@ -24,3 +24,13 @@ describe('freshness with ref/control links', () => {
     expect(nodeIsCurrent(g, node, { g1: before }, [], { assets: { a1: edited } })).toBe(false);
   });
 });
+
+describe('control links', () => {
+  it('a new control link makes the result stale, like a ref link', () => {
+    const base = { nodes: [node, src], edges: [] as never[], groups: [] } as unknown as Graph;
+    const withControl = { ...base, edges: [{ id: 'c', source: 'src', target: 'n1', kind: 'control' }] } as unknown as Graph;
+    const g1 = { ...gen, nodeRequest: stable(nodeRequest(base, node, { g1: gen }, [], { assets: { a1: asset } })) } as Generation;
+    expect(nodeIsCurrent(base, node, { g1 }, [], { assets: { a1: asset } })).toBe(true);
+    expect(nodeIsCurrent(withControl, node, { g1 }, [], { assets: { a1: asset } })).toBe(false);
+  });
+});
