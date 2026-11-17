@@ -52,10 +52,13 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => { unloading = true; });
   window.addEventListener('pageshow', () => { unloading = false; });
 }
+/** Only a request the network aborted (fetch's TypeError) is quiet while the page unloads; anything else always warns. */
 const report = (what: string) => (err: unknown) => {
-  if (unloading) return;
+  if (unloading && err instanceof TypeError) return;
   console.warn(`Disk copy: could not ${what}`, err);
 };
+/** A response from the server that says no is a real failure, whether or not the page is unloading. */
+const reportHttp = (what: string, res: Response) => console.warn(`Disk copy: could not ${what}`, `HTTP ${res.status}`);
 
 // State writes are serialized and coalesced: only the newest pending value is sent, never out of order.
 let stateChain: Promise<void> = Promise.resolve();
@@ -212,6 +215,7 @@ export const disk = {
             clearUnconfirmed();
             result = 'ok';
           } else if (res.status !== 400) {
+            reportHttp('save state', res);
             if (!unconfirmedCommits.includes(attempt.commitId)) {
               unconfirmedCommits.push(attempt.commitId);
               if (unconfirmedCommits.length > 64) unconfirmedCommits.shift();
@@ -265,7 +269,7 @@ export const disk = {
             clearUnconfirmed();
             if (typeof next === 'string') seedDeltaFromText(next);
             result = 'ok';
-          }
+          } else reportHttp('save state', res);
         }
       } catch (err) { report('save state')(err); }
       waiters.forEach((resolve) => resolve(result));
