@@ -57,3 +57,16 @@ Origen: «Referencias que fallan en silencio» ([pendientes](pendientes.md), pun
 - **Q1** `model.in/out` (data): ¿el nodo modelo ejecuta por sí mismo con el prompt entrante o solo configura? Hasta decidirlo se mantiene como solo configuración.
 - **Q2** `agent.control` / `chat` (control): ¿qué significa «controlar» al agente más allá del enlace (pausar, enviar turno)? Sin definir no hay efecto verificable.
 - **Q3** `space.in`: ¿«Assets in» crea assets en el espacio o solo los referencia?
+
+## Errores conocidos que evitamos
+
+Lecciones de otros sistemas de nodos (en parte de foros; no verificadas una a una). Cómo las cubre cada contrato:
+
+| # | Error ajeno | Cómo lo cubre este contrato | Estado |
+| --- | --- | --- | --- |
+| 1 | Conversiones de tipo silenciosas (Blender #120648, #111482) | `portTypeCompatible` solo admite `any`, tipos iguales y `model3d→image`; cualquier otra conversión debe ser un nodo/paso explícito, nunca implícita en el enlace. | hoy; sin test propio de «no convierte» |
+| 2 | Referencias por nombre o ruta; destino ausente sustituido (Maya; Houdini con HDA por nombre) | R1–R3: referencia por id estable; `'active'` = sigue la vigente, id concreto = fijada; destino ausente = `invalid` visible, reparable en el sitio. Excepción abierta: `RefNodeData.ref` de modelo se resuelve por ref del catálogo (no por nombre). | hecho (docs, sesiones); modelo: pendiente |
+| 3 | Actualizar o borrar se lleva ediciones locales sin avisar (overrides de Blender) | `deleteDoc` deja los nodos inválidos en vez de repuntarlos, sin perder el nodo. Falta: aviso previo con el número de nodos/ediciones afectados y recuperación tras borrar. | parcial; aviso y recuperación pendientes |
+| 4 | Dependencias ocultas o sin hash por contenido (Maya EG, caché de ComfyUI) | R5: la firma `nodeRequest` incluye enlaces `ref`/`control` y la revisión de contenido del asset referido (`assetRevisions`). Regla: toda dependencia es un puerto declarado. | hecho para ref/control y assets |
+| 5 | Nodos con efectos tratados como puros (ComfyUI IS_CHANGED) | chat, agent y escritura en library se marcan no idempotentes; su firma de caché incluye modelo, prompt y versión del nodo. | pendiente (parte 2) |
+| 6 | Esquema de puertos sin versión (Blender #116590) | `SYSTEM_NODE_TYPES` debe llevar versión y migración explícita al cambiar puertos; hoy no existe. | pendiente; decisión de diseño |
