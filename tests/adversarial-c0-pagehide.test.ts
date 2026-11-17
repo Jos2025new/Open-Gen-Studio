@@ -90,7 +90,7 @@ describe('C0 pagehide warning boundary', () => {
 
     expect(await disk.setCommit(commit())).toBe('fail');
     expect(await disk.setCommit({ ...commit(), savedAt: 3000 })).toBe('fail');
-    expect(warn.mock.calls.map(([message, detail]) => [message, detail])).toEqual([
+    expect(warn.mock.calls.map(([message, detail]: unknown[]) => [message, detail])).toEqual([
       ['Disk copy: could not save state', 'HTTP 502'],
       ['Disk copy: could not save state', 'HTTP 503'],
     ]);
