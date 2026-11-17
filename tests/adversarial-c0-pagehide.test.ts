@@ -112,7 +112,9 @@ describe('C0 pagehide warning boundary', () => {
     expect(warn).toHaveBeenCalledWith('Disk copy: could not save state', 'HTTP 502');
   });
 
-  it.each(['commit', 'state'] as const)('warns for HTTP 409 on %s after pagehide, including a non-JSON body', async (kind) => {
+  // By design: a 409 is the save-guard's refusal. It has its own visible flow (result 'conflict' / 'rejected' -> reportSave -> status and banner:
+  // "Another tab saved changes" / "A save was set aside as a possible loss"), so it is not also a console warning.
+  it.each(['commit', 'state'] as const)('answers HTTP 409 on %s after pagehide with the conflict result (its own visible flow), not a console warning, even with a non-JSON body', async (kind) => {
     saveResponse = () => new Response('conflict', { status: 409 });
     hide();
 
@@ -120,6 +122,6 @@ describe('C0 pagehide warning boundary', () => {
       ? await disk.setCommit(commit())
       : await disk.setState('{"savedAt":2000,"state":{}}');
     expect(result).toBe('conflict');
-    expect(warn).toHaveBeenCalledWith('Disk copy: could not save state', 'HTTP 409');
+    expect(warn).not.toHaveBeenCalled();
   });
 });
