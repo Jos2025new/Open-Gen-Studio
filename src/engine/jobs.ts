@@ -367,13 +367,13 @@ async function execute(id: string): Promise<string[]> {
       await runCreateStyle(g, signal);
       return [];
     }
-    // Inputs on a text-only model: switch to its image-input twin of the same family (edit / image-to-video).
+    // Text-only model + inputs: image-input twin (edit / image-to-video).
     if ((g.kind === 'image' || g.kind === 'video') && !g.op && (g.inputs.refs.length || g.inputs.firstFrame)) {
       const cur = modelSummary(g.modelRef);
       const twin = sentModelRef(g.modelRef, g.kind, true);
       if (twin !== g.modelRef) {
-        const before = { modelRef: g.modelRef, variant: cur ? variantRoute(cur) : 'unknown', inputRoles: { references: g.inputs.refs.length, firstFrame: Boolean(g.inputs.firstFrame), lastFrame: Boolean(g.inputs.lastFrame) } };
-        patchGeneration(g.id, { modelRef: twin, modelName: modelSummary(twin)?.name ?? g.modelName, provider: parseModelRef(twin)?.provider ?? g.provider });
+        const before = { modelRef: g.modelRef, variant: cur ? variantRoute(cur) : 'unknown', inputRoles: { references: g.inputs.refs.length, firstFrame: !!g.inputs.firstFrame, lastFrame: !!g.inputs.lastFrame } };
+        patchGeneration(g.id, { modelRef: twin, modelName: modelSummary(twin)?.name ?? g.modelName, provider: modelSummary(twin)?.provider ?? g.provider });
         g = get().generations[g.id];
         recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late variant resolution', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
       }

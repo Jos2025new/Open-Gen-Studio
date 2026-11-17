@@ -86,3 +86,9 @@ Orden: (1) agente propio, (2) nodo `prompt` y ajustes de medio, (3) chat dueño 
 1. **Agente.** `RefNodeData.llm?: { provider, model }` en el nodo agente. Ausente = sigue `settings.agent` (el global, que pasa a ser el valor por defecto de un agente sin elección propia). `agentEngine(sessionId?)` lee el nodo agente de la sesión y, si tiene `llm`, usa ese; si no, el global. Los controles actuales siguen escribiendo el global, así que nada cambia en pantalla ni en datos viejos. `ChatMessageMeta` gana `agentNodeId` (id del nodo agente) **junto a** `agent`, que sigue siendo el rol visible ('Director'): sustituirlo cambiaría lo que se ve.
 2. **Prompt.** Nodo `prompt` con `composer.text` como valor; el agente lee aristas `prompt→agent` y, sin aristas, `composer.text` como hoy.
 3. **Chat.** Registro de tipos de nodo de sistema en `spec.ts` (un solo sitio para añadir un tipo); el nodo chat admite varios agentes conectados.
+
+### Estado de los acoplamientos (2026-11-17)
+
+- 1 hecho: `RefNodeData.llm`, `agentEngine(sessionId?)`, `ChatMessageMeta.agentNodeId`, `setAgentLlm`; sin interfaz propia todavía (los controles escriben el global).
+- 2 hecho: nodos `prompt` y `mediaSettings` (espejos de `composer`); el agente añade al modelo el texto de los `prompt` independientes conectados. `mediaSettings` solo lee; falta que escriba.
+- 3 a medias: `resolveSystemNodeLive` usa un registro exhaustivo por tipo. El chat ya lista varios agentes conectados; falta que el nodo chat sea dueño de su feed (hoy `ref = sessionId`) y que el remitente sea el agente que respondió, no el primero.

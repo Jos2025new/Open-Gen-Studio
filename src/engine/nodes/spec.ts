@@ -290,8 +290,9 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
   const session = st.sessions[sessionId];
   const graph = session?.graph;
 
-  switch (d.type) {
-    case 'chat': {
+  // One entry per type: adding a system node type is one entry here and one in SYSTEM_NODE_TYPES (both are exhaustive records).
+  const resolvers: Record<SystemNodeType, () => LiveSystemSummary> = {
+    chat: () => {
       if (!st.sessions[d.ref]) return missingTarget(node, 'Chat', 'Session');
       const targetSession = st.sessions[d.ref];
       const feed = targetSession?.feed ?? [];
@@ -321,8 +322,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         details: [preview],
         connections,
       };
-    }
-    case 'agent': {
+    },
+    agent: () => {
       if (!st.sessions[d.ref]) return missingTarget(node, 'Agent', 'Session');
       const targetSession = st.sessions[d.ref];
       const ag = targetSession?.agent;
@@ -364,8 +365,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         details: [`${ag?.history.length ?? 0} turns in memory · ${attached.length} model(s) attached`],
         attachedModels: attached,
       };
-    }
-    case 'model': {
+    },
+    model: () => {
       const cat = st.catalog.models[d.ref];
       const provider = cat?.provider ?? (d.ref.includes('::') ? d.ref.split('::')[0] : st.settings.agent.provider);
       const kind = d.mediaKind ?? cat?.kind ?? 'llm';
@@ -379,8 +380,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         chips: [`Kind: ${kind}`, `Attach: ${mode}`],
         details: [d.ref || 'offline'],
       };
-    }
-    case 'provider': {
+    },
+    provider: () => {
       const pid = (d.ref || 'openrouter') as ProviderId;
       const status = st.catalog.status[pid] ?? 'idle';
       const count = Object.values(st.catalog.models).filter((m) => m.provider === pid).length;
@@ -393,8 +394,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         chips: [`${count} models`],
         details: [`Provider ${pid}`],
       };
-    }
-    case 'designer.doc': {
+    },
+    'designer.doc': () => {
       const docs = session?.docs ?? [];
       const following = d.ref === 'active';
       const doc = following ? docs.find((x) => x.id === session?.activeDocId) : docs.find((x) => x.id === d.ref);
@@ -411,8 +412,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         details: doc ? doc.layers.slice(0, 3).map((l) => `${l.type}: ${l.name}`) : ['Ready for Designer layers'],
         doc,
       };
-    }
-    case 'space': {
+    },
+    space: () => {
       if (isOmniSpace(d.ref)) return omniSpaceLive(sessionId, d);
       const spaceId = d.ref || 'create';
       const isActive = st.ui.space === spaceId;
@@ -427,8 +428,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         chips: [`Space: ${spaceId}`, `${assetCount} assets`],
         details: [spaceId === 'tools' ? 'Direct asset transformations' : 'Panel + Board workspace'],
       };
-    }
-    case 'session': {
+    },
+    session: () => {
       const s = st.sessions[d.ref];
       if (!s) return missingTarget(node, 'Session', 'Session');
       return {
@@ -440,8 +441,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         chips: [`${s?.docs.length ?? 0} docs`, `${s?.graph.nodes.length ?? 0} nodes`],
         details: [s?.title ?? 'Untitled session'],
       };
-    }
-    case 'library': {
+    },
+    library: () => {
       const subjects = [...st.library, ...(session?.subjects ?? [])];
       return {
         type: 'library',
@@ -452,18 +453,17 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         chips: subjects.slice(0, 3).map((s) => `@${s.name}`),
         details: [subjects.length ? subjects.map((s) => s.name).join(', ') : 'Characters, objects & styles'],
       };
-    }
-    case 'prompt': {
+    },
+    prompt: () => {
       const text = promptNodeText(node) ?? '';
       return { type: 'prompt', ref: d.ref, title: d.title || 'Prompt', subtitle: d.ref === 'composer' ? 'Studio prompt box' : 'Independent text', badge: 'Text', chips: [`${text.length} chars`], details: [text.slice(0, 90) || 'Empty'] };
-    }
-    case 'mediaSettings': {
+    },
+    mediaSettings: () => {
       const kind = (d.ref in st.composer ? d.ref : 'image') as 'image' | 'video';
       const c = st.composer[kind];
       return { type: 'mediaSettings', ref: d.ref, title: d.title || 'Media settings', subtitle: `${kind} · ${c?.settings?.aspect ?? 'auto'}`, badge: 'Settings', chips: [c?.modelRef ?? ''], details: [`count ${c?.settings?.count ?? 1}`] };
-    }
-    case 'toolset':
-      return {
+    },
+    toolset: () => ({
         type: 'toolset',
         ref: d.ref || 'toolset',
         title: d.title || 'Tools',
@@ -471,6 +471,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         badge: 'Catalog',
         chips: OP_IDS.slice(0, 3).map((id) => OPS[id].label),
         details: ['Relight, Upscale, Remove BG, Reframe, Animate…'],
-      };
-  }
+    }),
+  };
+  return resolvers[d.type]();
 }

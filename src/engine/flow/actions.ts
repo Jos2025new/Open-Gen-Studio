@@ -277,7 +277,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   const st = get();
   const graph = st.sessions[sessionId].graph;
   const context = requestContext(sessionId);
-  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, assets: st.assets, ...context });
+  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context });
   const inputs = new Set(run.runIds);
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
