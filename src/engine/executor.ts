@@ -137,6 +137,13 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     return ids;
   };
 
+  /** A reference the step declares must resolve: a missing one stops the step before any provider call. */
+  const requireAsset = async (ref: string, what = 'reference'): Promise<string> => {
+    const a = await resolveAsset(ref);
+    if (!a || !useStore.getState().assets[a]) throw new Error(`Missing ${what} "${ref}": its image does not exist. Nothing was sent to the provider.`);
+    return a;
+  };
+
   const resolveAsset = async (ref: string | undefined): Promise<string | null> => {
     if (!ref) return null;
     const p = parseRef(ref);
@@ -208,8 +215,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       case 'image': {
         const refs: string[] = [];
         for (const r of s.refs) {
-          const a = await resolveAsset(r);
-          if (a) refs.push(a);
+          refs.push(await requireAsset(r));
         }
         const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }), variants: s.variations });
         ctx.onState(s.id, 'running', { generationId: g.id });
@@ -218,21 +224,19 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       case 'model3d': {
         const refs: string[] = [];
         for (const r of s.refs) {
-          const a = await resolveAsset(r);
-          if (a) refs.push(a);
+          refs.push(await requireAsset(r));
         }
         const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return stepOutputs(g.id, await runSettled(g.id));
       }
       case 'video': {
-        const firstFrame = (await resolveAsset(s.firstFrame)) ?? undefined;
-        const lastFrame = (await resolveAsset(s.lastFrame)) ?? undefined;
+        const firstFrame = s.firstFrame ? await requireAsset(s.firstFrame, 'first frame') : undefined;
+        const lastFrame = s.lastFrame ? await requireAsset(s.lastFrame, 'last frame') : undefined;
         const refs: string[] = [];
         const times: Record<string, number> = {};
         for (const [i, r] of (s.refs ?? []).entries()) {
-          const a = await resolveAsset(r);
-          if (!a) continue;
+          const a = await requireAsset(r);
           refs.push(a);
           const t = s.times?.[i];
           if (t != null) times[a] = t;
@@ -265,8 +269,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         if (s.more?.length) {
           const rest: string[] = [];
           for (const r of s.more) {
-            const a = await resolveAsset(r);
-            if (a) rest.push(a);
+            rest.push(await requireAsset(r));
           }
           params = { ...params, clips: rest.join(',') };
           // Music under the joined video: an audio step of this plan or an audio asset.
@@ -275,8 +278,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         if (s.refs?.length) {
           const got: Array<{ asset: string; role?: string; note?: string }> = [];
           for (const r of s.refs) {
-            const a = await resolveAsset(r.ref);
-            if (a) got.push({ asset: a, role: r.role, note: r.note });
+            got.push({ asset: await requireAsset(r.ref), role: r.role, note: r.note });
           }
           params = { ...params, _refs: got.map((g) => g.asset).join(','), _refRoles: JSON.stringify(got) };
         }

@@ -17,6 +17,8 @@ import { openHome } from './navModel';
 import { SessionInfo, SessionMenu } from './SessionTools';
 import { StudioReopen } from '../studio/StudioReopen';
 import { getLeftSlot, subscribeLeftSlot, setHomeTabsSlot } from './topbarSlot';
+import { saveStatus } from '../../store/saveStatus';
+import { connectedState } from './connectedState';
 import '../../styles/topbar-home.css';
 import '../../styles/compact-popovers.css';
 import '../../styles/topbar-groups.css';
@@ -62,6 +64,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const [addedProviders, setAddedProviders] = useState<RemoteProviderId[]>([]);
   const generationsPop = usePopover();
   const connected = REMOTE_PROVIDERS.filter((p) => keys[p]?.trim());
+  const link = connectedState(connected.length, useSyncExternalStore(saveStatus.subscribe, () => saveStatus.getState().reason));
   const shownProviders = [...new Set([...addedProviders, ...connected])];
 
   useEffect(() => {
@@ -128,7 +131,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       <div className="topbar-right">
         <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
         <button type="button" ref={connectedPop.ref} className={`topbar-menu topbar-pill ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
-          <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${connected.length ? 'is-on' : ''}`} />
+          <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${link.on ? 'is-on' : ''}`} title={link.title} />
         </button>
         {!home && hasSession ? <>
           <SessionInfo onGenerations={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }} />
