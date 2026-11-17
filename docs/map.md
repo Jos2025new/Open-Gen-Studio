@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 377 | 277 |
-| [store.ts](../src/store/store.ts) | 257 | 261 |
+| [types.ts](../src/engine/types.ts) | 377 | 278 |
+| [store.ts](../src/store/store.ts) | 257 | 262 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 45 |
@@ -30,7 +30,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
-| [ops.ts](../src/engine/ops.ts) | 47 | 18 |
+| [ops.ts](../src/engine/ops.ts) | 47 | 19 |
 | [id.ts](../src/lib/id.ts) | 45 | 0 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 28 |
@@ -46,30 +46,30 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Área | Archivos | Tests que la importan directamente |
 | --- | --- | --- |
 | `src` | 2 | 0 |
-| `src/components/assets` | 17 | 8 |
+| `src/components/assets` | 17 | 9 |
 | `src/components/chat` | 23 | 22 |
 | `src/components/composer` | 15 | 15 |
 | `src/components/designer` | 101 | 56 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 19 | 16 |
-| `src/components/omni` | 7 | 3 |
+| `src/components/omni` | 7 | 4 |
 | `src/components/shell` | 37 | 27 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 3 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 340 |
+| `src/engine` | 69 | 342 |
 | `src/engine/agent` | 57 | 117 |
 | `src/engine/commands` | 7 | 14 |
-| `src/engine/design` | 163 | 202 |
+| `src/engine/design` | 163 | 203 |
 | `src/engine/flow` | 16 | 33 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/nodes` | 6 | 7 |
+| `src/engine/nodes` | 6 | 8 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
 | `src/lib` | 35 | 358 |
-| `src/store` | 18 | 263 |
+| `src/store` | 18 | 264 |
 
 221 de 679 módulos no tienen ningún test que los importe directamente.
 
