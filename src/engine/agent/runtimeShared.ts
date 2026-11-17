@@ -60,11 +60,13 @@ export function feedBase(workspace: Workspace) {
 }
 
 export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}): ChatMessageMeta {
-  const e = agentEngine();
+  const sender = extra.agentNodeId;
+  const e = agentEngine(get().activeSessionId, sender);
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
-    ...(agentNodeOf()?.id ? { agentNodeId: agentNodeOf()!.id } : {}),
+    ...(agentNodeOf(undefined, sender)?.id ? { agentNodeId: agentNodeOf(undefined, sender)!.id } : {}),
+    ...(chatNodeOf() ? { chatNodeId: chatNodeOf() } : {}),
     space: placeFor(get().ui, workspace),
     provider: e.kind === 'offline' ? 'offline' : e.provider,
     model: e.kind === 'offline' ? 'Local planner' : e.model,
@@ -103,13 +105,34 @@ export function setThreadOpen(open: boolean): void {
 }
 
 /** The session's agent node (the first one: attachModelToNode and the chat use the same). */
-export function agentNodeOf(sessionId: string = get().activeSessionId) {
-  return get().sessions[sessionId]?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent');
+export function agentNodeOf(sessionId: string = get().activeSessionId, nodeId?: string) {
+  const agents = get().sessions[sessionId]?.graph.nodes.filter((n) => n.data.kind === 'ref' && n.data.type === 'agent') ?? [];
+  return (nodeId ? agents.find((n) => n.id === nodeId) : undefined) ?? agents[0];
 }
 
-export function agentEngine(sessionId: string = get().activeSessionId): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
+/** The chat node that owns a message with no `chatNodeId` of its own: the session's first chat node. */
+export function chatNodeOf(sessionId: string = get().activeSessionId): string | undefined {
+  return get().sessions[sessionId]?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'chat')?.id;
+}
+
+/** The agent nodes connected to a chat node by a control link (either direction). Several can share one chat. */
+export function chatAgents(sessionId: string = get().activeSessionId, chatNodeId: string | undefined = chatNodeOf(sessionId)): string[] {
+  const g = get().sessions[sessionId]?.graph;
+  if (!g || !chatNodeId) return [];
+  const ids = g.edges.filter((e) => (e.kind ?? 'data') === 'control').flatMap((e) => (e.source === chatNodeId ? [e.target] : e.target === chatNodeId ? [e.source] : []));
+  return [...new Set(ids)].filter((id) => g.nodes.some((n) => n.id === id && n.data.kind === 'ref' && n.data.type === 'agent'));
+}
+
+/** The feed a chat node owns. Messages written before chats owned their feed carry no `chatNodeId` and belong to the first chat: nothing is moved or lost. */
+export function feedOfChat(sessionId: string, chatNodeId: string) {
+  const s = get().sessions[sessionId];
+  const first = chatNodeOf(sessionId);
+  return (s?.feed ?? []).filter((f) => ((f as { meta?: { chatNodeId?: string } }).meta?.chatNodeId ?? first) === chatNodeId);
+}
+
+export function agentEngine(sessionId: string = get().activeSessionId, agentNodeId?: string): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
   const { keys } = get().settings;
-  const own = agentNodeOf(sessionId)?.data;
+  const own = agentNodeOf(sessionId, agentNodeId)?.data;
   const chosen = own?.kind === 'ref' ? own.llm : undefined;
   const agent = chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
   if (agent.provider === 'offline') return { kind: 'offline' };

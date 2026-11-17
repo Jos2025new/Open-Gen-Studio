@@ -16,6 +16,10 @@ export interface ChatMessageMeta {
   agent?: string;
   /** Id of the agent node that wrote the message (several agents can share a chat). */
   agentNodeId?: string;
+  /** The chat node whose feed holds the message. Absent on older messages: they belong to the session's first chat. */
+  chatNodeId?: string;
+  /** User messages: the agent nodes the message goes to (every agent connected to the chat). */
+  toAgentNodeIds?: string[];
   /** Space where the message was written. */
   space?: Place;
   /** Provider id ('openrouter' | 'nanogpt' | 'atlas' | 'offline'). */

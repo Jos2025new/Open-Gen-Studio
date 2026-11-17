@@ -22,7 +22,7 @@ import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { promptsWiredToAgent } from '../nodes/spec';
-import { addReplyToRequest, agentEngine, agentNodeOf, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { addReplyToRequest, agentEngine, agentNodeOf, chatAgents, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
 import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
@@ -46,7 +46,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   const runId = uid('turn');
   autoTitleSession(sessionId, clean || 'Edit');
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined }) });
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(chatAgents(sessionId).length ? { toAgentNodeIds: chatAgents(sessionId) } : {}) }) });
   if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
