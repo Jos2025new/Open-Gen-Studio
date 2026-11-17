@@ -44,7 +44,7 @@ function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: Gr
     node('audio', Music, 'Audio', 'Generate music or song lyrics', 'audio music song lyrics voice'),
     node('model3d', Box, '3D model', 'Generate a GLB model from text or image', '3d model glb'),
     ...(omni && omni.spaces !== false ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
-    ...(omni ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
+    ...(omni && omni.spaces !== false ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
   ];
 }

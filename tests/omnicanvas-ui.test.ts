@@ -123,13 +123,11 @@ describe('loose assets on the omnicanvas', () => {
 });
 
 describe('the ordinary Nodes canvas', () => {
-  it('draws the system parts but no Space node after the omnicanvas was opened', () => {
+  it('draws none of the omnicanvas nodes after the omnicanvas was opened', () => {
     ensureOmniNodes(sid);
     const g = useStore.getState().sessions[sid].graph;
     expect(g.nodes.length).toBeGreaterThan(5);
-    const seen = ordinaryGraph(g);
-    expect(seen.nodes.length).toBeGreaterThan(0);
-    expect(seen.nodes.every((n) => n.data.kind === 'ref' && n.data.type !== 'space')).toBe(true);
-    expect(seen.nodes.length).toBeLessThan(g.nodes.length);
+    expect(ordinaryGraph(g).nodes).toHaveLength(0);
+    expect(ordinaryGraph(g).edges).toHaveLength(0);
   });
 });

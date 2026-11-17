@@ -56,10 +56,18 @@ afterEach(async () => {
 });
 
 describe('P7 Add node adversarial coverage', () => {
-  it('offers and can add/remove every listed system part, while ordinary Nodes offers no Spaces', async () => {
-    const expected = ['Agent', 'Model', 'Designer Doc', 'Library', 'Tools'];
-    expect(labels('System')).toEqual(expect.arrayContaining(expected));
+  it('ordinary Nodes offers NO system node and no Space (user rule 2026-11-17: system nodes belong to the omnicanvas)', () => {
+    expect(host.querySelector('.node-lib-sec[aria-label="System"]')).toBeNull();
     expect(host.querySelector('.node-lib-sec[aria-label="Spaces"]')).toBeNull();
+    expect(labels('System')).toEqual([]);
+    expect(selected).toEqual([]);
+  });
+
+  it('the omnicanvas offers every system part, Chat included, and the Spaces', async () => {
+    await act(async () => root.render(createElement(NodeLibrary, { onPick: vi.fn(), onAsset: vi.fn(), onImport: vi.fn(), omni: { ...omni, spaces: true } })));
+    const expected = ['Chat', 'Agent', 'Model', 'Designer Doc', 'Library', 'Tools'];
+    expect(labels('System')).toEqual(expect.arrayContaining(expected));
+    expect(host.querySelector('.node-lib-sec[aria-label="Spaces"]')).not.toBeNull();
     for (const label of expected) {
       const option = [...host.querySelectorAll<HTMLElement>('.node-lib-sec[aria-label="System"] [role="option"]')]
         .find((el) => el.querySelector('.node-lib-text > span')?.textContent === label);
@@ -67,12 +75,6 @@ describe('P7 Add node adversarial coverage', () => {
       await act(async () => option!.click());
     }
     expect(selected).toHaveLength(expected.length);
-    expect(spaces).toEqual([]);
-    expect(useStore.getState().sessions[sid].graph.nodes.some((node) => node.data.kind === 'ref' && ['agent', 'model', 'designer.doc', 'library', 'toolset'].includes(node.data.type))).toBe(false);
-  });
-
-  it('offers Chat in Add node alongside the system node types', () => {
-    expect(labels('System')).toContain('Chat');
   });
 
   it('removes an added system node without removing the omnicanvas Space or asset and without leaving dangling edges', () => {

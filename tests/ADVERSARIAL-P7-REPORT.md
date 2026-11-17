@@ -29,3 +29,7 @@ Resultado final: **2 archivos, 5 pruebas pasan, 2 fallan**. La ejecución final 
 No se cambió código de producto ni `scripts/map-contracts-nodes.mjs`. Las únicas adiciones son los dos tests adversariales y este informe.
 
 Risk: none
+
+## Corrección del usuario (2026-11-17)
+
+Regla: los nodos del sistema son los que cada space genera por defecto y necesita; se ven en el omnicanvas al desacoplar o abrir un space; los nodos de Nodes también se usan en el omnicanvas; los del sistema **no** se usan en el lienzo Nodes normal. El punto 7 original (`89c42d70`, `1b31f788`) iba contra esa regla y se revirtió: `ordinaryGraph` oculta todos los nodos del sistema y «Add node» en Nodes no los ofrece. La prueba que exigía Chat en «Add node» pasa a exigir lo contrario en Nodes (ninguna sección System ni Spaces) y a exigir Chat y los Spaces en el omnicanvas.

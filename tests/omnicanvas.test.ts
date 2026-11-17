@@ -113,7 +113,7 @@ describe('what the omnicanvas shows', () => {
 });
 
 describe('the ordinary Nodes canvas', () => {
-  it('draws the same graph when the omnicanvas was never opened, and with the system parts but without Spaces or its assets after', () => {
+  it('draws the same graph when the omnicanvas was never opened, and without its nodes after', () => {
     const g: Graph = { nodes: [own], edges: [] };
     expect(ordinaryGraph(g)).toBe(g);
     addAssets(asset('a', 1));
@@ -121,16 +121,12 @@ describe('the ordinary Nodes canvas', () => {
     ensureOmniNodes(sid);
     expect(graph().nodes.length).toBeGreaterThan(8);
     const seen = ordinaryGraph(graph());
-    // System parts are drawn on the ordinary canvas too; Space nodes and the omnicanvas's assets are not.
-    expect(seen.nodes).toContainEqual(own);
-    expect(seen.nodes.some((n) => n.omni === true || (n.data.kind === 'ref' && n.data.type === 'space'))).toBe(false);
-    expect(seen.nodes.some((n) => n.data.kind === 'ref' && n.data.type === 'chat')).toBe(true);
-    const shown = new Set(seen.nodes.map((n) => n.id));
-    expect(seen.edges.every((e) => shown.has(e.source) && shown.has(e.target))).toBe(true);
+    expect(seen.nodes).toEqual([own]);
+    expect(seen.edges).toEqual([]);
     // A link between a user node and an omnicanvas node stays in the graph but is not drawn there.
     expect(linkSystemNodes(sid, { source: 'mine', target: omniSpaceNodeId('designer'), kind: 'ref' }).error).toBeNull();
     expect(graph().edges.some((e) => e.source === 'mine')).toBe(true);
-    expect(ordinaryGraph(graph()).edges.some((e) => e.source === 'mine')).toBe(false);
+    expect(ordinaryGraph(graph()).edges).toEqual([]);
   });
 
   it('does not count what only the omnicanvas shows as the session\'s nodes or canvases', () => {

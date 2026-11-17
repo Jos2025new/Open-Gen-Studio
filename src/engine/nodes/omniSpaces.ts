@@ -33,10 +33,10 @@ export function omniSpacePorts(spaceRef: string): PortSpec[] | undefined {
 /** A node only the omnicanvas shows: system and Space nodes, and assets it brought in. */
 export const omniOnly = (n: GraphNode): boolean => n.data.kind === 'ref' || n.omni === true;
 
-/** What the ordinary Nodes canvas leaves out: the Space nodes and the assets the omnicanvas brought in. The system parts (chat, agent, models, doc, library, tools) are drawn there too. */
-export const hiddenInOrdinary = (n: GraphNode): boolean => n.omni === true || (n.data.kind === 'ref' && n.data.type === 'space');
+/** What the ordinary Nodes canvas leaves out: every system node (they are the Spaces' own nodes and show only on the omnicanvas, user rule 2026-11-17) and the assets the omnicanvas brought in. */
+export const hiddenInOrdinary = omniOnly;
 
-/** The graph as the ordinary Nodes canvas draws it: system nodes included, without Space nodes, omnicanvas assets and the links that touch them. The same object when there is nothing to hide. */
+/** The graph as the ordinary Nodes canvas draws it: without omnicanvas-only nodes and the links that touch them. The same object when there are none. */
 export function ordinaryGraph(g: Graph): Graph {
   if (!g.nodes.some(hiddenInOrdinary)) return g;
   const hidden = new Set(g.nodes.filter(hiddenInOrdinary).map((n) => n.id));
