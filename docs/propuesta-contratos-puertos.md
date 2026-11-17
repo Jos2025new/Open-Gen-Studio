@@ -16,7 +16,7 @@ Origen: «Referencias que fallan en silencio» ([pendientes](pendientes.md), pun
 | --- | --- | --- |
 | R1 Integridad | Una `ref` cuyo destino no existe queda **inválida y visible** (`LiveSystemSummary.invalid`); nunca se sustituye por el doc, sesión o modelo activo. | `tests/ref-integrity.test.ts` |
 | R2 Borrado | `deleteDoc` marca los nodos que apuntaban al doc como inválidos (no los borra ni los repunta). | ídem |
-| R3 Vigente o fijada | `RefNodeData.pinnedRevision` ausente = sigue la vigente; presente = fijada a esa revisión (`assetRevisions`). | ídem |
+| R3 Vigente o fijada | `ref: 'active'` = sigue la vigente (`tracking: 'following'`); un id concreto = fijada (`'pinned'`); revisión de asset: parte 4. | ídem |
 | R4 Obligatorias | Una entrada obligatoria ausente o sin resultado es error visible **antes** de llamar al proveedor; sin `if (a)` que la salte. | `tests/ref-required.test.ts` |
 | R5 Freshness | `nodeIsCurrent` compara contenido/revisión del referido y entradas `ref`/`control`. | `tests/ref-freshness.test.ts` |
 

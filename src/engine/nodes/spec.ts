@@ -235,11 +235,20 @@ export interface LiveSystemSummary {
   docName?: string;
   map?: Array<{ x: number; y: number }>;
   params?: Array<{ id: string; label: string; value: string; options?: Array<{ value: string; label: string }> }>;
+  /** The target no longer exists: the node says so instead of showing the active session, doc or model. */
+  invalid?: string;
+  /** `designer.doc`: 'following' = tracks the current revision; 'pinned' = a concrete doc id (a missing one is invalid). */
+  tracking?: 'following' | 'pinned';
   /** Chat node: the agent and the models connected to it. */
   connections?: Array<{ nodeId: string; kind: 'agent' | 'model'; title: string; detail: string }>;
 }
 
-/** Resolve live data from the store without copying or migrating anything. */
+function missingTarget(node: GraphNode, type: string, what: string): LiveSystemSummary {
+  const d = node.data as RefNodeData;
+  return { type: d.type, ref: d.ref, title: d.title || type, subtitle: `Missing ${what}`, badge: 'Invalid', chips: [], details: [`${what} "${d.ref}" no longer exists. Connect it to another or remove this node.`], invalid: `${what} not found` };
+}
+
+/** Resolve live data from the store without copying or migrating anything. A missing target is invalid, never replaced. */
 export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveSystemSummary | null {
   if (node.data.kind !== 'ref') return null;
   const d = node.data;
@@ -249,7 +258,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
 
   switch (d.type) {
     case 'chat': {
-      const targetSession = st.sessions[d.ref] ?? session;
+      if (!st.sessions[d.ref]) return missingTarget(node, 'Chat', 'Session');
+      const targetSession = st.sessions[d.ref];
       const feed = targetSession?.feed ?? [];
       const userCount = feed.filter((f) => f.type === 'user').length;
       const genCount = feed.filter((f) => f.type === 'generation').length;
@@ -279,7 +289,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       };
     }
     case 'agent': {
-      const targetSession = st.sessions[d.ref] ?? session;
+      if (!st.sessions[d.ref]) return missingTarget(node, 'Agent', 'Session');
+      const targetSession = st.sessions[d.ref];
       const ag = targetSession?.agent;
       const llmRef = st.settings.agent.provider === 'offline' ? 'offline' : st.settings.agent.model || 'offline';
       const attached: NonNullable<LiveSystemSummary['attachedModels']> = [];
@@ -351,10 +362,13 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
     }
     case 'designer.doc': {
       const docs = session?.docs ?? [];
-      const doc = docs.find((x) => x.id === d.ref) ?? docs.find((x) => x.id === session?.activeDocId) ?? docs[0];
+      const following = d.ref === 'active';
+      const doc = following ? docs.find((x) => x.id === session?.activeDocId) : docs.find((x) => x.id === d.ref);
+      if (!following && !doc) return missingTarget(node, 'Designer Doc', 'Document');
       const isActive = Boolean(doc && session?.activeDocId === doc.id);
       return {
         type: 'designer.doc',
+        tracking: following ? 'following' : 'pinned',
         ref: doc?.id ?? d.ref,
         title: doc?.name || d.title || 'Designer Doc',
         subtitle: doc ? `${doc.width} × ${doc.height} px · ${doc.layers.length} layer(s)` : 'No layers yet (points to active doc)',
@@ -381,7 +395,8 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       };
     }
     case 'session': {
-      const s = st.sessions[d.ref] ?? session;
+      const s = st.sessions[d.ref];
+      if (!s) return missingTarget(node, 'Session', 'Session');
       return {
         type: 'session',
         ref: s?.id ?? d.ref,

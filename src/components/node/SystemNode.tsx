@@ -83,6 +83,7 @@ export function SystemNode({ data, selected }: NodeProps<FlowNode>) {
         </div>
         <div className="nc-sys-body">
           <p className="nc-sys-sub">{live?.subtitle ?? ''}</p>
+          {live?.invalid ? <p className="nc-sys-sub" role="alert">{live.details[0]}</p> : null}
           {live?.attachedModels?.length ? (
             <ul className="nc-sys-models" aria-label="Attached models">
               {live.attachedModels.map((m) => <li key={`${m.nodeId}:${m.ref}:${m.mode}`}>{m.title}<small>{m.mode}</small></li>)}
