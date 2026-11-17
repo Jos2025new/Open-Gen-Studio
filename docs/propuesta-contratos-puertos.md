@@ -78,3 +78,11 @@ Lecciones de otros sistemas de nodos (en parte de foros; no verificadas una a un
 
 - Hecho: `model → agent` (control) cambia `session.agent.settings.<image|video>.modelRef` (`applyModelLinkToAgent`); `chat`/`agent` `out` (data) entrega el texto real a `prompt` (`flow/refText.ts`). Tests: `tests/ref-ports-effects.test.ts`.
 - Sin hacer: `designer.doc.out` y `library.out` como imagen real (el render del doc es asíncrono y necesita su propio paso en `executor.ts`), `designer.doc.in`, `library.in`, `space.in/out`, `agent.in/tools`, `model.in/out` (Q1). Error conocido 5: los nodos con efectos (chat, agent, library.in) aún no se marcan no idempotentes; error 6: el esquema de puertos aún no lleva versión. Ambos quedan en `pendientes.md`.
+
+## Nota de diseño: acoplamientos (2026-11-17)
+
+Orden: (1) agente propio, (2) nodo `prompt` y ajustes de medio, (3) chat dueño de su feed y registro de tipos. Sin migración que pierda datos: todo campo nuevo es opcional y su ausencia significa «sigue el valor de hoy». No toca archivos de persistencia protegida (solo añade campos opcionales al grafo y a `meta`).
+
+1. **Agente.** `RefNodeData.llm?: { provider, model }` en el nodo agente. Ausente = sigue `settings.agent` (el global, que pasa a ser el valor por defecto de un agente sin elección propia). `agentEngine(sessionId?)` lee el nodo agente de la sesión y, si tiene `llm`, usa ese; si no, el global. Los controles actuales siguen escribiendo el global, así que nada cambia en pantalla ni en datos viejos. `ChatMessageMeta` gana `agentNodeId` (id del nodo agente) **junto a** `agent`, que sigue siendo el rol visible ('Director'): sustituirlo cambiaría lo que se ve.
+2. **Prompt.** Nodo `prompt` con `composer.text` como valor; el agente lee aristas `prompt→agent` y, sin aristas, `composer.text` como hoy.
+3. **Chat.** Registro de tipos de nodo de sistema en `spec.ts` (un solo sitio para añadir un tipo); el nodo chat admite varios agentes conectados.

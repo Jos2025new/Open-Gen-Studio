@@ -64,6 +64,7 @@ export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
+    ...(agentNodeOf()?.id ? { agentNodeId: agentNodeOf()!.id } : {}),
     space: placeFor(get().ui, workspace),
     provider: e.kind === 'offline' ? 'offline' : e.provider,
     model: e.kind === 'offline' ? 'Local planner' : e.model,
@@ -101,8 +102,16 @@ export function setThreadOpen(open: boolean): void {
   useStore.setState((st) => ({ ui: { ...st.ui, threadOpen: open } }));
 }
 
-export function agentEngine(): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
-  const { agent, keys } = get().settings;
+/** The session's agent node (the first one: attachModelToNode and the chat use the same). */
+export function agentNodeOf(sessionId: string = get().activeSessionId) {
+  return get().sessions[sessionId]?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent');
+}
+
+export function agentEngine(sessionId: string = get().activeSessionId): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
+  const { keys } = get().settings;
+  const own = agentNodeOf(sessionId)?.data;
+  const chosen = own?.kind === 'ref' ? own.llm : undefined;
+  const agent = chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
   if (agent.provider === 'offline') return { kind: 'offline' };
   const key = keys[agent.provider]?.trim();
   if (!key || !agent.model) return { kind: 'offline' };

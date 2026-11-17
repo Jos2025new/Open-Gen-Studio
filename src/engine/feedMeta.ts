@@ -14,6 +14,8 @@ export interface ChatMessageMeta {
   timeZone?: string;
   /** Agent name/role (e.g. 'Director', 'Local planner'). */
   agent?: string;
+  /** Id of the agent node that wrote the message (several agents can share a chat). */
+  agentNodeId?: string;
   /** Space where the message was written. */
   space?: Place;
   /** Provider id ('openrouter' | 'nanogpt' | 'atlas' | 'offline'). */

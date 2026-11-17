@@ -341,6 +341,20 @@ export function applyModelLinkToAgent(sessionId: string, modelNodeId: string, ag
   return true;
 }
 
+/** Gives one agent node its own LLM (null = follow the default in settings.agent again). */
+export function setAgentLlm(sessionId: string, nodeId: string, llm: { provider: string; model: string } | null): string | null {
+  const node = useStore.getState().sessions[sessionId]?.graph.nodes.find((n) => n.id === nodeId);
+  if (node?.data.kind !== 'ref' || node.data.type !== 'agent') return `No such agent node: ${nodeId}.`;
+  return commitSystemGraph(sessionId, (g) => ({
+    ...g,
+    nodes: g.nodes.map((n) => {
+      if (n.id !== nodeId || n.data.kind !== 'ref') return n;
+      const { llm: _old, ...rest } = n.data;
+      return { ...n, data: llm ? { ...rest, llm } : rest };
+    }),
+  }));
+}
+
 export function attachModelToNode(
   sessionId: string,
   opts: {

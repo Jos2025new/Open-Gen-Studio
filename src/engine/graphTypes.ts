@@ -73,6 +73,8 @@ export interface RefNodeData {
   ref: string;
   title: string;
   attachMode?: ModelAttachMode;
+  /** Agent node: its own LLM. Absent = follows the default in settings.agent (nothing to migrate). */
+  llm?: { provider: string; model: string };
   dockedTo?: string;
   mergedModels?: string[];
   mediaKind?: MediaKind | 'llm';
