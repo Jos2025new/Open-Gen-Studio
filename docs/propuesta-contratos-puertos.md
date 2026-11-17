@@ -52,11 +52,14 @@ Origen: «Referencias que fallan en silencio» ([pendientes](pendientes.md), pun
 | creativos | `model` | control | fija `modelRef` del nodo | gen.modelRef cambia | P2 |
 | creativos | `control`/`out_control` | control | orden/relación; entra en freshness (R5) | R5 | P4 |
 
-## Preguntas abiertas
+## Decisiones del usuario (2026-11-17) sobre Q1–Q3
 
-- **Q1** `model.in/out` (data): ¿el nodo modelo ejecuta por sí mismo con el prompt entrante o solo configura? Hasta decidirlo se mantiene como solo configuración.
-- **Q2** `agent.control` / `chat` (control): ¿qué significa «controlar» al agente más allá del enlace (pausar, enviar turno)? Sin definir no hay efecto verificable.
-- **Q3** `space.in`: ¿«Assets in» crea assets en el espacio o solo los referencia?
+Principio: no se cambia lo que se ve; se separa en código lo que ya existe y se pasa de espejo a fuente de verdad.
+
+- **Q1** El nodo modelo o proveedor solo configura. Va acoplado por defecto al agente y se cambia en el propio nodo; quien ejecuta es el nodo de generación.
+- **Q2** El control es declarativo: conectar un agente a un chat. Un chat puede tener varios agentes (cada uno, un nodo conectado al chat) y cada mensaje lleva quién lo envió: id del nodo agente, su proveedor y su modelo. Pausar o enviar un turno son botones del nodo, no cables.
+- **Q3** «Assets in» solo referencia, por id estable; copiar es una acción explícita.
+- Una caja de texto independiente como nodo (`prompt`), conectable a varios agentes. Agrupar es unir nodos bajo un marco tipado.
 
 ## Errores conocidos que evitamos
 
