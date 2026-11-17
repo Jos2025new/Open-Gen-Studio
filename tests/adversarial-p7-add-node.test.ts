@@ -80,7 +80,7 @@ describe('P7 Add node adversarial coverage', () => {
     const sysId = addSystemNode(sid, { type: 'library', id: 'sys_library_adversarial' });
     const spaceId = addSystemNode(sid, { type: 'space', ref: 'studio', id: 'sys_space_studio' });
     const ownAsset = { id: 'omni_asset_fixture', position: { x: 900, y: 0 }, omni: true as const, data: { kind: 'asset' as const, title: 'Fixture', assetId: 'fixture' } };
-    setGraph(sid, (graph) => ({ ...graph, nodes: [...graph.nodes, ownAsset], edges: [...graph.edges, { id: 'adversarial-link', source: sysId, target: spaceId, kind: 'ref' }] }));
+    setGraph(sid, (graph) => ({ ...graph, nodes: [...graph.nodes, ownAsset], edges: [...graph.edges, { id: 'adversarial-link', source: sysId, target: spaceId, sourceHandle: 'out', targetHandle: 'ref', kind: 'ref' as const }] }));
     expect(deleteNodes(sid, [sysId])).toBeNull();
     const graph = useStore.getState().sessions[sid].graph;
     expect(graph.nodes.some((node) => node.id === sysId)).toBe(false);

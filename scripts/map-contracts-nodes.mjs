@@ -23,6 +23,8 @@ export default [{
     ['src/engine/flow/graph.ts', 'export function executionOrder'],
     ['src/components/node/SystemNode.tsx', 'export function linkClassProps'],
     ['src/styles/node-system.css', '.edge-link-control'],
+    ['src/engine/nodes/omniSpaces.ts', 'export const hiddenInOrdinary'],
+    ['src/components/node/AddNodeItems.tsx', 'const SYSTEM_ENTRIES'],
   ],
-  tests: ['tests/system-nodes.test.ts'],
+  tests: ['tests/system-nodes.test.ts', 'tests/omnicanvas.test.ts', 'tests/adversarial-p7-add-node.test.ts'],
 }];

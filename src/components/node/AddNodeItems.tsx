@@ -22,6 +22,7 @@ const SPACE_ICON: Record<OmniSpace, LucideIcon> = { studio: MessageSquare, nodes
 const SPACE_SUB: Record<OmniSpace, string> = { studio: 'Chat and results', nodes: 'Connected flows of cards', designer: 'Layers: raster, vector and text' };
 /** System parts as nodes: they point to the data where it lives (nothing is copied). */
 const SYSTEM_ENTRIES: Array<[SystemNodeType, LucideIcon, string, string]> = [
+  ['chat', MessageSquare, 'The chat of this session', 'chat conversation messages'],
   ['agent', Bot, 'The agent that answers in the chat', 'agent assistant director'],
   ['model', Sparkles, 'A model to attach to the agent or chat', 'model provider llm'],
   ['provider', Cpu, 'A provider and its catalog', 'provider catalog openrouter'],
