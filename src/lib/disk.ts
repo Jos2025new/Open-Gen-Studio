@@ -42,20 +42,7 @@ export function diskAvailable(): Promise<boolean> {
   return available;
 }
 
-/**
- * True from `pagehide` on: a reload or close aborts the requests still in flight (the browser rejects them with
- * "Failed to fetch"). Nothing is lost then: the browser copy is written first, and an aborted commit stays unconfirmed
- * and is sent again, with its `retryOf`, by the next load. Only that abort goes unreported; a real failure still warns.
- */
-let unloading = false;
-if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', () => { unloading = true; });
-  window.addEventListener('pageshow', () => { unloading = false; });
-}
-const report = (what: string) => (err: unknown) => {
-  if (unloading) return;
-  console.warn(`Disk copy: could not ${what}`, err);
-};
+const report = (what: string) => (err: unknown) => console.warn(`Disk copy: could not ${what}`, err);
 
 // State writes are serialized and coalesced: only the newest pending value is sent, never out of order.
 let stateChain: Promise<void> = Promise.resolve();
