@@ -1,5 +1,5 @@
 import { uid } from '../../lib/id';
-import { reconcileDeletionNotices, setGraph, toast, useStore } from '../../store/store';
+import { reconcileDeletionNotices, patchSession, setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem } from '../flow/locks';
 import { isOmniSpace } from './omniSpaces';
 import type {
@@ -321,6 +321,26 @@ export function addSystemNode(
   return id;
 }
 
+/**
+ * Control link model → agent has a real effect: the agent's image/video model for this session becomes the model node's.
+ * (The LLM model is the user's global setting and is not changed by a link.) Returns whether the agent config changed.
+ */
+export function applyModelLinkToAgent(sessionId: string, modelNodeId: string, agentNodeId: string): boolean {
+  const session = useStore.getState().sessions[sessionId];
+  const model = session?.graph.nodes.find((n) => n.id === modelNodeId)?.data;
+  const agent = session?.graph.nodes.find((n) => n.id === agentNodeId)?.data;
+  if (!session || model?.kind !== 'ref' || model.type !== 'model' || agent?.kind !== 'ref' || agent.type !== 'agent') return false;
+  const kind = model.mediaKind;
+  if ((kind !== 'image' && kind !== 'video') || !model.ref) return false;
+  const current = session.agent.settings?.[kind];
+  if (current?.modelRef === model.ref) return false;
+  patchSession(agent.ref in useStore.getState().sessions ? agent.ref : sessionId, (s) => ({
+    ...s,
+    agent: { ...s.agent, settings: { ...s.agent.settings, [kind]: { needsImage: false, ...s.agent.settings?.[kind], modelRef: model.ref } } },
+  }));
+  return true;
+}
+
 export function attachModelToNode(
   sessionId: string,
   opts: {
@@ -416,6 +436,7 @@ export function attachModelToNode(
     return { ...g, nodes, edges, ...(groups.length ? { groups } : { groups: undefined }) };
   });
 
+  if (!error) applyModelLinkToAgent(sessionId, modelNodeId, hostId);
   return { error, modelNodeId, edgeId, ...(opts.mode === 'grouped' ? { groupId } : {}) };
 }
 
@@ -554,6 +575,7 @@ export function linkSystemNodes(
     return { ...g, edges };
   });
 
+  if (!error && opts.kind === 'control') applyModelLinkToAgent(sessionId, opts.source, opts.target);
   return { error, ...(error ? {} : { edgeId }) };
 }
 
