@@ -17,7 +17,7 @@ const KIND_LABEL: Record<Kind, string> = { image: 'Image', video: 'Video', audio
 const SECTION_LABEL = { spaces: 'Spaces', system: 'System', media: 'Media', nodes: 'Nodes', tools: 'Tools' } as const;
 
 /** The omnicanvas also takes the session's own parts as nodes (a library where everything is a node). `has`: that Space already has its one node. */
-export interface OmniEntries { has: (space: OmniSpace) => boolean; onSpace: (space: OmniSpace) => void; onSystem: (type: SystemNodeType) => void }
+export interface OmniEntries { /** False on the ordinary Nodes canvas: system parts only, no Space nodes. */ spaces?: boolean; has: (space: OmniSpace) => boolean; onSpace: (space: OmniSpace) => void; onSystem: (type: SystemNodeType) => void }
 const SPACE_ICON: Record<OmniSpace, LucideIcon> = { studio: MessageSquare, nodes: Workflow, designer: PenTool };
 const SPACE_SUB: Record<OmniSpace, string> = { studio: 'Chat and results', nodes: 'Connected flows of cards', designer: 'Layers: raster, vector and text' };
 /** System parts as nodes: they point to the data where it lives (nothing is copied). */
@@ -42,7 +42,7 @@ function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: Gr
     node('video', Film, 'Video', 'Generate video', 'video generation first frame motion'),
     node('audio', Music, 'Audio', 'Generate music or song lyrics', 'audio music song lyrics voice'),
     node('model3d', Box, '3D model', 'Generate a GLB model from text or image', '3d model glb'),
-    ...(omni ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
+    ...(omni && omni.spaces !== false ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
     ...(omni ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
   ];

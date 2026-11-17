@@ -16,7 +16,7 @@ Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rend
 4. ~~**Barra inferior del visor**~~ **Hecho 2026-11-16**: pestañas con icono (Pintar, Editar, Variaciones, Convertir, Mejorar). Evidencia: código y `tests/lightbox.test.ts`; prueba visual en sandbox al final.
 5. **Idioma mezclado inglés/español** (*nuevo*, 2026-11-15): decisión del usuario pendiente.
 6. **C0 · «Disk copy: could not save state … Failed to fetch» al recargar.** **Crítico, pendiente de revisión independiente (zona protegida).** Arreglo y pruebas en la rama `task/c0-pagehide` (3 commits sobre `task/sqlite-adopt`), no fusionado. [detalle](pendientes-sistema.md)
-7. **Nodos del sistema fuera del lienzo de Nodes normal** (hoy solo en el omnicanvas). [plan](propuesta-todo-es-un-nodo-plan.md)
+7. ~~**Nodos del sistema fuera del lienzo de Nodes normal**~~ **Hecho 2026-11-17** (código y tests `omnicanvas*.test.ts`; prueba visual en el sandbox: el lienzo Nodes muestra Chat, Agent, Designer Doc y modelos, sin Spaces; salió el aviso de protección «Not saved to disk» por mezclar datos de dos sandboxes, sin tocarlo): el lienzo normal dibuja las partes del sistema y el menú «Add node» las ofrece; los Spaces y los assets del omnicanvas siguen solo allí. [plan](propuesta-todo-es-un-nodo-plan.md)
 8. **Paso 13 · puertos propios y cables entre ventanas.** [plan](propuesta-todo-es-un-nodo-plan.md)
 9. **Pasos 10 y 11** (dos agentes en un chat; ejecutar y parar por nodo): los hace el usuario. [plan](propuesta-todo-es-un-nodo-plan.md)
 10. **Migrar datos reales a SQLite**: necesita aprobación expresa. [detalle](pendientes-sistema.md)
