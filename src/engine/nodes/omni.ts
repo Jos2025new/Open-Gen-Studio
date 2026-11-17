@@ -1,8 +1,8 @@
 import { reconcileDeletionNotices, setComposer, useStore } from '../../store/store';
 import { selectDoc } from '../design/actions';
-import type { AgentStyle, ComposerMode, Graph, GraphEdge, GraphNode, RefNodeData } from '../types';
+import type { AgentStyle, ComposerMode, Graph, GraphEdge, GraphNode, RefNodeData, SystemNodeType } from '../types';
 import { estimatedHeight, findFreePosition, NODE_WIDTH, nodeRect, rectsOverlap, type NodeRect } from '../flow/graph';
-import { COL, ROW, addSystemNode, ensureSystemNodes, sysOrigin } from './system';
+import { COL, ROW, addSystemNode, ensureSystemNodes, linkSystemNodes, sysOrigin } from './system';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, type OmniSpace } from './omniSpaces';
 
 export { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, omniOnly, ordinaryGraph, type OmniSpace } from './omniSpaces';
@@ -147,11 +147,32 @@ const patchRef = (sessionId: string, nodeId: string, change: (d: RefNodeData) =>
   return null;
 };
 
-/** The look the user chose for a Space node: thumbnail or node. A preference of the view, so no undo step. */
+/** The system nodes each Space generates and needs to work (user rule 2026-11-17); they show when it is opened. */
+export const SPACE_SYSTEM_PARTS: Record<OmniSpace, SystemNodeType[]> = { studio: ['chat', 'agent', 'model'], designer: ['designer.doc'], nodes: ['toolset', 'library'] };
+
+/** Opening or undocking a Space shows its system nodes: the ones that are missing come back next to it, linked to it. Omnicanvas only (the ordinary Nodes canvas hides them). */
+export function showSpaceSystemNodes(sessionId: string, space: OmniSpace): string[] {
+  ensureOmniNodes(sessionId);
+  const spaceId = omniSpaceNodeId(space);
+  const added: string[] = [];
+  for (const type of SPACE_SYSTEM_PARTS[space]) {
+    const g = useStore.getState().sessions[sessionId]?.graph;
+    const anchor = g?.nodes.find((n) => n.id === spaceId);
+    if (!g || !anchor || g.nodes.some((n) => n.data.kind === 'ref' && n.data.type === type)) continue;
+    const id = addSystemNode(sessionId, { type, position: { x: anchor.position.x, y: anchor.position.y + 360 } });
+    linkSystemNodes(sessionId, { source: spaceId, target: id, kind: 'ref', both: true });
+    added.push(id);
+  }
+  return added;
+}
+
+/** The look the user chose for a Space node: thumbnail or node. Opening it as a node shows its system nodes. */
 export function setSpaceView(sessionId: string, nodeId: string, view: 'thumb' | 'node'): string | null {
   const node = useStore.getState().sessions[sessionId]?.graph.nodes.find((n) => n.id === nodeId);
   if (node && !(node.data.kind === 'ref' && node.data.type === 'space' && isOmniSpace(node.data.ref))) return `${nodeId} is not a Studio, Nodes or Designer node.`;
-  return patchRef(sessionId, nodeId, (d) => ({ ...d, view }));
+  const error = patchRef(sessionId, nodeId, (d) => ({ ...d, view }));
+  if (!error && view === 'node' && node?.data.kind === 'ref' && isOmniSpace(node.data.ref)) showSpaceSystemNodes(sessionId, node.data.ref);
+  return error;
 }
 
 /** The chat node undocked shows its agent and model connections; docked it looks like Studio's chat. */
