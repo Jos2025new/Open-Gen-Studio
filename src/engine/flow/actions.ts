@@ -246,7 +246,7 @@ export function runnableIds(nodes: GraphNode[]): string[] {
 
 function requestContext(sessionId: string) {
   const st = get(), graph = st.sessions[sessionId].graph;
-  return { schemas: st.catalog.schemas, operation: (n: GraphNode) => {
+  return { schemas: st.catalog.schemas, assets: st.assets, operation: (n: GraphNode) => {
     if (n.data.kind !== 'tool') return undefined;
     const engine = OPS[n.data.op].engine;
     if (['local', 'voice'].includes(engine)) return undefined;

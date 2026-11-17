@@ -1,4 +1,5 @@
-import type { GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
+import { normalizeAssetRevisions } from '../assetRevisions';
+import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
 
 export function stable(value: unknown): string {
@@ -17,7 +18,19 @@ export function comparableSettings(modelRef: string, settings: GenSettings, sche
 /** The result a subject binding names (`node#2` → 1), or undefined for the node's chosen result. */
 const pickOf = (from: string): number | undefined => { const m = /#(\d+)$/.exec(from); return m ? Math.max(0, Number(m[1]) - 1) : undefined; };
 
-export interface RequestContext { schemas?: Record<string, ModelSchema>; operation?: (node: GraphNode) => unknown }
+export interface RequestContext { schemas?: Record<string, ModelSchema>; assets?: Record<string, Asset>; operation?: (node: GraphNode) => unknown }
+
+/** What a ref/control link brings: the referred thing's identity and content revision (an edited asset changes it). */
+function linkTarget(graph: Graph, node: GraphNode, generations: Record<string, Generation>, assets: Record<string, Asset> = {}) {
+  return graph.edges.filter(e => (e.kind ?? 'data') !== 'data' && (e.target === node.id || (e.both && e.source === node.id))).map(e => {
+    const other = graph.nodes.find(n => n.id === (e.target === node.id ? e.source : e.target));
+    const d = other?.data;
+    const assetId = d?.kind === 'asset' ? d.assetId : undefined;
+    const rev = assetId ? normalizeAssetRevisions(assets[assetId]) : undefined;
+    const gen = d && 'generationId' in d && d.generationId ? generations[d.generationId] : undefined;
+    return { kind: e.kind, port: e.targetHandle, from: other?.id ?? null, to: d?.kind === 'ref' ? d.ref : assetId ?? gen?.id ?? null, rev: rev ? `${rev.index}/${rev.versions.length}` : undefined };
+  });
+}
 
 /** Compare the graph's logical request, before provider defaults, mention substitution and automatic seeds. */
 export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<string, Generation>, library: Subject[] = [], ctx: RequestContext = {}) {
@@ -49,8 +62,10 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
     const s = subjects.find(x => x.id === id)!;
     return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: s.refAssetIds, video: s.videoAssetId, voice: s.voiceId };
   });
-  return d.kind === 'tool' ? { kind: d.kind, op: d.op, params: d.params, incoming, operation: ctx.operation?.(node) }
-    : 'settings' in d ? { kind: d.kind, modelRef: d.modelRef, prompt, settings: comparableSettings(d.modelRef, d.settings, ctx.schemas), incoming, subjects: mentioned } : { kind: d.kind, incoming };
+  const links = linkTarget(graph, node, generations, ctx.assets);
+  const extra = links.length ? { links } : {}; // absent when empty, so results saved before this stay current
+  return d.kind === 'tool' ? { kind: d.kind, op: d.op, params: d.params, incoming, operation: ctx.operation?.(node), ...extra }
+    : 'settings' in d ? { kind: d.kind, modelRef: d.modelRef, prompt, settings: comparableSettings(d.modelRef, d.settings, ctx.schemas), incoming, subjects: mentioned, ...extra } : { kind: d.kind, incoming, ...extra };
 }
 
 export function nodeIsCurrent(graph: Graph, node: GraphNode, generations: Record<string, Generation>, library: Subject[] = [], ctx: RequestContext = {}): boolean {
