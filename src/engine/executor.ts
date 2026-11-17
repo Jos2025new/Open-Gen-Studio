@@ -140,7 +140,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   /** A reference the step declares must resolve: a missing one stops the step before any provider call. */
   const requireAsset = async (ref: string, what = 'reference'): Promise<string> => {
     const a = await resolveAsset(ref);
-    if (!a || !useStore.getState().assets[a]) throw new Error(`Missing ${what} "${ref}": its image does not exist. Nothing was sent to the provider.`);
+    if (!a || (ref.startsWith('asset:') && !useStore.getState().assets[a])) throw new Error(`Missing ${what} "${ref}": its image does not exist. Nothing was sent to the provider.`);
     return a;
   };
 

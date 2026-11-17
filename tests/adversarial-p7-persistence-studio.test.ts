@@ -63,7 +63,7 @@ describe('P7 persistence and embedded canvas adversarial coverage', () => {
     expect(restored.edges).toEqual(session.graph.edges);
   });
 
-  it('keeps system nodes visible in a narrow embedded Studio Nodes canvas without Spaces or assets', async () => {
+  it('draws no system node, Space or omnicanvas asset in a narrow embedded Studio Nodes canvas (user rule 2026-11-17)', async () => {
     ensureSystemNodes(sid);
     const space = addSystemNode(sid, { type: 'space', ref: 'studio', id: 'sys_space_studio' });
     const asset = { id: 'omni_asset_narrow', position: { x: 0, y: 0 }, omni: true as const, data: { kind: 'asset' as const, title: 'Hidden asset', assetId: 'a' } };
@@ -74,7 +74,7 @@ describe('P7 persistence and embedded canvas adversarial coverage', () => {
     expect(host.querySelector('.node-canvas.is-embedded')).not.toBeNull();
     expect(host.querySelector('[aria-label="Add node"]')).toBeNull();
     const drawn = ordinaryGraph(useStore.getState().sessions[sid].graph);
-    expect(drawn.nodes.some((node) => node.data.kind === 'ref' && node.data.type === 'chat')).toBe(true);
+    expect(drawn.nodes.some((node) => node.data.kind === 'ref')).toBe(false);
     expect(drawn.nodes.some((node) => node.id === space || node.id === asset.id)).toBe(false);
     expect(host.querySelector('.studio-board')?.getAttribute('style')).toContain(`width: ${BOARD_MIN}px`);
   });
