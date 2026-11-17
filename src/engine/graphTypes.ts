@@ -6,7 +6,7 @@ export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool'
 export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
 /** Link classes: `data` carries values and runs in order; `ref` points; `control` governs. `both` only on ref and control. */
 export type LinkKind = 'data' | 'ref' | 'control';
-export type SystemNodeType = 'chat' | 'agent' | 'provider' | 'model' | 'session' | 'space' | 'designer.doc' | 'library' | 'toolset';
+export type SystemNodeType = 'chat' | 'agent' | 'provider' | 'model' | 'session' | 'space' | 'designer.doc' | 'library' | 'toolset' | 'prompt' | 'mediaSettings';
 export type ModelAttachMode = 'wired' | 'docked' | 'grouped' | 'merged';
 
 export interface PortSpec {
@@ -75,6 +75,8 @@ export interface RefNodeData {
   attachMode?: ModelAttachMode;
   /** Agent node: its own LLM. Absent = follows the default in settings.agent (nothing to migrate). */
   llm?: { provider: string; model: string };
+  /** Prompt node: its own text. Absent with ref 'composer' = the composer's text (the Studio prompt box). */
+  promptText?: string;
   dockedTo?: string;
   mergedModels?: string[];
   mediaKind?: MediaKind | 'llm';

@@ -21,7 +21,8 @@ import { sectionsOf } from './settingsCard';
 import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
-import { addReplyToRequest, agentEngine, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { promptsWiredToAgent } from '../nodes/spec';
+import { addReplyToRequest, agentEngine, agentNodeOf, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
 import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
@@ -39,6 +40,9 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const attachments = [...(opts.attachments ?? st.composer.attachments)];
   const clean = text.trim();
   if (!clean && !attachments.length) return;
+  // Independent prompt nodes wired into the agent add their text to what the model reads (the chat shows only what was typed).
+  const agentNode = agentNodeOf(sessionId);
+  const wired = agentNode ? promptsWiredToAgent(sessionId, agentNode.id) : [];
 
   const runId = uid('turn');
   autoTitleSession(sessionId, clean || 'Edit');
@@ -129,7 +133,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const forced = steerNote(gate, confirmFirst);
   // The route goes first: one buried after the context was followed after the prompt's own steps.
   const askFirst = session(sessionId).agent.questionRound === 0;
-  pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
+  pushHistory(sessionId, userMessage(`${forced}${userBlock([clean, ...wired].filter(Boolean).join('\n\n') || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace, { route: 'new', runId });
 }
 

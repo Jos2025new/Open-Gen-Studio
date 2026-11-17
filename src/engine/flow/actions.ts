@@ -69,6 +69,8 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
         'designer.doc': session?.activeDocId ?? session?.docs[0]?.id ?? 'active',
         library: 'library',
         toolset: 'toolset',
+        prompt: 'composer',
+        mediaSettings: 'image',
       };
       return { kind: 'ref', type, ref: opts.ref ?? defaults[type], title: SYSTEM_NODE_TYPES[type].title };
     }

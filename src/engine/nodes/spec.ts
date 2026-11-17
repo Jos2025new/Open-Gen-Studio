@@ -118,6 +118,22 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
     ],
     commands: ['nodes.system.link', 'nodes.system.unlink', 'library.subject.save'],
   },
+  prompt: {
+    type: 'prompt',
+    title: 'Prompt',
+    ports: [
+      { id: 'out', direction: 'out', kind: 'data', type: 'text', multi: true, label: 'Text' },
+    ],
+    commands: ['nodes.system.link', 'nodes.system.unlink'],
+  },
+  mediaSettings: {
+    type: 'mediaSettings',
+    title: 'Media settings',
+    ports: [
+      { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Settings' },
+    ],
+    commands: ['nodes.system.link', 'nodes.system.unlink'],
+  },
   toolset: {
     type: 'toolset',
     title: 'Tools',
@@ -246,6 +262,24 @@ export interface LiveSystemSummary {
 function missingTarget(node: GraphNode, type: string, what: string): LiveSystemSummary {
   const d = node.data as RefNodeData;
   return { type: d.type, ref: d.ref, title: d.title || type, subtitle: `Missing ${what}`, badge: 'Invalid', chips: [], details: [`${what} "${d.ref}" no longer exists. Connect it to another or remove this node.`], invalid: `${what} not found` };
+}
+
+/** The text a prompt node holds: the composer's text, or its own when it is an independent box. */
+export function promptNodeText(node: GraphNode | undefined): string | undefined {
+  const d = node?.data;
+  if (d?.kind !== 'ref' || d.type !== 'prompt') return undefined;
+  return d.ref === 'composer' ? useStore.getState().composer.text : d.promptText ?? '';
+}
+
+/** Texts of independent prompt nodes wired into an agent (data link into it); the composer's own text is sent as always. */
+export function promptsWiredToAgent(sessionId: string, agentNodeId: string): string[] {
+  const g = useStore.getState().sessions[sessionId]?.graph;
+  if (!g) return [];
+  return g.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === agentNodeId).flatMap((e) => {
+    const src = g.nodes.find((n) => n.id === e.source);
+    const t = src?.data.kind === 'ref' && src.data.ref !== 'composer' ? promptNodeText(src)?.trim() : undefined;
+    return t ? [t] : [];
+  });
 }
 
 /** Resolve live data from the store without copying or migrating anything. A missing target is invalid, never replaced. */
@@ -418,6 +452,15 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         chips: subjects.slice(0, 3).map((s) => `@${s.name}`),
         details: [subjects.length ? subjects.map((s) => s.name).join(', ') : 'Characters, objects & styles'],
       };
+    }
+    case 'prompt': {
+      const text = promptNodeText(node) ?? '';
+      return { type: 'prompt', ref: d.ref, title: d.title || 'Prompt', subtitle: d.ref === 'composer' ? 'Studio prompt box' : 'Independent text', badge: 'Text', chips: [`${text.length} chars`], details: [text.slice(0, 90) || 'Empty'] };
+    }
+    case 'mediaSettings': {
+      const kind = (d.ref in st.composer ? d.ref : 'image') as 'image' | 'video';
+      const c = st.composer[kind];
+      return { type: 'mediaSettings', ref: d.ref, title: d.title || 'Media settings', subtitle: `${kind} · ${c?.settings?.aspect ?? 'auto'}`, badge: 'Settings', chips: [c?.modelRef ?? ''], details: [`count ${c?.settings?.count ?? 1}`] };
     }
     case 'toolset':
       return {

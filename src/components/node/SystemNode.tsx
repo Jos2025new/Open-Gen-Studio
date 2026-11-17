@@ -20,6 +20,8 @@ const ICONS: Record<SystemNodeType, LucideIcon> = {
   'designer.doc': FileText,
   library: Database,
   toolset: Wand,
+  prompt: MessageSquare,
+  mediaSettings: Sparkles,
 };
 
 /** One handle per port. The link class shows in the shape (data: dot, ref: ring, control: diamond), not only in the colour. */
