@@ -60,6 +60,9 @@ export const viewedLane = (s: Session | undefined): string | undefined => s?.age
 /** The state of an agent instance (read-only). An id the session has no thread for reads as no state. */
 export const laneState = (sessionId: string, nodeId: string): AgentState | undefined => threadOf(useStore.getState().sessions[sessionId], nodeId);
 
+/** The same thread, or a fresh one when the agent has none (a read that must not fail). `laneState` tells a missing thread from an empty one. */
+export const agentOf = (sessionId: string, nodeId: string): AgentState => laneState(sessionId, nodeId) ?? freshAgent();
+
 /**
  * Write to one agent's state by id: an operation that belongs to an agent (its turn, the end of its plan, a rewrite on
  * its card, the edit of its message) never lands in whichever agent happens to be on screen. Without an id it is the

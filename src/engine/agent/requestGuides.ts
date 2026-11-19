@@ -1,5 +1,5 @@
 import { useStore } from '../../store/store';
-import { freshAgent, laneState } from './lanes';
+import { agentOf } from './lanes';
 import { defaultModelFor, inputVariant, modelSummary } from '../catalog';
 import { guideForModel, modelGuide } from '../guides';
 import { readGuide, STAGED_GUIDE } from '../skills';
@@ -10,7 +10,6 @@ import { readGuide, STAGED_GUIDE } from '../skills';
  */
 
 const get = useStore.getState;
-const agentOf = (sessionId: string, owner: string) => laneState(sessionId, owner) ?? freshAgent();
 
 /** Whether a text is already somewhere in the conversation sent to the model (guides go once). */
 export function inConversation(sessionId: string, owner: string, t: string): boolean {

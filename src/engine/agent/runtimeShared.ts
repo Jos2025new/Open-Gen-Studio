@@ -1,4 +1,4 @@
-import { dropThread, freshAgent, laneState, patchLane, resolveOwner } from './lanes';
+import { agentOf, dropThread, laneState, patchLane, resolveOwner } from './lanes';
 import { MAIN_THREAD, feedOfAgentIn, feedOfChatIn } from './threads';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
@@ -77,7 +77,7 @@ export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: 
 }
 
 /** An agent's state by id (explicit); `undefined` is the agent on screen, for a caller no agent owns. */
-export const agentOf = (sessionId: string, owner: string): AgentState => laneState(sessionId, owner) ?? freshAgent();
+export { agentOf };
 
 /** One abort controller per running turn: an agent's key is its own, so two agents of one session can run at once. */
 export const turnKey = (sessionId: string, owner: string): string => `${sessionId}|${owner}`;
