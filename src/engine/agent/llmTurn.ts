@@ -12,7 +12,7 @@ import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, loadLlmCatalog, modelSummary } from '../catalog';
 import { uid } from '../../lib/id';
 import type { ChatMessageMeta, ChatMessageUsage } from '../feedMeta';
-import type { AgentStyle, AssistantFeedItem, FeedItem, LlmMessage, SettingsFeedItem, Workspace } from '../types';
+import type { AgentState, AgentStyle, AssistantFeedItem, FeedItem, LlmMessage, SettingsFeedItem, Workspace } from '../types';
 import { addSpend, appendFeed, patchSession, removeFeedItem, updateFeedItem } from '../../store/store';
 import { SYSTEM_PROMPT } from './context';
 import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
@@ -28,7 +28,8 @@ import { activityLog } from './activityLog';
 import { waitHooks } from './schemaWait';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
-import { agentEngine, controllers, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
+import { agentEngine, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
+import { laneState } from './lanes';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
@@ -50,20 +51,20 @@ const HURRY_NOTE =
 export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId?: string }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
-  // A turn belongs to the agent whose state is loaded; a call that names another one never borrows it.
-  const lane = session(sessionId)?.agentLane;
-  if (opts.agentNodeId && lane && lane !== opts.agentNodeId) return;
+  // A turn belongs to one agent for its whole life: every read and write below names it, whichever agent is on screen later.
+  const owner = opts.agentNodeId ?? session(sessionId)?.agentLane;
+  const mine = (): AgentState => laneState(sessionId, owner) ?? session(sessionId).agent;
   const engine = agentEngine(sessionId, opts.agentNodeId);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
   const runId = opts.runId ?? uid('turn');
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   let outcome: TurnOutcome = 'text';
-  patchAgent(sessionId, { busy: true, phase: 'working' });
+  patchAgent(sessionId, { busy: true, phase: 'working' }, owner);
   const log = activityLog(sessionId, rowCanvas(workspace));
   const showThinking = get().settings.agent.showThinking !== false;
   const controller = new AbortController();
-  controllers.set(sessionId, controller);
+  controllers.set(turnKey(sessionId, owner), controller);
   const signal = controller.signal;
   const until = <T,>(work: Promise<T>) => untilStopped(work, signal);
   const clock = turnClock(sessionId);
@@ -125,8 +126,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     endLog(outcome);
     log.end();
     clock.end();
-    patchAgent(sessionId, { busy: false, phase: undefined, waiting: undefined });
-    if (controllers.get(sessionId) === controller) controllers.delete(sessionId);
+    patchAgent(sessionId, { busy: false, phase: undefined, waiting: undefined }, owner);
+    if (controllers.get(turnKey(sessionId, owner)) === controller) controllers.delete(turnKey(sessionId, owner));
   };
   const cut = () => {
     cutTurn = true;
@@ -151,7 +152,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       const hasTextBubble = () => Boolean(textItemId && session(sessionId).feed.some((f) => f.id === textItemId));
       let result: ChatResult;
       try {
-        if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
+        if (mine().phase !== 'working') patchAgent(sessionId, { phase: 'working' }, owner);
         drainAgentNotes(sessionId);
         if (!hurryNoted && Date.now() - turnStart > HURRY_MS) {
           pushHistory(sessionId, { role: 'user', content: HURRY_NOTE });
@@ -162,7 +163,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           apiKey: engine.key,
           model: engine.model,
           system: agentSystem(),
-          messages: repairHistory(session(sessionId).agent.history),
+          messages: repairHistory(mine().history),
           tools: toolsFor(get().composer.agentStyle),
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
@@ -173,7 +174,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             if (done) return;
             firstOutput();
             armSilence();
-            patchAgent(sessionId, { phase: 'drafting' });
+            patchAgent(sessionId, { phase: 'drafting' }, owner);
           },
           onText: (_delta, full) => {
             if (done) return;
@@ -326,7 +327,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           continue;
         }
         if (call.name === 'confirm_settings') {
-          const ag = () => session(sessionId).agent;
+          const ag = mine;
           const v = confirmSettingsSchema.safeParse(parsed.value);
           if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
           inferChoices(sessionId, 'confirm_settings', v.data.parts);
@@ -343,16 +344,15 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }), meta: takePendingMeta(hasTextBubble()) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
-          patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
+          patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } }, owner);
           if (get().ui.workspace !== 'chat') setThreadOpen(true);
           outcome = 'settings';
           return;
         }
         if (call.name === 'ask_questions') {
           const style = get().composer.agentStyle;
-          const s = session(sessionId);
           // Auto allows one card for what changes the result or cost (F1); guided, the rounds set in Settings.
-          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds) && !durationOwed(s.agent.history)) {
+          if (mine().questionRound >= roundsFor(style, get().settings.guidedRounds) && !durationOwed(mine().history)) {
             respond('Question rounds are used up. Use sensible defaults for anything still open and call propose_plan now.');
             continue;
           }
@@ -398,18 +398,18 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             continue;
           }
           inferChoices(sessionId, 'propose_plan', v.data.steps);
-          if (!v.data.revision && (session(sessionId).agent.settingsParts?.length ?? 0) > 1) {
+          if (!v.data.revision && (mine().settingsParts?.length ?? 0) > 1) {
             const feed = session(sessionId).feed;
             const userAt = feed.findLastIndex((f) => f.type === 'user');
-            if (!feed.slice(userAt + 1).some((f) => f.type === 'settings' && f.status === 'confirmed')) patchAgent(sessionId, { settingsParts: undefined });
+            if (!feed.slice(userAt + 1).some((f) => f.type === 'settings' && f.status === 'confirmed')) patchAgent(sessionId, { settingsParts: undefined }, owner);
           }
           // Guided confirms settings per request; the session model still persists.
-          if (workspace !== 'node' && get().composer.agentStyle === 'guided' && session(sessionId).agent.questionRound === 0) {
+          if (workspace !== 'node' && get().composer.agentStyle === 'guided' && mine().questionRound === 0) {
             respond('Guided mode: ask your questions first (ask_questions, one card), then propose the plan.');
             continue;
           }
           const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
-          const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((session(sessionId).agent.settingsParts ?? []).map((p) => [p.kind, p])) : session(sessionId).agent.settings)) : null;
+          const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((mine().settingsParts ?? []).map((p) => [p.kind, p])) : mine().settings)) : null;
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
           if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, v.data.steps))) {
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
@@ -421,8 +421,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
               continue;
             }
           }
-          patchAgent(sessionId, { phase: 'checking' });
-          const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn), action: (entry) => log.action(entry) });
+          patchAgent(sessionId, { phase: 'checking' }, owner);
+          const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn, owner), action: (entry) => log.action(entry) });
           const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal, pendingMeta(hasTextBubble())), waits);
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.

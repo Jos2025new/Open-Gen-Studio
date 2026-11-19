@@ -392,7 +392,7 @@ export const useStore = create<AppState>()(
       const p = (persisted ?? {}) as Partial<Persisted>;
       const restored = p.sessions && Object.keys(p.sessions).length ? p.sessions : current.sessions;
       // A reload interrupts agent calls; nodes saved at an older descriptor version are migrated.
-      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, graph: loadMigration(s.graph), agent: { ...s.agent, busy: false, phase: undefined, revising: undefined, waiting: undefined } }]));
+      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, loadedSession(s)]));
       const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] && !sessions[p.activeSessionId].hidden ? p.activeSessionId : Object.keys(sessions).find((id) => !sessions[id].hidden) ?? Object.keys(sessions)[0];
       const assets = p.assets ?? {};
       const ui = sanitizeUi({ ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) });
@@ -430,6 +430,15 @@ export const useStore = create<AppState>()(
 onWriterLockGranted(() => void useStore.persist.rehydrate());
 
 /** Before the global library, subjects lived in each session: copied once (first name wins); sessions keep theirs. */
+const interrupted = (a: Session['agent']): Session['agent'] => ({ ...a, busy: false, phase: undefined, revising: undefined, waiting: undefined });
+/** A loaded session: nodes migrated, agents idle, the old `agentLanes` shape folded into `agents`. */
+function loadedSession(s: Session): Session {
+  const old = (s as { agentLanes?: Record<string, Session['agent']> }).agentLanes;
+  const { agentLanes: _gone, ...rest } = s as Session & { agentLanes?: unknown };
+  const agents = s.agentLane === undefined ? undefined : Object.fromEntries(Object.entries({ ...old, ...s.agents, [s.agentLane]: s.agent }).map(([k, a]) => [k, interrupted(a)]));
+  return { ...rest, graph: loadMigration(s.graph), agent: interrupted(s.agent), ...(agents ? { agents } : {}) };
+}
+
 export function legacySubjects(sessions: Record<string, Session>): Subject[] {
   const out: Subject[] = [];
   for (const s of Object.values(sessions)) {
@@ -449,11 +458,21 @@ export function activeSession(): Session {
   return s.sessions[s.activeSessionId];
 }
 
+/** `session.agents` = every agent's state by id; `session.agent` = the one on screen (`agentLane`), kept in step here on every write. */
+function syncAgents(prev: Session, next: Session): Session {
+  const lane = next.agentLane;
+  if (lane === undefined) return next;
+  const agents = next.agents ?? {};
+  if (prev.agentLane !== lane) return { ...next, agent: agents[lane] ?? next.agent, agents: { ...agents, [lane]: agents[lane] ?? next.agent } };
+  if (next.agent !== prev.agent) return { ...next, agents: { ...agents, [lane]: next.agent } };
+  return agents[lane] && agents[lane] !== next.agent ? { ...next, agent: agents[lane] } : next;
+}
+
 export function patchSession(id: string, fn: (s: Session) => Session): void {
   set((st) => {
     const cur = st.sessions[id];
     if (!cur) return {};
-    return { sessions: { ...st.sessions, [id]: { ...fn(cur), updatedAt: Date.now() } } };
+    return { sessions: { ...st.sessions, [id]: { ...syncAgents(cur, fn(cur)), updatedAt: Date.now() } } };
   });
 }
 

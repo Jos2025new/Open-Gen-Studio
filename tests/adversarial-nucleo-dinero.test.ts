@@ -26,7 +26,7 @@ beforeEach(() => {
   resetActions();
   vi.stubGlobal('fetch', () => { throw new Error('Unexpected network request'); });
   const st = useStore.getState();
-  useStore.setState({ activeSessionId: HOME, generations: {}, sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agentLanes: undefined } } });
+  useStore.setState({ activeSessionId: HOME, generations: {}, sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agents: undefined } } });
 });
 
 describe('money boundaries through the reviewed Run path', () => {

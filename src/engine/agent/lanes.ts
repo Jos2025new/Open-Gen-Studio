@@ -2,17 +2,18 @@ import { patchSession, toast, useStore } from '../../store/store';
 import type { AgentState } from '../types';
 
 /*
- * One agent state per agent node (ADR 0031, strip 2). `session.agent` stays the state of the agent that is active
- * (every existing reader keeps working); the others are parked in `agentLanes`. Switching the recipient parks the
- * current state and loads the target's: its own history, open cards, notes and request. The first agent to be written
- * to inherits whatever the session already had, so no saved conversation is lost or split.
+ * One live state per agent node, in a map by agent id inside the session (ADR 0031, strip 2): `session.agents`.
+ * Nothing is parked or restored: an operation names the agent it belongs to and reads or writes that entry
+ * (`laneState`, `patchLane`), so agent A can be mid-turn while B answers and nothing crosses. `session.agentLane` is
+ * only which agent is on screen, and `session.agent` is that entry projected for the readers of the UI (the store keeps
+ * both in step in one place: `syncAgents`). A session saved before agents had instances is migrated on load.
  */
 declare module '../types' {
   interface Session {
-    /** The agent node whose state `agent` currently holds. Absent: a session from before agent instances. */
+    /** The agent node on screen. Absent: a session from before agent instances. */
     agentLane?: string;
-    /** The parked states of the other agent nodes. */
-    agentLanes?: Record<string, AgentState>;
+    /** The live state of every agent node, by node id. */
+    agents?: Record<string, AgentState>;
   }
 }
 
@@ -21,16 +22,15 @@ const SHARED = ['settings', 'switchedTo', 'enhance'] as const;
 
 export const freshAgent = (): AgentState => ({ history: [], questionRound: 0, notes: [], busy: false });
 
-/** Make `nodeId`'s state the active one. Returns why it cannot (an agent is mid-turn), or null. */
+/** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. Always null. */
 export function enterLane(sessionId: string, nodeId: string): string | null {
   const s = useStore.getState().sessions[sessionId];
   if (!s || s.agentLane === nodeId) return null;
-  if (s.agentLane === undefined) { patchSession(sessionId, (x) => ({ ...x, agentLane: nodeId })); return null; }
-  if (s.agent.busy) return 'The other agent is still working. Wait for it or stop it before writing to this one.';
   patchSession(sessionId, (x) => {
-    const { [nodeId]: parked, ...others } = x.agentLanes ?? {};
+    if (x.agentLane === undefined) return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: x.agent } }; // the first agent inherits what the session had
     const shared = Object.fromEntries(SHARED.filter((k) => x.agent[k] !== undefined).map((k) => [k, x.agent[k]]));
-    return { ...x, agentLane: nodeId, agentLanes: { ...others, [x.agentLane!]: x.agent }, agent: { ...(parked ?? freshAgent()), ...shared } };
+    const mine = { ...(x.agents?.[nodeId] ?? freshAgent()), ...shared };
+    return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: mine }, agent: mine };
   });
   return null;
 }
@@ -52,24 +52,23 @@ export function claimLaneOfItem(sessionId: string, itemId: string): string | nul
   return why;
 }
 
-/** The state of an agent instance, active or parked (read-only). */
-export function laneState(sessionId: string, nodeId: string): AgentState | undefined {
+/** The state of an agent instance (read-only). An id the session has no entry for reads as no state. */
+export function laneState(sessionId: string, nodeId: string | undefined): AgentState | undefined {
   const s = useStore.getState().sessions[sessionId];
   if (!s) return undefined;
-  return s.agentLane === nodeId ? s.agent : s.agentLanes?.[nodeId];
+  if (!nodeId || s.agentLane === undefined) return s.agent;
+  return s.agents?.[nodeId] ?? (s.agentLane === nodeId ? s.agent : undefined);
 }
 
 /**
- * Write to one agent's state, active or parked: an operation that belongs to an agent (the end of its plan, a rewrite on
- * its card, the edit of its message) never lands in whichever agent happens to be on screen.
+ * Write to one agent's state by id: an operation that belongs to an agent (its turn, the end of its plan, a rewrite on
+ * its card, the edit of its message) never lands in whichever agent happens to be on screen. Without an id it is the
+ * agent on screen.
  */
 export function patchLane(sessionId: string, nodeId: string | undefined, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   const resolve = (a: AgentState) => ({ ...a, ...(typeof patch === 'function' ? patch(a) : patch) });
   patchSession(sessionId, (x) => {
-    if (nodeId && x.agentLane !== undefined && x.agentLane !== nodeId) {
-      const parked = x.agentLanes?.[nodeId] ?? freshAgent();
-      return { ...x, agentLanes: { ...x.agentLanes, [nodeId]: resolve(parked) } };
-    }
+    if (nodeId && x.agentLane !== undefined) return { ...x, agents: { ...x.agents, [nodeId]: resolve(x.agents?.[nodeId] ?? (x.agentLane === nodeId ? x.agent : freshAgent())) } };
     return { ...x, agent: resolve(x.agent) };
   });
 }

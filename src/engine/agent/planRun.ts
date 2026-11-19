@@ -1,4 +1,4 @@
-import { claimLaneOfItem, laneOfItem, patchLane } from './lanes';
+import { claimLaneOfItem, laneOfItem, laneState, patchLane } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun } from '../flow/actions';
@@ -339,12 +339,12 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
  * S4: brief closure after a plan. Skip without an LLM, while busy/pending, or after a new user message.
  */
 async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
-  toCanvasOfItem(sessionId, itemId);
-  const s = session(sessionId);
-  // The closing message is written by the owner of the plan; with another agent on screen it waits for nobody and is skipped.
+  // The closing message is written by the agent that owns the plan, from its own state, whichever agent is on screen.
   const owner = laneOfItem(sessionId, itemId);
-  if (owner && s?.agentLane !== undefined && s.agentLane !== owner) return;
-  if (!s || agentEngine(sessionId, owner).kind !== 'llm' || s.agent.busy || s.agent.pending) return;
+  if (!owner || session(sessionId)?.agentLane === owner) toCanvasOfItem(sessionId, itemId);
+  const s = session(sessionId);
+  const own = laneState(sessionId, owner);
+  if (!s || !own || agentEngine(sessionId, owner).kind !== 'llm' || own.busy || own.pending) return;
   const at = s.feed.findIndex((f) => f.id === itemId);
   if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
   const item = s.feed[at];
@@ -352,8 +352,8 @@ async function wrapUpPlan(sessionId: string, itemId: string, title: string, stat
   // After an edit the agent gets the original and the result to compare; otherwise it has not seen the result.
   const pairs = item.type === 'plan' && agentSeesImages() ? await editPairParts(item) : [];
   pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
-${pairs.length ? WRAPUP_COMPARE_RULE : WRAPUP_RULE}`, pairs));
-  await llmTurn(sessionId, turnCanvas(item.workspace), { textOnly: true, route: 'wrap-up' });
+${pairs.length ? WRAPUP_COMPARE_RULE : WRAPUP_RULE}`, pairs), owner);
+  await llmTurn(sessionId, turnCanvas(item.workspace), { textOnly: true, route: 'wrap-up', agentNodeId: owner });
 }
 
 // ---------------------------------------------------------------------------

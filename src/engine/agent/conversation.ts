@@ -22,21 +22,21 @@ import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { promptsWiredToAgent } from '../nodes/spec';
-import { addReplyToRequest, agentEngine, agentNodeOf, chatNodeOf, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, setTurnChat, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { addReplyToRequest, agentEngine, agentNodeOf, chatNodeOf, controllers, ending, turnKey, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, setTurnChat, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
 import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
 import { llmTurn } from './llmTurn';
-import { claimLaneOfItem, enterLane } from './lanes';
+import { claimLaneOfItem, enterLane, laneState } from './lanes';
 import { recipientOf } from './recipient';
 
 export async function sendAgentMessage(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string } = {}): Promise<void> {
   const st = get();
   const sessionId = st.activeSessionId;
-  if (!agentAccepts()) return;
   const canvas = agentCanvas();
   // The recipient is explicit end to end (ADR 0031, strip 2): this agent's own state, history, cards and model.
   const to = recipientOf(sessionId, opts.agentNodeId, opts.chatNodeId);
+  if (!agentAccepts(to.id)) return;
   if (to.error) { notice(sessionId, canvas, to.error, 'error'); return; }
   if (!text.trim() && ![...(opts.attachments ?? st.composer.attachments)].length) return;
   const blocked = to.id ? enterLane(sessionId, to.id) : null;
@@ -44,12 +44,12 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // The turn is reserved before the first wait (attachments, the Designer page): nothing else can enter this session meanwhile.
   setTurnChat(sessionId, opts.chatNodeId ?? chatNodeOf(sessionId));
   toCanvas(sessionId, canvas); // switching canvas loads that canvas's parked state: it must happen before the reservation
-  patchAgent(sessionId, { busy: true, phase: 'working' });
+  patchAgent(sessionId, { busy: true, phase: 'working' }, to.id);
   try {
     await deliver(text, opts, sessionId, to, st);
   } finally {
     // A turn that ran clears its own flag; one that stopped before starting must not leave the agent reserved.
-    if (!controllers.has(sessionId) && session(sessionId)?.agent.busy) patchAgent(sessionId, { busy: false, phase: undefined });
+    if (!controllers.has(turnKey(sessionId, to.id)) && laneState(sessionId, to.id)?.busy) patchAgent(sessionId, { busy: false, phase: undefined }, to.id);
   }
 }
 
@@ -92,11 +92,11 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`);
-      patchAgent(sessionId, { pending: undefined });
+      patchAgent(sessionId, { pending: undefined }, to.id);
       await llmTurn(sessionId, workspace, { route: 'settings-reply', runId, agentNodeId: to.id });
       return;
     }
-    patchAgent(sessionId, { pending: undefined });
+    patchAgent(sessionId, { pending: undefined }, to.id);
   }
   // Typing while a plan waits: the agent revises it (only what was asked) or treats it as a new request.
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
@@ -110,13 +110,13 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
           const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
-      patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
+      patchAgent(sessionId, { pending: undefined, revising: pendingItem.id }, to.id);
       await llmTurn(sessionId, workspace, { route: 'plan-comment', runId, agentNodeId: to.id });
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
       removeDraftNodes(sessionId, pendingItem.plan.id);
       addReplyToRequest(sessionId, clean, attachments);
-      patchAgent(sessionId, { pending: undefined });
+      patchAgent(sessionId, { pending: undefined }, to.id);
       await offlineTurn(sessionId, workspace, 'plan-comment', runId);
     }
     return;
@@ -126,7 +126,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
   if (pending) resolvePendingAsSuperseded(sessionId);
   beginJourney(sessionId, 'settings-response');
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
-  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined });
+  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined }, to.id);
   const engine = agentEngine(sessionId, to.id);
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
@@ -146,7 +146,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     if (typeof view !== 'string') parts.push(...view);
   }
   // New requests retain earlier images/reference results as notes; tools can reload them (T6).
-  patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
+  patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }), to.id);
   // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
   // In the Designer filters and effects are FX layers (designer_fx), not the fx operation that makes a new image.
   const gate = workspace === 'node' ? [] : requestGate(sessionId).filter((g) => workspace !== 'designer' || g.op !== 'fx');
@@ -194,8 +194,8 @@ function replyToCard(sessionId: string, toolCallId: string | null | undefined, c
   pushHistory(sessionId, toolCallId ? { role: 'tool', tool_call_id: toolCallId, content } : userMessage(`[app] ${content}`, []));
 }
 
-export function pushHistory(sessionId: string, msg: LlmMessage): void {
-  patchAgent(sessionId, (a) => ({ history: [...a.history, msg] }));
+export function pushHistory(sessionId: string, msg: LlmMessage, agentNodeId?: string): void {
+  patchAgent(sessionId, (a) => ({ history: [...a.history, msg] }), agentNodeId);
 }
 
 /** The card reports what it shows selected, so typing instead of pressing Continue sends it. */
@@ -302,7 +302,9 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
 
 /** Stop the agent of the given session (by default the one on screen). */
 export function stopAgent(sessionId: string = get().activeSessionId): void {
-  const c = controllers.get(sessionId);
+  // The agent on screen is the one the Stop button belongs to; another agent's turn keeps running.
+  const lane = get().sessions[sessionId]?.agentLane;
+  const c = controllers.get(turnKey(sessionId, lane)) ?? controllers.get(sessionId);
   c?.abort();
   if (c) ending.get(c)?.();
 }

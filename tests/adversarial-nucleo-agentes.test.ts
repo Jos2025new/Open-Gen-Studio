@@ -9,7 +9,7 @@ vi.mock('../src/engine/agent/llmTurn', () => ({ llmTurn: turn }));
 
 import { useStore } from '../src/store/store';
 import { sendAgentMessage, submitAnswers } from '../src/engine/agent/conversation';
-import { laneState } from '../src/engine/agent/lanes';
+import { laneState, patchLane } from '../src/engine/agent/lanes';
 import { disconnectEdges, patchNodeData } from '../src/engine/flow/actions';
 
 const HOME = useStore.getState().activeSessionId;
@@ -28,7 +28,7 @@ beforeEach(() => {
     settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'vision' } },
     catalog: { ...st.catalog, llmStatus: { ...st.catalog.llmStatus, openrouter: 'ready' }, llm: { ...st.catalog.llm, openrouter: [{ id: 'vision', name: 'Vision', tools: true, vision: true }, { id: 'blind', name: 'Blind', tools: true, vision: false }] } },
     assets: { ...st.assets, picture: { id: 'picture', kind: 'image', name: 'picture', width: 10, height: 10 } as never },
-    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agentLanes: undefined } },
+    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agents: undefined } },
   });
 });
 
@@ -40,6 +40,42 @@ describe('two agent adversarial routes', () => {
     await sendAgentMessage('do not route', { chatNodeId: 'chat' });
     expect.soft(turn).not.toHaveBeenCalled();
     expect(current().feed.at(-1)).toMatchObject({ type: 'notice' });
+  });
+
+  it('overlapping turns: A is busy while B answers, and nothing crosses', async () => {
+    let finishA!: () => void;
+    turn.mockImplementationOnce(() => new Promise<void>((resolve) => { finishA = resolve; }));
+    const a = sendAgentMessage('question for A', { agentNodeId: 'a' });
+    await vi.waitFor(() => expect(turn).toHaveBeenCalledTimes(1));
+    expect(laneState(HOME, 'a')?.busy).toBe(true);
+    await sendAgentMessage('question for B', { agentNodeId: 'b' });
+    expect(turn).toHaveBeenLastCalledWith(HOME, expect.anything(), expect.objectContaining({ agentNodeId: 'b' }));
+    // B finished; A's turn is still running and its flag, history and cards are its own.
+    expect(laneState(HOME, 'a')?.busy).toBe(true);
+    expect(laneState(HOME, 'b')?.busy).toBe(false);
+    const hist = (id: string) => JSON.stringify(laneState(HOME, id)?.history);
+    expect(hist('a')).toContain('question for A');
+    expect(hist('a')).not.toContain('question for B');
+    expect(hist('b')).toContain('question for B');
+    expect(hist('b')).not.toContain('question for A');
+    patchLane(HOME, 'b', { notes: ['only b'] });
+    expect(laneState(HOME, 'a')?.notes).not.toContain('only b');
+    finishA(); await a;
+    expect(laneState(HOME, 'a')?.busy).toBe(false);
+    expect(laneState(HOME, 'b')?.notes).toEqual(['only b']);
+    // The feed attributes each message to its own agent.
+    expect(current().feed.filter((f) => f.type === 'user').map((f) => (f as { meta?: { agentNodeId?: string } }).meta?.agentNodeId)).toEqual(['a', 'b']);
+  });
+
+  it('a session saved with the old lane shape (parked agentLanes) loads into the map by id, idle', () => {
+    const old = { ...current(), agentLane: 'a', agent: { history: [{ role: 'user', content: 'from A' }], questionRound: 0, notes: [], busy: true }, agentLanes: { b: { history: [{ role: 'user', content: 'from B' }], questionRound: 1, notes: ['n'], busy: true } }, agents: undefined };
+    const merged = useStore.persist.getOptions().merge!({ sessions: { [HOME]: old } }, useStore.getState()) as ReturnType<typeof useStore.getState>;
+    const s = merged.sessions[HOME] as unknown as { agents: Record<string, { busy: boolean; history: unknown[] }>; agent: { busy: boolean } };
+    expect(Object.keys(s.agents).sort()).toEqual(['a', 'b']);
+    expect(JSON.stringify(s.agents.a.history)).toContain('from A');
+    expect(JSON.stringify(s.agents.b.history)).toContain('from B');
+    expect([s.agents.a.busy, s.agents.b.busy, s.agent.busy]).toEqual([false, false, false]);
+    expect('agentLanes' in s).toBe(false);
   });
 
   it('uses the chosen agent vision capability for its attachment', async () => {
@@ -55,8 +91,12 @@ describe('two agent adversarial routes', () => {
     const first = sendAgentMessage('for A', { agentNodeId: 'a', chatNodeId: 'chat', attachments: ['picture'] });
     await vi.waitFor(() => expect(blob).toHaveBeenCalled());
     expect(current().agent.busy).toBe(true);
+    // B is another agent: it answers while A still waits for its attachment (A's reservation is A's alone).
     await sendAgentMessage('for B', { agentNodeId: 'b' });
-    expect(turn).not.toHaveBeenCalled();
+    expect(turn).toHaveBeenCalledTimes(1);
+    expect(turn).toHaveBeenLastCalledWith(HOME, expect.anything(), expect.objectContaining({ agentNodeId: 'b' }));
+    expect(laneState(HOME, 'a')?.busy).toBe(true);
+    turn.mockClear();
     const before = useStore.getState();
     useStore.setState({ activeSessionId: 'other', sessions: { ...before.sessions, other: { ...before.sessions[HOME], id: 'other', feed: [], graph: { nodes: [], edges: [] } } } });
     release(undefined); await first;
@@ -66,18 +106,23 @@ describe('two agent adversarial routes', () => {
     expect(useStore.getState().sessions.other.feed).toEqual([]);
   });
 
-  it('refuses A card answers during B turn and preserves both pending states', async () => {
+  it('A answers its card while B is mid-turn: A continues, B keeps its busy flag, card and history (nothing crosses)', async () => {
     await sendAgentMessage('A request', { agentNodeId: 'a' });
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...current(), feed: [{ id: 'card-a', createdAt: 1, workspace: 'chat', type: 'questions', status: 'pending', questions: [], meta: { agentNodeId: 'a' } } as never], agent: { ...current().agent, pending: { toolCallId: 'call-a', kind: 'questions', feedItemId: 'card-a' } } } } }));
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...current(), feed: [{ id: 'card-a', createdAt: 1, workspace: 'chat', type: 'questions', status: 'pending', questions: [{ id: 'answer', question: 'Go?', options: [] }], meta: { agentNodeId: 'a' } } as never] } } }));
+    patchLane(HOME, 'a', { pending: { toolCallId: 'call-a', kind: 'questions', feedItemId: 'card-a' } });
     await sendAgentMessage('B request', { agentNodeId: 'b' });
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...current(), agent: { ...current().agent, busy: true, pending: { toolCallId: 'call-b', kind: 'questions', feedItemId: 'card-b' } } } } }));
+    patchLane(HOME, 'b', { busy: true, pending: { toolCallId: 'call-b', kind: 'questions', feedItemId: 'card-b' } });
+    const bBefore = laneState(HOME, 'b');
     turn.mockClear();
     await submitAnswers(HOME, 'card-a', { answer: 'yes' });
-    expect(turn).not.toHaveBeenCalled();
-    expect(current().agentLane).toBe('b');
-    expect(current().agent.pending?.feedItemId).toBe('card-b');
-    expect(laneState(HOME, 'a')?.pending?.feedItemId).toBe('card-a');
-    expect(current().feed.find((f) => f.id === 'card-a')).toMatchObject({ status: 'pending' });
+    expect(turn).toHaveBeenCalledWith(HOME, expect.anything(), expect.objectContaining({ route: 'answers' }));
+    // A's turn was started for A (the card's owner is the agent on screen after claiming); B's state is the very same object.
+    expect(current().agentLane).toBe('a');
+    expect(laneState(HOME, 'b')).toBe(bBefore);
+    expect(laneState(HOME, 'b')?.busy).toBe(true);
+    expect(laneState(HOME, 'b')?.pending?.feedItemId).toBe('card-b');
+    expect(JSON.stringify(laneState(HOME, 'a')?.history)).toContain('yes');
+    expect(JSON.stringify(laneState(HOME, 'b')?.history)).not.toContain('yes');
   });
 
   it('routes a comment on A’s waiting plan back to A with B selected', async () => {
@@ -91,10 +136,10 @@ describe('two agent adversarial routes', () => {
             id: 'plan-a', createdAt: 1, workspace: 'chat', type: 'plan', status: 'awaiting',
             plan: { id: 'plan-a', title: 'A plan', steps: [] }, meta: { agentNodeId: 'a' },
           } as never],
-          agent: { ...current().agent, pending: { toolCallId: null, kind: 'plan', feedItemId: 'plan-a' } },
         },
       },
     }));
+    patchLane(HOME, 'a', { pending: { toolCallId: null, kind: 'plan', feedItemId: 'plan-a' } });
     await sendAgentMessage('private B request', { agentNodeId: 'b' });
     turn.mockClear();
     await sendAgentMessage('Change the framing', { attachments: [], agentNodeId: 'a' });

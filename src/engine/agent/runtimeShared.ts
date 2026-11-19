@@ -1,3 +1,4 @@
+import { patchLane } from './lanes';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -47,9 +48,13 @@ export function requestGate(sessionId: string) {
 }
 
 
-export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
-  patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...(typeof patch === 'function' ? patch(s.agent) : patch) } }));
+/** Write an agent's state: the one named by `agentNodeId` (a turn always names its own), else the agent on screen. */
+export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>), agentNodeId?: string): void {
+  patchLane(sessionId, agentNodeId, patch);
 }
+
+/** One abort controller per running turn: an agent's key is its own, so two agents of one session can run at once. */
+export const turnKey = (sessionId: string, agentNodeId?: string): string => (agentNodeId ? `${sessionId}|${agentNodeId}` : sessionId);
 
 /** Where a row is shown: Studio's chat keeps every row as chat, also while the agent works on a canvas it opened in the board. */
 export const rowCanvas = (workspace: Workspace): Workspace => (get().ui.workspace === 'chat' ? 'chat' : workspace);

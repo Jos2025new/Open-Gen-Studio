@@ -85,7 +85,7 @@ beforeEach(() => {
         feed: [],
         agent: { history: [], questionRound: 0, notes: [], busy: false },
         agentLane: undefined,
-        agentLanes: undefined,
+        agents: undefined,
       },
     },
   });
