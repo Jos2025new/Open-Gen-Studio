@@ -93,15 +93,27 @@ Sugerencias, por impacto:
 6. Mantener anotados los recortes de alcance de arriba.
 7. Endurecer `check-graph-writes` y `check-node-descriptors` antes de llamar «mecánica» a la siguiente tanda.
 
+## Revisión de Neon al informe externo (2026-11-19)
+
+Gemini 4 Neon revisó el informe de Sonnet: [revision-neon-externa](../nucleo-nodos/revision-neon-externa.md). Acierta en los síntomas, exagera cuatro puntos (`retryAgentTurn` ya reclama carril; los recortes sí se aprobaron; `nodes.node.edit` sí recibe `expect`; el registro en RAM no reusa aprobaciones al recargar) y se queda corto en lo grave. La sesión maestra comprobó en el código tres puntos:
+- **Doble gasto:** `approveNodeRun` (`agent/planRun.ts:118-130`) espera `prepareNodeRun` con la tarjeta aún en `awaiting`, sin el candado `planRuns`, y crea un `uid('run')` nuevo: un doble clic puede cobrar dos veces.
+- **Escape de la capa única:** `deleteGeneration` (`engine/actions.ts:516`) escribe `graph` con `useStore.setState` y `check-graph-writes` no lo ve.
+- **Lentitud:** `RunButton` (`nodes.tsx:60`) y `RunAll` (`NodeCanvasParts.tsx:44`) se suscriben al store entero.
+Sin comprobar aún: la corrupción cruzada entre agentes en paralelo (`llmTurn`/`conversation` escriben sin `owner`, `turnChats` único por sesión, `reopenCard`, `stopAgent`). Suite completa tras el arreglo de raíz: 600 archivos y 4244 tests en verde (no cubre nada de lo anterior).
+
 ## Pendiente, en orden
 
-0. **Revisar un cambio de comportamiento** (`b07c5090`). Con el estado por agente, dos agentes de un mismo chat pueden trabajar a la vez y cada uno contesta sus tarjetas, aunque el otro esté ocupado. Antes eso se rechazaba. Sonnet cambió 4 tests viejos en ese sentido. Es coherente con «un chat tiene varios agentes», pero el usuario no lo ha aprobado; que lo ataque el Neon nuevo y lo confirme el usuario.
-1. Commit del estado por agente (Sonnet) y suite completa.
-2. Rehacer el boceto de avisos con la corrección del usuario (ver «Decisiones»), aprobarlo e implementarlo.
-3. Un Neon nuevo que revise las propuestas y todo lo hecho; decidir con el usuario qué hacer con lo que señale.
-4. Prueba del usuario en el sandbox, con una clave de proveedor: una generación real y dos agentes.
-5. Decisión sobre el space: subnet o solo navegación.
-6. Fusionar o no `task/nucleo-nodos`, y en ese momento actualizar `pendientes.md` y `docs/map.md`.
+0. **Decisión del usuario sobre agentes en paralelo** (`ddf27bcb`; `b07c5090` solo cambió tests). Recomendado por ambos revisores: volver a un turno por sesión, como dice el ADR, y evitar la zona protegida (`writerHandoff.ts:14`). Si se aprueba paralelo: autorización para `writerHandoff.ts`, `owner` en todo `llmTurn`/`conversation`/`runtimeShared`/`spec`/`reopenCard`/`stopAgent`, y revisión independiente.
+1. Cerrar el doble gasto: candado antes del `await` en `approveNodeRun`, `runId` estable por tarjeta, y gastar la aprobación al intentar enviar (`action.ts:113`).
+2. Cerrar escapes del núcleo: `deleteGeneration` por `edit.ts`, `expect`/`replaces` en `nodeTools.ts`, validar `broken` en `compoundProblem`, revisar `silent: true`, y `check-graph-writes` multilínea o por AST.
+3. Rendimiento: quitar `useStore(s => s)`, acotar `snapshots`/`ledger`, evitar `[...feed].reverse()` en `resolver.ts:56`.
+4. Importar `migrate.ts` desde el arranque, con un test `v1 → v2`.
+5. ADR 0031: quitar «Aprobar este contrato», alinear 87-88 con lo decidido en 0, añadir la corrección de borrado y la decisión de avisos.
+6. Rehacer el boceto de avisos con la corrección del usuario (ver «Decisiones»), aprobarlo e implementarlo.
+7. Revisión independiente de 0-4 y suite completa una vez.
+8. Prueba del usuario en el sandbox, con una clave de proveedor: una generación real y dos agentes.
+9. Decisión sobre el space: subnet o solo navegación; envolver el resto de componentes.
+10. Fusionar o no `task/nucleo-nodos`; entonces actualizar `pendientes.md` (con `067:66-69`) y `docs/map.md`.
 
 ## Lecciones
 
