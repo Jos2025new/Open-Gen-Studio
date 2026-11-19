@@ -87,9 +87,7 @@ export async function prepareAction(session: string, targets: string[], force = 
   if (gone) return { ok: false, errors: [`No such node: ${gone}.`] };
   const preview = await prepareNodeRun(session, targets, force);
   if (preview.errors.length) return { ok: false, errors: preview.errors };
-  const snapshot: ActionSnapshot = { id: uid('appr'), session, targets: [...targets], force, preview, pins: pinsFor(session, [...preview.runIds, ...preview.inputIds]), at: Date.now() };
-  snapshots.set(snapshot.id, snapshot);
-  trim();
+  const snapshot = adoptPreview(session, targets, force, preview);
   recordJourneyEvent({ journeyId: session, journey: 'node-core', event: 'action.prepared', reason: 'snapshot approved for an explicit destination', sessionId: session, approvalId: snapshot.id, after: { targets, signature: snapshot.preview.signature } });
   return { ok: true, snapshot };
 }
