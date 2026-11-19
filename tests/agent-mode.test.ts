@@ -18,6 +18,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { AgentStyle, PlanFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown };
 const enc = new TextEncoder();
 const sse = (chunks: unknown[]) =>
@@ -51,7 +52,7 @@ beforeEach(() => {
     composer: { ...st.composer, attachments: [] },
     sessions: {
       ...st.sessions,
-      [sid()]: { ...st.sessions[sid()], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } },
+      [sid()]: { ...st.sessions[sid()], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) },
     },
   });
 });
@@ -134,11 +135,11 @@ describe('guided always asks, and confirms settings in every request', () => {
     const confirmed = { image: { modelRef: 'local::studio-image', needsImage: false } };
     for (const style of ['guided', 'auto'] as const) {
       setMode(style);
-      useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, settings: confirmed as never } } } }));
+      useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { settings: confirmed as never }) } } }));
       replies = [text('ok')];
       await sendAgentMessage('Otra imagen');
-      expect(useStore.getState().sessions[sid()].agent.settings?.image?.modelRef).toBe('local::studio-image');
-      expect(useStore.getState().sessions[sid()].agent.settingsParts).toBeUndefined();
+      expect(viewed(useStore.getState().sessions[sid()]).settings?.image?.modelRef).toBe('local::studio-image');
+      expect(viewed(useStore.getState().sessions[sid()]).settingsParts).toBeUndefined();
     }
   });
 });

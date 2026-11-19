@@ -16,6 +16,7 @@ import { HomeBar } from '../src/components/shell/HomeBar';
 import { HomeView } from '../src/components/shell/HomeView';
 import { newSession, setUi, useStore } from '../src/store/store';
 
+import { agentsWith } from './helpers/threads';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} };
 
@@ -47,7 +48,7 @@ describe('Home draft through the real HomeView tabs', () => {
   const draftOf = () => useStore.getState().ui.homeDrafts?.[useStore.getState().activeSessionId];
   const goButton = () => host.querySelector('button.home-bar-go') as HTMLButtonElement;
   const mount = () => { host = document.createElement('div'); document.body.append(host); root = createRoot(host); act(() => root!.render(createElement(HomeView))); };
-  const setBusy = (busy: boolean) => useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy } } } }));
+  const setBusy = (busy: boolean) => useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agents: agentsWith(s.sessions[s.activeSessionId], { busy }) } } }));
 
   beforeEach(() => {
     setBusy(false);
@@ -128,7 +129,7 @@ describe('Home draft persistence and sessions', () => {
     mount();
     act(() => type(input()!, 'a red fox'));
     // Busy flips without a re-render: the submit below runs with the last render's guard.
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy: true } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agents: agentsWith(s.sessions[s.activeSessionId], { busy: true }) } } }));
     host.querySelector('form.home-bar-wrap')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(draftOf()).toBe('a red fox');
     expect(sendAgentMessage).not.toHaveBeenCalled();

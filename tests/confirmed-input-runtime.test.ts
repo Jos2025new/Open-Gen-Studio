@@ -6,6 +6,7 @@ import { confirmSettings } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import { serve } from './fixtures/live/serve';
 import type { SettingsFeedItem, SettingsChoice, PlanFeedItem, ImageStep } from '../src/engine/types';
+import { mainThread } from './helpers/threads';
 const before = useStore.getState();
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(before); });
 it('publishes the plan after confirming Edit through the real runtime and recorded Atlas adapter', async () => {
@@ -35,7 +36,7 @@ it('publishes the plan after confirming Edit through the real runtime and record
     settings: { ...before.settings, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     composer: { ...before.composer, agentStyle: 'auto', attachments: [] },
     catalog: { ...before.catalog, models: Object.fromEntries(models.map(m => [m.ref, m])), schemas },
-    sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [card], agent: { busy: false, questionRound: 0, notes: [], history: [{ role: 'assistant', content: '', tool_calls: [{ id: 'settings-call', type: 'function', function: { name: 'confirm_settings', arguments: '{"parts":[{"kind":"image","refs":1}]}' } }] }], pending: { kind: 'settings', toolCallId: 'settings-call', feedItemId: card.id } } } },
+    sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [card], agents: mainThread({ busy: false, questionRound: 0, notes: [], history: [{ role: 'assistant', content: '', tool_calls: [{ id: 'settings-call', type: 'function', function: { name: 'confirm_settings', arguments: '{"parts":[{"kind":"image","refs":1}]}' } }] }], pending: { kind: 'settings', toolCallId: 'settings-call', feedItemId: card.id } }) } },
   });
   await confirmSettings(sid, card.id, [choice]);
   const plan = useStore.getState().sessions[sid].feed.find(f => f.type === 'plan') as PlanFeedItem | undefined;

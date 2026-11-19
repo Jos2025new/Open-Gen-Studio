@@ -44,6 +44,7 @@ import { useStore } from '../../src/store/store';
 import type { LlmProviderId, QuestionsFeedItem, Workspace } from '../../src/engine/types';
 import { serve } from '../fixtures/live/serve';
 
+import { mainThread, viewed } from '../helpers/threads';
 const KEY = process.env.BENCH_LLM_KEY;
 const PROVIDER = (process.env.BENCH_LLM_PROVIDER ?? 'nanogpt') as LlmProviderId;
 const STYLE = (process.env.BENCH_STYLE ?? 'guided') as 'guided' | 'auto';
@@ -99,7 +100,7 @@ async function runCase(c: Case) {
   }
   useStore.setState((s) => ({
     ui: { ...s.ui, workspace: c.workspace ?? 'chat' },
-    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], docs: [], activeDocId: null, agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], docs: [], activeDocId: null, agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   }));
   for (const [i, text] of c.turns.entries()) {
     useStore.setState((s) => ({ composer: { ...s.composer, agentStyle: STYLE, attachments: i === 0 ? attachments : [] } }));
@@ -120,7 +121,7 @@ async function runCase(c: Case) {
     plans: s.feed.flatMap((f) => (f.type === 'plan' ? [{ title: f.plan.title, status: f.status, revised: Boolean(f.revised), estimateUsd: f.estimate.usd, steps: f.plan.steps.map((x) => ({ id: x.id, kind: x.kind, model: 'modelRef' in x ? x.modelRef : undefined, prompt: 'prompt' in x ? x.prompt : undefined })) }] : [])),
     questions: s.feed.flatMap((f) => (f.type === 'questions' ? f.questions.map((q) => q.question) : [])),
     // What the validator answered to rejected plans (only in the history: the feed drops them).
-    rejections: (s.agent?.history ?? []).flatMap((m) => (m.role === 'tool' && typeof m.content === 'string' && /^(Plan rejected|Invalid propose_plan)/.test(m.content) ? [m.content] : [])),
+    rejections: (viewed(s)?.history ?? []).flatMap((m) => (m.role === 'tool' && typeof m.content === 'string' && /^(Plan rejected|Invalid propose_plan)/.test(m.content) ? [m.content] : [])),
     stepDetails: s.feed.flatMap((f) => (f.type === 'plan' ? [f.plan.steps] : [])),
     replies: s.feed.flatMap((f) => (f.type === 'assistant' ? [f.text] : f.type === 'notice' ? [`[notice] ${f.text}`] : [])),
   };

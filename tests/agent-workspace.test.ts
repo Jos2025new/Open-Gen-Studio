@@ -14,6 +14,7 @@ import { guideIndex, guideWorkspaceProblem, readGuide } from '../src/engine/skil
 import { useStore } from '../src/store/store';
 import type { LlmMessage } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 type Reply = { text?: string; tool?: { name: string; args: unknown } };
 
 const sse = (r: Reply) => {
@@ -38,7 +39,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
-    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -76,7 +77,7 @@ describe('text before a rejected plan', () => {
     replies = [{ text: 'Here is your plan.', tool: bad }, { text: 'Fixed plan.', tool: good }];
     await sendAgentMessage('upscale it');
     expect(assistantTexts()).toEqual(['Fixed plan.']);
-    expect(session().agent.history.some((m: LlmMessage) => m.role === 'assistant' && m.content === 'Here is your plan.')).toBe(true);
+    expect(viewed(session()).history.some((m: LlmMessage) => m.role === 'assistant' && m.content === 'Here is your plan.')).toBe(true);
     expect(session().feed.some((f) => f.type === 'plan')).toBe(true);
   });
 
@@ -109,7 +110,7 @@ describe('attached images as references, no library saves unasked', () => {
 
 describe('one conversation per session, canvas-tagged', () => {
   const setCanvas = (w: 'chat' | 'node') => useStore.setState((st) => ({ ui: { ...st.ui, workspace: w } }));
-  const tags = () => session().agent.history.filter((m: LlmMessage) => m.role === 'user').map((m: LlmMessage) => String(typeof m.content === 'string' ? m.content : '').split('\n').slice(0, 2).join(' '));
+  const tags = () => viewed(session()).history.filter((m: LlmMessage) => m.role === 'user').map((m: LlmMessage) => String(typeof m.content === 'string' ? m.content : '').split('\n').slice(0, 2).join(' '));
 
   it('the node canvas continues the chat conversation; each message says where it was written', async () => {
     setCanvas('chat');
@@ -119,7 +120,7 @@ describe('one conversation per session, canvas-tagged', () => {
     replies = [{ text: 'node answer' }];
     await sendAgentMessage('continue here');
     expect(tags()).toEqual(['<user_message canvas="chat"> hello from chat', '<user_message canvas="node"> continue here']);
-    expect(session().agent.canvas).toBe('node');
+    expect(viewed(session()).canvas).toBe('node');
     setCanvas('chat');
   });
 });

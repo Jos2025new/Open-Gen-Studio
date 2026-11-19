@@ -28,6 +28,7 @@ import { historyDepth } from '../src/engine/design/history';
 import { useStore } from '../src/store/store';
 import type { DesignDoc, VectorLayer } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 const sid = useStore.getState().activeSessionId;
 const rect = { type: 'rect', x: 10, y: 10, w: 100, h: 60, fill: '#ff0000' };
 let doc: DesignDoc;
@@ -153,7 +154,7 @@ async function request(text: string, reply: Array<{ name: string; args: unknown 
     ui: { ...st.ui, workspace: 'designer' },
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
   await sendAgentMessage(text);
   vi.unstubAllGlobals();

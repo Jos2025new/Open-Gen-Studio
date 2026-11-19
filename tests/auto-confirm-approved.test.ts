@@ -12,13 +12,14 @@ import { confirmApproved } from '../src/engine/agent/inherit';
 import { useStore } from '../src/store/store';
 import type { ModelSummary, PlanStep } from '../src/engine/types';
 
+import { viewed, agentsWith } from './helpers/threads';
 /* Auto: approving a plan confirms what it runs (sandbox session 2026-10-25). */
 const TEXT = 'atlas::google/nano-banana-2/text-to-image';
 const EDIT = 'atlas::google/nano-banana-2/edit';
 const OTHER = 'atlas::bytedance/seedream-v5.0-flash/text-to-image';
 const before = useStore.getState();
 const sid = () => before.activeSessionId;
-const confirmed = () => useStore.getState().sessions[sid()].agent.settings;
+const confirmed = () => viewed(useStore.getState().sessions[sid()]).settings;
 afterEach(() => useStore.setState(before));
 
 function setup() {
@@ -26,7 +27,7 @@ function setup() {
   const s = useStore.getState();
   useStore.setState({
     catalog: { ...s.catalog, models: { ...s.catalog.models, [TEXT]: model(TEXT, 'Nano Banana 2', false), [EDIT]: model(EDIT, 'Nano Banana 2', true), [OTHER]: model(OTHER, 'Seedream 5.0 Flash', false) } },
-    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, settings: { image: { modelRef: OTHER, needsImage: false, count: 1, aspect: '1:1' } } } } },
+    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { settings: { image: { modelRef: OTHER, needsImage: false, count: 1, aspect: '1:1' } } }) } },
   });
 }
 const img = (id: string, modelRef: string, over: Record<string, unknown> = {}) => ({ id, kind: 'image', title: id, prompt: id, modelRef, refs: [], settings: { aspect: '16:9', count: 2, resolution: '2K', advanced: {} }, ...over }) as unknown as PlanStep;

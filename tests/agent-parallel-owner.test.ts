@@ -18,6 +18,7 @@ import { directModelRefs, inConversation } from '../src/engine/agent/requestGuid
 import { buildContext } from '../src/engine/agent/context';
 import { resolveSystemNodeLive } from '../src/engine/nodes/spec';
 
+import { mainThread } from './helpers/threads';
 /** ADR 0031: two agents of one chat run in parallel; whatever agent A's turn writes lands in A, never in the agent on screen. */
 const HOME = useStore.getState().activeSessionId;
 const ref = (id: string, type: 'chat' | 'agent') => ({ id, position: { x: 0, y: 0 }, data: { kind: 'ref' as const, type, ref: HOME, title: id } });
@@ -36,7 +37,7 @@ beforeEach(() => {
   useStore.setState({
     activeSessionId: HOME,
     settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'default/model' } },
-    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agents: undefined } },
+    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }), agentLane: undefined} },
   });
   // A waits to be released (it is the slow one); B answers at once.
   chat.mockImplementation(async (o) => {

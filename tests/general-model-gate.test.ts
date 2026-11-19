@@ -27,6 +27,7 @@ import { confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
   const chunk = { choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] };
@@ -59,7 +60,7 @@ beforeEach(() => {
       [sid()]: {
         ...st.sessions[sid()],
         feed: [], subjects: [],
-        agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: 'local::studio-image', needsImage: false } } },
+        agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: 'local::studio-image', needsImage: false } } }),
       },
     },
   });

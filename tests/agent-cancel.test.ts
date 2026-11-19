@@ -13,6 +13,7 @@ import { useStore } from '../src/store/store';
 
 import { newSession } from '../src/store/store';
 
+import { viewed } from './helpers/threads';
 const enc = new TextEncoder();
 const line = (x: unknown) => enc.encode(`data: ${JSON.stringify(x)}\n\n`);
 /** A provider that streams nothing until aborted. */
@@ -51,12 +52,12 @@ describe('agent cancellation is per session', () => {
     await turnB;
     expect(signals[1].aborted).toBe(true);
     expect(signals[0].aborted).toBe(false);
-    expect(useStore.getState().sessions[a].agent.busy).toBe(true);
+    expect(viewed(useStore.getState().sessions[a]).busy).toBe(true);
 
     stopAgent(a); // A can still be stopped after B finished
     await turnA;
     expect(signals[0].aborted).toBe(true);
-    expect(useStore.getState().sessions[a].agent.busy).toBe(false);
+    expect(viewed(useStore.getState().sessions[a]).busy).toBe(false);
     vi.unstubAllGlobals();
   });
 });

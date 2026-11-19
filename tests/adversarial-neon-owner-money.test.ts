@@ -20,6 +20,7 @@ import { controllers } from '../src/engine/agent/runtimeShared';
 import { draftMode } from '../src/engine/agent/draftFirst';
 import { resetActions } from '../src/engine/nodecore/action';
 
+import { mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const ref = (id: string, type: 'chat' | 'agent', extra: Record<string, unknown> = {}) => ({
   id, position: { x: 0, y: 0 }, data: { kind: 'ref' as const, type, ref: HOME, title: id, ...extra },
@@ -92,9 +93,8 @@ beforeEach(() => {
         ...st.sessions[HOME],
         graph: baseGraph(),
         feed: [],
-        agent: { history: [], questionRound: 0, notes: [], busy: false },
+        agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }),
         agentLane: undefined,
-        agents: undefined,
       },
     },
   });

@@ -1,38 +1,28 @@
 import { patchSession, toast, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
+import { allThreads, freshAgent, shownKey, threadOf, withThread } from './threads';
+
+export { allThreads, freshAgent, threadOf };
 
 /*
- * One live state per agent node, in a map by agent id inside the session (ADR 0031, strip 2): `session.agents`.
- * Nothing is parked or restored: an operation names the agent it belongs to and reads or writes that entry
- * (`laneState`, `patchLane`), so agent A can be mid-turn while B answers and nothing crosses. `session.agentLane` is
- * only which agent is on screen, and `session.agent` is that entry projected for the readers of the UI (the store keeps
- * both in step in one place: `syncAgents`). A session saved before agents had instances is migrated on load.
+ * One thread per agent node, `session.agents[id]` (agent/threads.ts). An operation names the agent it belongs to and reads or
+ * writes that thread (`laneState`, `patchLane`), so agent A can be mid-turn while B answers and nothing crosses.
+ * `session.agentLane` only says which thread the UI shows.
  */
-declare module '../types' {
-  interface Session {
-    /** The agent node on screen. Absent: a session from before agent instances. */
-    agentLane?: string;
-    /** The live state of every agent node, by node id. */
-    agents?: Record<string, AgentState>;
-  }
-}
-
 /** Choices that belong to the work, not to one agent: they carry across instances. */
 const SHARED = ['settings', 'switchedTo', 'enhance'] as const;
-
-export const freshAgent = (): AgentState => ({ history: [], questionRound: 0, notes: [], busy: false });
 
 /** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. Always null. */
 export function enterLane(sessionId: string, nodeId: string): string | null {
   const s = useStore.getState().sessions[sessionId];
   if (!s || s.agentLane === nodeId) return null;
   patchSession(sessionId, (x) => {
-    if (x.agentLane === undefined) return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: x.agents?.[nodeId] ?? x.agent } }; // the first agent inherits what the session had
+    const from = threadOf(x, undefined);
+    const agents = withThread(x.agents, nodeId);
     // The shared choices fill what the target lacks; they never overwrite its own (it may be mid-turn).
-    const target = x.agents?.[nodeId] ?? freshAgent();
-    const shared = Object.fromEntries(SHARED.filter((k) => x.agent[k] !== undefined && target[k] === undefined).map((k) => [k, x.agent[k]]));
-    const mine = { ...target, ...shared };
-    return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: mine }, agent: mine };
+    const target = agents[nodeId];
+    const shared = from && from !== target ? Object.fromEntries(SHARED.filter((k) => from[k] !== undefined && target[k] === undefined).map((k) => [k, from[k]])) : {};
+    return { ...x, agentLane: nodeId, agents: { ...agents, [nodeId]: { ...target, ...shared } } };
   });
   return null;
 }
@@ -57,21 +47,7 @@ export function claimLaneOfItem(sessionId: string, itemId: string): string | nul
 /** Which agent's thread the UI shows (a choice of display only: nothing is ever written through it). */
 export const viewedLane = (s: Session | undefined): string | undefined => s?.agentLane;
 
-/**
- * The state of one agent's thread, from a session value (so a UI selector can use it). With an id it is that agent's, never another's;
- * an id with no thread reads as nothing. Without an id: the thread on screen (display and "the agent that would take a message" only).
- */
-export function threadOf(s: Session | undefined, nodeId: string | undefined): AgentState | undefined {
-  if (!s) return undefined;
-  if (!nodeId) return s.agent;
-  if (s.agentLane === undefined) return s.agents?.[nodeId] ?? (s.agents && Object.keys(s.agents).length ? undefined : s.agent);
-  return s.agents?.[nodeId] ?? (s.agentLane === nodeId ? s.agent : undefined);
-}
-
-/** Every thread of the session (for what asks whether any agent is working or waiting). */
-export const allThreads = (s: Session | undefined): AgentState[] => (!s ? [] : s.agents && Object.keys(s.agents).length ? Object.values(s.agents) : [s.agent]);
-
-/** The state of an agent instance (read-only). An id the session has no entry for reads as no state. */
+/** The state of an agent instance (read-only). An id the session has no thread for reads as no state. */
 export const laneState = (sessionId: string, nodeId: string | undefined): AgentState | undefined => threadOf(useStore.getState().sessions[sessionId], nodeId);
 
 /**
@@ -80,11 +56,10 @@ export const laneState = (sessionId: string, nodeId: string | undefined): AgentS
  * agent on screen.
  */
 export function patchLane(sessionId: string, nodeId: string | undefined, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
-  const resolve = (a: AgentState) => ({ ...a, ...(typeof patch === 'function' ? patch(a) : patch) });
   patchSession(sessionId, (x) => {
-    // Before any agent was shown: the first agent written inherits what the session had, the others start fresh. Never the on-screen one.
-    if (nodeId && x.agentLane === undefined) return { ...x, agents: { ...x.agents, [nodeId]: resolve(x.agents?.[nodeId] ?? (x.agents && Object.keys(x.agents).length ? freshAgent() : x.agent)) } };
-    if (nodeId) return { ...x, agents: { ...x.agents, [nodeId]: resolve(x.agents?.[nodeId] ?? (x.agentLane === nodeId ? x.agent : freshAgent())) } };
-    return { ...x, agent: resolve(x.agent) };
+    const key = nodeId ?? shownKey(x);
+    const agents = withThread(x.agents, key);
+    const a = agents[key];
+    return { ...x, agents: { ...agents, [key]: { ...a, ...(typeof patch === 'function' ? patch(a) : patch) } } };
   });
 }

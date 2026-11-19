@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { idbKeyval, resetWorld, settle, until } from './helpers/fakeTabs';
 
+import { viewed } from './helpers/threads';
 vi.mock('idb-keyval', () => idbKeyval());
 vi.mock('../src/engine/design/raster', () => ({ flushRaster: async () => undefined, pendingRaster: () => [] }));
 vi.mock('../src/lib/log', () => ({ logEvent: () => undefined, logged: (_: string, f: unknown) => f, logSettled: async () => undefined }));
@@ -34,7 +35,7 @@ describe('adversarial: writerHandoff con agentes en paralelo', () => {
     tab1.lanes.patchLane(sid, 'agentA', { busy: true, phase: 'working' });
     tab1.lanes.enterLane(sid, 'agentB');
     tab1.lanes.patchLane(sid, 'agentB', { busy: false });
-    expect(tab1.state().sessions[sid].agent.busy).toBe(false);
+    expect(viewed(tab1.state().sessions[sid]).busy).toBe(false);
 
     const tab2 = await openTab();
     await settle();

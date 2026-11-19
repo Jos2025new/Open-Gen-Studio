@@ -18,6 +18,7 @@ import { clearJourneyTrace, lastJourneyTrace } from '../../src/lib/journeyTrace'
 import { useStore } from '../../src/store/store';
 import type { PlanFeedItem, SettingsFeedItem } from '../../src/engine/types';
 
+import { viewed, mainThread } from '../helpers/threads';
 type Reply = { name?: string; args?: unknown; text?: string };
 const sse = (reply: Reply) => {
   const chunk = reply.name
@@ -48,7 +49,7 @@ function setup() {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test-model' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [], userPicked: {} },
-    sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 }
 
@@ -65,7 +66,7 @@ describe('runtime request and card decisions', () => {
     expect(settingsCard()?.status).toBe('pending');
     await sendAgentMessage('Why that model?');
     expect(settingsCard()?.status).toBe('skipped');
-    expect(useStore.getState().sessions[sessionId].agent.settings).toBeUndefined();
+    expect(viewed(useStore.getState().sessions[sessionId]).settings).toBeUndefined();
     expect(lastJourneyTrace().map((e) => e.event)).toContain('settings.reply_received');
     expect(lastJourneyTrace().some((e) => e.event === 'settings.confirmed' || e.event === 'plan.approved')).toBe(false);
     expect(requests.every((r) => r.body.messages)).toBe(true);

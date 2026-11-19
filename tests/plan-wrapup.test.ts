@@ -12,6 +12,7 @@ import { approvePlan, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 type Reply = { plan?: { title: string; revision?: boolean; texts: string[] }; text?: string };
 const bodies: Array<{ messages: Array<{ role: string; content: unknown }>; tools?: unknown[] }> = [];
 
@@ -44,7 +45,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -63,7 +64,7 @@ describe('brief wrap-up after a plan runs (S4)', () => {
     expect(last).toMatch(/^\[app\] Plan "Two" finished \(done\): s1 done; s2 done/);
     expect(last).toMatch(/MUST reply in at most 2 short sentences/);
     expect(feed().some((f) => f.type === 'assistant' && f.text === 'Ready. Want a vertical cut, or leave it here?')).toBe(true);
-    expect(useStore.getState().sessions[useStore.getState().activeSessionId].agent.busy).toBe(false);
+    expect(viewed(useStore.getState().sessions[useStore.getState().activeSessionId]).busy).toBe(false);
   });
 
   it('a tool call in the wrap-up is ignored: no new plan card, no second call', async () => {
@@ -72,7 +73,7 @@ describe('brief wrap-up after a plan runs (S4)', () => {
     await approvePlan(useStore.getState().activeSessionId, plans()[0].id);
     expect(chatCalls).toBe(2);
     expect(plans().map((p) => p.plan.title)).toEqual(['One']);
-    const history = useStore.getState().sessions[useStore.getState().activeSessionId].agent.history;
+    const history = viewed(useStore.getState().sessions[useStore.getState().activeSessionId]).history;
     expect(history.at(-1)).toMatchObject({ role: 'tool', content: 'Ignored: this reply is text only.' });
   });
 

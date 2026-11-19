@@ -10,12 +10,13 @@ import { sendAgentMessage, approvePlan, presentNodeRun, undoNodeDeletion } from 
 import { restoreNodeGeneration, deleteNodes, deleteNodesWithUndo, patchNodeData, connectNodes } from '../src/engine/flow/actions';
 import { buildContext } from '../src/engine/agent/context';
 import type { Graph, PlanFeedItem, NoticeFeedItem } from '../src/engine/types';
+import { agentsWith } from './helpers/threads';
 let sid:string;
 const data=(title:string)=>({kind:'image' as const,title,prompt:'old',modelRef:'local::studio-image',settings:{count:1,advanced:{}},outputIndex:0});
 beforeEach(()=>{
  const st=useStore.getState();sid=st.activeSessionId;
  const graph:Graph={nodes:[{id:'key2',position:{x:0,y:0},data:data('Keyframe 2')},{id:'final',position:{x:300,y:0},data:{...data('Final'),kind:'video',modelRef:'local::studio-video'}}],edges:[{id:'edge',source:'key2',target:'final',sourceHandle:'out',targetHandle:'first'}]};
- useStore.setState({sessions:{...st.sessions,[sid]:{...st.sessions[sid],graph,feed:[],agent:{...st.sessions[sid].agent,pending:undefined,busy:false}}},settings:{...st.settings,agent:{...st.settings.agent,provider:'offline'}}});execute.mockClear();
+ useStore.setState({sessions:{...st.sessions,[sid]:{...st.sessions[sid],graph,feed:[],agents: agentsWith(st.sessions[sid], { pending:undefined,busy:false })}},settings:{...st.settings,agent:{...st.settings.agent,provider:'offline'}}});execute.mockClear();
 });
 afterEach(()=>vi.unstubAllGlobals());
 const session=()=>useStore.getState().sessions[sid];

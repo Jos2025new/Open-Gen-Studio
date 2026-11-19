@@ -1005,7 +1005,10 @@ export interface Session {
   graph: Graph;
   docs: DesignDoc[];
   activeDocId: string | null;
-  agent: AgentState;
+  /** Every agent's thread by agent node id (see agent/threads.ts). */
+  agents: Record<string, AgentState>;
+  /** Which thread the UI shows (display only; nothing is written through it). Absent: the session's main thread. */
+  agentLane?: string;
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };
   /** Edits the user made back in the conversation, newest last (for us; the agent never sees it). */
   editLog?: EditLogEntry[];

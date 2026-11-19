@@ -65,6 +65,7 @@ import { executeSteps } from '../src/engine/executor';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem, PlanStep } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown };
 const sse = (call: Call) =>
   new Response(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
@@ -94,7 +95,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());

@@ -19,6 +19,7 @@ import { changeNamed, modelChange, providersIn, resolveNamedModel } from '../src
 import { useStore } from '../src/store/store';
 import type { ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const ATLAS = 'atlas::google/nano-banana-2/text-to-image';
 const NANO = 'nanogpt::nano-banana-2';
 const LITE = 'atlas::google/nano-banana-2-lite/text-to-image';
@@ -40,7 +41,7 @@ let primed = false;
 function prime() {
   if (primed) return;
   primed = true;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } }, settingsParts: [{ kind: 'image', modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' }] } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } }, settingsParts: [{ kind: 'image', modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' }] }) } } }));
 }
 
 function setup() {
@@ -61,7 +62,7 @@ function setup() {
     settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...s.composer, agentStyle: 'guided', attachments: [], image: { ...s.composer.image, modelRef: ATLAS } },
     catalog: { ...s.catalog, models: { ...s.catalog.models, ...models }, schemas: { ...s.catalog.schemas, ...schemas } },
-    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } },
+    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } }) } },
   });
 }
 const card = () => st().feed.find((f) => f.type === 'settings') as SettingsFeedItem | undefined;
@@ -107,11 +108,11 @@ describe('the same model at another provider is a change the user confirms', () 
       { id: 's2', kind: 'image', title: 'I2', prompt: 'p2', count: 1, model: ATLAS, user_requested: false },
     ] } }];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(NANO);
-    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
+    expect(viewed(st()).settings?.image?.modelRef).toBe(NANO);
+    expect(viewed(st()).settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
     expect(refs()).toEqual([NANO, ATLAS]);
     // The agent is told which is which even though both are called Nano Banana 2.
-    expect(JSON.stringify(st().agent.history)).toContain(`steps whose \\"model\\" is ${NANO} use it`);
+    expect(JSON.stringify(viewed(st()).history)).toContain(`steps whose \\"model\\" is ${NANO} use it`);
   });
 
   it('F-02: an A/B between providers of one line: each step that writes its ref keeps its own provider, and the note says so', async () => {
@@ -123,7 +124,7 @@ describe('the same model at another provider is a change the user confirms', () 
       { id: 's2', kind: 'image', title: 'I2', prompt: 'p2', count: 1, model: NANO, user_requested: true },
     ] } }];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
+    expect(viewed(st()).settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
     expect(refs()).toEqual([ATLAS, NANO]);
   });
 

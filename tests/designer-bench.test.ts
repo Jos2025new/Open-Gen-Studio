@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { appendBenchSessions, intervalWork, longBenchStrokes, sandboxBenchAllowed } from '../src/lib/designerBenchFixtures';
 import { createSession } from '../src/store/store';
 
+import { viewed } from './helpers/threads';
 it('makes exactly 300 long strokes with deterministic geometry and ids', () => {
   const strokes = longBenchStrokes();
   expect(strokes).toHaveLength(300);
@@ -17,7 +18,7 @@ it('adds 1000 synthetic sessions once, preserving every existing session by refe
   const second = appendBenchSessions(first, createSession);
   expect(Object.keys(second)).toHaveLength(1001);
   expect(second['bench-fluidity-session-0']).toBe(first['bench-fluidity-session-0']);
-  expect(second['bench-fluidity-session-0'].agent.busy).toBe(false);
+  expect(viewed(second['bench-fluidity-session-0']).busy).toBe(false);
 });
 it('counts nested work only once and clips work at frame boundaries', () => {
   expect(intervalWork([[0, 10], [2, 4], [9, 15], [30, 40]], 5, 35)).toBe(15);

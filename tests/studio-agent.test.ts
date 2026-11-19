@@ -17,10 +17,11 @@ import { openBoardSchema } from '../src/engine/agent/agentCanvas';
 import { getStudioBoard, setStudioBoard, studioCanvases } from '../src/lib/studioBoard';
 import type { Graph } from '../src/engine/types';
 
+import { viewed, agentsWith } from './helpers/threads';
 let sid: string;
 const data = (title: string) => ({ kind: 'image' as const, title, prompt: 'old', modelRef: 'local::studio-image', settings: { count: 1, advanced: {} }, outputIndex: 0 });
 const session = () => useStore.getState().sessions[sid];
-const toolResults = () => session().agent.history.filter((m) => m.role === 'tool').map((m) => String(m.content));
+const toolResults = () => viewed(session()).history.filter((m) => m.role === 'tool').map((m) => String(m.content));
 
 function script(calls: Array<{ name: string; args: object }>) {
   const replies = [...calls];
@@ -41,7 +42,7 @@ beforeEach(() => {
   const st = useStore.getState();
   sid = st.activeSessionId;
   const graph: Graph = { nodes: [{ id: 'key2', position: { x: 0, y: 0 }, data: data('Keyframe 2') }], edges: [] };
-  useStore.setState({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph, feed: [], agent: { ...st.sessions[sid].agent, pending: undefined, busy: false, history: [] } } } });
+  useStore.setState({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph, feed: [], agents: agentsWith(st.sessions[sid], { pending: undefined, busy: false, history: [] }) } } });
   setStudioBoard({ open: true, view: 'assets' });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -133,7 +134,7 @@ describe('open_board', () => {
     expect(toolResults().join('\n')).toContain('Graph actions work only on the node canvas');
     expect(session().graph.nodes[0].data).toMatchObject({ prompt: 'old' });
 
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agent: { ...s.sessions[sid].agent, history: [] } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agents: agentsWith(s.sessions[sid], { history: [] }) } } }));
     script([{ name: 'open_board', args: { view: 'nodes' } }, { name: 'edit_node', args: { node_id: 'key2', prompt: 'walk toward the camera', expect_rev: ownerRev(session().graph, 'key2') } }]);
     await sendAgentMessage('edit the keyframe');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'nodes' });
@@ -165,7 +166,7 @@ describe('open_board', () => {
     await sendAgentMessage('look');
     expect(toolResults().join('\n')).toContain('view_canvas works only in the Designer');
 
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agent: { ...s.sessions[sid].agent, history: [] } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agents: agentsWith(s.sessions[sid], { history: [] }) } } }));
     script([{ name: 'open_board', args: { view: 'designer' } }, { name: 'view_canvas', args: {} }, { name: 'designer_fx', args: {} }]);
     await sendAgentMessage('look at the design');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'designer' });
@@ -225,7 +226,7 @@ describe('Studio is independent of its board (2026-10-24)', () => {
 
 describe('Studio keeps its context when a card is tagged for another canvas (2026-10-24)', () => {
   const card = () => ({ id: 'q1', createdAt: 0, workspace: 'node', type: 'questions', status: 'pending', questions: [{ id: 'a', question: '¿Cuál?', options: ['x', 'y'], allowCustom: true, multi: false }] }) as never;
-  const arm = () => useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [card()], agent: { ...s.sessions[sid].agent, history: [], pending: { toolCallId: 't1', kind: 'questions', feedItemId: 'q1' } } } } }));
+  const arm = () => useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [card()], agents: agentsWith(s.sessions[sid], { history: [], pending: { toolCallId: 't1', kind: 'questions', feedItemId: 'q1' } }) } } }));
 
   it('answering a card tagged node from Studio resumes the turn on the chat canvas', async () => {
     goLive('chat');

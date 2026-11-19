@@ -12,6 +12,7 @@ import { approvePlan, cancelPlan, sendAgentMessage } from '../src/engine/agent/r
 import { useStore } from '../src/store/store';
 import type { AgentStyle, PlanFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 type Reply = { plan?: { texts: string[]; revision?: boolean }; questions?: boolean | { default: string }; text?: string; guide?: string };
 
 const sse = (r: Reply) => {
@@ -39,7 +40,7 @@ function setup(style: AgentStyle) {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: style, attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 }
 afterEach(() => vi.unstubAllGlobals());
@@ -132,7 +133,7 @@ describe('auto mode', () => {
     await sendAgentMessage('a');
     await vi.waitFor(() => expect(metrics()[0].outcome).toBe('approved'));
     expect(metrics()[0]).toMatchObject({ plans: 1, llmCalls: 1 });
-    await vi.waitFor(() => expect(useStore.getState().sessions[sid()].agent.busy).toBe(false));
+    await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
     expect(metrics()[0].agentMs).toBeGreaterThanOrEqual(metrics()[0].msToPlan!);
     expect(metrics()[0].msToPlan).toBeGreaterThanOrEqual(0);
   });

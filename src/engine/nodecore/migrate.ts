@@ -45,3 +45,6 @@ export function stampNew(prev: Graph, next: Graph): Graph {
 }
 
 setLoadMigration(migrateGraph);
+
+/** Saved sessions with the single `agent` (or `agentLanes`) load with one thread per agent (agent/threads.ts). */
+export { migrateAgents } from '../agent/threads';

@@ -14,6 +14,7 @@ import { ActivityBlock } from '../src/components/chat/ActivityBlock';
 import type { ActivityFeedItem } from '../src/engine/types';
 import { useStore } from '../src/store/store';
 
+import { agentsWith } from './helpers/threads';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('ActivityBlock renders', () => {
@@ -29,7 +30,7 @@ describe('ActivityBlock renders', () => {
     expect(errors).not.toHaveBeenCalled();
     const s = useStore.getState().sessions[sessionId];
     await act(async () => {
-      useStore.setState({ sessions: { ...useStore.getState().sessions, [sessionId]: { ...s, agent: { ...s.agent, busy: true, waiting: [{ key: 'k', name: 'Wan 3.0', since: Date.now() - 4000 }] } } } });
+      useStore.setState({ sessions: { ...useStore.getState().sessions, [sessionId]: { ...s, agents: agentsWith(s, { busy: true, waiting: [{ key: 'k', name: 'Wan 3.0', since: Date.now() - 4000 }] }) } } });
     });
     expect(host.textContent).toContain('Loading schema');
     expect(host.textContent).toContain('Wan 3.0');
@@ -41,7 +42,7 @@ describe('ActivityBlock renders', () => {
   it('a finished turn folds to one line with what it did; its reasoning shows only when opened (ADR 0024 M)', async () => {
     const sessionId = Object.keys(useStore.getState().sessions)[0];
     const s = useStore.getState().sessions[sessionId];
-    useStore.setState({ sessions: { ...useStore.getState().sessions, [sessionId]: { ...s, agent: { ...s.agent, busy: false, waiting: [] } } } });
+    useStore.setState({ sessions: { ...useStore.getState().sessions, [sessionId]: { ...s, agents: agentsWith(s, { busy: false, waiting: [] }) } } });
     const item = { id: 'a2', type: 'activity', startedAt: Date.now() - 7000, endedAt: Date.now(), entries: [
       { kind: 'thinking', text: 'Long private reasoning text', ms: 2000 },
       { kind: 'action', icon: 'questions', label: 'Asked 1 question' },

@@ -17,6 +17,7 @@ import { SYSTEM_PROMPT } from '../src/engine/agent/context';
 import { useStore } from '../src/store/store';
 import type { AgentStyle } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 const before = useStore.getState();
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(before); });
 
@@ -49,7 +50,7 @@ async function guide(style: AgentStyle, args: Record<string, unknown>, afterQues
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: style, attachments: [], workflowId: null },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
   await sendAgentMessage('Quiero tres chicos para un anuncio UGC que tengo en mente');
   if (afterQuestions) {

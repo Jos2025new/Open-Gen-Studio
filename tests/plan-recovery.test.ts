@@ -55,6 +55,7 @@ import { resumePlan, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
   const chunk = { choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] };
@@ -77,7 +78,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -152,7 +153,7 @@ describe('recovering a failed plan', () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     // The closing message of the first run is written by the model too: let it finish before queuing the next reply.
-    await vi.waitFor(() => expect(useStore.getState().sessions[sid()].agent.busy).toBe(false));
+    await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
     replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'Listo, lo reintento.'];
     await sendAgentMessage('reinténtalo');
     await vi.waitFor(() => expect(planItem().status).toBe('done'));

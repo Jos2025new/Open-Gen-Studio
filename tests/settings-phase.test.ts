@@ -12,6 +12,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { MediaKind, SettingsChoice, VideoStep } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const models = await local.listModels(undefined);
 const getModel = async (ref: string) => {
   const model = models.find((m) => m.ref === ref);
@@ -128,7 +129,7 @@ describe('a video plan before the settings are confirmed', () => {
     if (roundDone) return;
     roundDone = true;
     const id = useStore.getState().activeSessionId;
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [id]: { ...s.sessions[id], agent: { ...s.sessions[id].agent, questionRound: 1 } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [id]: { ...s.sessions[id], agents: agentsWith(s.sessions[id], { questionRound: 1 }) } } }));
   };
   beforeEach(() => {
     sent.length = 0;
@@ -150,7 +151,7 @@ describe('a video plan before the settings are confirmed', () => {
     useStore.setState({
       settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
       composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
-      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
     });
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -179,7 +180,7 @@ describe('a video plan before the settings are confirmed', () => {
     expect(card()?.status).toBe('pending');
     await sendAgentMessage('¿Por qué ese modelo?');
     expect(card()?.status).toBe('skipped');
-    expect(useStore.getState().sessions[sid].agent.settings).toBeUndefined();
+    expect(viewed(useStore.getState().sessions[sid]).settings).toBeUndefined();
     const tool = sent.at(-1)!.messages.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
     expect(tool).toMatch(/Nothing was confirmed/);
   });

@@ -115,7 +115,7 @@ describe('confirm_settings in Auto: the length gate and the visible check', () =
     useStore.setState({
       settings: { ...s.settings, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
       composer: { ...s.composer, agentStyle: 'auto', attachments: [], video: { ...s.composer.video, modelRef: SEED } },
-      sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+      sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
     });
     await sendAgentMessage('Un video de dos chicas trotando, 45 segundos, con seedance 2.0 mini');
     const feed = useStore.getState().sessions[sid].feed;
@@ -137,7 +137,7 @@ import type { FeedItem, PlanFeedItem, SettingsFeedItem } from '../src/engine/typ
 type Reply = { name: string; args: unknown } | string;
 const sidOf = () => useStore.getState().activeSessionId;
 const feedOf = (): FeedItem[] => useStore.getState().sessions[sidOf()].feed;
-const agentOf = () => useStore.getState().sessions[sidOf()].agent;
+const agentOf = () => viewed(useStore.getState().sessions[sidOf()]);
 
 /** Runs one request in Auto (or `style`) with scripted agent replies; returns what each model call was sent and the plan cards seen at that moment. */
 async function drive(replies: Reply[], text: string, over: { style?: 'auto' | 'guided'; agent?: Record<string, unknown>; feed?: FeedItem[] } = {}) {
@@ -157,7 +157,7 @@ async function drive(replies: Reply[], text: string, over: { style?: 'auto' | 'g
   useStore.setState({
     settings: { ...s.settings, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...s.composer, agentStyle: over.style ?? 'auto', attachments: [], video: { ...s.composer.video, modelRef: SEED } },
-    sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: over.feed ?? [], agent: { history: [], questionRound: 0, notes: [], busy: false, ...over.agent } } },
+    sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: over.feed ?? [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, ...over.agent }) } },
   });
   await sendAgentMessage(text);
   return { sent, plansSeen };
@@ -281,7 +281,7 @@ describe('a model the app keeps is said, not offered again (item 3)', () => {
   const confirmed = (style: 'auto' | 'guided') => {
     const s = useStore.getState();
     const id = s.activeSessionId;
-    useStore.setState({ composer: { ...s.composer, agentStyle: style }, sessions: { ...s.sessions, [id]: { ...s.sessions[id], agent: { ...s.sessions[id].agent, history: [], settings: { video: { modelRef: SEED, needsImage: false, duration: 5 } } } } } });
+    useStore.setState({ composer: { ...s.composer, agentStyle: style }, sessions: { ...s.sessions, [id]: { ...s.sessions[id], agents: agentsWith(s.sessions[id], { history: [], settings: { video: { modelRef: SEED, needsImage: false, duration: 5 } } }) } } });
     return id;
   };
   it('Auto: states the model kept and why, and never asks for confirm_settings', () => {
@@ -331,6 +331,7 @@ describe('the notice of a turn that really fails (item 6)', () => {
 
 import { buildContext } from '../src/engine/agent/context';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 describe('the agent knows what the chosen model takes before it writes (2026-10-24: three images on a one-start-image model)', () => {
   const startOnly = () => {
     const s = useStore.getState();
@@ -342,7 +343,7 @@ describe('the agent knows what the chosen model takes before it writes (2026-10-
 
   it('a video model confirmed earlier: the context line says what it takes', () => {
     const s = useStore.getState();
-    const session = { ...s.sessions[sidOf()], agent: { ...s.sessions[sidOf()].agent, settings: { video: { modelRef: SEED, resolution: '720p', duration: 12, aspect: '16:9' } } } };
+    const session = { ...s.sessions[sidOf()], agents: agentsWith(s.sessions[sidOf()], { settings: { video: { modelRef: SEED, resolution: '720p', duration: 12, aspect: '16:9', needsImage: false } } }) };
     expect(buildContext(session as never, { workspace: 'chat', style: 'auto', round: 0, maxRounds: 2, attachments: [] })).toContain('(takes: 720p, 1080p · 5–12 s · 16:9, 9:16, 4:3 · 1 start image, no reference images)');
   });
 

@@ -23,6 +23,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { LlmMessage } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 const sent: LlmMessage[][] = [];
 const text = () => new Response('data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
 
@@ -43,7 +44,7 @@ function setup(vision: boolean | undefined) {
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     catalog: { ...st.catalog, llm: { nanogpt: [{ id: 'm', name: 'm', tools: true, ...(vision === undefined ? {} : { vision }) } as never] } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 }
 

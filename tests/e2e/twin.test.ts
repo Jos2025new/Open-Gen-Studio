@@ -64,6 +64,7 @@ import { useStore } from '../../src/store/store';
 import type { PlanFeedItem, QuestionsFeedItem, SettingsChoice, SettingsFeedItem, SettingsSection } from '../../src/engine/types';
 import { serve } from '../fixtures/live/serve';
 
+import { mainThread } from '../helpers/threads';
 const MODEL = process.env.TWIN_MODEL ?? 'deepseek/deepseek-v4.1-flash';
 const LLM_HOSTS = /(^|\.)nano-gpt\.com$/;
 
@@ -181,7 +182,7 @@ describe.skipIf(!process.env.TWIN)('twin of the reference runs (real agent LLM, 
       useStore.setState((s) => ({
         activeSessionId: sesId,
         ui: { ...s.ui, workspace: 'chat' },
-        sessions: { ...s.sessions, [sesId]: { ...s.sessions[s.activeSessionId], id: sesId, title: steps[0].say, createdAt: Date.now(), feed: [], docs: [], activeDocId: null, agentMetrics: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+        sessions: { ...s.sessions, [sesId]: { ...s.sessions[s.activeSessionId], id: sesId, title: steps[0].say, createdAt: Date.now(), feed: [], docs: [], activeDocId: null, agentMetrics: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
       }));
       sessionIds.push(sesId);
       for (const step of steps) {

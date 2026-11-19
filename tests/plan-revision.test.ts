@@ -15,6 +15,7 @@ import type { PlanStep } from '../src/engine/types';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 type Reply = { plan?: { title: string; revision?: boolean; texts: string[]; subjects?: Array<{ name: string; from: string }> }; text?: string };
 
 const sse = (r: Reply) => {
@@ -44,7 +45,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -62,7 +63,7 @@ describe('commenting on a pending plan', () => {
     expect(after).toHaveLength(1);
     expect(after[0]).toMatchObject({ status: 'awaiting', revised: true });
     expect(chatCalls).toBe(2);
-    expect(useStore.getState().sessions[useStore.getState().activeSessionId].agent).toMatchObject({ busy: false, revising: undefined });
+    expect(viewed(useStore.getState().sessions[useStore.getState().activeSessionId])).toMatchObject({ busy: false, revising: undefined });
   });
 
   it('a different request closes the old plan instead of mixing them', async () => {
@@ -82,7 +83,7 @@ describe('commenting on a pending plan', () => {
     replies = [{ text: 'Which model do you mean?' }];
     await sendAgentMessage('use the other one');
     expect(plans().map((p) => p.status)).toEqual(['awaiting']);
-    const agent = useStore.getState().sessions[useStore.getState().activeSessionId].agent;
+    const agent = viewed(useStore.getState().sessions[useStore.getState().activeSessionId]);
     expect(agent.revising).toBeUndefined();
     expect(agent.pending).toMatchObject({ kind: 'plan', feedItemId: plans()[0].id });
   });
@@ -112,7 +113,7 @@ describe('choosing which steps run', () => {
     const done = plans()[0];
     expect(done.stepStates).toEqual({ s1: 'done', s2: 'skipped', s3: 'skipped' });
     expect(done.status).toBe('done');
-    const history = useStore.getState().sessions[useStore.getState().activeSessionId].agent.history;
+    const history = viewed(useStore.getState().sessions[useStore.getState().activeSessionId]).history;
     expect(history.some((m) => m.role === 'tool' && typeof m.content === 'string' && /unchecked s2, s3/.test(m.content))).toBe(true);
     // The plan call plus the text-only wrap-up after it ran (S4), which reports the unchecked steps.
     expect(chatCalls).toBe(2);
@@ -164,10 +165,10 @@ describe('a card with no open tool call still goes to the LLM', () => {
   const questionsCard = () => {
     const sid = useStore.getState().activeSessionId;
     const item = { id: 'q1', createdAt: 1, workspace: 'chat', type: 'questions', questions: [{ id: 'a', question: 'Which?', options: ['x', 'y'], allowCustom: true, multi: false }], round: 1, maxRounds: 2, status: 'pending' };
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [item as never], agent: { ...st.sessions[sid].agent, pending: { toolCallId: null, kind: 'questions', feedItemId: 'q1' } } } } }));
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [item as never], agents: agentsWith(st.sessions[sid], { pending: { toolCallId: null, kind: 'questions', feedItemId: 'q1' } }) } } }));
     return sid;
   };
-  const history = (sid: string) => useStore.getState().sessions[sid].agent.history;
+  const history = (sid: string) => viewed(useStore.getState().sessions[sid]).history;
   it('answers arrive as a user message and the agent replies', async () => {
     const sid = questionsCard();
     replies = [{ plan: { title: 'P', texts: ['a'] } }];

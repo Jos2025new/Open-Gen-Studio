@@ -15,6 +15,7 @@ import { chat, type ToolSpec } from '../src/engine/providers/llm';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 
+import { mainThread } from './helpers/threads';
 const enc = new TextEncoder();
 const sse = (chunks: unknown[]) =>
   new Response(
@@ -126,7 +127,7 @@ describe('agent turn prefix stability across calls', () => {
       composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
       sessions: {
         ...st.sessions,
-        [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } },
+        [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) },
       },
     });
   });

@@ -11,6 +11,7 @@ vi.mock('../src/lib/idb', () => ({
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 
+import { mainThread } from './helpers/threads';
 const sse = (text: string) => {
   const body = `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`;
   return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
@@ -40,7 +41,7 @@ beforeEach(() => {
         ...st.sessions[sid],
         // A settings card waiting for confirmation, opened without a tool call id.
         feed: [{ id: 'set1', type: 'settings', workspace: 'chat', status: 'pending', sections: [] } as never],
-        agent: { history: [], questionRound: 0, notes: [], busy: false, pending: { kind: 'settings', feedItemId: 'set1' } } as never,
+        agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, pending: { toolCallId: null, kind: 'settings', feedItemId: 'set1' } }) as never,
       },
     },
   });

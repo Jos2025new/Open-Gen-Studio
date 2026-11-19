@@ -22,6 +22,7 @@ import { sendAgentMessage, stopAgent } from '../src/engine/agent/conversation';
 import { enterLane, laneState, patchLane } from '../src/engine/agent/lanes';
 import { controllers } from '../src/engine/agent/runtimeShared';
 
+import { mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const ref = (id: string, type: 'chat' | 'agent') => ({ id, position: { x: 0, y: 0 }, data: { kind: 'ref' as const, type, ref: HOME, title: id } });
 const control = (id: string, source: string, target: string) => ({ id, source, target, sourceHandle: 'out_control', targetHandle: 'control', kind: 'control' as const });
@@ -81,9 +82,8 @@ beforeEach(() => {
         ...st.sessions[HOME],
         graph: baseGraph(),
         feed: [],
-        agent: { history: [], questionRound: 0, notes: [], busy: false },
+        agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }),
         agentLane: undefined,
-        agents: undefined,
       },
     },
   });

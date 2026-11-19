@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { idbKeyval, resetWorld, settle, until } from './helpers/fakeTabs';
 
+import { agentsWith } from './helpers/threads';
 /*
  * Plan 1.4, test 15f: work in flight when another tab asks for the lock. Generations with a provider job (remoteJob)
  * move to the next tab with no cancel and no partial charge; the rest is listed, waited for or given up on purpose.
@@ -123,7 +124,7 @@ describe('test 15f: handing over work in flight', () => {
     const a = await openTab();
     await hydrated(a);
     const sid = a.state().activeSessionId;
-    a.store.useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agent: { ...s.sessions[sid].agent, busy: true } } } }));
+    a.store.useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agents: agentsWith(s.sessions[sid], { busy: true }) } } }));
     const b = await openTab();
     await settle();
     b.lock.useHere();

@@ -18,6 +18,7 @@ import { offlinePlan } from '../src/engine/agent/offline';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 
+import { mainThread } from './helpers/threads';
 /*
  * The keyword gate (agent/force.ts). An operation fires when it is named (a deterministic score of associated words,
  * Spanish and English, in request order), its input is attached and its required parameters can be read from the text.
@@ -131,7 +132,7 @@ async function request(text: string, attachments: string[], proposed?: unknown[]
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
   await sendAgentMessage(text);
   vi.unstubAllGlobals();

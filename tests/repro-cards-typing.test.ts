@@ -5,6 +5,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { QuestionsFeedItem } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 // Repro (case 4, H10): typing in the Composer while a questions card is open. The card shows the recommended option as
 // selected; typing must not drop it. (A selection the user clicked lives in QuestionsCard's React state, so only the
 // shown recommended value is reproducible here; the clicked-selection variant is NOT reproducible below the UI.)
@@ -28,7 +29,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], editLog: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], editLog: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());

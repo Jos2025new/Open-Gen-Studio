@@ -17,6 +17,7 @@ import { buildContext } from '../src/engine/agent/context';
 import type { Asset } from '../src/engine/types';
 import { useStore } from '../src/store/store';
 
+import { mainThread } from './helpers/threads';
 const image = (id: string, name: string): Asset => ({
   id,
   name,
@@ -103,7 +104,7 @@ it.each([true, false])('a request with only a 3D attachment respects agent visio
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'fixture' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [{ id: 'fixture', name: 'Fixture', tools: true, vision }] } },
     ui: { ...st.ui, workspace: 'chat' },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { busy: false, history: [], questionRound: 0, notes: [] } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ busy: false, history: [], questionRound: 0, notes: [] }) } },
   });
   let messages: Array<{ role: string; content: unknown }> = [];
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {

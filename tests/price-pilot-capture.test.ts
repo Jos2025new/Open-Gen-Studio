@@ -13,6 +13,7 @@ import { priceDecisionNote } from '../src/engine/agent/priceNotes';
 import { costAuthorization } from '../src/engine/priceAuthorization';
 import { useStore } from '../src/store/store';
 
+import { agentsWith, mainThread } from './helpers/threads';
 const MODEL = 'deepseek/deepseek-v4.1-flash';
 const settings = { count: 1, advanced: {} };
 const before = costAuthorization('nanogpt::test-before', settings, { usd: 0.2, approximate: true });
@@ -39,7 +40,7 @@ it('captures actual runtime requests offline with complete tools and stable pref
       settings: { ...st.settings, keys: { atlas: '', fal: '', openrouter: '', nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: MODEL, effort: 'low', showThinking: false } },
       composer: { ...st.composer, attachments: [], agentStyle: 'guided', skillId: null, workflowId: null },
       sessions: { [sid]: { ...st.sessions[sid], title: 'Sandbox pilot fixture', feed: [], subjects: [], agentMetrics: [],
-        agent: { history: [], notes: !c.continuation && arm === 'notice' ? [note] : [], busy: false, questionRound: 0 } } },
+        agents: mainThread({ history: [], notes: !c.continuation && arm === 'notice' ? [note] : [], busy: false, questionRound: 0 }) } },
     });
     vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
@@ -47,7 +48,7 @@ it('captures actual runtime requests offline with complete tools and stable pref
       captured.push(body);
       const guide = c.continuation && captured.length === 1;
       if (guide && arm === 'notice') useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: {
-        ...s.sessions[sid], agent: { ...s.sessions[sid].agent, notes: [note] },
+        ...s.sessions[sid], agents: agentsWith(s.sessions[sid], { notes: [note] }),
       } } }));
       const delta = guide ? { tool_calls: [{ index: 0, id: 'pilot-guide', function: { name: 'read_guide', arguments: '{"id":"workflow:storyboard"}' } }] }
         : { content: c.answer };

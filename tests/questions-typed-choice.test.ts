@@ -8,6 +8,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { QuestionsFeedItem } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 
@@ -25,7 +26,7 @@ function setup() {
   const st = useStore.getState();
   useStore.setState({
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [item], editLog: [], agent: { history: [], questionRound: 0, notes: [], busy: false, pending: { kind: 'questions', feedItemId: 'q1', toolCallId: null } } } },
+    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [item], editLog: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, pending: { kind: 'questions', feedItemId: 'q1', toolCallId: null } }) } },
   } as never);
   host = document.createElement('div');
   document.body.replaceChildren(host);

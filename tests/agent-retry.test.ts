@@ -12,6 +12,7 @@ import { retryAgentTurn, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { NoticeFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 const enc = new TextEncoder();
 const line = (x: unknown) => enc.encode(`data: ${JSON.stringify(x)}\n\n`);
 const text = (t: string) => ({ choices: [{ delta: { content: t } }] });
@@ -39,7 +40,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 
@@ -97,7 +98,7 @@ describe('a provider that goes silent', () => {
     const note = useStore.getState().sessions[sid].feed.at(-1) as NoticeFeedItem;
     expect(note.text).toMatch(/no response for 120 s/);
     expect(note.retry).toBeDefined();
-    expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
+    expect(viewed(useStore.getState().sessions[sid]).busy).toBe(false);
   });
 });
 
@@ -158,7 +159,7 @@ describe('a turn that goes quiet (T3)', () => {
     const act = useStore.getState().sessions[sid].feed.find((f) => f.type === 'activity');
     expect(JSON.stringify(act)).toMatch(/no answer for 60 s/);
     // Nothing was cut: the turn is still working and can be stopped from the composer.
-    expect(useStore.getState().sessions[sid].agent.busy).toBe(true);
+    expect(viewed(useStore.getState().sessions[sid]).busy).toBe(true);
     expect(useStore.getState().sessions[sid].feed.some((f) => f.type === 'notice')).toBe(false);
     await vi.advanceTimersByTimeAsync(60_000);
     await turn;
@@ -180,7 +181,7 @@ describe('a turn that goes quiet (T3)', () => {
     expect(note.text).toMatch(/5 min/);
     expect(note.text).not.toMatch(/^Stopped\.$/);
     expect(note.retry).toBeDefined();
-    expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
+    expect(viewed(useStore.getState().sessions[sid]).busy).toBe(false);
   });
 
   it('no clock survives the turn: a finished turn leaves nothing running', async () => {
@@ -195,7 +196,7 @@ describe('a turn that goes quiet (T3)', () => {
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     vi.useRealTimers();
     expect(useStore.getState().sessions[sid].feed).toHaveLength(before);
-    expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
+    expect(viewed(useStore.getState().sessions[sid]).busy).toBe(false);
   });
 });
 
@@ -209,7 +210,7 @@ describe('a tool call written as text (DeepSeek DSML)', () => {
     expect(note.retry).toBeDefined();
     expect(note.garbledItemId).toBeTruthy();
     expect(s.feed.find((f) => f.id === note.garbledItemId)).toMatchObject({ text: 'La rehago con la cara más joven.' });
-    expect(s.agent.history.some((m) => m.role === 'assistant')).toBe(false);
+    expect(viewed(s).history.some((m) => m.role === 'assistant')).toBe(false);
     const { deleteGarbled } = await import('../src/engine/agent/runtime');
     deleteGarbled(sid, note.id);
     expect(useStore.getState().sessions[sid].feed.some((f) => f.type === 'assistant' || f.type === 'notice')).toBe(false);
@@ -229,7 +230,7 @@ describe('a readable tool call written as text', () => {
     expect(feed.some((f) => f.type === 'notice')).toBe(false);
     // On its next call the model reads a warning with the result of the converted call.
     const { repairHistory } = await import('../src/engine/agent/runtime');
-    const sent = repairHistory(useStore.getState().sessions[sid].agent.history);
+    const sent = repairHistory(viewed(useStore.getState().sessions[sid]).history);
     expect(sent.find((m) => m.role === 'tool')?.content).toMatch(/^Warning: you wrote this call as text markup/);
   });
 
@@ -241,7 +242,7 @@ describe('a readable tool call written as text', () => {
 });
 
 describe("the user's own messages", () => {
-  const said = (sid: string) => useStore.getState().sessions[sid].agent.history.filter((m) => m.role === 'user').map((m) => String(m.content).split('\n').slice(1, 2).join(''));
+  const said = (sid: string) => viewed(useStore.getState().sessions[sid]).history.filter((m) => m.role === 'user').map((m) => String(m.content).split('\n').slice(1, 2).join(''));
   it('delete: gone from the chat, and the agent reads only a deletion note in its place', async () => {
     let n = 0;
     vi.stubGlobal('fetch', async () => sse([text(`answer ${++n}`)]));
@@ -253,8 +254,8 @@ describe("the user's own messages", () => {
     deleteUserMessage(sid, first.id);
     const s = useStore.getState().sessions[sid];
     expect(s.feed.some((f) => f.id === first.id)).toBe(false);
-    expect(s.agent.history.some((m) => String(m.content).includes('primero'))).toBe(false);
-    expect(s.agent.history.find((m) => m.role === 'user')?.content).toMatch(/^\[The user deleted this message/);
+    expect(viewed(s).history.some((m) => String(m.content).includes('primero'))).toBe(false);
+    expect(viewed(s).history.find((m) => m.role === 'user')?.content).toMatch(/^\[The user deleted this message/);
     expect(said(sid)[1]).toBe('segundo');
   });
 

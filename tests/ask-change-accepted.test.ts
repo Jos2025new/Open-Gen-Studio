@@ -19,6 +19,7 @@ import { isAcceptance, offerRequest, userRequest } from '../src/engine/modelName
 import { useStore } from '../src/store/store';
 import type { ModelSchema, ModelSummary, SettingsFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const ATLAS = 'atlas::google/nano-banana-2/text-to-image';
 const NANO = 'nanogpt::nano-banana-2';
 const LITE = 'atlas::google/nano-banana-2-lite/text-to-image';
@@ -39,7 +40,7 @@ let primed = false;
 function prime() {
   if (primed) return;
   primed = true;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' }, ...s.sessions[sid()].agent.settings } } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' }, ...viewed(s.sessions[sid()]).settings } }) } } }));
 }
 
 function setup() {
@@ -60,13 +61,13 @@ function setup() {
     settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...s.composer, agentStyle: 'guided', attachments: [], image: { ...s.composer.image, modelRef: ATLAS } },
     catalog: { ...s.catalog, models: { ...s.catalog.models, ...models }, schemas: { ...s.catalog.schemas, ...schemas } },
-    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } },
+    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } }) } },
   });
 }
 const card = () => st().feed.find((f) => f.type === 'settings') as SettingsFeedItem | undefined;
 const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', user_requested: false, ...part }] } });
 /** The agent offered a change in plain text in an earlier turn. */
-const offered = (text: string) => useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, history: [{ role: 'user', content: '<user_message canvas="chat">\nUna imagen de un faro\n</user_message>' }, { role: 'assistant', content: text }] } } } }));
+const offered = (text: string) => useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...st(), agents: agentsWith(st(), { history: [{ role: 'user', content: '<user_message canvas="chat">\nUna imagen de un faro\n</user_message>' }, { role: 'assistant', content: text }] }) } } }));
 
 describe('ADR 0025 D: a change the agent offered in text and the user accepted', () => {
   beforeEach(() => { script = []; seen = []; setup(); });
@@ -88,8 +89,8 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
     expect(card()?.sections[0].recommended.modelRef).toBe(ATLAS);
     expect(card()?.sections[0].modelSelection?.reason).toBe('session');
     await confirmSettings(sid(), card()!.id, [card()!.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
-    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([ATLAS]);
+    expect(viewed(st()).settings?.image?.modelRef).toBe(ATLAS);
+    expect(viewed(st()).settingsParts?.map((p) => p.modelRef)).toEqual([ATLAS]);
   });
 
   it('(b2) F-01: another model line the user did not ask for does not slip through an ordinary card either, and the agent is told', async () => {
@@ -99,8 +100,8 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
     expect(card()?.sections[0].recommended.modelRef).toBe(ATLAS);
     expect(card()?.sections[0].modelSelection).toEqual({ requested: 'nano banana 2 lite', reason: 'session' });
     await confirmSettings(sid(), card()!.id, [card()!.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
-    const told = st().agent.history.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    expect(viewed(st()).settings?.image?.modelRef).toBe(ATLAS);
+    const told = viewed(st()).history.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
     expect(told).toContain('reason: session');
     expect(told).toContain('Requested: nano banana 2 lite');
   });

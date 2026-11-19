@@ -13,6 +13,7 @@ import { useStore } from '../src/store/store';
 import { serve } from './fixtures/live/serve';
 import type { AgentStyle, ImageStep, PlanFeedItem } from '../src/engine/types';
 
+import { agentsWith, mainThread } from './helpers/threads';
 const NANO = 'atlas::google/nano-banana-2/text-to-image-developer';
 const SEEDREAM = 'atlas::bytedance/seedream-v5.0-pro/text-to-image';
 const before = useStore.getState();
@@ -38,7 +39,7 @@ async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: bo
     settings: { ...before.settings, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     composer: { ...before.composer, agentStyle: opts.style, attachments: [], image: { ...before.composer.image, modelRef: NANO }, userPicked: { ...(before.composer.userPicked ?? {}), image: opts.userPicked } },
     catalog: { ...before.catalog, models: Object.fromEntries(models.map((m) => [m.ref, m])), schemas },
-    sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [], agent: { busy: false, questionRound: 0, notes: [], history: [], ...(opts.confirmed ? { settings: { image: { modelRef: opts.confirmed, needsImage: false, resolution: '1k', aspect: '1:1', count: 1 } } } : {}) } } },
+    sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [], agents: mainThread({ busy: false, questionRound: 0, notes: [], history: [], ...(opts.confirmed ? { settings: { image: { modelRef: opts.confirmed, needsImage: false, resolution: '1k', aspect: '1:1', count: 1 } } } : {}) }) } },
   });
   await sendAgentMessage(opts.text ?? 'Una imagen de una bicicleta roja');
   const plan = useStore.getState().sessions[sid].feed.find((f) => f.type === 'plan') as PlanFeedItem | undefined;
@@ -72,13 +73,13 @@ describe('Direct video guides follow the models that can run', () => {
     const sid = before.activeSessionId;
     useStore.setState({
       composer: { ...before.composer, agentStyle: 'direct', attachments: [], video: { ...before.composer.video, modelRef: 'nanogpt::seedance-2.0' }, videoRoutes: { image: 'atlas::kwaivgi/kling-v3.0-pro/image-to-video' } },
-      sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], agent: { ...before.sessions[sid].agent, settings: { video: { modelRef: 'atlas::alibaba/wan-3.0/text-to-video', needsImage: false } } } } },
+      sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], agents: agentsWith(before.sessions[sid], { settings: { video: { modelRef: 'atlas::alibaba/wan-3.0/text-to-video', needsImage: false } } }) } },
     });
     expect(directModelRefs(sid, undefined, 'video')).toEqual(['atlas::alibaba/wan-3.0/text-to-video']);
     expect(earlyModelGuide(sid, undefined, 'model:seedance')).toContain('direct mode');
     expect(earlyModelGuide(sid, undefined, 'model:kling')).toContain('direct mode');
     expect(earlyModelGuide(sid, undefined, 'model:wan')).toBeUndefined();
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agent: { ...s.sessions[sid].agent, settings: undefined } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agents: agentsWith(s.sessions[sid], { settings: undefined }) } } }));
     expect(directModelRefs(sid, undefined, 'video')).toEqual(expect.arrayContaining(['nanogpt::seedance-2.0', 'atlas::kwaivgi/kling-v3.0-pro/image-to-video']));
     expect(earlyModelGuide(sid, undefined, 'model:wan')).toContain('direct mode');
   });

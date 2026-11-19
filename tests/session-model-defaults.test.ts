@@ -6,6 +6,7 @@ import { pickComposerModel } from '../src/engine/catalog';
 import { useStore } from '../src/store/store';
 import type { SettingsChoice } from '../src/engine/types';
 
+import { viewed } from './helpers/threads';
 const before = useStore.getState();
 const sid = before.activeSessionId;
 const choice: SettingsChoice = { modelRef: 'atlas::example/image', aspect: '4:5', resolution: '2K', count: 2, needsImage: false };
@@ -14,14 +15,14 @@ afterEach(() => useStore.setState(before));
 describe('session model choices and composer defaults', () => {
   it('remembers a session choice without changing defaults when the setting is off', () => {
     rememberSessionModel(sid, undefined, 'image', choice);
-    expect(useStore.getState().sessions[sid].agent.settings?.image).toEqual(choice);
+    expect(viewed(useStore.getState().sessions[sid]).settings?.image).toEqual(choice);
     expect(useStore.getState().composer).toEqual(before.composer);
   });
 
   it('copies an explicitly chosen model into composer defaults when enabled', () => {
     useStore.setState({ settings: { ...before.settings, agent: { ...before.settings.agent, updateComposerDefaults: true } } as typeof before.settings });
     rememberSessionModel(sid, undefined, 'image', choice, true);
-    expect(useStore.getState().sessions[sid].agent.settings?.image).toEqual(choice);
+    expect(viewed(useStore.getState().sessions[sid]).settings?.image).toEqual(choice);
     expect(useStore.getState().composer.image.modelRef).toBe(choice.modelRef);
     expect(useStore.getState().composer.userPicked?.image).toBe(true);
   });
@@ -36,8 +37,8 @@ describe('session model choices and composer defaults', () => {
   it('a picked composer model is a session choice; an automatic variant switch is not', async () => {
     rememberSessionModel(sid, undefined, 'image', choice);
     await pickComposerModel('image', 'atlas::other/image', false);
-    expect(useStore.getState().sessions[sid].agent.settings?.image?.modelRef).toBe(choice.modelRef);
+    expect(viewed(useStore.getState().sessions[sid]).settings?.image?.modelRef).toBe(choice.modelRef);
     await pickComposerModel('image', 'atlas::other/image');
-    expect(useStore.getState().sessions[sid].agent.settings?.image?.modelRef).toBe('atlas::other/image');
+    expect(viewed(useStore.getState().sessions[sid]).settings?.image?.modelRef).toBe('atlas::other/image');
   });
 });

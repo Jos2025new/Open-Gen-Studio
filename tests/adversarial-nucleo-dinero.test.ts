@@ -13,6 +13,7 @@ import { recordOf, resetActions, runApproved } from '../src/engine/nodecore/acti
 import { inspectNode } from '../src/engine/nodecore/inspect';
 import { sourceValue, storeEnv } from '../src/engine/nodecore/resolver';
 
+import { mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const text = (value: string) => ({ id: 'text', position: { x: 0, y: 0 }, data: { kind: 'text' as const, title: 'Text', text: value } });
 const generator = (id: string) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'image' as const, title: id, prompt: 'local fallback prompt', modelRef: 'local::image', settings: { count: 1, advanced: {} }, outputIndex: 0 } });
@@ -26,7 +27,7 @@ beforeEach(() => {
   resetActions();
   vi.stubGlobal('fetch', () => { throw new Error('Unexpected network request'); });
   const st = useStore.getState();
-  useStore.setState({ activeSessionId: HOME, generations: {}, sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agents: undefined } } });
+  useStore.setState({ activeSessionId: HOME, generations: {}, sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }), agentLane: undefined} } });
 });
 
 describe('money boundaries through the reviewed Run path', () => {

@@ -16,6 +16,7 @@ import { confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const FLUX = 'atlas::bfl/flux-3-klein/text-to-image';
 const GROK = 'atlas::xai/grok-imagine-image/text-to-image';
 const OTHER = 'atlas::google/nano-banana-2/text-to-image';
@@ -35,7 +36,7 @@ let primed = false;
 function prime() {
   if (primed || useStore.getState().composer.agentStyle !== 'guided') return;
   primed = true;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } }, settingsParts: [{ kind: 'image', modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' }] } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { questionRound: 1, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } }, settingsParts: [{ kind: 'image', modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' }] }) } } }));
 }
 
 function setup(style: 'guided' | 'direct' = 'guided') {
@@ -55,7 +56,7 @@ function setup(style: 'guided' | 'direct' = 'guided') {
     settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...s.composer, agentStyle: style, attachments: [], image: { ...s.composer.image, modelRef: FLUX } },
     catalog: { ...s.catalog, models: { ...s.catalog.models, ...models }, schemas: { ...s.catalog.schemas, ...schemas } },
-    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } } } } },
+    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } } }) } },
   });
 }
 const card = () => st().feed.find((f) => f.type === 'settings') as SettingsFeedItem | undefined;
@@ -99,8 +100,8 @@ describe('model switch: refusal, card, confirmation', () => {
       { id: 's2', kind: 'image', title: 'I2', prompt: 'p2', count: 1, model: FLUX, user_requested: false },
     ] } }];
     await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(GROK);
-    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([GROK, FLUX]);
+    expect(viewed(st()).settings?.image?.modelRef).toBe(GROK);
+    expect(viewed(st()).settingsParts?.map((p) => p.modelRef)).toEqual([GROK, FLUX]);
     expect(refs()).toEqual([GROK, FLUX]);
   });
 
@@ -121,7 +122,7 @@ describe('model switch: refusal, card, confirmation', () => {
     const c = card()!;
     script = [steps(FLUX)];
     await confirmSettings(sid(), c.id, [{ ...c.switchFrom!, needsImage: false }]);
-    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([FLUX]);
+    expect(viewed(st()).settingsParts?.map((p) => p.modelRef)).toEqual([FLUX]);
     expect(refs()).toEqual([FLUX]);
   });
 
@@ -149,7 +150,7 @@ const cards = () => st().feed.filter((f) => f.type === 'settings') as SettingsFe
 describe('Direct never asks about a switch', () => {
   it('Direct never asks', async () => {
     setup('direct');
-    useStore.setState({ sessions: { ...useStore.getState().sessions, [sid()]: { ...st(), agent: { ...st().agent, switchedTo: { image: { modelRef: GROK, needsImage: false } } } } } });
+    useStore.setState({ sessions: { ...useStore.getState().sessions, [sid()]: { ...st(), agents: agentsWith(st(), { switchedTo: { image: { modelRef: GROK, needsImage: false } } }) } } });
     script = [steps(undefined)];
     await sendAgentMessage('Hazme otra imagen de una taza');
     expect(cards()).toHaveLength(0);

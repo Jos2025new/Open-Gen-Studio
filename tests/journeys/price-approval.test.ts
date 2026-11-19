@@ -33,6 +33,7 @@ import { logSettled } from '../../src/lib/log';
 import { useStore } from '../../src/store/store';
 import type { ModelSchema, ModelSummary, PlanFeedItem } from '../../src/engine/types';
 
+import { viewed, mainThread } from '../helpers/threads';
 const TEXT = 'atlas::journey/studio-7/text-to-image';
 const EDIT = 'atlas::journey/studio-7/edit';
 const imageModel = (ref: string, acceptsImage: boolean, usd: number): ModelSummary => ({
@@ -87,7 +88,7 @@ async function prepare(catalog: 'injected-change' | 'stable-capable' | 'stable-i
     catalog: { ...st.catalog, models: { [TEXT]: imageModel(TEXT, capable, 0.2), [EDIT]: imageModel(EDIT, true, 1.2) }, schemas: { [TEXT]: schema(TEXT, capable), [EDIT]: schema(EDIT, true) }, status: { ...st.catalog.status, atlas: 'ready' } },
     settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'test-only' }, budgetOn: false, budgetAccepted: null, agent: { ...st.settings.agent, provider: 'offline' } },
     composer: { ...st.composer, image: { ...st.composer.image, modelRef: TEXT }, userPicked: {}, videoRoutes: undefined },
-    sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
   const context = {
     workspace: 'chat' as const,
@@ -144,7 +145,7 @@ describe('price approval evidence (simulated prices, real adapter)', () => {
     expect(logged).not.toContain('test-only');
     expect(logged).not.toContain('input.png');
     expect(lastJourneyTrace().some(e => e.event === 'plan.step_cost_stopped')).toBe(true);
-    expect(useStore.getState().sessions[run.sessionId].agent.notes.join(' ')).toContain('s1 needs cost review');
+    expect(viewed(useStore.getState().sessions[run.sessionId]).notes.join(' ')).toContain('s1 needs cost review');
     const html = renderToStaticMarkup(createElement(PlanCard, { item, sessionId: run.sessionId }));
     expect(html).toContain('$1.20 en vez de $0.20');
     expect(html).toContain('Continuar');

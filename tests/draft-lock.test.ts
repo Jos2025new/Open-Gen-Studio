@@ -21,6 +21,7 @@ import { selectDraft, unlockDraft } from '../src/engine/agent/draftActions';
 import { useStore } from '../src/store/store';
 import type { ModelSchema, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => new Response(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
 let replies: Call[] = [];
@@ -33,7 +34,7 @@ function primeGuided() {
   if (roundDone) return;
   roundDone = true;
   const id = useStore.getState().activeSessionId;
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [id]: { ...s.sessions[id], agent: { ...s.sessions[id].agent, questionRound: 1 } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [id]: { ...s.sessions[id], agents: agentsWith(s.sessions[id], { questionRound: 1 }) } } }));
 }
 
 beforeEach(() => {
@@ -54,7 +55,7 @@ beforeEach(() => {
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
     catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [REF]: schema } },
-    sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -85,7 +86,7 @@ describe('borrador en la tarjeta de ajustes', () => {
     await openCard();
     replies = [plan];
     await confirmSettings(sid(), card().id, [{ ...card().sections[0].recommended, resolution: '1080p' }]);
-    expect(useStore.getState().sessions[sid()].agent.settings?.video?.resolution).toBe('480p');
+    expect(viewed(useStore.getState().sessions[sid()]).settings?.video?.resolution).toBe('480p');
     await vi.waitFor(() => expect(feed().some((f) => f.type === 'plan')).toBe(true));
     const step = (feed().find((f): f is PlanFeedItem => f.type === 'plan')!).plan.steps[0] as { settings: { resolution?: string } };
     expect(step.settings.resolution).toBe('480p');
@@ -108,7 +109,7 @@ describe('borrador en la tarjeta de ajustes', () => {
     selectSettings(sid(), card().id, 0, { ...card().sections[0].recommended, resolution: '720p' });
     replies = [plan];
     await confirmSettings(sid(), card().id, card().sections.map((x) => x.chosen!));
-    expect(useStore.getState().sessions[sid()].agent.settings?.video?.resolution).toBe('720p');
+    expect(viewed(useStore.getState().sessions[sid()]).settings?.video?.resolution).toBe('720p');
     expect(String(sent.at(-1)!.messages.at(-1)!.content)).toMatch(/El usuario desbloqueó la resolución de borrador y eligió 720p[\s\S]*no la cuestiones/);
   });
 });

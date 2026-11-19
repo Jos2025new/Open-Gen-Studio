@@ -14,6 +14,7 @@ vi.mock('../src/components/composer/ModelList', () => ({ ModelList: () => null }
 import { AgentModelControls } from '../src/components/composer/AgentModelControls';
 import { SettingsPanel } from '../src/components/shell/SettingsPanel';
 import { useStore } from '../src/store/store';
+import { agentsWith } from './helpers/threads';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root, host: HTMLDivElement;
 beforeEach(async () => {
@@ -23,7 +24,7 @@ beforeEach(async () => {
   useStore.setState({
     composer: { ...st.composer, image: { ...st.composer.image, modelRef: 'local::composer-image' }, video: { ...st.composer.video, modelRef: 'local::composer-video' } },
     settings: { ...st.settings, agent: { ...st.settings.agent, updateComposerDefaults: false } },
-    sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], agent: { ...st.sessions[sessionId].agent, settings: { image: { modelRef: 'local::session-image', needsImage: false }, video: { modelRef: 'local::composer-video', needsImage: false } } } } },
+    sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], agents: agentsWith(st.sessions[sessionId], { settings: { image: { modelRef: 'local::session-image', needsImage: false }, video: { modelRef: 'local::composer-video', needsImage: false } } }) } },
   });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   await act(async () => root.render(createElement(AgentModelControls)));

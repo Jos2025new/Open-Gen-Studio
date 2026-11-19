@@ -21,6 +21,7 @@ import { lineKey, variantRoute } from '../../src/engine/variants';
 import { sectionsOf } from '../../src/engine/agent/settingsCard';
 import type { FeedItem, Generation, LlmMessage, ModelSummary, PlanFeedItem, PlanStep, Session, SettingsChoice, SettingsFeedItem } from '../../src/engine/types';
 
+import { viewed } from '../helpers/threads';
 type Saved = { sessions: Record<string, Session>; generations: Record<string, Generation> };
 type Check = { check: string; ok: boolean; detail: string };
 
@@ -53,7 +54,7 @@ function stepDeps(st: PlanStep): string[] {
 
 function reportSession(s: Session, gens: Record<string, Generation>) {
   const feed = s.feed;
-  const history = s.agent?.history ?? [];
+  const history = viewed(s)?.history ?? [];
   const checks: Check[] = [];
   const lines: string[] = [];
   const add = (check: string, ok: boolean, detail: string) => checks.push({ check, ok, detail });

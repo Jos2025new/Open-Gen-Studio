@@ -19,6 +19,7 @@ import { repairHistory, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { LlmMessage } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const enc = new TextEncoder();
 const line = (x: unknown) => enc.encode(`data: ${JSON.stringify(x)}\n\n`);
 const text = (t: string) => ({ choices: [{ delta: { content: t } }] });
@@ -41,7 +42,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 
@@ -114,13 +115,13 @@ describe('the history of a new request (T6)', () => {
       return replies[calls.length - 1]();
     });
     await sendAgentMessage('quiero un UGC para vender la corneta');
-    const afterFirst = useStore.getState().sessions[sid].agent.history;
+    const afterFirst = viewed(useStore.getState().sessions[sid]).history;
     expect(afterFirst.filter((m) => m.role === 'tool')).toHaveLength(5);
     // The revised guides are shorter; explicitly cross the compaction threshold to test recovery, not their size.
-    useStore.setState(st => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], agent: { ...st.sessions[sid].agent, history: st.sessions[sid].agent.history.map((m, i) => i === st.sessions[sid].agent.history.findIndex(x => x.role === 'tool') ? { ...m, content: String(m.content) + ' '.repeat(TRIM_MIN_CHARS) } : m) } } } }));
+    useStore.setState(st => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], agents: agentsWith(st.sessions[sid], { history: viewed(st.sessions[sid]).history.map((m, i) => i === viewed(st.sessions[sid]).history.findIndex(x => x.role === 'tool') ? { ...m, content: String(m.content) + ' '.repeat(TRIM_MIN_CHARS) } : m) }) } } }));
 
     await sendAgentMessage('ahora en un sofá');
-    const history = useStore.getState().sessions[sid].agent.history;
+    const history = viewed(useStore.getState().sessions[sid]).history;
     const tools = history.filter((m) => m.role === 'tool').map((m) => String(m.content));
     // The five guides of the first request are now one line each…
     expect(tools.slice(0, 5)).toEqual([

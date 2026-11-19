@@ -4,6 +4,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { idbKeyval, resetWorld, settle } from './helpers/fakeTabs';
 
+import { viewed } from './helpers/threads';
 /*
  * Plan 1.4, test 15e: the read-only panel covers the app and blocks keys and pointer, and a tab without the lock
  * generates nothing and calls no provider.
@@ -99,7 +100,7 @@ describe('test 15e: the read-only panel', () => {
     await b.runtime.sendAgentMessage('make a picture');
     const sess = b.store.useStore.getState().sessions[st.activeSessionId];
     expect(sess.feed.some((f) => f.type === 'user')).toBe(false);
-    expect(sess.agent.busy).toBe(false);
+    expect(viewed(sess).busy).toBe(false);
     expect(calls.filter((u) => u !== '/x/store/ping')).toEqual([]);
     expect(a.lock.holdsWriterLock()).toBe(true);
   });

@@ -7,6 +7,7 @@ import { canReopenCard, reopenCard, sendAgentMessage, submitAnswers } from '../s
 import { useStore } from '../src/store/store';
 import type { QuestionsFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown } | string;
 let replies: Call[] = [];
 const sid = () => useStore.getState().activeSessionId;
@@ -26,7 +27,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], editLog: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], editLog: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -45,15 +46,15 @@ describe('editing an earlier answer', () => {
     expect(s().feed.at(-1)?.id).toBe(card.id);
     expect(s().feed.find((f) => f.id === card.id)).toMatchObject({ status: 'pending', answers: { who: 'A gamer' } });
     // The agent's context ends at its own question again: no answer, no reply after it.
-    const last = s().agent.history.at(-1)!;
+    const last = viewed(s()).history.at(-1)!;
     expect(last.role).toBe('assistant');
     expect(last.tool_calls?.[0].function.name).toBe('ask_questions');
-    expect(s().agent.pending).toMatchObject({ kind: 'questions', feedItemId: card.id });
+    expect(viewed(s()).pending).toMatchObject({ kind: 'questions', feedItemId: card.id });
     expect(s().editLog).toEqual([expect.objectContaining({ kind: 'questions', itemId: card.id, before: 'Who?: A gamer', removed: 2 })]);
 
     replies = ['Now a chef.'];
     await submitAnswers(sid(), card.id, { who: 'A chef' });
-    expect(s().agent.history.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n')).toMatch(/Who\?: A chef/);
-    expect(String(s().agent.history.filter((m) => m.role === 'tool').map((m) => m.content))).not.toMatch(/A gamer\n/);
+    expect(viewed(s()).history.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n')).toMatch(/Who\?: A chef/);
+    expect(String(viewed(s()).history.filter((m) => m.role === 'tool').map((m) => m.content))).not.toMatch(/A gamer\n/);
   });
 });

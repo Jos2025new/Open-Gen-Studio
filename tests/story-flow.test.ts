@@ -54,6 +54,7 @@ import { sendAgentMessage, submitAnswers } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { FeedItem, PlanFeedItem, QuestionsFeedItem, SettingsFeedItem } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
   const chunk = { choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] };
@@ -79,7 +80,7 @@ beforeEach(() => {
     composer: { ...st.composer, agentStyle: 'auto', attachments: ['char'] },
     assets: { ...st.assets, char: { id: 'char', kind: 'image', mime: 'image/png', width: 384, height: 682, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 } },
     library: [],
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());

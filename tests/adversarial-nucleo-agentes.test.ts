@@ -12,6 +12,7 @@ import { sendAgentMessage, submitAnswers } from '../src/engine/agent/conversatio
 import { laneState, patchLane } from '../src/engine/agent/lanes';
 import { disconnectEdges, patchNodeData } from '../src/engine/flow/actions';
 
+import { viewed, mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const ref = (id: string, type: 'chat' | 'agent', extra = {}) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'ref' as const, type, ref: HOME, title: id, ...extra } });
 const edge = (id: string, target: string) => ({ id, source: 'chat', target, sourceHandle: 'out_control', targetHandle: 'control', kind: 'control' as const });
@@ -28,7 +29,7 @@ beforeEach(() => {
     settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'vision' } },
     catalog: { ...st.catalog, llmStatus: { ...st.catalog.llmStatus, openrouter: 'ready' }, llm: { ...st.catalog.llm, openrouter: [{ id: 'vision', name: 'Vision', tools: true, vision: true }, { id: 'blind', name: 'Blind', tools: true, vision: false }] } },
     assets: { ...st.assets, picture: { id: 'picture', kind: 'image', name: 'picture', width: 10, height: 10 } as never },
-    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agents: undefined } },
+    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }), agentLane: undefined} },
   });
 });
 
@@ -70,11 +71,11 @@ describe('two agent adversarial routes', () => {
   it('a session saved with the old lane shape (parked agentLanes) loads into the map by id, idle', () => {
     const old = { ...current(), agentLane: 'a', agent: { history: [{ role: 'user', content: 'from A' }], questionRound: 0, notes: [], busy: true }, agentLanes: { b: { history: [{ role: 'user', content: 'from B' }], questionRound: 1, notes: ['n'], busy: true } }, agents: undefined };
     const merged = useStore.persist.getOptions().merge!({ sessions: { [HOME]: old } }, useStore.getState()) as ReturnType<typeof useStore.getState>;
-    const s = merged.sessions[HOME] as unknown as { agents: Record<string, { busy: boolean; history: unknown[] }>; agent: { busy: boolean } };
+    const s = merged.sessions[HOME] as unknown as { agents: Record<string, { busy: boolean; history: unknown[] }> };
     expect(Object.keys(s.agents).sort()).toEqual(['a', 'b']);
     expect(JSON.stringify(s.agents.a.history)).toContain('from A');
     expect(JSON.stringify(s.agents.b.history)).toContain('from B');
-    expect([s.agents.a.busy, s.agents.b.busy, s.agent.busy]).toEqual([false, false, false]);
+    expect([s.agents.a.busy, s.agents.b.busy]).toEqual([false, false]);
     expect('agentLanes' in s).toBe(false);
   });
 
@@ -90,7 +91,7 @@ describe('two agent adversarial routes', () => {
     blob.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
     const first = sendAgentMessage('for A', { agentNodeId: 'a', chatNodeId: 'chat', attachments: ['picture'] });
     await vi.waitFor(() => expect(blob).toHaveBeenCalled());
-    expect(current().agent.busy).toBe(true);
+    expect(viewed(current()).busy).toBe(true);
     // B is another agent: it answers while A still waits for its attachment (A's reservation is A's alone).
     await sendAgentMessage('for B', { agentNodeId: 'b' });
     expect(turn).toHaveBeenCalledTimes(1);

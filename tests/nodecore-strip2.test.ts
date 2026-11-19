@@ -15,6 +15,7 @@ import { recipientOf } from '../src/engine/agent/recipient';
 import { setAgentLlm } from '../src/engine/nodes/system';
 import { patchNodeData } from '../src/engine/flow/actions';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const ref = (id: string, type: 'chat' | 'agent', extra = {}) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'ref' as const, type, ref: HOME, title: id, ...extra } });
 const control = (id: string, source: string, target: string) => ({ id, source, target, sourceHandle: 'out_control', targetHandle: 'control', kind: 'control' as const });
@@ -28,7 +29,7 @@ beforeEach(() => {
   useStore.setState({
     activeSessionId: HOME,
     settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'default/model' } },
-    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false }, agentLane: undefined, agents: undefined } },
+    sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }), agentLane: undefined} },
   });
 });
 
@@ -62,9 +63,9 @@ describe('strip 2: chat with two agents', () => {
     pushHistory(HOME, { role: 'assistant', content: 'writer says' }, 'agentA');
     await sendAgentMessage('for the critic', { agentNodeId: 'agentB' });
     expect(laneState(HOME, 'agentA')!.history.some((m) => m.content === 'writer says')).toBe(true);
-    expect(S().agent.history.some((m) => m.content === 'writer says')).toBe(false); // the critic never saw it
+    expect(viewed(S()).history.some((m) => m.content === 'writer says')).toBe(false); // the critic never saw it
     await sendAgentMessage('writer again', { agentNodeId: 'agentA' });
-    expect(S().agent.history.some((m) => m.content === 'writer says')).toBe(true);
+    expect(viewed(S()).history.some((m) => m.content === 'writer says')).toBe(true);
     expect(laneState(HOME, 'agentB')!.history.some((m) => JSON.stringify(m.content).includes('for the critic'))).toBe(true);
   });
 
@@ -72,7 +73,7 @@ describe('strip 2: chat with two agents', () => {
     await sendAgentMessage('plan something', { agentNodeId: 'agentA' });
     patchLane(HOME, 'agentA', { pending: { toolCallId: 'call-1', kind: 'questions', feedItemId: 'card-1' } });
     await sendAgentMessage('hello critic', { agentNodeId: 'agentB' });
-    expect(S().agent.pending).toBeUndefined(); // the critic has none
+    expect(viewed(S()).pending).toBeUndefined(); // the critic has none
     expect(laneState(HOME, 'agentA')!.pending).toMatchObject({ feedItemId: 'card-1' }); // the writer's card is still open
     expect(turn.mock.calls.at(-1)![2]).toMatchObject({ agentNodeId: 'agentB' });
   });
@@ -82,7 +83,7 @@ describe('strip 2: chat with two agents', () => {
     patchLane(HOME, 'agentA', { busy: true });
     expect(enterLane(HOME, 'agentB')).toBeNull();
     expect(S().agentLane).toBe('agentB');
-    expect(S().agent.busy).toBe(false);
+    expect(viewed(S()).busy).toBe(false);
     expect(laneState(HOME, 'agentA')!.busy).toBe(true);
   });
 
@@ -95,9 +96,9 @@ describe('strip 2: chat with two agents', () => {
   });
 
   it('an existing conversation stays with the first agent that is written to', async () => {
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agent: { ...st.sessions[HOME].agent, history: [{ role: 'user', content: 'old talk' }] } } } }));
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agents: agentsWith(st.sessions[HOME], { history: [{ role: 'user', content: 'old talk' }] }) } } }));
     await sendAgentMessage('continue', { agentNodeId: 'agentA' });
-    expect(S().agent.history.some((m) => m.content === 'old talk')).toBe(true);
+    expect(viewed(S()).history.some((m) => m.content === 'old talk')).toBe(true);
     expect(laneState(HOME, 'agentB')).toBeUndefined();
   });
 });

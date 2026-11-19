@@ -14,7 +14,8 @@ import { agentAccepts } from '../src/engine/agent/sendGate';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { newSession, setUi, useStore } from '../src/store/store';
 
-const setBusy = (busy: boolean) => useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy } } } }));
+import { agentsWith } from './helpers/threads';
+const setBusy = (busy: boolean) => useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agents: agentsWith(s.sessions[s.activeSessionId], { busy }) } } }));
 const feedCount = () => useStore.getState().sessions[useStore.getState().activeSessionId]?.feed.length ?? 0;
 
 describe('sendAgentMessage uses agentAccepts()', () => {

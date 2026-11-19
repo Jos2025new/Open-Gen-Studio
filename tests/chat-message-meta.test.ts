@@ -26,6 +26,7 @@ import { notice } from '../src/engine/agent/runtimeShared';
 import { buildMessageMetaSummary, formatMessageDateTime } from '../src/engine/feedMeta';
 import { useStore } from '../src/store/store';
 
+import { mainThread } from './helpers/threads';
 function resetStore(opts: { provider?: 'openrouter' | 'offline'; model?: string } = {}) {
   mockChat.mockReset();
   const provider = opts.provider ?? 'openrouter';
@@ -60,12 +61,12 @@ function resetStore(opts: { provider?: 'openrouter' | 'offline'; model?: string 
       [sid]: {
         ...st.sessions[sid],
         feed: [],
-        agent: {
+        agents: mainThread({
           busy: false,
           history: [],
           notes: [],
           questionRound: 0,
-        },
+        }),
       },
     },
   });

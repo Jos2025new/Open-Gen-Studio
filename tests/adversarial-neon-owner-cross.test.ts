@@ -22,6 +22,7 @@ import { applyEdit } from '../src/engine/nodecore/edit';
 import { applyModelLinkToAgent } from '../src/engine/nodes/system';
 import { NetworkError } from '../src/lib/http';
 
+import { mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const INITIAL_SESSION = structuredClone(useStore.getState().sessions[HOME]);
 const ref = (id: string, type: 'chat' | 'agent' | 'model', extra: Record<string, unknown> = {}) => ({
@@ -81,9 +82,8 @@ beforeEach(() => {
         id: HOME,
         graph: baseGraph(),
         feed: [],
-        agent: { history: [], questionRound: 0, notes: [], busy: false },
+        agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }),
         agentLane: undefined,
-        agents: undefined,
       },
     },
   });

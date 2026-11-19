@@ -7,6 +7,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { ImageStep, ModelSchema, ModelSummary, PlanFeedItem } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 const Y = 'atlas::google/nano-banana-2/text-to-image';
 const Z = 'atlas::bfl/flux-3-klein/text-to-image';
 const A = 'atlas::xai/grok-imagine-image/text-to-image';
@@ -40,7 +41,7 @@ beforeEach(() => {
     settings: { ...initial.settings, keys: { ...initial.settings.keys, nanogpt: 'fixture', atlas: 'fixture' }, agent: { ...initial.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     composer: { ...initial.composer, agentStyle: 'auto', attachments: [], image: { ...initial.composer.image, modelRef: Y } },
     catalog: { ...initial.catalog, models: { ...initial.catalog.models, ...models }, schemas: { ...initial.catalog.schemas, ...schemas } },
-    sessions: { ...initial.sessions, [initial.activeSessionId]: { ...initial.sessions[initial.activeSessionId], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: Y, needsImage: false, count: 1, aspect: '1:1' } } } } },
+    sessions: { ...initial.sessions, [initial.activeSessionId]: { ...initial.sessions[initial.activeSessionId], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: Y, needsImage: false, count: 1, aspect: '1:1' } } }) } },
   });
 });
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(initial); });

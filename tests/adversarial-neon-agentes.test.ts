@@ -26,6 +26,7 @@ import { rewritePrompts } from '../src/engine/agent/planSettings';
 import { feedOfChat } from '../src/engine/agent/runtimeShared';
 import { disconnectEdges } from '../src/engine/flow/actions';
 
+import { mainThread } from './helpers/threads';
 const HOME = useStore.getState().activeSessionId;
 const ref = (id: string, type: 'chat' | 'agent', extra = {}) => ({
   id,
@@ -83,9 +84,8 @@ beforeEach(() => {
         ...st.sessions[HOME],
         graph: baseGraph(),
         feed: [],
-        agent: { history: [], questionRound: 0, notes: [], busy: false },
+        agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }),
         agentLane: undefined,
-        agents: undefined,
       },
     },
   });

@@ -23,6 +23,7 @@ import { useStore } from '../src/store/store';
 import type { Workspace } from '../src/engine/types';
 import type { FxLayer } from '../src/engine/fx/types';
 
+import { mainThread } from './helpers/threads';
 const image = { id: 'img1', kind: 'image', name: 'img1', createdAt: 0, width: 800, height: 600 };
 useStore.setState({ assets: { ...useStore.getState().assets, img1: image } as never });
 const fired = (text: string) => gateOps(text, [image as never], false).filter((g) => g.fired).map((g) => [g.op, g.params]);
@@ -59,7 +60,7 @@ async function request(workspace: Workspace, text: string, attachments: string[]
     ui: { ...st.ui, workspace },
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
   await sendAgentMessage(text);
   vi.unstubAllGlobals();

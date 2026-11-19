@@ -19,6 +19,7 @@ import { changePlanChoice, changePlanDraft, planSections, rewritePrompts, setPro
 import { useStore } from '../src/store/store';
 import type { FeedItem, ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const ATLAS = 'atlas::google/nano-banana-2/text-to-image';
 const NANO = 'nanogpt::nano-banana-2';
 const LITE = 'atlas::google/nano-banana-2-lite/text-to-image';
@@ -58,7 +59,7 @@ function setup() {
     settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...s.composer, agentStyle: 'auto', attachments: [], image: { ...s.composer.image, modelRef: ATLAS } },
     catalog: { ...s.catalog, models: { ...s.catalog.models, ...models }, schemas: { ...s.catalog.schemas, ...schemas } },
-    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } },
+    sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } }) } },
   });
   usePlanRewrite.setState({ busy: {}, failed: {} });
 }
@@ -72,15 +73,15 @@ describe('Auto: confirm_settings without a card', () => {
   beforeEach(setup);
 
   it('(a) no pending card; an inline confirmed item stays in the feed; the plan is shown in the same turn', async () => {
-    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...st(), agent: { ...st().agent, settings: undefined } } } }));
+    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...st(), agents: agentsWith(st(), { settings: undefined }) } } }));
     script = [ask({}), proposal()];
     await sendAgentMessage('Una imagen de un faro');
-    expect(st().agent.pending?.kind).not.toBe('settings');
+    expect(viewed(st()).pending?.kind).not.toBe('settings');
     expect(settingsItems().filter((f) => f.status === 'pending')).toHaveLength(0);
     expect(settingsItems()).toHaveLength(1);
     expect(settingsItems()[0]).toMatchObject({ status: 'confirmed', inline: true });
     expect(planItem()).toBeDefined();
-    expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
+    expect(viewed(st()).settings?.image?.modelRef).toBe(ATLAS);
   });
 
   it('(b) a model the user names in the request is applied with no Keep / Change card', async () => {
@@ -89,11 +90,11 @@ describe('Auto: confirm_settings without a card', () => {
     expect(settingsItems()).toHaveLength(1);
     expect(settingsItems()[0]).toMatchObject({ status: 'confirmed', inline: true, sections: [{ chosen: { modelRef: LITE } }] });
     expect(settingsItems()[0].switchFrom).toBeUndefined();
-    expect(st().agent.pending).toBeUndefined();
-    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    expect(viewed(st()).pending).toBeUndefined();
+    expect(viewed(st()).settings?.image?.modelRef).toBe(LITE);
     expect(planItem()?.plan.steps.map((x) => (x as ImageStep).modelRef)).toEqual([LITE]);
     await approvePlan(sid(), planItem()!.id);
-    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    expect(viewed(st()).settings?.image?.modelRef).toBe(LITE);
     // The next request names no model and the agent writes the old one: the approved one stays.
     script = [ask({}), proposal(ATLAS)];
     await sendAgentMessage('Ahora un faro de noche');
@@ -128,24 +129,24 @@ describe('plan card settings', () => {
     await changePlanChoice(sid(), 'pl1', 'image', { modelRef: LITE, aspect: '3:4', count: 2, needsImage: false });
     expect(steps().filter((x) => x.kind === 'image').map((x) => [x.modelRef, x.settings.aspect, x.settings.count])).toEqual([[LITE, '3:4', 2], [LITE, '3:4', 2]]);
     expect(steps().find((x) => x.kind === 'video')).toMatchObject({ modelRef: VID, settings: { aspect: '16:9', duration: 5 } });
-    expect(st().agent.settings?.image).toMatchObject({ modelRef: LITE, aspect: '3:4', count: 2 });
+    expect(viewed(st()).settings?.image).toMatchObject({ modelRef: LITE, aspect: '3:4', count: 2 });
     script = ['{"v1":"clip rewritten"}'];
     await changePlanChoice(sid(), 'pl1', 'video', { modelRef: VID, aspect: '9:16', duration: 8, resolution: '1080p', needsImage: false });
     expect(steps().find((x) => x.kind === 'video')).toMatchObject({ modelRef: VID, settings: { aspect: '9:16', duration: 8 } });
-    expect(st().agent.settings?.video).toMatchObject({ aspect: '9:16', duration: 8 });
+    expect(viewed(st()).settings?.video).toMatchObject({ aspect: '9:16', duration: 8 });
   });
 
   it('(d2) changing one image line in a comparison leaves the other model, session, and composer alone', async () => {
     put([img('a1'), img('a2'), img('b1', { modelRef: NANO }), img('b2', { modelRef: NANO })]);
     useStore.setState((s) => ({
       composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE } },
-      sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, settings: { image: { modelRef: LITE, needsImage: false, count: 1, aspect: '1:1' } } } } },
+      sessions: { ...s.sessions, [sid()]: { ...st(), agents: agentsWith(st(), { settings: { image: { modelRef: LITE, needsImage: false, count: 1, aspect: '1:1' } } }) } },
     }));
     setPromptWriter(sid(), 'pl1', false);
     expect(planSections(st().feed, planItem()!).map((x) => [x.recommended.modelRef, x.count])).toEqual([[ATLAS, 2], [NANO, 2]]);
     await changePlanChoice(sid(), 'pl1', 'image', { modelRef: LITE, aspect: '1:1', count: 1, needsImage: false }, NANO);
     expect(steps().filter((x) => x.kind === 'image').map((x) => x.modelRef)).toEqual([ATLAS, ATLAS, LITE, LITE]);
-    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    expect(viewed(st()).settings?.image?.modelRef).toBe(LITE);
     expect(useStore.getState().composer.image.modelRef).toBe(LITE);
   });
 
@@ -182,7 +183,7 @@ describe('plan card settings', () => {
     expect(user).toMatch(/references in order asset:a2/);
     expect(JSON.stringify(bodies[1].messages[1].content)).toMatch(/over 4000 characters/);
     expect(steps()[0].prompt).toBe('short clip');
-    expect(st().agent.notes.at(-1)).toMatch(/prompt writer, not you, rewrote.*v1: "short clip"/);
+    expect(viewed(st()).notes.at(-1)).toMatch(/prompt writer, not you, rewrote.*v1: "short clip"/);
   });
 
   it('(e3) "Ajustar prompt" off: a change on the card sends the prompt as written; turning it on adapts it', async () => {
@@ -200,7 +201,7 @@ describe('plan card settings', () => {
     put([vid('v1'), vid('v2', { settings: { aspect: '16:9', duration: 5, resolution: '720p', advanced: {} } }), img('i1')]);
     changePlanDraft(sid(), 'pl1', 'draft');
     expect(steps().filter((x) => x.kind === 'video').map((x) => x.settings.resolution)).toEqual(['480p', '480p']);
-    expect(st().agent.draftMode).toMatchObject({ kind: 'draft', locked: true });
+    expect(viewed(st()).draftMode).toMatchObject({ kind: 'draft', locked: true });
     expect(steps().find((x) => x.kind === 'image')?.settings).toMatchObject({ aspect: '1:1' });
   });
 
@@ -210,7 +211,7 @@ describe('plan card settings', () => {
     expect(steps()[0].settings.resolution).toBe('1080p');
     await changePlanChoice(sid(), 'pl1', 'video', { modelRef: VID, aspect: '16:9', duration: 5, resolution: '480p', needsImage: false });
     expect(steps()[0].settings.resolution).toBe('480p');
-    expect(st().agent.settings?.video?.resolution).toBe('480p');
+    expect(viewed(st()).settings?.video?.resolution).toBe('480p');
   });
 });
 
@@ -233,7 +234,7 @@ describe('Auto: which model and values, without a card (sandbox session 2026-10-
   });
 
   it('(i) a model named in the request wins over the composer pick', async () => {
-    useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } }, sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, settings: undefined } } } }));
+    useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } }, sessions: { ...s.sessions, [sid()]: { ...st(), agents: agentsWith(st(), { settings: undefined }) } } }));
     script = [ask({ model: ATLAS, user_requested: true }), proposal(ATLAS, true)];
     await sendAgentMessage('Una imagen de un faro con nano banana 2');
     expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(ATLAS);
@@ -260,9 +261,9 @@ describe('Auto: approving a plan confirms what it runs', () => {
 
   it('(k) a plan that runs another model than the confirmed one makes it the confirmed one; unchecked steps do not count', async () => {
     put([img('s1', { modelRef: LITE, settings: { aspect: '16:9', count: 1, advanced: {} } }), img('s2', { modelRef: ATLAS })]);
-    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...st(), feed: st().feed.map((f) => (f.type === 'plan' ? { ...f, skipped: ['s2'] } : f)), agent: { ...st().agent, pending: { kind: 'plan', feedItemId: 'pl1' } as never } } } }));
+    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...st(), feed: st().feed.map((f) => (f.type === 'plan' ? { ...f, skipped: ['s2'] } : f)), agents: agentsWith(st(), { pending: { kind: 'plan', feedItemId: 'pl1' } as never }) } } }));
     await approvePlan(sid(), 'pl1');
-    expect(st().agent.settings?.image).toMatchObject({ modelRef: LITE, aspect: '16:9' });
+    expect(viewed(st()).settings?.image).toMatchObject({ modelRef: LITE, aspect: '16:9' });
   });
 });
 

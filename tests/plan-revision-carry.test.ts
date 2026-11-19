@@ -14,6 +14,7 @@ import { normalizePlan, type PlanContext, type RawPlan } from '../src/engine/pla
 import { useStore } from '../src/store/store';
 import type { Plan, PlanFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 type Reply = { title: string; revision?: boolean; style?: string; texts: string[] };
 const sse = (r: Reply) => {
   const args = JSON.stringify({ title: r.title, revision: r.revision, style: r.style, steps: r.texts.map((t, i) => ({ id: `s${i + 1}`, kind: 'text', text: t })) });
@@ -32,7 +33,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -52,7 +53,7 @@ describe('a revision keeps the style of the plan it replaces', () => {
     expect(revised.plan.adjustments).toContain('Kept the previous style');
     expect(revised.plan.adjustments.join(' ')).not.toContain('You omitted');
     await approvePlan(sid(), revised.id);
-    const told = useStore.getState().sessions[sid()].agent.history.some((m) => m.role === 'tool' && typeof m.content === 'string' && /You omitted the style; the previous one was kept/.test(m.content));
+    const told = viewed(useStore.getState().sessions[sid()]).history.some((m) => m.role === 'tool' && typeof m.content === 'string' && /You omitted the style; the previous one was kept/.test(m.content));
     expect(told).toBe(true);
   });
 

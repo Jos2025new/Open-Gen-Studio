@@ -13,6 +13,7 @@ import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { ActivityFeedItem } from '../src/engine/types';
 
+import { mainThread } from './helpers/threads';
 const enc = new TextEncoder();
 const sse = (chunks: unknown[]) =>
   new Response(new ReadableStream({ start(c) { for (const x of chunks) c.enqueue(enc.encode(`data: ${JSON.stringify(x)}\n\n`)); c.enqueue(enc.encode('data: [DONE]\n\n')); c.close(); } }), { headers: { 'content-type': 'text/event-stream' } });
@@ -68,7 +69,7 @@ describe('activity block of a turn (L3–L4)', () => {
     useStore.setState({
       settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', effort: 'low', showThinking: true } },
       composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
-      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
     });
   });
 

@@ -20,6 +20,7 @@ import { editPairParts } from '../src/engine/agent/wrapUpPairs';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem } from '../src/engine/types';
 
+import { viewed, mainThread } from './helpers/threads';
 const sse = (text: string, tool?: unknown) => {
   const chunks: unknown[] = [];
   if (text) chunks.push({ choices: [{ delta: { content: text } }] });
@@ -44,7 +45,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -83,7 +84,7 @@ describe('wrap-up after a plan', () => {
     await sendAgentMessage('note');
     await approvePlan(sid(), plans()[0].id);
     expect(chatCalls).toBe(2);
-    const last = useStore.getState().sessions[sid()].agent.history.filter((m) => m.role === 'user').at(-1)!;
+    const last = viewed(useStore.getState().sessions[sid()]).history.filter((m) => m.role === 'user').at(-1)!;
     expect(typeof last.content).toBe('string');
     expect(last.content).toMatch(/you have not seen the result/);
   });

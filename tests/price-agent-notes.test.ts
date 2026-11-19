@@ -19,6 +19,7 @@ import { resolveStepCostReview, resumePlan, sendAgentMessage, settleInterruptedP
 import { recordPriceResults } from '../src/engine/agent/priceNotes';
 import type { LlmMessage, ModelSummary, PlanFeedItem } from '../src/engine/types';
 
+import { viewed, agentsWith, mainThread } from './helpers/threads';
 const REF = 'nanogpt::test-image';
 type Body = { messages: Array<LlmMessage | { role: 'system'; content: string }>; model: string };
 let bodies: Body[];
@@ -28,7 +29,7 @@ let quoteCalls = 0;
 let inject: (() => void) | undefined;
 let toolRounds = 0;
 const sid = () => useStore.getState().activeSessionId;
-const agent = () => useStore.getState().sessions[sid()].agent;
+const agent = () => viewed(useStore.getState().sessions[sid()]);
 const plan = () => useStore.getState().sessions[sid()].feed.find((f): f is PlanFeedItem => f.type === 'plan')!;
 const notices = (body: Body, needle: string) => body.messages.filter((m) => typeof m.content === 'string' && m.content.includes(needle));
 
@@ -56,7 +57,7 @@ beforeEach(() => {
       schemas: { [REF]: { ref: REF, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' } } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [], userPicked: {} },
     sessions: { ...st.sessions, [st.activeSessionId]: { ...st.sessions[st.activeSessionId], feed: [], agentMetrics: [],
-      agent: { history: [], notes: [], questionRound: 0, busy: false } } },
+      agents: mainThread({ history: [], notes: [], questionRound: 0, busy: false }) } },
   });
   vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => {
     mediaCalls++;
@@ -114,7 +115,7 @@ describe('price notices reach the model over the existing channel', () => {
 
   it.each(['continue', 'cancel'] as const)('rehydration preserves %s and delivers pending notices once', async (choice) => {
     reviewedStep();
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...agent(), busy: true } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { busy: true }) } } }));
     await resolveStepCostReview(sid(), 'card', 's1', choice);
     expect(modelCalls).toBe(0);
     vi.useFakeTimers(); useStore.setState({ hydrated: true }); await vi.advanceTimersByTimeAsync(2100);
@@ -122,7 +123,7 @@ describe('price notices reach the model over the existing channel', () => {
     expect(saved).toBeTruthy();
     useStore.setState({ sessions: {}, generations: {} }); disk.raw = saved;
     await useStore.persist.rehydrate(); vi.useRealTimers();
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...agent(), busy: false } } } }));
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { busy: false }) } } }));
     settleInterruptedPlans();
     await sendAgentMessage('status');
     const needle = choice === 'continue' ? 'Decisión: Continuar' : 'Decisión: Cancelar';
@@ -176,7 +177,7 @@ describe('price notices reach the model over the existing channel', () => {
     if (withNotice) inject = () => {
       if (hurry) vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000);
       useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: {
-        ...s.sessions[sid()], agent: { ...agent(), notes: ['[app] Plan P, paso s1: antes $0.20 → ahora $1.20 (motivo: modelo). Decisión: Continuar. Autorizado: $1.20 estimados. Estado: pendiente.'] },
+        ...s.sessions[sid()], agents: agentsWith(s.sessions[sid()], { notes: ['[app] Plan P, paso s1: antes $0.20 → ahora $1.20 (motivo: modelo). Decisión: Continuar. Autorizado: $1.20 estimados. Estado: pendiente.'] }),
       } } }));
     };
     await sendAgentMessage('read the storyboard guide');

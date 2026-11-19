@@ -8,12 +8,13 @@ import { approvePlan, presentNodeRun } from '../src/engine/agent/runtime';
 import * as action from '../src/engine/nodecore/action';
 import { prepareAction, runAction } from '../src/engine/nodecore/action';
 import type { Graph } from '../src/engine/types';
+import { agentsWith } from './helpers/threads';
 let sid:string;
 const data=(title:string)=>({kind:'image' as const,title,prompt:'old',modelRef:'local::studio-image',settings:{count:1,advanced:{}},outputIndex:0});
 beforeEach(()=>{
  const st=useStore.getState();sid=st.activeSessionId;
  const graph:Graph={nodes:[{id:'key2',position:{x:0,y:0},data:data('Keyframe 2')},{id:'final',position:{x:300,y:0},data:{...data('Final'),kind:'video',modelRef:'local::studio-video'}}],edges:[{id:'edge',source:'key2',target:'final',sourceHandle:'out',targetHandle:'first'}]};
- useStore.setState({sessions:{...st.sessions,[sid]:{...st.sessions[sid],graph,feed:[],agent:{...st.sessions[sid].agent,pending:undefined,busy:false}}},settings:{...st.settings,agent:{...st.settings.agent,provider:'offline'}}});execute.mockClear();
+ useStore.setState({sessions:{...st.sessions,[sid]:{...st.sessions[sid],graph,feed:[],agents: agentsWith(st.sessions[sid], { pending:undefined,busy:false })}},settings:{...st.settings,agent:{...st.settings.agent,provider:'offline'}}});execute.mockClear();
 });
 afterEach(()=>vi.unstubAllGlobals());
 

@@ -17,6 +17,7 @@ import { installHomeAutoClose } from '../src/components/shell/homeGuard';
 import { sessionDocs } from '../src/engine/design/actions';
 import { setUi, useStore } from '../src/store/store';
 
+import { agentsWith } from './helpers/threads';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} };
 installHomeAutoClose();
@@ -45,7 +46,7 @@ function typeInto(el: HTMLInputElement, value: string): void {
 }
 
 function setBusy(busy: boolean): void {
-  useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy } } } }));
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agents: agentsWith(s.sessions[s.activeSessionId], { busy }) } } }));
 }
 beforeEach(() => { vi.useFakeTimers(); setReducedMotion(false); setBusy(false); useStore.setState((s) => ({ composer: { ...s.composer, attachments: [] } })); setUi({ home: true, space: undefined, homeDrafts: {} }); sendAgentMessage.mockClear(); });
 afterEach(() => { act(() => root?.unmount()); root = undefined; host?.remove(); vi.useRealTimers(); });
