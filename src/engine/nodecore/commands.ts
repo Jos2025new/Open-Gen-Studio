@@ -16,7 +16,7 @@ export const commands = [
   nodeCommand({
     id: 'nodes.edit.connect',
     title: 'Connect with precondition',
-    description: 'Connects two nodes through the single editing layer. `replaces` names the cable expected on a single-cable input (an edge id, null for none, "any" to replace); `expect` (required) maps the target node id to the revision you read. Never starts a generation. Returns {edge, rev} or throws the conflict.',
+    description: 'Connects two nodes through the single editing layer. `replaces` names the cable expected on a single-cable input (an edge id, null for none; an absent cable is a conflict); `expect` (required) maps the target node id to the revision you read. Never starts a generation. Returns {edge, rev} or throws the conflict.',
     args: z.object({ source: nodeRef, target: nodeRef, targetHandle: z.string().nullable(), sourceHandle: z.string().nullable().optional(), kind: linkKind.optional(), both: z.boolean().optional(), replaces: z.union([z.string(), z.null()]).optional(), expect }).strict(),
     effect: 'write',
     run: (on, args) => {
