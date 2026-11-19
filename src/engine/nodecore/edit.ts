@@ -1,7 +1,7 @@
 import { uid } from '../../lib/id';
 import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { setGraph, toast, useStore } from '../../store/store';
-import { connect, connectionError, inputPorts, nodePorts, withEdge } from '../flow/graph';
+import { connect, connectionError, inputPorts, nodePorts, sameSourcePort, withEdge } from '../flow/graph';
 import { graphEditProblem } from '../flow/locks';
 import { applyModelLinkToAgent } from '../nodes/system';
 import type { Graph, GraphEdge, GraphNode, GraphNodeData, LinkKind, PortSpec } from '../types';
@@ -75,7 +75,7 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
     const own = kind === 'data' ? inputPorts(graph.nodes.find((n) => n.id === target)!.data).find((p) => p.id === targetHandle) : undefined;
     multi = own ? own.multi : tgtPort.multi !== false;
     const edge: GraphEdge = { id: uid('edge'), source, target, sourceHandle: srcPort.id, targetHandle, kind, ...(op.both && kind !== 'data' ? { both: true } : {}) };
-    const dup = (e: GraphEdge) => e.source === source && e.target === target && e.targetHandle === targetHandle && sameKind(e, kind);
+    const dup = (e: GraphEdge) => sameSourcePort(e, edge) && e.target === target && e.targetHandle === targetHandle && sameKind(e, kind);
     const occupant = multi ? undefined : graph.edges.find((e) => e.target === target && e.targetHandle === targetHandle && sameKind(e, kind) && !dup(e));
     const refused = replaceConflict(occupant, op.replaces, target, targetHandle, graph);
     if (refused) return refused;
@@ -91,13 +91,15 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
   const before = new Set(graph.edges.map((e) => e.id));
   next = connect(graph, { source, target, targetHandle, sourceHandle: op.sourceHandle, kind: op.kind, both: op.both });
   // Whatever the old edge on a single-cable input was, `replaces` must name it.
-  const replacedEdge = graph.edges.find((e) => !next.edges.some((n) => n.id === e.id) && e.target === target && e.targetHandle === targetHandle);
+  // against the handle the wiring resolved (a system port is named by its kind, not by the caller's null).
+  const added = next.edges.find((e) => !before.has(e.id));
+  const wired = added?.targetHandle ?? targetHandle;
+  const replacedEdge = graph.edges.find((e) => !next.edges.some((n) => n.id === e.id) && e.target === target && e.targetHandle === wired);
   const isSingle = legacyPort ? !legacyPort.multi : replacedEdge !== undefined || typeof op.replaces === 'string';
   // Wiring the same cable again is idempotent only while nothing is lost: a pinned cable must be named.
-  const sameSource = replacedEdge?.source === source && op.replaces == null && !replacedEdge.pin; // wiring the same cable again is not a replacement
+  const sameSource = !!replacedEdge && !!added && sameSourcePort(replacedEdge, added) && op.replaces == null && !replacedEdge.pin; // wiring the same cable again is not a replacement
   const refused = isSingle && !sameSource ? replaceConflict(replacedEdge, op.replaces, target, targetHandle, graph) : null;
   if (refused) return refused;
-  const added = next.edges.find((e) => !before.has(e.id));
   return finishConnect(graph, next, added?.id ?? '', source, target, kind);
 }
 

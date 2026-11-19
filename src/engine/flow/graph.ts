@@ -183,11 +183,14 @@ export function handleIndex(handle: string | null | undefined): number | undefin
   return m ? Number(m[1]) - 1 : undefined;
 }
 
+/** The same output of the same node (an output with no handle is `out`): two outputs of one node are two cables. */
+export const sameSourcePort = (a: GraphEdge, b: GraphEdge): boolean => a.source === b.source && (a.sourceHandle ?? 'out') === (b.sourceHandle ?? 'out');
+
 /** `edge` joins the cables: the same cable again is replaced, and on a single-cable input so is whatever else sits there (same kind). One rule for both ways of wiring a resolved port. */
 export function withEdge(edges: GraphEdge[], edge: GraphEdge, single: boolean): GraphEdge[] {
   const kind = edge.kind ?? 'data';
   const here = (e: GraphEdge) => e.target === edge.target && e.targetHandle === edge.targetHandle && (e.kind ?? 'data') === kind;
-  return [...edges.filter((e) => !(here(e) && (single || e.source === edge.source))), edge];
+  return [...edges.filter((e) => !(here(e) && (single || sameSourcePort(e, edge)))), edge];
 }
 
 /** Add an edge, replacing the existing edge on single-input ports. */
@@ -206,12 +209,10 @@ export function connect(
     return { ...graph, edges: withEdge(graph.edges, edge, resolved.tgtPort?.multi === false) };
   }
   const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
-  let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === c.targetHandle));
-  if (port && !port.multi) edges = edges.filter((e) => !(e.target === c.target && e.targetHandle === c.targetHandle));
   // A copy of a link that lost its image stays without one (it must not fall back to the node's chosen result).
   const outputIndex = c.sourceHandle === GONE_HANDLE ? NO_RESULT : handleIndex(c.sourceHandle);
-  edges.push({ id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) });
-  return { ...graph, edges };
+  const edge: GraphEdge = { id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) };
+  return { ...graph, edges: withEdge(graph.edges, edge, Boolean(port && !port.multi)) };
 }
 
 // ---------------------------------------------------------------------------
