@@ -183,6 +183,13 @@ export function handleIndex(handle: string | null | undefined): number | undefin
   return m ? Number(m[1]) - 1 : undefined;
 }
 
+/** `edge` joins the cables: the same cable again is replaced, and on a single-cable input so is whatever else sits there (same kind). One rule for both ways of wiring a resolved port. */
+export function withEdge(edges: GraphEdge[], edge: GraphEdge, single: boolean): GraphEdge[] {
+  const kind = edge.kind ?? 'data';
+  const here = (e: GraphEdge) => e.target === edge.target && e.targetHandle === edge.targetHandle && (e.kind ?? 'data') === kind;
+  return [...edges.filter((e) => !(here(e) && (single || e.source === edge.source))), edge];
+}
+
 /** Add an edge, replacing the existing edge on single-input ports. */
 export function connect(
   graph: Graph,
@@ -195,20 +202,8 @@ export function connect(
     const kind: LinkKind = c.kind ?? resolved.kind ?? 'data';
     const targetHandle = resolved.tgtPort?.id ?? c.targetHandle;
     const sourceHandle = resolved.srcPort?.id ?? (c.sourceHandle || 'out');
-    let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === targetHandle && (e.kind ?? 'data') === kind));
-    if (resolved.tgtPort && resolved.tgtPort.multi === false) {
-      edges = edges.filter((e) => !(e.target === c.target && e.targetHandle === targetHandle && (e.kind ?? 'data') === kind));
-    }
-    edges.push({
-      id: uid('edge'),
-      source: c.source,
-      target: c.target,
-      sourceHandle,
-      targetHandle,
-      kind,
-      ...(c.both && kind !== 'data' ? { both: true } : {}),
-    });
-    return { ...graph, edges };
+    const edge: GraphEdge = { id: uid('edge'), source: c.source, target: c.target, sourceHandle, targetHandle, kind, ...(c.both && kind !== 'data' ? { both: true } : {}) };
+    return { ...graph, edges: withEdge(graph.edges, edge, resolved.tgtPort?.multi === false) };
   }
   const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
   let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === c.targetHandle));

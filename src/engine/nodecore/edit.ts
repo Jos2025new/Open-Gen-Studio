@@ -1,7 +1,7 @@
 import { uid } from '../../lib/id';
 import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { setGraph, toast, useStore } from '../../store/store';
-import { connect, connectionError, inputPorts, nodePorts } from '../flow/graph';
+import { connect, connectionError, inputPorts, nodePorts, withEdge } from '../flow/graph';
 import { graphEditProblem } from '../flow/locks';
 import { applyModelLinkToAgent } from '../nodes/system';
 import type { Graph, GraphEdge, GraphNode, GraphNodeData, LinkKind, PortSpec } from '../types';
@@ -81,7 +81,7 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
     if (refused) return refused;
     const again = graph.edges.find(dup);
     if (again?.pin && op.replaces !== again.id) return replaceConflict(again, op.replaces, target, targetHandle, graph) ?? { error: `The cable ${again.id} is pinned; name it to wire it again.` };
-    next = { ...graph, edges: [...graph.edges.filter((e) => !dup(e) && (multi || !(e.target === target && e.targetHandle === targetHandle && sameKind(e, kind)))), edge] };
+    next = { ...graph, edges: withEdge(graph.edges, edge, !multi) };
     return finishConnect(graph, next, edge.id, source, target, kind);
   }
   const problem = connectionError(graph, assets, { source, target, targetHandle: op.targetHandle, sourceHandle: op.sourceHandle, kind: op.kind, both: op.both });
