@@ -13,3 +13,4 @@ Material de entrada del [ADR 0031](../decisions/0031-nucleo-de-nodos.md) (2026-1
 - [revision-neon-externa](revision-neon-externa.md): Gemini 4 Neon revisa el informe externo de la sesión (2026-11-19): doble gasto, escape de `deleteGeneration` y corrupción entre agentes en paralelo.
 - [informe-neon-owner](informe-neon-owner.md): Neon ataca el historial por agente (2026-11-19): 20 fallos de dinero, borrado, Stop y recarga; propone un hilo por agente.
 - [informe-neon-hilos](informe-neon-hilos.md): Neon ataca el hilo por agente (2026-11-19): 25 fallos de Stop global, feed, dinero, migración, núcleo, checks y rendimiento.
+- [informe-neon-cierre](informe-neon-cierre.md): Neon ataca el cierre (2026-11-19): 14 fallos de Stop y aprobaciones, edición, migración, chat sin agente, cables, multi-chat y checks AST.
