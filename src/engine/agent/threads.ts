@@ -57,7 +57,9 @@ export function migrateAgents(s: Session): Session {
   const agents: Record<string, AgentState> = { ...agentLanes, ...raw.agents };
   // The single `agent` was the one on screen: the lane it names, else the agent of the last row, else the first agent of the graph.
   const lastOwner = [...s.feed].reverse().map((f) => (f as { meta?: { agentNodeId?: string } }).meta?.agentNodeId).find((id) => id && s.graph.nodes.some((n) => n.id === id));
-  if (agent) agents[raw.agentLane ?? lastOwner ?? firstAgentId(s.graph)] = agent;
+  // With no lane named, the old agent goes to a node that has no thread yet: it never replaces one that is there.
+  const free = [lastOwner, ...s.graph.nodes.filter((n) => n.data.kind === 'ref' && n.data.type === 'agent').map((n) => n.id)].find((id) => id && !agents[id]);
+  if (agent) agents[raw.agentLane ?? free ?? MAIN_THREAD] = agent;
   if (!Object.keys(agents).length) agents[MAIN_THREAD] = freshAgent();
   return { ...rest, agents: Object.fromEntries(Object.entries(agents).map(([k, a]) => [k, interrupted(a)])) } as Session;
 }
