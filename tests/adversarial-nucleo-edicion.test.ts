@@ -101,7 +101,7 @@ describe('public graph editing and inspector boundaries', () => {
 
   it('keeps the last result attached to its producing run after a newer approval goes stale', async () => {
     arrange({ nodes: [image('gen')], edges: [] });
-    const generation = { id: 'result', sessionId: session, kind: 'image', status: 'done', assetIds: ['simulated-image'], settings, inputs: { refs: [] } } as Generation;
+    const generation = { id: 'result', sessionId: session, kind: 'image', status: 'done', assetIds: ['simulated-image'], settings, inputs: { refs: [] } } as unknown as Generation;
     execute.mockImplementationOnce(async (_steps, context) => {
       useStore.setState({ generations: { [generation.id]: generation } });
       context.onState('gen', 'running', { generationId: generation.id });
