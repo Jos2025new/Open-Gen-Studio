@@ -61,6 +61,38 @@ Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`
 - **La suite se paró dos veces** en `tsc`, por un cast en un test de GPT, y en `check-sizes`, porque `flow/actions.ts` creció.
 - **La PC se apagó de noche** porque alguien desconectó el cable. No se perdió nada: cada parte tenía su commit.
 
+## Revisión externa de la sesión (Sonnet sin contexto, 2026-11-19)
+
+La sesión maestra comprobó en el código los dos primeros puntos.
+- **Grave, en zona protegida.** `src/store/writerHandoff.ts:14` cuenta una sesión como ocupada solo con `s.agent.busy`, es decir, solo el agente en pantalla. Con agentes en paralelo (`b07c5090`), un agente ocupado en segundo plano no frena el traspaso del bloqueo de escritor. Arreglarlo exige autorización expresa y revisión independiente. La alternativa es volver a «un turno a la vez por sesión», que es lo que dice el ADR.
+- **El ADR se contradice con la rama.** El ADR 0031 (línea 88) dice «Un turno a la vez por sesión… un trabajo en paralelo de dos agentes no entra», y `b07c5090` hace lo contrario. Además, el ADR no recoge todavía la corrección del usuario sobre borrar un nodo uno mismo, y sigue diciendo «Aceptado» y «Aprobar este contrato» a la vez.
+- **Otros lectores de `agent.busy`** siguen mirando solo al agente en pantalla: `retryAgentTurn` (`conversation.ts:297`), `messageEdit.ts:39,54,87`, `HomeBar.tsx:15`, `Composer.tsx:245` y `FeedList.tsx:68,139,227`.
+- **El estado por agente es parcial.** Hay dos copias, `session.agents[id]` y la proyección `session.agent`, que se sincronizan (`store.ts:461-468`). `lanes.ts` todavía comparte `settings`, `switchedTo` y `enhance` entre agentes.
+- **Los checks son débiles.** `check-graph-writes` busca por regex y lo esquivan alias o un `setState`; `dropResults.ts` es una excepción. `check-node-descriptors` solo comprueba que aparezcan ciertas palabras. El nodo `ref` agrupa todos los nodos de sistema, cuyos puertos siguen en `nodes/spec.ts`. El render, el menú y `SYSTEM_NODE_TYPES` siguen cerrados: «añadir un tipo es un archivo» vale para el descriptor, no para el nodo entero.
+- **Migraciones.** Se registran por efecto lateral (`setLoadMigration`), y si `migrate.ts` no se ha importado antes de rehidratar, no migra (no verificado). Migrar datos reales necesita aprobación y una copia previa; hoy solo existe la tubería.
+- **Registro de acciones en memoria.** Tras recargar, se olvida qué aprobaciones se gastaron.
+- **El arreglo de raíz no tiene revisión independiente.** `compound`, `present`, `travel` y las aprobaciones solo los ha probado quien los hizo (regla [done-needs-another-model]).
+- **Recortes de alcance que no se dijeron:**
+  - el inicio y fin de space, que la 067 llama «la manda», quedó aplazado;
+  - las piezas sin nodo de la 067 (board, log de generaciones, ajustes, layer, paneles de Designer, historial de prompts) no están nombradas;
+  - otros pendientes de la 067: imagen de doc y library, nodos no idempotentes, la prueba de Argon en el sandbox, el panel de exportación, el idioma, A3-A6 y B1-B2.
+- **Decisiones sin aprobar:**
+  - `nodes.node.edit` exige `expect`, y el contexto del agente no lo menciona;
+  - los selectores «To» y de modelo del agente tienen un aspecto provisional;
+  - borrar el destino no deja marca;
+  - un chat sin agente bloquea el envío.
+- **Archivos cerca de 30 KB:** `map-contracts.md` (29 960 B), `map-contracts-2.md`, `informe-neon.md`, `flow/actions.ts` (31 121 B, por encima de 30 KB y por debajo de su base), `store.ts` y `Composer.tsx`.
+- **Visión:** el inspector no tiene panel y nadie ha medido el resolvedor con grafos grandes.
+
+Sugerencias, por impacto:
+1. Arreglar los lectores de `busy`, o prohibir los turnos en paralelo hasta que el usuario decida.
+2. Que el usuario decida sobre los agentes en paralelo, y alinear el ADR.
+3. Pasar al ADR la corrección sobre cables y borrado.
+4. Importar `migrate.ts` desde el arranque y probar una carga con datos viejos.
+5. Revisión independiente del arreglo de raíz, y suite completa después.
+6. Mantener anotados los recortes de alcance de arriba.
+7. Endurecer `check-graph-writes` y `check-node-descriptors` antes de llamar «mecánica» a la siguiente tanda.
+
 ## Pendiente, en orden
 
 0. **Revisar un cambio de comportamiento** (`b07c5090`). Con el estado por agente, dos agentes de un mismo chat pueden trabajar a la vez y cada uno contesta sus tarjetas, aunque el otro esté ocupado. Antes eso se rechazaba. Sonnet cambió 4 tests viejos en ese sentido. Es coherente con «un chat tiene varios agentes», pero el usuario no lo ha aprobado; que lo ataque el Neon nuevo y lo confirme el usuario.
