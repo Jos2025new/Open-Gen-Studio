@@ -51,6 +51,7 @@ Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`
   - **Cable rojo solo si el cable existe pero no puede funcionar.** Por ejemplo, cambiar el modelo deja un puerto con otro tipo.
   - **Se mantienen** el resumen «N problemas» con su lista y la insignia de recuento en un space o grupo cerrado.
 - **Arreglos visuales de los nodos de space, el buscador y la barra:** aprobados tal cual.
+- **Paralelismo por agente** (decidido en 0, recogido en el ADR 0031 el 2026-11-19): cada agente lleva su turno; dos pueden trabajar a la vez. La corrección de borrado y los avisos de arriba ya están también en el ADR.
 
 ## Reveses y su causa
 

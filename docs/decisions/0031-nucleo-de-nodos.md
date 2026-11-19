@@ -65,9 +65,13 @@ Contra este contrato, no contra la completitud del inventario. Cada regla de los
 
 ## Decisiones del usuario pendientes
 
-- Aprobar este contrato.
 - Aprobar el cambio de la primera tira: texto → generación primero y dos agentes después (propuesta de GPT; la sesión maestra está de acuerdo).
 - Space: decidir más adelante si encapsula o solo navega (recomendado: decidir después de la tira 2).
+
+## Decisiones del usuario vigentes (2026-11-19)
+
+- **Borrar un nodo uno mismo no es un error.** El cable se va (con «Deshacer» en el aviso de borrado) y no se dibuja ningún cable rojo; si la entrada era obligatoria, solo el puerto que se quedó sin nada se pone en rojo, con «Falta el prompt» al pasar el ratón. El cable inválido (`graph.broken`) queda para lo que existe pero no puede funcionar, no para un borrado hecho por el usuario.
+- **Avisos a escala, pocos y solo si algo es inválido de verdad.** Los textos salen al pasar el ratón (color e icono siempre visibles); un puerto incompatible no deja soltar el cable y muestra un aviso breve junto al cursor; editar el origen no es un error (el cable sigue el valor vigente y lo de abajo queda desactualizado); fijar un cable es explícito y, si su origen cambia, basta una marca discreta. Se mantienen el resumen «N problemas» con su lista y el recuento en un space o grupo cerrado. Detalle y fuentes en [068](../history/068-2026-11-W47-master-nucleo-nodos.md#decisiones-del-usuario-vigentes).
 
 ## Notas de implementación
 
@@ -85,7 +89,7 @@ Ajustes que obligó el código al construir las piezas 1 a 5 (rama `task/nucleo-
 
 - **Destinatario.** `sendAgentMessage(texto, { agentNodeId })`; sin nombre, el que fija el nodo chat (`recipient`, dato del nodo) y, si no, el primer agente conectado (lo de siempre). Un id que no es un agente da un aviso, nunca otro agente. `agentEngine`, `messageMeta` y `llmTurn` reciben el id; sin id usan el agente activo de la sesión.
 - **Estado por instancia.** El estado vivo de cada agente (historial, pendientes, notas, `busy`, modelo, ajustes) vive en `session.agents[idDelNodo]`; nada se aparca ni se restaura (`agent/lanes.ts`: `enterLane` solo mueve el puntero `agentLane`, `laneState` lee y `patchLane` escribe por id). `session.agent` es el agente en pantalla proyectado para los lectores de la interfaz; el store (`syncAgents`) mantiene ambos en paso en cada escritura. Un turno (`llmTurn`, `sendAgentMessage`, cierre de plan) nombra a su agente de principio a fin y su `AbortController` tiene clave propia (`turnKey`): A puede estar ocupado mientras B responde, y la puerta de envío mira al agente destinatario. Las sesiones guardadas con `agentLanes` se pliegan en `agents` al cargar (todos en reposo). Se comparten `settings`, `switchedTo` y `enhance` al cambiar de agente en pantalla. Las acciones de una tarjeta traen primero el agente dueño a pantalla.
-- **Límite.** Un turno a la vez por sesión: con un agente trabajando no se puede cambiar a otro (aviso). Un trabajo en paralelo de dos agentes no entra.
+- **Paralelismo por agente.** Cada agente lleva su propio turno, historial, pendientes y parada: dos agentes pueden trabajar a la vez, y todo lo que se escribe nombra a su dueño (ver «Agentes en paralelo: todo se escribe con dueño»). Solo hay un turno a la vez por agente.
 - **Controles nuevos (pedidos por el contrato).** El nodo agente tiene un selector de modelo (`setAgentLlm`) y el nodo chat un selector «To» cuando hay dos o más agentes conectados. No cambian las tarjetas existentes; el aspecto de los dos controles es provisional.
 
 ### Correcciones de la revisión de GPT (hallazgos 1 a 3)
