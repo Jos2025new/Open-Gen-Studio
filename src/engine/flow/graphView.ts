@@ -1,3 +1,4 @@
+import { ownerRev } from '../nodecore/revision';
 import { truncate } from '../../lib/format';
 import { OPS } from '../ops';
 import type { Generation, Graph, GraphNode } from '../types';
@@ -73,7 +74,7 @@ export function readGraph(graph: Graph, generations: Record<string, Generation>,
       const n = graph.nodes.find((x) => x.id === id);
       if (!n) return `${id}: no such node`;
       const d = n.data;
-      const lines = [`${n.id} ${kindOf(n)} "${d.title}"${selected.has(n.id) ? ' (selected)' : ''}`, `  status: ${statusOf(n, generations)}`];
+      const lines = [`${n.id} ${kindOf(n)} "${d.title}"${selected.has(n.id) ? ' (selected)' : ''}`, `  status: ${statusOf(n, generations)}`, `  rev: ${ownerRev(graph, n.id)} (pass it as expect_rev to edit_node)`];
       if (runsGeneration(d) && d.generationId) {
         const g = nodeAttempt(n, generations);
         if (g?.error) lines.push(`  error: ${truncate(g.error, 160)}`);

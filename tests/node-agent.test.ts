@@ -4,6 +4,7 @@ vi.mock('../src/lib/idb',()=>({stateDb:{get:async()=>undefined,set:async()=>unde
 const execute=vi.hoisted(()=>vi.fn(async()=>({outputs:new Map(),failed:[],skipped:[]})));
 vi.mock('../src/engine/executor',async original=>({...await original<typeof import('../src/engine/executor')>(),executeSteps:execute}));
 import { useStore, appendFeed } from '../src/store/store';
+import { ownerRev } from '../src/engine/nodecore/revision';
 import { editGraphTool } from '../src/engine/agent/nodeTools';
 import { sendAgentMessage, approvePlan, presentNodeRun, undoNodeDeletion } from '../src/engine/agent/runtime';
 import { restoreNodeGeneration, deleteNodes, deleteNodesWithUndo, patchNodeData, connectNodes } from '../src/engine/flow/actions';
@@ -20,7 +21,7 @@ afterEach(()=>vi.unstubAllGlobals());
 const session=()=>useStore.getState().sessions[sid];
 describe('agent actions on existing nodes',()=>{
  it('handles the complete chat tool loop with a simulated LLM',async()=>{
-  const replies=[{name:'read_graph',args:{node_ids:['key2','final']}},{name:'edit_node',args:{node_id:'key2',prompt:'walk toward the camera'}},{name:'run_nodes',args:{node_ids:['final']}}];
+  const replies=[{name:'read_graph',args:{node_ids:['key2','final']}},{name:'edit_node',args:{node_id:'key2',prompt:'walk toward the camera',expect_rev:ownerRev(session().graph,'key2')}},{name:'run_nodes',args:{node_ids:['final']}}];
   vi.stubGlobal('fetch',async(_url:string,init?:RequestInit)=>{
     const body=init?.body?JSON.parse(String(init.body)):{};
     if(!body.messages)return new Response(JSON.stringify({data:[]}));
@@ -35,7 +36,7 @@ describe('agent actions on existing nodes',()=>{
   expect(session().graph.nodes).toHaveLength(2);expect(session().graph.nodes[0].data).toMatchObject({prompt:'walk toward the camera'});expect(execute).not.toHaveBeenCalled();
  });
  it('edits keyframe 2, proposes only existing IDs and waits for approval',async()=>{
-  expect((await editGraphTool(sid,'edit_node',{node_id:'key2',prompt:'walk toward the camera'})).text).toContain('Updated');
+  expect((await editGraphTool(sid,'edit_node',{node_id:'key2',prompt:'walk toward the camera',expect_rev:ownerRev(session().graph,'key2')})).text).toContain('Updated');
   const card=await presentNodeRun(sid,['final']);expect(card.errors).toEqual([]);expect(execute).not.toHaveBeenCalled();
   const item=session().feed.find(f=>f.id===card.itemId) as PlanFeedItem;
   expect(item.plan.steps.map(s=>s.id)).toEqual(['key2','final']);expect(session().graph.nodes.map(n=>n.id)).toEqual(['key2','final']);
@@ -50,8 +51,8 @@ describe('agent actions on existing nodes',()=>{
  });
  it('shares cycle/port/model validation and reports missing IDs',async()=>{
   expect((await editGraphTool(sid,'connect_nodes',{source:'final',target:'key2',port:'ref'})).text).not.toContain('Connected existing');
-  expect((await editGraphTool(sid,'edit_node',{node_id:'missing',prompt:'x'})).text).toContain('No such node');
-  expect((await editGraphTool(sid,'edit_node',{node_id:'key2',model_ref:'local::studio-video'})).text).toContain('not image');
+  expect((await editGraphTool(sid,'edit_node',{node_id:'missing',prompt:'x',expect_rev:'r'})).text).toContain('No such node');
+  expect((await editGraphTool(sid,'edit_node',{node_id:'key2',model_ref:'local::studio-video',expect_rev:ownerRev(session().graph,'key2')})).text).toContain('not image');
   expect((await editGraphTool(sid,'disconnect_nodes',{edge_ids:['edge']})).text).toContain('Disconnected');expect(session().graph.edges).toHaveLength(0);
  });
  it('offers Undo and restores connections without reverting later edits or deleting results',()=>{

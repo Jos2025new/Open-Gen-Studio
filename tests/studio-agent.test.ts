@@ -8,6 +8,7 @@ vi.mock('../src/engine/design/exportDesign', async (original) => ({
 }));
 import { createDoc } from '../src/engine/design/doc';
 import { useStore } from '../src/store/store';
+import { ownerRev } from '../src/engine/nodecore/revision';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { agentCanvas, moveToCanvas, studioLine } from '../src/engine/agent/agentCanvas';
 import { buildContext } from '../src/engine/agent/context';
@@ -127,13 +128,13 @@ describe('open_board', () => {
   });
   it('without it, graph tools are refused in Studio; after open_board("nodes") the same turn edits the node', async () => {
     goLive('chat');
-    script([{ name: 'edit_node', args: { node_id: 'key2', prompt: 'a' } }]);
+    script([{ name: 'edit_node', args: { node_id: 'key2', prompt: 'a', expect_rev: 'r' } }]);
     await sendAgentMessage('edit');
     expect(toolResults().join('\n')).toContain('Graph actions work only on the node canvas');
     expect(session().graph.nodes[0].data).toMatchObject({ prompt: 'old' });
 
     useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agent: { ...s.sessions[sid].agent, history: [] } } } }));
-    script([{ name: 'open_board', args: { view: 'nodes' } }, { name: 'edit_node', args: { node_id: 'key2', prompt: 'walk toward the camera' } }]);
+    script([{ name: 'open_board', args: { view: 'nodes' } }, { name: 'edit_node', args: { node_id: 'key2', prompt: 'walk toward the camera', expect_rev: ownerRev(session().graph, 'key2') } }]);
     await sendAgentMessage('edit the keyframe');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'nodes' });
     expect(useStore.getState().ui.workspace).toBe('chat');
