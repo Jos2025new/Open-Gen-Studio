@@ -1,6 +1,6 @@
 # 068 · Sesión maestra 2026-11-18/19: núcleo de nodos (ADR 0031) en rama experimental
 
-Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`), sin push ni fusión. El usuario la prueba antes de fusionar nada.
+Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`), fusionada en `main` el 2026-11-19: la segunda mitad de la sesión está en la [069](069-2026-11-W47-master-cierre-fusion.md).
 
 ## Recorrido
 
@@ -104,17 +104,7 @@ Sin comprobar aún: la corrupción cruzada entre agentes en paralelo (`llmTurn`/
 
 ## Pendiente, en orden
 
-0. **Decisión del usuario sobre agentes en paralelo** (`ddf27bcb`; `b07c5090` solo cambió tests). Recomendado por ambos revisores: volver a un turno por sesión, como dice el ADR, y evitar la zona protegida (`writerHandoff.ts:14`). Si se aprueba paralelo: autorización para `writerHandoff.ts`, `owner` en todo `llmTurn`/`conversation`/`runtimeShared`/`spec`/`reopenCard`/`stopAgent`, y revisión independiente.
-1. Cerrar el doble gasto: candado antes del `await` en `approveNodeRun`, `runId` estable por tarjeta, y gastar la aprobación al intentar enviar (`action.ts:113`).
-2. Cerrar escapes del núcleo: `deleteGeneration` por `edit.ts`, `expect`/`replaces` en `nodeTools.ts`, validar `broken` en `compoundProblem`, revisar `silent: true`, y `check-graph-writes` multilínea o por AST.
-3. Rendimiento: quitar `useStore(s => s)`, acotar `snapshots`/`ledger`, evitar `[...feed].reverse()` en `resolver.ts:56`.
-4. Importar `migrate.ts` desde el arranque, con un test `v1 → v2`.
-5. ADR 0031: quitar «Aprobar este contrato», alinear 87-88 con lo decidido en 0, añadir la corrección de borrado y la decisión de avisos.
-6. Rehacer el boceto de avisos con la corrección del usuario (ver «Decisiones»), aprobarlo e implementarlo.
-7. Revisión independiente de 0-4 y suite completa una vez.
-8. Prueba del usuario en el sandbox, con una clave de proveedor: una generación real y dos agentes.
-9. Decisión sobre el space: subnet o solo navegación; envolver el resto de componentes.
-10. Fusionar o no `task/nucleo-nodos`; entonces actualizar `pendientes.md` (con `067:66-69`) y `docs/map.md`.
+Los puntos 0 a 5 y 7 se cerraron en la segunda mitad de la sesión. La lista vigente está en la [069](069-2026-11-W47-master-cierre-fusion.md#pendiente-en-orden).
 
 ## Lecciones
 

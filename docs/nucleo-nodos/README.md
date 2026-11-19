@@ -14,3 +14,8 @@ Material de entrada del [ADR 0031](../decisions/0031-nucleo-de-nodos.md) (2026-1
 - [informe-neon-owner](informe-neon-owner.md): Neon ataca el historial por agente (2026-11-19): 20 fallos de dinero, borrado, Stop y recarga; propone un hilo por agente.
 - [informe-neon-hilos](informe-neon-hilos.md): Neon ataca el hilo por agente (2026-11-19): 25 fallos de Stop global, feed, dinero, migración, núcleo, checks y rendimiento.
 - [informe-neon-cierre](informe-neon-cierre.md): Neon ataca el cierre (2026-11-19): 14 fallos de Stop y aprobaciones, edición, migración, chat sin agente, cables, multi-chat y checks AST.
+- [critica-grok-nucleo](critica-grok-nucleo.md): crítica dura de Grok (2026-11-19): doble cobro en planes, cable que cambia de imagen, memoria del agente borrado; descriptores y subnet.
+- [revision-dry-kiss-sol](revision-dry-kiss-sol.md): revisión DRY y KISS de GPT 6.2 Sol (2026-11-19): 10 simplificaciones aplicadas.
+- [auditoria-cierre](auditoria-cierre.md): auditorías de cierre de GPT 6.2 Sol y Neon sobre el transcript y el código (2026-11-19): qué bloqueaba la fusión.
+- [prueba-haiku-final](prueba-haiku-final.md): prueba de usuario nuevo en el sandbox antes de fusionar (Haiku, 2026-11-19).
+- [investigacion-agentes-suscripcion](investigacion-agentes-suscripcion.md): usar suscripciones (Claude, Codex, Cursor, Grok, Gemini) como agentes de la app por su CLI oficial (2026-11-19).

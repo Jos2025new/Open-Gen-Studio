@@ -6,6 +6,10 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 **Cómo se mantiene.** Una fila por ítem, con ID estable (A1, B2…) que usan los archivos de detalle. Al cerrar uno: se quita de aquí y de su detalle y se añade a [cerrados](pendientes-cerrados.md) con commit o test. Un ítem nuevo lleva su fecha de hoy. Evidencia: **código** (leído), **test**, **sandbox** (puerto 5183), **usuario**, **informe** (prueba de GPT del 2026-10-21), **propuesta** (sin implementar).
 
+## Núcleo de nodos, tras la fusión (2026-11-19)
+
+El núcleo de nodos (ADR 0031) y el hilo por agente están en `main`. Su lista vigente, en orden, está en [069](history/069-2026-11-W47-master-cierre-fusion.md#pendiente-en-orden): controles y nombres de los agentes, la crítica de diseño de Grok (descriptores y subnet), Neon sobre las propuestas, el boceto de avisos, los agentes de suscripción por su CLI oficial, la prueba con clave real y el paso de la app real a `main` (migra sus datos: necesita aprobación), la rama menor de Grok y la fricción vista por Haiku. También quedan las piezas de [067](history/067-2026-11-W47-master-estabilizacion.md) líneas 66-69.
+
 ## Por impacto visible (2026-11-16)
 
 Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rendimiento. Los seis marcados *nuevo* no estaban en ningún archivo.
