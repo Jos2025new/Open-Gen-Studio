@@ -7,10 +7,10 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseSync } from 'rolldown/utils';
 
 // lanes.ts and the store define the by-id write itself.
 const ALLOWED = new Set(['src/engine/agent/lanes.ts', 'src/store/store.ts']);
-const HAND_WRITE = /\.\.\.\w+,\s*agent:\s*\{\s*\.\.\.\w+\.agent\b/; // `{ ...session, agent: { ...session.agent, … } }`
 const HINT = 'write it by id: `patchAgent(sessionId, patch, owner)` (agent/runtimeShared.ts) or `patchLane(sessionId, owner, patch)` (agent/lanes.ts); `owner` is the agent the turn, card or plan belongs to.';
 
 function walk(dir, out = []) {
@@ -28,9 +28,31 @@ export function check(root = '.') {
   for (const file of walk(join(root, 'src'))) {
     const rel = relative(root, file).split('\\').join('/');
     if (ALLOWED.has(rel)) continue;
-    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-      if (HAND_WRITE.test(line.replace(/\/\/.*$/, ''))) errors.push(`${rel}:${i + 1}: writes an agent's state by hand (it lands in the agent on screen). ${HINT}`);
-    });
+    const text = readFileSync(file, 'utf8');
+    const { program, errors: broken } = parseSync(file, text);
+    if (broken.length) { errors.push(`${rel}:1: could not be parsed, so its agent writes could not be checked (${broken[0].message}).`); continue; }
+    const flag = (node, why) => errors.push(`${rel}:${text.slice(0, node.start).split('\n').length}: ${why}. ${HINT}`);
+    const keyName = (p) => (p.key?.type === 'Identifier' ? p.key.name : p.key?.value);
+    const isAgentMember = (n) => n?.type === 'MemberExpression' && !n.computed && n.property?.name === 'agent';
+    const touchesAgent = (n) => { for (let m = n; m?.type === 'MemberExpression'; m = m.object) if (isAgentMember(m)) return true; return false; };
+    // `agent` is also the name of a settings key and of a message's label (a string): those are not an agent's state.
+    const plain = (v) => v?.type === 'Literal' || v?.type === 'TemplateLiteral' || (v?.type === 'Identifier' && v.name === 'undefined') || (v?.type === 'ConditionalExpression' && plain(v.consequent) && plain(v.alternate));
+    const settingsLike = (o) => o.properties.some((p) => p.type === 'SpreadElement' && (p.argument?.property?.name === 'settings' || p.argument?.name === 'settings'));
+    // The syntax tree: line breaks, a variable in between or `Object.assign` do not hide a write.
+    const visit = (node) => {
+      if (!node || typeof node.type !== 'string') return;
+      // `{ ...session, agent: … }` (a session rebuilt with an agent put in it), however it is laid out.
+      if (node.type === 'ObjectExpression' && node.properties.some((p) => p.type === 'SpreadElement') && !settingsLike(node) && node.properties.some((p) => p.type === 'Property' && keyName(p) === 'agent' && !plain(p.value))) flag(node, "puts an agent into a session by hand (it lands in the agent on screen)");
+      // `Object.assign(session.agent, …)`, `session.agent.busy = …`, `session.agent.notes.push(…)`.
+      if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression' && node.callee.object?.name === 'Object' && node.callee.property?.name === 'assign' && touchesAgent(node.arguments[0])) flag(node, "mutates an agent's state by hand");
+      if (node.type === 'AssignmentExpression' && touchesAgent(node.left)) flag(node, "assigns into an agent's state by hand");
+      if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression' && ['push', 'splice', 'pop', 'shift', 'unshift', 'sort', 'reverse'].includes(node.callee.property?.name) && touchesAgent(node.callee.object)) flag(node, "mutates an agent's state by hand");
+      for (const key of Object.keys(node)) {
+        const child = node[key];
+        if (Array.isArray(child)) child.forEach(visit); else if (child && typeof child === 'object') visit(child);
+      }
+    };
+    visit(program);
   }
   return errors;
 }
