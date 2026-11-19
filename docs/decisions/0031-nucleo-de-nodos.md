@@ -105,3 +105,10 @@ Ajustes que obligó el código al construir las piezas 1 a 5 (rama `task/nucleo-
 - **Una sola vía de edición.** `expect` es obligatorio en `nodes.edit.connect/set`; `replaces` con un cable ya ausente es conflicto; `ownerRev` incluye los cables rotos; `set` rechaza ciclos por `subjects`; la operación nueva `add` cubre «crear conectado»; `setAgentLlm` y `addConnected` usan `applyEdit`; el tipo de enlace Modelo→Agente arrastrado se infiere igual que en el comando.
 - **Registro e inspector.** `affects: false` en un puerto evita invalidar al consumidor; el inspector enseña la última ejecución del nodo (`lastRunFor`); `check-node-descriptors` exige `migrate` si `version` > 1.
 - **Sigue abierto.** `NodeKind` sigue cerrado y las direcciones completas siguen siendo ayudas (los cables usan ids locales); el inspector no tiene panel; el registro de acciones vive en memoria.
+
+### Correcciones de los tests adversariales (10 fallos)
+
+- **Dinero.** La aprobación que adopta la interfaz incluye destino y `force` en su id; una aprobación cuyo envío falló no se reenvía con un `runId` nuevo (hay que preparar otra).
+- **Conexiones.** Pegar conserva el `pin` del cable; restaurar omite el cable que cerraría un ciclo (también por sujetos); el historial cuenta `broken` como cambio; `replaces` que nombra un cable de otro nodo es conflicto.
+- **Edición.** `nodes.node.edit` acepta `expect` (revisión leída). Sin él solo vale para un nodo que un comando del mismo llamador creó o editó y que nadie ha tocado desde (revisión igual a la recordada); si no, se rechaza.
+- **Agentes.** Un destinatario guardado y desconectado siempre bloquea; `agentSeesImages(sesión, agente)` usa el modelo del agente elegido; `lastRunFor(sesión, nodo, generación)` liga el resultado a la ejecución que lo produjo (`ActionRecord.generationIds`).
