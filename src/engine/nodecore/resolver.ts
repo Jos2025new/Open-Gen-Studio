@@ -48,7 +48,7 @@ export function sessionChatText(node: GraphNode): string | undefined {
   const d = node.data;
   if (d.kind !== 'ref' || (d.type !== 'chat' && d.type !== 'agent')) return undefined;
   const s = useStore.getState().sessions[d.ref];
-  const first = s?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === d.type)?.id;
+  const first = s?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === d.type)?.id ?? node.id; // a node outside the session graph (or with none) reads the untagged items
   const wanted = d.type === 'chat' ? 'user' : 'assistant';
   const owner = (f: { meta?: { agentNodeId?: string; chatNodeId?: string } }) => (d.type === 'chat' ? f.meta?.chatNodeId : f.meta?.agentNodeId) ?? first;
   const last = [...(s?.feed ?? [])].reverse().find((f) => f.type === wanted && 'text' in f && owner(f as never) === node.id);

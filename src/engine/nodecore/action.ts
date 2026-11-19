@@ -36,8 +36,11 @@ export interface ActionRecord {
   sends: number;
   result?: ExecResult | null;
   error?: string;
+  /** Order of the run in this app session, to find the latest. */
+  seq: number;
 }
 
+let counter = 0;
 const snapshots = new Map<string, ActionSnapshot>();
 const ledger = new Map<string, ActionRecord & { done: Promise<ActionRecord> }>();
 
@@ -93,13 +96,13 @@ export const runApproved = (session: string, targets: string[], force: boolean, 
 export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')): Promise<ActionRecord> {
   const known = ledger.get(runId);
   if (known) {
-    if (known.approval !== snapshot.id) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, error: 'This run id belongs to another approval; approve again and use a new id.' });
+    if (known.approval !== snapshot.id) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: 'This run id belongs to another approval; approve again and use a new id.' });
     return known.done;
   }
   const session = useStore.getState().sessions[snapshot.session];
-  const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, done: undefined as never };
+  const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, seq: ++counter, done: undefined as never };
   ledger.set(runId, record);
-  const finish = (): ActionRecord => ({ runId, approval: snapshot.id, session: record.session, targets: record.targets, status: record.status, sends: record.sends, result: record.result, error: record.error });
+  const finish = (): ActionRecord => ({ runId, approval: snapshot.id, session: record.session, targets: record.targets, status: record.status, sends: record.sends, seq: record.seq, result: record.result, error: record.error });
   record.done = (async () => {
     if (!session) { settle(runId, { status: 'failed', error: 'The session of this action no longer exists.' }); return finish(); }
     const missing = snapshot.targets.find((t) => !session.graph.nodes.some((n) => n.id === t));
@@ -119,4 +122,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
   return record.done;
 }
 
-export const knownRunIds = (): string[] => [...ledger.keys()];
+/** The latest run of this session that had this node as a destination. */
+export function lastRunFor(session: string, node: string): ActionRecord | undefined {
+  return [...ledger.values()].filter((r) => r.session === session && r.targets.includes(node)).sort((a, b) => b.seq - a.seq)[0];
+}

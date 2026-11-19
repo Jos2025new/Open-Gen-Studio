@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 385 | 289 |
-| [store.ts](../src/store/store.ts) | 263 | 278 |
+| [types.ts](../src/engine/types.ts) | 385 | 291 |
+| [store.ts](../src/store/store.ts) | 263 | 280 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 46 |
@@ -57,22 +57,22 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 353 |
-| `src/engine/agent` | 59 | 121 |
+| `src/engine` | 69 | 355 |
+| `src/engine/agent` | 59 | 122 |
 | `src/engine/commands` | 7 | 14 |
 | `src/engine/design` | 163 | 204 |
-| `src/engine/flow` | 17 | 43 |
+| `src/engine/flow` | 17 | 45 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/nodecore` | 21 | 3 |
-| `src/engine/nodes` | 6 | 21 |
+| `src/engine/nodecore` | 21 | 5 |
+| `src/engine/nodes` | 6 | 22 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 376 |
-| `src/store` | 18 | 280 |
+| `src/lib` | 35 | 378 |
+| `src/store` | 18 | 282 |
 
-232 de 705 módulos no tienen ningún test que los importe directamente.
+230 de 705 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -89,7 +89,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
-- [commands.ts](../src/engine/nodecore/commands.ts)
 - [generation.ts](../src/engine/nodecore/generation.ts)
 - [asset.node.ts](../src/engine/nodecore/types/asset.node.ts)
 - [audio.node.ts](../src/engine/nodecore/types/audio.node.ts)

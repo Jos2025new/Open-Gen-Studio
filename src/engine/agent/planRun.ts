@@ -162,7 +162,7 @@ function runPlanItem(sessionId: string, itemId: string, chosen: PlanStep[], off:
   const key = `${sessionId}:${itemId}`;
   const existing = planRuns.get(key);
   if (existing) return existing;
-  const promise = executePlanItem(sessionId, itemId, chosen, off, resume).finally(() => { planRuns.delete(key); });
+  const promise: Promise<void> = executePlanItem(sessionId, itemId, chosen, off, resume).finally(() => { if (planRuns.get(key) === promise) planRuns.delete(key); });
   planRuns.set(key, promise);
   return promise;
 }
@@ -296,6 +296,8 @@ async function executePlanItem(
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else if (status === 'error') toast(`${plan.title} failed`, 'error');
+  // The steps are over: a Retry clicked while the closing message is written starts its own run instead of being handed this one.
+  planRuns.delete(`${sessionId}:${itemId}`);
   if (status !== 'review') await wrapUpPlan(sessionId, itemId, plan.title, status, summary);
 }
 

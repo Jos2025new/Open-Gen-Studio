@@ -151,6 +151,8 @@ describe('recovering a failed plan', () => {
   it('the agent retries when the user asks ("reinténtalo")', async () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
+    // The closing message of the first run is written by the model too: let it finish before queuing the next reply.
+    await vi.waitFor(() => expect(useStore.getState().sessions[sid()].agent.busy).toBe(false));
     replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'Listo, lo reintento.'];
     await sendAgentMessage('reinténtalo');
     await vi.waitFor(() => expect(planItem().status).toBe('done'));

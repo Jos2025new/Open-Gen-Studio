@@ -42,6 +42,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const blocked = to.id ? enterLane(sessionId, to.id) : null;
   if (blocked) { notice(sessionId, canvas, blocked, 'info'); return; }
   // The turn is reserved before the first wait (attachments, the Designer page): nothing else can enter this session meanwhile.
+  toCanvas(sessionId, canvas); // switching canvas loads that canvas's parked state: it must happen before the reservation
   patchAgent(sessionId, { busy: true, phase: 'working' });
   try {
     await deliver(text, opts, sessionId, to, st);

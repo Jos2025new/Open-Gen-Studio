@@ -9,18 +9,19 @@ import { inspectNode } from './inspect';
 
 const ids = z.array(nodeRef).min(1).max(40);
 const linkKind = z.enum(['data', 'ref', 'control']);
-const expect = z.record(z.string(), z.string()).optional();
+/** Required: an edit that does not say which revision it read is refused (the layer's `require`). */
+const expect = z.record(z.string(), z.string());
 
 export const commands = [
   nodeCommand({
     id: 'nodes.edit.connect',
     title: 'Connect with precondition',
-    description: 'Connects two nodes through the single editing layer. `replaces` names the cable expected on a single-cable input (an edge id, null for none, "any" to replace); `expect` maps node ids to the revisions you read. Never starts a generation. Returns {edge, rev} or throws the conflict.',
+    description: 'Connects two nodes through the single editing layer. `replaces` names the cable expected on a single-cable input (an edge id, null for none, "any" to replace); `expect` (required) maps the target node id to the revision you read. Never starts a generation. Returns {edge, rev} or throws the conflict.',
     args: z.object({ source: nodeRef, target: nodeRef, targetHandle: z.string().nullable(), sourceHandle: z.string().nullable().optional(), kind: linkKind.optional(), both: z.boolean().optional(), replaces: z.union([z.string(), z.null()]).optional(), expect }).strict(),
     effect: 'write',
     run: (on, args) => {
       const { expect: want, ...c } = args;
-      const done = applyEdit({ session: on.session, ...(want ? { expect: want } : {}), op: { op: 'connect', ...c, replaces: c.replaces ?? null } });
+      const done = applyEdit({ session: on.session, require: true, expect: want, op: { op: 'connect', ...c, replaces: c.replaces ?? null } });
       if (!done.ok) throw new Error(done.error);
       return { edge: done.edgeId ?? null, rev: done.rev };
     },
@@ -28,11 +29,11 @@ export const commands = [
   nodeCommand({
     id: 'nodes.edit.set',
     title: 'Edit a node parameter',
-    description: 'Writes parameters of one node through the single editing layer; only keys the node type owns. `expect` carries the node revision you read: a stale one is refused. Returns {rev}.',
+    description: 'Writes parameters of one node through the single editing layer; only keys the node type owns. `expect` (required) carries the node revision you read: a stale or missing one is refused. Returns {rev}.',
     args: z.object({ node: nodeRef, patch: z.record(z.string(), z.unknown()), expect }).strict(),
     effect: 'write',
     run: (on, args) => {
-      const done = applyEdit({ session: on.session, ...(args.expect ? { expect: args.expect } : {}), op: { op: 'set', node: args.node, patch: args.patch as never, strict: true } });
+      const done = applyEdit({ session: on.session, require: true, expect: args.expect, op: { op: 'set', node: args.node, patch: args.patch as never, strict: true } });
       if (!done.ok) throw new Error(done.error);
       return { rev: done.rev };
     },

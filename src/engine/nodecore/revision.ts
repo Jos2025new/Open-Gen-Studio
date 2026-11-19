@@ -21,7 +21,8 @@ export function ownerRev(graph: Graph, nodeId: string): string {
   const data = Object.fromEntries(Object.entries(node.data).filter(([k]) => !IGNORED.has(k)));
   const edges = graph.edges.filter((e) => e.source === nodeId || e.target === nodeId)
     .map((e) => ({ id: e.id, s: e.source, t: e.target, sh: e.sourceHandle, th: e.targetHandle, o: e.outputIndex, k: e.kind, b: e.both, p: e.pin })).sort((a, b) => a.id.localeCompare(b.id));
-  return digest(stableJson({ data, edges }));
+  const broken = (graph.broken ?? []).filter((b) => b.edge.target === nodeId || b.edge.source === nodeId).map((b) => [b.edge.id, b.missing]).sort();
+  return digest(stableJson({ data, edges, broken }));
 }
 
 export const nodeOf = (graph: Graph, id: string): GraphNode | undefined => graph.nodes.find((n) => n.id === id);

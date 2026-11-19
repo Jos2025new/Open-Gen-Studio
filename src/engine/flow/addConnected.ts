@@ -1,9 +1,9 @@
 import { uid } from '../../lib/id';
-import { setGraph, toast, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
+import { applyEdit } from '../nodecore/edit';
 import { isAutoOption, matchInputOption, nearestAspect, paramByRole } from '../params';
 import type { GraphNode, GraphNodeData } from '../types';
-import { connect, connectionError, estimatedHeight, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, portFits } from './graph';
-import { graphEditProblem } from './locks';
+import { estimatedHeight, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, portFits } from './graph';
 
 const get = useStore.getState;
 
@@ -34,13 +34,9 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   const children = graph.edges.filter((e) => e.source === fromId).map((e) => graph.nodes.find((n) => n.id === e.target)).filter((n): n is GraphNode => Boolean(n));
   const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
   const id = uid('nd');
-  const next = { ...graph, nodes: [...graph.nodes, { id, data, position: at ?? { x: from.position.x + NODE_WIDTH + 100, y } }] };
-  const edge = { source: fromId, target: id, targetHandle: port.id, sourceHandle };
-  if (connectionError(next, st.assets, edge)) return null;
-  // The picker is one action: rejected connections leave no orphan, and Undo removes node and edge together.
-  const connected = connect(next, edge);
-  const error = graphEditProblem(sessionId, graph, connected);
-  if (error) { toast(error, 'error'); return null; }
-  setGraph(sessionId, () => connected);
+  // The picker is one action through the editing layer: a rejected connection leaves no orphan, and Undo removes node and cable together.
+  const node: GraphNode = { id, data, position: at ?? { x: from.position.x + NODE_WIDTH + 100, y } };
+  const done = applyEdit({ session: sessionId, op: { op: 'add', node, connect: { source: fromId, targetHandle: port.id, sourceHandle } } });
+  if (!done.ok) return null;
   return id;
 }

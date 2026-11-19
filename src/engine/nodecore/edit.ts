@@ -4,7 +4,7 @@ import { setGraph, toast, useStore } from '../../store/store';
 import { connect, connectionError, inputPorts, nodePorts } from '../flow/graph';
 import { graphEditProblem } from '../flow/locks';
 import { applyModelLinkToAgent } from '../nodes/system';
-import type { Graph, GraphEdge, GraphNodeData, LinkKind, PortSpec } from '../types';
+import type { Graph, GraphEdge, GraphNode, GraphNodeData, LinkKind, PortSpec } from '../types';
 import { findCycle } from './deps';
 import { descriptorOf } from './registry';
 import { ownerRev } from './revision';
@@ -28,15 +28,20 @@ export type EditOp =
   }
   | { op: 'disconnect'; edges: string[] }
   | { op: 'set'; node: string; patch: Partial<GraphNodeData>; strict?: boolean }
-  | { op: 'delete'; nodes: string[] };
+  | { op: 'delete'; nodes: string[] }
+  /** A new node, optionally wired in the same step: a rejected wire leaves no orphan node and Undo removes both. */
+  | { op: 'add'; node: GraphNode; connect?: { source: string; targetHandle: string; sourceHandle?: string | null } };
 
-export interface EditRequest { session: string; op: EditOp; expect?: Record<string, string> }
+/** `require`: the caller must say which revision it read (commands and the agent); the interface passes none and edits what it shows. */
+export interface EditRequest { session: string; op: EditOp; expect?: Record<string, string>; require?: true }
 
 export type EditResult =
   | { ok: true; edgeId?: string; rev: Record<string, string> }
   | { ok: false; error: string; conflict?: { node: string; expected: string; actual: string }; draft: EditRequest };
 
-const touched = (op: EditOp): string[] => op.op === 'connect' ? [op.source, op.target] : op.op === 'disconnect' ? [] : op.op === 'set' ? [op.node] : op.nodes;
+/** The nodes whose revision the edit depends on. */
+const touched = (op: EditOp): string[] => op.op === 'connect' ? [op.source, op.target] : op.op === 'disconnect' ? [] : op.op === 'set' ? [op.node] : op.op === 'add' ? (op.connect ? [op.connect.source] : []) : op.nodes;
+const owners = (op: EditOp): string[] => op.op === 'connect' ? [op.target] : op.op === 'set' ? [op.node] : op.op === 'delete' ? op.nodes : op.op === 'add' && op.connect ? [op.connect.source] : [];
 const refuse = (req: EditRequest, error: string, conflict?: { node: string; expected: string; actual: string }): EditResult => ({ ok: false, error, ...(conflict ? { conflict } : {}), draft: req });
 
 /** The owner revisions of the nodes an edit touches, to hand back to the caller for its next precondition. */
@@ -61,7 +66,7 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
     const edge: GraphEdge = { id: uid('edge'), source, target, sourceHandle: srcPort.id, targetHandle, kind, ...(op.both && kind !== 'data' ? { both: true } : {}) };
     const dup = (e: GraphEdge) => e.source === source && e.target === target && e.targetHandle === targetHandle && sameKind(e, kind);
     const occupant = multi ? undefined : graph.edges.find((e) => e.target === target && e.targetHandle === targetHandle && sameKind(e, kind) && !dup(e));
-    const refused = replaceConflict(occupant, op.replaces, target, targetHandle);
+    const refused = replaceConflict(occupant, op.replaces, target, targetHandle, graph);
     if (refused) return refused;
     next = { ...graph, edges: [...graph.edges.filter((e) => !dup(e) && (multi || !(e.target === target && e.targetHandle === targetHandle && sameKind(e, kind)))), edge] };
     return finishConnect(graph, next, edge.id, source, target, kind);
@@ -75,14 +80,17 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
   // Whatever the old edge on a single-cable input was, `replaces` must name it.
   const replacedEdge = graph.edges.find((e) => !next.edges.some((n) => n.id === e.id) && e.target === target && e.targetHandle === targetHandle);
   const isSingle = legacyPort ? !legacyPort.multi : replacedEdge !== undefined;
-  const refused = isSingle ? replaceConflict(replacedEdge && !(replacedEdge.source === source) ? replacedEdge : undefined, op.replaces, target, targetHandle) : null;
+  const sameSource = replacedEdge?.source === source && op.replaces == null; // wiring the same cable again is not a replacement
+  const refused = isSingle && !sameSource ? replaceConflict(replacedEdge, op.replaces, target, targetHandle, graph) : null;
   if (refused) return refused;
   const added = next.edges.find((e) => !before.has(e.id));
   return finishConnect(graph, next, added?.id ?? '', source, target, kind);
 }
 
-function replaceConflict(occupant: GraphEdge | undefined, replaces: EditOp extends never ? never : string | null | undefined, target: string, port: string) {
-  if (!occupant || replaces === 'any') return null;
+function replaceConflict(occupant: GraphEdge | undefined, replaces: string | null | undefined, target: string, port: string, graph: Graph) {
+  if (replaces === 'any') return null;
+  // The cable that was expected is gone: that is a conflict too, not permission to wire over whatever is there now.
+  if (!occupant) return typeof replaces === 'string' && !graph.edges.some((e) => e.id === replaces) ? { error: `The cable ${replaces} you meant to replace on "${port}" is no longer there.`, conflict: { node: target, expected: replaces, actual: 'none' } } : null;
   if (replaces === occupant.id) return null;
   return { error: `The input "${port}" already has a cable (${occupant.id}); name it as the one to replace.`, conflict: { node: target, expected: replaces ?? 'none', actual: occupant.id } };
 }
@@ -112,6 +120,10 @@ export function applyEdit(req: EditRequest): EditResult {
   const st = useStore.getState();
   const graph = st.sessions[req.session]?.graph;
   if (!graph) return refuse(req, 'No such session.');
+  if (req.require) {
+    const missingRev = owners(req.op).find((id) => !req.expect || !(id in req.expect));
+    if (missingRev) return refuse(req, `Say which revision of "${missingRev}" you read (expect): this edit does not run blind.`);
+  }
   for (const [node, expected] of Object.entries(req.expect ?? {})) {
     const actual = ownerRev(graph, node);
     if (actual !== expected) return refuse(req, `"${node}" changed since you read it; your edit was kept as a draft.`, { node, expected, actual });
@@ -145,6 +157,17 @@ export function applyEdit(req: EditRequest): EditResult {
         if (stray) return refuse(req, `"${stray}" is not a parameter of a ${node.data.kind} node.`);
       }
       next = { ...graph, nodes: graph.nodes.map((n) => n.id === op.node ? { ...n, data: { ...n.data, ...op.patch } as GraphNodeData } : n) };
+      if ('subjects' in op.patch) { const loop = findCycle(next); if (loop) return refuse(req, `That would create a loop (${loop.join(' → ')}).`); }
+      break;
+    }
+    case 'add': {
+      if (graph.nodes.some((n) => n.id === op.node.id)) return refuse(req, `Node ${op.node.id} already exists.`);
+      const withNode = { ...graph, nodes: [...graph.nodes, op.node] };
+      if (!op.connect) { next = withNode; break; }
+      if (!graph.nodes.some((n) => n.id === op.connect!.source)) return refuse(req, `No such node: ${op.connect.source}.`);
+      const planned = planConnect(withNode, { op: 'connect', source: op.connect.source, target: op.node.id, targetHandle: op.connect.targetHandle, sourceHandle: op.connect.sourceHandle, replaces: null }, st.assets);
+      if ('error' in planned) return refuse(req, planned.error, planned.conflict);
+      next = planned.next; edgeId = planned.edgeId;
       break;
     }
     case 'delete': {
@@ -166,7 +189,9 @@ export function applyEdit(req: EditRequest): EditResult {
   const locked = graphEditProblem(req.session, graph, next);
   if (locked) { toast(locked, 'error'); return refuse(req, locked); }
   setGraph(req.session, () => next);
-  if (op.op === 'connect' && (op.kind ?? op.ports?.kind) === 'control') applyModelLinkToAgent(req.session, op.source, op.target);
+  // The kind is the one the edge really got (a dragged Model→Agent cable is inferred as control, like the command).
+  const made = edgeId ? next.edges.find((e) => e.id === edgeId) : undefined;
+  if (made && (made.kind ?? 'data') === 'control') applyModelLinkToAgent(req.session, made.source, made.target);
   recordJourneyEvent({ journeyId: req.session, journey: 'node-core', event: `edit.${op.op}`, reason: 'edit through the single editing layer', sessionId: req.session, after: { op, edgeId } });
   return { ok: true, ...(edgeId ? { edgeId } : {}), rev: revisionsOf(next, touched(op)) };
 }

@@ -8,7 +8,7 @@ export default [{
     ['src/components/node/connectionDrop.ts', 'export function connectionDrop'],
     ['src/components/node/AddNodeItems.tsx', 'portFits(accepts'],
     ['src/components/node/NodeWorkspace.tsx', 'connectionDrop(e, state, canvasRef.current)'],
-    ['src/engine/flow/addConnected.ts', 'connect(next, edge)'],
+    ['src/engine/flow/addConnected.ts', 'applyEdit({ session: sessionId'],
     ['src/styles/node.css', '.node-connection-preview path'],
   ],
   tests: ['tests/connected-node-menu.test.ts', 'tests/node-connection-drop.test.ts', 'tests/add-connected-node.test.ts'],
@@ -48,7 +48,7 @@ export default [{
   what: 'ADR 0031 tira 2: el chat escribe a un agente explícito; cada agente tiene su historial, tarjetas y LLM.',
   sides: [
     ['src/engine/agent/recipient.ts', 'export function recipientOf'],
-    ['src/engine/agent/conversation.ts', 'recipientOf(sessionId, opts.agentNodeId)'],
+    ['src/engine/agent/conversation.ts', 'recipientOf(sessionId, opts.agentNodeId, opts.chatNodeId)'],
     ['src/engine/agent/lanes.ts', 'export function enterLane'],
     ['src/engine/agent/runtimeShared.ts', 'agentNodeId ?? get().sessions[sessionId]?.agentLane'],
     ['src/components/node/SystemNode.tsx', '<AgentLlmSelect'],

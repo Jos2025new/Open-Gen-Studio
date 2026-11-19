@@ -6,7 +6,7 @@ import { descriptorOf } from './registry';
 import { resolveInputs, storeEnv, type ResolvedInput } from './resolver';
 import { digest } from './address';
 import { ownerRev } from './revision';
-import { knownRunIds, recordOf } from './action';
+import { lastRunFor } from './action';
 
 /**
  * The inspector (ADR 0031): one node seen through the resolver. Not a second system: every field is what the
@@ -44,7 +44,7 @@ export function inspectNode(session: string, nodeId: string, ctx: RequestContext
     const bad = inputs.find((i) => i.status === 'invalid');
     staleReason = !gen ? 'It has not run yet.' : gen.status !== 'done' ? `The last run is ${gen.status}.` : bad ? `An input is invalid: ${bad.reason}` : 'Its parameters or inputs changed since the last result.';
   }
-  const run = gen ? [...Object.values(inspectRuns())].find((r) => r.targets.includes(nodeId)) : undefined;
+  const run = gen ? lastRunFor(session, nodeId) : undefined;
   return {
     node: nodeId, kind: node.data.kind, version: d?.version ?? 0, revision: ownerRev(graph, nodeId), inputs,
     signature: digest(`${node.data.kind}@${d?.version ?? 0}:${stable(request)}`), fresh, ...(staleReason ? { staleReason } : {}),
@@ -52,6 +52,3 @@ export function inspectNode(session: string, nodeId: string, ctx: RequestContext
     ...(gen ? { lastRun: { generationId: gen.id, status: gen.status, ...(run ? { runId: run.runId, sends: run.sends } : {}) } } : {}),
   };
 }
-
-/** The runs this session of the app knows (the ledger is memory, like the locks). */
-function inspectRuns() { return Object.fromEntries(knownRunIds().map((id) => [id, recordOf(id)!])); }

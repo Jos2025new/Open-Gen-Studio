@@ -93,3 +93,15 @@ Ajustes que obligó el código al construir las piezas 1 a 5 (rama `task/nucleo-
 - **Cables rotos.** Cada cable roto conserva su identidad (`Graph.broken`): otro cable en el mismo puerto ya no lo oculta. Solo lo retiran: borrar al consumidor, volver la fuente, desconectarlo explícitamente, o recablear un puerto de un solo cable del mismo tipo. También se marcan los enlaces `ref` y `control`. Sigue sin dibujarse en el lienzo (decisión visual pendiente) y borrar al consumidor se lleva su cable (desviación ya anotada).
 - **Plan desde el resolvedor.** `graphToSteps` descarta los cables cuya fijación (`pin`) ya no coincide: no se ejecutan ni se pasan al proveedor; si el puerto es obligatorio, la guardia bloquea. La firma de la aprobación incluye la versión del descriptor y la revisión y validez de cada entrada; la firma de frescura incluye la revisión de una fuente cuyo contenido se revisó (los resultados guardados no cambian).
 - **Ejecutar pasa por el registro.** Los botones Run de nodo y de lote usan `runApproved`: un id por confirmación, ligado a su aprobación. Un id conocido nunca reenvía, tampoco tras un fallo (puede haber llegado al proveedor); reintentar exige una aprobación nueva y un id nuevo. Un id de otra aprobación se rechaza.
+
+### Correcciones de la revisión de GPT (hallazgos 4 a 6)
+
+- **Tarjetas al dueño.** Toda acción de tarjeta (aprobar, responder, comentar, editar) entra primero en el agente dueño (`claimLaneOfItem`); si no puede (otro agente trabaja) avisa y no cambia nada. Los controles de comentario pasan el agente dueño.
+- **Turno reservado.** `sendAgentMessage` marca el turno ocupado antes de la primera espera (adjuntos) y lleva sesión, chat y agente hasta historial, proveedor y feed (`messageMeta`, `engineLabel`, `agentEngine`). El puerto de un agente lee su última respuesta por autor (los datos antiguos sin autor siguen yendo al primero).
+- **Destinatario.** Uno guardado y desconectado no se sustituye: el selector muestra «Not connected — choose one» y el envío avisa. El `Composer` del nodo chat pasa el id de su chat.
+
+### Correcciones de la revisión de GPT (hallazgos 7 y 8)
+
+- **Una sola vía de edición.** `expect` es obligatorio en `nodes.edit.connect/set`; `replaces` con un cable ya ausente es conflicto; `ownerRev` incluye los cables rotos; `set` rechaza ciclos por `subjects`; la operación nueva `add` cubre «crear conectado»; `setAgentLlm` y `addConnected` usan `applyEdit`; el tipo de enlace Modelo→Agente arrastrado se infiere igual que en el comando.
+- **Registro e inspector.** `affects: false` en un puerto evita invalidar al consumidor; el inspector enseña la última ejecución del nodo (`lastRunFor`); `check-node-descriptors` exige `migrate` si `version` > 1.
+- **Sigue abierto.** `NodeKind` sigue cerrado y las direcciones completas siguen siendo ayudas (los cables usan ids locales); el inspector no tiene panel; el registro de acciones vive en memoria.
