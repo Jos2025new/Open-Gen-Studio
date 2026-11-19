@@ -90,7 +90,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     const engine = agentEngine(sessionId, to.id);
     if (engine.kind === 'llm') {
       addReplyToRequest(sessionId, clean, attachments, to.id);
-      const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
+      const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`, to.id);
       patchAgent(sessionId, { pending: undefined }, to.id);
       await llmTurn(sessionId, workspace, { route: 'settings-reply', runId, agentNodeId: to.id });
@@ -105,7 +105,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     // The engine decides who answers; a plan kept after a text-only reply has no open tool call, so it gets a user message.
     if (engine.kind === 'llm') {
       addReplyToRequest(sessionId, clean, attachments, to.id);
-      const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
+      const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`, to.id);
           const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts), to.id);
@@ -138,7 +138,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     return;
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(sessionId, to.id), attachments: attachments.length });
-  const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
+  const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
   const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
   // The Designer page travels with a new request, so "draw on this" needs no extra round.
   if (workspace === 'designer' && agentSeesImages(sessionId, to.id)) {
@@ -155,7 +155,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
   const forced = steerNote(gate, confirmFirst);
   // The route goes first: one buried after the context was followed after the prompt's own steps.
   const askFirst = agentOf(sessionId, to.id).questionRound === 0;
-  pushHistory(sessionId, userMessage(`${forced}${userBlock([clean, ...wired].filter(Boolean).join('\n\n') || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts), to.id);
+  pushHistory(sessionId, userMessage(`${forced}${userBlock([clean, ...wired].filter(Boolean).join('\n\n') || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, to.id, askFirst)}\n</app_context>`, parts), to.id);
   await llmTurn(sessionId, workspace, { route: 'new', runId, agentNodeId: to.id });
 }
 
@@ -169,9 +169,9 @@ async function visibleAttachments(sessionId: string, workspace: Workspace, attac
   return attachmentParts(attachments);
 }
 
-function contextOpts(sessionId: string, workspace: Workspace, attachments: string[]) {
-  const s = session(sessionId);
-  return { workspace, style: get().composer.agentStyle, round: s.agent.questionRound, maxRounds: get().settings.guidedRounds, attachments };
+function contextOpts(sessionId: string, owner: string | undefined, workspace: Workspace, attachments: string[]) {
+  const agent = agentOf(sessionId, owner);
+  return { workspace, style: get().composer.agentStyle, round: agent.questionRound, maxRounds: get().settings.guidedRounds, attachments, agent };
 }
 
 function resolvePendingAsSuperseded(sessionId: string, owner: string | undefined): void {
@@ -227,7 +227,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   if (engine.kind === 'llm') {
     const lines = item.questions.map((q) => `- ${q.question}: ${answers[q.id] ?? '(no answer)'}`);
     if (answers.note) lines.push(`- User note: ${answers.note}`);
-    const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, agentOf(sessionId, owner).draft?.attachments ?? []));
+    const ctx = buildContext(session(sessionId), contextOpts(sessionId, owner, workspace, agentOf(sessionId, owner).draft?.attachments ?? []));
     replyToCard(sessionId, pending?.toolCallId, `User answers (${how}):\n${lines.join('\n')}\n\n${ctx}`, owner);
     await llmTurn(sessionId, workspace, { route: 'answers', runId, agentNodeId: owner });
     return;
@@ -253,7 +253,7 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
   patchAgent(sessionId, { pending: undefined, cardPick: undefined, questionRound: get().settings.guidedRounds }, owner);
   const engine = agentEngine(sessionId, owner);
   if (engine.kind === 'llm') {
-    const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), agentOf(sessionId, owner).draft?.attachments ?? []));
+    const ctx = buildContext(session(sessionId), contextOpts(sessionId, owner, turnCanvas(item.workspace), agentOf(sessionId, owner).draft?.attachments ?? []));
     replyToCard(sessionId, pending?.toolCallId, `The user skipped the questions. Use sensible defaults and call propose_plan now.\n\n${ctx}`, owner);
     await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'skip', agentNodeId: owner });
     return;
@@ -284,8 +284,8 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   patchAgent(sessionId, (a) => confirmedState(a, item, sections), owner);
   for (const x of sections) if (x.chosen && sections.filter((p) => p.kind === x.kind).length === 1) rememberSessionModel(sessionId, owner, x.kind, x.chosen, true);
   if (agentEngine(sessionId, owner).kind !== 'llm' || !pending?.toolCallId) return;
-  const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), agentOf(sessionId, owner).draft?.attachments ?? []));
-  pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` }, owner);
+  const ctx = buildContext(session(sessionId), contextOpts(sessionId, owner, turnCanvas(item.workspace), agentOf(sessionId, owner).draft?.attachments ?? []));
+  pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, owner, t), note)}\n\n${ctx}` }, owner);
   await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'settings-confirm', agentNodeId: owner });
 }
 

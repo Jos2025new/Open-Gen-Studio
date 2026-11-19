@@ -11,7 +11,8 @@ import { saveNow, useStore } from './store';
  * Imported by App; a test imports it to get the same wiring.
  */
 const inFlight = () => Object.values(useStore.getState().generations).filter((g) => g.status === 'running' || g.status === 'queued');
-const busySessions = () => Object.values(useStore.getState().sessions).filter((s) => s.agent.busy).map((s) => s.id);
+/** A session is busy while ANY of its agents is mid-turn (agents run in parallel; `session.agent` is only the one on screen). */
+const busySessions = () => Object.values(useStore.getState().sessions).filter((s) => s.agent.busy || Object.values(s.agents ?? {}).some((a) => a.busy)).map((s) => s.id);
 
 export function workReport(): WorkReport {
   const gens = inFlight();

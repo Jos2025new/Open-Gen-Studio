@@ -61,5 +61,5 @@ export async function autoConfirmSettings(sessionId: string, owner: string | und
   for (const x of item.sections) {
     if (x.chosen && x.modelSelection?.reason.startsWith('user request') && item.sections.filter((y) => y.kind === x.kind).length === 1) rememberSessionModel(sessionId, owner, x.kind, x.chosen, true);
   }
-  return settingsResultText(item, item.sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), undefined, true) + notes.join('');
+  return settingsResultText(item, item.sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, owner, t), undefined, true) + notes.join('');
 }

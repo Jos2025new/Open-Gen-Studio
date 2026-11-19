@@ -14,6 +14,8 @@ import { check as ownerCheck } from '../scripts/check-agent-owner.mjs';
 import { useStore } from '../src/store/store';
 import { sendAgentMessage, stopAgent } from '../src/engine/agent/conversation';
 import { laneState, patchLane } from '../src/engine/agent/lanes';
+import { directModelRefs, inConversation } from '../src/engine/agent/requestGuides';
+import { buildContext } from '../src/engine/agent/context';
 import { resolveSystemNodeLive } from '../src/engine/nodes/spec';
 
 /** ADR 0031: two agents of one chat run in parallel; whatever agent A's turn writes lands in A, never in the agent on screen. */
@@ -106,5 +108,29 @@ describe('parallel agents: A runs in the background while B is on screen', () =>
     mkdirSync(join(root, 'src/engine'), { recursive: true });
     writeFileSync(join(root, 'src/engine/bad.ts'), "patchSession(id, (s) => ({ ...s, agent: { ...s.agent, notes: [] } }));\n");
     expect(ownerCheck(root)).toEqual([expect.stringMatching(/bad\.ts:1: writes an agent's state by hand/)]);
+  });
+
+  describe('readers take the agent that owns the turn, not the one on screen', () => {
+    const setup = async () => {
+      await sendAgentMessage('hello B', { agentNodeId: 'agentB', chatNodeId: 'chat2' }); // B is on screen
+      patchLane(HOME, 'agentA', { history: [{ role: 'user', content: 'GUIDE-MARK' }], settings: { video: { modelRef: 'local::vid-a', aspect: '16:9', resolution: '720p', needsImage: false, duration: 5 } } as never, draft: { request: 'for A', answers: {}, attachments: [] } });
+    };
+    it('a guide already in A\'s conversation is found for A and not for B', async () => {
+      await setup();
+      expect(inConversation(HOME, 'agentA', 'GUIDE-MARK')).toBe(true);
+      expect(inConversation(HOME, 'agentB', 'GUIDE-MARK')).toBe(false);
+    });
+    it('Direct runs the model A confirmed, not the one on screen', async () => {
+      await setup();
+      useStore.setState((st) => ({ composer: { ...st.composer, agentStyle: 'direct' } }));
+      expect(directModelRefs(HOME, 'agentA', 'video')).toContain('local::vid-a');
+      expect(directModelRefs(HOME, 'agentB', 'video')).not.toContain('local::vid-a');
+    });
+    it('the context of A\'s turn carries A\'s confirmed settings', async () => {
+      await setup();
+      const opts = (id: string) => ({ workspace: 'chat' as const, style: 'auto' as const, round: 0, maxRounds: 1, attachments: [], agent: laneState(HOME, id)! });
+      expect(buildContext(S(), opts('agentA'))).toContain('settings confirmed by the user');
+      expect(buildContext(S(), opts('agentB'))).not.toContain('settings confirmed by the user');
+    });
   });
 });

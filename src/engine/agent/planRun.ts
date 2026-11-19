@@ -29,7 +29,7 @@ import { overLimit, overLimitText, rerunNote } from '../budget';
 import { confirmApproved, inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { failedStepSummary } from './failureContext';
-import { agentEngine, closeRevisedPlan, designerDims, feedBase, get, messageMeta, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
+import { agentEngine, agentOf, closeRevisedPlan, designerDims, feedBase, get, messageMeta, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
 import { pushHistory } from './conversation';
 import { llmTurn } from './llmTurn';
 
@@ -68,7 +68,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     return;
   }
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
-  const pending = s.agent.pending;
+  const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === itemId;
   if (closesRequest) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
@@ -140,7 +140,7 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
   }
   const status = result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status, error: result.failed.map(f => `${f.stepId}: ${f.error}`).join(' · ') || undefined });
-  const pending = session(sessionId).agent.pending;
+  const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === item.id;
   if (closesRequest) {
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...result.outputs].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` }, owner);
@@ -279,7 +279,7 @@ async function executePlanItem(
       // …and what came out (size, length).
       const first = out.assetIds[0] ? get().assets[out.assetIds[0]] : undefined;
       // The confirmed model's own variant for these inputs is the same choice.
-      const conf = Object.values(session(sessionId).agent.settings ?? {}).find((c) => c && c.modelRef !== ran && modelSummary(c.modelRef) && modelSummary(ran ?? '') && lineKey(modelSummary(c.modelRef)!) === lineKey(modelSummary(ran!)!));
+      const conf = Object.values(agentOf(sessionId, laneOfItem(sessionId, itemId)).settings ?? {}).find((c) => c && c.modelRef !== ran && modelSummary(c.modelRef) && modelSummary(ran ?? '') && lineKey(modelSummary(c.modelRef)!) === lineKey(modelSummary(ran!)!));
       const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}${conf ? ` (the ${variantRoute(modelSummary(ran!)!)} variant of the confirmed ${modelSummary(conf.modelRef)!.name}: the same model, not a change)` : ''}` : '', first?.width && first.height ? `${shapeLabel(first.width, first.height)}, ${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
       const by = facts.length ? ` (${facts.join(', ')})` : '';
       if (out.assetIds.length) return `${st.id}${by} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
@@ -442,7 +442,7 @@ export function cancelPlan(sessionId: string, itemId: string): void {
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'canceled' });
   removeDraftNodes(sessionId, item.plan.id);
-  const pending = s.agent.pending;
+  const pending = agentOf(sessionId, owner).pending;
   if (pending?.feedItemId === itemId) {
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: 'The user canceled this plan.' }, owner);
     closeRequest(sessionId, 'canceled');

@@ -15,7 +15,7 @@ import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { composerChosen, isConnected, modelSummary, variantLine } from '../catalog';
 import { routeHead, VIDEO_PURPOSES } from '../routing';
 import { guideForModel } from '../guides';
-import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
+import type { AgentState, AgentStyle, MediaKind, Session, Workspace } from '../types';
 import { useStore } from '../../store/store';
 import { activeDoc, fxSummary } from '../design/actions';
 import { REFERENCE_PROTOCOLS, modelFit } from '../modelRules';
@@ -264,7 +264,7 @@ function alternatives(): string {
 export const WRAPUP_RULE =
   'MUST reply in at most 2 short sentences: say it is ready (or what failed; you have not seen the result, so say what you asked for — "I asked to keep everything else" — never that it came out right or intact; name the model as the summary’s "made with" says, in your own words (never copy the summary’s notation, brackets or ids; never the model you asked for if it differs, and say it differs); the shape and size listed are what came out; say something differs from what was asked only when the summary says "delivered differs" (e.g. "you asked 9:16, it came 1:1"), never by comparing with values from your plan or the settings) and offer 1-2 next steps or leaving it as is. Text only: no tools, no new plan.';
 
-export function buildContext(session: Session, opts: { workspace: Workspace; style: AgentStyle; round: number; maxRounds: number; attachments: string[] }): string {
+export function buildContext(session: Session, opts: { workspace: Workspace; style: AgentStyle; round: number; maxRounds: number; attachments: string[]; /** The state of the agent the context is for (its confirmed settings), not the one on screen. */ agent?: AgentState }): string {
   const st = get();
   const lines: string[] = [];
   lines.push(`workspace: ${opts.workspace}`);
@@ -292,7 +292,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (videoOverrides.length) {
     lines.push(`video route models picked by the user: ${videoOverrides.map(([mode, ref]) => `${mode} → ${ref}`).join(', ')}; use each only for that input route`);
   }
-  const confirmed = Object.entries(session.agent.settings ?? {}).filter(([, c]) => c);
+  const confirmed = Object.entries((opts.agent ?? session.agent).settings ?? {}).filter(([, c]) => c);
   if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user, kept for these kinds (confirm_settings again only to change them): ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}${takes(c!.modelRef)}`).join('; ')}`);
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);

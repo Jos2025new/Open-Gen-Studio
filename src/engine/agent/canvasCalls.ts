@@ -254,7 +254,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
     return { handled: true, workspace: c.workspace };
   }
   // A video model's prompting guide waits for phase 2: only the confirmed model's comes with the confirmation.
-  const early = v.success && c.workspace !== 'node' ? earlyModelGuide(sessionId, v.data.id) : undefined;
+  const early = v.success && c.workspace !== 'node' ? earlyModelGuide(sessionId, c.owner, v.data.id) : undefined;
   if (early) {
     respond(early);
     return { handled: true, workspace: c.workspace };
@@ -267,10 +267,10 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   }
   const text = v.success ? readGuide(v.data.id) : undefined;
   // Once per conversation: a guide already in the history is not sent again (C4).
-  const seen = text != null && inConversation(sessionId, text);
+  const seen = text != null && inConversation(sessionId, c.owner, text);
   // A video workflow brings the guide of the video model the plan will use, in the same result (no extra round).
   // ... and of the image model for its image steps (sheets, key frames, renders).
-  const attach = v.success && text && !seen ? modelGuidesFor(sessionId, v.data.id) : '';
+  const attach = v.success && text && !seen ? modelGuidesFor(sessionId, c.owner, v.data.id) : '';
   if (v.success && text && !seen) {
     recordMetric(sessionId, { type: 'guide', id: v.data.id });
     log.action({ icon: 'guide', label: `Read the ${guideLabel(v.data.id)}` });
