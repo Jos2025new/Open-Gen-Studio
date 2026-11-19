@@ -41,7 +41,11 @@ export function withThread(agents: Record<string, AgentState>, nodeId: string, f
 }
 
 /** A turn cut by a reload is over: nothing is working or waiting on the network. */
-export const interrupted = (a: AgentState): AgentState => ({ ...a, busy: false, phase: undefined, revising: undefined, waiting: undefined });
+export const interrupted = (a: AgentState): AgentState => ({
+  ...a, busy: false, phase: undefined, revising: undefined, waiting: undefined,
+  // A plan being rewritten when the app closed is a plan waiting again: its comment goes on revising it, not as a new request.
+  ...(a.revising && !a.pending ? { pending: { toolCallId: null, kind: 'plan' as const, feedItemId: a.revising } } : {}),
+});
 
 /**
  * A saved session loads with its threads: one saved with the single `agent` (and maybe `agentLane`/`agents`, or the older
@@ -51,7 +55,9 @@ export function migrateAgents(s: Session): Session {
   const raw = s as Session & { agent?: AgentState; agentLanes?: Record<string, AgentState> };
   const { agent, agentLanes, ...rest } = raw;
   const agents: Record<string, AgentState> = { ...agentLanes, ...raw.agents };
-  if (agent) agents[raw.agentLane ?? MAIN_THREAD] = agent;
+  // The single `agent` was the one on screen: the lane it names, else the agent of the last row, else the first agent of the graph.
+  const lastOwner = [...s.feed].reverse().map((f) => (f as { meta?: { agentNodeId?: string } }).meta?.agentNodeId).find((id) => id && s.graph.nodes.some((n) => n.id === id));
+  if (agent) agents[raw.agentLane ?? lastOwner ?? firstAgentId(s.graph)] = agent;
   if (!Object.keys(agents).length) agents[MAIN_THREAD] = freshAgent();
   return { ...rest, agents: Object.fromEntries(Object.entries(agents).map(([k, a]) => [k, interrupted(a)])) } as Session;
 }

@@ -1,5 +1,5 @@
-import { freshAgent, laneState, patchLane, resolveOwner } from './lanes';
-import { feedOfAgentIn, feedOfChatIn } from './threads';
+import { dropThread, freshAgent, laneState, patchLane, resolveOwner } from './lanes';
+import { MAIN_THREAD, feedOfAgentIn, feedOfChatIn } from './threads';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -41,6 +41,7 @@ onNodesRemoved((sessionId, removed) => {
     const c = controllers.get(turnKey(sessionId, n.id));
     c?.abort();
     if (c) ending.get(c)?.();
+    dropThread(sessionId, n.id);
   }
 });
 
@@ -102,7 +103,8 @@ export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
-    ...(agentNodeOf(sessionId, sender)?.id ? { agentNodeId: agentNodeOf(sessionId, sender)!.id } : {}),
+    // The sender's id stays on its rows even when its node is gone, so they do not pass for the first agent's.
+    ...(sender !== MAIN_THREAD ? { agentNodeId: sender } : {}),
     ...(chat ? { chatNodeId: chat } : {}),
     space: placeFor(get().ui, workspace),
     provider: e.kind === 'offline' ? 'offline' : e.provider,

@@ -1,6 +1,6 @@
 import { patchSession, toast, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
-import { allThreads, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
+import { MAIN_THREAD, allThreads, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
 
 export { allThreads, freshAgent, shownThread, threadOf };
 
@@ -11,6 +11,11 @@ export { allThreads, freshAgent, shownThread, threadOf };
  */
 /** Choices that belong to the work, not to one agent: they carry across instances. */
 const SHARED = ['settings', 'switchedTo', 'enhance'] as const;
+
+/** A deleted agent's thread goes with it. */
+export function dropThread(sessionId: string, nodeId: string): void {
+  patchSession(sessionId, (x) => (x.agents[nodeId] ? { ...x, agents: Object.fromEntries(Object.entries(x.agents).filter(([k]) => k !== nodeId)), ...(x.agentLane === nodeId ? { agentLane: undefined } : {}) } : x));
+}
 
 /** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. Always null. */
 export function enterLane(sessionId: string, nodeId: string): string | null {
@@ -64,6 +69,8 @@ export const laneState = (sessionId: string, nodeId: string): AgentState | undef
 export function patchLane(sessionId: string, nodeId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   patchSession(sessionId, (x) => {
     const key = nodeId;
+    // A turn that outlives its agent node (deleted in flight) writes nothing: its thread is gone and does not come back.
+    if (!x.agents[key] && key !== MAIN_THREAD && !x.graph.nodes.some((n) => n.id === key)) return x;
     const agents = withThread(x.agents, key, firstAgentId(x.graph));
     const a = agents[key];
     return { ...x, agents: { ...agents, [key]: { ...a, ...(typeof patch === 'function' ? patch(a) : patch) } } };
