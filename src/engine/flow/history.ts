@@ -15,7 +15,7 @@ export const historyRevision = () => revision;
 export function subscribeGraphHistory(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
 export function graphHistory(id: string, direction: 'undo' | 'redo') { return [...(direction === 'undo' ? stack(id).past : stack(id).future)].reverse(); }
 function logical(g: Graph) {
-  return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges });
+  return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges, broken: g.broken ?? [] });
 }
 /** Open groups by session: the first `recordGraph` inside one is its undo step, the later ones add nothing (ADR 0030). */
 const groups = new Map<string, { first: Entry | null }>();
@@ -65,7 +65,7 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
   const added = after.nodes.filter(n => !before.nodes.some(p => p.id === n.id));
   const removed = before.nodes.filter(n => !after.nodes.some(p => p.id === n.id));
   const changed = after.nodes.filter(n => { const prev = before.nodes.find(p => p.id === n.id); return prev && logical({ nodes: [prev], edges: [] }) !== logical({ nodes: [n], edges: [] }); });
-  const edges = JSON.stringify(before.edges) !== JSON.stringify(after.edges);
+  const edges = JSON.stringify([before.edges, before.broken ?? []]) !== JSON.stringify([after.edges, after.broken ?? []]);
   const moved = changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(before.nodes.find(p => p.id === n.id)!.data));
   const label = added.length ? `Add ${added.map(n => n.data.title).join(', ')}` : removed.length ? `Delete ${removed.map(n => n.data.title).join(', ')}` : edges ? 'Change connections' : `${moved ? 'Move' : 'Edit'} ${changed.map(n => n.data.title).join(', ')}`;
   const key = `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;

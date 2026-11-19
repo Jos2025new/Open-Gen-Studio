@@ -59,7 +59,6 @@ describe('public graph editing and inspector boundaries', () => {
     arrange({ nodes: [text('source'), text('other'), image('destination'), image('unrelated')], edges: [] });
     expect(tryConnect(session, { source: 'other', target: 'unrelated', targetHandle: 'prompt' })).toBe(true);
     const [elsewhere] = graph().edges;
-    // FALLO REAL: replaceConflict treats the expected cable as present if its ID exists anywhere in the graph.
     const result = await call('nodes.edit.connect', {
       source: 'source', target: 'destination', targetHandle: 'prompt', replaces: elsewhere.id,
       expect: { destination: inspect('destination').revision },
@@ -88,7 +87,6 @@ describe('public graph editing and inspector boundaries', () => {
     expect(removed.ok).toBe(true);
     const { deleted } = removed.results[0] as { deleted: unknown };
     expect(tryConnect(session, { source: 'bravo', target: 'charlie', targetHandle: 'ref' })).toBe(true);
-    // FALLO REAL: restoreNodes checks only cable-to-cable reachability, then commits a cycle that includes a subject.
     await call('nodes.node.restore', { deleted });
     expect(graph().edges.map(({ source, target }) => [source, target])).toEqual([['bravo', 'charlie']]);
   });
@@ -99,7 +97,6 @@ describe('public graph editing and inspector boundaries', () => {
     expect(copyNodes(session, ['gen'])).toBe(1);
     const [pasted] = pasteNodes(session);
     expect(pasted).toBeTruthy();
-    // FALLO REAL: pasteNodes rebuilds incoming cables with connect(), discarding their pins and consuming the current value.
     expect(inspect(pasted).inputs).toEqual([expect.objectContaining({ status: 'invalid', pinMoved: true })]);
   });
 

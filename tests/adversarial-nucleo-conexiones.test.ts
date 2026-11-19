@@ -55,7 +55,6 @@ describe('adversarial connection lifecycle', () => {
     expect(deleteNodes(sid, ['a'])).toBeNull();
     expect(disconnectEdges(sid, ['lost'])).toBeNull();
     expect(broken()).toEqual([]);
-    // FALLO REAL: history.ts logical() omits broken, so removing only a broken cable creates no undo step.
     expect(travel('undo')).toBe(true);
     expect.soft(broken()).toEqual(['lost']);
     expect.soft(graph().nodes.some((node) => node.id === 'a')).toBe(false);

@@ -172,7 +172,12 @@ export function pasteNodes(sessionId: string, at?: { x: number; y: number }): st
     if (!source || !target) continue;
     const c = { source, target, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle };
     const port = inputPorts(added.find((n) => n.id === target)!.data).find((p) => p.id === e.targetHandle);
-    if (port && !connectionError(next, st.assets, c)) next = connect(next, c);
+    if (port && !connectionError(next, st.assets, c)) {
+      const had = new Set(next.edges.map((x) => x.id));
+      next = connect(next, c);
+      // The copy keeps the revision its cable was pinned to, so an invalid reference stays invalid.
+      if (e.pin) next = { ...next, edges: next.edges.map((x) => (had.has(x.id) ? x : { ...x, pin: e.pin })) };
+    }
   }
   setGraph(sessionId, () => next);
   return added.map((n) => n.id);

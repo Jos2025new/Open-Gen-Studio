@@ -90,7 +90,8 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
 function replaceConflict(occupant: GraphEdge | undefined, replaces: string | null | undefined, target: string, port: string, graph: Graph) {
   if (replaces === 'any') return null;
   // The cable that was expected is gone: that is a conflict too, not permission to wire over whatever is there now.
-  if (!occupant) return typeof replaces === 'string' && !graph.edges.some((e) => e.id === replaces) ? { error: `The cable ${replaces} you meant to replace on "${port}" is no longer there.`, conflict: { node: target, expected: replaces, actual: 'none' } } : null;
+  // With nothing on this input, a named cable is not on it, whichever node it lives on.
+  if (!occupant) return typeof replaces === 'string' ? { error: `The cable ${replaces} you meant to replace on "${port}" is no longer there.`, conflict: { node: target, expected: replaces, actual: 'none' } } : null;
   if (replaces === occupant.id) return null;
   return { error: `The input "${port}" already has a cable (${occupant.id}); name it as the one to replace.`, conflict: { node: target, expected: replaces ?? 'none', actual: occupant.id } };
 }

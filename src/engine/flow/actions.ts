@@ -17,6 +17,7 @@ import { SYSTEM_NODE_TYPES } from '../nodes/system';
 import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
 import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
+import { findCycle } from '../nodecore/deps';
 import { applyEdit } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
 import { storeEnv } from '../nodecore/resolver';
@@ -431,7 +432,10 @@ export function restoreNodes(sessionId: string, deleted: DeletedNodes): { error:
     const occupied = port && !port.multi && next.edges.some(e => e.target === edge.target && e.targetHandle === edge.targetHandle);
     const problem = connectionError(next, get().assets, edge);
     if (occupied || problem) { skipped.push(`${edge.id}: ${occupied ? 'port changed since deletion' : problem}`); continue; }
-    next = { ...next, edges: [...next.edges, { ...edge }] };
+    const candidate = { ...next, edges: [...next.edges, { ...edge }] };
+    // Subjects can close a loop the cable-to-cable check does not see.
+    if (findCycle(candidate)) { skipped.push(`${edge.id}: would create a loop`); continue; }
+    next = candidate;
   }
   return { error: editGraph(sessionId, () => next), skipped };
 }
