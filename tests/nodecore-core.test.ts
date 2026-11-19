@@ -48,10 +48,10 @@ describe('node core: descriptors and identity (points 1-2)', () => {
     tryConnect(sid, { source: 't2', target: 'img', targetHandle: 'prompt' });
     expect(g().broken).toBeUndefined();
   });
-  it('an invalid cable on a required input blocks the action; on an optional one it does not', () => {
+  it('a deleted source on a required input blocks the action (the input is empty); on an optional one it does not', () => {
     useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph: { nodes: [{ id: 'op', position: { x: 0, y: 0 }, data: { kind: 'tool', title: 'Split', op: 'grid_split', params: { grid: 2 }, outputIndex: 0 } }, text('t1', 'x'), image('img')], edges: [{ id: 'e1', source: 't1', target: 'op', sourceHandle: 'out', targetHandle: 'input' }] } } } }));
     deleteNodes(sid, ['t1']);
-    expect(runProblems(g(), ['op'], storeEnv())[0]).toContain('input cable is invalid');
+    expect(runProblems(g(), ['op'], storeEnv())[0]).toContain('input is empty');
     expect(runProblems(g(), ['img'], storeEnv())).toEqual([]);
   });
 });

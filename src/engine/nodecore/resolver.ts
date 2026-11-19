@@ -30,6 +30,8 @@ export interface ResolvedInput {
   revision: string | null;
   /** A tombstone of a deleted node's link: shown as invalid, not part of the request. */
   broken?: true;
+  /** A tombstone of a deletion (not an incompatibility): the input is missing, silently; it only helps to restore. */
+  lost?: true;
   kind?: import('../types').LinkKind;
   /** Set when the cable is invalid because its pin no longer matches. */
   pinMoved?: true;
@@ -103,7 +105,7 @@ export function resolveInputs(graph: Graph, node: GraphNode, env: ResolveEnv): R
   });
   const broken = (graph.broken ?? []).filter((b) => b.edge.target === node.id).map((b): ResolvedInput => ({
     kind: b.edge.kind ?? 'data', port: b.edge.targetHandle, edgeId: b.edge.id, from: b.missing === 'source' ? null : b.edge.source, mode: b.edge.pin ? 'pinned' : 'moving',
-    status: 'invalid', reason: `The ${b.missing} node was deleted.`, value: null, revision: null, broken: true,
+    status: 'invalid', reason: `The ${b.missing} node was deleted.`, value: null, revision: null, broken: true, ...((b.reason ?? 'deleted') === 'deleted' ? { lost: true as const } : {}),
   }));
   return [...live, ...broken];
 }

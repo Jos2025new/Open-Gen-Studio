@@ -154,7 +154,7 @@ function planDelete(graph: Graph, ids: string[]): Graph {
   // deleted goes with it (the owner's cables are its own), and tombstones of a deleted owner are pruned.
   const kept = (graph.broken ?? []).filter((b) => !drop.has(b.edge.target));
   const lost = graph.edges.filter((e) => drop.has(e.source) && !drop.has(e.target));
-  const broken = [...kept, ...lost.map((edge) => ({ edge, missing: 'source' as const, at: Date.now() }))];
+  const broken = [...kept, ...lost.map((edge) => ({ edge, missing: 'source' as const, reason: 'deleted' as const, at: Date.now() }))];
   // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
   const groups = graph.groups?.map((gr) => ({ ...gr, nodeIds: gr.nodeIds.filter((id) => !drop.has(id)) })).filter((gr) => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
   return { ...graph, nodes: graph.nodes.filter((n) => !drop.has(n.id)), edges: graph.edges.filter((e) => !drop.has(e.source) && !drop.has(e.target)), ...(graph.groups ? { groups } : {}), ...(broken.length ? { broken } : {}) };

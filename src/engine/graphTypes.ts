@@ -132,6 +132,8 @@ export interface BrokenLink {
   edge: GraphEdge;
   /** Which end of the link is gone. */
   missing: 'source' | 'target';
+  /** Why it is recorded: `deleted` (the user or an agent removed the node: silent, kept only to restore) or `incompatible` (the cable exists but cannot work: reported). Absent: `deleted`. */
+  reason?: 'deleted' | 'incompatible';
   at: number;
 }
 
@@ -153,6 +155,6 @@ export interface Graph {
   omniAt?: number;
   /** Asset ids already seen at `omniAt`, so new assets sharing that timestamp are not discarded. */
   omniAtIds?: string[];
-  /** Links whose node was deleted; the node core reports them as invalid. Cleared when the node comes back. */
+  /** Links whose node was deleted (or that cannot work): kept to restore; only `incompatible` ones are reported as invalid. Cleared when the node comes back. */
   broken?: BrokenLink[];
 }

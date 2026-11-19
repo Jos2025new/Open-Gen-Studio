@@ -17,7 +17,9 @@ export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): st
     if (!node) continue;
     const required = descriptorOf(node.data.kind)?.required ?? [];
     for (const input of resolveInputs(graph, node, env)) {
-      if (input.status === 'invalid' && required.includes(input.port)) problems.push(`“${node.data.title}”: the ${input.port} cable is invalid. ${input.reason ?? ''}`.trim());
+      if (input.status !== 'invalid' || !required.includes(input.port)) continue;
+      // A deleted source is not an invalid cable: the input is simply empty, and the run waits for it.
+      problems.push(input.lost ? `“${node.data.title}”: the ${input.port} input is empty (its source was deleted).` : `“${node.data.title}”: the ${input.port} cable is invalid. ${input.reason ?? ''}`.trim());
     }
   }
   return problems;
