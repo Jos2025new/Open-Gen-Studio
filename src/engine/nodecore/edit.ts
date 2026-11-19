@@ -22,8 +22,8 @@ export interface ResolvedPorts { srcPort: PortSpec; tgtPort: PortSpec; kind: Lin
 export type EditOp =
   | {
     op: 'connect'; source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean;
-    /** The cable expected on a single-cable input: an edge id, `null` for none, `'any'` to replace whatever is there. */
-    replaces?: string | null | 'any';
+    /** The cable expected on a single-cable input: an edge id, or `null` for none. */
+    replaces?: string | null;
     /** The caller already resolved and validated the ports (the system link command); skips the UI validation. */
     ports?: ResolvedPorts;
   }
@@ -80,7 +80,7 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
     const refused = replaceConflict(occupant, op.replaces, target, targetHandle, graph);
     if (refused) return refused;
     const again = graph.edges.find(dup);
-    if (again?.pin && op.replaces !== again.id && op.replaces !== 'any') return replaceConflict(again, op.replaces, target, targetHandle, graph) ?? { error: `The cable ${again.id} is pinned; name it to wire it again.` };
+    if (again?.pin && op.replaces !== again.id) return replaceConflict(again, op.replaces, target, targetHandle, graph) ?? { error: `The cable ${again.id} is pinned; name it to wire it again.` };
     next = { ...graph, edges: [...graph.edges.filter((e) => !dup(e) && (multi || !(e.target === target && e.targetHandle === targetHandle && sameKind(e, kind)))), edge] };
     return finishConnect(graph, next, edge.id, source, target, kind);
   }
@@ -102,7 +102,6 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
 }
 
 function replaceConflict(occupant: GraphEdge | undefined, replaces: string | null | undefined, target: string, port: string, graph: Graph) {
-  if (replaces === 'any') return null;
   // The cable that was expected is gone: that is a conflict too, not permission to wire over whatever is there now.
   // With no other cable on this input, the named one must still be on this very input (the same wiring again), never one of another node.
   if (!occupant) return typeof replaces === 'string' && !graph.edges.some((e) => e.id === replaces && e.target === target && e.targetHandle === port) ? { error: `The cable ${replaces} you meant to replace on "${port}" is no longer there.`, conflict: { node: target, expected: replaces, actual: 'none' } } : null;
@@ -121,6 +120,8 @@ function finishConnect(_before: Graph, next: Graph, edgeId: string, source: stri
 /** Why a composed change is refused, or null. */
 function compoundProblem(before: Graph, after: Graph, dropped: string[]): string | null {
   const alive = new Set(after.nodes.map((n) => n.id));
+  const rewired = after.edges.find((e) => { const was = before.edges.find((x) => x.id === e.id); return was && !dropped.includes(e.id) && (was.source !== e.source || was.target !== e.target || was.sourceHandle !== e.sourceHandle || was.targetHandle !== e.targetHandle); });
+  if (rewired) return `That change would silently rewire the cable ${rewired.id}; name it in the dropped list and add a new one.`;
   const lost = before.edges.find((e) => alive.has(e.source) && alive.has(e.target) && !after.edges.some((x) => x.id === e.id) && !dropped.includes(e.id));
   if (lost) return `That change would silently remove the cable ${lost.id} (${lost.source} → ${lost.target}).`;
   const dangling = after.edges.find((e) => !alive.has(e.source) || !alive.has(e.target));

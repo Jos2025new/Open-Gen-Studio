@@ -517,25 +517,17 @@ export function deleteGeneration(generationId: string): void {
   const g = get().generations[generationId];
   if (!g) return;
   const assetIds = [...g.assetIds];
-  if (g.sessionId in get().sessions) editCompound(g.sessionId, 'delete generation', (gr) => ({ ...gr, nodes: gr.nodes.map((n) => runsGeneration(n.data) && n.data.generationId === generationId ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] } : n) }), { silent: true });
+  if (assetsInUse(assetIds)) { toast('A result is in use by a running flow.', 'error'); return; }
   useStore.setState((st) => {
-    const generations = { ...st.generations };
+    const { generations, sessions: moved } = dropResults(st, new Set(assetIds));
     delete generations[generationId];
     const assets = { ...st.assets };
     for (const id of assetIds) delete assets[id];
-    const s = st.sessions[g.sessionId];
-    const sessions = s
-      ? {
-          ...st.sessions,
-          [g.sessionId]: {
-            ...s,
-            feed: s.feed.filter((f) => !(f.type === 'generation' && f.generationId === generationId)),
-          },
-        }
-      : st.sessions;
-    const composer = { ...st.composer, attachments: st.composer.attachments.filter((a) => !assetIds.includes(a)) };
-    return { generations, assets, sessions, composer };
+    const s = moved[g.sessionId];
+    const sessions = s ? { ...moved, [g.sessionId]: { ...s, feed: s.feed.filter((f) => !(f.type === 'generation' && f.generationId === generationId)) } } : moved;
+    return { generations, assets, sessions, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !assetIds.includes(a)) } };
   });
+  if (g.sessionId in get().sessions) editCompound(g.sessionId, 'delete generation', (gr) => ({ ...gr, nodes: gr.nodes.map((n) => runsGeneration(n.data) && n.data.generationId === generationId ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] } : n) }), { silent: true });
   void deleteAssetBlobs(assetIds);
 }
 

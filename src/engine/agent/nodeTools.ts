@@ -14,8 +14,12 @@ export async function editGraphTool(sessionId: string, name: string, input: unkn
     const args = parsed.data, st = useStore.getState();
     const n = st.sessions[sessionId]?.graph.nodes.find(n => n.id === args.node_id);
     if (!n) return { text: `No such node: ${args.node_id}.` };
-    const rev = ownerRev(st.sessions[sessionId].graph, n.id);
-    if (rev !== args.expect_rev) return { text: `Node ${n.id} changed since you read it (rev ${rev}); read_graph again and repeat the edit with the new expect_rev.` };
+    const stale = (): string | undefined => {
+      const rev = ownerRev(useStore.getState().sessions[sessionId]?.graph ?? { nodes: [], edges: [] }, n.id);
+      return rev === args.expect_rev ? undefined : `Node ${n.id} changed since you read it (rev ${rev}); read_graph again and repeat the edit with the new expect_rev.`;
+    };
+    const old = stale();
+    if (old) return { text: old };
     const d = n.data;
     if ((args.model_ref || args.settings) && !('modelRef' in d)) return { text: 'This node has no generation model/settings.' };
     if (args.params && d.kind !== 'tool') return { text: 'Only tool nodes have operation params.' };
@@ -25,6 +29,9 @@ export async function editGraphTool(sessionId: string, name: string, input: unkn
       const modelRef = args.model_ref ?? d.modelRef;
       const resolved = await resolveModel(modelRef);
       if (!resolved) return { text: `Unknown or unavailable model: ${modelRef}.` };
+      // The user may have edited this node while the model was being resolved: the check and the writes below have no wait between them.
+      const moved = stale();
+      if (moved) return { text: moved };
       const requested = { ...d.settings, ...args.settings, advanced: { ...d.settings.advanced, ...args.settings?.advanced }, extras: { ...d.settings.extras, ...args.settings?.extras } };
       const { settings } = coerceSettings(resolved.schema, d.kind, requested);
       error = setNodeModel(sessionId, n.id, { modelRef, settings });
