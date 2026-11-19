@@ -71,6 +71,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   const turnStart = Date.now();
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
+  /** Arguments of the last plan the validator refused. The same payload a second time ends the turn. */
+  let brokenPlan: string | undefined;
   let lastBlock: string | undefined;
   // Auto confirming the settings itself is the app's step, not the agent's: once per turn it gives the round back.
   let settled = false;
@@ -391,10 +393,19 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         if (canvas.handled) continue;
         if (call.name === 'propose_plan') {
           const v = proposePlanSchema.safeParse(parsed.value);
+          // The same broken plan twice (DeepSeek repeating a plan with no prompt): stop and say so. The model stays.
+          const repeated = call.arguments === brokenPlan;
           if (!v.success) {
-            respond(`Invalid propose_plan input: ${formatZodError(v.error)}`);
+            const why = formatZodError(v.error);
+            if (repeated) {
+              outcome = 'error';
+              notice(sessionId, workspace, `The model sent the same invalid plan twice (${why}). This turn stopped. The model was not changed. Rephrase the request.`, 'error', undefined, takePendingMeta(hasTextBubble()));
+              return;
+            }
+            brokenPlan = call.arguments;
+            respond(`Invalid propose_plan input: ${why}`);
             recordMetric(sessionId, { type: 'rejected' });
-            logEvent('harness', { session: sessionId, where: 'propose_plan', problems: formatZodError(v.error) });
+            logEvent('harness', { session: sessionId, where: 'propose_plan', problems: why });
             planFailures++;
             continue;
           }
@@ -435,6 +446,12 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           if (presented.errors.length) {
             // What the agent wrote before a rejected plan promised it; the feed drops it (the history keeps it).
             if (textItemId) removeFeedItem(sessionId, textItemId);
+            if (repeated) {
+              outcome = 'error';
+              notice(sessionId, workspace, `The model sent the same invalid plan twice (${presented.errors[0]}). This turn stopped. The model was not changed. Rephrase the request.`, 'error', undefined, takePendingMeta(hasTextBubble()));
+              return;
+            }
+            brokenPlan = call.arguments;
             recordMetric(sessionId, { type: 'rejected' });
             log.action({ icon: 'fix', label: `Checked the plan: ${presented.errors.length} problem${presented.errors.length === 1 ? '' : 's'} to fix`, detail: presented.errors[0] });
             planFailures++;
