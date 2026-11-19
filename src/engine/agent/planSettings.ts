@@ -6,7 +6,7 @@ import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';
 import { addSpend, updateFeedItem, useStore } from '../../store/store';
-import { laneOfItem, patchLane } from './lanes';
+import { laneOfItem, laneState, patchLane } from './lanes';
 import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
@@ -67,7 +67,7 @@ export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSect
 }
 
 /** The draft choice shown on an Auto plan with video (the session's, Borrador by default). */
-export const planDraft = (sessionId: string): DraftMode => get().sessions[sessionId]?.agent.draftMode ?? draftMode('draft');
+export const planDraft = (sessionId: string, owner: string | undefined): DraftMode => laneState(sessionId, owner)?.draftMode ?? draftMode('draft');
 
 /** The model this step runs on for a picked line: the variant its inputs need (edit, image-to-video). */
 const stepModel = (ref: string, s: GenStep) => (needsImage(s) ? inputVariant(ref, s.kind)?.ref ?? ref : ref);
@@ -92,7 +92,7 @@ export async function changePlanChoice(sessionId: string, itemId: string, kind: 
   const before = item?.plan.steps.find((s): s is GenStep => isGen(s) && s.kind === kind && (!sourceModelRef || modelGroup(s.modelRef) === modelGroup(sourceModelRef)));
   if (!item || !before) return;
   await Promise.all([ensureSchema(next.modelRef), ...item.plan.steps.filter(isGen).map((s) => ensureSchema(stepModel(next.modelRef, s)))]);
-  const draft = kind === 'video' ? planDraft(sessionId) : undefined;
+  const draft = kind === 'video' ? planDraft(sessionId, laneOfItem(sessionId, itemId)) : undefined;
   // A resolution the user picks on the card is the one that runs and is priced (Alta calidad once swapped the lowest for the highest); a locked draft keeps its own.
   const picked = next.resolution !== before.settings.resolution && !draft?.locked;
   const c = kind === 'video' && !picked ? withModeResolution(next, draft, settingsOptions(get().catalog.schemas[next.modelRef], 'video').resolutions, next.resolution) : next;
@@ -106,14 +106,14 @@ export async function changePlanChoice(sessionId: string, itemId: string, kind: 
   else patchLane(sessionId, owner, (a) => ({ settingsParts: a.settingsParts?.map((p) => p.kind === kind && modelGroup(p.modelRef) === group ? { ...c, kind } : p) }));
   const changedIds = now.plan.steps.filter(isGen).filter((s) => s.kind === kind && modelGroup(s.modelRef) === group).map((s) => s.id);
   const prompts = stepModel(c.modelRef, before) !== before.modelRef;
-  if (promptWriterOn(sessionId) && (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect)) await rewritePrompts(sessionId, itemId, kind, c.modelRef, changedIds);
+  if (promptWriterOn(sessionId, owner) && (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect)) await rewritePrompts(sessionId, itemId, kind, c.modelRef, changedIds);
 }
 
 /** Borrador / Alta calidad / the user's words on the plan card: the app sets (a draft locks) the video resolution. */
 export function changePlanDraft(sessionId: string, itemId: string, kind: DraftMode['kind'], text?: string, unlock = false): void {
   const item = planOf(sessionId, itemId);
   if (!item) return;
-  const prev = planDraft(sessionId);
+  const prev = planDraft(sessionId, laneOfItem(sessionId, itemId));
   const mode: DraftMode = unlock ? { ...prev, locked: false, unlocked: true } : prev.kind === kind && kind !== 'draft' ? { ...draftMode(kind, text), unlocked: prev.unlocked } : draftMode(kind, text);
   const schemas = get().catalog.schemas;
   let chosen: SettingsChoice | undefined;
@@ -141,7 +141,7 @@ export async function recheckPlanPrice(sessionId: string, itemId: string): Promi
 const fenced = (text: string) => text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
 
 /** The plan card's prompt writer is on unless the user turned it off (then prompts are sent as written). */
-export const promptWriterOn = (sessionId: string) => get().sessions[sessionId]?.agent.enhance !== false;
+export const promptWriterOn = (sessionId: string, owner: string | undefined) => laneState(sessionId, owner)?.enhance !== false;
 
 /** The switch on the plan card; turning it on adapts the prompts to the card as it is now. */
 export function setPromptWriter(sessionId: string, itemId: string, on: boolean): void {

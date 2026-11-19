@@ -3,15 +3,17 @@ import { changePlanChoice, changePlanDraft, planDraft, promptWriterOn, rewritePr
 import type { PlanFeedItem, SettingsSection } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
+import { laneState } from '../../engine/agent/lanes';
 import { DraftChoice, SettingsSectionBlock } from './SettingsCard';
 
 /** Auto's one card: the settings card's draft choice, model and values, on the waiting plan (engine/agent/planSettings). */
 export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem; sessionId: string; sections: SettingsSection[] }) {
-  useStore((s) => s.sessions[sessionId]?.agent.draftMode);
-  useStore((s) => s.sessions[sessionId]?.agent.enhance);
-  const writer = promptWriterOn(sessionId);
+  const owner = item.meta?.agentNodeId; // the agent that owns this card, not the one on screen
+  useStore(() => laneState(sessionId, owner)?.draftMode);
+  useStore(() => laneState(sessionId, owner)?.enhance);
+  const writer = promptWriterOn(sessionId, owner);
   const models = useStore((s) => s.catalog.models);
-  const draft = planDraft(sessionId);
+  const draft = planDraft(sessionId, owner);
   // While a rewrite runs the toggle waits; a model picked meanwhile starts a newer rewrite, and the newest one wins (runs in planSettings).
   const rewriting = usePlanRewrite((s) => Boolean(s.busy[item.id]));
   const titled = sections.length > 1;

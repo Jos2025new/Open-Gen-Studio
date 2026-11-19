@@ -28,7 +28,7 @@ import { backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, formatZodError } from './tools';
-import { agentChoice, agentOf, get, session } from './runtimeShared';
+import { agentChoice, agentOf, feedOfAgent, get, session } from './runtimeShared';
 import { flushToolResults, guideLabel } from './conversation';
 import { planRecoveryProblem, presentNodeRun, resumePlan } from './planRun';
 import { activityLog } from './activityLog';
@@ -71,7 +71,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
     return { handled: true, workspace: c.workspace };
   }
   const mode = v.data.action === 'check_status' ? 'check' : 'retry';
-  const target = [...session(sessionId).feed].reverse().find((f): f is PlanFeedItem => f.type === 'plan' && (f.status === 'error' || f.status === 'partial'));
+  const target = [...feedOfAgent(sessionId, c.owner)].reverse().find((f): f is PlanFeedItem => f.type === 'plan' && (f.status === 'error' || f.status === 'partial'));
   const problem = target ? planRecoveryProblem(target, mode, sessionId) : 'There is no failed plan in this chat.';
   if (target && !problem) {
     log.action({ icon: 'fix', label: mode === 'check' ? 'Checked the status of the failed steps' : 'Retried the failed steps', detail: target.plan.title });

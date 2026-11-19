@@ -122,6 +122,7 @@ describe('adversarial: dinero, doble gasto y planes cruzados', () => {
     const first = approvePlan(HOME, itemId);
     const second = approvePlan(HOME, itemId);
     await second;
+    await vi.waitFor(() => expect(typeof releaseRun).toBe('function')); // the first click's run has reached the provider
     // Mientras el primer run sigue en vuelo, el segundo clic NO debe haber devuelto la tarjeta a 'awaiting' (rehabilitando Approve).
     const statusWhileRunning = (S().feed.find((f) => f.id === itemId) as PlanFeedItem).status;
     releaseRun();
