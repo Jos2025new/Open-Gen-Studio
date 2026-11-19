@@ -51,7 +51,6 @@ export default [{
     ['src/engine/agent/conversation.ts', 'recipientOf(sessionId, opts.agentNodeId, opts.chatNodeId)'],
     ['src/engine/agent/lanes.ts', 'export function enterLane'],
     ['src/engine/agent/runtimeShared.ts', 'agentNodeId ?? viewedLane(get().sessions[sessionId])'],
-    ['src/engine/agent/threads.ts', 'export function threadOf'],
     ['src/components/node/SystemNode.tsx', '<AgentLlmSelect'],
     ['src/components/omni/ChatNode.tsx', '<ChatRecipientSelect'],
   ],
