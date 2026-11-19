@@ -2,7 +2,9 @@
 
 ## Estado
 
-Aceptado para la rama experimental `task/nucleo-nodos` (usuario, 2026-11-18): tiras 1 y 2 allí; el usuario la prueba antes de cualquier fusión.
+Aceptado
+
+Para la rama experimental `task/nucleo-nodos` (usuario, 2026-11-18): tiras 1 y 2 allí; el usuario la prueba antes de cualquier fusión.
 
 ## Fecha
 
@@ -47,6 +49,12 @@ Siete piezas forman el núcleo. Cada una es una varilla: lo que venga después s
 ## Cómo se revisa
 
 Contra este contrato, no contra la completitud del inventario. Cada regla de los puntos 1 a 7 se convierte en un check o un test. GPT ataca cada tira con tests adversariales. Un hallazgo que no rompa una regla del contrato se apunta en pendientes y no frena la tira.
+
+## Alternativas
+
+- **Seguir con el inventario por componente** (tanda del 2026-11-18): descartada; no converge y cada revisión abre más filas.
+- **Tipos de nodo nuevos pieza por pieza** (tanda del 2026-11-17): descartada; produjo espejos y el envío a varios agentes nunca funcionó.
+- **Space como subnet evaluable desde ya:** aplazada; cambia el significado de los cables actuales y conviene decidirla tras la tira 2.
 
 ## Consecuencias
 
