@@ -1,4 +1,5 @@
 import type { Graph } from '../types';
+import { GONE_HANDLE, NO_RESULT, resultHandle } from './graph';
 
 interface Entry { before: Graph; after: Graph; label: string; key: string; time: number }
 interface Stack { past: Entry[]; future: Entry[]; latest: Map<string, Graph['nodes'][number]> }
@@ -19,6 +20,35 @@ function logical(g: Graph) {
 }
 /** Open groups by session: the first `recordGraph` inside one is its undo step, the later ones add nothing (ADR 0030). */
 const groups = new Map<string, { first: Entry | null }>();
+
+/** Results deleted from a generation, in order (an index that moved, or -1: gone): travelling back must not give an old index to the wrong image (ADR 0031). */
+const drops: Array<{ gen: string; to: number[]; len: number; at: number }> = [];
+export function noteDropped(gen: string, to: number[], len: number): void {
+  drops.push({ gen, to, len, at: Date.now() });
+  if (drops.length > 200) drops.shift();
+}
+/** A graph from the past with its result indexes brought to the results that exist now. */
+function reconciled(graph: Graph, since: number): Graph {
+  const later = (gen: string) => drops.filter((d) => d.gen === gen && d.at >= since);
+  const generation = new Map(graph.nodes.map((n) => [n.id, (n.data as { generationId?: string }).generationId]));
+  const follow = (gen: string, index: number): number => later(gen).reduce((i, d) => (i < 0 ? i : d.to[i] ?? i), index);
+  const nodes = graph.nodes.map((n) => {
+    const d = n.data as { generationId?: string; outputIndex?: number };
+    if (!d.generationId || d.outputIndex == null || !later(d.generationId).length) return n;
+    const next = follow(d.generationId, d.outputIndex);
+    const len = later(d.generationId).at(-1)!.len;
+    const to = next >= 0 ? next : Math.max(0, Math.min(d.outputIndex, len - 1));
+    return to === d.outputIndex ? n : { ...n, data: { ...n.data, outputIndex: to } } as typeof n;
+  });
+  const edges = graph.edges.map((e) => {
+    const gen = generation.get(e.source);
+    if (!gen || e.outputIndex == null || e.outputIndex === NO_RESULT || !later(gen).length) return e;
+    const next = follow(gen, e.outputIndex);
+    if (next === e.outputIndex) return e;
+    return next < 0 ? { ...e, outputIndex: NO_RESULT, sourceHandle: GONE_HANDLE } : { ...e, outputIndex: next, sourceHandle: resultHandle(next) };
+  });
+  return { ...graph, nodes, edges };
+}
 
 /**
  * Makes every change to this graph until `close` one undo step: a command, or a sequence of them. `revert` puts the
@@ -97,7 +127,7 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
     return n;
   }) };
   replay = true;
-  try { if (!apply(graph)) return false; } finally { replay = false; }
+  try { if (!apply(reconciled(graph, target.time))) return false; } finally { replay = false; }
   for (let i = 0; i < count; i++) to.push(from.pop()!);
   notify();
   return true;

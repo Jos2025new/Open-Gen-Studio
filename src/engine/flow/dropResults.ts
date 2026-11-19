@@ -1,4 +1,5 @@
 import type { Generation, Session } from '../types';
+import { noteDropped } from './history';
 import { GONE_HANDLE, NO_RESULT, resultHandle } from './graph';
 
 /**
@@ -15,6 +16,7 @@ export function dropResults<S extends { generations: Record<string, Generation>;
     let n = 0;
     moved.set(g.id, { to: g.assetIds.map((a) => (gone.has(a) ? -1 : n++)), len: kept.length });
     generations[g.id] = { ...g, assetIds: kept };
+    noteDropped(g.id, moved.get(g.id)!.to, kept.length);
   }
   if (!moved.size) return { generations, sessions: st.sessions };
   const sessions = { ...st.sessions };
