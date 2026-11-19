@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { migrateAgents } from '../src/engine/agent/threads';
+import { feedOfAgentIn, migrateAgents } from '../src/engine/agent/threads';
 import { createSession } from '../src/store/store';
 import type { AgentState, Session } from '../src/engine/types';
 
@@ -21,5 +21,14 @@ describe('migrating a session with no agentLane', () => {
     const m = migrateAgents(old);
     expect(m.agents.agentA?.history[0].content).toBe('mine');
     expect(m.agents.agentB).toBeUndefined();
+  });
+
+  it('writes the owner on rows that name none, so deleting the first agent does not hand them to the next', () => {
+    const old = { ...createSession('o'), graph: { nodes: [ref('agentA'), ref('agentB')], edges: [] }, feed: [{ id: 'f1', createdAt: 1, workspace: 'chat', type: 'user', text: 'old', mode: 'agent', attachments: [] }] } as unknown as Session;
+    const m = migrateAgents(old);
+    const without = { ...m, graph: { ...m.graph, nodes: m.graph.nodes.filter((n) => n.id !== 'agentA') } };
+    expect(feedOfAgentIn(m, 'agentA')).toHaveLength(1);
+    expect(feedOfAgentIn(without, 'agentB')).toHaveLength(0);
+    expect(migrateAgents(m)).toEqual(m); // idempotent
   });
 });

@@ -62,7 +62,10 @@ export function migrateAgents(s: Session): Session {
   const free = (s.graph?.nodes ?? []).filter((n) => n.data.kind === 'ref' && n.data.type === 'agent').map((n) => n.id).find((id) => !agents[id]);
   if (agent) agents[raw.agentLane ?? free ?? MAIN_THREAD] = agent;
   if (!Object.keys(agents).length) agents[MAIN_THREAD] = freshAgent();
-  return { ...rest, agents: Object.fromEntries(Object.entries(agents).map(([k, a]) => [k, interrupted(a)])) } as Session;
+  // A row that names no agent was the first agent's by position. Its owner is written on it, so deleting that agent (or adding one before it) cannot hand the old rows to another.
+  const first = firstAgentId(s.graph);
+  const feed = first === MAIN_THREAD || !Array.isArray(rest.feed) ? rest.feed : rest.feed.map((f) => ((f as Meta).meta?.agentNodeId ? f : { ...f, meta: { ...(f as Meta).meta, agentNodeId: first } } as typeof f));
+  return { ...rest, feed, agents: Object.fromEntries(Object.entries(agents).map(([k, a]) => [k, interrupted(a)])) } as Session;
 }
 
 type Meta = { meta?: { agentNodeId?: string; chatNodeId?: string } };
