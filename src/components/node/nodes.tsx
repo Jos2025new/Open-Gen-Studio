@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Handle, NodeToolbar, Position, useConnection, type Node, type NodeProps } from '@xyflow/react';
+import { Handle, NodeToolbar, Position, useConnection, useStore as useFlowStore, type Node, type NodeProps } from '@xyflow/react';
 import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip, Layers } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
@@ -770,6 +770,9 @@ function NodeTitle({ sessionId, node }: { sessionId: string; node: GraphNode }) 
   );
 }
 
+/** Height of the floating title plus its gap above the card, in px at zoom 1. */
+const TITLE_RISE = 21;
+
 function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const { node, solo, panel: inPanel } = data;
   const assets = useStore((s) => s.assets);
@@ -787,9 +790,11 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
   const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
   const showTools = Boolean(selected) && solo;
+  // The title floats above the card and scales with the zoom, the toolbar does not: clear the title, then a small fixed gap.
+  const toolbarOffset = useFlowStore((st) => Math.round(7 + TITLE_RISE * st.transform[2]));
   return (
     <>
-      <NodeToolbar isVisible={showTools} position={Position.Top} offset={28}>
+      <NodeToolbar isVisible={showTools} position={Position.Top} offset={toolbarOffset}>
         <NodeActions node={node} out={out} panel={inPanel} />
       </NodeToolbar>
       {panel ? (
