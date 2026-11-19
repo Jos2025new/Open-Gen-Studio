@@ -6,3 +6,4 @@ Material de entrada del [ADR 0031](../decisions/0031-nucleo-de-nodos.md) (2026-1
 - [revision-desacople](revision-desacople.md): revisión independiente de esa tabla (GPT 6.2 Sol).
 - [propuesta-nucleo-nodos](propuesta-nucleo-nodos.md): propuesta de núcleo de la sesión maestra.
 - [revision-nucleo](revision-nucleo.md): revisión independiente de la propuesta (GPT 6.2 Sol).
+- [revision-commits-nucleo](revision-commits-nucleo.md): revisión independiente de los 4 primeros commits (GPT 6.2 Sol, 2026-11-19).
