@@ -34,6 +34,8 @@ export interface ActionRecord {
   status: RunStatus;
   /** How many times work was actually sent for this id. */
   sends: number;
+  /** Set the moment the send is attempted, before any provider answer: a send that fails early may still have reached the provider. */
+  attempted?: boolean;
   result?: ExecResult | null;
   error?: string;
   /** The generations this run's sends produced. */
@@ -110,7 +112,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
   }
   // An approval pays for one send, whether it ended well or badly (a failed send may have reached the provider too):
   // a new run id does not buy a second one. Trying again means preparing again and approving again.
-  const spent = [...ledger.values()].find((r) => r.approval === snapshot.id && (r.sends > 0 || r.status === 'running'));
+  const spent = [...ledger.values()].find((r) => r.approval === snapshot.id && (r.attempted || r.sends > 0 || r.status === 'running'));
   if (spent) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: `This approval was already used (${spent.runId}); prepare the action again and approve it again.` });
   const session = useStore.getState().sessions[snapshot.session];
   const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, seq: ++counter, done: undefined as never };
@@ -123,6 +125,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
     const moved = Object.entries(snapshot.pins).find(([key, rev]) => pinsFor(snapshot.session, [(JSON.parse(key) as string[])[0]])[key] !== rev);
     if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${(JSON.parse(moved[0]) as string[]).slice(0, 2).join('.')}). Review it again.` }); return finish(); }
     try {
+      record.attempted = true;
       const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } onState?.(step, state, info); });
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }
       settle(runId, { status: result.failed.length ? 'failed' : 'done', result, ...(result.failed.length ? { error: result.failed[0].error } : {}) });

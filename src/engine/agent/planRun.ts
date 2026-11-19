@@ -116,7 +116,18 @@ export function undoNodeDeletion(sessionId: string, itemId: string): string | nu
   return error;
 }
 
-async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
+/** One approval in flight per card: a second click gets the same promise, never a second approval. */
+const nodeApprovals = new Map<string, Promise<void>>();
+function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
+  const key = `${sessionId}:${item.id}`;
+  const open = nodeApprovals.get(key);
+  if (open) return open;
+  const promise = approveNodeRunNow(sessionId, item).finally(() => nodeApprovals.delete(key));
+  nodeApprovals.set(key, promise);
+  return promise;
+}
+
+async function approveNodeRunNow(sessionId: string, item: PlanFeedItem): Promise<void> {
   const owner = item.meta?.agentNodeId;
   const request = item.nodeRun!;
   const preview = await prepareNodeRun(sessionId, request.targets, request.force);
