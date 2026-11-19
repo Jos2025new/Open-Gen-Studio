@@ -54,6 +54,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   if (agentOf(sessionId, owner).revising === itemId) return; // its agent is rewriting it: the old plan must not run
   if (item.nodeRun) { await approveNodeRun(sessionId, item); return; }
+  if (item.plan.workspace === 'node') return; // a Nodes plan runs only as an approved node run (its card carries one); never by recompiling the live graph
   const { plan } = item;
   const off = new Set(item.skipped ?? []);
   // A join over clips the user unchecked joins only the clips that run (or is dropped when fewer than two remain).
@@ -185,7 +186,7 @@ async function executePlanItem(
   }
   const result = await executeSteps(steps, {
     ...(resume ? { prior: resume.prior, blocked: resume.blocked, waiting: resume.waiting, reuseGenerations: resume.reuseGenerations } : {}),
-    canceled: new Set(item.canceledSteps ?? []),
+    canceled: new Set((item.canceledSteps ?? []).map((id) => (workspace === 'node' ? nodeOf(id) : id))),
     sessionId,
     planId: plan.id,
     workspace,
@@ -301,14 +302,17 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const blocked = new Map<string, string>();
   const waiting = new Set<string>();
   const reuseGenerations: Record<string, string> = {};
+  // The executor knows a Nodes plan's steps by node id (`<plan>_<step>`): what it reuses or holds back is keyed the same way.
+  const exec = (id: string) => (latest.plan.workspace === 'node' ? `${latest.plan.id}_${id}` : id);
+  for (const [k, v] of [...prior]) { prior.delete(k); prior.set(exec(k), v); }
   for (const st of chosen) {
     const gid = latest.stepGenerations[st.id];
     const gen = gid ? get().generations[gid] : undefined;
-    if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
-    else if (gen?.status === 'review') waiting.add(st.id);
-    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[st.id] = gen.id;
-    else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
-    else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
+    if (gen?.status === 'done') prior.set(exec(st.id), { assetIds: gen.assetIds, text: gen.text });
+    else if (gen?.status === 'review') waiting.add(exec(st.id));
+    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[exec(st.id)] = gen.id;
+    else if (gen?.status === 'running') blocked.set(exec(st.id), 'Interrupted by reload; check the existing generation before retrying.');
+    else if (latest.stepStates[st.id] === 'error') blocked.set(exec(st.id), gen?.error ?? 'Failed');
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({ ...it, status: 'running', stepStates: { ...it.stepStates, ...Object.fromEntries([...blocked.keys()].map(id => [id, 'error' as StepState])) } }));
   await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked, waiting, reuseGenerations });

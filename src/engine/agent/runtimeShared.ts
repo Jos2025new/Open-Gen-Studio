@@ -366,6 +366,15 @@ export async function presentPlan(
     if (action === 'ask' && !confirmedNow) return { errors: [], settingsNeeded: costAskMessage([...new Set(settingKinds)], total.usd) };
   }
   const style = get().composer.agentStyle;
+  // A Nodes plan is prepared (drafted nodes, reviewed price, signature) before its card exists: a card with no approval to carry is never shown, so it cannot be approved in the gap.
+  let nodeRun: PlanFeedItem['nodeRun'];
+  let prepared: Awaited<ReturnType<typeof prepareNodeRun>> | undefined;
+  if (workspace === 'node') {
+    materializeNodes(sessionId, plan);
+    const targets = plan.steps.filter(s => s.kind !== 'text').map(s => `${plan.id}_${s.id}`);
+    prepared = await prepareNodeRun(sessionId, targets);
+    nodeRun = { targets, force: true, signature: prepared.signature };
+  }
   const item: PlanFeedItem = {
     ...feedBase(workspace),
     type: 'plan',
@@ -377,18 +386,13 @@ export async function presentPlan(
     stepGenerations: {},
     estimate: total,
     meta: meta ?? messageMeta(workspace, {}, sessionId, owner),
+    ...(prepared ? { nodeRun, plan: { ...plan, steps: prepared.steps }, estimate: prepared.estimate, error: prepared.errors.join(' ') || undefined } : {}),
   };
   const replaced = closeRevisedPlan(sessionId, revision, owner);
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
   for (const a of plan.adjustments.filter((x) => /\byour [\w-]+ model\b/.test(x))) toast(a.replace(/^[\w-]+: /, ''), 'error', 5000);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } }, owner);
-  if (workspace === 'node') {
-    materializeNodes(sessionId, plan);
-    const targets = plan.steps.filter(s => s.kind !== 'text').map(s => `${plan.id}_${s.id}`);
-    const preview = await prepareNodeRun(sessionId, targets);
-    updateFeedItem<PlanFeedItem>(sessionId, item.id, { nodeRun: { targets, force: true, signature: preview.signature }, plan: { ...plan, steps: preview.steps }, estimate: preview.estimate, error: preview.errors.join(' ') || undefined });
-  }
   // Recorded before auto-approval closes the request.
   if (agentMs != null) {
     const models = [...new Set(plan.steps.flatMap((st) => ('modelRef' in st && st.modelRef ? [st.modelRef] : [])))];

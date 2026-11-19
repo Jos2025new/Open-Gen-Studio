@@ -36,7 +36,10 @@ export function checkStepAuthorization(g: Generation, proposed: StepAuthorizatio
   const item = useStore.getState().sessions[g.sessionId]?.feed.find((f): f is PlanFeedItem => f.type === 'plan' && f.plan.id === g.planId);
   const stepId = item?.plan.workspace === 'node' ? g.stepId.replace(`${g.planId}_`, '') : g.stepId;
   const approved = item?.stepAuthorizations?.[stepId];
-  if (!item || !approved) return;
+  if (!item) return;
+  // A step of a plan that nobody authorized (a node the live graph added after the approval) is not sent: it needs its own approval with its price.
+  if (!approved && !item.nodeRun) throw new Error(`The step ${stepId} has no approved price; approve the plan again to run it.`);
+  if (!approved) return;
   const variantChanged = approved.modelRef !== proposed.modelRef;
   const changed = variantChanged || parameterKey(approved) !== parameterKey(proposed);
   const before = approved.estimate.usd;
