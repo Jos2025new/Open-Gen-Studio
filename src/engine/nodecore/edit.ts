@@ -122,7 +122,7 @@ function finishConnect(_before: Graph, next: Graph, edgeId: string, source: stri
 /** Why a composed change is refused, or null. */
 function compoundProblem(before: Graph, after: Graph, dropped: string[]): string | null {
   const alive = new Set(after.nodes.map((n) => n.id));
-  const rewired = after.edges.find((e) => { const was = before.edges.find((x) => x.id === e.id); return was && !dropped.includes(e.id) && (was.source !== e.source || was.target !== e.target || was.sourceHandle !== e.sourceHandle || was.targetHandle !== e.targetHandle); });
+  const rewired = after.edges.find((e) => { const was = before.edges.find((x) => x.id === e.id); return was && !dropped.includes(e.id) && (was.source !== e.source || was.target !== e.target || was.sourceHandle !== e.sourceHandle || was.targetHandle !== e.targetHandle || was.outputIndex !== e.outputIndex || was.pin !== e.pin || was.kind !== e.kind); });
   if (rewired) return `That change would silently rewire the cable ${rewired.id}; name it in the dropped list and add a new one.`;
   const lost = before.edges.find((e) => alive.has(e.source) && alive.has(e.target) && !after.edges.some((x) => x.id === e.id) && !dropped.includes(e.id));
   if (lost) return `That change would silently remove the cable ${lost.id} (${lost.source} → ${lost.target}).`;

@@ -40,6 +40,16 @@ describe('compound changes and invalid cables', () => {
     expect(graph().broken).toBeUndefined();
   });
 
+  it('refuses a change that keeps a cable\'s endpoints but changes what it delivers (result, pin or kind)', () => {
+    const base = { ...edge('e1', 'a', 'b'), outputIndex: 0 } as unknown as Graph['edges'][number];
+    arrange({ nodes: [text('a'), text('b')], edges: [base] } as unknown as Graph);
+    for (const patch of [{ outputIndex: 1 }, { outputIndex: undefined }, { pin: 'x' }, { kind: 'order' }]) {
+      const problem = editCompound(session, 'swap', (g) => ({ ...g, edges: g.edges.map((e) => ({ ...e, ...patch })) as Graph['edges'] }));
+      expect(problem, JSON.stringify(patch)).toMatch(/rewire/);
+    }
+    expect(graph().edges[0]).toEqual(base);
+  });
+
   it('refuses a cable that would be live and invalid at once', () => {
     arrange({ nodes: [text('a'), text('b')], edges: [edge('e1', 'a', 'b')] } as unknown as Graph);
     const problem = editCompound(session, 'both', (g) => ({ ...g, broken: [{ edge: edge('e1', 'gone', 'b'), missing: 'source', at: 1 }] }));
