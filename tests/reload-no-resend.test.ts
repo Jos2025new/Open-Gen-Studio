@@ -56,4 +56,20 @@ describe('after a reload nothing already sent is sent again', () => {
     expect(execute).not.toHaveBeenCalled();
     expect(card('fd_p').stepStates).toEqual({ s1: 'done', s2: 'error' }); // the finished step stays finished
   });
+
+  it('a Nodes plan that was running (its node already has a sent generation): approving, resuming and settling after reload send nothing', async () => {
+    const st = useStore.getState();
+    const step: PlanStep = { id: 's1', kind: 'image', title: 'S1', prompt: 'x', modelRef: 'local::studio-image', settings: { count: 1, advanced: {} }, refs: [] };
+    const plan: PlanFeedItem = { id: 'fd_n', createdAt: 1, workspace: 'node', type: 'plan', style: 'auto', nodeRun: { targets: ['pln_s1'], force: true, signature: 'sig' }, plan: { id: 'pln', title: 'N', summary: '', workspace: 'node', style: '', steps: [step], subjects: [], adjustments: [] }, status: 'running', stepStates: { s1: 'running' }, stepGenerations: { s1: 'g1' }, estimate: { usd: 0.01, approximate: false } };
+    const graph = { nodes: [{ id: 'pln_s1', planId: 'pln', position: { x: 0, y: 0 }, data: { ...image('S1'), generationId: 'g1' } }], edges: [] } as unknown as Graph;
+    const gen = { id: 'g1', sessionId: sid, kind: 'image', prompt: 'x', modelRef: 'local::studio-image', modelName: 'm', provider: 'atlas', settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'agent', status: 'running', assetIds: [], remoteJob: { provider: 'atlas', id: 'job1', meta: {} }, createdAt: 1, estimate: { usd: 0.01, approximate: false }, stepId: 'pln_s1', planId: 'pln' };
+    useStore.setState({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph, feed: [plan] } }, generations: { g1: gen } as never });
+    reload();
+    settleInterruptedPlans();
+    await approvePlan(sid, 'fd_n');
+    const said = await resumePlan(sid, 'fd_n', 'retry');
+    expect(said).toMatch(/rerun from their nodes/);
+    expect(execute).not.toHaveBeenCalled();
+    expect(card('fd_n').status).not.toBe('awaiting'); // never offered for approval again
+  });
 });
