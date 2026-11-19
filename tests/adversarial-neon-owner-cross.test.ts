@@ -327,7 +327,7 @@ describe('adversarial: cruce entre agentes, borrado, edición y revisión', () =
   // FALLO REAL: turnChats (runtimeShared.ts:72) solo vive en RAM y submitAnswers/confirmSettings/retryAgentTurn no restauran setTurnChat desde item.meta.chatNodeId; tras recargar, responder una tarjeta de B en chat2 manda su respuesta a chat (chat 1 de A).
   it('tras recargar (turnChats vacío), responder una tarjeta de B en chat2 debe seguir respondiendo en chat2', async () => {
     const ask = { id: 'qB', name: 'ask_questions', arguments: JSON.stringify({ questions: [{ id: 'k', question: 'Q in chat2?', options: ['1', '2'] }] }) };
-    chat.mockResolvedValueOnce(llmReply('B asks', [ask])).mockResolvedValueOnce(llmReply('B reply after reload'));
+    chat.mockResolvedValueOnce(llmReply('B asks', [ask])).mockImplementationOnce(async (o) => { o.onText?.('B reply after reload', 'B reply after reload'); return llmReply('B reply after reload'); }); // the reply row is created by streaming: the mock must stream
 
     await sendAgentMessage('ask B in chat2', { agentNodeId: 'agentB', chatNodeId: 'chat2' });
     const qCard = S().feed.find((f): f is QuestionsFeedItem => f.type === 'questions')!;

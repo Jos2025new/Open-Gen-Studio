@@ -32,11 +32,14 @@ function historyIndexOf(sessionId: string, itemId: string): number {
   return k >= 0 ? hits[k] : -1;
 }
 
+/** The agent that wrote the message is mid-turn (not the one on screen): its conversation must not change under it. */
+const ownerBusy = (sessionId: string, item: { meta?: { agentNodeId?: string } }) => !!laneState(sessionId, item.meta?.agentNodeId)?.busy;
+
 /** Delete one of the user's messages: gone from the chat, and from what the agent reads (a short note keeps the turn order valid). */
 export function deleteUserMessage(sessionId: string, itemId: string): void {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
-  if (!s || s.agent.busy || item?.type !== 'user') return;
+  if (!s || item?.type !== 'user' || ownerBusy(sessionId, item)) return;
   const owner = item.meta?.agentNodeId;
   const i = historyIndexOf(sessionId, itemId);
   if (i >= 0) patchLane(sessionId, owner, (a) => ({ history: a.history.map((m, j) => (j === i ? { ...m, content: DELETED_MESSAGE } : m)) }));
@@ -51,7 +54,7 @@ export function deleteUserMessage(sessionId: string, itemId: string): void {
 export async function editUserMessage(sessionId: string, itemId: string, text: string): Promise<void> {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
-  if (!s || s.agent.busy || item?.type !== 'user' || (!text.trim() && !item.attachments.length)) return;
+  if (!s || item?.type !== 'user' || ownerBusy(sessionId, item) || (!text.trim() && !item.attachments.length)) return;
   if (claimLaneOfItem(sessionId, itemId)) return;
   const owner = item.meta?.agentNodeId;
   const i = historyIndexOf(sessionId, itemId);

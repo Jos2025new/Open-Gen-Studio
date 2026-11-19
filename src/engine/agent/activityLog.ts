@@ -1,13 +1,14 @@
 import { uid } from '../../lib/id';
 import { appendFeed, updateFeedItem } from '../../store/store';
 import type { ActivityEntry, ActivityFeedItem, Workspace } from '../types';
+import type { ChatMessageMeta } from '../feedMeta';
 
 /**
  * The turn's activity block (L3): created when the turn starts, it collects the streamed reasoning (store updates
  * throttled) and each action, and records when the turn ended.
  */
-export function activityLog(sessionId: string, workspace: Workspace) {
-  const item: ActivityFeedItem = { id: uid('fd'), createdAt: Date.now(), workspace, type: 'activity', startedAt: Date.now(), entries: [] };
+export function activityLog(sessionId: string, workspace: Workspace, meta?: ChatMessageMeta) {
+  const item: ActivityFeedItem = { id: uid('fd'), createdAt: Date.now(), workspace, type: 'activity', ...(meta ? { meta } : {}), startedAt: Date.now(), entries: [] };
   appendFeed(sessionId, item);
   const patch = (fn: (entries: ActivityEntry[]) => ActivityEntry[]) =>
     updateFeedItem<ActivityFeedItem>(sessionId, item.id, (it) => ({ ...it, entries: fn(it.entries) }));

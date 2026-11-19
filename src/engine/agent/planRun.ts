@@ -29,7 +29,7 @@ import { overLimit, overLimitText, rerunNote } from '../budget';
 import { confirmApproved, inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { failedStepSummary } from './failureContext';
-import { agentEngine, agentOf, closeRevisedPlan, designerDims, feedBase, get, messageMeta, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
+import { agentEngine, agentOf, closeRevisedPlan, feedOfAgent, designerDims, feedBase, get, messageMeta, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
 import { pushHistory } from './conversation';
 import { llmTurn } from './llmTurn';
 
@@ -116,7 +116,7 @@ export function undoNodeDeletion(sessionId: string, itemId: string): string | nu
   return error;
 }
 
-/** One approval in flight per card: a second click gets the same promise, never a second approval. */
+/** One approval in flight per card. */
 const nodeApprovals = new Map<string, Promise<void>>();
 function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
   const key = `${sessionId}:${item.id}`;
@@ -359,12 +359,13 @@ async function wrapUpPlan(sessionId: string, itemId: string, title: string, stat
   const s = session(sessionId);
   const own = laneState(sessionId, owner);
   if (!s || !own || agentEngine(sessionId, owner).kind !== 'llm' || own.busy || own.pending) return;
-  const at = s.feed.findIndex((f) => f.id === itemId);
-  if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
-  const item = s.feed[at];
+  const mine = feedOfAgent(sessionId, owner);
+  const at = mine.findIndex((f) => f.id === itemId);
+  if (at < 0 || mine.slice(at + 1).some((f) => f.type === 'user')) return;
+  const item = mine[at];
   drainAgentNotes(sessionId, owner);
   // After an edit the agent gets the original and the result to compare; otherwise it has not seen the result.
-  const pairs = item.type === 'plan' && agentSeesImages() ? await editPairParts(item) : [];
+  const pairs = item.type === 'plan' && agentSeesImages(sessionId, owner) ? await editPairParts(item) : [];
   pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
 ${pairs.length ? WRAPUP_COMPARE_RULE : WRAPUP_RULE}`, pairs), owner);
   await llmTurn(sessionId, turnCanvas(item.workspace), { textOnly: true, route: 'wrap-up', agentNodeId: owner });

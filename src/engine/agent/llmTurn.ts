@@ -61,7 +61,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   let outcome: TurnOutcome = 'text';
   patchAgent(sessionId, { busy: true, phase: 'working' }, owner);
-  const log = activityLog(sessionId, rowCanvas(workspace));
+  const log = activityLog(sessionId, rowCanvas(workspace), messageMeta(workspace, {}, sessionId, owner));
   const showThinking = get().settings.agent.showThinking !== false;
   const controller = new AbortController();
   controllers.set(turnKey(sessionId, owner), controller);

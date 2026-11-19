@@ -28,7 +28,7 @@ import { backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, formatZodError } from './tools';
-import { agentOf, get, session } from './runtimeShared';
+import { agentChoice, agentOf, get, session } from './runtimeShared';
 import { flushToolResults, guideLabel } from './conversation';
 import { planRecoveryProblem, presentNodeRun, resumePlan } from './planRun';
 import { activityLog } from './activityLog';
@@ -138,7 +138,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   const v = viewCanvasSchema.safeParse(parsed.value);
   if (!v.success) respond(`Invalid view_canvas input: ${formatZodError(v.error)}`);
   else if (c.workspace !== 'designer') respond('view_canvas works only in the Designer.');
-  else if (!agentSeesImages()) respond('The selected agent model cannot see images.');
+  else if (!agentSeesImages(sessionId, c.owner)) respond('The selected agent model cannot see images.');
   else {
     const view = await until(canvasParts(sessionId, v.data.layer_id)).catch((e) => { if (isAbort(e)) throw e; return 'The page could not be rendered.'; });
     if (typeof view === 'string') respond(view);
@@ -167,7 +167,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
     const found = findAssets(session(sessionId), c.workspace, st.assets, st.generations, v.data);
     log.action({ icon: 'search', label: v.data.view ? 'Looked at results' : 'Searched results', detail: [v.data.kind?.join(','), v.data.query, v.data.since].filter(Boolean).join(' · ') || undefined });
     if (!v.data.view || !found.rows.length) respond(found.text);
-    else if (!agentSeesImages()) respond(`${found.text}\n\nNone sent: the agent model the user picked (${get().settings.agent.model}) cannot see images, on any canvas. Tell the user exactly that, and that a model with vision (chosen in Settings → Agent) can look; never describe the results.`);
+    else if (!agentSeesImages(sessionId, c.owner)) respond(`${found.text}\n\nNone sent: the agent model the user picked (${agentChoice(sessionId, c.owner).model}) cannot see images, on any canvas. Tell the user exactly that, and that a model with vision (chosen in Settings → Agent) can look; never describe the results.`);
     else {
       const parts: LlmContentPart[] = [];
       for (const t of viewTargets(found.rows, get().assets)) {

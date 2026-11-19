@@ -157,6 +157,10 @@ function planDelete(graph: Graph, ids: string[]): Graph {
   return { ...graph, nodes: graph.nodes.filter((n) => !drop.has(n.id)), edges: graph.edges.filter((e) => !drop.has(e.source) && !drop.has(e.target)), ...(graph.groups ? { groups } : {}), ...(broken.length ? { broken } : {}) };
 }
 
+/** Things that must stop when their node goes (an agent's turn): registered by their owner, called once the edit is written. */
+const removalHooks: Array<(session: string, removed: GraphNode[]) => void> = [];
+export const onNodesRemoved = (hook: (session: string, removed: GraphNode[]) => void): void => { removalHooks.push(hook); };
+
 /** Run one edit. Same commit rules as the old `editGraph`: the lock check, the toast, one `setGraph`. */
 /** The error of a refused edit, or null when it applied: the shape the flow actions return. */
 export const editError = (r: EditResult): string | null => (r.ok ? null : r.error);
@@ -255,6 +259,8 @@ export function applyEdit(req: EditRequest): EditResult {
     // The system keeps its own parts in step without an undo step (the same graph rules held above).
     useStore.setState((s0) => s0.sessions[req.session] ? { sessions: { ...s0.sessions, [req.session]: { ...s0.sessions[req.session], graph: next } } } : s0);
   } else setGraph(req.session, () => next);
+  const gone = graph.nodes.filter((n) => !next.nodes.some((m) => m.id === n.id));
+  if (gone.length) removalHooks.forEach((hook) => hook(req.session, gone));
   // The kind is the one the edge really got (a dragged Model→Agent cable is inferred as control, like the command).
   const made = edgeId ? next.edges.find((e) => e.id === edgeId) : undefined;
   if (made && (made.kind ?? 'data') === 'control') applyModelLinkToAgent(req.session, made.source, made.target);

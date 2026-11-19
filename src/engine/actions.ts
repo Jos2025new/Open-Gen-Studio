@@ -24,7 +24,7 @@ import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { dropHistory } from './design/history';
-import { designerDims } from './agent/runtime';
+import { designerDims, stopAgent } from './agent/runtime';
 import { sheetCut } from './sheet';
 import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
 import {
@@ -517,7 +517,6 @@ export function deleteGeneration(generationId: string): void {
   const g = get().generations[generationId];
   if (!g) return;
   const assetIds = [...g.assetIds];
-  // Nodes showing this result let go of it through the editing layer.
   if (g.sessionId in get().sessions) editCompound(g.sessionId, 'delete generation', (gr) => ({ ...gr, nodes: gr.nodes.map((n) => runsGeneration(n.data) && n.data.generationId === generationId ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] } : n) }), { silent: true });
   useStore.setState((st) => {
     const generations = { ...st.generations };
@@ -755,10 +754,10 @@ export function deleteSession(sessionId: string): void {
   const st = get();
   const s = st.sessions[sessionId];
   if (!s) return;
+  stopAgent(sessionId);
   // Images of library items outlive the session that made them.
   const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
-  // Generations still running are not canceled (the provider may charge anyway): they finish, their charge goes to
-  // Spending once, and jobs.purgeDiscarded removes them and their results then.
+  // Running generations are not canceled (the provider may charge anyway): they finish and jobs.purgeDiscarded removes them.
   const active = new Set(Object.values(st.generations).filter((g) => g.sessionId === sessionId && isRunning(g.id)).map((g) => g.id));
   const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id) && !(a.generationId && active.has(a.generationId))).map((a) => a.id);
   const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId && !active.has(g.id)).map((g) => g.id);

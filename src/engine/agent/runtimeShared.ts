@@ -19,7 +19,7 @@ import type { AgentQuestion, AgentState, LlmProviderId, MediaKind, NoticeFeedIte
 import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
 import { placeFor } from '../place';
 import { appendFeed, patchSession, toast, updateFeedItem, useStore } from '../../store/store';
-import { editCompound } from '../nodecore/edit';
+import { editCompound, onNodesRemoved } from '../nodecore/edit';
 import { suggestModel } from './modelIndex';
 import { recordMetric } from './metrics';
 import { gateOps } from './force';
@@ -32,6 +32,16 @@ export const get = useStore.getState;
 export const controllers = new Map<string, AbortController>();
 /** Ends a turn at once (Stop, the cap), without waiting for what it awaits. */
 export const ending = new WeakMap<AbortController, () => void>();
+
+// An agent node that goes stops its own turn: nothing keeps working (and spending) for a node that is not there.
+onNodesRemoved((sessionId, removed) => {
+  for (const n of removed) {
+    if (n.data.kind !== 'ref' || n.data.type !== 'agent') continue;
+    const c = controllers.get(turnKey(sessionId, n.id));
+    c?.abort();
+    if (c) ending.get(c)?.();
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,10 +82,21 @@ export function feedBase(workspace: Workspace) {
 const turnChats = new Map<string, string>();
 export const setTurnChat = (sessionId: string, chatNodeId: string | undefined, owner: string | undefined) => { const k = turnKey(sessionId, owner); if (chatNodeId) turnChats.set(k, chatNodeId); else turnChats.delete(k); };
 
+function lastChatOfAgent(sessionId: string, agentNodeId: string | undefined): string | undefined {
+  if (!agentNodeId) return undefined;
+  const feed = get().sessions[sessionId]?.feed ?? [];
+  for (let i = feed.length - 1; i >= 0; i--) {
+    const m = (feed[i] as { meta?: { agentNodeId?: string; chatNodeId?: string } }).meta;
+    if (m?.agentNodeId === agentNodeId && m.chatNodeId) return m.chatNodeId;
+  }
+  return undefined;
+}
+
 /** The metadata of a row. `owner` is the agent it is written for (explicit: pass `undefined` only for a row no agent owns). */
 export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta>, sessionId: string, owner: string | undefined): ChatMessageMeta {
   const sender = extra.agentNodeId ?? owner;
-  const chat = turnChats.get(turnKey(sessionId, sender)) ?? chatNodeOf(sessionId);
+  // After a reload the map is empty: the chat is the one this agent's own last row was written in.
+  const chat = turnChats.get(turnKey(sessionId, sender)) ?? lastChatOfAgent(sessionId, sender) ?? chatNodeOf(sessionId);
   const e = agentEngine(sessionId, sender);
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
@@ -122,7 +143,7 @@ export function setThreadOpen(open: boolean): void {
 /** The session's agent node (the first one: attachModelToNode and the chat use the same). */
 export function agentNodeOf(sessionId: string = get().activeSessionId, nodeId?: string) {
   const agents = get().sessions[sessionId]?.graph.nodes.filter((n) => n.data.kind === 'ref' && n.data.type === 'agent') ?? [];
-  return (nodeId ? agents.find((n) => n.id === nodeId) : undefined) ?? agents[0];
+  return nodeId ? agents.find((n) => n.id === nodeId) : agents[0];
 }
 
 /** The chat node that owns a message with no `chatNodeId` of its own: the session's first chat node. */
@@ -143,6 +164,14 @@ export function feedOfChat(sessionId: string, chatNodeId: string) {
   const s = get().sessions[sessionId];
   const first = chatNodeOf(sessionId);
   return (s?.feed ?? []).filter((f) => ((f as { meta?: { chatNodeId?: string } }).meta?.chatNodeId ?? first) === chatNodeId);
+}
+
+/** The feed one agent owns: what carries its id, plus what predates agent ids (the first agent's). No owner: the whole feed. */
+export function feedOfAgent(sessionId: string, owner: string | undefined) {
+  const feed = get().sessions[sessionId]?.feed ?? [];
+  if (!owner) return feed;
+  const first = agentNodeOf(sessionId)?.id;
+  return feed.filter((f) => ((f as { meta?: { agentNodeId?: string } }).meta?.agentNodeId ?? first) === owner);
 }
 
 /** The provider and model of the agent a turn is for: the node's own choice, else the global one. */
@@ -301,7 +330,7 @@ export async function presentPlan(
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
-  const carried = revision ? carryOverRevision(raw, session(sessionId)) : [];
+  const carried = revision ? carryOverRevision(raw, { feed: session(sessionId).feed, agent: agentOf(sessionId, owner) }) : [];
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId, owner), planId);
   if (plan && carried.length) plan.agentNotes = carried;
   if (signal?.aborted) return { errors: [] };

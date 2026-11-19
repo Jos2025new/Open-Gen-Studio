@@ -27,7 +27,7 @@ export function enterLane(sessionId: string, nodeId: string): string | null {
   const s = useStore.getState().sessions[sessionId];
   if (!s || s.agentLane === nodeId) return null;
   patchSession(sessionId, (x) => {
-    if (x.agentLane === undefined) return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: x.agent } }; // the first agent inherits what the session had
+    if (x.agentLane === undefined) return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: x.agents?.[nodeId] ?? x.agent } }; // the first agent inherits what the session had
     // The shared choices fill what the target lacks; they never overwrite its own (it may be mid-turn).
     const target = x.agents?.[nodeId] ?? freshAgent();
     const shared = Object.fromEntries(SHARED.filter((k) => x.agent[k] !== undefined && target[k] === undefined).map((k) => [k, x.agent[k]]));
@@ -58,7 +58,8 @@ export function claimLaneOfItem(sessionId: string, itemId: string): string | nul
 export function laneState(sessionId: string, nodeId: string | undefined): AgentState | undefined {
   const s = useStore.getState().sessions[sessionId];
   if (!s) return undefined;
-  if (!nodeId || s.agentLane === undefined) return s.agent;
+  if (!nodeId) return s.agent;
+  if (s.agentLane === undefined) return s.agents?.[nodeId] ?? (s.agents && Object.keys(s.agents).length ? undefined : s.agent);
   return s.agents?.[nodeId] ?? (s.agentLane === nodeId ? s.agent : undefined);
 }
 
@@ -70,7 +71,9 @@ export function laneState(sessionId: string, nodeId: string | undefined): AgentS
 export function patchLane(sessionId: string, nodeId: string | undefined, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   const resolve = (a: AgentState) => ({ ...a, ...(typeof patch === 'function' ? patch(a) : patch) });
   patchSession(sessionId, (x) => {
-    if (nodeId && x.agentLane !== undefined) return { ...x, agents: { ...x.agents, [nodeId]: resolve(x.agents?.[nodeId] ?? (x.agentLane === nodeId ? x.agent : freshAgent())) } };
+    // Before any agent was shown: the first agent written inherits what the session had, the others start fresh. Never the on-screen one.
+    if (nodeId && x.agentLane === undefined) return { ...x, agents: { ...x.agents, [nodeId]: resolve(x.agents?.[nodeId] ?? (x.agents && Object.keys(x.agents).length ? freshAgent() : x.agent)) } };
+    if (nodeId) return { ...x, agents: { ...x.agents, [nodeId]: resolve(x.agents?.[nodeId] ?? (x.agentLane === nodeId ? x.agent : freshAgent())) } };
     return { ...x, agent: resolve(x.agent) };
   });
 }
