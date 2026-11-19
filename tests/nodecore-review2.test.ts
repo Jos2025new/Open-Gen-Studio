@@ -9,7 +9,7 @@ vi.mock('../src/engine/agent/llmTurn', () => ({ llmTurn: turn }));
 import { useStore } from '../src/store/store';
 import { sendAgentMessage, submitAnswers } from '../src/engine/agent/conversation';
 import { messageMeta } from '../src/engine/agent/runtimeShared';
-import { laneState } from '../src/engine/agent/lanes';
+import { laneState, patchLane } from '../src/engine/agent/lanes';
 import { recipientOf } from '../src/engine/agent/recipient';
 import { resolveInputs, storeEnv } from '../src/engine/nodecore/resolver';
 import { patchNodeData } from '../src/engine/flow/actions';
@@ -32,18 +32,18 @@ beforeEach(() => {
 });
 
 describe('review finding 4: a card action belongs to its own agent', () => {
-  it('refuses to answer A\'s card while B is mid-turn, before changing anything', async () => {
+  it('answers A\'s card while B is mid-turn: A continues, B is untouched', async () => {
     await sendAgentMessage('plan', { agentNodeId: 'agentA' });
     useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], feed: [{ id: 'card-1', createdAt: 1, workspace: 'chat', type: 'questions', status: 'pending', questions: [], meta: { agentNodeId: 'agentA' } } as never], agent: { ...st.sessions[HOME].agent, pending: pend('questions') } } } }));
     await sendAgentMessage('hello', { agentNodeId: 'agentB' });
     expect(S().agentLane).toBe('agentB');
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agent: { ...st.sessions[HOME].agent, busy: true } } } }));
+    patchLane(HOME, 'agentB', { busy: true });
     turn.mockClear();
     await submitAnswers(HOME, 'card-1', { a: 'b' });
-    expect(turn).not.toHaveBeenCalled();
-    expect(S().agentLane).toBe('agentB');
-    expect(laneState(HOME, 'agentA')!.pending).toMatchObject({ feedItemId: 'card-1' });
-    expect((S().feed.find((f) => f.id === 'card-1') as { status: string }).status).toBe('pending');
+    expect(turn).toHaveBeenCalledTimes(1);
+    expect(laneState(HOME, 'agentB')!.busy).toBe(true);
+    expect(laneState(HOME, 'agentA')!.pending).toBeUndefined();
+    expect((S().feed.find((f) => f.id === 'card-1') as { status: string }).status).toBe('answered');
   });
   it('a card action brings its owner forward when nobody is working', async () => {
     await sendAgentMessage('plan', { agentNodeId: 'agentA' });
@@ -55,17 +55,17 @@ describe('review finding 4: a card action belongs to its own agent', () => {
 });
 
 describe('review finding 5: the turn is reserved and keeps its identity', () => {
-  it('a second agent cannot start while the first turn is still running', async () => {
+  it('a second agent starts while the first turn is still running; each keeps its own reservation', async () => {
     let release!: () => void;
     turn.mockImplementationOnce(() => new Promise<undefined>((r) => { release = () => r(undefined); }));
     const first = sendAgentMessage('slow', { agentNodeId: 'agentA' });
     await vi.waitFor(() => expect(turn).toHaveBeenCalledTimes(1));
     expect(S().agent.busy).toBe(true);
-    await sendAgentMessage('too early', { agentNodeId: 'agentB' });
-    expect(turn).toHaveBeenCalledTimes(1);
-    expect(S().agentLane).toBe('agentA');
+    await sendAgentMessage('in parallel', { agentNodeId: 'agentB' });
+    expect(turn).toHaveBeenCalledTimes(2);
+    expect(laneState(HOME, 'agentA')!.busy).toBe(true);
     release(); await first;
-    expect(S().agent.busy).toBe(false);
+    expect(laneState(HOME, 'agentA')!.busy).toBe(false);
   });
   it('a message that never reaches a turn does not leave the agent reserved', async () => {
     await sendAgentMessage('   ', { agentNodeId: 'agentA' });

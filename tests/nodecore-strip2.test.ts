@@ -10,7 +10,7 @@ vi.mock('../src/engine/agent/llmTurn', () => ({ llmTurn: turn }));
 import { useStore } from '../src/store/store';
 import { sendAgentMessage, pushHistory } from '../src/engine/agent/conversation';
 import { agentEngine } from '../src/engine/agent/runtimeShared';
-import { enterLane, laneState } from '../src/engine/agent/lanes';
+import { enterLane, laneState, patchLane } from '../src/engine/agent/lanes';
 import { recipientOf } from '../src/engine/agent/recipient';
 import { setAgentLlm } from '../src/engine/nodes/system';
 import { patchNodeData } from '../src/engine/flow/actions';
@@ -70,20 +70,20 @@ describe('strip 2: chat with two agents', () => {
 
   it('an open card belongs to its agent: a message to the other does not answer it', async () => {
     await sendAgentMessage('plan something', { agentNodeId: 'agentA' });
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agent: { ...st.sessions[HOME].agent, pending: { toolCallId: 'call-1', kind: 'questions', feedItemId: 'card-1' } } } } }));
+    patchLane(HOME, 'agentA', { pending: { toolCallId: 'call-1', kind: 'questions', feedItemId: 'card-1' } });
     await sendAgentMessage('hello critic', { agentNodeId: 'agentB' });
     expect(S().agent.pending).toBeUndefined(); // the critic has none
     expect(laneState(HOME, 'agentA')!.pending).toMatchObject({ feedItemId: 'card-1' }); // the writer's card is still open
     expect(turn.mock.calls.at(-1)![2]).toMatchObject({ agentNodeId: 'agentB' });
   });
 
-  it('an agent that is mid-turn cannot be switched away from', async () => {
+  it('showing another agent never moves or stops the one that is mid-turn', async () => {
     await sendAgentMessage('go', { agentNodeId: 'agentA' });
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agent: { ...st.sessions[HOME].agent, busy: false } } } }));
+    patchLane(HOME, 'agentA', { busy: true });
     expect(enterLane(HOME, 'agentB')).toBeNull();
-    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agent: { ...st.sessions[HOME].agent, busy: true } } } }));
-    expect(enterLane(HOME, 'agentA')).toContain('still working');
     expect(S().agentLane).toBe('agentB');
+    expect(S().agent.busy).toBe(false);
+    expect(laneState(HOME, 'agentA')!.busy).toBe(true);
   });
 
   it('each agent has its own LLM', () => {
