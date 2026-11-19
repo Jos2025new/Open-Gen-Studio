@@ -2,6 +2,7 @@ import { useStore } from '../../store/store';
 import { normalizeAssetRevisions } from '../assetRevisions';
 import type { Asset, Generation, Graph, GraphEdge, GraphNode } from '../types';
 import { digest, type RefMode, type RefStatus } from './address';
+import { feedOwner } from '../agent/threads';
 
 /*
  * The one resolver (ADR 0031 point 3). Preview, the freshness signature and the run plan all take a node's effective
@@ -52,12 +53,11 @@ export function sessionChatText(node: GraphNode): string | undefined {
   const s = useStore.getState().sessions[d.ref];
   const first = s?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === d.type)?.id ?? node.id; // a node outside the session graph (or with none) reads the untagged items
   const wanted = d.type === 'chat' ? 'user' : 'assistant';
-  const owner = (f: { meta?: { agentNodeId?: string; chatNodeId?: string } }) => (d.type === 'chat' ? f.meta?.chatNodeId : f.meta?.agentNodeId) ?? first;
   const feed = s?.feed ?? [];
   // Newest first, without copying the feed (a long chat is read for every node on every pass).
   for (let i = feed.length - 1; i >= 0; i--) {
     const f = feed[i];
-    if (f.type === wanted && 'text' in f && owner(f as never) === node.id) return f.text;
+    if (f.type === wanted && 'text' in f && feedOwner(f, d.type, first) === node.id) return f.text;
   }
   return undefined;
 }

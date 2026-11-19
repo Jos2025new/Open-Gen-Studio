@@ -63,16 +63,22 @@ export function migrateAgents(s: Session): Session {
 }
 
 type Meta = { meta?: { agentNodeId?: string; chatNodeId?: string } };
+
+/** Who owns a row: the agent or chat it names, else (a row from before ids) the fallback, the first one. The one rule every reader of the feed shares. */
+export const feedOwner = (row: object, kind: 'agent' | 'chat', fallback: string | undefined): string | undefined => {
+  const m = (row as Meta).meta;
+  return (kind === 'agent' ? m?.agentNodeId : m?.chatNodeId) ?? fallback;
+};
 const isRef = (type: string) => (n: Session['graph']['nodes'][number]) => n.data.kind === 'ref' && n.data.type === type;
 
 /** The feed one agent owns: what carries its id, plus what predates agent ids (the first agent's). Pure: read it from any session value. */
 export function feedOfAgentIn(s: Pick<Session, 'feed' | 'graph'> | undefined, owner: string): Session['feed'] {
   const first = firstAgentId(s?.graph);
-  return (s?.feed ?? []).filter((f) => ((f as Meta).meta?.agentNodeId ?? first) === owner);
+  return (s?.feed ?? []).filter((f) => feedOwner(f, 'agent', first) === owner);
 }
 
 /** The feed a chat node owns: what carries its id, plus what predates chat ids (the first chat's). */
 export function feedOfChatIn(s: Pick<Session, 'feed' | 'graph'> | undefined, chatNodeId: string): Session['feed'] {
   const first = s?.graph.nodes.find(isRef('chat'))?.id;
-  return (s?.feed ?? []).filter((f) => ((f as Meta).meta?.chatNodeId ?? first) === chatNodeId);
+  return (s?.feed ?? []).filter((f) => feedOwner(f, 'chat', first) === chatNodeId);
 }

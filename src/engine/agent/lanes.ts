@@ -1,6 +1,6 @@
 import { patchSession, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
-import { allThreads, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
+import { allThreads, feedOwner, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
 
 export { allThreads, freshAgent, shownThread, threadOf };
 
@@ -42,8 +42,9 @@ export function resolveOwner(sessionId: string, named?: string): string {
 
 /** The agent that owns a feed item (its message or card): the one it names, else (a row from before agent ids) the first. */
 export function laneOfItem(sessionId: string, itemId: string): string {
-  const item = useStore.getState().sessions[sessionId]?.feed.find((f) => f.id === itemId) as { meta?: { agentNodeId?: string } } | undefined;
-  return resolveOwner(sessionId, item?.meta?.agentNodeId);
+  const s = useStore.getState().sessions[sessionId];
+  const item = s?.feed.find((f) => f.id === itemId);
+  return (item && feedOwner(item, 'agent', undefined)) || firstAgentId(s?.graph);
 }
 
 /** A card action belongs to the agent that raised the card: bring its thread forward first, and say who it is. */
