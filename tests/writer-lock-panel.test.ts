@@ -78,8 +78,12 @@ describe('test 15e: the read-only panel', () => {
     expect(document.body.querySelector('.writer-lock')).toBeNull(); // the holder is not covered
     const b = await openTab();
     await settle();
-    b.lock.useHere();
-    await settle();
+    // The panel subscribes with useSyncExternalStore. Outside act(), a busy suite commits that update after the
+    // assertion, so the overlay is missing and the test fails; alone, the same settle() usually flushes it in time.
+    await act(async () => {
+      b.lock.useHere();
+      await settle();
+    });
     expect(a.lock.holdsWriterLock()).toBe(false);
     expect(document.body.querySelector('.writer-lock')?.textContent).toContain('Open Gen Studio is open in another tab');
     expect(buttons()).toEqual(['Use here']);
