@@ -53,8 +53,13 @@ export function sessionChatText(node: GraphNode): string | undefined {
   const first = s?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === d.type)?.id ?? node.id; // a node outside the session graph (or with none) reads the untagged items
   const wanted = d.type === 'chat' ? 'user' : 'assistant';
   const owner = (f: { meta?: { agentNodeId?: string; chatNodeId?: string } }) => (d.type === 'chat' ? f.meta?.chatNodeId : f.meta?.agentNodeId) ?? first;
-  const last = [...(s?.feed ?? [])].reverse().find((f) => f.type === wanted && 'text' in f && owner(f as never) === node.id);
-  return last && 'text' in last ? last.text : undefined;
+  const feed = s?.feed ?? [];
+  // Newest first, without copying the feed (a long chat is read for every node on every pass).
+  for (let i = feed.length - 1; i >= 0; i--) {
+    const f = feed[i];
+    if (f.type === wanted && 'text' in f && owner(f as never) === node.id) return f.text;
+  }
+  return undefined;
 }
 
 export function storeEnv(): ResolveEnv {

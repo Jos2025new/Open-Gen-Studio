@@ -52,6 +52,23 @@ export const snapshotById = (id: string): ActionSnapshot | undefined => snapshot
 export const recordOf = (runId: string): ActionRecord | undefined => { const r = ledger.get(runId); return r && { ...r, done: undefined } as unknown as ActionRecord; };
 export function resetActions(): void { snapshots.clear(); ledger.clear(); }
 
+/** Most runs and approvals kept in memory: a long session must not grow them for ever. */
+export const LEDGER_LIMIT = 300;
+export const ledgerSize = () => ({ snapshots: snapshots.size, ledger: ledger.size });
+/** Drops the oldest (maps keep insertion order). A run still going stays; an evicted record takes its approval with it, so a used approval can never come back to life. */
+function trim(): void {
+  for (const [id, r] of ledger) {
+    if (ledger.size <= LEDGER_LIMIT) break;
+    if (r.status === 'running') continue;
+    ledger.delete(id);
+    snapshots.delete(r.approval);
+  }
+  for (const id of snapshots.keys()) {
+    if (snapshots.size <= LEDGER_LIMIT) break;
+    snapshots.delete(id);
+  }
+}
+
 /** The revisions of every input the run reads, by `node.port`. */
 function pinsFor(session: string, ids: string[]): Record<string, string> {
   const graph = useStore.getState().sessions[session]?.graph;
@@ -72,6 +89,7 @@ export async function prepareAction(session: string, targets: string[], force = 
   if (preview.errors.length) return { ok: false, errors: preview.errors };
   const snapshot: ActionSnapshot = { id: uid('appr'), session, targets: [...targets], force, preview, pins: pinsFor(session, [...preview.runIds, ...preview.inputIds]), at: Date.now() };
   snapshots.set(snapshot.id, snapshot);
+  trim();
   recordJourneyEvent({ journeyId: session, journey: 'node-core', event: 'action.prepared', reason: 'snapshot approved for an explicit destination', sessionId: session, approvalId: snapshot.id, after: { targets, signature: snapshot.preview.signature } });
   return { ok: true, snapshot };
 }
@@ -86,6 +104,7 @@ export function adoptPreview(session: string, targets: string[], force: boolean,
   const id = uid('appr');
   const snapshot: ActionSnapshot = { id, session, targets: [...targets], force, preview, pins: pinsFor(session, [...preview.runIds, ...preview.inputIds]), at: Date.now() };
   snapshots.set(id, snapshot);
+  trim();
   return snapshot;
 }
 
@@ -117,6 +136,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
   const session = useStore.getState().sessions[snapshot.session];
   const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, seq: ++counter, done: undefined as never };
   ledger.set(runId, record);
+  trim();
   const finish = (): ActionRecord => ({ runId, approval: snapshot.id, session: record.session, targets: record.targets, status: record.status, sends: record.sends, seq: record.seq, result: record.result, error: record.error });
   record.done = (async () => {
     if (!session) { settle(runId, { status: 'failed', error: 'The session of this action no longer exists.' }); return finish(); }

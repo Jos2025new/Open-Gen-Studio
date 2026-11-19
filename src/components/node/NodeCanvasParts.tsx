@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Play, Plus } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
+import { usePreviewDeps } from './usePreviewDeps';
 import { prepareNodeRun, previewRun } from '../../engine/flow/actions';
 import { runApproved } from '../../engine/nodecore/action';
 import { uid } from '../../lib/id';
@@ -41,7 +42,7 @@ export function AddNodeMenu({ onAdd, onImport, omni }: { onAdd: (data: GraphNode
 export function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
   const pop = usePopover();
   const confirmId = useRef('');
-  useStore(s => s); // Keep the reviewed request and price current.
+  usePreviewDeps(sessionId, pop.open); // Keeps the reviewed request and price current.
   const preview = pop.open ? previewRun(sessionId, ids, false) : null;
   return (
     <>

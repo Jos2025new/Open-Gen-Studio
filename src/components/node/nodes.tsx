@@ -13,6 +13,7 @@ import { extensionForMime } from '../../lib/media';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
+import { usePreviewDeps } from './usePreviewDeps';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationProgress } from './GenerationProgress';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
@@ -57,7 +58,7 @@ export function RunButton({ node, primary }: { node: GraphNode; primary?: boolea
   const sessionId = useSessionId();
   const pop = usePopover();
   const confirmId = useRef('');
-  useStore(s => s); // Keep the reviewed request and price current.
+  usePreviewDeps(sessionId, pop.open || !!primary); // Keeps the reviewed request and price current.
   const preview = pop.open || primary ? previewRun(sessionId, [node.id]) : null;
   return (
     <>
