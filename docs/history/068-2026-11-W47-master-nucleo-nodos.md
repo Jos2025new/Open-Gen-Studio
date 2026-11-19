@@ -43,6 +43,13 @@ Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`
   - un cable fijado cuyo origen cambió es un aviso ámbar, con «Usar el valor nuevo» o «Mantener el fijado».
 
   De Blender se copia: tres niveles con el icono del más grave, el cable inválido en rojo con su motivo, los avisos que suben al grupo y la búsqueda por texto de aviso. Lo que se evita: borrar cables cuando desaparece un socket.
+- **Corrección del usuario al boceto** (2026-11-19, manda sobre lo anterior). La regla es pocos mensajes, y solo cuando algo es inválido de verdad:
+  - **Textos solo al pasar el ratón.** El color y el icono se ven siempre; nunca hay cajas de texto abiertas en el lienzo.
+  - **Puerto incompatible:** no se deja soltar el cable. Junto al cursor aparece un aviso breve, «Este puerto no admite texto», y no queda ningún estado de error.
+  - **Borrar un nodo uno mismo no es un error.** El cable se va (con «Deshacer» en el aviso de borrado) y no se dibuja ningún cable rojo. Si esa entrada era obligatoria, solo se pone en rojo el puerto que se quedó sin nada, con «Falta el prompt» al pasar el ratón.
+  - **Editar el origen uno mismo no es un error.** Por defecto, un cable sigue el valor vigente y lo de abajo solo queda desactualizado, como ya ocurre. Fijar un cable es una acción explícita y rara. Si el origen de un cable fijado cambia, basta con una marca discreta en el cable; al pasar el ratón ofrece «Usar el valor nuevo · Mantener el fijado». Nunca sale una ventana.
+  - **Cable rojo solo si el cable existe pero no puede funcionar.** Por ejemplo, cambiar el modelo deja un puerto con otro tipo.
+  - **Se mantienen** el resumen «N problemas» con su lista y la insignia de recuento en un space o grupo cerrado.
 - **Arreglos visuales de los nodos de space, el buscador y la barra:** aprobados tal cual.
 
 ## Reveses y su causa
@@ -58,7 +65,7 @@ Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`
 
 0. **Revisar un cambio de comportamiento** (`b07c5090`). Con el estado por agente, dos agentes de un mismo chat pueden trabajar a la vez y cada uno contesta sus tarjetas, aunque el otro esté ocupado. Antes eso se rechazaba. Sonnet cambió 4 tests viejos en ese sentido. Es coherente con «un chat tiene varios agentes», pero el usuario no lo ha aprobado; que lo ataque el Neon nuevo y lo confirme el usuario.
 1. Commit del estado por agente (Sonnet) y suite completa.
-2. Boceto de avisos para aprobar, e implementarlo después.
+2. Rehacer el boceto de avisos con la corrección del usuario (ver «Decisiones»), aprobarlo e implementarlo.
 3. Un Neon nuevo que revise las propuestas y todo lo hecho; decidir con el usuario qué hacer con lo que señale.
 4. Prueba del usuario en el sandbox, con una clave de proveedor: una generación real y dos agentes.
 5. Decisión sobre el space: subnet o solo navegación.
