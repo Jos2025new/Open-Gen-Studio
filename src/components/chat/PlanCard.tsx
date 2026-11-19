@@ -129,9 +129,11 @@ function DetailLine({ step, detail }: { step: PlanStep; detail: string }) {
 const WS_NAMES = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
 
 export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: string }) {
-  const graph = useStore(s => s.sessions[sessionId].graph);
-  const library = useStore(s => s.library);
-  const composer = useStore(s => s.composer);
+  // A closed card shows its result and reads nothing that changes while the chat streams or the user types: only an open one follows the graph, library, composer and feed.
+  const awaiting = item.status === 'awaiting';
+  const graph = useStore(s => (awaiting ? s.sessions[sessionId].graph : undefined));
+  const library = useStore(s => (awaiting ? s.library : undefined));
+  const composer = useStore(s => (awaiting ? s.composer : undefined));
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const assets = useStore((s) => s.assets);
@@ -142,11 +144,12 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const workspace = useStore((s) => s.ui.workspace);
   // While the agent revises this plan after a comment, it must not run in its old form.
   const revising = useStore(() => laneState(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId))?.revising === item.id); // the agent that owns the card, not the one on screen
-  const reused = useStore((s) => reusedDraft(s.sessions[sessionId]?.feed ?? [], item.id));
+  // Only an auto plan with video can have reused a draft choice; any other never scans the feed.
+  const asksDraft = item.style === 'auto' && item.plan.steps.some((x) => x.kind === 'video');
+  const reused = useStore((s) => (asksDraft ? reusedDraft(s.sessions[sessionId]?.feed ?? [], item.id) : undefined));
   const { plan } = item;
-  const awaiting = item.status === 'awaiting';
   // Auto: the settings card's choices live on this card; changing the model rewrites its prompts here.
-  const feed = useStore((s) => s.sessions[sessionId]?.feed);
+  const feed = useStore((s) => (awaiting ? s.sessions[sessionId]?.feed : undefined));
   const sections = awaiting ? planSections(feed ?? [], item) : [];
   const rewriting = usePlanRewrite((s) => Boolean(s.busy[item.id]));
   const rewriteFailed = usePlanRewrite((s) => s.failed[item.id]);
@@ -189,7 +192,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const spent = spentLabel(plannedSpend(item.stepGenerations, generations));
   const stopRun = () => { stopPlanRun(plan.id); for (const id of Object.values(item.stepGenerations)) if (generations[id] && ['running', 'queued'].includes(generations[id].status)) cancelGeneration(id); };
   /** Only a waiting plan can be edited: the other states show the same lines without the Edit button. */
-  const editable = (label: string, node: React.ReactNode, step?: PlanStep) => (awaiting ? <EditLine agentNodeId={item.meta?.agentNodeId} label={label} references={step ? stepReferenceChoices(step, plan.steps, assets, library, plan.subjects, 'modelRef' in step ? schemas[step.modelRef]?.slots.promptRefs : undefined) : []}>{node}</EditLine> : node);
+  const editable = (label: string, node: React.ReactNode, step?: PlanStep) => (awaiting ? <EditLine agentNodeId={item.meta?.agentNodeId} label={label} references={step ? stepReferenceChoices(step, plan.steps, assets, library ?? [], plan.subjects, 'modelRef' in step ? schemas[step.modelRef]?.slots.promptRefs : undefined) : []}>{node}</EditLine> : node);
 
   return (
     <article className={`plan-card cc-w status-${item.status}${sections.length ? ' is-auto' : ''}`} data-pop-bound>

@@ -302,9 +302,9 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       if (!st.sessions[d.ref]) return missingTarget(node, 'Chat', 'Session');
       const targetSession = st.sessions[d.ref];
       const feed = feedOfChatIn(targetSession, node.id);
-      const userCount = feed.filter((f) => f.type === 'user').length;
-      const genCount = feed.filter((f) => f.type === 'generation').length;
-      const lastMsg = [...feed].reverse().find((f) => f.type === 'user' || f.type === 'assistant');
+      let userCount = 0, genCount = 0, lastMsg: (typeof feed)[number] | undefined;
+      // One pass, no copy; a message still streaming is not the preview (its every token would redraw the card).
+      for (const f of feed) { if (f.type === 'user') userCount++; else if (f.type === 'generation') genCount++; if ((f.type === 'user' || (f.type === 'assistant' && !f.streaming))) lastMsg = f; }
       const preview = lastMsg && 'text' in lastMsg ? lastMsg.text.slice(0, 90) : 'Conversation ready';
       const connections: NonNullable<LiveSystemSummary['connections']> = [];
       const linked = (id: string) => (graph?.edges ?? []).flatMap((e) => (e.source === id ? [e.target] : e.target === id ? [e.source] : []));

@@ -68,14 +68,16 @@ function RichText({ text }: { text: string }) {
 /** One of the user's messages; copy, edit and delete show on hover or focus. Editing makes the answer again. */
 function UserMessage({ item, sessionId }: { item: Extract<FeedItem, { type: 'user' }>; sessionId: string }) {
   const busy = useThread(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId), (a) => a.busy, false);
+  const [editing, setEditing] = useState(false);
+  // How many rows follow is shown only while editing: reading it for every message on every streamed token made the chat slower the longer it was.
   const later = useStore((s) => {
+    if (!editing) return 0;
     const feed = s.sessions[sessionId]?.feed ?? [];
     return feed.length - 1 - feed.findIndex((f) => f.id === item.id);
   });
   const current = useStore((s) => s.ui.workspace);
   // A message written in Studio's chat stays editable there, whatever the board shows (2026-10-24).
   const editable = item.workspace === current || current === 'chat';
-  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
   const save = () => {
     if (!draft.trim() && !item.attachments.length) return;
