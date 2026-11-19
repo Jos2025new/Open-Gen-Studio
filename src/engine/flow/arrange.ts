@@ -1,7 +1,8 @@
 import { uid } from '../../lib/id';
 import type { Graph, GraphEdge, GraphGroup, GraphNode, GenNodeData } from '../types';
-import { setGraph, toast, useStore } from '../../store/store';
-import { connect, connectionError, inputPorts, NODE_WIDTH, runsGeneration } from './graph';
+import { toast, useStore } from '../../store/store';
+import { editCompound, editPresentation } from '../nodecore/edit';
+import { connectionError, inputPorts, NODE_WIDTH, runsGeneration } from './graph';
 import { deleteNodes } from './actions';
 import { graphEditProblem } from './locks';
 
@@ -61,7 +62,7 @@ export function alignNodes(sessionId: string, ids: string[], mode: AlignMode, to
   const graph = get().sessions[sessionId]?.graph;
   if (!graph) return;
   const pos = alignPositions(graph, ids, mode, to, sizes);
-  if (pos.size) setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (pos.has(n.id) ? { ...n, position: pos.get(n.id)! } : n)) }));
+  if (pos.size) editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (pos.has(n.id) ? { ...n, position: pos.get(n.id)! } : n)) }));
 }
 
 /** The group every one of `ids` is in, when they are exactly one whole group. */
@@ -78,23 +79,23 @@ export function groupNodes(sessionId: string, ids: string[], title?: string): st
   const id = uid('grp');
   const n = (graph.groups?.length ?? 0) + 1;
   const kept = (graph.groups ?? []).map((g) => ({ ...g, nodeIds: g.nodeIds.filter((x) => !ids.includes(x)) })).filter((g) => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
-  setGraph(sessionId, (g) => ({ ...g, groups: [...kept, { id, title: title ?? `Group ${n}`, nodeIds: [...ids] }] }));
+  editPresentation(sessionId, (g) => ({ ...g, groups: [...kept, { id, title: title ?? `Group ${n}`, nodeIds: [...ids] }] }));
   return id;
 }
 
 export function ungroup(sessionId: string, groupId: string): void {
   const graph = get().sessions[sessionId]?.graph;
   if (graph?.groups?.some(g => g.id === groupId && 'detachedOutputs' in g)) { reattachOutputs(sessionId, groupId); return; }
-  setGraph(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).filter((x) => x.id !== groupId) }));
+  editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).filter((x) => x.id !== groupId) }));
 }
 
 export function renameGroup(sessionId: string, groupId: string, title: string): void {
   const t = title.trim().slice(0, 80);
-  if (t) setGraph(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, title: t } : x)) }));
+  if (t) editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, title: t } : x)) }));
 }
 
 export function setGroupColor(sessionId: string, groupId: string, color: string | undefined): void {
-  setGraph(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, color } : x)) }));
+  editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, color } : x)) }));
 }
 
 /** The frame around a group's nodes (flow coordinates), from their real sizes: it follows them as they move. */
@@ -110,7 +111,7 @@ export function groupBounds(graph: Graph, group: GraphGroup, sizes: Sizes, pad =
 
 /** Move every node of a group by (dx, dy). */
 export function moveGroup(sessionId: string, groupId: string, dx: number, dy: number): void {
-  setGraph(sessionId, (g) => {
+  editPresentation(sessionId, (g) => {
     const members = new Set(g.groups?.find((x) => x.id === groupId)?.nodeIds ?? []);
     return { ...g, nodes: g.nodes.map((n) => (members.has(n.id) ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n)) };
   });
@@ -170,16 +171,12 @@ export function pasteNodes(sessionId: string, at?: { x: number; y: number }): st
     const source = ids.get(e.source) ?? (graph.nodes.some((n) => n.id === e.source) ? e.source : undefined);
     const target = ids.get(e.target);
     if (!source || !target) continue;
-    const c = { source, target, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle };
-    const port = inputPorts(added.find((n) => n.id === target)!.data).find((p) => p.id === e.targetHandle);
-    if (port && !connectionError(next, st.assets, c)) {
-      const had = new Set(next.edges.map((x) => x.id));
-      next = connect(next, c);
-      // The copy keeps the revision its cable was pinned to, so an invalid reference stays invalid.
-      if (e.pin) next = { ...next, edges: next.edges.map((x) => (had.has(x.id) ? x : { ...x, pin: e.pin })) };
-    }
+    const c = { source, target, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle, kind: e.kind, both: e.both };
+    const port = (e.kind ?? 'data') === 'data' ? inputPorts(added.find((n) => n.id === target)!.data).find((p) => p.id === e.targetHandle) : {};
+    // The copy keeps the cable whole (kind, both, output, and the revision it was fixed to): a pasted invalid reference stays invalid.
+    if (port && !connectionError(next, st.assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), source, target }] };
   }
-  setGraph(sessionId, () => next);
+  editCompound(sessionId, 'paste', () => next);
   return added.map((n) => n.id);
 }
 
@@ -228,7 +225,7 @@ export function detachOutputs(sessionId: string, nodeId: string): string[] {
   const next = { ...graph, nodes: graph.nodes.flatMap(n => n.id === nodeId ? cards : [n]), edges: [...graph.edges, ...copied], groups: [...groups, group] };
   const problem = graphEditProblem(sessionId, graph, next);
   if (problem) { toast(problem, 'error'); return []; }
-  setGraph(sessionId, () => next);
+  editCompound(sessionId, 'detach-outputs', () => next);
   return group.nodeIds;
 }
 
@@ -272,6 +269,6 @@ export function reattachOutputs(sessionId: string, groupId: string): void {
   }
   const problem = graphEditProblem(sessionId, graph, next);
   if (problem) { toast(problem, 'error'); return; }
-  setGraph(sessionId, () => next);
+  editCompound(sessionId, 'reattach-outputs', () => next);
   if (skipped.length) toast(`Could not keep ${skipped.length} new connection(s): ${skipped.join('; ')}`, 'error');
 }

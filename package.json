@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "check": "node scripts/check-all.mjs",
-    "test": "tsc -b --noEmit && node scripts/check-safeguards.mjs && node scripts/check-protected.mjs && node scripts/check-docs.mjs && node scripts/check-sizes.mjs && node scripts/px-to-rem.mjs --check && node scripts/check-gui.mjs && node scripts/check-functions.mjs && node scripts/check-commands.mjs && node scripts/check-node-descriptors.mjs && node scripts/map.mjs && vitest run",
+    "test": "tsc -b --noEmit && node scripts/check-safeguards.mjs && node scripts/check-protected.mjs && node scripts/check-docs.mjs && node scripts/check-sizes.mjs && node scripts/px-to-rem.mjs --check && node scripts/check-gui.mjs && node scripts/check-functions.mjs && node scripts/check-commands.mjs && node scripts/check-node-descriptors.mjs && node scripts/check-graph-writes.mjs && node scripts/map.mjs && vitest run",
     "test:related": "node scripts/test-related.mjs",
     "map": "node scripts/map.mjs --write",
     "snapshot:models": "node scripts/model-snapshot.mjs",

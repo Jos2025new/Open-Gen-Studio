@@ -1,7 +1,8 @@
 import { claimLaneOfItem } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
-import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
+import { prepareNodeRun, previewRun } from '../flow/actions';
+import { runApproved } from '../nodecore/action';
 import { uid } from '../../lib/id';
 import { logEvent } from '../../lib/log';
 import { journeyIdFor, recordJourneyEvent } from '../../lib/journeyTrace';
@@ -16,8 +17,9 @@ import { graphToSteps, runsGeneration } from '../flow/graph';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { modelSummary } from '../catalog';
 import type { ChatMessageMeta } from '../feedMeta';
-import type { PlanFeedItem, PlanStep, StepState } from '../types';
-import { appendFeed, setGraph, toast, updateFeedItem } from '../../store/store';
+import type { GraphNodeData, PlanFeedItem, PlanStep, StepState } from '../types';
+import { appendFeed, toast, updateFeedItem } from '../../store/store';
+import { applyEdit } from '../nodecore/edit';
 import { WRAPUP_RULE } from './context';
 import { editPairParts, WRAPUP_COMPARE_RULE } from './wrapUpPairs';
 import { agentSeesImages, userMessage } from './attachments';
@@ -32,15 +34,10 @@ import { pushHistory } from './conversation';
 import { llmTurn } from './llmTurn';
 
 export function removeDraftNodes(sessionId: string, planId: string): void {
-  setGraph(sessionId, (g) => {
-    const drop = new Set(
-      g.nodes
-        .filter((n) => n.planId === planId && !(runsGeneration(n.data) && n.data.generationId))
-        .map((n) => n.id),
-    );
-    if (!drop.size) return g;
-    return { ...g, nodes: g.nodes.filter((n) => !drop.has(n.id)), edges: g.edges.filter((e) => !drop.has(e.source) && !drop.has(e.target)) };
-  });
+  const g = session(sessionId)?.graph;
+  const drop = g?.nodes.filter((n) => n.planId === planId && !(runsGeneration(n.data) && n.data.generationId)).map((n) => n.id) ?? [];
+  // Through the layer: a cable some other node had from a draft stays as an invalid cable, like any deletion.
+  if (drop.length) applyEdit({ session: sessionId, op: { op: 'delete', nodes: drop } });
 }
 
 // ---------------------------------------------------------------------------
@@ -130,9 +127,10 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
   }
   if (overLimit(preview.estimate, sessionId)) { updateFeedItem(sessionId, item.id, { estimate: preview.estimate, error: overLimitText(preview.estimate) }); return; }
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'running', error: undefined, stepStates: {} });
-  const result = await runNodes(sessionId, request.targets, preview, request.force, (id, state, info) => {
+  const record = await runApproved(sessionId, request.targets, request.force, preview, uid('run'), (id, state, info) => {
     updateFeedItem<PlanFeedItem>(sessionId, item.id, it => ({ ...it, stepStates: { ...it.stepStates, [id]: state }, stepGenerations: info?.generationId ? { ...it.stepGenerations, [id]: info.generationId } : it.stepGenerations }));
   });
+  const result = record.result;
   if (!result) {
     const next = previewRun(sessionId, request.targets, request.force);
     updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || rerunNote(next.estimate, sessionId) });
@@ -232,12 +230,8 @@ async function executePlanItem(
           appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: info.generationId });
         } else if (workspace === 'node') {
           const nodeId = stepId.startsWith(`${plan.id}_`) ? stepId : nodeOf(stepId);
-          setGraph(sessionId, (g) => ({
-            ...g,
-            nodes: g.nodes.map((n) =>
-              n.id === nodeId && runsGeneration(n.data) ? { ...n, data: { ...n.data, generationId: info.generationId } } : n,
-            ),
-          }));
+          const bound = session(sessionId).graph.nodes.find((n) => n.id === nodeId);
+          if (bound && runsGeneration(bound.data)) applyEdit({ session: sessionId, op: { op: 'set', node: nodeId, patch: { generationId: info.generationId } as Partial<GraphNodeData> } });
         }
       }
     },

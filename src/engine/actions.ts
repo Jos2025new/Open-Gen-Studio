@@ -35,12 +35,12 @@ import {
   patchSession,
   setComposer,
   setComposerMedia,
-  setGraph,
   setUi,
   toast,
   useStore,
 } from '../store/store';
 import { keptDrafts } from '../store/homeDrafts';
+import { applyEdit, editCompound } from './nodecore/edit';
 
 const get = useStore.getState;
 
@@ -404,7 +404,7 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   ];
   const nodes: GraphNode[] = [promptNode, ...refNodes.map(({ handle: _h, ...n }) => n), genNode];
   const pos = autoLayout(nodes, edges, origin);
-  setGraph(sessionId, (gr) => ({ ...gr, nodes: [...gr.nodes, ...nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }))], edges: [...gr.edges, ...edges] }));
+  editCompound(sessionId, 'from-generation', (gr) => ({ ...gr, nodes: [...gr.nodes, ...nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }))], edges: [...gr.edges, ...edges] }));
   runGeneration(g.id).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
   });
@@ -455,7 +455,7 @@ export async function regenerate(generationId: string): Promise<void> {
   const node = session?.graph.nodes.find((n) => runsGeneration(n.data) && n.data.generationId === g.id);
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
-    setGraph(g.sessionId, (gr) => ({ ...gr, nodes: gr.nodes.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, generationId: next.id, sketchAssetId: undefined } as GraphNode['data'] } : n)) }));
+    applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { generationId: next.id, sketchAssetId: undefined } as Partial<GraphNode['data']> } });
   } else {
     appendFeed(g.sessionId, { ...feedBase('chat'), type: 'generation', generationId: next.id });
   }
@@ -744,7 +744,7 @@ export function addAssetNode(sessionId: string, assetId: string, position?: { x:
   const pos = position ?? (bounds ? { x: bounds.x, y: bounds.y + bounds.h + 80 } : { x: 0, y: 0 });
   // A generated 3D model comes back as its own 3D node (see addAssetAsNode).
   if (get().assets[assetId]?.kind === 'model3d') return void import('./flow/actions').then((m) => m.addAssetAsNode(sessionId, assetId, pos));
-  setGraph(sessionId, (g) => ({ ...g, nodes: [...g.nodes, { id: uid('nd'), position: pos, data: { kind: 'asset', title: 'Asset', assetId } }] }));
+  applyEdit({ session: sessionId, op: { op: 'add', node: { id: uid('nd'), position: pos, data: { kind: 'asset', title: 'Asset', assetId } } } });
 }
 
 export function sendToNodes(assetId: string): void {

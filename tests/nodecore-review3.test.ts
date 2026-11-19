@@ -92,6 +92,9 @@ describe('review finding 8: affects, inspector and the descriptor check', () => 
     useStore.setState({ generations: { g1: { id: 'g1', status: 'done', assetIds: ['a'], inputs: { refs: [] }, prompt: 'x', settings } as never } });
     const run = async (id: string) => { const p = await prepareAction(HOME, ['gen']); if (!p.ok) throw new Error(p.errors.join()); execute.mockImplementationOnce(async (_s, ctx) => { ctx.onState('gen', 'running', { generationId: `n${id}` }); return { outputs: new Map(), failed: [], skipped: [], waiting: [] }; }); await runAction(p.snapshot, id); };
     await run('run-1'); await run('run-2');
+    // The result on the node is the one run-2 made: the inspector names the run by the generation, never by the node.
+    useStore.setState((st) => ({ generations: { ...st.generations, 'nrun-2': { id: 'nrun-2', status: 'done', assetIds: ['a'], inputs: { refs: [] }, prompt: 'x', settings } as never } }));
+    patchNodeData(HOME, 'gen', { generationId: 'nrun-2' } as never);
     expect(inspectNode(HOME, 'gen')!.lastRun).toMatchObject({ runId: 'run-2' });
   });
   it('the check asks for migrations once a type moves past version 1', () => {

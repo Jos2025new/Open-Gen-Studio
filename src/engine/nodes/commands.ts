@@ -139,11 +139,13 @@ export const commands = [
         both: z.boolean().optional(),
         source_handle: z.string().min(1).max(80).optional(),
         target_handle: z.string().min(1).max(80).optional(),
+        replaces: z.string().min(1).max(80).nullable().optional(),
       })
       .strict(),
     effect: 'write',
     run: (on, args) => {
       const res = linkSystemNodes(on.session, {
+        replaces: args.replaces ?? null,
         source: args.source,
         target: args.target,
         kind: args.kind,

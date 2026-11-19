@@ -36,7 +36,8 @@ import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from 
 import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
-import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
+import { addAssets, addSpend, patchAsset, patchGeneration, updateFeedItem, upsertGeneration, useStore } from '../store/store';
+import { applyEdit } from './nodecore/edit';
 import { consumeOnce, noteExcess } from './budget';
 
 const get = useStore.getState;
@@ -854,11 +855,9 @@ function relinkAttempt(oldId: string, newId: string): void {
   for (const [sessionId, session] of Object.entries(useStore.getState().sessions)) {
     const nodes = session.graph?.nodes ?? [];
     if (nodes.some((n) => 'generationId' in n.data && n.data.generationId === oldId)) {
-      setGraph(sessionId, (gr) => ({
-        ...gr,
-        nodes: gr.nodes.map((n): GraphNode => ('generationId' in n.data && n.data.generationId === oldId
-          ? { ...n, data: { ...n.data, generationId: newId } as GraphNode['data'] } : n)),
-      }));
+      for (const n of nodes) {
+        if ('generationId' in n.data && n.data.generationId === oldId) applyEdit({ session: sessionId, op: { op: 'set', node: n.id, patch: { generationId: newId } as Partial<GraphNode['data']> } });
+      }
     }
     for (const item of session.feed) {
       if (item.type === 'generation' && item.generationId === oldId) {

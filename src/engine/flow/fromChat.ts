@@ -2,7 +2,8 @@ import { canvasIndex } from '../canvas';
 import { OPS } from '../ops';
 import { uid } from '../../lib/id';
 import type { Generation, GraphEdge, GraphNode, GraphNodeData } from '../types';
-import { setGraph, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
+import { editCompound } from '../nodecore/edit';
 import { autoLayout, NODE_WIDTH } from './graph';
 
 const get = () => useStore.getState();
@@ -106,6 +107,6 @@ export function chatToNodes(sessionId: string, only?: string[]): { added: GraphN
   const top = s.graph.nodes.reduce((y, n) => Math.min(y, n.position.y), Infinity);
   const pos = autoLayout(nodes, edges, { x: Number.isFinite(right) ? right + 200 : 0, y: Number.isFinite(top) ? top : 0 });
   for (const n of nodes) n.position = pos.get(n.id) ?? n.position;
-  setGraph(sessionId, (graph) => ({ ...graph, nodes: [...graph.nodes, ...nodes], edges: [...graph.edges, ...edges] }));
+  editCompound(sessionId, 'from-chat', (graph) => ({ ...graph, nodes: [...graph.nodes, ...nodes], edges: [...graph.edges, ...edges] }));
   return { added: nodes, edges };
 }

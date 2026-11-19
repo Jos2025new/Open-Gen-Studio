@@ -1,6 +1,7 @@
 import { reconcileDeletionNotices, setComposer, useStore } from '../../store/store';
+import { editCompound } from '../nodecore/edit';
 import { selectDoc } from '../design/actions';
-import type { AgentStyle, ComposerMode, Graph, GraphEdge, GraphNode, RefNodeData, SystemNodeType } from '../types';
+import type { AgentStyle, ComposerMode, GraphEdge, GraphNode, RefNodeData, SystemNodeType } from '../types';
 import { estimatedHeight, findFreePosition, NODE_WIDTH, nodeRect, rectsOverlap, type NodeRect } from '../flow/graph';
 import { COL, ROW, addSystemNode, ensureSystemNodes, linkSystemNodes, sysOrigin } from './system';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, type OmniSpace } from './omniSpaces';
@@ -14,13 +15,6 @@ const PER_ROW = 5;
 export const OMNI_SPACE_Y = -420;
 /** A loose asset this far (flow px) from the main parts is brought next to them when the omnicanvas opens. */
 const FAR_FROM_MAIN = 900;
-
-function writeGraph(sessionId: string, graph: Graph): void {
-  useStore.setState((s) => {
-    const cur = s.sessions[sessionId];
-    return cur ? { sessions: { ...s.sessions, [sessionId]: { ...cur, graph } } } : s;
-  });
-}
 
 /**
  * Open the omnicanvas for a session: its parts as nodes (chat, agent, models, docs), one Studio, one Nodes and one
@@ -123,7 +117,8 @@ export function ensureOmniNodes(sessionId: string): string[] {
   const idsChanged = (omniAtIds?.length ?? 0) !== (graph.omniAtIds?.length ?? 0)
     || Boolean(omniAtIds?.some((id, i) => id !== graph.omniAtIds?.[i]));
   if (moved || nodes.length !== graph.nodes.length || edges.length !== graph.edges.length || omniAt !== graph.omniAt || idsChanged) {
-    writeGraph(sessionId, { ...graph, nodes, edges, ...(omniAt !== undefined ? { omniAt, omniAtIds } : {}) });
+    // The omnicanvas keeps its own parts in step: no undo step.
+    editCompound(sessionId, 'omni-nodes', () => ({ ...graph, nodes, edges, ...(omniAt !== undefined ? { omniAt, omniAtIds } : {}) }), { silent: true });
   }
   reconcileDeletionNotices(sessionId);
   return added;
@@ -143,8 +138,8 @@ const patchRef = (sessionId: string, nodeId: string, change: (d: RefNodeData) =>
   if (!graph || !node) return `No such node: ${nodeId}.`;
   if (node.data.kind !== 'ref') return `${nodeId} is not a system node.`;
   const data = change(node.data);
-  writeGraph(sessionId, { ...graph, nodes: graph.nodes.map((n) => (n.id === nodeId ? { ...n, data } : n)) });
-  return null;
+  // A look the user chose: kept without an undo step (a key the change dropped stays dropped).
+  return editCompound(sessionId, 'system-view', (g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === nodeId ? { ...n, data } : n)) }), { silent: true });
 };
 
 /** The system nodes each Space generates and needs to work (user rule 2026-11-17); they show when it is opened. */

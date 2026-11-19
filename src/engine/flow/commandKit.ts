@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { registerHistory } from '../commands/history';
 import { defineCommand, type Availability, type CommandContext, type CommandSpec, type Target } from '../commands/types';
-import { patchSession, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
+import { applyEdit } from '../nodecore/edit';
 import type { Estimate, Graph, GraphNode } from '../types';
 import { openHistoryGroup } from './history';
 
@@ -55,7 +56,8 @@ export function hasTarget(ctx: CommandContext, args?: Named): Availability {
   if (!graph) return NO_SESSION;
   const missingNode = mentionedNodes.find((id) => !graph.nodes.some((n) => n.id === id));
   if (missingNode) return missingNode.startsWith('sys_') && !graph.nodes.some((n) => n.data.kind === 'ref') ? 'The system nodes are not on the canvas yet: run nodes.system.ensure first.' : `No such node: ${missingNode}.`;
-  const missingEdge = mentionedEdges.find((id) => !graph.edges.some((e) => e.id === id));
+  // An invalid cable left behind by a deleted node can still be named: it is removed through the same command.
+  const missingEdge = mentionedEdges.find((id) => !graph.edges.some((e) => e.id === id) && !graph.broken?.some((b) => b.edge.id === id));
   return missingEdge ? `No such edge: ${missingEdge}.` : true;
 }
 
@@ -88,7 +90,7 @@ registerHistory('nodes', {
       commit: () => group.close(),
       rollback: () => {
         const back = group.revert() ?? before;
-        if (back) patchSession(sessionId, (s) => ({ ...s, graph: back }));
+        if (back) applyEdit({ session: sessionId, op: { op: 'travel', graph: back, silent: true } });
       },
     };
   },

@@ -7,6 +7,7 @@ import type { GenSettings, GraphEdge, GraphNode, GraphNodeData, OpId } from '../
 import { budgetProblem } from '../actions';
 import * as A from './actions';
 import { applyEdit } from '../nodecore/edit';
+import { prepareAction, runAction } from '../nodecore/action';
 import { ownerRev } from '../nodecore/revision';
 import { edgeRef, findNode, graphOf, hasTarget, nodeCommand, nodeOf, nodeRef } from './commandKit';
 
@@ -14,7 +15,7 @@ import { edgeRef, findNode, graphOf, hasTarget, nodeCommand, nodeOf, nodeRef } f
 
 const none = z.object({}).strict();
 const kind = z.enum(['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset', 'ref']);
-const sysType = z.enum(['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset']);
+const sysType = z.enum(['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset', 'prompt', 'mediaSettings']);
 const linkKind = z.enum(['data', 'ref', 'control']);
 const attachMode = z.enum(['wired', 'docked', 'grouped', 'merged']);
 const op = z.enum(OP_IDS as [OpId, ...OpId[]]);
@@ -53,6 +54,11 @@ const refNode = z
     dockedTo: z.string().optional(),
     mergedModels: z.array(z.string()).optional(),
     mediaKind: z.enum(['llm', 'image', 'video', 'audio', 'model3d']).optional(),
+    llm: z.object({ provider: z.string(), model: z.string() }).strict().optional(),
+    recipient: z.string().optional(),
+    promptText: z.string().optional(),
+    view: z.enum(['thumb', 'node']).optional(),
+    undocked: z.boolean().optional(),
   })
   .strict();
 /** A node's data as the actions take it. The graph stores plain JSON; settings and params keep their own shape. */
@@ -60,13 +66,17 @@ const nodeData = z.discriminatedUnion('kind', [textNode, genNode, toolNode, asse
 
 const nodePatch = z
   .object({
-    kind: kind.optional(),
     type: sysType.optional(),
     ref: z.string().optional(),
     attachMode: attachMode.optional(),
     dockedTo: z.string().optional(),
     mergedModels: z.array(z.string()).optional(),
     mediaKind: z.enum(['llm', 'image', 'video', 'audio', 'model3d']).optional(),
+    llm: z.object({ provider: z.string(), model: z.string() }).strict().optional(),
+    recipient: z.string().optional(),
+    promptText: z.string().optional(),
+    view: z.enum(['thumb', 'node']).optional(),
+    undocked: z.boolean().optional(),
     title: title.optional(),
     text: z.string().optional(),
     prompt: z.string().optional(),
@@ -94,6 +104,7 @@ const storedEdge = z
     outputIndex: z.number().int().optional(),
     kind: linkKind.optional(),
     both: z.boolean().optional(),
+    pin: z.string().optional(),
   })
   .strict();
 
@@ -105,17 +116,10 @@ function edgeAfter(on: { session: string }, before: Set<string>): string | null 
   return graphOf(on).edges.find((e) => !before.has(e.id))?.id ?? null;
 }
 
-/**
- * What a caller can know without reading: a node a command made, and the revision its own last edit left. A later
- * `nodes.node.edit` may omit `expect` only while the node is still exactly that; anything else changed it, and a
- * draft written from an older read must not overwrite it.
- */
-const known = new Map<string, string>();
-const keyOf = (session: string | undefined, node: string) => `${session}:${node}`;
-function born<T extends string | null | undefined>(on: { session?: string }, node: T): T {
+/** A command that makes or changes a node hands back its revision: the next edit names it (`expect`), nobody edits blind. */
+function revOf<T extends string | null | undefined>(on: { session?: string }, node: T): { node: T; rev: string | null } {
   const graph = useStore.getState().sessions[on.session ?? '']?.graph;
-  if (node && graph) known.set(keyOf(on.session, node), ownerRev(graph, node));
-  return node;
+  return { node, rev: node && graph ? ownerRev(graph, node) : null };
 }
 
 export const commands = [
@@ -135,7 +139,7 @@ export const commands = [
     description: 'Adds a node with this data at this position. Returns {node}.',
     args: z.object({ data: nodeData, position: point }).strict(),
     effect: 'write',
-    run: (on, args) => ({ node: born(on, A.addNode(on.session, args.data as GraphNodeData, args.position)) }),
+    run: (on, args) => revOf(on, A.addNode(on.session, args.data as GraphNodeData, args.position)),
   }),
   nodeCommand({
     id: 'nodes.node.add_asset',
@@ -144,7 +148,7 @@ export const commands = [
     args: z.object({ asset, position: point }).strict(),
     effect: 'write',
     available: (ctx, args) => (args?.asset && !useStore.getState().assets[args.asset] ? `No asset "${args.asset}".` : hasTarget(ctx)),
-    run: (on, args) => ({ node: born(on, A.addAssetAsNode(on.session, args.asset, args.position)) }),
+    run: (on, args) => revOf(on, A.addAssetAsNode(on.session, args.asset, args.position)),
   }),
   nodeCommand({
     id: 'nodes.node.add_connected',
@@ -156,26 +160,20 @@ export const commands = [
     run: (on, args) => {
       const node = A.addConnected(on.session, args.source, args.data as GraphNodeData, args.at, args.source_handle ?? null);
       if (!node) throw new Error('The node could not be connected: no input port fits its output there.');
-      return { node };
+      return revOf(on, node);
     },
   }),
   nodeCommand({
     id: 'nodes.node.edit',
     title: 'Change node',
-    description: 'Merges these fields into a node\'s data (title, prompt, text, modelRef, settings, params, op, assetId…). `expect` is the node revision you read (nodes.node.inspect); a stale one is refused. It may be left out only for a node a command of yours made and nobody changed since.',
-    args: z.object({ node: nodeRef, patch: nodePatch, expect: z.string().min(1).max(80).optional() }).strict(),
+    description: 'Merges these fields into a node\'s data (title, prompt, text, modelRef, settings, params, op, assetId…; never its kind). `expect` is the node revision you read (nodes.node.inspect, or the rev a command returned); a stale or missing one is refused. Returns {node, rev}.',
+    args: z.object({ node: nodeRef, patch: nodePatch, expect: z.string().min(1).max(80) }).strict(),
     effect: 'write',
     run: (on, args) => {
-      const key = keyOf(on.session, args.node);
-      const graph = graphOf(on);
       nodeOf(on, args.node);
-      // Without `expect` this only works on a node this caller made and nobody changed since.
-      const blind = args.expect === undefined;
-      if (blind && known.get(key) !== ownerRev(graph, args.node)) throw new Error(`Say which revision of "${args.node}" you read (expect, from nodes.node.inspect): this edit does not run blind.`);
-      const done = applyEdit({ session: on.session!, ...(blind ? {} : { require: true, expect: { [args.node]: args.expect! } }), op: { op: 'set', node: args.node, patch: args.patch as Partial<GraphNodeData> } });
+      const done = applyEdit({ session: on.session!, require: true, expect: { [args.node]: args.expect }, op: { op: 'set', node: args.node, patch: args.patch as Partial<GraphNodeData>, strict: true } });
       if (!done.ok) throw new Error(done.error);
-      if (blind) born(on, args.node);
-      return { node: args.node };
+      return revOf(on, args.node);
     },
   }),
   nodeCommand({
@@ -221,7 +219,7 @@ export const commands = [
     description: 'A copy with the same parameters and connections, offset; it gets no result of its own. Returns {node}.',
     args: z.object({ node: nodeRef }).strict(),
     effect: 'write',
-    run: (on, args) => ({ node: born(on, A.duplicateNode(on.session, nodeOf(on, args.node))) }),
+    run: (on, args) => revOf(on, A.duplicateNode(on.session, nodeOf(on, args.node))),
   }),
   nodeCommand({
     id: 'nodes.node.set_model',
@@ -302,7 +300,7 @@ export const commands = [
   nodeCommand({
     id: 'nodes.edge.connect',
     title: 'Connect nodes',
-    description: 'Connects a source to a target input port (target_handle) with optional link class (data, ref, control) and bidirectional flag (both); an occupied single-input port is replaced. Returns {edge}.',
+    description: 'Connects a source to a target input port (target_handle) with optional link class (data, ref, control) and bidirectional flag (both); an occupied single-input port is refused unless `replaces` names the cable to replace. Returns {edge}.',
     args: z
       .object({
         source: nodeRef,
@@ -311,6 +309,7 @@ export const commands = [
         source_handle: z.string().min(1).max(80).nullable().optional(),
         kind: linkKind.optional(),
         both: z.boolean().optional(),
+        replaces: z.string().min(1).max(80).nullable().optional(),
       })
       .strict(),
     effect: 'write',
@@ -324,6 +323,8 @@ export const commands = [
           sourceHandle: args.source_handle ?? null,
           kind: args.kind,
           both: args.both,
+          // Not seeing the port, a command must name the cable it replaces; an occupied port without it is refused.
+          replaces: args.replaces ?? null,
         }),
       );
       return { edge: edgeAfter(on, before) };
@@ -377,11 +378,12 @@ export const commands = [
     effect: 'spend',
     estimate: (on, args) => A.previewRun(on.session, args.targets, args.force ?? true).estimate,
     run: async (on, args) => {
-      const preview = await A.prepareNodeRun(on.session, args.targets, args.force ?? true);
-      if (preview.errors.length) throw new Error(preview.errors[0]);
-      const problem = budgetProblem(preview.estimate, on.session);
+      // The same registry as nodes.action.*: one approval, one send, and the inspector can tell which run made which result.
+      const prepared = await prepareAction(on.session, args.targets, args.force ?? true);
+      if (!prepared.ok) throw new Error(prepared.errors[0]);
+      const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session);
       if (problem) throw new Error(problem);
-      const started = await A.runNodes(on.session, args.targets, preview, args.force ?? true);
+      const started = (await runAction(prepared.snapshot)).result;
       if (!started) throw new Error('The graph changed after it was reviewed; review it again.');
       return { outputs: Object.fromEntries(started.outputs), failed: started.failed, skipped: started.skipped, waiting: started.waiting, ...(started.stopped ? { stopped: true } : {}) };
     },

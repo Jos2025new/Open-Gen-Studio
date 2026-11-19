@@ -60,7 +60,7 @@ export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): 
     case 'asset':
       return data.assetId ? assets[data.assetId]?.kind ?? null : null;
     case 'ref':
-      if (data.type === 'chat' || data.type === 'agent') return 'text';
+      if (data.type === 'chat' || data.type === 'agent' || data.type === 'prompt') return 'text';
       if (data.type === 'designer.doc' || data.type === 'space' || data.type === 'library') return 'image';
       return null;
   }
@@ -129,7 +129,7 @@ function usesSystemPorts(
   return (
     src.data.kind === 'ref' ||
     tgt.data.kind === 'ref' ||
-    c.kind != null ||
+    (c.kind != null && c.kind !== 'data') ||
     Boolean(c.both) ||
     Boolean(c.targetHandle && ['sys_ref', 'model', 'control'].includes(c.targetHandle)) ||
     Boolean(c.sourceHandle && ['out_ref', 'out_control'].includes(c.sourceHandle))
@@ -392,8 +392,9 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     if (checked.has(id) && (!effectiveForced || checked.get(id))) return checked.get(id)!;
     if (!runsGeneration(n.data)) return false;
     visiting.add(id);
-    const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' ? [p.id] : []; }) : [];
-    const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id && !unusable(id).has(e.id)).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
+    // A subject whose source was deleted is reported by the preview as a missing input, not walked.
+    const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' && byId.has(p.id) ? [p.id] : []; }) : [];
+    const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id && !unusable(id).has(e.id) && e.pin == null).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
     visiting.delete(id);
     const needsRun = effectiveForced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
     checked.set(id, needsRun);
@@ -406,21 +407,22 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   targets.forEach(t => visit(t, options.force !== false));
 
   /** `index`: the result the link uses (edge.outputIndex); unset = the node's chosen result. */
-  const refFor = (sourceId: string, index?: number): string | null => {
+  const refFor = (sourceId: string, index?: number, pinned = false): string | null => {
     const n = byId.get(sourceId);
     if (!n || n.data.kind === 'text') return null;
     // A link whose image was deleted delivers nothing, even when its source runs in this batch (never `source#0`).
     if (index === NO_RESULT) { errors.push(`The link from "${n.data.title}" has no output: its image was deleted. Connect it again.`); return null; }
     // A 3D source gives its view image (rendered when the model is shown or its view changes).
     if (n.data.kind === 'model3d' || (n.data.kind === 'asset' && options.assets?.[n.data.assetId ?? '']?.kind === 'model3d')) {
-      if (run.has(sourceId)) { errors.push(`Run "${n.data.title}" first: its view image is made from the finished model.`); return null; }
+      if (!pinned && run.has(sourceId)) { errors.push(`Run "${n.data.title}" first: its view image is made from the finished model.`); return null; }
       const model = nodeOutputAsset(n, generations), view = model ? options.assets?.[model]?.viewImageId : undefined;
       if (view) return `asset:${view}`;
       errors.push(`"${n.data.title}" has no view image yet. Wait a moment for its preview to render, then run again.`);
       return null;
     }
     const at = index ?? ('outputIndex' in n.data ? n.data.outputIndex : 0);
-    if (run.has(sourceId)) return at ? `${sourceId}#${at + 1}` : sourceId;
+    // A cable fixed to a finished revision takes that result as it is: the source is not run for it.
+    if (!pinned && run.has(sourceId)) return at ? `${sourceId}#${at + 1}` : sourceId;
     const asset = nodeOutputAsset(n, generations, at);
     if (asset) return `asset:${asset}`;
     errors.push(`"${n.data.title}" has no output yet.`);
@@ -461,7 +463,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     if (d.kind === 'image' || d.kind === 'model3d') {
       const refs = inEdges
         .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
-        .map((e) => refFor(e.source, e.outputIndex))
+        .map((e) => refFor(e.source, e.outputIndex, e.pin != null))
         .filter((r): r is string => Boolean(r));
       steps.push({ id, kind: d.kind, title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep | Model3dStep);
     } else if (d.kind === 'video') {
@@ -469,7 +471,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       const last = inEdges.find((e) => e.targetHandle === 'last');
       const refs = inEdges
         .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo' || e.targetHandle === 'audio')
-        .map((e) => refFor(e.source, e.outputIndex))
+        .map((e) => refFor(e.source, e.outputIndex, e.pin != null))
         .filter((r): r is string => Boolean(r));
       steps.push({
         id,
@@ -479,8 +481,8 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
         promptFrom,
         modelRef: d.modelRef,
         settings: d.settings,
-        firstFrame: first ? refFor(first.source, first.outputIndex) ?? undefined : undefined,
-        lastFrame: last ? refFor(last.source, last.outputIndex) ?? undefined : undefined,
+        firstFrame: first ? refFor(first.source, first.outputIndex, first.pin != null) ?? undefined : undefined,
+        lastFrame: last ? refFor(last.source, last.outputIndex, last.pin != null) ?? undefined : undefined,
         refs: refs.length ? refs : undefined,
       } satisfies VideoStep);
     } else if (d.kind === 'audio') {
@@ -497,7 +499,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       } satisfies AudioStep);
     } else if (d.kind === 'tool') {
       const input = inEdges.find((e) => e.targetHandle === 'input');
-      const ref = input ? refFor(input.source, input.outputIndex) : null;
+      const ref = input ? refFor(input.source, input.outputIndex, input.pin != null) : null;
       if (!ref) errors.push(`"${d.title}" needs an ${OPS[d.op].input} input.`);
       steps.push({ id, kind: 'op', title: d.title, op: d.op, input: ref ?? '', params: d.params } satisfies OpStep);
     }

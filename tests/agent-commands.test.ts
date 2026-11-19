@@ -42,7 +42,7 @@ beforeEach(() => {
 const chain = [
   { cmd: 'nodes.node.new_data', args: { kind: 'text' } },
   { cmd: 'nodes.node.add', args: { data: '$1', position: { x: 0, y: 0 } } },
-  { cmd: 'nodes.node.edit', args: { node: '$2.node', patch: { title: 'Prompt', text: 'Hola' } } },
+  { cmd: 'nodes.node.edit', args: { node: '$2.node', expect: '$2.rev', patch: { title: 'Prompt', text: 'Hola' } } },
 ];
 
 describe('find_commands', () => {
@@ -159,11 +159,11 @@ describe('run_commands', () => {
     const seq = [
       { cmd: 'nodes.node.new_data', args: { kind: 'image' } },
       { cmd: 'nodes.node.add', args: { data: '$1', position: { x: 0, y: 0 } } },
-      { cmd: 'nodes.node.edit', args: { node: '$2.node', patch: { prompt: 'first cat', modelRef: 'fal::test-image', settings: { count: 2, advanced: {} } } } },
+      { cmd: 'nodes.node.edit', args: { node: '$2.node', expect: '$2.rev', patch: { prompt: 'first cat', modelRef: 'fal::test-image', settings: { count: 2, advanced: {} } } } },
       { cmd: 'nodes.run.start', args: { targets: ['$2.node'] } },
       { cmd: 'nodes.node.new_data', args: { kind: 'image' } },
       { cmd: 'nodes.node.add', args: { data: '$5', position: { x: 300, y: 0 } } },
-      { cmd: 'nodes.node.edit', args: { node: '$6.node', patch: { prompt: 'second cat', modelRef: 'fal::test-image', settings: { count: 1, advanced: {} } } } },
+      { cmd: 'nodes.node.edit', args: { node: '$6.node', expect: '$6.rev', patch: { prompt: 'second cat', modelRef: 'fal::test-image', settings: { count: 1, advanced: {} } } } },
       { cmd: 'nodes.run.start', args: { targets: ['$6.node'] } },
     ];
     const pendingRun = runCommandsTool(sid, { seq });

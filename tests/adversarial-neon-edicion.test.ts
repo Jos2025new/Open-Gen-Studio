@@ -67,17 +67,18 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
       { cmd: 'nodes.node.add', args: { data: imageNode('tmp').data, position: pos }, on: { session: sid } },
       { caller: 'agent' },
     );
-    const { node } = added.results[0] as { node: string };
+    const { node, rev } = added.results[0] as { node: string; rev: string };
 
+    // Both commands name the revision they read (the one the add returned): the first wins, the delayed one is stale.
     const newer = await run(
-      { cmd: 'nodes.node.edit', args: { node, patch: { settings: { count: 3, advanced: {} } } }, on: { session: sid } },
+      { cmd: 'nodes.node.edit', args: { node, expect: rev, patch: { settings: { count: 3, advanced: {} } } }, on: { session: sid } },
       { caller: 'agent' },
     );
     expect(newer.ok).toBe(true);
 
-    // Delayed command carrying an older draft (count: 1) without expect must not overwrite count: 3.
+    // Delayed command carrying an older draft (count: 1) and the older revision must not overwrite count: 3.
     const delayed = await run(
-      { cmd: 'nodes.node.edit', args: { node, patch: { settings: { count: 1, aspect: '16:9', advanced: {} } } }, on: { session: sid } },
+      { cmd: 'nodes.node.edit', args: { node, expect: rev, patch: { settings: { count: 1, aspect: '16:9', advanced: {} } } }, on: { session: sid } },
       { caller: 'agent' },
     );
     expect(delayed.ok).toBe(false);

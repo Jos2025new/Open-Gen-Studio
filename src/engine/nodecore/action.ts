@@ -3,7 +3,6 @@ import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { useStore } from '../../store/store';
 import type { ExecResult } from '../executor';
 import { prepareNodeRun, runNodes, type NodeRunPreview } from '../flow/actions';
-import { digest } from './address';
 import { resolveInputs, storeEnv } from './resolver';
 
 /*
@@ -25,6 +24,7 @@ export interface ActionSnapshot {
   at: number;
 }
 
+type StepStateHook = Parameters<typeof runNodes>[4];
 export type RunStatus = 'running' | 'done' | 'failed' | 'stale';
 export interface ActionRecord {
   runId: string;
@@ -81,29 +81,37 @@ function settle(runId: string, patch: Partial<ActionRecord>) {
 
 /** The snapshot of a preview the user reviewed in the interface: the approval is the signature they saw. */
 export function adoptPreview(session: string, targets: string[], force: boolean, preview: NodeRunPreview): ActionSnapshot {
-  const id = `appr:${session}:${digest(`${preview.signature}|${force ? 1 : 0}|${targets.join(',')}`)}`;
+  const id = uid('appr');
   const snapshot: ActionSnapshot = { id, session, targets: [...targets], force, preview, pins: pinsFor(session, [...preview.runIds, ...preview.inputIds]), at: Date.now() };
   snapshots.set(id, snapshot);
   return snapshot;
 }
 
-/** The interface's Run buttons: the reviewed preview runs through the same registry, under the id of this confirmation. */
-export const runApproved = (session: string, targets: string[], force: boolean, preview: NodeRunPreview, runId: string) => runAction(adoptPreview(session, targets, force, preview), runId);
+/**
+ * The interface's Run buttons: the reviewed preview runs through the same registry, under the id of this confirmation.
+ * Each confirmation is its own approval; the same confirmation clicked twice gets the run it already started.
+ */
+export function runApproved(session: string, targets: string[], force: boolean, preview: NodeRunPreview, runId: string, onState?: StepStateHook): Promise<ActionRecord> {
+  const known = ledger.get(runId);
+  if (known && known.session === session && known.targets.join(',') === targets.join(',')) return known.done;
+  return runAction(adoptPreview(session, targets, force, preview), runId, onState);
+}
 
 /**
  * Run a snapshot under a run id. An id that is known is never sent again, whatever happened to it: running gives the
  * same run, done and failed give their record (a failed or interrupted send may have reached the provider, so the
  * state is kept as it is). Trying again means a new approval and a new id. An id belongs to one approval only.
  */
-export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')): Promise<ActionRecord> {
+export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), onState?: StepStateHook): Promise<ActionRecord> {
   const known = ledger.get(runId);
   if (known) {
     if (known.approval !== snapshot.id) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: 'This run id belongs to another approval; approve again and use a new id.' });
     return known.done;
   }
-  // An approval whose send failed may have reached the provider: a new run id does not buy a second send.
-  const spent = [...ledger.values()].find((r) => r.approval === snapshot.id && r.status === 'failed' && r.sends > 0);
-  if (spent) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: `The earlier send under this approval may have reached the provider (${spent.runId}); prepare the action again.` });
+  // An approval pays for one send, whether it ended well or badly (a failed send may have reached the provider too):
+  // a new run id does not buy a second one. Trying again means preparing again and approving again.
+  const spent = [...ledger.values()].find((r) => r.approval === snapshot.id && (r.sends > 0 || r.status === 'running'));
+  if (spent) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: `This approval was already used (${spent.runId}); prepare the action again and approve it again.` });
   const session = useStore.getState().sessions[snapshot.session];
   const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, seq: ++counter, done: undefined as never };
   ledger.set(runId, record);
@@ -115,7 +123,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
     const moved = Object.entries(snapshot.pins).find(([key, rev]) => pinsFor(snapshot.session, [key.split('.')[0]])[key] !== rev);
     if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${moved[0].split(':')[0]}). Review it again.` }); return finish(); }
     try {
-      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (_step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } });
+      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } onState?.(step, state, info); });
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }
       settle(runId, { status: result.failed.length ? 'failed' : 'done', result, ...(result.failed.length ? { error: result.failed[0].error } : {}) });
     } catch (err) {
@@ -127,10 +135,12 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
   return record.done;
 }
 
-/** The run that produced this generation; when none is known (an older result), the latest run that sent something, else the latest attempt. */
-export function lastRunFor(session: string, node: string, generationId?: string): ActionRecord | undefined {
-  const mine = [...ledger.values()].filter((r) => r.session === session && r.targets.includes(node)).sort((a, b) => b.seq - a.seq);
-  const producer = generationId ? mine.find((r) => r.generationIds?.includes(generationId)) : undefined;
-  if (producer) return producer;
-  return mine.find((r) => r.sends > 0) ?? mine[0];
+/** The run that produced this generation, found by the generation itself (an ancestor run inside a downstream batch counts); none when no run of this app session did. */
+export function lastRunFor(session: string, generationId: string): ActionRecord | undefined {
+  return [...ledger.values()].filter((r) => r.session === session && r.generationIds?.includes(generationId)).sort((a, b) => b.seq - a.seq)[0];
+}
+
+/** The latest attempt that targeted this node (whatever it produced): what the inspector shows next to a result that came from elsewhere. */
+export function lastAttemptFor(session: string, node: string): ActionRecord | undefined {
+  return [...ledger.values()].filter((r) => r.session === session && r.targets.includes(node)).sort((a, b) => b.seq - a.seq)[0];
 }

@@ -27,7 +27,8 @@ export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): st
 export function coreSignature(graph: Graph, ids: string[]) {
   const env = storeEnv();
   return ids.map((id) => {
-    const n = graph.nodes.find((x) => x.id === id)!;
+    const n = graph.nodes.find((x) => x.id === id);
+    if (!n) return [id, 'missing'];
     return [id, descriptorOf(n.data.kind)?.version, resolveInputs(graph, n, env).map((i) => [i.port, i.edgeId, i.revision, i.status])];
   });
 }

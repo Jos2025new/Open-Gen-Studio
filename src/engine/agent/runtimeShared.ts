@@ -17,7 +17,8 @@ import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, line
 import type { AgentQuestion, AgentState, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, PlanStep, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
 import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
 import { placeFor } from '../place';
-import { appendFeed, patchSession, setGraph, toast, updateFeedItem, useStore } from '../../store/store';
+import { appendFeed, patchSession, toast, updateFeedItem, useStore } from '../../store/store';
+import { editCompound } from '../nodecore/edit';
 import { suggestModel } from './modelIndex';
 import { recordMetric } from './metrics';
 import { gateOps } from './force';
@@ -382,7 +383,7 @@ function materializeNodes(sessionId: string, plan: Plan): void {
   const bounds = graphBounds(graph.nodes);
   const origin = bounds ? { x: bounds.x + bounds.w + 160, y: bounds.y } : { x: 0, y: 0 };
   const positions = autoLayout(nodes, edges, origin);
-  setGraph(sessionId, (g) => ({
+  editCompound(sessionId, 'plan-nodes', (g) => ({
     ...g,
     nodes: [...g.nodes, ...nodes.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position }))],
     edges: [...g.edges, ...edges],

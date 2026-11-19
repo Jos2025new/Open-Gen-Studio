@@ -5,7 +5,7 @@ import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
 import { routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
-import { graphEditProblem, lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
+import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
 import { placeFor } from '../place';
 import { uid } from '../../lib/id';
@@ -14,11 +14,11 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, MediaKind, OpId, SystemNodeType } from '../types';
 import { SYSTEM_NODE_TYPES } from '../nodes/system';
-import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
-import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
+import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
+import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
-import { applyEdit, editError } from '../nodecore/edit';
+import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
 import { storeEnv } from '../nodecore/resolver';
 
@@ -83,18 +83,8 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
 
 export function addNode(sessionId: string, data: GraphNodeData, position: { x: number; y: number }): string {
   const id = uid('nd');
-  setGraph(sessionId, (g) => ({ ...g, nodes: [...g.nodes, { id, position, data }] }));
+  applyEdit({ session: sessionId, op: { op: 'add', node: { id, position, data } } });
   return id;
-}
-
-function editGraph(sessionId: string, change: (g: import('../types').Graph) => import('../types').Graph): string | null {
-  const graph = get().sessions[sessionId]?.graph;
-  if (!graph) return 'No such session.';
-  const next = change(graph);
-  const error = graphEditProblem(sessionId, graph, next);
-  if (error) { toast(error, 'error'); return error; }
-  setGraph(sessionId, () => next);
-  return null;
 }
 
 export function patchNodeData(sessionId: string, nodeId: string, patch: Partial<GraphNodeData>): string | null {
@@ -131,15 +121,16 @@ export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenN
   if (!model && !patch.modelRef.startsWith('local::')) return `Unknown model: ${patch.modelRef}.`;
   if (model && model.kind !== node.data.kind) return `${model.name} produces ${model.kind}, not ${node.data.kind}.`;
   const textOutput = node.data.kind === 'audio' && model?.textOutput ? true : undefined;
-  return editGraph(sessionId, g => {
+  return editCompound(sessionId, 'set-model', g => {
     const nodes = g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...patch, textOutput } as GraphNodeData } : n);
     const out = outputPort(nodes.find(n => n.id === nodeId)!.data, get().assets);
-    const edges = g.edges.filter(e => {
-      if (e.source !== nodeId) return true;
+    // Only data cables have a port type to fit; ref and control links are not about the output and always stay.
+    const keeps = (e: import('../types').GraphEdge) => {
+      if (e.source !== nodeId || (e.kind ?? 'data') !== 'data') return true;
       const tgt = nodes.find(n => n.id === e.target);
-      return tgt && portFits(out, inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type);
-    });
-    return { ...g, nodes, edges };
+      return Boolean(tgt && portFits(out, inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type));
+    };
+    return { graph: { ...g, nodes, edges: g.edges.filter(keeps) }, dropped: g.edges.filter(e => !keeps(e)).map(e => e.id) };
   });
 }
 
@@ -174,17 +165,18 @@ export function duplicateNode(sessionId: string, node: GraphNode): string {
   const taken = graph.nodes.map((n) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(copy(?: (\\d+))?\\)$`).exec(n.data.title)).filter(Boolean).map((m) => Number(m![1] ?? 1));
   data.title = `${base} (copy ${Math.max(0, ...taken) + 1})`;
   let next: import('../types').Graph = { ...graph, nodes: [...graph.nodes, { id, position: { x: node.position.x + 40, y: node.position.y + 60 }, data }] };
+  // The copy's cables are the original's, whole: kind, both, outputIndex and the revision a cable is fixed to.
   for (const e of graph.edges.filter((x) => x.target === node.id)) {
-    const c = { source: e.source, target: id, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle };
-    if (!connectionError(next, st.assets, c)) next = connect(next, c);
+    const c = { source: e.source, target: id, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle, kind: e.kind, both: e.both };
+    if (!connectionError(next, st.assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), target: id }] };
   }
   for (const e of graph.edges.filter((x) => x.source === node.id)) {
     const target = next.nodes.find((n) => n.id === e.target);
     const port = target ? inputPorts(target.data).find((p) => p.id === e.targetHandle) : undefined;
-    const c = { source: id, target: e.target, targetHandle: e.targetHandle };
-    if (port?.multi && !connectionError(next, st.assets, c)) next = connect(next, c);
+    const c = { source: id, target: e.target, targetHandle: e.targetHandle, kind: e.kind, both: e.both };
+    if (port?.multi && (e.kind ?? 'data') === 'data' && !connectionError(next, st.assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), source: id }] };
   }
-  setGraph(sessionId, () => next);
+  editCompound(sessionId, 'duplicate', () => next);
   return id;
 }
 
@@ -201,14 +193,14 @@ export function renameNode(sessionId: string, nodeId: string, typed: string): vo
 
 export function connectNodes(
   sessionId: string,
-  c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
+  c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean; replaces?: string | null },
 ): string | null {
   const st = get();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return 'No such session.';
   const handle = c.targetHandle ?? c.kind ?? 'in';
   const occupant = graph.edges.find(e => e.target === c.target && e.targetHandle === handle && (e.kind ?? 'data') === (c.kind ?? 'data'));
-  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: occupant?.id ?? null } }));
+  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: c.replaces !== undefined ? c.replaces : occupant?.id ?? null } }));
 }
 export function tryConnect(
   sessionId: string,
@@ -225,21 +217,21 @@ export function disconnectEdges(sessionId: string, ids: string[]): string | null
 export function setNodeOp(sessionId: string, nodeId: string, op: OpId): string | null {
   const node = get().sessions[sessionId]?.graph.nodes.find(n => n.id === nodeId);
   if (node?.data.kind !== 'tool') return `No tool node: ${nodeId}.`;
-  return editGraph(sessionId, g => {
+  return editCompound(sessionId, 'set-op', g => {
     const nodes = g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, op, params: defaultOpParams(OPS[op]), title: OPS[op].label, generationId: undefined } as GraphNodeData } : n);
-    const edges = g.edges.filter(e => {
-      if (e.source !== nodeId && e.target !== nodeId) return true;
+    const keeps = (e: import('../types').GraphEdge) => {
+      if ((e.source !== nodeId && e.target !== nodeId) || (e.kind ?? 'data') !== 'data') return true;
       const src = nodes.find(n => n.id === e.source), tgt = nodes.find(n => n.id === e.target);
-      return src && tgt && portFits(outputPort(src.data, get().assets), inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type);
-    });
-    return { ...g, nodes, edges };
+      return Boolean(src && tgt && portFits(outputPort(src.data, get().assets), inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type));
+    };
+    return { graph: { ...g, nodes, edges: g.edges.filter(keeps) }, dropped: g.edges.filter(e => !keeps(e)).map(e => e.id) };
   });
 }
 
 export function layoutAll(sessionId: string): void {
   const graph = get().sessions[sessionId].graph;
   const pos = autoLayout(graph.nodes, graph.edges, { x: 0, y: 0 });
-  setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })) }));
+  editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })) }));
 }
 
 export function runnableIds(nodes: GraphNode[]): string[] {
@@ -332,7 +324,8 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
   const { total } = estimateSteps(run.steps);
   const requests = [...inputs].map(id => {
-    const n = graph.nodes.find(n => n.id === id)!;
+    const n = graph.nodes.find(n => n.id === id);
+    if (!n) return [id, 'missing']; // already reported as an error above
     return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
   });
   return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
@@ -395,7 +388,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
           const snapshot = { ...graph, nodes: graph.nodes.map(n => n.id === stepId ? completed : n) };
           patchGeneration(generationId, { nodeRequest: stable(nodeRequest(snapshot, completed, st.generations, library, { ...context, schemas: st.catalog.schemas })) });
           // Keep what the user edited meanwhile; only the result changes.
-          setGraph(sessionId, g => ({ ...g, nodes: g.nodes.map(n => n.id === stepId ? { ...n, data: { ...n.data, generationId } } as GraphNode : n) }));
+          applyEdit({ session: sessionId, op: { op: 'set', node: stepId, patch: { generationId } as Partial<GraphNodeData> } });
         }
         onState?.(stepId, state, info);
       },
@@ -433,7 +426,7 @@ export function restoreNodes(sessionId: string, deleted: DeletedNodes): { error:
     if (findCycle(candidate)) { skipped.push(`${edge.id}: would create a loop`); continue; }
     next = candidate;
   }
-  return { error: editGraph(sessionId, () => next), skipped };
+  return { error: editCompound(sessionId, 'restore', () => next), skipped };
 }
 
 /** Both chat Undo and requested agent recovery restore the same deletion snapshot. */

@@ -6,7 +6,7 @@ import { descriptorOf } from './registry';
 import { resolveInputs, storeEnv, type ResolvedInput } from './resolver';
 import { digest } from './address';
 import { ownerRev } from './revision';
-import { lastRunFor } from './action';
+import { lastAttemptFor, lastRunFor } from './action';
 
 /**
  * The inspector (ADR 0031): one node seen through the resolver. Not a second system: every field is what the
@@ -26,6 +26,8 @@ export interface NodeInspection {
   /** Nodes that become stale when this one changes. */
   consumers: string[];
   lastRun?: { generationId: string; status: string; runId?: string; sends?: number };
+  /** The latest attempt that targeted this node, apart from the run that made the result shown. */
+  lastAttempt?: { runId: string; status: string; sends: number; error?: string };
 }
 
 export function inspectNode(session: string, nodeId: string, ctx: RequestContext = {}): NodeInspection | null {
@@ -44,11 +46,13 @@ export function inspectNode(session: string, nodeId: string, ctx: RequestContext
     const bad = inputs.find((i) => i.status === 'invalid');
     staleReason = !gen ? 'It has not run yet.' : gen.status !== 'done' ? `The last run is ${gen.status}.` : bad ? `An input is invalid: ${bad.reason}` : 'Its parameters or inputs changed since the last result.';
   }
-  const run = gen ? lastRunFor(session, nodeId, gen.id) : undefined;
+  const run = gen ? lastRunFor(session, gen.id) : undefined;
+  const attempt = lastAttemptFor(session, nodeId);
   return {
     node: nodeId, kind: node.data.kind, version: d?.version ?? 0, revision: ownerRev(graph, nodeId), inputs,
     signature: digest(`${node.data.kind}@${d?.version ?? 0}:${stable(request)}`), fresh, ...(staleReason ? { staleReason } : {}),
     consumers: consumersOf(graph, [nodeId]),
     ...(gen ? { lastRun: { generationId: gen.id, status: gen.status, ...(run ? { runId: run.runId, sends: run.sends } : {}) } } : {}),
+    ...(attempt ? { lastAttempt: { runId: attempt.runId, status: attempt.status, sends: attempt.sends, ...(attempt.error ? { error: attempt.error } : {}) } } : {}),
   };
 }

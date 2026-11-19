@@ -1,3 +1,4 @@
+import { resolveInputs, storeEnv } from '../nodecore/resolver';
 import { OPS, OP_IDS } from '../ops';
 import { PROVIDER_LABELS } from '../providers/types';
 import { useStore } from '../../store/store';
@@ -275,10 +276,12 @@ export function promptNodeText(node: GraphNode | undefined): string | undefined 
 /** Texts of independent prompt nodes wired into an agent (data link into it); the composer's own text is sent as always. */
 export function promptsWiredToAgent(sessionId: string, agentNodeId: string): string[] {
   const g = useStore.getState().sessions[sessionId]?.graph;
-  if (!g) return [];
-  return g.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === agentNodeId).flatMap((e) => {
-    const src = g.nodes.find((n) => n.id === e.source);
-    const t = src?.data.kind === 'ref' && src.data.ref !== 'composer' ? promptNodeText(src)?.trim() : undefined;
+  const agent = g?.nodes.find((n) => n.id === agentNodeId);
+  if (!g || !agent) return [];
+  // Read through the common resolver: a broken or moved pinned cable delivers nothing.
+  return resolveInputs(g, agent, storeEnv()).flatMap((i) => {
+    const src = g.nodes.find((n) => n.id === i.from);
+    const t = i.status === 'ok' && src?.data.kind === 'ref' && src.data.type === 'prompt' && src.data.ref !== 'composer' ? i.value?.trim() : undefined;
     return t ? [t] : [];
   });
 }

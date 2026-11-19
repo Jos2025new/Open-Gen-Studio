@@ -27,8 +27,18 @@ export type EditOp =
     ports?: ResolvedPorts;
   }
   | { op: 'disconnect'; edges: string[] }
-  | { op: 'set'; node: string; patch: Partial<GraphNodeData>; strict?: boolean }
+  | { op: 'set'; node: string; patch: Partial<GraphNodeData>; strict?: boolean; }
   | { op: 'delete'; nodes: string[] }
+  /**
+   * A composed change (paste, restore, system parts, a model swap): the caller builds the next graph and the layer checks
+   * what no composed change may do. No cable between two surviving nodes disappears unless it is named in `dropped`, a
+   * data cycle is refused, and so are cables or tombstones pointing nowhere. Parameters and topology still pass the lock.
+   */
+  | { op: 'compound'; label: string; /** Parts the system keeps in step on its own (no undo step). */ silent?: true; change: (g: Graph) => Graph | { graph: Graph; dropped: string[] } }
+  /** Undo or redo: the graph the history holds, put back as it was. The history itself decides which one. */
+  | { op: 'travel'; graph: Graph; /** A rollback: the history is not touched. */ silent?: true }
+  /** Position, size, groups and view only: nodes keep their data and the cables are untouched, or the change is refused. */
+  | { op: 'present'; change: (g: Graph) => Graph; silent?: true }
   /** A new node, optionally wired in the same step: a rejected wire leaves no orphan node and Undo removes both. */
   | { op: 'add'; node: GraphNode; connect?: { source: string; targetHandle: string; sourceHandle?: string | null } };
 
@@ -40,8 +50,8 @@ export type EditResult =
   | { ok: false; error: string; conflict?: { node: string; expected: string; actual: string }; draft: EditRequest };
 
 /** The nodes whose revision the edit depends on. */
-const touched = (op: EditOp): string[] => op.op === 'connect' ? [op.source, op.target] : op.op === 'disconnect' ? [] : op.op === 'set' ? [op.node] : op.op === 'add' ? (op.connect ? [op.connect.source] : []) : op.nodes;
-const owners = (op: EditOp): string[] => op.op === 'connect' ? [op.target] : op.op === 'set' ? [op.node] : op.op === 'delete' ? op.nodes : op.op === 'add' && op.connect ? [op.connect.source] : [];
+const touched = (op: EditOp): string[] => op.op === 'compound' || op.op === 'present' || op.op === 'travel' ? [] : op.op === 'connect' ? [op.source, op.target] : op.op === 'disconnect' ? [] : op.op === 'set' ? [op.node] : op.op === 'add' ? (op.connect ? [op.connect.source] : []) : op.nodes;
+const owners = (op: EditOp): string[] => op.op === 'compound' || op.op === 'present' || op.op === 'travel' ? [] : op.op === 'connect' ? [op.target] : op.op === 'set' ? [op.node] : op.op === 'delete' ? op.nodes : op.op === 'add' && op.connect ? [op.connect.source] : [];
 const refuse = (req: EditRequest, error: string, conflict?: { node: string; expected: string; actual: string }): EditResult => ({ ok: false, error, ...(conflict ? { conflict } : {}), draft: req });
 
 /** The owner revisions of the nodes an edit touches, to hand back to the caller for its next precondition. */
@@ -68,6 +78,8 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
     const occupant = multi ? undefined : graph.edges.find((e) => e.target === target && e.targetHandle === targetHandle && sameKind(e, kind) && !dup(e));
     const refused = replaceConflict(occupant, op.replaces, target, targetHandle, graph);
     if (refused) return refused;
+    const again = graph.edges.find(dup);
+    if (again?.pin && op.replaces !== again.id && op.replaces !== 'any') return replaceConflict(again, op.replaces, target, targetHandle, graph) ?? { error: `The cable ${again.id} is pinned; name it to wire it again.` };
     next = { ...graph, edges: [...graph.edges.filter((e) => !dup(e) && (multi || !(e.target === target && e.targetHandle === targetHandle && sameKind(e, kind)))), edge] };
     return finishConnect(graph, next, edge.id, source, target, kind);
   }
@@ -79,8 +91,9 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
   next = connect(graph, { source, target, targetHandle, sourceHandle: op.sourceHandle, kind: op.kind, both: op.both });
   // Whatever the old edge on a single-cable input was, `replaces` must name it.
   const replacedEdge = graph.edges.find((e) => !next.edges.some((n) => n.id === e.id) && e.target === target && e.targetHandle === targetHandle);
-  const isSingle = legacyPort ? !legacyPort.multi : replacedEdge !== undefined;
-  const sameSource = replacedEdge?.source === source && op.replaces == null; // wiring the same cable again is not a replacement
+  const isSingle = legacyPort ? !legacyPort.multi : replacedEdge !== undefined || typeof op.replaces === 'string';
+  // Wiring the same cable again is idempotent only while nothing is lost: a pinned cable must be named.
+  const sameSource = replacedEdge?.source === source && op.replaces == null && !replacedEdge.pin; // wiring the same cable again is not a replacement
   const refused = isSingle && !sameSource ? replaceConflict(replacedEdge, op.replaces, target, targetHandle, graph) : null;
   if (refused) return refused;
   const added = next.edges.find((e) => !before.has(e.id));
@@ -102,6 +115,19 @@ function finishConnect(_before: Graph, next: Graph, edgeId: string, source: stri
     if (loop) return { error: `That connection would create a loop (${loop.join(' → ')}).` };
   }
   return { next, edgeId, source, target };
+}
+
+/** Why a composed change is refused, or null. */
+function compoundProblem(before: Graph, after: Graph, dropped: string[]): string | null {
+  const alive = new Set(after.nodes.map((n) => n.id));
+  const lost = before.edges.find((e) => alive.has(e.source) && alive.has(e.target) && !after.edges.some((x) => x.id === e.id) && !dropped.includes(e.id));
+  if (lost) return `That change would silently remove the cable ${lost.id} (${lost.source} → ${lost.target}).`;
+  const dangling = after.edges.find((e) => !alive.has(e.source) || !alive.has(e.target));
+  if (dangling) return `The cable ${dangling.id} would point to a node that is not there.`;
+  const dup = after.nodes.find((n, i) => after.nodes.findIndex((m) => m.id === n.id) !== i);
+  if (dup) return `Node ${dup.id} would exist twice.`;
+  const loop = findCycle(after);
+  return loop ? `That would create a loop (${loop.join(' → ')}).` : null;
 }
 
 function planDelete(graph: Graph, ids: string[]): Graph {
@@ -174,6 +200,23 @@ export function applyEdit(req: EditRequest): EditResult {
       next = planned.next; edgeId = planned.edgeId;
       break;
     }
+    case 'compound': {
+      const made = op.change(graph);
+      const { graph: after, dropped } = 'graph' in made ? made : { graph: made as Graph, dropped: [] as string[] };
+      const problem = compoundProblem(graph, after, dropped);
+      if (problem) return refuse(req, problem);
+      next = after;
+      break;
+    }
+    case 'travel': next = op.graph; break;
+    case 'present': {
+      const after = op.change(graph);
+      const same = after.edges === graph.edges && after.broken === graph.broken && after.nodes.length === graph.nodes.length
+        && after.nodes.every((n, i) => n.id === graph.nodes[i].id && n.data === graph.nodes[i].data);
+      if (!same) return refuse(req, 'A layout change cannot touch node data or cables.');
+      next = after;
+      break;
+    }
     case 'delete': {
       const missing = op.nodes.find((id) => !graph.nodes.some((n) => n.id === id));
       if (missing) return refuse(req, `No such node: ${missing}.`);
@@ -192,10 +235,26 @@ export function applyEdit(req: EditRequest): EditResult {
   }
   const locked = graphEditProblem(req.session, graph, next);
   if (locked) { toast(locked, 'error'); return refuse(req, locked); }
-  setGraph(req.session, () => next);
+  if ((op.op === 'compound' || op.op === 'present' || op.op === 'travel') && op.silent) {
+    // The system keeps its own parts in step without an undo step (the same graph rules held above).
+    useStore.setState((s0) => s0.sessions[req.session] ? { sessions: { ...s0.sessions, [req.session]: { ...s0.sessions[req.session], graph: next } } } : s0);
+  } else setGraph(req.session, () => next);
   // The kind is the one the edge really got (a dragged Model→Agent cable is inferred as control, like the command).
   const made = edgeId ? next.edges.find((e) => e.id === edgeId) : undefined;
   if (made && (made.kind ?? 'data') === 'control') applyModelLinkToAgent(req.session, made.source, made.target);
   recordJourneyEvent({ journeyId: req.session, journey: 'node-core', event: `edit.${op.op}`, reason: 'edit through the single editing layer', sessionId: req.session, after: { op, edgeId } });
   return { ok: true, ...(edgeId ? { edgeId } : {}), rev: revisionsOf(next, touched(op)) };
+}
+
+/** A composed change through the layer (see the `compound` operation). Returns the reason it was refused, or null. */
+export function editCompound(session: string, label: string, change: (g: Graph) => Graph | { graph: Graph; dropped: string[] }, opts: { silent?: true } = {}): string | null {
+  const done = applyEdit({ session, op: { op: 'compound', label, change, ...opts } });
+  if (!done.ok) toast(done.error, 'error');
+  return done.ok ? null : done.error;
+}
+
+/** A presentation change (positions, groups, view) through the layer. */
+export function editPresentation(session: string, change: (g: Graph) => Graph, opts: { silent?: true } = {}): string | null {
+  const done = applyEdit({ session, op: { op: 'present', change, ...opts } });
+  return done.ok ? null : done.error;
 }

@@ -11,7 +11,8 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { setGraph, setUi, toast, useStore } from '../../store/store';
+import { setUi, toast, useStore } from '../../store/store';
+import { editPresentation } from '../../engine/nodecore/edit';
 import { ensureOmniNodes, ordinaryGraph } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration, } from '../../engine/flow/graph';
@@ -215,7 +216,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         else if (c.type === 'remove') removed.push(c.id);
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
-      if (moves.size) setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)) }));
+      if (moves.size) editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)) }));
       // A dragged frame moves its nodes — unless they are selected too, then they already moved with it.
       for (const [g, p] of frameMoves) {
         if (g.nodeIds.some((id) => moves.has(id))) continue;

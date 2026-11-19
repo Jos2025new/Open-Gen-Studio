@@ -1,7 +1,6 @@
 import { uid } from '../../lib/id';
-import { reconcileDeletionNotices, patchSession, setGraph, toast, useStore } from '../../store/store';
-import { graphEditProblem } from '../flow/locks';
-import { applyEdit } from '../nodecore/edit';
+import { reconcileDeletionNotices, patchSession, toast, useStore } from '../../store/store';
+import { applyEdit, editCompound } from '../nodecore/edit';
 import { isOmniSpace } from './omniSpaces';
 import type {
   Graph,
@@ -233,36 +232,18 @@ export function ensureSystemNodes(sessionId: string, opts: { recordHistory?: boo
     return [];
   }
   const nextGraph: Graph = { ...session.graph, nodes, edges };
-  if (opts.recordHistory) {
-    setGraph(sessionId, () => nextGraph);
-  } else {
-    useStore.setState((s) => {
-      const cur = s.sessions[sessionId];
-      if (!cur) return s;
-      return {
-        sessions: {
-          ...s.sessions,
-          [sessionId]: { ...cur, graph: nextGraph },
-        },
-      };
-    });
-  }
+  editCompound(sessionId, 'system-nodes', () => nextGraph, opts.recordHistory ? {} : { silent: true });
   reconcileDeletionNotices(sessionId);
   return addedIds;
 }
 
 function commitSystemGraph(sessionId: string, update: (g: Graph) => Graph): string | null {
-  const st = useStore.getState();
-  const graph = st.sessions[sessionId]?.graph;
-  if (!graph) return 'No such session.';
-  const next = update(graph);
-  const err = graphEditProblem(sessionId, graph, next);
-  if (err) {
-    toast(err, 'error');
-    return err;
-  }
-  setGraph(sessionId, () => next);
-  return null;
+  // A system link, unlink or attach is an explicit act on its cable: the cables it replaces or removes are its own.
+  return editCompound(sessionId, 'system-link', (g) => {
+    const next = update(g);
+    const alive = new Set(next.nodes.map((n) => n.id));
+    return { graph: next, dropped: g.edges.filter((e) => alive.has(e.source) && alive.has(e.target) && !next.edges.some((x) => x.id === e.id)).map((e) => e.id) };
+  });
 }
 
 export function addSystemNode(
@@ -315,10 +296,8 @@ export function addSystemNode(
     ...(spec.dockedTo ? { dockedTo: spec.dockedTo } : {}),
     ...(spec.mediaKind ? { mediaKind: spec.mediaKind } : {}),
   };
-  setGraph(sessionId, (g) => ({
-    ...g,
-    nodes: [...g.nodes.filter((n) => n.id !== id), { id, position, data }],
-  }));
+  // A node of the same id is replaced by the new one; its cables stay.
+  editCompound(sessionId, 'system-node', (g) => ({ ...g, nodes: [...g.nodes.filter((n) => n.id !== id), { id, position, data }] }));
   return id;
 }
 
@@ -505,6 +484,8 @@ export function linkSystemNodes(
     both?: boolean;
     sourceHandle?: string;
     targetHandle?: string;
+    /** A caller that cannot see the port (commands, the agent) names the cable it replaces; the interface leaves it out and replaces what it shows. */
+    replaces?: string | null;
   },
 ): { error: string | null; edgeId?: string } {
   ensureSystemNodes(sessionId);
@@ -552,7 +533,7 @@ export function linkSystemNodes(
   }
   // One commit path (ADR 0031 point 5): replacement, loop check, locks, trace and the model→agent copy live in the layer.
   const occupied = graph.edges.find((e) => e.target === opts.target && e.targetHandle === resolved.tgtPort!.id && (e.kind ?? 'data') === opts.kind && e.source !== opts.source);
-  const done = applyEdit({ session: sessionId, op: { op: 'connect', source: opts.source, target: opts.target, targetHandle: resolved.tgtPort.id, kind: opts.kind, both: opts.both, replaces: occupied?.id ?? null, ports: { srcPort: resolved.srcPort, tgtPort: resolved.tgtPort, kind: opts.kind } } });
+  const done = applyEdit({ session: sessionId, op: { op: 'connect', source: opts.source, target: opts.target, targetHandle: resolved.tgtPort.id, kind: opts.kind, both: opts.both, replaces: opts.replaces !== undefined ? opts.replaces : occupied?.id ?? null, ports: { srcPort: resolved.srcPort, tgtPort: resolved.tgtPort, kind: opts.kind } } });
   const error = done.ok ? null : done.error;
   const edgeId = done.ok ? done.edgeId : undefined;
   return { error, ...(error ? {} : { edgeId }) };
@@ -579,6 +560,8 @@ export function unlinkSystemNodes(
       return false;
     })
     .map((e) => e.id);
+  // An invalid cable left by a deleted node is a connection too: it is removed the same way.
+  if (opts.edgeId && !toRemove.length && graph.broken?.some((b) => b.edge.id === opts.edgeId)) toRemove.push(opts.edgeId);
 
   if (!toRemove.length) return { error: 'No matching connection found.', removed: [] };
   const done = applyEdit({ session: sessionId, op: { op: 'disconnect', edges: toRemove } });

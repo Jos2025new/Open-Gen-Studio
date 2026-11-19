@@ -74,7 +74,7 @@ describe('a sequence on the node graph', () => {
       seq: [
         { cmd: 'nodes.node.new_data', args: { kind: 'text' } },
         { cmd: 'nodes.node.add', args: { data: '$1', position: { x: 0, y: 0 } } },
-        { cmd: 'nodes.node.edit', args: { node: '$2.node', patch: { title: 'Prompt', text: 'Hola' } } },
+        { cmd: 'nodes.node.edit', args: { node: '$2.node', expect: '$2.rev', patch: { title: 'Prompt', text: 'Hola' } } },
         { cmd: 'nodes.node.new_data', args: { kind: 'image' } },
         { cmd: 'nodes.node.add', args: { data: '$4', position: { x: 400, y: 0 } } },
         { cmd: 'nodes.edge.connect', args: { source: '$2.node', target: '$5.node', target_handle: 'prompt' } },
@@ -106,7 +106,7 @@ describe('a sequence on the node graph', () => {
       on: on(),
       seq: [
         { cmd: 'nodes.node.add', args: { data: text(), position: { x: 200, y: 0 } } },
-        { cmd: 'nodes.node.edit', args: { node: 'nope', patch: { title: 'Gone' } } },
+        { cmd: 'nodes.node.edit', args: { node: 'nope', expect: 'x', patch: { title: 'Gone' } } },
       ],
     }, { caller: 'agent' });
 
@@ -128,7 +128,7 @@ describe('a sequence on the node graph', () => {
   });
 
   it('reports the action\'s reason when a command cannot run', async () => {
-    expect(await run({ cmd: 'nodes.node.edit', args: { node: 'nope', patch: { title: 'x' } }, on: on() }, { caller: 'agent' })).toMatchObject({ ok: false, error: { code: 'unavailable', message: 'No such node: nope.' } });
+    expect(await run({ cmd: 'nodes.node.edit', args: { node: 'nope', expect: 'x', patch: { title: 'x' } }, on: on() }, { caller: 'agent' })).toMatchObject({ ok: false, error: { code: 'unavailable', message: 'No such node: nope.' } });
     const made = invoke(command('nodes.node.add')!, { data: text(), position: { x: 0, y: 0 } }, on()) as { node: string };
     expect(await run({ cmd: 'nodes.edge.connect', args: { source: made.node, target: 'nope', target_handle: 'prompt' }, on: on() }, { caller: 'agent' })).toMatchObject({ ok: false, error: { code: 'unavailable', message: 'No such node: nope.' } });
     expect(graph().edges).toEqual([]);

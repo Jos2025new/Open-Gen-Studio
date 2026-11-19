@@ -46,6 +46,8 @@ const GONE = -1;
  */
 export function sessionChatText(node: GraphNode): string | undefined {
   const d = node.data;
+  // An independent prompt box says what it holds; the composer's box says what is typed there.
+  if (d.kind === 'ref' && d.type === 'prompt') return d.ref === 'composer' ? useStore.getState().composer.text : d.promptText ?? '';
   if (d.kind !== 'ref' || (d.type !== 'chat' && d.type !== 'agent')) return undefined;
   const s = useStore.getState().sessions[d.ref];
   const first = s?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === d.type)?.id ?? node.id; // a node outside the session graph (or with none) reads the untagged items
@@ -91,7 +93,7 @@ export function resolveInputs(graph: Graph, node: GraphNode, env: ResolveEnv): R
     if (!src) return { ...base, status: 'invalid', reason: 'The source node no longer exists.', value: null, revision: null };
     if (e.outputIndex === GONE) return { ...base, status: 'invalid', reason: 'The image this link used was deleted.', value: null, revision: null };
     const { value, revision, edited } = sourceValue(src, e, env);
-    if (e.pin && value != null && revision !== e.pin) return { ...base, status: 'invalid', pinMoved: true, reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
+    if (e.pin && revision !== e.pin) return { ...base, status: 'invalid', pinMoved: true, reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
     return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: 'The source has no output yet.' } : {}), value, revision, ...(edited ? { rev: revision! } : {}) };
   });
   const broken = (graph.broken ?? []).filter((b) => b.edge.target === node.id).map((b): ResolvedInput => ({
