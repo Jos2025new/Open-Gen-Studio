@@ -127,8 +127,22 @@ function compoundProblem(before: Graph, after: Graph, dropped: string[]): string
   if (dangling) return `The cable ${dangling.id} would point to a node that is not there.`;
   const dup = after.nodes.find((n, i) => after.nodes.findIndex((m) => m.id === n.id) !== i);
   if (dup) return `Node ${dup.id} would exist twice.`;
+  // A tombstone the change invents must be a real loss: the consumer is there, the source is gone, and the cable is not live too.
+  // Old ones that went stale (consumer gone, source back) are pruned after, never refused.
+  const fresh = (after.broken ?? []).filter((b) => !before.broken?.some((o) => o.edge.id === b.edge.id));
+  const fake = fresh.find((b) => !alive.has(b.edge.target) || alive.has(b.edge.source) || after.edges.some((e) => e.id === b.edge.id));
+  if (fake) return `The invalid cable ${fake.edge.id} would not be a real loss (its consumer must be there, its source gone).`;
+  const twice = after.broken?.find((b, i) => after.broken!.findIndex((c) => c.edge.id === b.edge.id) !== i);
+  if (twice) return `The invalid cable ${twice.edge.id} would be listed twice.`;
   const loop = findCycle(after);
   return loop ? `That would create a loop (${loop.join(' → ')}).` : null;
+}
+
+/** Invalid cables last until their consumer goes, their source comes back, or they are removed: the same rule whichever way the graph is written. */
+function pruneBroken(g: Graph): Graph {
+  if (!g.broken) return g;
+  const live = g.broken.filter((b) => g.nodes.some((n) => n.id === b.edge.target) && !g.nodes.some((n) => n.id === b.edge.source));
+  return live.length === g.broken.length ? g : { ...g, broken: live.length ? live : undefined };
 }
 
 function planDelete(graph: Graph, ids: string[]): Graph {
@@ -234,7 +248,7 @@ export function applyEdit(req: EditRequest): EditResult {
     const left = next.broken.filter((b) => !(single && added && b.edge.target === added.target && b.edge.targetHandle === added.targetHandle && (b.edge.kind ?? 'data') === (added.kind ?? 'data')));
     next = { ...next, broken: left.length ? left : undefined };
   }
-  next = stampNew(graph, next);
+  next = pruneBroken(stampNew(graph, next));
   const locked = graphEditProblem(req.session, graph, next);
   if (locked) { toast(locked, 'error'); return refuse(req, locked); }
   if ((op.op === 'compound' || op.op === 'present' || op.op === 'travel') && op.silent) {

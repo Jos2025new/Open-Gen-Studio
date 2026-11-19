@@ -517,6 +517,8 @@ export function deleteGeneration(generationId: string): void {
   const g = get().generations[generationId];
   if (!g) return;
   const assetIds = [...g.assetIds];
+  // Nodes showing this result let go of it through the editing layer.
+  if (g.sessionId in get().sessions) editCompound(g.sessionId, 'delete generation', (gr) => ({ ...gr, nodes: gr.nodes.map((n) => runsGeneration(n.data) && n.data.generationId === generationId ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] } : n) }), { silent: true });
   useStore.setState((st) => {
     const generations = { ...st.generations };
     delete generations[generationId];
@@ -529,14 +531,6 @@ export function deleteGeneration(generationId: string): void {
           [g.sessionId]: {
             ...s,
             feed: s.feed.filter((f) => !(f.type === 'generation' && f.generationId === generationId)),
-            graph: {
-              ...s.graph,
-              nodes: s.graph.nodes.map((n) =>
-                runsGeneration(n.data) && n.data.generationId === generationId
-                  ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] }
-                  : n,
-              ),
-            },
           },
         }
       : st.sessions;

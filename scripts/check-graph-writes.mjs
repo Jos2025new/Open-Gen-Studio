@@ -6,12 +6,12 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseSync } from 'rolldown/utils';
 
 // dropResults is the one held exception: a reducer inside the store's own atomic asset deletion (generations and indices change
 // in one `set`), it only rewrites result indices of nodes and cables. Moving it into the layer needs the layer to join that transaction.
 const ALLOWED = new Set(['src/engine/nodecore/edit.ts', 'src/store/store.ts', 'src/engine/flow/dropResults.ts']);
-const CALL = /\b(setGraph|writeGraph|editGraph)\s*\(/;
-const SESSION_WRITE = /\.\.\.\w+,\s*graph:/; // `{ ...session, graph: … }` put into the store by hand
+const CALLS = new Set(['setGraph', 'writeGraph', 'editGraph']);
 const HINT = 'write the graph through `applyEdit` (src/engine/nodecore/edit.ts): `connect`/`disconnect`/`set`/`delete`/`add` for a cable or a parameter, `editCompound` for a composed change, `editPresentation` for position, size or groups.';
 
 function walk(dir, out = []) {
@@ -29,11 +29,28 @@ export function check(root = '.') {
   for (const file of walk(join(root, 'src'))) {
     const rel = relative(root, file).split('\\').join('/');
     if (ALLOWED.has(rel)) continue;
-    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-      const code = line.replace(/\/\/.*$/, '');
-      if (/^\s*(import|export)\b.*\bfrom\b/.test(code)) return;
-      if (CALL.test(code) || SESSION_WRITE.test(code)) errors.push(`${rel}:${i + 1}: writes the graph outside the editing layer. ${HINT}`);
-    });
+    const text = readFileSync(file, 'utf8');
+    const { program, errors: broken } = parseSync(file, text);
+    if (broken.length) { errors.push(`${rel}:1: could not be parsed, so its graph writes could not be checked (${broken[0].message}).`); continue; }
+    const flag = (node) => errors.push(`${rel}:${text.slice(0, node.start).split('\n').length}: writes the graph outside the editing layer. ${HINT}`);
+    const keyName = (p) => p.key?.type === 'Identifier' ? p.key.name : p.key?.value;
+    // The syntax tree, not lines: a call or an object split over several lines is the same write.
+    const visit = (node) => {
+      if (!node || typeof node.type !== 'string') return;
+      if (node.type === 'CallExpression') {
+        const fn = node.callee;
+        const name = fn.type === 'Identifier' ? fn.name : fn.type === 'MemberExpression' ? fn.property?.name : '';
+        if (CALLS.has(name)) flag(node);
+      }
+      // `{ ...session, graph: … }`: a session object rebuilt by hand with a new graph (any nesting, any line breaks).
+      if (node.type === 'ObjectExpression' && node.properties.some((p) => p.type === 'SpreadElement')
+        && node.properties.some((p) => p.type === 'Property' && keyName(p) === 'graph')) flag(node);
+      for (const key of Object.keys(node)) {
+        const child = node[key];
+        if (Array.isArray(child)) child.forEach(visit); else if (child && typeof child === 'object') visit(child);
+      }
+    };
+    visit(program);
   }
   return errors;
 }
