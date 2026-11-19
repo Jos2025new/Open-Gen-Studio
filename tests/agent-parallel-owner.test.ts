@@ -9,7 +9,8 @@ vi.mock('../src/engine/providers/llm', async (orig) => ({ ...(await orig<typeof 
 
 import { useStore } from '../src/store/store';
 import { sendAgentMessage, stopAgent } from '../src/engine/agent/conversation';
-import { laneState } from '../src/engine/agent/lanes';
+import { laneState, patchLane } from '../src/engine/agent/lanes';
+import { resolveSystemNodeLive } from '../src/engine/nodes/spec';
 
 /** ADR 0031: two agents of one chat run in parallel; whatever agent A's turn writes lands in A, never in the agent on screen. */
 const HOME = useStore.getState().activeSessionId;
@@ -83,5 +84,15 @@ describe('parallel agents: A runs in the background while B is on screen', () =>
     await a;
     expect(laneState(HOME, 'agentA')?.busy).toBe(false);
     expect(text(laneState(HOME, 'agentA')?.history)).not.toContain('A final');
+  });
+
+  it('each agent card shows its own state and model, not the global one', async () => {
+    await sendAgentMessage('hello B', { agentNodeId: 'agentB', chatNodeId: 'chat2' });
+    patchLane(HOME, 'agentA', { busy: true, phase: 'working' });
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: { ...st.sessions[HOME].graph, nodes: st.sessions[HOME].graph.nodes.map((n) => (n.id === 'agentA' && n.data.kind === 'ref' ? { ...n, data: { ...n.data, llm: { provider: 'openrouter', model: 'a/own' } } } : n)) } } } }));
+    const card = (id: string) => resolveSystemNodeLive(HOME, S().graph.nodes.find((n) => n.id === id)!);
+    expect(card('agentA')).toMatchObject({ badge: 'Busy', chips: expect.arrayContaining([expect.stringContaining('own')]) });
+    expect(card('agentB')?.badge).not.toBe('Busy');
+    expect(card('agentB')?.chips).not.toContainEqual(expect.stringContaining('own'));
   });
 });

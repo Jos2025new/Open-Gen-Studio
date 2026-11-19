@@ -2,6 +2,7 @@ import { resolveInputs, storeEnv } from '../nodecore/resolver';
 import { OPS, OP_IDS } from '../ops';
 import { PROVIDER_LABELS } from '../providers/types';
 import { useStore } from '../../store/store';
+import { laneState } from '../agent/lanes';
 import { isOmniSpace, omniSpacePorts } from './omniSpaces';
 import { omniSpaceLive } from './omniLive';
 import type {
@@ -309,7 +310,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       for (const agentId of linked(node.id)) {
         const agent = graph?.nodes.find((n) => n.id === agentId);
         if (agent?.data.kind !== 'ref' || agent.data.type !== 'agent') continue;
-        const busy = st.sessions[agent.data.ref]?.agent.busy;
+        const busy = laneState(agent.data.ref, agent.id)?.busy;
         connections.push({ nodeId: agent.id, kind: 'agent', title: agent.data.title || 'Agent', detail: busy ? 'working' : 'ready' });
         for (const modelId of linked(agent.id)) {
           const m = graph?.nodes.find((n) => n.id === modelId);
@@ -330,8 +331,10 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
     agent: () => {
       if (!st.sessions[d.ref]) return missingTarget(node, 'Agent', 'Session');
       const targetSession = st.sessions[d.ref];
-      const ag = targetSession?.agent;
-      const llmRef = st.settings.agent.provider === 'offline' ? 'offline' : st.settings.agent.model || 'offline';
+      // This card shows its own agent: its state and its own model, not the one on screen or the global default.
+      const ag = laneState(d.ref, node.id);
+      const choice = d.llm ?? st.settings.agent;
+      const llmRef = choice.provider === 'offline' ? 'offline' : choice.model || 'offline';
       const attached: NonNullable<LiveSystemSummary['attachedModels']> = [];
       if (graph) {
         for (const edge of graph.edges) {
@@ -360,7 +363,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
         ref: targetSession?.id ?? d.ref,
         title: d.title || 'Agent',
         subtitle: ag?.busy ? `Working (${ag.phase ?? 'working'})` : `Style: ${st.composer.agentStyle}`,
-        badge: ag?.busy ? 'Busy' : st.settings.agent.provider,
+        badge: ag?.busy ? 'Busy' : choice.provider,
         chips: [
           `Director: ${modelLabelForRef(llmRef)}`,
           `Mode: ${st.composer.mode}`,
