@@ -92,14 +92,19 @@ describe('strip 1: text → generation in Omni (ADR 0031 acceptance)', () => {
     expect(recordOf('run-1')?.sends).toBe(1);
   });
 
-  it('a failed run retried by id re-runs only what is stale', async () => {
+  it('a failed run is kept as it is: the same id never resends, a new approval and id do', async () => {
     patchNodeData(A, 'text', { text: 'a green fox' });
     const prepared = await prepareAction(A, ['gen']);
     if (!prepared.ok) throw new Error(prepared.errors.join());
     execute.mockImplementationOnce(async (_s, ctx) => { ctx.onState('gen', 'running', { generationId: 'g2' }); return { outputs: new Map(), failed: [{ stepId: 'gen', error: 'provider down' }], skipped: [], waiting: [] }; });
-    expect(await runAction(prepared.snapshot, 'run-1')).toMatchObject({ status: 'failed', error: 'provider down' });
+    expect(await runAction(prepared.snapshot, 'run-1')).toMatchObject({ status: 'failed', error: 'provider down', sends: 1 });
+    expect(await runAction(prepared.snapshot, 'run-1')).toMatchObject({ status: 'failed', sends: 1 });
+    expect(execute).toHaveBeenCalledTimes(1);
+    const again = await prepareAction(A, ['gen']);
+    if (!again.ok) throw new Error(again.errors.join());
+    expect(await runAction(again.snapshot, 'run-1')).toMatchObject({ status: 'stale', error: expect.stringContaining('another approval') });
     execute.mockImplementationOnce(async (_s, ctx) => { ctx.onState('gen', 'running', { generationId: 'g3' }); return { outputs: new Map(), failed: [], skipped: [], waiting: [] }; });
-    expect(await runAction(prepared.snapshot, 'run-1')).toMatchObject({ status: 'done', sends: 2 });
+    expect(await runAction(again.snapshot, 'run-2')).toMatchObject({ status: 'done', sends: 1 });
     expect(execute).toHaveBeenCalledTimes(2);
   });
 

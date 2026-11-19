@@ -1,7 +1,7 @@
 import type { Graph } from '../types';
 import { findCycle } from './deps';
 import { descriptorOf } from './registry';
-import { resolveInputs, type ResolveEnv } from './resolver';
+import { resolveInputs, storeEnv, type ResolveEnv } from './resolver';
 
 /**
  * What stops an action before anything is spent (ADR 0031 points 2 and 4): a cycle through a node it runs, and an
@@ -21,4 +21,13 @@ export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): st
     }
   }
   return problems;
+}
+
+/** What the approval also covers: each node's type version and the revision and validity of every input it reads. */
+export function coreSignature(graph: Graph, ids: string[]) {
+  const env = storeEnv();
+  return ids.map((id) => {
+    const n = graph.nodes.find((x) => x.id === id)!;
+    return [id, descriptorOf(n.data.kind)?.version, resolveInputs(graph, n, env).map((i) => [i.port, i.edgeId, i.revision, i.status])];
+  });
 }

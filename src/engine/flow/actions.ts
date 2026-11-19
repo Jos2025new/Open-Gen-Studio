@@ -18,7 +18,7 @@ import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore 
 import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 import { applyEdit } from '../nodecore/edit';
-import { runProblems } from '../nodecore/guard';
+import { coreSignature, runProblems } from '../nodecore/guard';
 import { storeEnv } from '../nodecore/resolver';
 
 const get = useStore.getState;
@@ -338,7 +338,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     const n = graph.nodes.find(n => n.id === id)!;
     return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
   });
-  return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, steps: run.steps.map(({ title: _title, ...s }) => s), total }) };
+  return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
 
 export async function prepareNodeRun(sessionId: string, targets: string[], force = true): Promise<NodeRunPreview> {

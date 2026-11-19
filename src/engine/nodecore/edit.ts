@@ -1,7 +1,7 @@
 import { uid } from '../../lib/id';
 import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { setGraph, toast, useStore } from '../../store/store';
-import { connect, connectionError, inputPorts } from '../flow/graph';
+import { connect, connectionError, inputPorts, nodePorts } from '../flow/graph';
 import { graphEditProblem } from '../flow/locks';
 import { applyModelLinkToAgent } from '../nodes/system';
 import type { Graph, GraphEdge, GraphNodeData, LinkKind, PortSpec } from '../types';
@@ -97,10 +97,10 @@ function finishConnect(_before: Graph, next: Graph, edgeId: string, source: stri
 
 function planDelete(graph: Graph, ids: string[]): Graph {
   const drop = new Set(ids);
-  // Only a reference that lost its source stays as an invalid cable on the node that kept it. A cable whose owner is
+  // Any link (data, ref or control) that lost its source stays as an invalid cable on the node that kept it. A cable whose owner is
   // deleted goes with it (the owner's cables are its own), and tombstones of a deleted owner are pruned.
   const kept = (graph.broken ?? []).filter((b) => !drop.has(b.edge.target));
-  const lost = graph.edges.filter((e) => drop.has(e.source) && !drop.has(e.target) && (e.kind ?? 'data') === 'data');
+  const lost = graph.edges.filter((e) => drop.has(e.source) && !drop.has(e.target));
   const broken = [...kept, ...lost.map((edge) => ({ edge, missing: 'source' as const, at: Date.now() }))];
   // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
   const groups = graph.groups?.map((gr) => ({ ...gr, nodeIds: gr.nodeIds.filter((id) => !drop.has(id)) })).filter((gr) => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
@@ -156,8 +156,11 @@ export function applyEdit(req: EditRequest): EditResult {
   }
   if (op.op === 'connect' && next.broken?.length) {
     // A new cable on a port takes the place of the invalid one that was left there.
+    // Only a single-cable port is repaired by wiring it again; on a multi-cable port the invalid cable stays until removed.
     const added = next.edges.find((e) => e.id === edgeId);
-    const left = next.broken.filter((b) => !(added && b.edge.target === added.target && b.edge.targetHandle === added.targetHandle));
+    const tgt = added && next.nodes.find((n) => n.id === added.target);
+    const single = tgt && nodePorts(tgt.data, st.assets).find((p) => p.id === added!.targetHandle && p.direction === 'in')?.multi === false;
+    const left = next.broken.filter((b) => !(single && added && b.edge.target === added.target && b.edge.targetHandle === added.targetHandle && (b.edge.kind ?? 'data') === (added.kind ?? 'data')));
     next = { ...next, broken: left.length ? left : undefined };
   }
   const locked = graphEditProblem(req.session, graph, next);

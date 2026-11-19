@@ -3,6 +3,7 @@ import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { useStore } from '../../store/store';
 import type { ExecResult } from '../executor';
 import { prepareNodeRun, runNodes, type NodeRunPreview } from '../flow/actions';
+import { digest } from './address';
 import { resolveInputs, storeEnv } from './resolver';
 
 /*
@@ -73,15 +74,30 @@ function settle(runId: string, patch: Partial<ActionRecord>) {
   if (r) Object.assign(r, patch);
 }
 
+/** The snapshot of a preview the user reviewed in the interface: the approval is the signature they saw. */
+export function adoptPreview(session: string, targets: string[], force: boolean, preview: NodeRunPreview): ActionSnapshot {
+  const id = `appr:${session}:${digest(preview.signature)}`;
+  const snapshot: ActionSnapshot = { id, session, targets: [...targets], force, preview, pins: pinsFor(session, [...preview.runIds, ...preview.inputIds]), at: Date.now() };
+  snapshots.set(id, snapshot);
+  return snapshot;
+}
+
+/** The interface's Run buttons: the reviewed preview runs through the same registry, under the id of this confirmation. */
+export const runApproved = (session: string, targets: string[], force: boolean, preview: NodeRunPreview, runId: string) => runAction(adoptPreview(session, targets, force, preview), runId);
+
+/**
+ * Run a snapshot under a run id. An id that is known is never sent again, whatever happened to it: running gives the
+ * same run, done and failed give their record (a failed or interrupted send may have reached the provider, so the
+ * state is kept as it is). Trying again means a new approval and a new id. An id belongs to one approval only.
+ */
 export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')): Promise<ActionRecord> {
   const known = ledger.get(runId);
   if (known) {
-    // Reconcile first: a running or finished run is never sent again.
-    if (known.status === 'running' || known.status === 'done') return known.done;
-    if (known.status === 'stale') return known.done;
+    if (known.approval !== snapshot.id) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, error: 'This run id belongs to another approval; approve again and use a new id.' });
+    return known.done;
   }
   const session = useStore.getState().sessions[snapshot.session];
-  const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: known ? known.sends : 0, done: undefined as never };
+  const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, done: undefined as never };
   ledger.set(runId, record);
   const finish = (): ActionRecord => ({ runId, approval: snapshot.id, session: record.session, targets: record.targets, status: record.status, sends: record.sends, result: record.result, error: record.error });
   record.done = (async () => {
@@ -91,8 +107,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
     const moved = Object.entries(snapshot.pins).find(([key, rev]) => pinsFor(snapshot.session, [key.split('.')[0]])[key] !== rev);
     if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${moved[0].split(':')[0]}). Review it again.` }); return finish(); }
     try {
-      // Failed retries re-run only what is still stale: finished results are current and are never paid for twice.
-      const result = await runNodes(snapshot.session, snapshot.targets, known?.status === 'failed' ? undefined : snapshot.preview, known?.status === 'failed' ? false : snapshot.force, (_step, state, info) => { if (state === 'running' && info?.generationId) record.sends += 1; });
+      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (_step, state, info) => { if (state === 'running' && info?.generationId) record.sends += 1; });
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }
       settle(runId, { status: result.failed.length ? 'failed' : 'done', result, ...(result.failed.length ? { error: result.failed[0].error } : {}) });
     } catch (err) {

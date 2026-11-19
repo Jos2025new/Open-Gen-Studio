@@ -1,10 +1,12 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, NodeToolbar, Position, useConnection, type Node, type NodeProps } from '@xyflow/react';
 import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip, Layers } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, renameNode, setSketch, tryConnect } from '../../engine/flow/actions';
+import { runApproved } from '../../engine/nodecore/action';
+import { uid } from '../../lib/id';
+import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, setNodeModel, restoreNodeGeneration, renameNode, setSketch, tryConnect } from '../../engine/flow/actions';
 import { nodeAttempt, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, runsGeneration } from '../../engine/flow/graph';
 import { detachOutputs, detachedOutputGroup, reattachOutputs } from '../../engine/flow/arrange';
 import { extensionForMime } from '../../lib/media';
@@ -54,11 +56,12 @@ function useSessionId() {
 export function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
   const sessionId = useSessionId();
   const pop = usePopover();
+  const confirmId = useRef('');
   useStore(s => s); // Keep the reviewed request and price current.
   const preview = pop.open || primary ? previewRun(sessionId, [node.id]) : null;
   return (
     <>
-      <button ref={pop.ref} type="button" className={`${primary ? 'nt-go' : 'nt-btn nt-run'} nodrag ${pop.open ? 'is-open' : ''}`} aria-label="Run node" onClick={() => void prepareNodeRun(sessionId, [node.id]).then(pop.toggle)}>
+      <button ref={pop.ref} type="button" className={`${primary ? 'nt-go' : 'nt-btn nt-run'} nodrag ${pop.open ? 'is-open' : ''}`} aria-label="Run node" onClick={() => { confirmId.current = uid('run'); void prepareNodeRun(sessionId, [node.id]).then(pop.toggle); }}>
         <Play size={12} fill="currentColor" /> {primary && preview ? costLabel(preview.estimate, { short: true }) : 'Run'}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Run node">
@@ -72,7 +75,7 @@ export function RunButton({ node, primary }: { node: GraphNode; primary?: boolea
             onCancel={pop.close}
             onConfirm={() => {
               if (previewRun(sessionId, [node.id]).signature !== preview.signature) return;
-              return runNodes(sessionId, [node.id], preview).then(result => { if (result) pop.close(); });
+              return runApproved(sessionId, [node.id], true, preview, confirmId.current).then(() => pop.close());
             }}
           />
         ) : null}

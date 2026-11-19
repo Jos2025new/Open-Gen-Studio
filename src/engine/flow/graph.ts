@@ -2,6 +2,7 @@ import { mentionSubjects } from '../params';
 import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
 import { refNodeText } from './refText';
+import { resolveInputs, sessionChatText } from '../nodecore/resolver';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
@@ -375,6 +376,14 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const checked = new Map<string, boolean>();
   const visiting = new Set<string>();
   const targetSet = new Set(targets);
+  // The plan takes its cables from the resolver (ADR 0031 point 3): an invalid one (a pinned revision that moved, a
+  // deleted image) delivers nothing, so it is neither run for nor handed to the provider.
+  const env = { generations, assets: options.assets ?? {}, chatText: sessionChatText };
+  const badEdges = new Map<string, Set<string>>();
+  const unusable = (id: string): Set<string> => {
+    if (!badEdges.has(id)) { const n = byId.get(id); badEdges.set(id, new Set(n ? resolveInputs(graph, n, env).filter(i => i.pinMoved).map(i => i.edgeId) : [])); }
+    return badEdges.get(id)!;
+  };
   const visit = (id: string, forced: boolean): boolean => {
     const n = byId.get(id);
     if (!n) { errors.push(`No such node: ${id}.`); return false; }
@@ -384,7 +393,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     if (!runsGeneration(n.data)) return false;
     visiting.add(id);
     const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' ? [p.id] : []; }) : [];
-    const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
+    const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id && !unusable(id).has(e.id)).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
     visiting.delete(id);
     const needsRun = effectiveForced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
     checked.set(id, needsRun);
@@ -422,7 +431,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const textSteps = new Map<string, TextStep>();
   for (const id of run) {
     const n = byId.get(id)!;
-    const inEdges = graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === id);
+    const inEdges = graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === id && !unusable(id).has(e.id));
     const d = n.data;
     // Text ports (prompt, lyrics): a text node, or a node with a text result (Transcribe, lyrics) from this run or before.
     const textFrom = (handle: string): string | undefined => {

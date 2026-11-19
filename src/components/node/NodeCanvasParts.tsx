@@ -1,6 +1,9 @@
+import { useRef } from 'react';
 import { Play, Plus } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
-import { prepareNodeRun, previewRun, runNodes } from '../../engine/flow/actions';
+import { prepareNodeRun, previewRun } from '../../engine/flow/actions';
+import { runApproved } from '../../engine/nodecore/action';
+import { uid } from '../../lib/id';
 import type { GraphNodeData } from '../../engine/types';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton } from '../ui/primitives';
@@ -37,11 +40,12 @@ export function AddNodeMenu({ onAdd, onImport, omni }: { onAdd: (data: GraphNode
 
 export function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
   const pop = usePopover();
+  const confirmId = useRef('');
   useStore(s => s); // Keep the reviewed request and price current.
   const preview = pop.open ? previewRun(sessionId, ids, false) : null;
   return (
     <>
-      <Button ref={pop.ref} size="sm" variant="primary" icon={Play} disabled={!ids.length} onClick={() => void prepareNodeRun(sessionId, ids, false).then(pop.toggle)}>
+      <Button ref={pop.ref} size="sm" variant="primary" icon={Play} disabled={!ids.length} onClick={() => { confirmId.current = uid('run'); void prepareNodeRun(sessionId, ids, false).then(pop.toggle); }}>
         Run all
       </Button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Run all nodes">
@@ -55,7 +59,7 @@ export function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] })
             onCancel={pop.close}
             onConfirm={() => {
               if (previewRun(sessionId, ids, false).signature !== preview.signature) return;
-              return runNodes(sessionId, ids, preview, false).then(result => { if (result) pop.close(); });
+              return runApproved(sessionId, ids, false, preview, confirmId.current).then(() => pop.close());
             }}
           />
         ) : null}

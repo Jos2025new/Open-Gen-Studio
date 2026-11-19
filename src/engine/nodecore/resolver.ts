@@ -29,6 +29,11 @@ export interface ResolvedInput {
   revision: string | null;
   /** A tombstone of a deleted node's link: shown as invalid, not part of the request. */
   broken?: true;
+  kind?: import('../types').LinkKind;
+  /** Set when the cable is invalid because its pin no longer matches. */
+  pinMoved?: true;
+  /** The revision, only for a source whose content was revised: it joins the freshness signature. */
+  rev?: string;
 }
 
 /** An edge whose image was deleted keeps this index: it can never match a result (see graph.ts NO_RESULT). */
@@ -50,24 +55,26 @@ export function storeEnv(): ResolveEnv {
 }
 
 /** What a source node delivers on one edge: its value and the revision label of that value. */
-export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): { value: string | null; revision: string | null } {
+export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): { value: string | null; revision: string | null; edited?: true } {
   const data = src?.data;
   if (!data) return { value: null, revision: null };
   const gen = 'generationId' in data && data.generationId ? env.generations[data.generationId] : undefined;
   let value: string | null | undefined;
   let revision: string | null = null;
+  let edited: true | undefined;
   if (data.kind === 'text') value = data.text;
   else if (data.kind === 'ref') value = env.chatText(src!);
   else if (data.kind === 'asset') {
     value = data.sketchAssetId ?? data.assetId;
     const rev = data.assetId ? normalizeAssetRevisions(env.assets[data.assetId]) : undefined;
     if (value) revision = `${value}@${rev ? `${rev.index}/${rev.versions.length}` : '0'}`;
+    if (rev && rev.versions.length > 1) edited = true;
   } else {
     value = gen?.text ?? ('outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[edge.outputIndex ?? data.outputIndex] : null);
     if (value && gen) revision = `${gen.id}:${value}`;
   }
   if (value == null) return { value: null, revision: null };
-  return { value, revision: revision ?? digest(value) };
+  return { value, revision: revision ?? digest(value), ...(edited ? { edited } : {}) };
 }
 
 /** Every data input of a node, resolved: the value, its revision, and whether the link is usable. */
@@ -77,16 +84,16 @@ export function resolveInputs(graph: Graph, node: GraphNode, env: ResolveEnv): R
     const base = { port: e.targetHandle, edgeId: e.id, from: src?.id ?? null, mode: (e.pin ? 'pinned' : 'moving') as RefMode };
     if (!src) return { ...base, status: 'invalid', reason: 'The source node no longer exists.', value: null, revision: null };
     if (e.outputIndex === GONE) return { ...base, status: 'invalid', reason: 'The image this link used was deleted.', value: null, revision: null };
-    const { value, revision } = sourceValue(src, e, env);
-    if (e.pin && value != null && revision !== e.pin) return { ...base, status: 'invalid', reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
-    return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: 'The source has no output yet.' } : {}), value, revision };
+    const { value, revision, edited } = sourceValue(src, e, env);
+    if (e.pin && value != null && revision !== e.pin) return { ...base, status: 'invalid', pinMoved: true, reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
+    return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: 'The source has no output yet.' } : {}), value, revision, ...(edited ? { rev: revision! } : {}) };
   });
-  const broken = (graph.broken ?? []).filter((b) => b.edge.target === node.id && (b.edge.kind ?? 'data') === 'data').map((b): ResolvedInput => ({
-    port: b.edge.targetHandle, edgeId: b.edge.id, from: b.missing === 'source' ? null : b.edge.source, mode: b.edge.pin ? 'pinned' : 'moving',
+  const broken = (graph.broken ?? []).filter((b) => b.edge.target === node.id).map((b): ResolvedInput => ({
+    kind: b.edge.kind ?? 'data', port: b.edge.targetHandle, edgeId: b.edge.id, from: b.missing === 'source' ? null : b.edge.source, mode: b.edge.pin ? 'pinned' : 'moving',
     status: 'invalid', reason: `The ${b.missing} node was deleted.`, value: null, revision: null, broken: true,
   }));
   return [...live, ...broken];
 }
 
 /** The inputs a node's request is built from, in the `{ port, value }` shape saved signatures already use. */
-export const incomingOf = (inputs: ResolvedInput[]) => inputs.filter((i) => !i.broken).map((i) => ({ port: i.port, value: i.value }));
+export const incomingOf = (inputs: ResolvedInput[]) => inputs.filter((i) => !i.broken).map((i) => ({ port: i.port, value: i.value, ...(i.rev ? { rev: i.rev } : {}) }));
