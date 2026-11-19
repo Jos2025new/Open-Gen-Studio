@@ -25,6 +25,16 @@ Traspaso para la próxima sesión maestra. Rama única: `task/sqlite-adopt` (wor
 
 La suite completa sobre la rama ya fusionada se lanzó el 2026-11-18; su resultado está en `pendientes.md`.
 
+## Corrección del 2026-11-18: verificado en el código, mucho es parcial
+
+Un Sonnet lo comprobó en el código (solo lectura) y la tabla de arriba exagera. Estado real:
+- **Varios agentes, A2:** FALSO en el envío real. `sendAgentMessage` llama a `agentEngine()` sin `agentNodeId` (`conversation.ts:68,82,108`; `llmTurn.ts:53`) y `agentNodeOf` devuelve siempre el primer agente (`runtimeShared.ts:98-100`). Los metadatos y `chatAgents` existen, pero responde siempre el primero. Los tests probaban `agentEngine` con un id explícito, no el envío.
+- **LLM propio por agente, A1:** parcial. `setAgentLlm` (`system.ts:345`) solo lo usan los tests; no hay control en el nodo para cambiarlo.
+- **Nodo `prompt`, A4:** parcial. Solo lo lee el primer agente y no se puede crear desde la UI (falta en `AddNodeItems.tsx:24-33`). `mediaSettings` existe como tipo, pero no se genera ni se ofrece.
+- **«Assets in», A3:** referencia por id, sí; no existe la acción explícita «copiar».
+- **Regla de nodos del sistema:** los puntos 3 y 4 están hechos (`omniSpaces.ts:40-52`, `AddNodeItems.tsx:46-47`). El punto 1 es parcial: Studio genera chat, agent y model; Designer, `designer.doc`; Nodes, toolset y library; faltan provider, board, log, ajustes y aspecto. El punto 2 es parcial: al abrir un space, sus nodos salen sueltos debajo, sin un marco encapsulado.
+- **Diagnóstico:** se usaron sus 3 acoplamientos y los tres quedaron a medias. Las piezas sin nodo (board, log de generaciones, ajustes generales, layer, paneles de Designer, historial de prompts) no se atacaron. Fue un recorte de alcance que no se dijo.
+
 ## Decisiones del usuario (vigentes)
 
 - **Nodos del sistema:** cada space crea los suyos por defecto y los necesita; se ven en el omnicanvas al abrir el space, como un nodo encapsulado. Los nodos de Nodes sirven en los dos lienzos; los del sistema **nunca** van en el lienzo Nodes normal.
