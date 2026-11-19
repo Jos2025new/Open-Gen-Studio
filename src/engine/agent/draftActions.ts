@@ -1,5 +1,6 @@
-import { patchSession, updateFeedItem, useStore } from '../../store/store';
-import type { AgentState, SettingsFeedItem, SettingsSection } from '../types';
+import { updateFeedItem, useStore } from '../../store/store';
+import { laneState, patchLane } from './lanes';
+import type { SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, latestDraft, unlockNote, withModeResolution, type DraftMode } from './draftFirst';
 
 export { draftGate } from './draftFirst';
@@ -22,7 +23,7 @@ const cardOf = (sessionId: string, itemId: string): SettingsFeedItem | undefined
   const item = useStore.getState().sessions[sessionId]?.feed.find((f) => f.id === itemId);
   return item?.type === 'settings' && item.status === 'pending' ? item : undefined;
 };
-const remember = (sessionId: string, mode: DraftMode) => patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, draftMode: mode } as AgentState }));
+const remember = (sessionId: string, owner: string | undefined, mode: DraftMode) => patchLane(sessionId, owner, { draftMode: mode });
 
 /** The user picked Borrador / Alta calidad / their own words on the card: the app sets (and for a draft locks) the resolution. */
 export function selectDraft(sessionId: string, itemId: string, kind: DraftMode['kind'], text?: string): void {
@@ -33,7 +34,7 @@ export function selectDraft(sessionId: string, itemId: string, kind: DraftMode['
   const same = item.draft?.kind === kind;
   const next: DraftMode = same && kind !== 'draft' ? { ...mode, unlocked: item.draft?.unlocked } : mode;
   updateFeedItem<SettingsFeedItem>(sessionId, itemId, { draft: next, ...(same && kind === 'other' ? {} : { sections: lockSections(sectionsOf(item), next) }) });
-  remember(sessionId, next);
+  remember(sessionId, item.meta?.agentNodeId, next);
 }
 
 /** The padlock: the user lifts the lock to change the resolution; the agent is told once the card is confirmed. */
@@ -42,7 +43,7 @@ export function unlockDraft(sessionId: string, itemId: string): void {
   if (!item?.draft?.locked) return;
   const next: DraftMode = { ...item.draft, locked: false, unlocked: true };
   updateFeedItem<SettingsFeedItem>(sessionId, itemId, { draft: next });
-  remember(sessionId, next);
+  remember(sessionId, item.meta?.agentNodeId, next);
 }
 
 /** What the agent reads of the draft choice when the card is confirmed (the unlock is a fact it must not question). */
@@ -57,10 +58,10 @@ export function draftLines(d: DraftMode | undefined, sections: Array<SettingsSec
 }
 
 /** Video cards carry the draft choice; the one set earlier in this request stays (a second card cannot lift the lock). */
-export function cardDraft<S extends SettingsSection>(sessionId: string, sections: S[], asked?: DraftMode): { sections: S[]; draft?: DraftMode } {
+export function cardDraft<S extends SettingsSection>(sessionId: string, owner: string | undefined, sections: S[], asked?: DraftMode): { sections: S[]; draft?: DraftMode } {
   if (!sections.some((x) => x.kind === 'video')) return { sections };
-  const draft = asked ?? useStore.getState().sessions[sessionId].agent.draftMode ?? draftMode('draft');
-  remember(sessionId, draft);
+  const draft = asked ?? laneState(sessionId, owner)?.draftMode ?? draftMode('draft');
+  remember(sessionId, owner, draft);
   return { sections: lockSections(sections, draft), draft };
 }
 

@@ -28,7 +28,7 @@ import { backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, formatZodError } from './tools';
-import { get, session } from './runtimeShared';
+import { agentOf, get, session } from './runtimeShared';
 import { flushToolResults, guideLabel } from './conversation';
 import { planRecoveryProblem, presentNodeRun, resumePlan } from './planRun';
 import { activityLog } from './activityLog';
@@ -36,6 +36,8 @@ import { generationStatus, generationStatusSchema } from './jobStatus';
 
 type CallCtx = {
   sessionId: string;
+  /** The agent whose turn this is: everything the call writes goes to it. */
+  owner: string | undefined;
   workspace: Workspace;
   call: ChatResult['toolCalls'][number];
   parsed: { value: unknown };
@@ -90,11 +92,11 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   const v = nodeIdsSchema.safeParse(parsed.value);
   if (c.workspace !== 'node') { respond('run_nodes works only on the node canvas.'); return { handled: true, workspace: c.workspace }; }
   if (!v.success) { respond(`Invalid run_nodes: ${v.error.message}`); return { handled: true, workspace: c.workspace }; }
-  const proposed = await until(presentNodeRun(sessionId, v.data.node_ids, call.id, c.cardMeta?.()));
+  const proposed = await until(presentNodeRun(sessionId, v.data.node_ids, call.id, c.cardMeta?.(), c.owner));
   if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); return { handled: true, workspace: c.workspace }; }
   c.onCardCommitted?.();
   log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
-  ignoreRest(index); flushToolResults(sessionId, toolResults); return { handled: true, stop: true, workspace: c.workspace };
+  ignoreRest(index); flushToolResults(sessionId, toolResults, c.owner); return { handled: true, stop: true, workspace: c.workspace };
           }
           if (call.name === 'export_design') {
   const doc = c.workspace === 'designer' ? activeDoc(sessionId) : null;
@@ -258,7 +260,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
     return { handled: true, workspace: c.workspace };
   }
   // A workflow asks before it loads: the short card (no metric, no "Read the…" action) until answered.
-  const card = v.success ? cardInsteadOfGuide(v.data, session(sessionId).agent.questionRound, get().composer.agentStyle === 'direct') : undefined;
+  const card = v.success ? cardInsteadOfGuide(v.data, agentOf(sessionId, c.owner).questionRound, get().composer.agentStyle === 'direct') : undefined;
   if (card) {
     respond(card);
     return { handled: true, workspace: c.workspace };

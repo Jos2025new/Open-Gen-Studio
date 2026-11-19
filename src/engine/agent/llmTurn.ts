@@ -93,7 +93,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     clearTimeout(silenceTimer);
     silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
   };
-  const turnMeta = () => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId);
+  const turnMeta = () => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId, owner);
   const clearPending = () => {
     pendingUsage = undefined;
     pendingCost = 0;
@@ -122,7 +122,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     say?.();
     clearTimeout(silenceTimer);
     clearTimeout(capTimer);
-    keepCommentedPlan(sessionId);
+    keepCommentedPlan(sessionId, owner);
     endLog(outcome);
     log.end();
     clock.end();
@@ -153,9 +153,9 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       let result: ChatResult;
       try {
         if (mine().phase !== 'working') patchAgent(sessionId, { phase: 'working' }, owner);
-        drainAgentNotes(sessionId);
+        drainAgentNotes(sessionId, owner);
         if (!hurryNoted && Date.now() - turnStart > HURRY_MS) {
-          pushHistory(sessionId, { role: 'user', content: HURRY_NOTE });
+          pushHistory(sessionId, { role: 'user', content: HURRY_NOTE }, owner);
           hurryNoted = true;
         }
         result = await until(chat({
@@ -181,8 +181,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             armSilence();
             if (!textItemId) {
               firstOutput();
-              textItemMeta = messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId);
-              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel(sessionId), meta: textItemMeta };
+              textItemMeta = messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId, owner);
+              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel(sessionId, owner), meta: textItemMeta };
               textItemId = item.id;
               appendFeed(sessionId, item);
             } else {
@@ -291,7 +291,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         content: result.text || null,
         tool_calls: result.toolCalls.length ? result.toolCalls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.name, arguments: c.arguments } })) : undefined,
         ...(result.reasoningDetails ? { reasoning_details: result.reasoningDetails } : {}),
-      });
+      }, owner);
       if (!result.toolCalls.length) {
         // Nothing to show and nothing to run (T2): say what actually happened, and leave the turn retryable.
         if (!result.text.trim()) {
@@ -303,7 +303,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       }
       // The wrap-up after a plan (S4) is text only: a tool call there is answered as ignored and nothing runs.
       if (opts.textOnly) {
-        flushToolResults(sessionId, result.toolCalls.map((c) => ({ role: 'tool' as const, tool_call_id: c.id, content: 'Ignored: this reply is text only.' })));
+        flushToolResults(sessionId, result.toolCalls.map((c) => ({ role: 'tool' as const, tool_call_id: c.id, content: 'Ignored: this reply is text only.' })), owner);
         return;
       }
 
@@ -330,18 +330,18 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const ag = mine;
           const v = confirmSettingsSchema.safeParse(parsed.value);
           if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
-          inferChoices(sessionId, 'confirm_settings', v.data.parts);
+          inferChoices(sessionId, owner, 'confirm_settings', v.data.parts);
           if (workspace === 'node') { respond('The node canvas has its own settings on each node: call propose_plan directly.'); continue; }
           const parts = imagesFirst(v.data.parts);
-          const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
+          const { sections, failed } = await sectionsOfParts(sessionId, owner, parts, until, log);
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
-          if (get().composer.agentStyle === 'auto') { respond(await autoAnswer(sessionId, rowCanvas(workspace), call.id, v.data.summary, sections, parts, log, turnMeta())); continue; }
+          if (get().composer.agentStyle === 'auto') { respond(await autoAnswer(sessionId, owner, rowCanvas(workspace), call.id, v.data.summary, sections, parts, log, turnMeta())); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
-          flushToolResults(sessionId, toolResults);
+          flushToolResults(sessionId, toolResults, owner);
           const sw = await switchSection(sections, ag().settings, ag().settingsParts, parts[0]?.user_requested === true, parts[0]?.model, undefined, parts[0]);
           const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }), meta: takePendingMeta(hasTextBubble()) };
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, owner, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }), meta: takePendingMeta(hasTextBubble()) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } }, owner);
@@ -364,7 +364,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           log.action({ icon: 'questions', label: `Asked ${v.data.questions.length} question${v.data.questions.length === 1 ? '' : 's'}` });
           // This call's result is sent later, with the user's answers.
           ignoreRest(index);
-          flushToolResults(sessionId, toolResults);
+          flushToolResults(sessionId, toolResults, owner);
           recordMetric(sessionId, { type: 'questions' });
           showQuestions(
             sessionId,
@@ -379,12 +379,13 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
               default: q.default && q.options.includes(q.default) ? q.default : undefined,
             })),
             call.id,
+            owner,
             takePendingMeta(hasTextBubble()),
           );
           outcome = 'questions';
           return;
         }
-        const canvas = await runCanvasCall({ sessionId, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools, cardMeta: () => pendingMeta(hasTextBubble()), onCardCommitted: () => { if (!hasTextBubble()) clearPending(); } });
+        const canvas = await runCanvasCall({ sessionId, owner, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools, cardMeta: () => pendingMeta(hasTextBubble()), onCardCommitted: () => { if (!hasTextBubble()) clearPending(); } });
         workspace = canvas.workspace;
         if (canvas.stop) return;
         if (canvas.handled) continue;
@@ -397,7 +398,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             planFailures++;
             continue;
           }
-          inferChoices(sessionId, 'propose_plan', v.data.steps);
+          inferChoices(sessionId, owner, 'propose_plan', v.data.steps);
           if (!v.data.revision && (mine().settingsParts?.length ?? 0) > 1) {
             const feed = session(sessionId).feed;
             const userAt = feed.findLastIndex((f) => f.type === 'user');
@@ -411,9 +412,9 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
           const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((mine().settingsParts ?? []).map((p) => [p.kind, p])) : mine().settings)) : null;
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
-          if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, v.data.steps))) {
+          if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, owner, v.data.steps))) {
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
-            const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log, turnMeta()) : (gate ?? draft)!;
+            const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, owner, rowCanvas(workspace), call.id, v.data.steps, until, log, turnMeta()) : (gate ?? draft)!;
             if (told !== null) {
               if (get().composer.agentStyle !== 'auto') recordMetric(sessionId, { type: 'rejected' });
               else if (!settled) { settled = true; iteration--; }
@@ -423,7 +424,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           }
           patchAgent(sessionId, { phase: 'checking' }, owner);
           const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn, owner), action: (entry) => log.action(entry) });
-          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal, pendingMeta(hasTextBubble())), waits);
+          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, owner, v.data.revision === true, clock.elapsed(), signal, pendingMeta(hasTextBubble())), waits);
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
             if (textItemId) removeFeedItem(sessionId, textItemId);
@@ -445,14 +446,14 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           if (!hasTextBubble()) clearPending();
           // This call's result is sent when the user approves or cancels.
           ignoreRest(index);
-          flushToolResults(sessionId, toolResults);
+          flushToolResults(sessionId, toolResults, owner);
           outcome = 'plan';
           return;
         }
         respond(`Unknown tool "${call.name}".`);
       }
-      flushToolResults(sessionId, toolResults);
-      for (const m of afterTools) pushHistory(sessionId, m);
+      flushToolResults(sessionId, toolResults, owner);
+      for (const m of afterTools) pushHistory(sessionId, m, owner);
       if (planFailures >= 3) {
         outcome = 'error';
         notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.', 'error', undefined, takePendingMeta(hasTextBubble()));

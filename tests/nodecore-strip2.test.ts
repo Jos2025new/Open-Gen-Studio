@@ -59,7 +59,7 @@ describe('strip 2: chat with two agents', () => {
 
   it('each agent keeps its own history', async () => {
     await sendAgentMessage('for the writer', { agentNodeId: 'agentA' });
-    pushHistory(HOME, { role: 'assistant', content: 'writer says' });
+    pushHistory(HOME, { role: 'assistant', content: 'writer says' }, 'agentA');
     await sendAgentMessage('for the critic', { agentNodeId: 'agentB' });
     expect(laneState(HOME, 'agentA')!.history.some((m) => m.content === 'writer says')).toBe(true);
     expect(S().agent.history.some((m) => m.content === 'writer says')).toBe(false); // the critic never saw it

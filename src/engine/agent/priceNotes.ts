@@ -1,4 +1,5 @@
 import { patchSession, useStore } from '../../store/store';
+import { patchLane } from './lanes';
 import type { StepAuthorization, StepCostReview } from '../types';
 
 export interface StepPriceDecision {
@@ -26,12 +27,8 @@ export function priceDecisionNote(planId: string, stepId: string, record: StepPr
 }
 
 /** Drain in one persisted update; notices are independent immutable tail messages. */
-export function drainAgentNotes(sessionId: string): void {
-  patchSession(sessionId, (s) => {
-    if (!s.agent.notes.length) return s;
-    return { ...s, agent: { ...s.agent, notes: [], history: [...s.agent.history,
-      ...s.agent.notes.map((note) => ({ role: 'user' as const, content: note.startsWith('[app]') ? note : `[app] ${note}` }))] } };
-  });
+export function drainAgentNotes(sessionId: string, owner: string | undefined): void {
+  patchLane(sessionId, owner, (a) => (a.notes.length ? { notes: [], history: [...a.history, ...a.notes.map((note) => ({ role: 'user' as const, content: note.startsWith('[app]') ? note : `[app] ${note}` }))] } : {}));
 }
 
 /** Reconcile terminal generations without any provider/LLM call, including after reload. */
@@ -53,7 +50,11 @@ export function recordPriceResults(sessionId: string, itemId: string): void {
       return [stepId, decisions ? { ...review, decisions } : review];
     }));
     if (!notes.length) return s;
+    // The note goes to the agent that owns the plan, not to the one on screen.
+    const owner = (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId;
+    const mine = owner && s.agentLane !== undefined ? (s.agents?.[owner] ?? (s.agentLane === owner ? s.agent : undefined)) : s.agent;
+    const withNotes = mine ? { ...mine, notes: [...mine.notes, ...notes] } : undefined;
     return { ...s, feed: s.feed.map((f) => f.id === itemId ? { ...item, stepCostReviews: reviews } : f),
-      agent: { ...s.agent, notes: [...s.agent.notes, ...notes] } };
+      ...(withNotes ? (owner && s.agentLane !== undefined ? { agents: { ...s.agents, [owner]: withNotes } } : { agent: withNotes }) : {}) };
   });
 }

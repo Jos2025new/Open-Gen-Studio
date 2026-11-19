@@ -1,4 +1,4 @@
-import { patchLane } from './lanes';
+import { laneState, patchLane } from './lanes';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -49,9 +49,12 @@ export function requestGate(sessionId: string) {
 
 
 /** Write an agent's state: the one named by `agentNodeId` (a turn always names its own), else the agent on screen. */
-export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>), agentNodeId?: string): void {
+export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>), agentNodeId: string | undefined): void {
   patchLane(sessionId, agentNodeId, patch);
 }
+
+/** An agent's state by id (explicit); `undefined` is the agent on screen, for a caller no agent owns. */
+export const agentOf = (sessionId: string, owner: string | undefined): AgentState => laneState(sessionId, owner) ?? session(sessionId).agent;
 
 /** One abort controller per running turn: an agent's key is its own, so two agents of one session can run at once. */
 export const turnKey = (sessionId: string, agentNodeId?: string): string => (agentNodeId ? `${sessionId}|${agentNodeId}` : sessionId);
@@ -65,18 +68,20 @@ export function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace: rowCanvas(workspace) };
 }
 
-/** The chat a session's current conversation comes from (set when a message is sent from a chat node). */
+/** The chat each agent's current conversation comes from (set when a message is sent from a chat node): one per agent, so two agents of a session never share it. */
 const turnChats = new Map<string, string>();
-export const setTurnChat = (sessionId: string, chatNodeId: string | undefined) => { if (chatNodeId) turnChats.set(sessionId, chatNodeId); else turnChats.delete(sessionId); };
+export const setTurnChat = (sessionId: string, chatNodeId: string | undefined, owner: string | undefined) => { const k = turnKey(sessionId, owner); if (chatNodeId) turnChats.set(k, chatNodeId); else turnChats.delete(k); };
 
-export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}, sessionId: string = get().activeSessionId): ChatMessageMeta {
-  const sender = extra.agentNodeId ?? get().sessions[sessionId]?.agentLane;
+/** The metadata of a row. `owner` is the agent it is written for (explicit: pass `undefined` only for a row no agent owns). */
+export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta>, sessionId: string, owner: string | undefined): ChatMessageMeta {
+  const sender = extra.agentNodeId ?? owner;
+  const chat = turnChats.get(turnKey(sessionId, sender)) ?? chatNodeOf(sessionId);
   const e = agentEngine(sessionId, sender);
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
     ...(agentNodeOf(sessionId, sender)?.id ? { agentNodeId: agentNodeOf(sessionId, sender)!.id } : {}),
-    ...((turnChats.get(sessionId) ?? chatNodeOf(sessionId)) ? { chatNodeId: turnChats.get(sessionId) ?? chatNodeOf(sessionId) } : {}),
+    ...(chat ? { chatNodeId: chat } : {}),
     space: placeFor(get().ui, workspace),
     provider: e.kind === 'offline' ? 'offline' : e.provider,
     model: e.kind === 'offline' ? 'Local planner' : e.model,
@@ -156,8 +161,8 @@ export function agentEngine(sessionId: string = get().activeSessionId, agentNode
   return { kind: 'llm', provider: agent.provider, model: agent.model, key };
 }
 
-export function engineLabel(sessionId: string = get().activeSessionId): string {
-  const e = agentEngine(sessionId);
+export function engineLabel(sessionId: string, owner: string | undefined): string {
+  const e = agentEngine(sessionId, owner);
   return e.kind === 'offline' ? 'Local planner' : `${e.model.replace(/^[^/]+\//, '')} · ${LLM_LABELS[e.provider]}`;
 }
 
@@ -175,21 +180,21 @@ export function userBlock(text: string, canvas: Workspace): string {
 /**
  * One conversation per session; restore an older parked canvas only when history is empty and the agent idle.
  */
-export function toCanvas(sessionId: string, workspace: Workspace): void {
-  const a = session(sessionId)?.agent;
+export function toCanvas(sessionId: string, workspace: Workspace, owner: string | undefined): void {
+  const a = session(sessionId) ? agentOf(sessionId, owner) : undefined;
   if (!a || a.busy || a.canvas === workspace) return;
   const there = a.parked?.[workspace];
   if (there && !a.history.length) {
-    patchAgent(sessionId, { ...there, pending: there.pending, draft: there.draft, revising: there.revising, canvas: workspace, parked: { ...a.parked, [workspace]: undefined } });
+    patchAgent(sessionId, { ...there, pending: there.pending, draft: there.draft, revising: there.revising, canvas: workspace, parked: { ...a.parked, [workspace]: undefined } }, owner);
     return;
   }
-  patchAgent(sessionId, { canvas: workspace });
+  patchAgent(sessionId, { canvas: workspace }, owner);
 }
 
 /** The conversation of the canvas a feed item belongs to. */
 export function toCanvasOfItem(sessionId: string, itemId: string): void {
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
-  if (item) toCanvas(sessionId, turnCanvas(item.workspace));
+  if (item) toCanvas(sessionId, turnCanvas(item.workspace), (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId);
 }
 
 /** What the user wrote in this session (messages and answers): a model named there is the user's choice. */
@@ -199,7 +204,7 @@ function userWords(sessionId: string): string {
   return [...said, s.agent.draft?.request ?? '', ...Object.values(s.agent.draft?.answers ?? {})].join('\n');
 }
 
-function planContext(sessionId: string, workspace: Workspace, strict = false) {
+function planContext(sessionId: string, workspace: Workspace, strict: boolean, owner: string | undefined) {
   const doc = workspace === 'designer' ? activeDoc(sessionId) : null;
   return {
     workspace,
@@ -209,7 +214,7 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
       return routes[route] ?? (route === 'edit' ? routes.reference : undefined);
     },
     defaultModel: (kind: MediaKind, needsImage: boolean) => {
-      const ref = (kind === 'image' || kind === 'video') && session(sessionId).agent.settings?.[kind]?.modelRef;
+      const ref = (kind === 'image' || kind === 'video') && agentOf(sessionId, owner).settings?.[kind]?.modelRef;
       return ref ? (needsImage ? lineRoutes(ref)[kind === 'image' ? 'edit' : 'image'] ?? ref : lineRoutes(ref).text ?? ref) : defaultModelFor(kind, needsImage);
     },
     defaultIsFallback: (kind: MediaKind, needsImage: boolean) => defaultModelChoice(kind, needsImage).source === 'fallback',
@@ -218,28 +223,28 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
     suggestModel,
     // Direct keeps session model precedence.
-    composerChosen: (kind: MediaKind) => get().composer.agentStyle === 'direct' || Boolean((kind === 'image' || kind === 'video') && session(sessionId).agent.settings?.[kind]) || composerChosen(kind),
+    composerChosen: (kind: MediaKind) => get().composer.agentStyle === 'direct' || Boolean((kind === 'image' || kind === 'video') && agentOf(sessionId, owner).settings?.[kind]) || composerChosen(kind),
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
     librarySubjects:()=>get().library,
     strictContinuity:strict,
     userText: () => userWords(sessionId),
     // This request only (an old "un ángulo diferente" must not fit a new one), user words only; the agent's reply is in offerText.
-    requestText: () => userRequest(session(sessionId).agent),
-    offerText: () => offerRequest(session(sessionId).agent),
+    requestText: () => userRequest(agentOf(sessionId, owner)),
+    offerText: () => offerRequest(agentOf(sessionId, owner)),
     // Angles already made from this source image, by finished angle operations on it.
     usedAngles: (assetId: string) => Object.values(get().generations)
       .filter((g) => g.status === 'done' && g.op?.id === 'angle' && g.op.sourceAssetId === assetId)
       .map((g) => String(g.op?.params.angle ?? ''))
       .filter(Boolean),
-    requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
+    requestImages: () => (agentOf(sessionId, owner).draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
     direct: () => get().composer.agentStyle === 'direct',
-    canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
-    answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
-    opModel: () => (workspace === 'node' ? undefined : get().composer.agentStyle === 'direct' ? get().composer.image.modelRef : session(sessionId).agent.settings?.image?.modelRef),
+    canAsk: () => agentOf(sessionId, owner).questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
+    answered: () => Object.keys(agentOf(sessionId, owner).draft?.answers ?? {}).length > 0,
+    opModel: () => (workspace === 'node' ? undefined : get().composer.agentStyle === 'direct' ? get().composer.image.modelRef : agentOf(sessionId, owner).settings?.image?.modelRef),
     // Direct inherits the session model without forcing the other settings.
-    confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
-    switchedTo: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle === 'auto' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.switchedTo?.[kind] : undefined),
-    confirmedParts: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' ? (session(sessionId).agent.settingsParts ?? []).filter((p) => p.kind === kind) : []),
+    confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? agentOf(sessionId, owner).settings?.[kind] : undefined),
+    switchedTo: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle === 'auto' && (kind === 'video' || kind === 'image') ? agentOf(sessionId, owner).switchedTo?.[kind] : undefined),
+    confirmedParts: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' ? (laneState(sessionId, owner)?.settingsParts ?? []).filter((p) => p.kind === kind) : []),
   };
 }
 
@@ -247,9 +252,9 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
 // Entry points
 
 /** A reply to a waiting card is part of the request: what the app reads for a model or provider the user named (userRequest) includes it. */
-export function addReplyToRequest(sessionId: string, text: string, attachments: string[]): void {
-  const draft = session(sessionId).agent.draft;
-  patchAgent(sessionId, { draft: { request: `${draft?.request ?? ''} ${text}`.trim(), answers: draft?.answers ?? {}, attachments: [...(draft?.attachments ?? []), ...attachments.filter((id) => !draft?.attachments?.includes(id))] } });
+export function addReplyToRequest(sessionId: string, text: string, attachments: string[], owner: string | undefined): void {
+  const draft = agentOf(sessionId, owner).draft;
+  patchAgent(sessionId, { draft: { request: `${draft?.request ?? ''} ${text}`.trim(), answers: draft?.answers ?? {}, attachments: [...(draft?.attachments ?? []), ...attachments.filter((id) => !draft?.attachments?.includes(id))] } }, owner);
 }
 
 /** Send a message from the composer in agent mode. */
@@ -259,10 +264,10 @@ export function showQuestions(
   intro: string | undefined,
   questions: AgentQuestion[],
   toolCallId: string | null,
+  owner: string | undefined,
   meta?: ChatMessageMeta,
 ): void {
-  const s = session(sessionId);
-  const round = s.agent.questionRound + 1;
+  const round = (laneState(sessionId, owner)?.questionRound ?? 0) + 1;
   const item: QuestionsFeedItem = {
     ...feedBase(workspace),
     type: 'questions',
@@ -272,11 +277,11 @@ export function showQuestions(
     maxRounds: roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     status: 'pending',
     ...(toolCallId ? { toolCallId } : {}),
-    meta: meta ?? messageMeta(workspace, {}, sessionId),
+    meta: meta ?? messageMeta(workspace, {}, sessionId, owner),
   };
   appendFeed(sessionId, item);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.presented', reason: 'agent asked for user information', sessionId, approvalId: item.id, after: { questionIds: questions.map((q) => q.id), round, maxRounds: item.maxRounds } });
-  patchAgent(sessionId, { questionRound: round, pending: { toolCallId, kind: 'questions', feedItemId: item.id } });
+  patchAgent(sessionId, { questionRound: round, pending: { toolCallId, kind: 'questions', feedItemId: item.id } }, owner);
   if (get().ui.workspace !== 'chat') setThreadOpen(true);
 }
 
@@ -286,6 +291,7 @@ export async function presentPlan(
   workspace: Workspace,
   raw: RawPlan,
   toolCallId: string | null,
+  owner: string | undefined,
   revision = false,
   /** Agent time so far, for the request's metrics (LLM turns only). */
   agentMs?: number,
@@ -296,7 +302,7 @@ export async function presentPlan(
   const started = Date.now();
   const planId = uid('pln');
   const carried = revision ? carryOverRevision(raw, session(sessionId)) : [];
-  const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId), planId);
+  const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId, owner), planId);
   if (plan && carried.length) plan.agentNotes = carried;
   if (signal?.aborted) return { errors: [] };
   const journey = revision ? 'plan-revision' : 'settings-correction';
@@ -315,14 +321,14 @@ export async function presentPlan(
     const action = needsConfirmation({
       workspace,
       kinds: settingKinds,
-      settings: session(sessionId).agent.settings,
+      settings: laneState(sessionId, owner)?.settings,
       style: get().composer.agentStyle,
       userChoseModel: (raw.steps ?? []).some((s) => Boolean(s.model)),
       estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
     });
     // The card just confirmed in this request already covers the cost: asking again looped (4 cards for one video).
-    const confirmedNow = settingKinds.every((k) => (session(sessionId).agent.settingsParts ?? []).some((p) => p.kind === k));
+    const confirmedNow = settingKinds.every((k) => (laneState(sessionId, owner)?.settingsParts ?? []).some((p) => p.kind === k));
     if (action === 'ask' && !confirmedNow) return { errors: [], settingsNeeded: costAskMessage([...new Set(settingKinds)], total.usd) };
   }
   const style = get().composer.agentStyle;
@@ -336,13 +342,13 @@ export async function presentPlan(
     stepStates: Object.fromEntries(plan.steps.map((st) => [st.id, 'pending' as StepState])),
     stepGenerations: {},
     estimate: total,
-    meta: meta ?? messageMeta(workspace, {}, sessionId),
+    meta: meta ?? messageMeta(workspace, {}, sessionId, owner),
   };
-  const replaced = closeRevisedPlan(sessionId, revision);
+  const replaced = closeRevisedPlan(sessionId, revision, owner);
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
   for (const a of plan.adjustments.filter((x) => /\byour [\w-]+ model\b/.test(x))) toast(a.replace(/^[\w-]+: /, ''), 'error', 5000);
-  patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
+  patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } }, owner);
   if (workspace === 'node') {
     materializeNodes(sessionId, plan);
     const targets = plan.steps.filter(s => s.kind !== 'text').map(s => `${plan.id}_${s.id}`);
@@ -366,17 +372,17 @@ export async function presentPlan(
  * The plan the user commented on: a revision replaces it (removed from the feed, the new card says "Revised");
  * any other outcome closes it as canceled, so two plans never mix. Returns whether it was replaced.
  */
-export function keepCommentedPlan(sessionId: string): void {
-  const id = session(sessionId).agent.revising;
+export function keepCommentedPlan(sessionId: string, owner: string | undefined): void {
+  const id = agentOf(sessionId, owner).revising;
   if (!id) return;
   const plan = session(sessionId).feed.find((f) => f.id === id);
-  patchAgent(sessionId, (a) => ({ revising: undefined, ...(plan?.type === 'plan' && plan.status === 'awaiting' && !a.pending ? { pending: { toolCallId: null, kind: 'plan', feedItemId: id } } : {}) }));
+  patchAgent(sessionId, (a) => ({ revising: undefined, ...(plan?.type === 'plan' && plan.status === 'awaiting' && !a.pending ? { pending: { toolCallId: null, kind: 'plan', feedItemId: id } } : {}) }), owner);
 }
 
-export function closeRevisedPlan(sessionId: string, replace: boolean): boolean {
-  const id = session(sessionId).agent.revising;
+export function closeRevisedPlan(sessionId: string, replace: boolean, owner: string | undefined): boolean {
+  const id = agentOf(sessionId, owner).revising;
   if (!id) return false;
-  patchAgent(sessionId, { revising: undefined });
+  patchAgent(sessionId, { revising: undefined }, owner);
   const old = session(sessionId).feed.find((f) => f.id === id);
   if (old?.type !== 'plan' || old.status !== 'awaiting') return false;
   removeDraftNodes(sessionId, old.plan.id);

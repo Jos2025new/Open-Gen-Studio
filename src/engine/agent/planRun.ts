@@ -46,6 +46,7 @@ export function removeDraftNodes(sessionId: string, planId: string): void {
 
 export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
   if (claimLaneOfItem(sessionId, itemId)) return;
+  const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -71,10 +72,10 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const closesRequest = pending?.feedItemId === itemId;
   if (closesRequest) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
-    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` });
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` }, owner);
     if (item.style === 'direct') inheritApproved(sessionId, chosen, item.comparisonKinds);
     else if (item.style === 'auto') confirmApproved(sessionId, chosen, item.comparisonKinds);
-    patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
+    patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined }, owner);
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
     ...it,
@@ -88,7 +89,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (closesRequest) closeRequest(sessionId, 'approved', total.usd);
 }
 
-export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null, meta?: ChatMessageMeta): Promise<{ errors: string[]; itemId?: string }> {
+export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null, meta?: ChatMessageMeta, owner?: string): Promise<{ errors: string[]; itemId?: string }> {
   if (!targets.length) return { errors: ['Select at least one existing node.'] };
   const graph = session(sessionId).graph;
   const missing = targets.find(id => !graph.nodes.some(n => n.id === id && runsGeneration(n.data)));
@@ -100,11 +101,11 @@ export async function presentNodeRun(sessionId: string, targets: string[], toolC
     nodeRun: { targets, force: true, signature: preview.signature },
     plan: { id: uid('pln'), title: 'Run existing nodes', summary: 'Existing node IDs and required upstream updates. No new flow is created.', workspace: 'node', steps: preview.steps, adjustments: [] },
     estimate: preview.estimate, stepStates: {}, stepGenerations: {},
-    meta: meta ?? messageMeta('node'),
+    meta: meta ?? messageMeta('node', {}, sessionId, owner),
   };
-  closeRevisedPlan(sessionId, false);
+  closeRevisedPlan(sessionId, false, owner);
   appendFeed(sessionId, item);
-  patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
+  patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } }, owner);
   setThreadOpen(true);
   return { errors: [], itemId: item.id };
 }
@@ -116,6 +117,7 @@ export function undoNodeDeletion(sessionId: string, itemId: string): string | nu
 }
 
 async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
+  const owner = item.meta?.agentNodeId;
   const request = item.nodeRun!;
   const preview = await prepareNodeRun(sessionId, request.targets, request.force);
   if (preview.signature !== request.signature || preview.errors.length) {
@@ -141,8 +143,8 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
   const pending = session(sessionId).agent.pending;
   const closesRequest = pending?.feedItemId === item.id;
   if (closesRequest) {
-    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...result.outputs].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` });
-    patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...result.outputs].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` }, owner);
+    patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined }, owner);
   }
   await wrapUpPlan(sessionId, item.id, item.plan.title, status, `${status}: ${preview.runIds.join(', ')}`);
   if (closesRequest) closeRequest(sessionId, 'approved', preview.estimate.usd);
@@ -299,6 +301,7 @@ async function executePlanItem(
 /** Claim the waiting step synchronously; another click cannot authorize or send it again. */
 export async function resolveStepCostReview(sessionId: string, itemId: string, stepId: string, decision: 'continue' | 'cancel'): Promise<void> {
   if (claimLaneOfItem(sessionId, itemId)) return;
+  const owner = laneOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
   const review = item?.stepCostReviews?.[stepId];
   const generationId = item?.stepGenerations[stepId];
@@ -311,7 +314,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
     stepAuthorizations: decision === 'continue' ? { ...it.stepAuthorizations, [stepId]: review.proposed } : it.stepAuthorizations,
     canceledSteps: decision === 'cancel' ? [...(it.canceledSteps ?? []), stepId] : it.canceledSteps,
   }));
-  patchAgent(sessionId, (a) => ({ notes: [...a.notes, priceDecisionNote(item.plan.id, stepId, record)] }));
+  patchAgent(sessionId, (a) => ({ notes: [...a.notes, priceDecisionNote(item.plan.id, stepId, record)] }), owner);
   patchGeneration(generationId, { status: decision === 'continue' ? 'queued' : 'canceled', statusText: undefined });
   // Independent steps already in flight finish first; their results are then reused, including after reload.
   await planRuns.get(`${sessionId}:${itemId}`);
@@ -348,7 +351,7 @@ async function wrapUpPlan(sessionId: string, itemId: string, title: string, stat
   const at = s.feed.findIndex((f) => f.id === itemId);
   if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
   const item = s.feed[at];
-  drainAgentNotes(sessionId);
+  drainAgentNotes(sessionId, owner);
   // After an edit the agent gets the original and the result to compare; otherwise it has not seen the result.
   const pairs = item.type === 'plan' && agentSeesImages() ? await editPairParts(item) : [];
   pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
@@ -432,6 +435,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
 
 export function cancelPlan(sessionId: string, itemId: string): void {
   if (claimLaneOfItem(sessionId, itemId)) return;
+  const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -440,9 +444,9 @@ export function cancelPlan(sessionId: string, itemId: string): void {
   removeDraftNodes(sessionId, item.plan.id);
   const pending = s.agent.pending;
   if (pending?.feedItemId === itemId) {
-    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: 'The user canceled this plan.' });
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: 'The user canceled this plan.' }, owner);
     closeRequest(sessionId, 'canceled');
-    patchAgent(sessionId, { pending: undefined, questionRound: 0 });
+    patchAgent(sessionId, { pending: undefined, questionRound: 0 }, owner);
   }
 }
 

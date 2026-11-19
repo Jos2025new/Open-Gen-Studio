@@ -1,15 +1,15 @@
 import { lineRoutes, resolveModel } from '../catalog';
 import { defaultChoice } from './settingsCard';
 import { offerRequest, userRequest } from '../modelNamed';
-import { appendFeed, patchSession, useStore } from '../../store/store';
-import type { AgentState, SettingsChoice, SettingsFeedItem, SettingsSection, Workspace } from '../types';
+import { appendFeed, useStore } from '../../store/store';
+import type { SettingsChoice, SettingsFeedItem, SettingsSection, Workspace } from '../types';
 import { cardDraft, confirmedSections } from './draftActions';
 import { askedQuality, draftMode } from './draftFirst';
 import { inConversation } from './requestGuides';
 import { settingsResultText } from './settingsResult';
 import { betterProvider, missing, wantedOf } from './providerFit';
 import type { ChatMessageMeta } from '../feedMeta';
-import { feedBase, messageMeta } from './runtimeShared';
+import { agentOf, feedBase, messageMeta, patchAgent } from './runtimeShared';
 import { confirmedState } from './switchModel';
 import { rememberSessionModel } from './sessionModel';
 
@@ -20,8 +20,8 @@ import { rememberSessionModel } from './sessionModel';
  * choice is the session's last one, Borrador by default, unless this request clearly asks for another (askedQuality). The plan card shows all of it and lets the user change it.
  * Returns the tool result for the agent.
  */
-export async function autoConfirmSettings(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string; refs?: number; start_image?: boolean }>, meta?: ChatMessageMeta): Promise<string> {
-  const agent = () => useStore.getState().sessions[sessionId].agent;
+export async function autoConfirmSettings(sessionId: string, owner: string | undefined, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string; refs?: number; start_image?: boolean }>, meta?: ChatMessageMeta): Promise<string> {
+  const agent = () => agentOf(sessionId, owner);
   // Both confirm_settings and propose_plan arrive with the same resolved model priority.
   const chosen = sections;
   const inputs = (x: SettingsSection) => parts.filter((p) => p.kind === x.kind && (!x.modelSelection?.requested || p.model === x.modelSelection.requested));
@@ -53,11 +53,11 @@ export async function autoConfirmSettings(sessionId: string, workspace: Workspac
     const before = sections.find((p) => p.kind === x.kind && p.modelSelection === x.modelSelection);
     if (before && before.recommended.modelRef !== x.recommended.modelRef) x.modelSelection = { ...x.modelSelection, reason: `${x.modelSelection?.reason ?? 'session'}; compatible variant or provider` };
   }
-  const draft = cardDraft(sessionId, fitted.map((x) => ({ ...x, chosen: x.chosen ?? x.recommended })), asked && draftMode(asked));
-  const base: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary, status: 'confirmed', toolCallId, inline: true, meta: meta ?? messageMeta(workspace), ...draft };
+  const draft = cardDraft(sessionId, owner, fitted.map((x) => ({ ...x, chosen: x.chosen ?? x.recommended })), asked && draftMode(asked));
+  const base: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary, status: 'confirmed', toolCallId, inline: true, meta: meta ?? messageMeta(workspace, {}, sessionId, owner), ...draft };
   const item: SettingsFeedItem = { ...base, sections: confirmedSections(base, base.sections) };
   appendFeed(sessionId, item);
-  patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...confirmedState(s.agent, item, item.sections) } as AgentState }));
+  patchAgent(sessionId, (a) => confirmedState(a, item, item.sections), owner);
   for (const x of item.sections) {
     if (x.chosen && x.modelSelection?.reason.startsWith('user request') && item.sections.filter((y) => y.kind === x.kind).length === 1) rememberSessionModel(sessionId, x.kind, x.chosen, true);
   }

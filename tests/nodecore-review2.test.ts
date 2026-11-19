@@ -73,7 +73,7 @@ describe('review finding 5: the turn is reserved and keeps its identity', () => 
   });
   it('metadata comes from the session of the turn, not from the one on screen', () => {
     useStore.setState((st) => ({ sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], agentLane: 'agentB' }, other: { ...st.sessions[HOME], id: 'other', graph: { nodes: [], edges: [] }, agentLane: undefined } }, activeSessionId: 'other' }));
-    expect(messageMeta('chat', {}, HOME)).toMatchObject({ agentNodeId: 'agentB', chatNodeId: 'chat' });
+    expect(messageMeta('chat', {}, HOME, 'agentB')).toMatchObject({ agentNodeId: 'agentB', chatNodeId: 'chat' });
   });
   it('an agent port delivers its own last reply, not the last one of the session', () => {
     const say = (id: string, agent: string, text: string) => ({ id, createdAt: 1, workspace: 'chat', type: 'assistant', text, meta: { agentNodeId: agent } }) as never;

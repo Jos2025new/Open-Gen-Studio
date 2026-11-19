@@ -28,8 +28,10 @@ export function enterLane(sessionId: string, nodeId: string): string | null {
   if (!s || s.agentLane === nodeId) return null;
   patchSession(sessionId, (x) => {
     if (x.agentLane === undefined) return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: x.agent } }; // the first agent inherits what the session had
-    const shared = Object.fromEntries(SHARED.filter((k) => x.agent[k] !== undefined).map((k) => [k, x.agent[k]]));
-    const mine = { ...(x.agents?.[nodeId] ?? freshAgent()), ...shared };
+    // The shared choices fill what the target lacks; they never overwrite its own (it may be mid-turn).
+    const target = x.agents?.[nodeId] ?? freshAgent();
+    const shared = Object.fromEntries(SHARED.filter((k) => x.agent[k] !== undefined && target[k] === undefined).map((k) => [k, x.agent[k]]));
+    const mine = { ...target, ...shared };
     return { ...x, agentLane: nodeId, agents: { ...x.agents, [nodeId]: mine }, agent: mine };
   });
   return null;

@@ -35,6 +35,6 @@ describe('agent node with its own LLM', () => {
   });
   it('messages carry the agent node id, keeping the visible role', () => {
     setAgentLlm(sid, 'sys_agent', { provider: 'atlas', model: 'own/model' });
-    expect(messageMeta('chat')).toMatchObject({ agent: 'Director', agentNodeId: 'sys_agent', provider: 'atlas', model: 'own/model' });
+    expect(messageMeta('chat', {}, useStore.getState().activeSessionId, undefined)).toMatchObject({ agent: 'Director', agentNodeId: 'sys_agent', provider: 'atlas', model: 'own/model' });
   });
 });

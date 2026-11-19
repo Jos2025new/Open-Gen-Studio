@@ -1,4 +1,5 @@
 import { useStore } from '../../store/store';
+import { agentOf } from './runtimeShared';
 import { logEvent } from '../../lib/log';
 import { modelSummary } from '../catalog';
 import { resolveNamedModel } from '../modelNamed';
@@ -69,8 +70,8 @@ export function inferUserRequested<T extends Written>(items: T[], words: string)
 }
 
 /** Infer the missing flags of a tool call's steps or parts from this request's words, and log it. */
-export function inferChoices(sessionId: string, where: string, items: Written[]): void {
+export function inferChoices(sessionId: string, owner: string | undefined, where: string, items: Written[]): void {
   const s = useStore.getState().sessions[sessionId];
-  const inferred = s ? inferUserRequested(items, requestWords(s.feed, s.agent.draft)) : [];
+  const inferred = s ? inferUserRequested(items, requestWords(s.feed, agentOf(sessionId, owner).draft)) : [];
   if (inferred.length) logEvent('harness', { session: sessionId, where, inferred: 'user_requested', items: inferred });
 }

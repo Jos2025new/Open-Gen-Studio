@@ -3,7 +3,7 @@ import { modelSummary } from '../catalog';
 import type { FeedItem, LlmMessage, QuestionsFeedItem, SettingsFeedItem, EditLogEntry } from '../types';
 import { patchSession, removeFeedItem, setUi, updateFeedItem } from '../../store/store';
 import { describeChoice, sectionsOf } from './settingsCard';
-import { get, patchAgent, session } from './runtimeShared';
+import { agentOf, get, patchAgent, session } from './runtimeShared';
 import { sendAgentMessage } from './conversation';
 import { removeDraftNodes } from './planRun';
 
@@ -70,7 +70,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
     questionRound: 0,
     draft: undefined,
     phase: undefined,
-  }));
+  }), owner);
   if (get().ui.workspace !== 'chat' && get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
   await sendAgentMessage(text, { attachments: item.attachments, ...(item.meta?.agentNodeId ? { agentNodeId: item.meta.agentNodeId } : {}), ...(item.meta?.chatNodeId ? { chatNodeId: item.meta.chatNodeId } : {}) });
 }
@@ -84,9 +84,10 @@ function logEdit(sessionId: string, e: Omit<EditLogEntry, 'at'>): void {
 export function canReopenCard(sessionId: string, itemId: string): boolean {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
-  if (!s || s.agent.busy || !item || (item.type !== 'questions' && item.type !== 'settings') || item.status === 'pending') return false;
+  const own = agentOf(sessionId, item?.meta?.agentNodeId);
+  if (!s || own.busy || !item || (item.type !== 'questions' && item.type !== 'settings') || item.status === 'pending') return false;
   const id = cardCallId(sessionId, item);
-  return Boolean(id) && s.agent.history.some((m) => m.role === 'tool' && m.tool_call_id === id);
+  return Boolean(id) && own.history.some((m) => m.role === 'tool' && m.tool_call_id === id);
 }
 
 /**
@@ -97,7 +98,7 @@ function cardCallId(sessionId: string, item: QuestionsFeedItem | SettingsFeedIte
   if (item.toolCallId) return item.toolCallId;
   const s = session(sessionId);
   const tool = item.type === 'questions' ? 'ask_questions' : 'confirm_settings';
-  const calls = s.agent.history.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).filter((c) => c.function.name === tool).map((c) => c.id) : []));
+  const calls = agentOf(sessionId, item.meta?.agentNodeId).history.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).filter((c) => c.function.name === tool).map((c) => c.id) : []));
   const cards = s.feed.filter((f) => f.type === item.type && f.workspace === item.workspace && f.status !== 'pending');
   return calls.length === cards.length ? calls[cards.indexOf(item)] : undefined;
 }
@@ -109,16 +110,19 @@ function cardCallId(sessionId: string, item: QuestionsFeedItem | SettingsFeedIte
  */
 export function reopenCard(sessionId: string, itemId: string): void {
   if (!canReopenCard(sessionId, itemId)) return;
+  if (claimLaneOfItem(sessionId, itemId)) return; // the card's agent comes forward first; if it cannot, nothing changes
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId)! as QuestionsFeedItem | SettingsFeedItem;
+  const owner = item.meta?.agentNodeId;
   const at = s.feed.indexOf(item);
   const callId = cardCallId(sessionId, item)!;
-  const cut = s.agent.history.findIndex((m) => m.role === 'tool' && m.tool_call_id === callId);
+  const cut = agentOf(sessionId, owner).history.findIndex((m) => m.role === 'tool' && m.tool_call_id === callId);
   const before = item.type === 'questions'
     ? Object.entries(item.answers ?? {}).map(([k, v]) => `${item.questions.find((q) => q.id === k)?.question ?? k}: ${v}`).join(' | ')
     : sectionsOf(item).map((x) => `${x.kind}: ${describeChoice(modelSummary((x.chosen ?? x.recommended).modelRef)?.name ?? '', x.chosen ?? x.recommended)}`).join(' | ');
   logEdit(sessionId, { kind: item.type, itemId, before, removed: s.feed.length - at - 1 });
-  for (const f of s.feed.slice(at + 1)) {
+  // Only this agent's rows after the card go: the other agent's messages and cards stay.
+  for (const f of s.feed.slice(at + 1).filter((x) => !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner)) {
     if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
     removeFeedItem(sessionId, f.id);
   }
@@ -133,7 +137,7 @@ export function reopenCard(sessionId: string, itemId: string): void {
     revising: undefined,
     notes: [],
     phase: undefined,
-  }));
+  }), owner);
 }
 
 export function deleteGarbled(sessionId: string, noticeId: string): void {
