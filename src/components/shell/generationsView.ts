@@ -1,5 +1,5 @@
 import { Box, FileText, Film, Image as ImageIcon, Music } from '../ui/icons';
-import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { PROVIDER_LABELS, shownProvider } from '../../engine/providers/types';
 import type { Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
 
@@ -35,7 +35,7 @@ export function filterGenerations(list: Generation[], { kind, status, q, sort }:
   return list
     .filter((g) => kind === 'all' || g.kind === kind)
     .filter((g) => status === 'all' || statusOf(g) === status)
-    .filter((g) => !needle || `${generationTitle(g)} ${g.modelName} ${PROVIDER_LABELS[g.provider]}`.toLowerCase().includes(needle))
+    .filter((g) => !needle || `${generationTitle(g)} ${g.modelName} ${PROVIDER_LABELS[shownProvider(g)]}`.toLowerCase().includes(needle))
     .sort((a, b) => {
       if (sort === 'cost') {
         const ac = cost(a), bc = cost(b);

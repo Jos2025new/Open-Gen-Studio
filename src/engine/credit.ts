@@ -4,7 +4,7 @@ import { formatUsd } from '../lib/format';
 import { apiKeyFor, isConnected, modelSummary } from './catalog';
 import { pushAlert, dismissAlert } from './alerts';
 import { ADAPTERS } from './providers/registry';
-import { PROVIDER_LABELS } from './providers/types';
+import { PROVIDER_LABELS, parseModelRef } from './providers/types';
 import { lineKey, modelFamily } from './variants';
 import { estimateMedia } from './costs';
 import type { GenSettings, Generation, ModelSummary, ProviderId } from './types';
@@ -149,7 +149,9 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   const empty = PROVIDER_LABELS[cur.provider];
   const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g), g.settings);
   const switchTo = (m: ModelSummary) => {
-    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: m.provider, error: undefined });
+    const to = parseModelRef(m.ref)?.provider ?? m.provider;
+    const note = `${empty} had no credit, so this ran on ${PROVIDER_LABELS[to]} (same model, same price or less).`;
+    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: to, error: undefined, notes: [...(g.notes ?? []), note] });
     return rerun(genId);
   };
   const auto = options.find((o) => o.same);

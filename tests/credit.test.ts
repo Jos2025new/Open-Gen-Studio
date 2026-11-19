@@ -8,6 +8,7 @@ import { useStore } from '../src/store/store';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
 import { forgetBalances, isCreditError, onGenerationCredit } from '../src/engine/credit';
+import { shownProvider } from '../src/engine/providers/types';
 import { useAlerts } from '../src/engine/alerts';
 
 const m = (provider: 'nanogpt' | 'atlas', id: string, usd: number): ModelSummary =>
@@ -75,7 +76,7 @@ describe('the equivalent model when a provider has no credit', () => {
     useStore.setState({
       settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
       catalog: { ...st.catalog, models: Object.fromEntries(models.map((x) => [x.ref, x])) },
-      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, status: 'error', inputs, settings: { count: 1 }, assetIds: [] } as never },
+      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, provider: failing.provider, status: 'error', inputs, settings: { count: 1 }, assetIds: [] } as never },
     });
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(0);
     vi.spyOn(ADAPTERS.nanogpt, 'balance').mockResolvedValue(5);
@@ -91,7 +92,12 @@ describe('the equivalent model when a provider has no credit', () => {
     const pro = img('nanogpt', 'nano-banana-pro', 0.14, true);
     const { switched, rerun } = await run([atlas, nano, pro], atlas);
     expect(switched).toBe(true);
-    expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2');
+    const saved = useStore.getState().generations.g1;
+    expect(saved.modelRef).toBe('nanogpt::nano-banana-2');
+    expect(saved.provider).toBe('nanogpt');
+    expect(saved.notes?.join(' ')).toMatch(/Atlas Cloud had no credit/);
+    expect(saved.notes?.join(' ')).toMatch(/NanoGPT/);
+    expect(shownProvider({ modelRef: saved.modelRef, provider: 'atlas' })).toBe('nanogpt');
     expect(rerun).toHaveBeenCalledWith('g1');
   });
 

@@ -5,7 +5,7 @@ import { checkJobsNow } from '../../engine/providers/shared';
 import { traceOf, useJobTrace } from '../../engine/jobTrace';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
-import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { PROVIDER_LABELS, shownProvider } from '../../engine/providers/types';
 import { copyText } from '../../engine/actions';
 import { formatDateTime, formatDuration, formatUsd } from '../../lib/format';
 import { setUi, useStore } from '../../store/store';
@@ -90,7 +90,7 @@ export function GenerationInfo({ generation: g, asset, defaultDetailsOpen = fals
   // What went in: the operation's source, the start frame and the references, shown above the prompt.
   const inputs = g ? generationInputs(g) : [];
   if (g) {
-    rows.push(['Model', `${g.modelName}${g.provider !== 'local' ? ` · ${PROVIDER_LABELS[g.provider]}` : ''}`]);
+    rows.push(['Model', `${g.modelName}${shownProvider(g) !== 'local' ? ` · ${PROVIDER_LABELS[shownProvider(g)]}` : ''}`]);
     const s = g.settings;
     const params = [
       s.aspect ? aspectLabel(s.aspect) : null,

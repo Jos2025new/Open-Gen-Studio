@@ -13,6 +13,7 @@ import { OPS } from '../../engine/ops';
 import { canvasIndex } from '../../engine/canvas';
 import { formatDuration } from '../../lib/format';
 import type { Generation } from '../../engine/types';
+import { PROVIDER_LABELS, shownProvider } from '../../engine/providers/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { useNow } from '../ui/hooks';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
@@ -27,8 +28,10 @@ import { GenerationNotices } from './GenerationNotices';
 
 function metaLine(g: Generation): string {
   const s = g.settings;
+  const provider = shownProvider(g);
   return [
     g.modelName,
+    provider !== 'local' ? PROVIDER_LABELS[provider] : null,
     s.aspect && s.aspect !== 'auto' ? aspectLabel(s.aspect) : null,
     s.resolution ?? null,
     g.kind === 'video' && s.duration ? durationLabel(s.duration) : null,
