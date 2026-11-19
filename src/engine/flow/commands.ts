@@ -6,6 +6,8 @@ import { OP_IDS } from '../ops';
 import type { GenSettings, GraphEdge, GraphNode, GraphNodeData, OpId } from '../types';
 import { budgetProblem } from '../actions';
 import * as A from './actions';
+import { applyEdit } from '../nodecore/edit';
+import { ownerRev } from '../nodecore/revision';
 import { edgeRef, findNode, graphOf, hasTarget, nodeCommand, nodeOf, nodeRef } from './commandKit';
 
 /* The node graph's actions as commands (ADR 0030). Each wraps the action the interface already calls. */
@@ -103,6 +105,19 @@ function edgeAfter(on: { session: string }, before: Set<string>): string | null 
   return graphOf(on).edges.find((e) => !before.has(e.id))?.id ?? null;
 }
 
+/**
+ * What a caller can know without reading: a node a command made, and the revision its own last edit left. A later
+ * `nodes.node.edit` may omit `expect` only while the node is still exactly that; anything else changed it, and a
+ * draft written from an older read must not overwrite it.
+ */
+const known = new Map<string, string>();
+const keyOf = (session: string | undefined, node: string) => `${session}:${node}`;
+function born<T extends string | null | undefined>(on: { session?: string }, node: T): T {
+  const graph = useStore.getState().sessions[on.session ?? '']?.graph;
+  if (node && graph) known.set(keyOf(on.session, node), ownerRev(graph, node));
+  return node;
+}
+
 export const commands = [
   /* --- Nodes --------------------------------------------------------------------------------------------------- */
   defineCommand({
@@ -120,7 +135,7 @@ export const commands = [
     description: 'Adds a node with this data at this position. Returns {node}.',
     args: z.object({ data: nodeData, position: point }).strict(),
     effect: 'write',
-    run: (on, args) => ({ node: A.addNode(on.session, args.data as GraphNodeData, args.position) }),
+    run: (on, args) => ({ node: born(on, A.addNode(on.session, args.data as GraphNodeData, args.position)) }),
   }),
   nodeCommand({
     id: 'nodes.node.add_asset',
@@ -129,7 +144,7 @@ export const commands = [
     args: z.object({ asset, position: point }).strict(),
     effect: 'write',
     available: (ctx, args) => (args?.asset && !useStore.getState().assets[args.asset] ? `No asset "${args.asset}".` : hasTarget(ctx)),
-    run: (on, args) => ({ node: A.addAssetAsNode(on.session, args.asset, args.position) }),
+    run: (on, args) => ({ node: born(on, A.addAssetAsNode(on.session, args.asset, args.position)) }),
   }),
   nodeCommand({
     id: 'nodes.node.add_connected',
@@ -147,11 +162,19 @@ export const commands = [
   nodeCommand({
     id: 'nodes.node.edit',
     title: 'Change node',
-    description: 'Merges these fields into a node\'s data (title, prompt, text, modelRef, settings, params, op, assetId…).',
-    args: z.object({ node: nodeRef, patch: nodePatch }).strict(),
+    description: 'Merges these fields into a node\'s data (title, prompt, text, modelRef, settings, params, op, assetId…). `expect` is the node revision you read (nodes.node.inspect); a stale one is refused. It may be left out only for a node a command of yours made and nobody changed since.',
+    args: z.object({ node: nodeRef, patch: nodePatch, expect: z.string().min(1).max(80).optional() }).strict(),
     effect: 'write',
     run: (on, args) => {
-      throwIf(A.patchNodeData(on.session, args.node, args.patch as Partial<GraphNodeData>));
+      const key = keyOf(on.session, args.node);
+      const graph = graphOf(on);
+      nodeOf(on, args.node);
+      // Without `expect` this only works on a node this caller made and nobody changed since.
+      const blind = args.expect === undefined;
+      if (blind && known.get(key) !== ownerRev(graph, args.node)) throw new Error(`Say which revision of "${args.node}" you read (expect, from nodes.node.inspect): this edit does not run blind.`);
+      const done = applyEdit({ session: on.session!, ...(blind ? {} : { require: true, expect: { [args.node]: args.expect! } }), op: { op: 'set', node: args.node, patch: args.patch as Partial<GraphNodeData> } });
+      if (!done.ok) throw new Error(done.error);
+      if (blind) born(on, args.node);
       return { node: args.node };
     },
   }),
@@ -198,7 +221,7 @@ export const commands = [
     description: 'A copy with the same parameters and connections, offset; it gets no result of its own. Returns {node}.',
     args: z.object({ node: nodeRef }).strict(),
     effect: 'write',
-    run: (on, args) => ({ node: A.duplicateNode(on.session, nodeOf(on, args.node)) }),
+    run: (on, args) => ({ node: born(on, A.duplicateNode(on.session, nodeOf(on, args.node))) }),
   }),
   nodeCommand({
     id: 'nodes.node.set_model',

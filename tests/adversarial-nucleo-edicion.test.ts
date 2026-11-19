@@ -49,7 +49,6 @@ describe('public graph editing and inspector boundaries', () => {
     const before = inspect('gen').revision;
     expect(patchNodeData(session, 'gen', { settings: { ...settings, count: 3 } })).toBeNull();
     expect(inspect('gen').revision).not.toBe(before);
-    // FALLO REAL: nodes.node.edit accepts a delayed full settings patch without the revision and overwrites the newer count.
     const stale = await call('nodes.node.edit', { node: 'gen', patch: { settings: { ...settings, count: 1, aspect: '16:9' } } });
     expect.soft(stale.ok).toBe(false);
     expect(graph().nodes[0].data).toMatchObject({ settings: { count: 3 } });
@@ -116,7 +115,6 @@ describe('public graph editing and inspector boundaries', () => {
     expect(patchNodeData(session, 'gen', { prompt: 'changed after preview' })).toBeNull();
     expect(await runApproved(session, ['gen'], true, second, 'never-sent')).toMatchObject({ status: 'stale', sends: 0 });
     expect(execute).toHaveBeenCalledTimes(1);
-    // FALLO REAL: inspectNode pairs the saved generation with the newest target attempt even when that attempt sent nothing.
     expect(inspect('gen').lastRun).toMatchObject({ generationId: 'result', runId: 'produced', sends: 1 });
   });
 });
