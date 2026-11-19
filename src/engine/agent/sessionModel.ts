@@ -1,17 +1,15 @@
 import type { SettingsChoice } from '../types';
 import { lineRoutes, pickComposerModel } from '../catalog';
-import { patchSession, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
+import { patchLane } from './lanes';
 
 type Kind = 'image' | 'video';
 
 /** Remember an explicit model choice for one session; optionally make it the composer's next default. */
-export function rememberSessionModel(sessionId: string, kind: Kind, choice: SettingsChoice, explicit = false): void {
+export function rememberSessionModel(sessionId: string, owner: string | undefined, kind: Kind, choice: SettingsChoice, explicit = false): void {
   if (!useStore.getState().sessions[sessionId]) return;
   choice = { ...choice, modelRef: lineRoutes(choice.modelRef).text ?? choice.modelRef };
-  patchSession(sessionId, (session) => ({
-    ...session,
-    agent: { ...session.agent, settings: { ...session.agent.settings, [kind]: choice } },
-  }));
+  patchLane(sessionId, owner, (a) => ({ settings: { ...a.settings, [kind]: choice } }));
 
   if (explicit && useStore.getState().settings.agent.updateComposerDefaults) void applyComposerChoice(kind, choice);
 }

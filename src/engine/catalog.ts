@@ -247,7 +247,7 @@ export function pickComposerModel(kind: MediaKind, ref: string, remember = true)
     if (state.composer[kind].modelRef !== ref) return;
     const settings = state.composer[kind].settings;
     const routes = lineRoutes(ref);
-    rememberSessionModel(sessionId, kind, {
+    rememberSessionModel(sessionId, undefined, kind, {
       modelRef: routes.text ?? ref,
       needsImage: false,
       ...(settings.aspect ? { aspect: settings.aspect } : {}),

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Graph } from '../src/engine/types';
 
@@ -7,6 +10,7 @@ type ChatOpts = { messages: unknown[]; signal?: AbortSignal; onText?: (d: string
 const chat = vi.hoisted(() => vi.fn<(o: ChatOpts) => Promise<unknown>>());
 vi.mock('../src/engine/providers/llm', async (orig) => ({ ...(await orig<typeof import('../src/engine/providers/llm')>()), chat }));
 
+import { check as ownerCheck } from '../scripts/check-agent-owner.mjs';
 import { useStore } from '../src/store/store';
 import { sendAgentMessage, stopAgent } from '../src/engine/agent/conversation';
 import { laneState, patchLane } from '../src/engine/agent/lanes';
@@ -94,5 +98,13 @@ describe('parallel agents: A runs in the background while B is on screen', () =>
     expect(card('agentA')).toMatchObject({ badge: 'Busy', chips: expect.arrayContaining([expect.stringContaining('own')]) });
     expect(card('agentB')?.badge).not.toBe('Busy');
     expect(card('agentB')?.chips).not.toContainEqual(expect.stringContaining('own'));
+  });
+
+  it('the check refuses a hand-built write of session.agent and the tree has none', () => {
+    expect(ownerCheck('.')).toEqual([]);
+    const root = mkdtempSync(join(tmpdir(), 'own-'));
+    mkdirSync(join(root, 'src/engine'), { recursive: true });
+    writeFileSync(join(root, 'src/engine/bad.ts'), "patchSession(id, (s) => ({ ...s, agent: { ...s.agent, notes: [] } }));\n");
+    expect(ownerCheck(root)).toEqual([expect.stringMatching(/bad\.ts:1: writes an agent's state by hand/)]);
   });
 });

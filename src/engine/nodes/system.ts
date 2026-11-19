@@ -1,5 +1,6 @@
 import { uid } from '../../lib/id';
-import { reconcileDeletionNotices, patchSession, toast, useStore } from '../../store/store';
+import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
+import { laneState, patchLane } from '../agent/lanes';
 import { applyEdit, editCompound } from '../nodecore/edit';
 import { isOmniSpace } from './omniSpaces';
 import type {
@@ -308,12 +309,9 @@ export function applyModelLinkToAgent(sessionId: string, modelNodeId: string, ag
   if (!session || model?.kind !== 'ref' || model.type !== 'model' || agent?.kind !== 'ref' || agent.type !== 'agent') return false;
   const kind = model.mediaKind;
   if ((kind !== 'image' && kind !== 'video') || !model.ref) return false;
-  const current = session.agent.settings?.[kind];
+  const current = laneState(sessionId, agentNodeId)?.settings?.[kind];
   if (current?.modelRef === model.ref) return false;
-  patchSession(agent.ref in useStore.getState().sessions ? agent.ref : sessionId, (s) => ({
-    ...s,
-    agent: { ...s.agent, settings: { ...s.agent.settings, [kind]: { needsImage: false, ...s.agent.settings?.[kind], modelRef: model.ref } } },
-  }));
+  patchLane(agent.ref in useStore.getState().sessions ? agent.ref : sessionId, agentNodeId, (a) => ({ settings: { ...a.settings, [kind]: { needsImage: false, ...a.settings?.[kind], modelRef: model.ref } } }));
   return true;
 }
 

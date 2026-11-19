@@ -13,28 +13,28 @@ afterEach(() => useStore.setState(before));
 
 describe('session model choices and composer defaults', () => {
   it('remembers a session choice without changing defaults when the setting is off', () => {
-    rememberSessionModel(sid, 'image', choice);
+    rememberSessionModel(sid, undefined, 'image', choice);
     expect(useStore.getState().sessions[sid].agent.settings?.image).toEqual(choice);
     expect(useStore.getState().composer).toEqual(before.composer);
   });
 
   it('copies an explicitly chosen model into composer defaults when enabled', () => {
     useStore.setState({ settings: { ...before.settings, agent: { ...before.settings.agent, updateComposerDefaults: true } } as typeof before.settings });
-    rememberSessionModel(sid, 'image', choice, true);
+    rememberSessionModel(sid, undefined, 'image', choice, true);
     expect(useStore.getState().sessions[sid].agent.settings?.image).toEqual(choice);
     expect(useStore.getState().composer.image.modelRef).toBe(choice.modelRef);
     expect(useStore.getState().composer.userPicked?.image).toBe(true);
   });
 
   it('sets the current session choice as a composer default on request', async () => {
-    rememberSessionModel(sid, 'image', choice);
+    rememberSessionModel(sid, undefined, 'image', choice);
     await setSessionModelAsDefault(sid, 'image');
     expect(useStore.getState().composer.image.modelRef).toBe(choice.modelRef);
     expect(useStore.getState().composer.userPicked?.image).toBe(true);
   });
 
   it('a picked composer model is a session choice; an automatic variant switch is not', async () => {
-    rememberSessionModel(sid, 'image', choice);
+    rememberSessionModel(sid, undefined, 'image', choice);
     await pickComposerModel('image', 'atlas::other/image', false);
     expect(useStore.getState().sessions[sid].agent.settings?.image?.modelRef).toBe(choice.modelRef);
     await pickComposerModel('image', 'atlas::other/image');

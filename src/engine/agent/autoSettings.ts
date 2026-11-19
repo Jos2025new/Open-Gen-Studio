@@ -59,7 +59,7 @@ export async function autoConfirmSettings(sessionId: string, owner: string | und
   appendFeed(sessionId, item);
   patchAgent(sessionId, (a) => confirmedState(a, item, item.sections), owner);
   for (const x of item.sections) {
-    if (x.chosen && x.modelSelection?.reason.startsWith('user request') && item.sections.filter((y) => y.kind === x.kind).length === 1) rememberSessionModel(sessionId, x.kind, x.chosen, true);
+    if (x.chosen && x.modelSelection?.reason.startsWith('user request') && item.sections.filter((y) => y.kind === x.kind).length === 1) rememberSessionModel(sessionId, owner, x.kind, x.chosen, true);
   }
   return settingsResultText(item, item.sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), undefined, true) + notes.join('');
 }

@@ -73,8 +73,8 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (closesRequest) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` }, owner);
-    if (item.style === 'direct') inheritApproved(sessionId, chosen, item.comparisonKinds);
-    else if (item.style === 'auto') confirmApproved(sessionId, chosen, item.comparisonKinds);
+    if (item.style === 'direct') inheritApproved(sessionId, owner, chosen, item.comparisonKinds);
+    else if (item.style === 'auto') confirmApproved(sessionId, owner, chosen, item.comparisonKinds);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined }, owner);
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({

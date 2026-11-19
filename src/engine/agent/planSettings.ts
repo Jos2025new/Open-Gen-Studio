@@ -5,7 +5,7 @@ import { chat } from '../providers/llm';
 import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';
-import { addSpend, patchSession, updateFeedItem, useStore } from '../../store/store';
+import { addSpend, updateFeedItem, useStore } from '../../store/store';
 import { laneOfItem, patchLane } from './lanes';
 import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
@@ -78,9 +78,9 @@ function applyChoice(s: GenStep, c: SettingsChoice): GenStep {
 }
 
 /** The session's confirmed choice of this kind follows the card, so the next request starts from it. */
-function remember(sessionId: string, kind: GenKind, c: SettingsChoice, draft?: DraftMode) {
-  rememberSessionModel(sessionId, kind, c, true);
-  if (draft) patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, draftMode: draft } }));
+function remember(sessionId: string, owner: string | undefined, kind: GenKind, c: SettingsChoice, draft?: DraftMode) {
+  rememberSessionModel(sessionId, owner, kind, c, true);
+  if (draft) patchLane(sessionId, owner, { draftMode: draft });
   const feed = get().sessions[sessionId].feed;
   const last = [...feed].reverse().find((f): f is SettingsFeedItem => f.type === 'settings' && Boolean(f.inline) && f.sections.some((x) => x.kind === kind));
   if (last) updateFeedItem<SettingsFeedItem>(sessionId, last.id, { sections: last.sections.map((x) => (x.kind === kind ? { ...x, chosen: c } : x)), ...(draft ? { draft } : {}) });
@@ -101,8 +101,9 @@ export async function changePlanChoice(sessionId: string, itemId: string, kind: 
   const group = modelGroup(before.modelRef);
   const comparison = now.comparisonKinds?.includes(kind) || new Set(now.plan.steps.filter(isGen).filter((s) => s.kind === kind).map((s) => modelGroup(s.modelRef))).size > 1;
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { comparisonKinds: comparison ? [...new Set([...(now.comparisonKinds ?? []), kind])] : now.comparisonKinds, plan: { ...now.plan, steps: now.plan.steps.map((s) => (isGen(s) && s.kind === kind && modelGroup(s.modelRef) === group ? applyChoice(s, c) : s)) } });
-  if (!comparison) remember(sessionId, kind, c);
-  else patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, settingsParts: s.agent.settingsParts?.map((p) => p.kind === kind && modelGroup(p.modelRef) === group ? { ...c, kind } : p) } }));
+  const owner = laneOfItem(sessionId, itemId);
+  if (!comparison) remember(sessionId, owner, kind, c);
+  else patchLane(sessionId, owner, (a) => ({ settingsParts: a.settingsParts?.map((p) => p.kind === kind && modelGroup(p.modelRef) === group ? { ...c, kind } : p) }));
   const changedIds = now.plan.steps.filter(isGen).filter((s) => s.kind === kind && modelGroup(s.modelRef) === group).map((s) => s.id);
   const prompts = stepModel(c.modelRef, before) !== before.modelRef;
   if (promptWriterOn(sessionId) && (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect)) await rewritePrompts(sessionId, itemId, kind, c.modelRef, changedIds);
@@ -125,8 +126,8 @@ export function changePlanDraft(sessionId: string, itemId: string, kind: DraftMo
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...item.plan, steps } });
   const video = planSections(get().sessions[sessionId].feed, { ...item, plan: { ...item.plan, steps } }).find((x) => x.kind === 'video');
   const comparison = item.comparisonKinds?.includes('video') || new Set(item.plan.steps.filter(isGen).filter((s) => s.kind === 'video').map((s) => modelGroup(s.modelRef))).size > 1;
-  if (video && !comparison) remember(sessionId, 'video', { ...video.recommended, ...(chosen ? { resolution: chosen.resolution } : {}) }, mode);
-  else patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, draftMode: mode } }));
+  if (video && !comparison) remember(sessionId, laneOfItem(sessionId, itemId), 'video', { ...video.recommended, ...(chosen ? { resolution: chosen.resolution } : {}) }, mode);
+  else patchLane(sessionId, laneOfItem(sessionId, itemId), { draftMode: mode });
 }
 
 /** The price button: ask the provider's price again for the plan's steps (Atlas quotes; schemas that had not loaded). */
@@ -144,7 +145,7 @@ export const promptWriterOn = (sessionId: string) => get().sessions[sessionId]?.
 
 /** The switch on the plan card; turning it on adapts the prompts to the card as it is now. */
 export function setPromptWriter(sessionId: string, itemId: string, on: boolean): void {
-  patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, enhance: on } }));
+  patchLane(sessionId, laneOfItem(sessionId, itemId), { enhance: on });
   const item = planOf(sessionId, itemId);
   if (on && item) for (const kind of new Set(item.plan.steps.filter(isGen).map((x) => x.kind))) void rewritePrompts(sessionId, itemId, kind);
 }

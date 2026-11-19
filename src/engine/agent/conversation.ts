@@ -282,7 +282,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   const pending = agentOf(sessionId, owner).pending;
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
   patchAgent(sessionId, (a) => confirmedState(a, item, sections), owner);
-  for (const x of sections) if (x.chosen && sections.filter((p) => p.kind === x.kind).length === 1) rememberSessionModel(sessionId, x.kind, x.chosen, true);
+  for (const x of sections) if (x.chosen && sections.filter((p) => p.kind === x.kind).length === 1) rememberSessionModel(sessionId, owner, x.kind, x.chosen, true);
   if (agentEngine(sessionId, owner).kind !== 'llm' || !pending?.toolCallId) return;
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), agentOf(sessionId, owner).draft?.attachments ?? []));
   pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` }, owner);
