@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 389 | 315 |
-| [store.ts](../src/store/store.ts) | 265 | 309 |
+| [types.ts](../src/engine/types.ts) | 389 | 319 |
+| [store.ts](../src/store/store.ts) | 265 | 313 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 46 |
@@ -38,7 +38,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 37 | 30 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
 | [render.ts](../src/engine/design/render.ts) | 31 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 30 | 17 |
+| [graph.ts](../src/engine/flow/graph.ts) | 30 | 18 |
 | [types.ts](../src/engine/providers/types.ts) | 30 | 9 |
 
 ## Por área
@@ -57,11 +57,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 379 |
-| `src/engine/agent` | 62 | 142 |
+| `src/engine` | 69 | 383 |
+| `src/engine/agent` | 62 | 145 |
 | `src/engine/commands` | 7 | 21 |
 | `src/engine/design` | 163 | 205 |
-| `src/engine/flow` | 17 | 56 |
+| `src/engine/flow` | 17 | 59 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 22 | 28 |
@@ -69,10 +69,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 70 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 406 |
-| `src/store` | 18 | 311 |
+| `src/lib` | 35 | 408 |
+| `src/store` | 18 | 315 |
 
-232 de 710 módulos no tienen ningún test que los importe directamente.
+231 de 710 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

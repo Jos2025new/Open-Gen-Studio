@@ -13,6 +13,7 @@ import { finalPlanStatus, reviewOpen } from '../planStop';
 import { patchGeneration } from '../../store/store';
 import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
 import { graphToSteps, runsGeneration } from '../flow/graph';
+import { lockNodes } from '../flow/locks';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { modelSummary } from '../catalog';
 import type { ChatMessageMeta } from '../feedMeta';
@@ -174,6 +175,14 @@ async function executePlanItem(
       return;
     }
   }
+  // A canvas plan sends under the same node lock as a Run: while it works the nodes cannot be run (and paid) a second time, and it does not start over nodes that already run.
+  let release = () => {};
+  if (workspace === 'node') {
+    try { release = lockNodes(sessionId, steps.map((st) => st.id)); } catch (e) {
+      updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: (e as Error).message });
+      return;
+    }
+  }
   const result = await executeSteps(steps, {
     ...(resume ? { prior: resume.prior, blocked: resume.blocked, waiting: resume.waiting, reuseGenerations: resume.reuseGenerations } : {}),
     canceled: new Set(item.canceledSteps ?? []),
@@ -204,7 +213,7 @@ async function executePlanItem(
         }
       }
     },
-  });
+  }).finally(release);
 
   // Designer: a final image the plan did not put on a layer goes on the page as a new layer (kept in Generations too).
   if (workspace === 'designer' && docId) {
