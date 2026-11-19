@@ -18,7 +18,7 @@ import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore 
 import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
-import { applyEdit } from '../nodecore/edit';
+import { applyEdit, editError } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
 import { storeEnv } from '../nodecore/resolver';
 
@@ -98,8 +98,7 @@ function editGraph(sessionId: string, change: (g: import('../types').Graph) => i
 }
 
 export function patchNodeData(sessionId: string, nodeId: string, patch: Partial<GraphNodeData>): string | null {
-  const done = applyEdit({ session: sessionId, op: { op: 'set', node: nodeId, patch } });
-  return done.ok ? null : done.error;
+  return editError(applyEdit({ session: sessionId, op: { op: 'set', node: nodeId, patch } }));
 }
 
 export function deleteNodes(sessionId: string, ids: string[]): string | null {
@@ -109,8 +108,7 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   if (missing) return `No such node: ${missing}.`;
   const drop = new Set(ids);
   const deleted = { nodes: structuredClone(graph.nodes.filter(n => drop.has(n.id))), edges: structuredClone(graph.edges.filter(e => drop.has(e.source) || drop.has(e.target))) };
-  const done = applyEdit({ session: sessionId, op: { op: 'delete', nodes: ids } });
-  const error = done.ok ? null : done.error;
+  const error = editError(applyEdit({ session: sessionId, op: { op: 'delete', nodes: ids } }));
   const galleryNodes = deleted.nodes.filter(n => n.data.kind !== 'ref');
   if (!error && galleryNodes.length) {
     const galleryIds = new Set(galleryNodes.map(n => n.id));
@@ -210,8 +208,7 @@ export function connectNodes(
   if (!graph) return 'No such session.';
   const handle = c.targetHandle ?? c.kind ?? 'in';
   const occupant = graph.edges.find(e => e.target === c.target && e.targetHandle === handle && (e.kind ?? 'data') === (c.kind ?? 'data'));
-  const done = applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: occupant?.id ?? null } });
-  return done.ok ? null : done.error;
+  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: occupant?.id ?? null } }));
 }
 export function tryConnect(
   sessionId: string,
@@ -222,8 +219,7 @@ export function tryConnect(
 export function disconnectEdges(sessionId: string, ids: string[]): string | null {
   const graph = get().sessions[sessionId]?.graph;
   if (!graph) return 'No such session.';
-  const done = applyEdit({ session: sessionId, op: { op: 'disconnect', edges: ids } });
-  return done.ok ? null : done.error;
+  return editError(applyEdit({ session: sessionId, op: { op: 'disconnect', edges: ids } }));
 }
 
 export function setNodeOp(sessionId: string, nodeId: string, op: OpId): string | null {

@@ -117,6 +117,9 @@ function planDelete(graph: Graph, ids: string[]): Graph {
 }
 
 /** Run one edit. Same commit rules as the old `editGraph`: the lock check, the toast, one `setGraph`. */
+/** The error of a refused edit, or null when it applied: the shape the flow actions return. */
+export const editError = (r: EditResult): string | null => (r.ok ? null : r.error);
+
 export function applyEdit(req: EditRequest): EditResult {
   const st = useStore.getState();
   const graph = st.sessions[req.session]?.graph;
