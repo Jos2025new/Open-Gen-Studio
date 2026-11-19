@@ -43,7 +43,7 @@ it('sets only the active session model as the composer default when asked', asyn
   const image = [...host.querySelectorAll('.agent-model-row')].find(row => row.querySelector('.agent-model-role')?.textContent === 'Image');
   const action = [...image!.querySelectorAll('button')].find(button => button.textContent === 'Set as default') as HTMLButtonElement;
   await act(async () => action.click());
-  expect(sessionDefaults.set).toHaveBeenCalledWith(useStore.getState().activeSessionId, 'image');
+  expect(sessionDefaults.set).toHaveBeenCalledWith(useStore.getState().activeSessionId, 'image', expect.any(String));
 });
 it('stores the Agent Settings checkbox as a composer-default preference', async () => {
   await act(async () => root.render(createElement(SettingsPanel)));

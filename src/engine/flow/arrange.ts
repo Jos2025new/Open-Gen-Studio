@@ -269,6 +269,6 @@ export function reattachOutputs(sessionId: string, groupId: string): void {
   }
   const problem = graphEditProblem(sessionId, graph, next);
   if (problem) { toast(problem, 'error'); return; }
-  editCompound(sessionId, 'reattach-outputs', () => next);
+  editCompound(sessionId, 'reattach-outputs', () => ({ graph: next, dropped: additions.map(e => e.id) })); // the new cables come back under their ids, re-pointed at the node
   if (skipped.length) toast(`Could not keep ${skipped.length} new connection(s): ${skipped.join('; ')}`, 'error');
 }

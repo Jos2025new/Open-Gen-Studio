@@ -1,6 +1,7 @@
 import { claimLaneOfItem, laneState, patchLane, resolveOwner } from './lanes';
 import { modelSummary } from '../catalog';
 import type { FeedItem, LlmMessage, QuestionsFeedItem, SettingsFeedItem, EditLogEntry } from '../types';
+import { feedOfAgentIn } from './threads';
 import { patchSession, removeFeedItem, setUi, updateFeedItem } from '../../store/store';
 import { describeChoice, sectionsOf } from './settingsCard';
 import { agentOf, get, patchAgent, session } from './runtimeShared';
@@ -23,7 +24,8 @@ function historyIndexOf(sessionId: string, itemId: string): number {
   if (!item) return -1;
   // The conversation of the agent the message was written to: its history, and only its messages count.
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
-  const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && f.meta?.agentNodeId === owner);
+  const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
+  const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && mine.has(f.id));
   const same = users.filter((f) => f.text === item.text);
   const needle = `\n${item.text || '(no text)'}\n</user_message>`;
   const history = laneState(sessionId, owner)?.history ?? [];
@@ -36,6 +38,7 @@ function historyIndexOf(sessionId: string, itemId: string): number {
 const ownerBusy = (sessionId: string, item: { meta?: { agentNodeId?: string } }) => !!laneState(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId))?.busy;
 
 /** Delete one of the user's messages: gone from the chat, and from what the agent reads (a short note keeps the turn order valid). */
+
 export function deleteUserMessage(sessionId: string, itemId: string): void {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
@@ -57,11 +60,12 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   if (!s || item?.type !== 'user' || ownerBusy(sessionId, item) || (!text.trim() && !item.attachments.length)) return;
   if (claimLaneOfItem(sessionId, itemId)) return;
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
+  const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
   const i = historyIndexOf(sessionId, itemId);
   const at = s.feed.indexOf(item);
-  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.slice(at + 1).filter((x) => !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner).length });
+  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.slice(at + 1).filter((x) => mine.has(x.id)).length });
   // What comes after it in this agent's conversation goes; the other agent's messages and cards stay.
-  for (const f of s.feed.slice(at).filter((x) => x.id === item.id || !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner)) {
+  for (const f of s.feed.slice(at).filter((x) => x.id === item.id || mine.has(x.id))) {
     if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
     removeFeedItem(sessionId, f.id);
   }
@@ -117,6 +121,7 @@ export function reopenCard(sessionId: string, itemId: string): void {
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId)! as QuestionsFeedItem | SettingsFeedItem;
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
+  const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
   const at = s.feed.indexOf(item);
   const callId = cardCallId(sessionId, item)!;
   const cut = agentOf(sessionId, owner).history.findIndex((m) => m.role === 'tool' && m.tool_call_id === callId);
@@ -125,7 +130,7 @@ export function reopenCard(sessionId: string, itemId: string): void {
     : sectionsOf(item).map((x) => `${x.kind}: ${describeChoice(modelSummary((x.chosen ?? x.recommended).modelRef)?.name ?? '', x.chosen ?? x.recommended)}`).join(' | ');
   logEdit(sessionId, { kind: item.type, itemId, before, removed: s.feed.length - at - 1 });
   // Only this agent's rows after the card go: the other agent's messages and cards stay.
-  for (const f of s.feed.slice(at + 1).filter((x) => !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner)) {
+  for (const f of s.feed.slice(at + 1).filter((x) => mine.has(x.id))) {
     if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
     removeFeedItem(sessionId, f.id);
   }

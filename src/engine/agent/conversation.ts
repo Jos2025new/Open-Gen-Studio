@@ -28,6 +28,7 @@ import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
 import { llmTurn } from './llmTurn';
 import { claimLaneOfItem, enterLane, laneOfItem, laneState } from './lanes';
+import { MAIN_THREAD } from './threads';
 import { recipientOf } from './recipient';
 
 export async function sendAgentMessage(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string } = {}): Promise<void> {
@@ -73,7 +74,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
 
   const runId = uid('turn');
   autoTitleSession(sessionId, clean || 'Edit');
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(opts.chatNodeId ? { chatNodeId: opts.chatNodeId } : {}), ...(to.id ? { agentNodeId: to.id, toAgentNodeIds: [to.id] } : {}) }, sessionId, to.id) });
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(opts.chatNodeId ? { chatNodeId: opts.chatNodeId } : {}), ...(to.id !== MAIN_THREAD ? { agentNodeId: to.id, toAgentNodeIds: [to.id] } : {}) }, sessionId, to.id) });
   if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = agentOf(sessionId, to.id).pending;

@@ -44,7 +44,7 @@ it.each([['Image', 'image'], ['Video', 'video'], ['Music', 'audio'], ['3D', 'mod
   await click(label);
   expect(host.querySelector('[data-kind]')?.getAttribute('data-auto-variants')).toBe('true');
   await click('Pick model');
-  expect(picks.pick).toHaveBeenCalledWith(kind, 'local::chosen');
+  expect(picks.pick).toHaveBeenCalledWith(kind, 'local::chosen', true, expect.any(String));
   if (kind === 'video') {
     expect(useStore.getState().composer.videoRoutes).toBeUndefined();
     expect(useStore.getState().settings.ops.videoEdit).toBeNull();
