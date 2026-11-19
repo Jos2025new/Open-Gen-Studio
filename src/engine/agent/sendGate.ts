@@ -8,5 +8,5 @@ export function agentAccepts(sessionId: string, agentNodeId: string): boolean {
   // The agent addressed decides, not the one on screen: A at work does not stop a message to B.
   const a = threadOf(s, agentNodeId);
   // A message is new work: with another tab asking for the lock it waits, even if some other agent is still finishing (`mayStartWork` lets that one continue its own turn).
-  return Boolean(s) && !a?.busy && mayStartWork() && !getWriterState().requested;
+  return Boolean(s) && Boolean(agentNodeId) && !a?.busy && mayStartWork() && !getWriterState().requested;
 }
