@@ -127,9 +127,10 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
   return record.done;
 }
 
-/** The run that produced this generation; with none given, the latest run that sent something, else the latest attempt. */
+/** The run that produced this generation; when none is known (an older result), the latest run that sent something, else the latest attempt. */
 export function lastRunFor(session: string, node: string, generationId?: string): ActionRecord | undefined {
   const mine = [...ledger.values()].filter((r) => r.session === session && r.targets.includes(node)).sort((a, b) => b.seq - a.seq);
-  if (generationId) return mine.find((r) => r.generationIds?.includes(generationId));
+  const producer = generationId ? mine.find((r) => r.generationIds?.includes(generationId)) : undefined;
+  if (producer) return producer;
   return mine.find((r) => r.sends > 0) ?? mine[0];
 }
