@@ -1,4 +1,4 @@
-import { claimLaneOfItem, laneOfItem, laneState, patchLane } from './lanes';
+import { claimLaneOfItem, laneOfItem, laneState, patchLane, viewedLane } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun } from '../flow/actions';
@@ -311,7 +311,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
 export async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
   // The closing message is written by the agent that owns the plan, from its own state, whichever agent is on screen.
   const owner = laneOfItem(sessionId, itemId);
-  if (!owner || session(sessionId)?.agentLane === owner) toCanvasOfItem(sessionId, itemId);
+  if (!owner || viewedLane(session(sessionId)) === owner) toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const own = laneState(sessionId, owner);
   if (!s || !own || agentEngine(sessionId, owner).kind !== 'llm' || own.busy || own.pending) return;

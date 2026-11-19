@@ -1,4 +1,4 @@
-import { laneState, patchLane } from './lanes';
+import { freshAgent, laneState, patchLane, viewedLane } from './lanes';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -64,7 +64,7 @@ export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: 
 }
 
 /** An agent's state by id (explicit); `undefined` is the agent on screen, for a caller no agent owns. */
-export const agentOf = (sessionId: string, owner: string | undefined): AgentState => laneState(sessionId, owner) ?? session(sessionId).agent;
+export const agentOf = (sessionId: string, owner: string | undefined): AgentState => laneState(sessionId, owner) ?? freshAgent();
 
 /** One abort controller per running turn: an agent's key is its own, so two agents of one session can run at once. */
 export const turnKey = (sessionId: string, agentNodeId?: string): string => (agentNodeId ? `${sessionId}|${agentNodeId}` : sessionId);
@@ -176,7 +176,7 @@ export function feedOfAgent(sessionId: string, owner: string | undefined) {
 
 /** The provider and model of the agent a turn is for: the node's own choice, else the global one. */
 export function agentChoice(sessionId: string = get().activeSessionId, agentNodeId?: string): { provider: LlmProviderId | 'offline'; model: string } {
-  const own = agentNodeOf(sessionId, agentNodeId ?? get().sessions[sessionId]?.agentLane)?.data;
+  const own = agentNodeOf(sessionId, agentNodeId ?? viewedLane(get().sessions[sessionId]))?.data;
   const chosen = own?.kind === 'ref' ? own.llm : undefined;
   return chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
 }
@@ -227,10 +227,10 @@ export function toCanvasOfItem(sessionId: string, itemId: string): void {
 }
 
 /** What the user wrote in this session (messages and answers): a model named there is the user's choice. */
-function userWords(sessionId: string): string {
-  const s = session(sessionId);
-  const said = s.feed.flatMap((f) => (f.type === 'user' ? [f.text ?? ''] : f.type === 'questions' && f.answers ? Object.values(f.answers) : []));
-  return [...said, s.agent.draft?.request ?? '', ...Object.values(s.agent.draft?.answers ?? {})].join('\n');
+function userWords(sessionId: string, owner: string | undefined): string {
+  const draft = agentOf(sessionId, owner).draft;
+  const said = feedOfAgent(sessionId, owner).flatMap((f) => (f.type === 'user' ? [f.text ?? ''] : f.type === 'questions' && f.answers ? Object.values(f.answers) : []));
+  return [...said, draft?.request ?? '', ...Object.values(draft?.answers ?? {})].join('\n');
 }
 
 function planContext(sessionId: string, workspace: Workspace, strict: boolean, owner: string | undefined) {
@@ -256,7 +256,7 @@ function planContext(sessionId: string, workspace: Workspace, strict: boolean, o
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
     librarySubjects:()=>get().library,
     strictContinuity:strict,
-    userText: () => userWords(sessionId),
+    userText: () => userWords(sessionId, owner),
     // This request only (an old "un ángulo diferente" must not fit a new one), user words only; the agent's reply is in offerText.
     requestText: () => userRequest(agentOf(sessionId, owner)),
     offerText: () => offerRequest(agentOf(sessionId, owner)),
@@ -330,7 +330,7 @@ export async function presentPlan(
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
-  const carried = revision ? carryOverRevision(raw, { feed: session(sessionId).feed, agent: agentOf(sessionId, owner) }) : [];
+  const carried = revision ? carryOverRevision(raw, { feed: session(sessionId).feed, revising: agentOf(sessionId, owner).revising }) : [];
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId, owner), planId);
   if (plan && carried.length) plan.agentNotes = carried;
   if (signal?.aborted) return { errors: [] };

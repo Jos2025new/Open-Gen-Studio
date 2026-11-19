@@ -1,4 +1,5 @@
 import { uid } from '../../lib/id';
+import { threadOf } from '../agent/lanes';
 import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
 import { laneState, patchLane } from '../agent/lanes';
 import { applyEdit, editCompound } from '../nodecore/edit';
@@ -70,8 +71,9 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
   };
 
   if (!hasAnyRefNode) {
+    const firstAgent = threadOf(session, session.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent')?.id); // its choices seed the default model nodes
     const llmRef = st.settings.agent.provider === 'offline' ? 'offline' : st.settings.agent.model || 'offline';
-    const imgRef = session.agent.settings?.image?.modelRef ?? st.composer.image.modelRef;
+    const imgRef = firstAgent?.settings?.image?.modelRef ?? st.composer.image.modelRef;
 
     ensureNode('sys_chat', at(1, 0), {
       kind: 'ref',
@@ -104,8 +106,8 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
       attachMode: 'wired',
     });
 
-    if (session.agent.settings?.video?.modelRef) {
-      const vidRef = session.agent.settings.video.modelRef;
+    if (firstAgent?.settings?.video?.modelRef) {
+      const vidRef = firstAgent.settings.video.modelRef;
       ensureNode('sys_model_video', at(0, 2), {
         kind: 'ref',
         type: 'model',

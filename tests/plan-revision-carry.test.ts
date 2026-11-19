@@ -83,7 +83,7 @@ describe('continuity of the revised plan', () => {
       { source: 's9', preserve: 'the room', steps: ['s2'] },
     ],
   } as unknown as Plan;
-  const session = { feed: [{ id: 'f1', type: 'plan', status: 'awaiting', plan: prev }], agent: { revising: 'f1' } };
+  const session = { feed: [{ id: 'f1', type: 'plan', status: 'awaiting', plan: prev }], revising: 'f1' };
   const raw = (extra: Partial<RawPlan> = {}): RawPlan => ({ steps: [{ id: 's1' }, { id: 's2' }] as RawPlan['steps'], ...extra });
 
   it('copies the groups that still point at existing steps and says what it dropped', () => {
@@ -102,7 +102,7 @@ describe('continuity of the revised plan', () => {
 
   it('does nothing when no plan is being revised', () => {
     const r = raw();
-    expect(carryOverRevision(r, { feed: [], agent: {} })).toEqual([]);
+    expect(carryOverRevision(r, { feed: [], revising: undefined })).toEqual([]);
     expect(r.continuity).toBeUndefined();
   });
 

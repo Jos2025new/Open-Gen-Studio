@@ -1,5 +1,5 @@
 import { patchSession, toast, useStore } from '../../store/store';
-import type { AgentState } from '../types';
+import type { AgentState, Session } from '../types';
 
 /*
  * One live state per agent node, in a map by agent id inside the session (ADR 0031, strip 2): `session.agents`.
@@ -54,14 +54,25 @@ export function claimLaneOfItem(sessionId: string, itemId: string): string | nul
   return why;
 }
 
-/** The state of an agent instance (read-only). An id the session has no entry for reads as no state. */
-export function laneState(sessionId: string, nodeId: string | undefined): AgentState | undefined {
-  const s = useStore.getState().sessions[sessionId];
+/** Which agent's thread the UI shows (a choice of display only: nothing is ever written through it). */
+export const viewedLane = (s: Session | undefined): string | undefined => s?.agentLane;
+
+/**
+ * The state of one agent's thread, from a session value (so a UI selector can use it). With an id it is that agent's, never another's;
+ * an id with no thread reads as nothing. Without an id: the thread on screen (display and "the agent that would take a message" only).
+ */
+export function threadOf(s: Session | undefined, nodeId: string | undefined): AgentState | undefined {
   if (!s) return undefined;
   if (!nodeId) return s.agent;
   if (s.agentLane === undefined) return s.agents?.[nodeId] ?? (s.agents && Object.keys(s.agents).length ? undefined : s.agent);
   return s.agents?.[nodeId] ?? (s.agentLane === nodeId ? s.agent : undefined);
 }
+
+/** Every thread of the session (for what asks whether any agent is working or waiting). */
+export const allThreads = (s: Session | undefined): AgentState[] => (!s ? [] : s.agents && Object.keys(s.agents).length ? Object.values(s.agents) : [s.agent]);
+
+/** The state of an agent instance (read-only). An id the session has no entry for reads as no state. */
+export const laneState = (sessionId: string, nodeId: string | undefined): AgentState | undefined => threadOf(useStore.getState().sessions[sessionId], nodeId);
 
 /**
  * Write to one agent's state by id: an operation that belongs to an agent (its turn, the end of its plan, a rewrite on

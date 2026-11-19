@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { useThread } from '../../engine/agent/useThread';
 import { BookOpen, Braces, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from '../ui/icons';
 import type { ActivityEntry, ActivityFeedItem, AgentState } from '../../engine/types';
-import { useStore } from '../../store/store';
 import { useNow } from '../ui/hooks';
 import { seconds, waitDetail } from '../../engine/agent/schemaWait';
 
@@ -36,9 +36,10 @@ function summary(entries: ActivityEntry[]): string {
 
 /** One agent turn: how long it worked, its reasoning (when streamed) and what it did (L3). Open while it runs, folded to one line once it ends. */
 export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; sessionId: string }) {
-  const busy = useStore((s) => s.sessions[sessionId]?.agent.busy ?? false);
-  const phase = useStore((s) => s.sessions[sessionId]?.agent.phase ?? 'working');
-  const waiting = useStore((s) => s.sessions[sessionId]?.agent.waiting ?? NO_WAITS);
+  const owner = item.meta?.agentNodeId; // the turn's own agent
+  const busy = useThread(sessionId, owner, (a) => a.busy, false);
+  const phase = useThread(sessionId, owner, (a) => a.phase ?? 'working', 'working');
+  const waiting = useThread(sessionId, owner, (a) => a.waiting ?? NO_WAITS, NO_WAITS);
   const running = !item.endedAt && busy;
   const now = useNow(1000, running);
   const [userOpen, setOpen] = useState<boolean | null>(null);

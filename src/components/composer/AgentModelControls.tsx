@@ -1,4 +1,5 @@
 import { ModelBrandIcon } from '../ui/ModelBrandIcon';
+import { useRecipientThread } from '../../engine/agent/useThread';
 import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import { filterLlm, llmMaker, llmMakers, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
@@ -107,7 +108,7 @@ export function AgentModelControls() {
   const agent = useStore((s) => s.settings.agent);
   const ops = useStore((s) => s.settings.ops);
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const sessionChoices = useStore((s) => s.sessions[s.activeSessionId]?.agent.settings);
+  const sessionChoices = useRecipientThread(activeSessionId, (a) => a.settings, undefined);
   useStore((s) => s.catalog.models);
 
   // Saved route overrides remain visible as a category choice until the user replaces or releases it.

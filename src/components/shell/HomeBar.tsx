@@ -1,4 +1,5 @@
 import { useRef, type FormEvent } from 'react';
+import { useRecipientThread } from '../../engine/agent/useThread';
 import { ArrowRight, Paperclip, X } from '../ui/icons';
 import { setComposer, setUi, useStore } from '../../store/store';
 import { agentAccepts } from '../../engine/agent/sendGate';
@@ -12,7 +13,7 @@ export function HomeBar() {
   const text = useStore((s) => s.ui.homeDrafts?.[s.activeSessionId]) ?? '';
   const setText = (value: string) => setUi((u) => ({ homeDrafts: { ...u.homeDrafts, [sessionId]: value } }));
   const fileRef = useRef<HTMLInputElement>(null);
-  const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
+  const busy = useRecipientThread(sessionId, (a) => a.busy, false); // the agent that would take this message
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const live = attachments.filter((id) => assets[id]);

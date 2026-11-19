@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useAnyThread } from '../../engine/agent/useThread';
 import { create } from 'zustand';
 import { Panel } from '@xyflow/react';
 import { Info, LayoutGrid, MessageSquare, Plus, X } from '../ui/icons';
@@ -46,7 +47,7 @@ function useSelectedResult(sessionId: string) {
 export function CornerButtons({ sessionId, space = 'node' }: { sessionId: string; space?: Space }) {
   const { view, open } = useCorner();
   const { items } = useSpaceFeed(sessionId, space);
-  const pending = useStore((s) => Boolean(s.sessions[sessionId]?.agent.pending || s.sessions[sessionId]?.agent.busy));
+  const pending = useAnyThread(sessionId, (a) => Boolean(a.pending) || a.busy);
   const toggle = (v: View) => {
     if (space === 'designer') {
       announceSidePopup('corner');
@@ -113,7 +114,7 @@ function SideContent({ sessionId, space, frame: FrameBox }: { sessionId: string;
   const { items, talked } = useSpaceFeed(sessionId, space);
   const allFeed = useStore((s) => s.sessions[sessionId]?.feed);
   const hasConversation = Boolean(allFeed?.some((f) => f.type === 'user' || f.type === 'assistant'));
-  const pending = useStore((s) => Boolean(s.sessions[sessionId]?.agent.pending || s.sessions[sessionId]?.agent.busy));
+  const pending = useAnyThread(sessionId, (a) => Boolean(a.pending) || a.busy);
   const selected = useSelectedResult(sessionId);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const notices = items.filter((f) => f.type === 'notice');

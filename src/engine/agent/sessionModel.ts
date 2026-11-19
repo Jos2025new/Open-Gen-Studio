@@ -1,7 +1,7 @@
 import type { SettingsChoice } from '../types';
 import { lineRoutes, pickComposerModel } from '../catalog';
 import { useStore } from '../../store/store';
-import { patchLane } from './lanes';
+import { laneState, patchLane } from './lanes';
 
 type Kind = 'image' | 'video';
 
@@ -15,8 +15,8 @@ export function rememberSessionModel(sessionId: string, owner: string | undefine
 }
 
 /** Make the model remembered by a session the next composer defaults. */
-export async function setSessionModelAsDefault(sessionId: string, kind: Kind): Promise<void> {
-  const choice = useStore.getState().sessions[sessionId]?.agent.settings?.[kind];
+export async function setSessionModelAsDefault(sessionId: string, kind: Kind, owner?: string): Promise<void> {
+  const choice = laneState(sessionId, owner)?.settings?.[kind]; // no owner: the agent on screen, where the button is
   if (!choice) return;
   await applyComposerChoice(kind, choice);
 }

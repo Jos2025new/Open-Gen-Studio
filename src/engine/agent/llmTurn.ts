@@ -29,7 +29,7 @@ import { waitHooks } from './schemaWait';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 import { agentEngine, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
-import { laneState } from './lanes';
+import { freshAgent, laneState, viewedLane } from './lanes';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
@@ -52,8 +52,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
   // A turn belongs to one agent for its whole life: every read and write below names it, whichever agent is on screen later.
-  const owner = opts.agentNodeId ?? session(sessionId)?.agentLane;
-  const mine = (): AgentState => laneState(sessionId, owner) ?? session(sessionId).agent;
+  const owner = opts.agentNodeId ?? viewedLane(session(sessionId));
+  const mine = (): AgentState => laneState(sessionId, owner) ?? freshAgent();
   const engine = agentEngine(sessionId, opts.agentNodeId);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);

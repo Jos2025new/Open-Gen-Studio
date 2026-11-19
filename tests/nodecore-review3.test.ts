@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { threadOf } from '../src/engine/agent/lanes';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,7 +75,7 @@ describe('review finding 7: preconditions and one edit path', () => {
     setGraph({ nodes: [{ id: 'm', position: { x: 0, y: 0 }, data: { kind: 'ref', type: 'model', ref: 'local::image', title: 'Model', mediaKind: 'image' } }, { id: 'ag', position: { x: 0, y: 0 }, data: { kind: 'ref', type: 'agent', ref: HOME, title: 'Agent' } }], edges: [] });
     tryConnect(HOME, { source: 'm', target: 'ag', targetHandle: 'model' }); // no kind: inferred, as the UI drag does
     expect(S().graph.edges[0].kind).toBe('control');
-    expect(S().agent.settings?.image?.modelRef).toBe('local::image');
+    expect(threadOf(S(), 'ag')?.settings?.image?.modelRef).toBe('local::image');
   });
 });
 

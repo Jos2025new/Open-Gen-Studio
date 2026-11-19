@@ -26,7 +26,7 @@ function historyIndexOf(sessionId: string, itemId: string): number {
   const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && f.meta?.agentNodeId === owner);
   const same = users.filter((f) => f.text === item.text);
   const needle = `\n${item.text || '(no text)'}\n</user_message>`;
-  const history = (owner ? laneState(sessionId, owner)?.history : undefined) ?? s.agent.history;
+  const history = laneState(sessionId, owner)?.history ?? [];
   const hits = history.flatMap((m, i) => ((m.role === 'user' || m.role === 'tool') && messageText(m).includes(needle) ? [i] : []));
   const k = hits.length - (same.length - same.indexOf(item));
   return k >= 0 ? hits[k] : -1;

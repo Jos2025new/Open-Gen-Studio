@@ -34,6 +34,7 @@ export function drainAgentNotes(sessionId: string, owner: string | undefined): v
 /** Reconcile terminal generations without any provider/LLM call, including after reload. */
 export function recordPriceResults(sessionId: string, itemId: string): void {
   const generations = useStore.getState().generations;
+  let toOwner: { owner: string | undefined; notes: string[] } | undefined;
   patchSession(sessionId, (s) => {
     const item = s.feed.find((f) => f.id === itemId);
     if (item?.type !== 'plan') return s;
@@ -52,9 +53,8 @@ export function recordPriceResults(sessionId: string, itemId: string): void {
     if (!notes.length) return s;
     // The note goes to the agent that owns the plan, not to the one on screen.
     const owner = (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId;
-    const mine = owner && s.agentLane !== undefined ? (s.agents?.[owner] ?? (s.agentLane === owner ? s.agent : undefined)) : s.agent;
-    const withNotes = mine ? { ...mine, notes: [...mine.notes, ...notes] } : undefined;
-    return { ...s, feed: s.feed.map((f) => f.id === itemId ? { ...item, stepCostReviews: reviews } : f),
-      ...(withNotes ? (owner && s.agentLane !== undefined ? { agents: { ...s.agents, [owner]: withNotes } } : { agent: withNotes }) : {}) };
+    toOwner = { owner, notes };
+    return { ...s, feed: s.feed.map((f) => f.id === itemId ? { ...item, stepCostReviews: reviews } : f) };
   });
+  if (toOwner) { const { owner, notes } = toOwner; patchLane(sessionId, owner, (a) => ({ notes: [...a.notes, ...notes] })); }
 }

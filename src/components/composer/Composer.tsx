@@ -1,4 +1,5 @@
 import { ComposerAlerts } from './ComposerAlerts';
+import { useRecipientThread } from '../../engine/agent/useThread';
 import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
 import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -242,8 +243,8 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
   const subjects = useStore((s) => s.library);
   const workspace = useStore((s) => s.ui.workspace);
   const focusTick = useStore((s) => s.ui.focusComposer);
-  const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
   const sessionId = useStore((s) => s.activeSessionId);
+  const busy = useRecipientThread(sessionId, (a) => a.busy, false); // the agent that would take this message, not whichever is on screen
   const assets = useStore((s) => s.assets);
   const acceptsImages = useStore((s) => {
     if (s.composer.mode === 'agent') return true;

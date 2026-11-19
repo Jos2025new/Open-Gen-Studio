@@ -8,11 +8,13 @@ vi.mock('../src/lib/idb', () => ({
   getAssetBlob: async () => undefined,
   putAssetBlob: async () => undefined,
 }));
+import { threadOf } from '../src/engine/agent/lanes';
 import { addSystemNode, attachModelToNode, ensureSystemNodes, linkSystemNodes } from '../src/engine/nodes/system';
 import { createSession, useStore } from '../src/store/store';
 
 let sid = '';
-const agentSettings = () => useStore.getState().sessions[sid].agent.settings;
+// The agent node's own thread (the model link writes by agent id).
+const agentSettings = () => { const s = useStore.getState().sessions[sid]; return threadOf(s, s.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent')?.id)?.settings; };
 beforeEach(() => {
   const session = createSession('Ports');
   sid = session.id;

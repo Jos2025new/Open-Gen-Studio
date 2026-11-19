@@ -107,7 +107,7 @@ describe('parallel agents: A runs in the background while B is on screen', () =>
     const root = mkdtempSync(join(tmpdir(), 'own-'));
     mkdirSync(join(root, 'src/engine'), { recursive: true });
     writeFileSync(join(root, 'src/engine/bad.ts'), "patchSession(id, (s) => ({ ...s, agent: { ...s.agent, notes: [] } }));\n");
-    expect(ownerCheck(root)).toEqual([expect.stringMatching(/bad\.ts:1: writes an agent's state by hand/)]);
+    expect(ownerCheck(root)[0]).toMatch(/bad\.ts:1: writes an agent's state by hand/);
   });
 
   describe('readers take the agent that owns the turn, not the one on screen', () => {

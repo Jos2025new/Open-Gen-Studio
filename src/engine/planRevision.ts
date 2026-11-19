@@ -9,8 +9,8 @@ import type { Plan, PlanContinuity } from './types';
  */
 
 /** The plan the user commented on, if still waiting. */
-function revisedPlan(session: { feed: Array<{ id: string; type: string }>; agent: { revising?: string } }): Plan | undefined {
-  const item = session.feed.find((f) => f.id === session.agent.revising) as { type: string; status?: string; plan?: Plan } | undefined;
+function revisedPlan(session: { feed: Array<{ id: string; type: string }>; revising?: string }): Plan | undefined {
+  const item = session.feed.find((f) => f.id === session.revising) as { type: string; status?: string; plan?: Plan } | undefined;
   return item?.type === 'plan' && item.status === 'awaiting' ? item.plan : undefined;
 }
 

@@ -19,7 +19,7 @@ vi.mock('../src/engine/executor', async (original) => ({
 
 import { useStore } from '../src/store/store';
 import { sendAgentMessage } from '../src/engine/agent/conversation';
-import { laneState } from '../src/engine/agent/lanes';
+import { laneState, patchLane } from '../src/engine/agent/lanes';
 import { deleteUserMessage, editUserMessage } from '../src/engine/agent/messageEdit';
 import { approvePlan } from '../src/engine/agent/planRun';
 import { rewritePrompts } from '../src/engine/agent/planSettings';
@@ -153,10 +153,10 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
         [HOME]: {
           ...sessionNow(),
           feed: [...sessionNow().feed, planItem],
-          agent: { ...sessionNow().agent, pending: { toolCallId: null, kind: 'plan', feedItemId: 'plan-a' } },
         },
       },
     }));
+    patchLane(HOME, 'agentA', { pending: { toolCallId: null, kind: 'plan', feedItemId: 'plan-a' } });
 
     let finishExec!: (res: { outputs: Map<string, { assetIds: string[]; text?: string }>; failed: []; skipped: []; waiting: [] }) => void;
     execute.mockImplementationOnce(() => new Promise((resolve) => { finishExec = resolve; }));
@@ -171,8 +171,10 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
     finishExec({ outputs: new Map([['s1', { assetIds: [], text: 'result from A' }]]), failed: [], skipped: [], waiting: [] });
     await approval;
 
-    expect(JSON.stringify(laneState(HOME, 'agentB')?.notes ?? [])).not.toContain('Secret Plan A');
-    expect(JSON.stringify(laneState(HOME, 'agentA')?.notes ?? [])).toContain('Secret Plan A');
+    // A's closing is its own turn now (a message to B no longer silences it): the news reaches A's conversation or notes, never B's.
+    const told = (id: string) => JSON.stringify([laneState(HOME, id)?.notes ?? [], laneState(HOME, id)?.history ?? []]);
+    expect(told('agentB')).not.toContain('Secret Plan A');
+    expect(told('agentA')).toContain('Secret Plan A');
   });
 
   it('tags the assistant reply with chat2 when the message was sent from chat2', async () => {

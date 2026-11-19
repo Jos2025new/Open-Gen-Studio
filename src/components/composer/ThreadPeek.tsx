@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useAnyThread } from '../../engine/agent/useThread';
 import { ChevronDown, MessageSquare } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { FeedList, NoticeView } from '../chat/FeedList';
@@ -10,10 +11,7 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
   const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.length ?? 0);
   const hasNodeMessage = useStore((s) => s.sessions[s.activeSessionId]?.feed.some((f) => f.workspace === 'node' && f.type === 'user' && f.mode === 'agent') ?? false);
   const feed = useStore((s) => s.sessions[s.activeSessionId]?.feed);
-  const pending = useStore((s) => {
-    const sess = s.sessions[s.activeSessionId];
-    return Boolean(sess?.agent.pending) || Boolean(sess?.agent.busy);
-  });
+  const pending = useAnyThread(sessionId, (a) => Boolean(a.pending) || a.busy);
   const lastKey = useStore((s) => {
     const f = s.sessions[s.activeSessionId]?.feed;
     const last = f?.[f.length - 1];
