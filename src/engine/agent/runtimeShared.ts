@@ -1,4 +1,5 @@
 import { freshAgent, laneState, patchLane, resolveOwner } from './lanes';
+import { feedOfAgentIn, feedOfChatIn } from './threads';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -160,19 +161,10 @@ export function chatAgents(sessionId: string = get().activeSessionId, chatNodeId
 }
 
 /** The feed a chat node owns. Messages written before chats owned their feed carry no `chatNodeId` and belong to the first chat: nothing is moved or lost. */
-export function feedOfChat(sessionId: string, chatNodeId: string) {
-  const s = get().sessions[sessionId];
-  const first = chatNodeOf(sessionId);
-  return (s?.feed ?? []).filter((f) => ((f as { meta?: { chatNodeId?: string } }).meta?.chatNodeId ?? first) === chatNodeId);
-}
+export const feedOfChat = (sessionId: string, chatNodeId: string) => feedOfChatIn(get().sessions[sessionId], chatNodeId);
 
-/** The feed one agent owns: what carries its id, plus what predates agent ids (the first agent's). No owner: the whole feed. */
-export function feedOfAgent(sessionId: string, owner: string) {
-  const feed = get().sessions[sessionId]?.feed ?? [];
-  if (!owner) return feed;
-  const first = agentNodeOf(sessionId)?.id;
-  return feed.filter((f) => ((f as { meta?: { agentNodeId?: string } }).meta?.agentNodeId ?? first) === owner);
-}
+/** The feed one agent owns: what carries its id, plus what predates agent ids (the first agent's). */
+export const feedOfAgent = (sessionId: string, owner: string) => feedOfAgentIn(get().sessions[sessionId], owner);
 
 /** The provider and model of the agent a turn is for: the node's own choice, else the global one. */
 export function agentChoice(sessionId: string = get().activeSessionId, agentNodeId?: string): { provider: LlmProviderId | 'offline'; model: string } {

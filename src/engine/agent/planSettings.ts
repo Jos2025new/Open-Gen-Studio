@@ -7,6 +7,7 @@ import { requote } from '../quotes';
 import { readGuide } from '../skills';
 import { addSpend, updateFeedItem, useStore } from '../../store/store';
 import { laneOfItem, laneState, patchLane } from './lanes';
+import { feedOfAgentIn } from './threads';
 import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
@@ -81,7 +82,7 @@ function applyChoice(s: GenStep, c: SettingsChoice): GenStep {
 function remember(sessionId: string, owner: string, kind: GenKind, c: SettingsChoice, draft?: DraftMode) {
   rememberSessionModel(sessionId, owner, kind, c, true);
   if (draft) patchLane(sessionId, owner, { draftMode: draft });
-  const feed = get().sessions[sessionId].feed;
+  const feed = feedOfAgentIn(get().sessions[sessionId], owner);
   const last = [...feed].reverse().find((f): f is SettingsFeedItem => f.type === 'settings' && Boolean(f.inline) && f.sections.some((x) => x.kind === kind));
   if (last) updateFeedItem<SettingsFeedItem>(sessionId, last.id, { sections: last.sections.map((x) => (x.kind === kind ? { ...x, chosen: c } : x)), ...(draft ? { draft } : {}) });
 }
@@ -124,7 +125,7 @@ export function changePlanDraft(sessionId: string, itemId: string, kind: DraftMo
     return { ...s, settings: { ...s.settings, resolution: c.resolution } } as GenStep;
   });
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...item.plan, steps } });
-  const video = planSections(get().sessions[sessionId].feed, { ...item, plan: { ...item.plan, steps } }).find((x) => x.kind === 'video');
+  const video = planSections(feedOfAgentIn(get().sessions[sessionId], laneOfItem(sessionId, itemId)), { ...item, plan: { ...item.plan, steps } }).find((x) => x.kind === 'video');
   const comparison = item.comparisonKinds?.includes('video') || new Set(item.plan.steps.filter(isGen).filter((s) => s.kind === 'video').map((s) => modelGroup(s.modelRef))).size > 1;
   if (video && !comparison) remember(sessionId, laneOfItem(sessionId, itemId), 'video', { ...video.recommended, ...(chosen ? { resolution: chosen.resolution } : {}) }, mode);
   else patchLane(sessionId, laneOfItem(sessionId, itemId), { draftMode: mode });

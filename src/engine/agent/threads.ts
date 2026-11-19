@@ -23,9 +23,9 @@ export const shownKey = (s: Pick<Session, 'agents' | 'agentLane'>): string => s.
  * One thread by agent id, from a session value. An id the session has no thread for reads as nothing, except that the session's
  * only thread (still under MAIN_THREAD) is the first agent's. No id: the thread the UI shows.
  */
-export function threadOf(s: Pick<Session, 'agents' | 'agentLane'> | undefined, nodeId: string): AgentState | undefined {
+export function threadOf(s: Pick<Session, 'agents' | 'graph'> | undefined, nodeId: string): AgentState | undefined {
   if (!s?.agents) return undefined;
-  return s.agents[nodeId] ?? (onlyMain(s.agents) ? s.agents[MAIN_THREAD] : undefined);
+  return s.agents[nodeId] ?? (onlyMain(s.agents) && nodeId === firstAgentId(s.graph) ? s.agents[MAIN_THREAD] : undefined);
 }
 
 const onlyMain = (agents: Record<string, AgentState>) => Object.keys(agents).length === 1 && MAIN_THREAD in agents;
@@ -33,10 +33,10 @@ const onlyMain = (agents: Record<string, AgentState>) => Object.keys(agents).len
 /** Every thread of the session. */
 export const allThreads = (s: Pick<Session, 'agents'> | undefined): AgentState[] => Object.values(s?.agents ?? {});
 
-/** The agents map with `nodeId`'s thread present: the session's main thread is taken over by the first agent, any other starts fresh. */
-export function withThread(agents: Record<string, AgentState>, nodeId: string): Record<string, AgentState> {
+/** The agents map with `nodeId`'s thread present: the session's main thread is taken over by the first agent, any other agent starts fresh. */
+export function withThread(agents: Record<string, AgentState>, nodeId: string, firstAgent: string): Record<string, AgentState> {
   if (agents[nodeId]) return agents;
-  if (onlyMain(agents)) { const { [MAIN_THREAD]: main, ...rest } = agents; return { ...rest, [nodeId]: main }; }
+  if (onlyMain(agents) && nodeId === firstAgent) { const { [MAIN_THREAD]: main, ...rest } = agents; return { ...rest, [nodeId]: main }; }
   return { ...agents, [nodeId]: freshAgent() };
 }
 
@@ -54,4 +54,19 @@ export function migrateAgents(s: Session): Session {
   if (agent) agents[raw.agentLane ?? MAIN_THREAD] = agent;
   if (!Object.keys(agents).length) agents[MAIN_THREAD] = freshAgent();
   return { ...rest, agents: Object.fromEntries(Object.entries(agents).map(([k, a]) => [k, interrupted(a)])) } as Session;
+}
+
+type Meta = { meta?: { agentNodeId?: string; chatNodeId?: string } };
+const isRef = (type: string) => (n: Session['graph']['nodes'][number]) => n.data.kind === 'ref' && n.data.type === type;
+
+/** The feed one agent owns: what carries its id, plus what predates agent ids (the first agent's). Pure: read it from any session value. */
+export function feedOfAgentIn(s: Pick<Session, 'feed' | 'graph'> | undefined, owner: string): Session['feed'] {
+  const first = firstAgentId(s?.graph);
+  return (s?.feed ?? []).filter((f) => ((f as Meta).meta?.agentNodeId ?? first) === owner);
+}
+
+/** The feed a chat node owns: what carries its id, plus what predates chat ids (the first chat's). */
+export function feedOfChatIn(s: Pick<Session, 'feed' | 'graph'> | undefined, chatNodeId: string): Session['feed'] {
+  const first = s?.graph.nodes.find(isRef('chat'))?.id;
+  return (s?.feed ?? []).filter((f) => ((f as Meta).meta?.chatNodeId ?? first) === chatNodeId);
 }

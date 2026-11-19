@@ -141,7 +141,7 @@ describe('adversarial: dinero, doble gasto y reutilización de aprobaciones', ()
 
     // A nunca eligió HQ; su draftMode no debe haber copiado `hq` de B
     expect(S().agents.agentA?.draftMode?.kind).not.toBe('hq');
-    expect(carried(HOME)).toEqual(draftMode('hq')); // confirma la causa raíz: carried no recibe owner
+    expect(carried(HOME, 'agentA')).toBeUndefined(); // carried now takes the owner: B's hq does not reach A
   });
 
   // Ataques que pasan: verifican que los arreglos de 086b815a y 342e3dde cierran esos dos casos.

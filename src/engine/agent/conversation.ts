@@ -132,7 +132,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
   if (pending) resolvePendingAsSuperseded(sessionId, to.id);
   beginJourney(sessionId, 'settings-response');
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
-  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined }, to.id);
+  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId, to.id), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined }, to.id);
   const engine = agentEngine(sessionId, to.id);
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;

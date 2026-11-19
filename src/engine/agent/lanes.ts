@@ -1,6 +1,6 @@
 import { patchSession, toast, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
-import { allThreads, firstAgentId, freshAgent, shownKey, shownThread, threadOf, withThread } from './threads';
+import { allThreads, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
 
 export { allThreads, freshAgent, shownThread, threadOf };
 
@@ -18,7 +18,7 @@ export function enterLane(sessionId: string, nodeId: string): string | null {
   if (!s || s.agentLane === nodeId) return null;
   patchSession(sessionId, (x) => {
     const from = shownThread(x);
-    const agents = withThread(x.agents, nodeId);
+    const agents = withThread(x.agents, nodeId, firstAgentId(x.graph));
     // The shared choices fill what the target lacks; they never overwrite its own (it may be mid-turn).
     const target = agents[nodeId];
     const shared = from && from !== target ? Object.fromEntries(SHARED.filter((k) => from[k] !== undefined && target[k] === undefined).map((k) => [k, from[k]])) : {};
@@ -63,8 +63,8 @@ export const laneState = (sessionId: string, nodeId: string): AgentState | undef
  */
 export function patchLane(sessionId: string, nodeId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   patchSession(sessionId, (x) => {
-    const key = nodeId ?? shownKey(x);
-    const agents = withThread(x.agents, key);
+    const key = nodeId;
+    const agents = withThread(x.agents, key, firstAgentId(x.graph));
     const a = agents[key];
     return { ...x, agents: { ...agents, [key]: { ...a, ...(typeof patch === 'function' ? patch(a) : patch) } } };
   });

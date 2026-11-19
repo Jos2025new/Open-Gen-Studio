@@ -28,7 +28,7 @@ import { activityLog } from './activityLog';
 import { waitHooks } from './schemaWait';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
-import { agentEngine, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
+import { agentEngine, feedOfAgent, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
 import { freshAgent, laneState, resolveOwner } from './lanes';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
@@ -400,7 +400,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           }
           inferChoices(sessionId, owner, 'propose_plan', v.data.steps);
           if (!v.data.revision && (mine().settingsParts?.length ?? 0) > 1) {
-            const feed = session(sessionId).feed;
+            const feed = feedOfAgent(sessionId, owner);
             const userAt = feed.findLastIndex((f) => f.type === 'user');
             if (!feed.slice(userAt + 1).some((f) => f.type === 'settings' && f.status === 'confirmed')) patchAgent(sessionId, { settingsParts: undefined }, owner);
           }
@@ -411,7 +411,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           }
           const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
           const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((mine().settingsParts ?? []).map((p) => [p.kind, p])) : mine().settings)) : null;
-          const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
+          const draft = workspace === 'node' ? null : draftGate(v.data.steps, feedOfAgent(sessionId, owner), get().composer.agentStyle, v.data.revision === true);
           if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, owner, v.data.steps))) {
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
             const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, owner, rowCanvas(workspace), call.id, v.data.steps, until, log, turnMeta()) : (gate ?? draft)!;

@@ -3,6 +3,7 @@ import { OPS, OP_IDS } from '../ops';
 import { PROVIDER_LABELS } from '../providers/types';
 import { useStore } from '../../store/store';
 import { laneState } from '../agent/lanes';
+import { feedOfChatIn } from '../agent/threads';
 import { isOmniSpace, omniSpacePorts } from './omniSpaces';
 import { omniSpaceLive } from './omniLive';
 import type {
@@ -300,7 +301,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
     chat: () => {
       if (!st.sessions[d.ref]) return missingTarget(node, 'Chat', 'Session');
       const targetSession = st.sessions[d.ref];
-      const feed = targetSession?.feed ?? [];
+      const feed = feedOfChatIn(targetSession, node.id);
       const userCount = feed.filter((f) => f.type === 'user').length;
       const genCount = feed.filter((f) => f.type === 'generation').length;
       const lastMsg = [...feed].reverse().find((f) => f.type === 'user' || f.type === 'assistant');
