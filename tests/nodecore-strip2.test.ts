@@ -4,7 +4,7 @@ import type { Graph } from '../src/engine/types';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener() {} }, document: { addEventListener() {}, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async (id: string) => id }));
 // The simulated provider: the turn itself is replaced; what it was asked is observable.
-const turn = vi.hoisted(() => vi.fn(async () => undefined));
+const turn = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => undefined));
 vi.mock('../src/engine/agent/llmTurn', () => ({ llmTurn: turn }));
 
 import { useStore } from '../src/store/store';
