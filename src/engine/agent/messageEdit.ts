@@ -1,7 +1,8 @@
 import { claimLaneOfItem, laneState, patchLane, resolveOwner } from './lanes';
 import { modelSummary } from '../catalog';
 import type { FeedItem, LlmMessage, QuestionsFeedItem, SettingsFeedItem, EditLogEntry } from '../types';
-import { feedOfAgentIn } from './threads';
+import { MAIN_THREAD, feedOfAgentIn } from './threads';
+import { agentAccepts } from './sendGate';
 import { patchSession, removeFeedItem, setUi, updateFeedItem } from '../../store/store';
 import { describeChoice, sectionsOf } from './settingsCard';
 import { agentOf, get, patchAgent, session } from './runtimeShared';
@@ -58,8 +59,10 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || item?.type !== 'user' || ownerBusy(sessionId, item) || (!text.trim() && !item.attachments.length)) return;
-  claimLaneOfItem(sessionId, itemId);
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
+  // Nothing is deleted for a send that will be refused (the writer handoff asks for the lock): the check is the one sendAgentMessage makes.
+  if (!agentAccepts(sessionId, owner)) return;
+  claimLaneOfItem(sessionId, itemId);
   const i = historyIndexOf(sessionId, itemId);
   // The message and what comes after it in this agent's conversation go; the other agent's messages and cards stay.
   const removed = removeOwnedFrom(sessionId, owner, s.feed.indexOf(item));
@@ -74,7 +77,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
     phase: undefined,
   }), owner);
   if (get().ui.workspace !== 'chat' && get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
-  await sendAgentMessage(text, { attachments: item.attachments, ...(item.meta?.agentNodeId ? { agentNodeId: item.meta.agentNodeId } : {}), ...(item.meta?.chatNodeId ? { chatNodeId: item.meta.chatNodeId } : {}) });
+  await sendAgentMessage(text, { attachments: item.attachments, ...(owner !== MAIN_THREAD ? { agentNodeId: owner } : {}), ...(item.meta?.chatNodeId ? { chatNodeId: item.meta.chatNodeId } : {}) });
 }
 
 /** The owner's rows from index `from` on leave the chat (a plan still awaiting takes its draft nodes along); returns how many. Others' rows stay. */
