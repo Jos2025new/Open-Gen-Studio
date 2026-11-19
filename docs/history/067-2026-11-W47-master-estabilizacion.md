@@ -23,7 +23,7 @@ Traspaso para la próxima sesión maestra. Rama única: `task/sqlite-adopt` (wor
 | Abrir un space en el omnicanvas muestra sus nodos del sistema | commit siguiente a `3090b237` | `tests/space-opens-its-nodes.test.ts` |
 | Punto 7 revertido según la regla del usuario | `60ab26f3` | tests |
 
-La suite completa sobre la rama ya fusionada se lanzó el 2026-11-18; su resultado está en `pendientes.md`.
+Suite completa sobre la rama ya fusionada (2026-11-18): 585 archivos, 4129 tests pasan, 5 omitidos, salida 0 (un worker, systemd-run 3 GB).
 
 ## Corrección del 2026-11-18: verificado en el código, mucho es parcial
 
@@ -62,7 +62,7 @@ Cómo se hace:
 
 ## Para retomar, en orden
 
-1. Resultado de la suite completa de `task/sqlite-adopt`; si está en verde, arrancar el reparto.
+1. Suite completa de `task/sqlite-adopt` en verde (2026-11-18, 4129 tests).
 2. Empezar la tanda del envoltorio (visión de arriba) con su equipo. Lo demás, sin solapar archivos, todos desde `task/sqlite-adopt`: Grok, punto 8 (puertos y cables entre ventanas); Hydrogen, el resto de contratos (imagen de doc y library, nodos no idempotentes, esquema versionado), después de Grok; GPT, solo tests adversariales; Argon, prueba en el sandbox (varios agentes, nodo `prompt`, abrir un space, migración del historial guardado). `pendientes.md` y `docs/map.md` solo los toca la sesión maestra al fusionar.
 3. Propuesto y sin confirmar: procedencia de los resultados (cada resultado guarda la revisión que usó) y marcar como desactualizado sin regenerar solo.
 4. Del usuario: diseño del panel de exportación y decisión del idioma.
