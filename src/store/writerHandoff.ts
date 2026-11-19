@@ -1,6 +1,7 @@
 import { WRITER_HANDOFF } from '../engine/checkStatus';
 import { controllers } from '../engine/jobs';
 import { stopSession } from '../engine/agent/runtime';
+import { allThreads } from '../engine/agent/threads';
 import { onWriterLockGranted, onWriterLockLost, setWriterHooks, type WorkReport } from '../lib/writerLock';
 import { resetSaveStatus } from './saveStatus';
 import { saveNow, useStore } from './store';
@@ -12,7 +13,7 @@ import { saveNow, useStore } from './store';
  */
 const inFlight = () => Object.values(useStore.getState().generations).filter((g) => g.status === 'running' || g.status === 'queued');
 /** A session is busy while ANY of its agents is mid-turn (agents run in parallel; `session.agent` is only the one on screen). */
-const busySessions = () => Object.values(useStore.getState().sessions).filter((s) => Object.values(s.agents).some((a) => a.busy)).map((s) => s.id);
+const busySessions = () => Object.values(useStore.getState().sessions).filter((s) => allThreads(s).some((a) => a.busy)).map((s) => s.id);
 
 export function workReport(): WorkReport {
   const gens = inFlight();

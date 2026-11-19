@@ -11,7 +11,8 @@ import { parseSync } from 'rolldown/utils';
 
 // lanes.ts and the store define the by-id write itself.
 // lanes.ts holds the threads and the one choice of which is shown; the store keeps the shown thread in step; writerHandoff only asks whether any agent is busy (protected).
-const ALLOWED = new Set(['src/engine/agent/lanes.ts', 'src/store/store.ts', 'src/store/writerHandoff.ts']);
+const ALLOWED = new Set(['src/engine/agent/lanes.ts', 'src/engine/agent/threads.ts', 'src/store/store.ts']); // store.ts only builds a new session and migrates a saved one
+const THREAD_KEYS = new Set(['agents', 'agentLane']);
 const HINT = 'write it by id: `patchAgent(sessionId, patch, owner)` (agent/runtimeShared.ts) or `patchLane(sessionId, owner, patch)` (agent/lanes.ts); `owner` is the agent the turn, card or plan belongs to.';
 
 function walk(dir, out = []) {
@@ -47,6 +48,7 @@ export function check(root = '.') {
     };
     // `agent` is also the name of a settings key and of a message's label (a string): those are not an agent's state.
     const plain = (v) => v?.type === 'Literal' || v?.type === 'TemplateLiteral' || (v?.type === 'Identifier' && v.name === 'undefined') || (v?.type === 'ConditionalExpression' && plain(v.consequent) && plain(v.alternate));
+    const plainProp = (p) => plain(p.value);
     const settingsLike = (o) => o.properties.some((p) => p.type === 'SpreadElement' && (p.argument?.property?.name === 'settings' || p.argument?.name === 'settings'));
     // The syntax tree: line breaks, a variable in between or `Object.assign` do not hide a write.
     let inSettings = 0; // `setSettings((s) => ({ agent: { ...s.agent } }))`: `s` is the settings, whose `agent` is the model choice
@@ -61,6 +63,12 @@ export function check(root = '.') {
       if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression' && node.callee.object?.name === 'Object' && node.callee.property?.name === 'assign' && touchesAgent(node.arguments[0])) flag(node, "mutates an agent's state by hand");
       if (node.type === 'AssignmentExpression' && touchesAgent(node.left)) flag(node, "assigns into an agent's state by hand");
       if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression' && ['push', 'splice', 'pop', 'shift', 'unshift', 'sort', 'reverse'].includes(node.callee.property?.name) && touchesAgent(node.callee.object)) flag(node, "mutates an agent's state by hand");
+      // The thread map and the pointer to the one on screen belong to lanes.ts and threads.ts: `s.agents`, `s.agentLane`, `{ agents }` or `{ agentLane }` anywhere else is a read or write that picks a thread by position.
+      if (node.type === 'MemberExpression' && THREAD_KEYS.has(node.computed ? node.property?.value : node.property?.name) && !inSettings) flag(node, `touches \`.${node.computed ? node.property.value : node.property.name}\` outside lanes.ts and threads.ts`);
+      // `const { agent, keys } = get().settings` is the settings' model choice; destructuring a thread out of anything else is a read by position.
+      const fromSettings = (i) => (i?.property?.name ?? i?.name) === 'settings';
+      if (node.type === 'VariableDeclarator' && node.id?.type === 'ObjectPattern' && !fromSettings(node.init) && node.id.properties.some((p) => p.type === 'Property' && (THREAD_KEYS.has(keyName(p)) || keyName(p) === 'agent'))) flag(node, 'destructures an agent thread out of an object');
+      if (node.type === 'Property' && THREAD_KEYS.has(keyName(node)) && node.parent !== 'pattern' && !plainProp(node) && !inSettings) flag(node, `writes \`${keyName(node)}:\` into a session by hand`);
       for (const key of Object.keys(node)) {
         const child = node[key];
         if (Array.isArray(child)) child.forEach(visit); else if (child && typeof child === 'object') visit(child);
