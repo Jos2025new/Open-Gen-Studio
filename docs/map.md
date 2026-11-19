@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 370 |
+| `src/lib` | 35 | 372 |
 | `src/store` | 18 | 276 |
 
 221 de 681 módulos no tienen ningún test que los importe directamente.

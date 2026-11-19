@@ -107,3 +107,32 @@ describe('disk write receipts', () => {
     expect(writes[1]).toContain('"savedAt":40,"baseAt":30');
   });
 });
+
+describe('disk write aborted by a reload', () => {
+  const aborting = async (_url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(_url).endsWith('/ping')) return ok();
+    if (method(init) === 'GET') return ok(state(10, 'base'));
+    throw new TypeError('Failed to fetch');
+  };
+
+  it('warns about a failed write while the page is alive', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const disk = await loadDisk(aborting);
+    await disk.getState();
+    expect(await disk.setState(state(20, 'alive'))).toBe('fail');
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('stays quiet when the browser aborts it on pagehide (the next load resends it)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const win = new EventTarget();
+    vi.stubGlobal('window', win);
+    const disk = await loadDisk(aborting);
+    await disk.getState();
+    win.dispatchEvent(new Event('pagehide'));
+    expect(await disk.setState(state(20, 'unloading'))).toBe('fail');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
