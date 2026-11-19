@@ -9,6 +9,8 @@ import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
 import '@xyflow/react/dist/style.css';
 import { startKeySync } from './engine/providerKeys';
+// Registers the load migration into the store; explicit so a saved v1 graph is upgraded whatever else loads first.
+import './engine/nodecore/migrate';
 import './styles/tokens.css';
 import './styles/accents.css';
 import './styles/soft-contrast.css';
