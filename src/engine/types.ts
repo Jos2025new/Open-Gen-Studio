@@ -1007,6 +1007,8 @@ export interface Session {
   activeDocId: string | null;
   /** Every agent's thread by agent node id (see agent/threads.ts). */
   agents: Record<string, AgentState>;
+  /** Threads of deleted agent nodes (the last few), so undoing the deletion by any path gives the agent its memory back (agent/threads.ts). */
+  retired?: Record<string, AgentState>;
   /** Which thread the UI shows (display only; nothing is written through it). Absent: the session's main thread. */
   agentLane?: string;
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };

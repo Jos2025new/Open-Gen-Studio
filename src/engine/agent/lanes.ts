@@ -14,9 +14,11 @@ const SHARED = ['settings', 'switchedTo', 'enhance'] as const;
 
 /** A deleted agent's thread goes with it. */
 const removed = new Set<string>();
+const RETIRED_KEPT = 8;
 export function dropThread(sessionId: string, nodeId: string): void {
   removed.add(`${sessionId}|${nodeId}`);
-  patchSession(sessionId, (x) => (x.agents[nodeId] ? { ...x, agents: Object.fromEntries(Object.entries(x.agents).filter(([k]) => k !== nodeId)), ...(x.agentLane === nodeId ? { agentLane: undefined } : {}) } : x));
+  // The thread leaves the live ones but is kept (the last RETIRED_KEPT): undoing the deletion, by any path, gives the agent its memory back.
+  patchSession(sessionId, (x) => (x.agents[nodeId] ? { ...x, agents: Object.fromEntries(Object.entries(x.agents).filter(([k]) => k !== nodeId)), retired: Object.fromEntries(Object.entries({ ...x.retired, [nodeId]: x.agents[nodeId] }).slice(-RETIRED_KEPT)), ...(x.agentLane === nodeId ? { agentLane: undefined } : {}) } : x));
 }
 
 /** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. */
@@ -26,7 +28,7 @@ export function enterLane(sessionId: string, nodeId: string): void {
   if (!s || s.agentLane === nodeId) return;
   patchSession(sessionId, (x) => {
     const from = shownThread(x);
-    const agents = withThread(x.agents, nodeId, firstAgentId(x.graph));
+    const agents = withThread(x.agents, nodeId, firstAgentId(x.graph), x.retired);
     // The shared choices fill what the target lacks; they never overwrite its own (it may be mid-turn).
     const target = agents[nodeId];
     const shared = from && from !== target ? Object.fromEntries(SHARED.filter((k) => from[k] !== undefined && target[k] === undefined).map((k) => [k, from[k]])) : {};
@@ -72,8 +74,8 @@ export function patchLane(sessionId: string, nodeId: string, patch: Partial<Agen
   patchSession(sessionId, (x) => {
     const key = nodeId;
     // A turn that outlives its agent node (deleted in flight) writes nothing: its thread is gone and does not come back.
-    if (!x.agents[key] && removed.has(`${sessionId}|${key}`)) return x;
-    const agents = withThread(x.agents, key, firstAgentId(x.graph));
+    if (!x.agents[key] && removed.has(`${sessionId}|${key}`) && !x.graph.nodes.some((n) => n.id === key)) return x;
+    const agents = withThread(x.agents, key, firstAgentId(x.graph), x.retired);
     const a = agents[key];
     return { ...x, agents: { ...agents, [key]: { ...a, ...(typeof patch === 'function' ? patch(a) : patch) } } };
   });

@@ -23,9 +23,9 @@ export const shownKey = (s: Pick<Session, 'agents' | 'agentLane'>): string => s.
  * One thread by agent id, from a session value. An id the session has no thread for reads as nothing, except that the session's
  * only thread (still under MAIN_THREAD) is the first agent's. No id: the thread the UI shows.
  */
-export function threadOf(s: Pick<Session, 'agents' | 'graph'> | undefined, nodeId: string): AgentState | undefined {
+export function threadOf(s: Pick<Session, 'agents' | 'graph'> & { retired?: Session['retired'] } | undefined, nodeId: string): AgentState | undefined {
   if (!s?.agents) return undefined;
-  return s.agents[nodeId] ?? (onlyMain(s.agents) && nodeId === firstAgentId(s.graph) ? s.agents[MAIN_THREAD] : undefined);
+  return s.agents[nodeId] ?? (s.retired?.[nodeId] && s.graph?.nodes.some((n) => n.id === nodeId) ? interrupted(s.retired[nodeId]) : undefined) ?? (onlyMain(s.agents) && nodeId === firstAgentId(s.graph) ? s.agents[MAIN_THREAD] : undefined);
 }
 
 const onlyMain = (agents: Record<string, AgentState>) => Object.keys(agents).length === 1 && MAIN_THREAD in agents;
@@ -34,8 +34,9 @@ const onlyMain = (agents: Record<string, AgentState>) => Object.keys(agents).len
 export const allThreads = (s: Pick<Session, 'agents'> | undefined): AgentState[] => Object.values(s?.agents ?? {});
 
 /** The agents map with `nodeId`'s thread present: the session's main thread is taken over by the first agent, any other agent starts fresh. */
-export function withThread(agents: Record<string, AgentState>, nodeId: string, firstAgent: string): Record<string, AgentState> {
+export function withThread(agents: Record<string, AgentState>, nodeId: string, firstAgent: string, retired?: Session['retired']): Record<string, AgentState> {
   if (agents[nodeId]) return agents;
+  if (retired?.[nodeId]) return { ...agents, [nodeId]: interrupted(retired[nodeId]) }; // an agent that came back (undo) has its thread again
   if (onlyMain(agents) && nodeId === firstAgent) { const { [MAIN_THREAD]: main, ...rest } = agents; return { ...rest, [nodeId]: main }; }
   return { ...agents, [nodeId]: freshAgent() };
 }
