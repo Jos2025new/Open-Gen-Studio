@@ -29,7 +29,7 @@ import { waitHooks } from './schemaWait';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 import { agentEngine, feedOfAgent, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
-import { freshAgent, laneState, resolveOwner } from './lanes';
+import { freshAgent, laneState } from './lanes';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
@@ -48,13 +48,13 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId?: string }): Promise<void> {
+export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId: string }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
   // A turn belongs to one agent for its whole life: every read and write below names it, whichever agent is on screen later.
-  const owner = resolveOwner(sessionId, opts.agentNodeId);
+  const owner = opts.agentNodeId;
   const mine = (): AgentState => laneState(sessionId, owner) ?? freshAgent();
-  const engine = agentEngine(sessionId, opts.agentNodeId);
+  const engine = agentEngine(sessionId, owner);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
   const runId = opts.runId ?? uid('turn');

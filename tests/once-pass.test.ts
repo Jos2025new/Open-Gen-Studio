@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe('Continue once lives only as long as the approved action', () => {
   it('an approved action that aborts (the graph changed) leaves no pass: the next action asks', async () => {
-    const card = await presentNodeRun(sid, ['a']);
+    const card = await presentNodeRun(sid, ['a'], null, undefined, 'main');
     patchNodeData(sid, 'a', { prompt: 'edited after the preview' });
     await withOncePass(sid, () => approvePlan(sid, card.itemId!));
     expect(execute).not.toHaveBeenCalled();

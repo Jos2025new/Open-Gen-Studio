@@ -38,14 +38,14 @@ describe('agent actions on existing nodes',()=>{
  });
  it('edits keyframe 2, proposes only existing IDs and waits for approval',async()=>{
   expect((await editGraphTool(sid,'edit_node',{node_id:'key2',prompt:'walk toward the camera',expect_rev:ownerRev(session().graph,'key2')})).text).toContain('Updated');
-  const card=await presentNodeRun(sid,['final']);expect(card.errors).toEqual([]);expect(execute).not.toHaveBeenCalled();
+  const card=await presentNodeRun(sid, ['final'], null, undefined, 'main');expect(card.errors).toEqual([]);expect(execute).not.toHaveBeenCalled();
   const item=session().feed.find(f=>f.id===card.itemId) as PlanFeedItem;
   expect(item.plan.steps.map(s=>s.id)).toEqual(['key2','final']);expect(session().graph.nodes.map(n=>n.id)).toEqual(['key2','final']);
   expect(item.plan.steps[0]).toMatchObject({prompt:'walk toward the camera'});
   await approvePlan(sid,item.id);expect(execute).toHaveBeenCalledTimes(1);expect(session().graph.nodes).toHaveLength(2);
  });
  it('refreshes the same card after a relevant edit and requires the next approval',async()=>{
-  const card=await presentNodeRun(sid,['final']);const id=card.itemId!;
+  const card=await presentNodeRun(sid, ['final'], null, undefined, 'main');const id=card.itemId!;
   patchNodeData(sid,'key2',{prompt:'after preview'});await approvePlan(sid,id);expect(execute).not.toHaveBeenCalled();
   expect(session().feed.find(f=>f.id===id)).toMatchObject({status:'awaiting',plan:{steps:[{prompt:'after preview'},{}]}});
   patchNodeData(sid,'key2',{title:'rename'});await approvePlan(sid,id);expect(execute).toHaveBeenCalledTimes(1);
@@ -110,7 +110,7 @@ describe('agent actions on existing nodes',()=>{
 });
 describe('a Nodes run stopped by the spending limit says so on its card',()=>{
  it('keeps the reason on the card instead of a toast only, and runs nothing',async()=>{
-  const card=await presentNodeRun(sid,['final']);const id=card.itemId!;
+  const card=await presentNodeRun(sid, ['final'], null, undefined, 'main');const id=card.itemId!;
   const st=useStore.getState();useStore.setState({spentUsd:2,settings:{...st.settings,budgetOn:true,budgetUsd:1,budgetAccepted:null}});
   await approvePlan(sid,id);expect(execute).not.toHaveBeenCalled();
   const item=session().feed.find(f=>f.id===id) as PlanFeedItem;

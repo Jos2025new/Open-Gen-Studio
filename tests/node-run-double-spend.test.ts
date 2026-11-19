@@ -21,7 +21,7 @@ afterEach(()=>vi.unstubAllGlobals());
 describe('one approval pays one send',()=>{
  beforeEach(()=>execute.mockClear());
  it('a double click on Run approves once: one execution',async()=>{
-  const card=await presentNodeRun(sid,['final']);expect(card.errors).toEqual([]);
+  const card=await presentNodeRun(sid, ['final'], null, undefined, 'main');expect(card.errors).toEqual([]);
   const adopt=vi.spyOn(action,'runApproved');
   const a=approvePlan(sid,card.itemId!);const b=approvePlan(sid,card.itemId!);
   await Promise.all([a,b]);
