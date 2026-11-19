@@ -40,8 +40,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   if (!agentAccepts(to.id)) return;
   if (to.error) { notice(sessionId, canvas, to.error, 'error'); return; }
   if (!text.trim() && ![...(opts.attachments ?? st.composer.attachments)].length) return;
-  const blocked = to.id ? enterLane(sessionId, to.id) : null;
-  if (blocked) { notice(sessionId, canvas, blocked, 'info'); return; }
+  enterLane(sessionId, to.id);
   // The turn is reserved before the first wait (attachments, the Designer page): nothing else can enter this session meanwhile.
   setTurnChat(sessionId, opts.chatNodeId ?? chatNodeOf(sessionId), to.id);
   toCanvas(sessionId, canvas, to.id); // switching canvas loads that canvas's parked state: it must happen before the reservation
@@ -210,7 +209,7 @@ export function pushHistory(sessionId: string, msg: LlmMessage, agentNodeId: str
 
 /** The card reports what it shows selected, so typing instead of pressing Continue sends it. */
 export function pickAnswers(sessionId: string, itemId: string, answers: Record<string, string>): void {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   const s = get().sessions[sessionId];
   if (!s) return;
@@ -221,7 +220,7 @@ export function pickAnswers(sessionId: string, itemId: string, answers: Record<s
 
 /** Answers chosen in a questions card. */
 export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips', runId?: string): Promise<void> {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
@@ -251,7 +250,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
 
 /** "Skip, plan now" on a questions card: no more questions, plan with sensible defaults. */
 export async function skipQuestions(sessionId: string, itemId: string): Promise<void> {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
@@ -272,14 +271,14 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
 
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
 export function selectSettings(sessionId: string, itemId: string, index: number, chosen: SettingsChoice): void {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { sections: sectionsOf(item).map((x, i) => (i === index ? { ...x, chosen } : x)) });
 }
 
 /** "Continue" on the settings card (phase 2): the agent gets the confirmed values and each model's prompting guide. */
 export async function confirmSettings(sessionId: string, itemId: string, chosen: SettingsChoice[], note?: string): Promise<void> {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
@@ -304,7 +303,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
  * a model search) are kept and not repeated. The half-written answer and the error notice are removed.
  */
 export async function retryAgentTurn(sessionId: string, noticeId: string): Promise<void> {
-  if (claimLaneOfItem(sessionId, noticeId)) return;
+  claimLaneOfItem(sessionId, noticeId);
   const owner = laneOfItem(sessionId, noticeId);
   toCanvasOfItem(sessionId, noticeId);
   const s = session(sessionId);

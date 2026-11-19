@@ -81,7 +81,7 @@ describe('strip 2: chat with two agents', () => {
   it('showing another agent never moves or stops the one that is mid-turn', async () => {
     await sendAgentMessage('go', { agentNodeId: 'agentA' });
     patchLane(HOME, 'agentA', { busy: true });
-    expect(enterLane(HOME, 'agentB')).toBeNull();
+    enterLane(HOME, 'agentB');
     expect(S().agentLane).toBe('agentB');
     expect(viewed(S()).busy).toBe(false);
     expect(laneState(HOME, 'agentA')!.busy).toBe(true);

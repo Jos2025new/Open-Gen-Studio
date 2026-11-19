@@ -45,7 +45,7 @@ export function removeDraftNodes(sessionId: string, planId: string): void {
 
 
 export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
@@ -267,7 +267,7 @@ async function executePlanItem(
 
 /** Claim the waiting step synchronously; another click cannot authorize or send it again. */
 export async function resolveStepCostReview(sessionId: string, itemId: string, stepId: string, decision: 'continue' | 'cancel'): Promise<void> {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
   const review = item?.stepCostReviews?.[stepId];
@@ -340,7 +340,7 @@ export { planRecovery, planRecoveryProblem, type PlanRecoveryMode };
  * Returns a short summary for the agent.
  */
 export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode): Promise<string> {
-  { const busy = claimLaneOfItem(sessionId, itemId); if (busy) return busy; }
+  claimLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan') return 'No such plan.';
@@ -402,7 +402,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
 }
 
 export function cancelPlan(sessionId: string, itemId: string): void {
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);

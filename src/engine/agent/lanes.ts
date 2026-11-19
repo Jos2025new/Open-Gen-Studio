@@ -1,4 +1,4 @@
-import { patchSession, toast, useStore } from '../../store/store';
+import { patchSession, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
 import { allThreads, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
 
@@ -19,11 +19,11 @@ export function dropThread(sessionId: string, nodeId: string): void {
   patchSession(sessionId, (x) => (x.agents[nodeId] ? { ...x, agents: Object.fromEntries(Object.entries(x.agents).filter(([k]) => k !== nodeId)), ...(x.agentLane === nodeId ? { agentLane: undefined } : {}) } : x));
 }
 
-/** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. Always null. */
-export function enterLane(sessionId: string, nodeId: string): string | null {
+/** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. */
+export function enterLane(sessionId: string, nodeId: string): void {
   removed.delete(`${sessionId}|${nodeId}`); // a node that comes back (undo) starts a thread again
   const s = useStore.getState().sessions[sessionId];
-  if (!s || s.agentLane === nodeId) return null;
+  if (!s || s.agentLane === nodeId) return;
   patchSession(sessionId, (x) => {
     const from = shownThread(x);
     const agents = withThread(x.agents, nodeId, firstAgentId(x.graph));
@@ -32,7 +32,6 @@ export function enterLane(sessionId: string, nodeId: string): string | null {
     const shared = from && from !== target ? Object.fromEntries(SHARED.filter((k) => from[k] !== undefined && target[k] === undefined).map((k) => [k, from[k]])) : {};
     return { ...x, agentLane: nodeId, agents: { ...agents, [nodeId]: { ...target, ...shared } } };
   });
-  return null;
 }
 
 /** The agent whose thread a thing belongs to: the one named, else the session's first agent node, else its main thread. Never the one on screen. */
@@ -47,15 +46,11 @@ export function laneOfItem(sessionId: string, itemId: string): string {
   return resolveOwner(sessionId, item?.meta?.agentNodeId);
 }
 
-/**
- * A card action belongs to the agent that raised the card: bring its state forward first. Returns the reason it cannot
- * (another agent is mid-turn) after telling the user, so the caller stops before changing anything.
- */
-export function claimLaneOfItem(sessionId: string, itemId: string): string | null {
+/** A card action belongs to the agent that raised the card: bring its thread forward first, and say who it is. */
+export function claimLaneOfItem(sessionId: string, itemId: string): string {
   const owner = laneOfItem(sessionId, itemId);
-  const why = owner ? enterLane(sessionId, owner) : null;
-  if (why) toast(why, 'error');
-  return why;
+  enterLane(sessionId, owner);
+  return owner;
 }
 
 /** Which agent's thread the UI shows (a choice of display only: nothing is ever written through it). */

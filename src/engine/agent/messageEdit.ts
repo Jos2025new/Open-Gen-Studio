@@ -58,7 +58,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || item?.type !== 'user' || ownerBusy(sessionId, item) || (!text.trim() && !item.attachments.length)) return;
-  if (claimLaneOfItem(sessionId, itemId)) return;
+  claimLaneOfItem(sessionId, itemId);
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
   const i = historyIndexOf(sessionId, itemId);
@@ -117,7 +117,7 @@ function cardCallId(sessionId: string, item: QuestionsFeedItem | SettingsFeedIte
  */
 export function reopenCard(sessionId: string, itemId: string): void {
   if (!canReopenCard(sessionId, itemId)) return;
-  if (claimLaneOfItem(sessionId, itemId)) return; // the card's agent comes forward first; if it cannot, nothing changes
+  claimLaneOfItem(sessionId, itemId); // the card's agent comes forward first; if it cannot, nothing changes
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId)! as QuestionsFeedItem | SettingsFeedItem;
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
