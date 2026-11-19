@@ -23,6 +23,11 @@ const groups = new Map<string, { first: Entry | null }>();
 
 /** Results deleted from a generation, in order (an index that moved, or -1: gone): travelling back must not give an old index to the wrong image (ADR 0031). */
 const drops: Array<{ gen: string; to: number[]; len: number; at: number }> = [];
+/** Can undo or redo still bring this node back? (Its thread is kept only while it can.) */
+export function historyHasNode(id: string, nodeId: string): boolean {
+  const s = stacks.get(id);
+  return !!s && [...s.past, ...s.future].some((e) => e.before.nodes.some((n) => n.id === nodeId) || e.after.nodes.some((n) => n.id === nodeId));
+}
 export function noteDropped(gen: string, to: number[], len: number): void {
   drops.push({ gen, to, len, at: Date.now() });
   if (drops.length > 200) drops.shift();

@@ -31,4 +31,15 @@ describe('deleting an agent node and getting it back', () => {
     expect(restoreNodes(entry.id, { nodes: gone, edges: [] }).error).toBeNull();
     expect(agentOf(entry.id, 'a2').history[0]?.content).toBe('remember me');
   });
+
+  it('keeps every thread the undo history can still bring back, however many agents are deleted', () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `x${i}`);
+    const entry = { ...createSession('many'), graph: { nodes: ids.map(agent), edges: [] } as unknown as Graph };
+    useStore.setState({ activeSessionId: entry.id, sessions: { [entry.id]: entry }, generations: {} });
+    for (const id of ids) patchLane(entry.id, id, { history: [{ role: 'user', content: `mem ${id}` }] });
+    const nodes = useStore.getState().sessions[entry.id].graph.nodes;
+    for (const id of ids) { const g = useStore.getState().sessions[entry.id].graph; expect(deleteNodes(entry.id, [id])).toBeNull(); void g; }
+    expect(restoreNodes(entry.id, { nodes: nodes.filter((n) => n.id === 'x0'), edges: [] }).error).toBeNull();
+    expect(agentOf(entry.id, 'x0').history[0]?.content).toBe('mem x0');
+  });
 });

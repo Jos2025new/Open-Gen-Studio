@@ -1,5 +1,6 @@
 import { patchSession, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
+import { historyHasNode } from '../flow/history';
 import { allThreads, feedOwner, firstAgentId, freshAgent, shownThread, threadOf, withThread } from './threads';
 
 export { allThreads, freshAgent, shownThread, threadOf };
@@ -14,11 +15,10 @@ const SHARED = ['settings', 'switchedTo', 'enhance'] as const;
 
 /** A deleted agent's thread goes with it. */
 const removed = new Set<string>();
-const RETIRED_KEPT = 8;
 export function dropThread(sessionId: string, nodeId: string): void {
   removed.add(`${sessionId}|${nodeId}`);
-  // The thread leaves the live ones but is kept (the last RETIRED_KEPT): undoing the deletion, by any path, gives the agent its memory back.
-  patchSession(sessionId, (x) => (x.agents[nodeId] ? { ...x, agents: Object.fromEntries(Object.entries(x.agents).filter(([k]) => k !== nodeId)), retired: Object.fromEntries(Object.entries({ ...x.retired, [nodeId]: x.agents[nodeId] }).slice(-RETIRED_KEPT)), ...(x.agentLane === nodeId ? { agentLane: undefined } : {}) } : x));
+  // The thread leaves the live ones but is kept for as long as undo/redo can bring its node back (no fixed count: the undo history is itself bounded): undoing the deletion, by any path, gives the agent its memory back.
+  patchSession(sessionId, (x) => (x.agents[nodeId] ? { ...x, agents: Object.fromEntries(Object.entries(x.agents).filter(([k]) => k !== nodeId)), retired: Object.fromEntries(Object.entries({ ...x.retired, [nodeId]: x.agents[nodeId] }).filter(([k]) => k === nodeId || historyHasNode(sessionId, k) || x.graph.nodes.some((n) => n.id === k))), ...(x.agentLane === nodeId ? { agentLane: undefined } : {}) } : x));
 }
 
 /** Show `nodeId`'s agent. Only the pointer moves; no state is copied away, so another agent's turn is untouched. */
