@@ -385,7 +385,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           outcome = 'questions';
           return;
         }
-        const canvas = await runCanvasCall({ sessionId, owner, workspace, call, parsed, index, log, until, respond, ignoreRest, toolResults, afterTools, cardMeta: () => pendingMeta(hasTextBubble()), onCardCommitted: () => { if (!hasTextBubble()) clearPending(); } });
+        const canvas = await runCanvasCall({ sessionId, owner, workspace, call, parsed, index, log, until, signal, respond, ignoreRest, toolResults, afterTools, cardMeta: () => pendingMeta(hasTextBubble()), onCardCommitted: () => { if (!hasTextBubble()) clearPending(); } });
         workspace = canvas.workspace;
         if (canvas.stop) return;
         if (canvas.handled) continue;

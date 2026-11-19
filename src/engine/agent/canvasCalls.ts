@@ -44,6 +44,8 @@ type CallCtx = {
   index: number;
   log: ReturnType<typeof activityLog>;
   until: <T,>(work: Promise<T>) => Promise<T>;
+  /** The turn's own: Stop reaches every wait that can spend. */
+  signal: AbortSignal;
   respond: (content: string) => void;
   ignoreRest: (fromIndex: number) => void;
   toolResults: LlmMessage[];
@@ -128,7 +130,7 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   return { handled: true, workspace: c.workspace };
           }
           if (call.name === 'find_commands' || call.name === 'run_commands') {
-  const r = call.name === 'find_commands' ? findCommandsTool(sessionId, parsed.value) : await until(runCommandsTool(sessionId, parsed.value));
+  const r = call.name === 'find_commands' ? findCommandsTool(sessionId, parsed.value) : await until(runCommandsTool(sessionId, parsed.value, c.signal, c.cardMeta?.()));
   if (r.done && call.name === 'run_commands') log.action({ icon: 'fix', label: 'Ran commands', detail: r.text });
   respond(r.text);
   return { handled: true, workspace: c.workspace };

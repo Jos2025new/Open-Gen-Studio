@@ -1,3 +1,4 @@
+import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
 import { appendFeed, updateFeedItem, useStore } from '../../store/store';
 import { allowForSession, beginOncePass, dontAskUntilNextSession, overLimit } from '../budget';
@@ -122,7 +123,7 @@ export function findCommandsTool(sessionId: string, input: unknown): ToolAnswer 
 }
 
 /** Runs the sequence on this session; steps act on the document on screen unless they name another. */
-export async function runCommandsTool(sessionId: string, input: unknown, signal?: AbortSignal): Promise<ToolAnswer> {
+export async function runCommandsTool(sessionId: string, input: unknown, signal?: AbortSignal, meta?: ChatMessageMeta): Promise<ToolAnswer> {
   const v = runCommandsSchema.safeParse(input);
   if (!v.success) return { text: `Invalid run_commands input: ${problems(v.error)}`, done: false };
   let docRef: string | undefined;
@@ -158,6 +159,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
               steps: request.steps.map((s) => ({ step: s.step, cmd: s.cmd, title: s.title, effect: s.effect, args: s.args, estimate: s.estimate })),
               totalSteps: v.data.seq.length,
               estimate: request.estimate,
+              ...(meta ? { meta } : {}),
             };
             appendFeed(sessionId, item);
             const onAbort = () => decideCommandApproval(sessionId, itemId, 'cancel');

@@ -109,14 +109,16 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     const engine = agentEngine(sessionId, to.id);
     // The engine decides who answers; a plan kept after a text-only reply has no open tool call, so it gets a user message.
     if (engine.kind === 'llm') {
+      // The old plan stops being approvable before the first wait; nothing that follows a wait publishes after Stop.
+      patchAgent(sessionId, { revising: pendingItem.id }, to.id);
+      const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
+      if (stop.aborted) { patchAgent(sessionId, { revising: undefined }, to.id); return; }
       addReplyToRequest(sessionId, clean, attachments, to.id);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`, to.id);
-          const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
-      if (stop.aborted) return;
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts), to.id);
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
-      patchAgent(sessionId, { pending: undefined, revising: pendingItem.id }, to.id);
+      patchAgent(sessionId, { pending: undefined }, to.id);
       await llmTurn(sessionId, workspace, { route: 'plan-comment', runId, agentNodeId: to.id });
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
