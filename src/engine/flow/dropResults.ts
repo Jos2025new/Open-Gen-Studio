@@ -21,13 +21,16 @@ export function dropResults<S extends { generations: Record<string, Generation>;
   for (const [sid, s] of Object.entries(st.sessions)) {
     const graph = s.graph;
     if (!graph) continue;
-    const gen = new Map<string, string>();
+    const gen = new Map<string, string>(); // node id -> its generation (any node that has results)
+    const pick = new Map<string, number>(); // node id -> the result its plain `out` cables deliver
     let changed = false;
     const nodes = graph.nodes.map((n) => {
       const d = n.data as { generationId?: string; outputIndex?: number };
       const m = d.generationId ? moved.get(d.generationId) : undefined;
-      if (!m || d.outputIndex == null) return n;
+      if (!m) return n;
       gen.set(n.id, d.generationId!);
+      pick.set(n.id, d.outputIndex ?? 0);
+      if (d.outputIndex == null) return n;
       const to = m.to[d.outputIndex];
       const next = to == null ? d.outputIndex : to >= 0 ? to : Math.max(0, Math.min(d.outputIndex, m.len - 1));
       if (next === d.outputIndex) return n;
@@ -36,9 +39,18 @@ export function dropResults<S extends { generations: Record<string, Generation>;
     });
     const edges = graph.edges.map((e) => {
       const m = gen.has(e.source) ? moved.get(gen.get(e.source)!) : undefined;
-      if (!m || e.outputIndex == null || e.outputIndex === NO_RESULT) return e;
-      const to = m.to[e.outputIndex];
-      const next = to == null ? e.outputIndex : to >= 0 ? to : NO_RESULT;
+      if (!m || e.outputIndex === NO_RESULT) return e;
+      // A plain `out` cable follows its node's pick: when that very result is deleted the node may fall back to a neighbour (a pick), but the cable
+      // delivers nothing: it must not pay for another image on the next Run without anyone choosing it.
+      const index = e.outputIndex ?? pick.get(e.source)!;
+      if (e.outputIndex == null && (e.kind ?? 'data') !== 'data') return e;
+      const to = m.to[index];
+      const next = to == null ? index : to >= 0 ? to : NO_RESULT;
+      if (e.outputIndex == null) {
+        if (next !== NO_RESULT) return e; // the node's own pick moves with its image: the cable still follows it
+        changed = true;
+        return { ...e, outputIndex: NO_RESULT, sourceHandle: GONE_HANDLE };
+      }
       if (next === e.outputIndex) return e;
       changed = true;
       return { ...e, outputIndex: next, sourceHandle: next === NO_RESULT ? GONE_HANDLE : resultHandle(next) };
