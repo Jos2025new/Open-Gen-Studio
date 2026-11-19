@@ -44,6 +44,10 @@ export default [{
     ['src/engine/nodecore/deps.ts', 'export function findCycle'],
     ['src/engine/graphTypes.ts', 'export interface BrokenLink'],
     ['src/store/store.ts', 'An invalid cable (ADR 0031) lasts until'],
+    ['src/engine/nodecore/action.ts', 'export function runAction'],
+    ['src/engine/nodecore/commands.ts', "id: 'nodes.action.run'"],
+    ['src/engine/nodecore/inspect.ts', 'export function inspectNode'],
+    ['src/engine/flow/actions.ts', 'export async function runNodes'],
   ],
-  tests: ['tests/nodecore-core.test.ts'],
+  tests: ['tests/nodecore-core.test.ts', 'tests/nodecore-strip1.test.ts'],
 }];

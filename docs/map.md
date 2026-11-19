@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 384 | 286 |
-| [store.ts](../src/store/store.ts) | 259 | 275 |
+| [types.ts](../src/engine/types.ts) | 385 | 287 |
+| [store.ts](../src/store/store.ts) | 262 | 276 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 46 |
@@ -31,15 +31,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
 | [ops.ts](../src/engine/ops.ts) | 47 | 19 |
-| [id.ts](../src/lib/id.ts) | 46 | 0 |
+| [id.ts](../src/lib/id.ts) | 47 | 0 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 28 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
+| [actions.ts](../src/engine/actions.ts) | 37 | 28 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
-| [actions.ts](../src/engine/actions.ts) | 36 | 28 |
 | [render.ts](../src/engine/design/render.ts) | 31 | 10 |
+| [graph.ts](../src/engine/flow/graph.ts) | 30 | 15 |
 | [types.ts](../src/engine/providers/types.ts) | 30 | 9 |
-| [graph.ts](../src/engine/flow/graph.ts) | 29 | 15 |
 
 ## Por área
 
@@ -57,22 +57,22 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 350 |
-| `src/engine/agent` | 57 | 120 |
+| `src/engine` | 69 | 351 |
+| `src/engine/agent` | 58 | 120 |
 | `src/engine/commands` | 7 | 14 |
 | `src/engine/design` | 163 | 204 |
-| `src/engine/flow` | 17 | 40 |
+| `src/engine/flow` | 17 | 41 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/nodecore` | 18 | 1 |
+| `src/engine/nodecore` | 21 | 2 |
 | `src/engine/nodes` | 6 | 20 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 373 |
-| `src/store` | 18 | 277 |
+| `src/lib` | 35 | 374 |
+| `src/store` | 18 | 278 |
 
-232 de 699 módulos no tienen ningún test que los importe directamente.
+234 de 703 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -88,7 +88,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [OmniWorkspace.tsx](../src/components/omni/OmniWorkspace.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
+- [lanes.ts](../src/engine/agent/lanes.ts)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
+- [commands.ts](../src/engine/nodecore/commands.ts)
 - [generation.ts](../src/engine/nodecore/generation.ts)
 - [asset.node.ts](../src/engine/nodecore/types/asset.node.ts)
 - [audio.node.ts](../src/engine/nodecore/types/audio.node.ts)

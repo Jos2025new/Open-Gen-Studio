@@ -52,7 +52,7 @@ describe('find_commands', () => {
     expect(answer.done).toBe(true);
     expect(lines).toHaveLength(2 + 8);
     expect(lines[0]).not.toContain('Document on screen');
-    expect(lines.find((l) => l.startsWith('nodes '))).toMatch(/^nodes \(32\) — /);
+    expect(lines.find((l) => l.startsWith('nodes '))).toMatch(/^nodes \(37\) — /);
     expect(lines.find((l) => l.startsWith('models '))).toMatch(/^models \(3\) — /);
     expect(lines.find((l) => l.startsWith('sessions '))).toMatch(/^sessions \(4\) — /);
     expect(findCommandsTool(sid, { area: 'nope' })).toEqual(findCommandsTool(sid, {}));
@@ -60,7 +60,7 @@ describe('find_commands', () => {
 
   it('lists an area with signatures, marks spend and delete, and never lists the hidden ones', () => {
     const nodes = findCommandsTool(sid, { area: 'nodes' }).text.split('\n');
-    expect(nodes).toHaveLength(1 + 32);
+    expect(nodes).toHaveLength(1 + 37);
     expect(nodes.find((l) => l.startsWith('nodes.run.start '))).toContain("[needs the user's approval]");
     expect(nodes.find((l) => l.startsWith('nodes.edge.connect '))).not.toContain('needs the user');
     const studio = findCommandsTool(sid, { area: 'studio' }).text;

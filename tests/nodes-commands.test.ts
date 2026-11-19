@@ -29,6 +29,9 @@ beforeEach(() => {
   useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: session } }));
 });
 
+/** The node core's own commands (nodecore/commands.ts): not wrappers of an action in actions.ts. */
+const NODE_CORE = new Set(['nodes.action.prepare', 'nodes.action.run', 'nodes.edit.connect', 'nodes.edit.set', 'nodes.node.inspect']);
+
 describe('the node actions as commands', () => {
   it('every exported action is a command or says why it is not', () => {
     const source = readFileSync('src/engine/flow/actions.ts', 'utf8');
@@ -37,7 +40,8 @@ describe('the node actions as commands', () => {
     expect(Object.keys(NODES_ACTIONS).sort()).toEqual([...declared, ...reexported].sort());
     const ids = new Set(Object.values(NODES_ACTIONS).filter((to) => !to.startsWith('- ')));
     for (const id of ids) expect(command(id), id).toBeDefined();
-    const nodes = allCommands().filter((c) => c.id.startsWith('nodes.') && !c.id.startsWith('nodes.system.')).map((c) => c.id);
+    const nodes = allCommands().filter((c) => c.id.startsWith('nodes.') && !c.id.startsWith('nodes.system.') && !NODE_CORE.has(c.id)).map((c) => c.id);
+    expect(['nodes.action.prepare', 'nodes.action.run', 'nodes.edit.connect', 'nodes.edit.set', 'nodes.node.inspect'].every((id) => command(id))).toBe(true);
     expect(nodes.sort()).toEqual([...ids].sort());
     expect(nodes).toHaveLength(21);
   });
