@@ -51,8 +51,8 @@ export function session(id: string): Session {
 }
 
 /** The operations the current request names, fired or not by its attachments and parameters (agent/force.ts). */
-export function requestGate(sessionId: string) {
-  const draft = session(sessionId).agent.draft;
+export function requestGate(sessionId: string, owner: string | undefined) {
+  const draft = agentOf(sessionId, owner).draft;
   const inputs = (draft?.attachments ?? []).flatMap((id) => (get().assets[id] ? [get().assets[id]] : []));
   return gateOps(draft?.request ?? '', inputs, get().composer.agentStyle === 'direct');
 }

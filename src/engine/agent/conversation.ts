@@ -45,15 +45,20 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   setTurnChat(sessionId, opts.chatNodeId ?? chatNodeOf(sessionId), to.id);
   toCanvas(sessionId, canvas, to.id); // switching canvas loads that canvas's parked state: it must happen before the reservation
   patchAgent(sessionId, { busy: true, phase: 'working' }, to.id);
+  // Stop works from the first moment: until the turn has its own controller, this one is what Stop aborts.
+  const key = turnKey(sessionId, to.id);
+  const reservation = new AbortController();
+  controllers.set(key, reservation);
   try {
-    await deliver(text, opts, sessionId, to, st);
+    await deliver(text, opts, sessionId, to, st, reservation.signal);
   } finally {
+    if (controllers.get(key) === reservation) controllers.delete(key);
     // A turn that ran clears its own flag; one that stopped before starting must not leave the agent reserved.
-    if (!controllers.has(turnKey(sessionId, to.id)) && laneState(sessionId, to.id)?.busy) patchAgent(sessionId, { busy: false, phase: undefined }, to.id);
+    if (!controllers.has(key) && laneState(sessionId, to.id)?.busy) patchAgent(sessionId, { busy: false, phase: undefined }, to.id);
   }
 }
 
-async function deliver(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string }, sessionId: string, to: { id?: string }, st: ReturnType<typeof get>): Promise<void> {
+async function deliver(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string }, sessionId: string, to: { id?: string }, st: ReturnType<typeof get>, stop: AbortSignal): Promise<void> {
   // Studio is the chat canvas whatever its board shows (agentCanvas).
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace, to.id);
@@ -108,6 +113,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`, to.id);
           const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
+      if (stop.aborted) return;
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts), to.id);
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id }, to.id);
@@ -140,16 +146,18 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(sessionId, to.id), attachments: attachments.length });
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
   const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
+  if (stop.aborted) return;
   // The Designer page travels with a new request, so "draw on this" needs no extra round.
   if (workspace === 'designer' && agentSeesImages(sessionId, to.id)) {
     const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');
     if (typeof view !== 'string') parts.push(...view);
+    if (stop.aborted) return;
   }
   // New requests retain earlier images/reference results as notes; tools can reload them (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }), to.id);
   // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
   // In the Designer filters and effects are FX layers (designer_fx), not the fx operation that makes a new image.
-  const gate = workspace === 'node' ? [] : requestGate(sessionId).filter((g) => workspace !== 'designer' || g.op !== 'fx');
+  const gate = workspace === 'node' ? [] : requestGate(sessionId, to.id).filter((g) => workspace !== 'designer' || g.op !== 'fx');
   // Auto and Guided confirm the image model of an image-model operation first (Auto once per session; Guided each request).
   const confirmFirst = get().composer.agentStyle !== 'direct' && !agentOf(sessionId, to.id).settings?.image && gate.some((g) => g.fired && (OPS as Record<string, { engine: string }>)[g.op]?.engine === 'edit');
   const forced = steerNote(gate, confirmFirst);
