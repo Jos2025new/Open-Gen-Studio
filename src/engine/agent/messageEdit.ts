@@ -1,4 +1,4 @@
-import { claimLaneOfItem } from './lanes';
+import { claimLaneOfItem, laneState, patchLane } from './lanes';
 import { modelSummary } from '../catalog';
 import type { FeedItem, LlmMessage, QuestionsFeedItem, SettingsFeedItem, EditLogEntry } from '../types';
 import { patchSession, removeFeedItem, setUi, updateFeedItem } from '../../store/store';
@@ -19,12 +19,15 @@ function messageText(m: LlmMessage): string {
  */
 function historyIndexOf(sessionId: string, itemId: string): number {
   const s = session(sessionId);
-  const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user');
-  const item = users.find((f) => f.id === itemId);
+  const item = s.feed.find((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && f.id === itemId);
   if (!item) return -1;
+  // The conversation of the agent the message was written to: its history, and only its messages count.
+  const owner = item.meta?.agentNodeId;
+  const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && f.meta?.agentNodeId === owner);
   const same = users.filter((f) => f.text === item.text);
   const needle = `\n${item.text || '(no text)'}\n</user_message>`;
-  const hits = s.agent.history.flatMap((m, i) => ((m.role === 'user' || m.role === 'tool') && messageText(m).includes(needle) ? [i] : []));
+  const history = (owner ? laneState(sessionId, owner)?.history : undefined) ?? s.agent.history;
+  const hits = history.flatMap((m, i) => ((m.role === 'user' || m.role === 'tool') && messageText(m).includes(needle) ? [i] : []));
   const k = hits.length - (same.length - same.indexOf(item));
   return k >= 0 ? hits[k] : -1;
 }
@@ -34,9 +37,10 @@ export function deleteUserMessage(sessionId: string, itemId: string): void {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || s.agent.busy || item?.type !== 'user') return;
+  const owner = item.meta?.agentNodeId;
   const i = historyIndexOf(sessionId, itemId);
-  if (i >= 0) patchAgent(sessionId, (a) => ({ history: a.history.map((m, j) => (j === i ? { ...m, content: DELETED_MESSAGE } : m)) }));
-  else if (item.text) patchAgent(sessionId, (a) => ({ notes: [...a.notes, `The user deleted an earlier message of theirs ("${item.text.slice(0, 80)}"): ignore it.`] }));
+  if (i >= 0) patchLane(sessionId, owner, (a) => ({ history: a.history.map((m, j) => (j === i ? { ...m, content: DELETED_MESSAGE } : m)) }));
+  else if (item.text) patchLane(sessionId, owner, (a) => ({ notes: [...a.notes, `The user deleted an earlier message of theirs ("${item.text.slice(0, 80)}"): ignore it.`] }));
   removeFeedItem(sessionId, itemId);
 }
 
@@ -49,10 +53,12 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || s.agent.busy || item?.type !== 'user' || (!text.trim() && !item.attachments.length)) return;
   if (claimLaneOfItem(sessionId, itemId)) return;
+  const owner = item.meta?.agentNodeId;
   const i = historyIndexOf(sessionId, itemId);
   const at = s.feed.indexOf(item);
-  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.length - at - 1 });
-  for (const f of s.feed.slice(at)) {
+  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.slice(at + 1).filter((x) => !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner).length });
+  // What comes after it in this agent's conversation goes; the other agent's messages and cards stay.
+  for (const f of s.feed.slice(at).filter((x) => x.id === item.id || !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner)) {
     if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
     removeFeedItem(sessionId, f.id);
   }

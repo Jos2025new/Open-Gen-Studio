@@ -38,7 +38,6 @@ beforeEach(() => {
 });
 
 describe('connections, broken cables and silent replacement (neon adversarial)', () => {
-  // FALLO REAL: hasTarget en commandKit.ts:58 solo busca en graph.edges e ignora graph.broken, impidiendo retirar un cable roto mediante nodes.edge.disconnect.
   it('allows removing a broken cable on a multi-cable port through nodes.edge.disconnect', async () => {
     install({
       nodes: [assetNode('a', 'a'), assetNode('b', 'b'), imageNode('x')],
@@ -56,7 +55,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(graph().edges.map((e) => e.id)).toEqual(['live']);
   });
 
-  // FALLO REAL: nodes.edge.connect llama a connectNodes, que autocompleta replaces con el cable actual y sustituye silenciosamente una entrada ocupada sin precondición.
   it('refuses silent replacement on an occupied single-cable port via nodes.edge.connect', async () => {
     install({
       nodes: [textNode('t1', 'first'), textNode('t2', 'second'), imageNode('gen')],
@@ -67,7 +65,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(graph().edges.map((e) => e.id)).toEqual(['e1']);
   });
 
-  // FALLO REAL: planConnect en edit.ts:77-84 consulta solo inputPorts (puertos creativos) y omite replaceConflict en puertos de sistema de un solo cable vacíos como model.
   it('rejects a stale replaces precondition on an empty single-cable system port (model) in nodes.edit.connect', async () => {
     install({
       nodes: [modelNode('m1', 'local::image'), modelNode('m2', 'local::image'), imageNode('gen')],
@@ -88,7 +85,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(graph().edges).toEqual([]);
   });
 
-  // FALLO REAL: duplicateNode en flow/actions.ts:177-180 no conserva edge.pin al duplicar el consumidor, convirtiendo una referencia fijada inválida en una móvil válida.
   it('preserves a pinned incoming reference when duplicating its consumer via nodes.node.duplicate', async () => {
     install({
       nodes: [textNode('src', 'current text'), imageNode('gen')],
@@ -102,7 +98,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(inspect(copyId).inputs).toEqual([expect.objectContaining({ status: 'invalid', pinMoved: true })]);
   });
 
-  // FALLO REAL: setNodeModel en flow/actions.ts:137-141 filtra todas las aristas salientes usando solo inputPorts sin excluir enlaces ref/control, borrándolos en silencio.
   it('keeps outgoing ref and control links when changing a generation node model via nodes.node.set_model', async () => {
     install({
       nodes: [imageNode('gen'), imageNode('other')],
@@ -116,7 +111,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(graph().edges.map((e) => e.id).sort()).toEqual(['c1', 'r1']);
   });
 
-  // FALLO REAL: storedEdge en flow/commands.ts:87-98 usa .strict() sin declarar pin, rompiendo el ciclo delete_with_undo -> restore cuando el nodo tenía cables fijados.
   it('round-trips a deleted node with a pinned cable through nodes.node.delete_with_undo and nodes.node.restore', async () => {
     install({
       nodes: [textNode('src', 'red'), imageNode('gen')],
@@ -131,7 +125,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(graph().edges).toEqual([expect.objectContaining({ id: 'e1', pin: 'old-pin' })]);
   });
 
-  // FALLO REAL: connect() en flow/graph.ts:194-210 entra en usesSystemPorts cuando kind='data' está presente y descarta sourceHandle='out-2' y outputIndex.
   it('preserves sourceHandle out-2 and outputIndex when connecting via nodes.edit.connect with kind data', async () => {
     install({
       nodes: [imageNode('src'), imageNode('dst')],
@@ -150,7 +143,6 @@ describe('connections, broken cables and silent replacement (neon adversarial)',
     expect(graph().edges[0]).toMatchObject({ sourceHandle: 'out-2', outputIndex: 1 });
   });
 
-  // FALLO REAL: planConnect en edit.ts:83 trata re-cablear la misma fuente sin replaces como no-reemplazo y destruye el pin existente en silencio.
   it('does not silently strip a pin when re-wiring the same source without naming replaces', async () => {
     install({
       nodes: [textNode('src', 'blue'), imageNode('gen')],

@@ -791,7 +791,8 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
   const showTools = Boolean(selected) && solo;
   // The title floats above the card and scales with the zoom, the toolbar does not: clear the title, then a small fixed gap.
-  const toolbarOffset = useFlowStore((st) => Math.round(7 + TITLE_RISE * st.transform[2]));
+  // Only the selected node with a toolbar reads the zoom: the others do not re-render on every zoom tick.
+  const toolbarOffset = useFlowStore((st) => (showTools ? Math.round(7 + TITLE_RISE * st.transform[2]) : 0));
   return (
     <>
       <NodeToolbar isVisible={showTools} position={Position.Top} offset={toolbarOffset}>

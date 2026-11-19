@@ -55,7 +55,6 @@ beforeEach(() => {
 });
 
 describe('money, approvals and inspector attribution (neon adversarial)', () => {
-  // FALLO REAL: runAction solo bloquea reutilización de una aprobación en estado 'failed'; tras 'done' permite cobrar dos veces con la misma aprobación.
   it('blocks double spend when the same prepared approval is passed to nodes.action.run a second time after succeeding', async () => {
     install({
       nodes: [textNode('t', 'red'), imageNode('gen')],
@@ -84,7 +83,6 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  // FALLO REAL: adoptPreview deriva el id de aprobación de forma determinista desde la firma, bloqueando permanentemente cualquier reintento legítimo en la UI tras un fallo.
   it('allows a fresh UI confirmation to retry a node after an earlier failed run without mutating parameters', async () => {
     install({
       nodes: [textNode('t', 'red'), imageNode('gen')],
@@ -110,7 +108,6 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
-  // FALLO REAL: graphToSteps recorre aristas fijadas (pin) y vuelve a ejecutar la fuente si quedó obsoleta, gastando dinero extra y cambiando la imagen fijada.
   it('does not re-run a stale upstream node when the downstream link is pinned to its finished revision', async () => {
     const doneGen = {
       id: 'gA1', sessionId: sid, kind: 'image', status: 'done', prompt: 'red', modelRef: 'local::image',
@@ -137,7 +134,6 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
     expect(preview.steps).toEqual([expect.objectContaining({ id: 'imgB', refs: ['asset:assetA1'] })]);
   });
 
-  // FALLO REAL: nodes.run.start esquiva el registro de acciones y el atajo de lastRunFor atribuye falsamente la generación nueva al runId antiguo.
   it('does not attribute a generation produced by nodes.run.start to an older action runId in the inspector', async () => {
     install({
       nodes: [imageNode('gen')],
@@ -170,7 +166,6 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
     expect(lastRun?.runId).not.toBe('run-old');
   });
 
-  // FALLO REAL: lastRunFor filtra por targets (no por runIds ejecutados) y cae al último envío anterior, atribuyendo un resultado nuevo de un nodo ancestro a una ejecución vieja.
   it('attributes an upstream node generation produced during a downstream run to that downstream runId', async () => {
     install({
       nodes: [imageNode('imgA', { prompt: 'v1' }), imageNode('imgB', { prompt: 'use A' })],
@@ -210,7 +205,6 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
     expect(inspect('imgA').lastRun).toMatchObject({ generationId: 'gA2', runId: 'run-B2' });
   });
 
-  // FALLO REAL: el fallback de lastRunFor a la última ejecución con sends > 0 atribuye un resultado previo guardado ('done') a una ejecución posterior fallida.
   it('does not attribute a pre-existing saved generation to a later failed run', async () => {
     const saved = { id: 'g-saved', sessionId: sid, kind: 'image', status: 'done', prompt: 'local prompt', modelRef: 'local::image', assetIds: ['a0'], settings, inputs: { refs: [] } } as unknown as Generation;
     install({ nodes: [imageNode('gen', { generationId: 'g-saved' })], edges: [] }, { generations: { 'g-saved': saved } });

@@ -18,5 +18,7 @@ export function recipientOf(sessionId: string, explicit?: string, chatNodeId?: s
     if (isAgent(set) && connected.includes(set)) return { id: set };
     return { error: 'The agent chosen for this chat is no longer connected. Choose another one in “To”.' };
   }
+  // A chat with no agent wired to it sends nowhere: it never falls back to some agent that merely exists in the graph.
+  if (chat && !connected.length) return { error: 'This chat has no agent connected. Connect one to it.' };
   return { id: connected[0] ?? agentNodeOf(sessionId)?.id };
 }

@@ -124,7 +124,6 @@ export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenN
   return editCompound(sessionId, 'set-model', g => {
     const nodes = g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...patch, textOutput } as GraphNodeData } : n);
     const out = outputPort(nodes.find(n => n.id === nodeId)!.data, get().assets);
-    // Only data cables have a port type to fit; ref and control links are not about the output and always stay.
     const keeps = (e: import('../types').GraphEdge) => {
       if (e.source !== nodeId || (e.kind ?? 'data') !== 'data') return true;
       const tgt = nodes.find(n => n.id === e.target);
@@ -143,12 +142,7 @@ export function setSketch(sessionId: string, nodeId: string, assetId: string | u
   if (prev && prev !== assetId) deleteAssets([prev]);
 }
 
-/** Copy a node (without its results) slightly offset. */
-/**
- * A copy of the node: its parameters and prompt, marked "(copy)", with no result of its own (the original's
- * generation, running or finished, stays with the original) and the same connections: every input, and every
- * output whose target port takes several inputs (a single-input port keeps its original source).
- */
+/** A copy without a result of its own, with the same cables (every input; outputs only into multi-input ports). */
 export function duplicateNode(sessionId: string, node: GraphNode): string {
   const data = structuredClone(node.data) as GraphNodeData;
   if (runsGeneration(data)) {
@@ -165,7 +159,6 @@ export function duplicateNode(sessionId: string, node: GraphNode): string {
   const taken = graph.nodes.map((n) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(copy(?: (\\d+))?\\)$`).exec(n.data.title)).filter(Boolean).map((m) => Number(m![1] ?? 1));
   data.title = `${base} (copy ${Math.max(0, ...taken) + 1})`;
   let next: import('../types').Graph = { ...graph, nodes: [...graph.nodes, { id, position: { x: node.position.x + 40, y: node.position.y + 60 }, data }] };
-  // The copy's cables are the original's, whole: kind, both, outputIndex and the revision a cable is fixed to.
   for (const e of graph.edges.filter((x) => x.target === node.id)) {
     const c = { source: e.source, target: id, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle, kind: e.kind, both: e.both };
     if (!connectionError(next, st.assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), target: id }] };

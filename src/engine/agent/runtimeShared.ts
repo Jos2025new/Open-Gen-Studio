@@ -60,6 +60,10 @@ export function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace: rowCanvas(workspace) };
 }
 
+/** The chat a session's current conversation comes from (set when a message is sent from a chat node). */
+const turnChats = new Map<string, string>();
+export const setTurnChat = (sessionId: string, chatNodeId: string | undefined) => { if (chatNodeId) turnChats.set(sessionId, chatNodeId); else turnChats.delete(sessionId); };
+
 export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}, sessionId: string = get().activeSessionId): ChatMessageMeta {
   const sender = extra.agentNodeId ?? get().sessions[sessionId]?.agentLane;
   const e = agentEngine(sessionId, sender);
@@ -67,7 +71,7 @@ export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
     ...(agentNodeOf(sessionId, sender)?.id ? { agentNodeId: agentNodeOf(sessionId, sender)!.id } : {}),
-    ...(chatNodeOf(sessionId) ? { chatNodeId: chatNodeOf(sessionId) } : {}),
+    ...((turnChats.get(sessionId) ?? chatNodeOf(sessionId)) ? { chatNodeId: turnChats.get(sessionId) ?? chatNodeOf(sessionId) } : {}),
     space: placeFor(get().ui, workspace),
     provider: e.kind === 'offline' ? 'offline' : e.provider,
     model: e.kind === 'offline' ? 'Local planner' : e.model,

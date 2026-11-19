@@ -1,4 +1,4 @@
-import { claimLaneOfItem } from './lanes';
+import { claimLaneOfItem, laneOfItem, patchLane } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun } from '../flow/actions';
@@ -286,7 +286,8 @@ async function executePlanItem(
     })
     .join('; ');
   recordPriceResults(sessionId, itemId);
-  patchAgent(sessionId, (a) => ({ notes: [...a.notes, `Plan "${plan.title}" (${plan.workspace} canvas) ${status}: ${summary}`] }));
+  // The end of a plan is told to the agent that raised it, whoever is on screen now.
+  patchLane(sessionId, laneOfItem(sessionId, itemId), (a) => ({ notes: [...a.notes, `Plan "${plan.title}" (${plan.workspace} canvas) ${status}: ${summary}`] }));
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else if (status === 'error') toast(`${plan.title} failed`, 'error');
@@ -340,7 +341,10 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
 async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
-  if (!s || agentEngine(sessionId).kind !== 'llm' || s.agent.busy || s.agent.pending) return;
+  // The closing message is written by the owner of the plan; with another agent on screen it waits for nobody and is skipped.
+  const owner = laneOfItem(sessionId, itemId);
+  if (owner && s?.agentLane !== undefined && s.agentLane !== owner) return;
+  if (!s || agentEngine(sessionId, owner).kind !== 'llm' || s.agent.busy || s.agent.pending) return;
   const at = s.feed.findIndex((f) => f.id === itemId);
   if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
   const item = s.feed[at];

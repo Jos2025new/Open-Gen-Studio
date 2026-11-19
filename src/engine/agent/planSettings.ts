@@ -6,6 +6,7 @@ import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';
 import { addSpend, patchSession, updateFeedItem, useStore } from '../../store/store';
+import { laneOfItem, patchLane } from './lanes';
 import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
@@ -165,7 +166,9 @@ function stepInputs(s: GenStep): string {
  * images each step sends, with the agent's video rules. The agent is told that the card's writer wrote them, not it.
  */
 export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[]): Promise<void> {
-  const engine = agentEngine(sessionId);
+  // The card's writer is the agent that raised the card: its model, its notes, whoever is on screen.
+  const owner = laneOfItem(sessionId, itemId);
+  const engine = agentEngine(sessionId, owner);
   const item = planOf(sessionId, itemId);
   const steps = item?.plan.steps.filter(isGen).filter((s) => s.kind === kind && s.prompt.trim() && (stepIds ? stepIds.includes(s.id) : !groupModelRef || modelGroup(s.modelRef) === modelGroup(groupModelRef))) ?? [];
   if (engine.kind !== 'llm' || !item || !steps.length) return;
@@ -179,7 +182,7 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const style = item.plan.style ? ` The app appends this style block to every prompt; never repeat or restate it: "${item.plan.style}".` : '';
   const system = `You are the plan card's prompt writer. The user changed the card; rewrite each prompt for ${name} and the step's settings and inputs listed with it${text ? ', following the prompting guide below' : ''}. Keep the content and intent: subjects, @names, the role of each image, actions, the style. Rules: English, except quoted dialogue and on-screen text, which stay as written. At most ${MAX_PROMPT} characters each; shorter is better. Fit the beats to the duration: drop beats rather than compress them, whole seconds only.${style}${kind === 'video' ? ` ${VIDEO_DIRECTION_POLICY}` : ''} The images of each step are attached after its line: look at them. Answer only a JSON object {"<step id>": "<new prompt>"}, nothing else.${text ? `\n\n---\nPrompting guide of ${name}:\n${text}` : ''}`;
   const lines = steps.map((s) => `${s.id} (${stepInputs(s)}) "${s.title}":\n${s.prompt}`).join('\n\n');
-  const parts = agentSeesImages() ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
+  const parts = agentSeesImages(sessionId, owner) ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
   let tooLong = '';
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -201,7 +204,7 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
       });
       if (!done.length) throw new Error('the answer had no prompts');
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...now.plan, steps: next } });
-      patchSession(sessionId, (x) => ({ ...x, agent: { ...x.agent, notes: [...x.agent.notes, `The plan card's prompt writer, not you, rewrote these prompts of "${now.plan.title}" after the user changed the card (${name}); they are what runs. No need to mention it. ${done.join(' ')}`] } }));
+      patchLane(sessionId, owner, (a) => ({ notes: [...a.notes, `The plan card's prompt writer, not you, rewrote these prompts of "${now.plan.title}" after the user changed the card (${name}); they are what runs. No need to mention it. ${done.join(' ')}`] }));
       setRewrite(itemId, false);
       return;
     }

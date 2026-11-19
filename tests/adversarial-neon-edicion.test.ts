@@ -42,7 +42,6 @@ beforeEach(() => {
 });
 
 describe('editing preconditions, parallel paths and resolver contract (neon adversarial)', () => {
-  // FALLO REAL: el mapa known de flow/commands.ts:113-118 no incluye caller; un llamador distinto (agent) puede editar a ciegas sin expect un nodo creado por cli.
   it('refuses a blind nodes.node.edit from a different caller on a node created by another caller', async () => {
     install({ nodes: [], edges: [] });
     const created = await run(
@@ -60,7 +59,6 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
     expect(graph().nodes[0].data).toMatchObject({ text: 'owned by cli' });
   });
 
-  // FALLO REAL: cada nodes.node.edit sin expect actualiza known a la nueva revisión, permitiendo que un segundo comando retrasado sin expect pise el ajuste reciente.
   it('refuses a stale blind nodes.node.edit after an earlier blind command already updated the node', async () => {
     install({ nodes: [], edges: [] });
     const added = await run(
@@ -85,7 +83,6 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
     expect(graph().nodes[0].data).toMatchObject({ settings: { count: 3 } });
   });
 
-  // FALLO REAL: nodes.node.edit llama a applyEdit sin strict: true, permitiendo cambiar el kind de un nodo text a image y corromper su forma.
   it('refuses changing a node kind or writing unowned fields through nodes.node.edit', async () => {
     install({ nodes: [textNode('t', 'hello')], edges: [] });
     const rev = inspect('t').revision;
@@ -97,7 +94,6 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
     expect(graph().nodes[0].data.kind).toBe('text');
   });
 
-  // FALLO REAL: previewRun en flow/actions.ts:336 y coreSignature en guard.ts:31 desreferencian sin comprobar un nodo faltante en subjects y lanzan TypeError.
   it('returns a structured error instead of crashing when preparing a node whose subject source was deleted', async () => {
     install({
       nodes: [imageNode('src'), imageNode('dst', { subjects: [{ name: 'Hero', from: 'src' }] })],
@@ -109,7 +105,6 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
     expect(prep).toMatchObject({ ok: false, error: { message: expect.stringContaining('Missing input node: src') } });
   });
 
-  // FALLO REAL: freshness.ts no consulta descriptor.affects; aunque affects[port] sea false y consumersOf no invalide, inspectNode marca el nodo como stale.
   it('keeps freshness consistent with descriptor.affects when a port declares affects: false', () => {
     const gDone = {
       id: 'g1', sessionId: sid, kind: 'image', status: 'done', prompt: 'red\nlocal', modelRef: 'local::image',
@@ -135,7 +130,6 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
     }
   });
 
-  // FALLO REAL: connectionError acepta conectar un nodo ref de tipo prompt a image.prompt, pero sessionChatText (resolver.ts:49) lo ignora y prepare falla con "has no text yet".
   it('resolves text from a connected system prompt node through the common resolver and prepareAction', async () => {
     install({
       nodes: [
@@ -155,7 +149,6 @@ describe('editing preconditions, parallel paths and resolver contract (neon adve
     expect(prep.ok).toBe(true);
   });
 
-  // FALLO REAL: resolver.ts:94 omite la comprobación de pin cuando value == null, reportando 'empty' en lugar de 'invalid' (pinMoved) si el asset fuente se vacía.
   it('marks a pinned cable as invalid (pinMoved) when its source output becomes null', async () => {
     install({
       nodes: [assetNode('a', 'img1'), imageNode('gen')],

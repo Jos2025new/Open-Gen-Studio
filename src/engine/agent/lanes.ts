@@ -58,3 +58,18 @@ export function laneState(sessionId: string, nodeId: string): AgentState | undef
   if (!s) return undefined;
   return s.agentLane === nodeId ? s.agent : s.agentLanes?.[nodeId];
 }
+
+/**
+ * Write to one agent's state, active or parked: an operation that belongs to an agent (the end of its plan, a rewrite on
+ * its card, the edit of its message) never lands in whichever agent happens to be on screen.
+ */
+export function patchLane(sessionId: string, nodeId: string | undefined, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
+  const resolve = (a: AgentState) => ({ ...a, ...(typeof patch === 'function' ? patch(a) : patch) });
+  patchSession(sessionId, (x) => {
+    if (nodeId && x.agentLane !== undefined && x.agentLane !== nodeId) {
+      const parked = x.agentLanes?.[nodeId] ?? freshAgent();
+      return { ...x, agentLanes: { ...x.agentLanes, [nodeId]: resolve(parked) } };
+    }
+    return { ...x, agent: resolve(x.agent) };
+  });
+}

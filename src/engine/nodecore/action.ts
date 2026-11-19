@@ -19,7 +19,7 @@ export interface ActionSnapshot {
   targets: string[];
   force: boolean;
   preview: NodeRunPreview;
-  /** `node.port` → the revision that input had when approved. */
+  /** `[node, port, cable]` (JSON) → the revision that input had when approved. */
   pins: Record<string, string>;
   at: number;
 }
@@ -57,7 +57,7 @@ function pinsFor(session: string, ids: string[]): Record<string, string> {
   const env = storeEnv();
   return Object.fromEntries(ids.flatMap((id) => {
     const node = graph.nodes.find((n) => n.id === id);
-    return node ? resolveInputs(graph, node, env).filter((i) => i.revision).map((i) => [`${id}.${i.port}:${i.edgeId}`, i.revision!]) : [];
+    return node ? resolveInputs(graph, node, env).filter((i) => i.revision).map((i) => [JSON.stringify([id, i.port, i.edgeId]), i.revision!]) : [];
   }));
 }
 
@@ -120,8 +120,8 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
     if (!session) { settle(runId, { status: 'failed', error: 'The session of this action no longer exists.' }); return finish(); }
     const missing = snapshot.targets.find((t) => !session.graph.nodes.some((n) => n.id === t));
     if (missing) { settle(runId, { status: 'stale', error: `The destination node ${missing} was deleted after you approved.` }); return finish(); }
-    const moved = Object.entries(snapshot.pins).find(([key, rev]) => pinsFor(snapshot.session, [key.split('.')[0]])[key] !== rev);
-    if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${moved[0].split(':')[0]}). Review it again.` }); return finish(); }
+    const moved = Object.entries(snapshot.pins).find(([key, rev]) => pinsFor(snapshot.session, [(JSON.parse(key) as string[])[0]])[key] !== rev);
+    if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${(JSON.parse(moved[0]) as string[]).slice(0, 2).join('.')}). Review it again.` }); return finish(); }
     try {
       const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } onState?.(step, state, info); });
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }

@@ -22,7 +22,7 @@ import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { promptsWiredToAgent } from '../nodes/spec';
-import { addReplyToRequest, agentEngine, agentNodeOf, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { addReplyToRequest, agentEngine, agentNodeOf, chatNodeOf, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, setTurnChat, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
 import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
@@ -42,6 +42,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const blocked = to.id ? enterLane(sessionId, to.id) : null;
   if (blocked) { notice(sessionId, canvas, blocked, 'info'); return; }
   // The turn is reserved before the first wait (attachments, the Designer page): nothing else can enter this session meanwhile.
+  setTurnChat(sessionId, opts.chatNodeId ?? chatNodeOf(sessionId));
   toCanvas(sessionId, canvas); // switching canvas loads that canvas's parked state: it must happen before the reservation
   patchAgent(sessionId, { busy: true, phase: 'working' });
   try {

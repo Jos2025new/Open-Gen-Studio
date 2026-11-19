@@ -92,7 +92,6 @@ beforeEach(() => {
 });
 
 describe('two-agent identity, history isolation and multi-chat (neon adversarial)', () => {
-  // FALLO REAL: recipientOf en recipient.ts:21 cae al primer agente del grafo (agentNodeOf) cuando se desconecta el único agente del chat, enrutando a un agente desconectado.
   it('does not route silently to an unconnected agent when the chat loses its only connected agent', async () => {
     // chat1 is wired ONLY to agentB; agentA sits disconnected earlier in graph.nodes; recipient is unset.
     useStore.setState((st) => ({
@@ -114,7 +113,6 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
     expect(sessionNow().feed.at(-1)).toMatchObject({ type: 'notice' });
   });
 
-  // FALLO REAL: deleteUserMessage en messageEdit.ts:33-41 no llama a claimLaneOfItem, borrando el mensaje del historial del agente B activo y dejando intacto el de A.
   it('deletes a user message from its owning agent history without mutating the other active agent', async () => {
     await sendAgentMessage('same request text', { agentNodeId: 'agentA' });
     await sendAgentMessage('same request text', { agentNodeId: 'agentB' });
@@ -127,7 +125,6 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
     expect(JSON.stringify(laneState(HOME, 'agentB')?.history)).toContain('same request text');
   });
 
-  // FALLO REAL: approvePlan no reserva el carril ni re-entra al dueño al terminar; si el usuario habla con B mientras corre el plan de A, las notas de A se escriben en B.
   it('delivers plan completion notes to the owning agent A even if the user talks to agent B while the plan executes', async () => {
     await sendAgentMessage('ask A for a plan', { agentNodeId: 'agentA' });
     const planItem: PlanFeedItem = {
@@ -178,7 +175,6 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
     expect(JSON.stringify(laneState(HOME, 'agentA')?.notes ?? [])).toContain('Secret Plan A');
   });
 
-  // FALLO REAL: conversation.ts:158 no pasa chatNodeId a llmTurn y runtimeShared.ts:69 marca la respuesta del asistente con el primer chat (chat1) en vez de chat2.
   it('tags the assistant reply with chat2 when the message was sent from chat2', async () => {
     await sendAgentMessage('hello from second chat', { chatNodeId: 'chat2' });
 
@@ -188,7 +184,6 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
     expect(feedOfChat(HOME, 'chat2').some((f) => f.type === 'assistant')).toBe(true);
   });
 
-  // FALLO REAL: historyIndexOf en messageEdit.ts:22-28 cuenta mensajes de usuario de todos los agentes en el feed y falla al localizar y recortar el historial de A.
   it('truncates agent A history cleanly when editing a message whose text also appeared in agent B', async () => {
     await sendAgentMessage('shared wording', { agentNodeId: 'agentA' });
     await sendAgentMessage('shared wording', { agentNodeId: 'agentB' });
@@ -201,7 +196,6 @@ describe('two-agent identity, history isolation and multi-chat (neon adversarial
     expect(histA).not.toContain('shared wording');
   });
 
-  // FALLO REAL: rewritePrompts en planSettings.ts:168,204 no consulta el dueño de la tarjeta ni cambia de carril: usa el modelo del agente B activo y escribe las notas en B.
   it('uses owning agent A model and lane notes when rewriting prompts on A’s awaiting plan while B is active', async () => {
     await sendAgentMessage('A starts', { agentNodeId: 'agentA' });
     const planItem: PlanFeedItem = {

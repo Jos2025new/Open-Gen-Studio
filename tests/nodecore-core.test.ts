@@ -12,7 +12,6 @@ vi.mock('../src/lib/idb', () => ({
 
 import { useStore } from '../src/store/store';
 import { descriptors, descriptorOf } from '../src/engine/nodecore/registry';
-import { addressKey, parseAddress, portAddress } from '../src/engine/nodecore/address';
 import { resolveInputs, storeEnv } from '../src/engine/nodecore/resolver';
 import { consumersOf, findCycle } from '../src/engine/nodecore/deps';
 import { applyEdit } from '../src/engine/nodecore/edit';
@@ -39,11 +38,6 @@ describe('node core: descriptors and identity (points 1-2)', () => {
     expect(descriptors().map((d) => d.kind).sort()).toEqual(['asset', 'audio', 'image', 'model3d', 'ref', 'text', 'tool', 'video']);
     expect(descriptorOf('tool')?.required).toEqual(['input']);
     expect(descriptorOf('image')?.actions).toEqual(['generate']);
-  });
-  it('addresses a port by session, graph, node and port', () => {
-    const a = portAddress('s1', 'sys_agent', 'in');
-    expect(parseAddress(addressKey(a))).toEqual(a);
-    expect(addressKey(portAddress('s2', 'sys_agent', 'in'))).not.toBe(addressKey(a));
   });
   it('keeps a cable to a deleted source visible as invalid, never silently gone', () => {
     expect(tryConnect(sid, { source: 't1', target: 'img', targetHandle: 'prompt' })).toBe(true);

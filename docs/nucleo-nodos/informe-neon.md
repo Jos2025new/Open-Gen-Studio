@@ -236,3 +236,7 @@ El registro de descriptores, migraciones, direcciones y `affects` están a media
 - `npm test` completo y scripts `node scripts/...` dependientes de CWD: el directorio de trabajo de la shell del entorno es `/home/samuel/.local/share/ogs-workers/bus` (no la raíz del repo) y `cd` no está en la lista de comandos permitidos; `npx tsc` y `npx vitest run ... --maxWorkers=1` sí se ejecutaron contra la raíz del repo con `--prefix`/`--root`.
 - No se arrancó la app, servidor de desarrollo, navegador, persistencia real ni red real (`fetch` simulado en todos los tests).
 - Comprobación de memoria `free -m` antes de cada Vitest: `available` entre 3181 MB y 3384 MB (siempre > 1200 MB). `npx tsc -b --noEmit` terminó con código 0.
+
+## Cierre (rama `task/nucleo-nodos`)
+
+Los 27 fallos pasan; se quitaron las marcas `FALLO REAL`. Una corrección de test: el 17 llamaba al primer `nodes.node.edit` sin `expect`; ahora ambos nombran la revisión que devolvió el alta (el retrasado sigue siendo rechazado). Quedan abiertos: estado indexado por agente (hoy hay escrituras al dueño, no un mapa), migraciones aplicadas en la carga y `dropResults.ts` fuera de la capa.
