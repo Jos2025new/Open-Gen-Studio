@@ -3,7 +3,8 @@ export type JourneyName =
   | 'settings-correction'
   | 'variant-inputs'
   | 'plan-revision'
-  | 'price-approval-execution';
+  | 'price-approval-execution'
+  | 'node-core';
 
 export interface JourneyEvent {
   at: number;

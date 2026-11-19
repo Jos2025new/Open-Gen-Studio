@@ -1,6 +1,7 @@
 import { uid } from '../../lib/id';
 import { reconcileDeletionNotices, patchSession, setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem } from '../flow/locks';
+import { applyEdit } from '../nodecore/edit';
 import { isOmniSpace } from './omniSpaces';
 import type {
   Graph,
@@ -555,41 +556,11 @@ export function linkSystemNodes(
   if (!portTypeCompatible(opts.kind, resolved.srcPort.type, resolved.tgtPort.type)) {
     return { error: `${resolved.tgtPort.label ?? resolved.tgtPort.id} expects ${resolved.tgtPort.type}, got ${resolved.srcPort.type}.` };
   }
-  if (opts.kind === 'data') {
-    const stack = [opts.target];
-    const seen = new Set<string>();
-    while (stack.length) {
-      const cur = stack.pop()!;
-      if (cur === opts.source) return { error: 'That connection would create a loop.' };
-      if (seen.has(cur)) continue;
-      seen.add(cur);
-      graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.source === cur).forEach((e) => stack.push(e.target));
-    }
-  }
-
-  const edgeId = uid('edge');
-  const targetHandle = resolved.tgtPort.id;
-  const sourceHandle = resolved.srcPort.id;
-  const error = commitSystemGraph(sessionId, (g) => {
-    let edges = g.edges.filter(
-      (e) => !(e.source === opts.source && e.target === opts.target && e.targetHandle === targetHandle && (e.kind ?? 'data') === opts.kind),
-    );
-    if (resolved.tgtPort?.multi === false) {
-      edges = edges.filter((e) => !(e.target === opts.target && e.targetHandle === targetHandle && (e.kind ?? 'data') === opts.kind));
-    }
-    edges.push({
-      id: edgeId,
-      source: opts.source,
-      target: opts.target,
-      sourceHandle,
-      targetHandle,
-      kind: opts.kind,
-      ...(opts.both ? { both: true } : {}),
-    });
-    return { ...g, edges };
-  });
-
-  if (!error && opts.kind === 'control') applyModelLinkToAgent(sessionId, opts.source, opts.target);
+  // One commit path (ADR 0031 point 5): replacement, loop check, locks, trace and the model→agent copy live in the layer.
+  const occupied = graph.edges.find((e) => e.target === opts.target && e.targetHandle === resolved.tgtPort!.id && (e.kind ?? 'data') === opts.kind && e.source !== opts.source);
+  const done = applyEdit({ session: sessionId, op: { op: 'connect', source: opts.source, target: opts.target, targetHandle: resolved.tgtPort.id, kind: opts.kind, both: opts.both, replaces: occupied?.id ?? null, ports: { srcPort: resolved.srcPort, tgtPort: resolved.tgtPort, kind: opts.kind } } });
+  const error = done.ok ? null : done.error;
+  const edgeId = done.ok ? done.edgeId : undefined;
   return { error, ...(error ? {} : { edgeId }) };
 }
 
@@ -616,10 +587,8 @@ export function unlinkSystemNodes(
     .map((e) => e.id);
 
   if (!toRemove.length) return { error: 'No matching connection found.', removed: [] };
-  const error = commitSystemGraph(sessionId, (g) => ({
-    ...g,
-    edges: g.edges.filter((e) => !toRemove.includes(e.id)),
-  }));
+  const done = applyEdit({ session: sessionId, op: { op: 'disconnect', edges: toRemove } });
+  const error = done.ok ? null : done.error;
   return { error, removed: error ? [] : toRemove };
 }
 

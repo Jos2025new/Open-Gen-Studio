@@ -27,4 +27,23 @@ export default [{
     ['src/components/node/AddNodeItems.tsx', 'const SYSTEM_ENTRIES'],
   ],
   tests: ['tests/system-nodes.test.ts', 'tests/omnicanvas.test.ts', 'tests/adversarial-p7-add-node.test.ts'],
+}, {
+  id: 'node-core',
+  what: 'ADR 0031: un descriptor por tipo de nodo (autocolectado), un resolvedor común de entradas, una sola capa de edición con revisión esperada y cables inválidos visibles al núcleo.',
+  sides: [
+    ['src/engine/nodecore/registry.ts', "import.meta.glob<{ default: NodeDescriptor }>('./types/*.node.ts'"],
+    ['scripts/check-node-descriptors.mjs', 'has no descriptor'],
+    ['src/engine/nodecore/resolver.ts', 'export function resolveInputs'],
+    ['src/engine/flow/freshness.ts', 'resolveInputs(graph, node'],
+    ['src/engine/nodecore/edit.ts', 'export function applyEdit'],
+    ['src/engine/flow/actions.ts', "applyEdit({ session: sessionId, op: { op: 'connect'"],
+    ['src/engine/flow/actions.ts', "applyEdit({ session: sessionId, op: { op: 'delete'"],
+    ['src/engine/nodes/system.ts', "op: 'connect', source: opts.source"],
+    ['src/engine/nodecore/guard.ts', 'export function runProblems'],
+    ['src/engine/flow/actions.ts', '...runProblems(graph, run.runIds'],
+    ['src/engine/nodecore/deps.ts', 'export function findCycle'],
+    ['src/engine/graphTypes.ts', 'export interface BrokenLink'],
+    ['src/store/store.ts', 'An invalid cable (ADR 0031) lasts until'],
+  ],
+  tests: ['tests/nodecore-core.test.ts'],
 }];

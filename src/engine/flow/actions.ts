@@ -17,6 +17,9 @@ import { SYSTEM_NODE_TYPES } from '../nodes/system';
 import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
 import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
+import { applyEdit } from '../nodecore/edit';
+import { runProblems } from '../nodecore/guard';
+import { storeEnv } from '../nodecore/resolver';
 
 const get = useStore.getState;
 
@@ -94,8 +97,8 @@ function editGraph(sessionId: string, change: (g: import('../types').Graph) => i
 }
 
 export function patchNodeData(sessionId: string, nodeId: string, patch: Partial<GraphNodeData>): string | null {
-  if (!get().sessions[sessionId]?.graph.nodes.some(n => n.id === nodeId)) return `No such node: ${nodeId}.`;
-  return editGraph(sessionId, g => ({ ...g, nodes: g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...patch } as GraphNodeData } : n) }));
+  const done = applyEdit({ session: sessionId, op: { op: 'set', node: nodeId, patch } });
+  return done.ok ? null : done.error;
 }
 
 export function deleteNodes(sessionId: string, ids: string[]): string | null {
@@ -105,9 +108,8 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   if (missing) return `No such node: ${missing}.`;
   const drop = new Set(ids);
   const deleted = { nodes: structuredClone(graph.nodes.filter(n => drop.has(n.id))), edges: structuredClone(graph.edges.filter(e => drop.has(e.source) || drop.has(e.target))) };
-  // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
-  const groups = (g0: import('../types').Graph) => g0.groups?.map(gr => ({ ...gr, nodeIds: gr.nodeIds.filter(id => !drop.has(id)) })).filter(gr => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
-  const error = editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)), ...(g.groups ? { groups: groups(g) } : {}) }));
+  const done = applyEdit({ session: sessionId, op: { op: 'delete', nodes: ids } });
+  const error = done.ok ? null : done.error;
   const galleryNodes = deleted.nodes.filter(n => n.data.kind !== 'ref');
   if (!error && galleryNodes.length) {
     const galleryIds = new Set(galleryNodes.map(n => n.id));
@@ -205,9 +207,10 @@ export function connectNodes(
   const st = get();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return 'No such session.';
-  const err = connectionError(graph, st.assets, c);
-  if (err) { toast(err, 'error'); return err; }
-  return editGraph(sessionId, g => connect(g, { ...c, targetHandle: c.targetHandle ?? c.kind ?? 'in' }));
+  const handle = c.targetHandle ?? c.kind ?? 'in';
+  const occupant = graph.edges.find(e => e.target === c.target && e.targetHandle === handle && (e.kind ?? 'data') === (c.kind ?? 'data'));
+  const done = applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: occupant?.id ?? null } });
+  return done.ok ? null : done.error;
 }
 export function tryConnect(
   sessionId: string,
@@ -217,9 +220,9 @@ export function tryConnect(
 }
 export function disconnectEdges(sessionId: string, ids: string[]): string | null {
   const graph = get().sessions[sessionId]?.graph;
-  const missing = ids.find(id => !graph?.edges.some(e => e.id === id));
-  if (missing) return `No such connection: ${missing}.`;
-  return editGraph(sessionId, g => ({ ...g, edges: g.edges.filter(e => !ids.includes(e.id)) }));
+  if (!graph) return 'No such session.';
+  const done = applyEdit({ session: sessionId, op: { op: 'disconnect', edges: ids } });
+  return done.ok ? null : done.error;
 }
 
 export function setNodeOp(sessionId: string, nodeId: string, op: OpId): string | null {
@@ -285,7 +288,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     for (const source of [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id).map(e => e.source), ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
   };
   run.runIds.forEach(visit);
-  const errors = [...run.errors];
+  const errors = [...run.errors, ...runProblems(graph, run.runIds, { ...storeEnv(), generations: st.generations, assets: st.assets })];
   for (const id of inputs) {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }

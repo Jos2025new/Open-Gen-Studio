@@ -523,7 +523,10 @@ export function patchAsset(id: string, patch: Partial<Asset>): void {
 
 export function setGraph(sessionId: string, fn: (g: Graph) => Graph): void {
   patchSession(sessionId, (s) => {
-    const graph = fn(s.graph);
+    const edited = fn(s.graph);
+    // An invalid cable (ADR 0031) lasts until its consumer goes, its port is rewired, or its source comes back.
+    const live = edited.broken?.filter((b) => edited.nodes.some((n) => n.id === b.edge.target) && !edited.nodes.some((n) => n.id === b.edge.source) && !edited.edges.some((e) => e.target === b.edge.target && e.targetHandle === b.edge.targetHandle && (e.kind ?? 'data') === 'data'));
+    const graph = edited.broken && live?.length !== edited.broken.length ? { ...edited, broken: live?.length ? live : undefined } : edited;
     const problem = graphEditProblem(sessionId, s.graph, graph);
     if (problem) { queueMicrotask(() => toast(problem, 'error')); return s; }
     recordGraph(sessionId, s.graph, graph);

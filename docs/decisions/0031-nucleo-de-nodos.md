@@ -68,3 +68,15 @@ Contra este contrato, no contra la completitud del inventario. Cada regla de los
 - Aprobar este contrato.
 - Aprobar el cambio de la primera tira: texto → generación primero y dos agentes después (propuesta de GPT; la sesión maestra está de acuerdo).
 - Space: decidir más adelante si encapsula o solo navega (recomendado: decidir después de la tira 2).
+
+## Notas de implementación
+
+Ajustes que obligó el código al construir las piezas 1 a 5 (rama `task/nucleo-nodos`):
+
+- **Código.** `src/engine/nodecore/`: `descriptor.ts` y `types/<tipo>.node.ts` (punto 1; `registry.ts` los recoge con `import.meta.glob`; `scripts/check-node-descriptors.mjs` en `npm test`), `address.ts` (2), `resolver.ts` (3), `deps.ts` y `guard.ts` (4), `edit.ts` y `revision.ts` (5).
+- **Revisión del dueño.** Se calcula (resumen de los parámetros del nodo y de sus cables, sin `generationId` ni `sketchAssetId`); no se guarda, así que no hay migración. Un resultado terminado no cuenta como edición.
+- **Cable fijado.** `GraphEdge.pin` (opcional): la revisión de la fuente a la que se fijó. Si la fuente ya entrega otra, la entrada es inválida. Las referencias se fijan al preparar la acción (punto 6), no al conectar.
+- **Cable inválido.** `Graph.broken` guarda el cable cuya **fuente** se borró y cuyo consumidor sigue; el resolvedor lo devuelve como entrada inválida y bloquea la acción solo si el puerto es `required` en el descriptor. Se retira al recablear el puerto, al volver la fuente o al borrar al consumidor. **Desviación:** al borrar el *destino* del cable no se deja marca: el cable pertenece al nodo que lo posee y se va con él (las tarjetas separadas de `arrange.ts` son destinos efímeros y no deben dejar rastro). La acción que nombraba un destino borrado se rechaza (punto 6).
+- **Un solo commit de edición.** `tryConnect`/`connectNodes`, `linkSystemNodes`, `unlinkSystemNodes`, `patchNodeData`, `disconnectEdges` y `deleteNodes` llaman a `applyEdit`. Cada llamador sigue validando sus puertos; el reemplazo en entrada de un solo cable (cardinalidad del descriptor, no la tabla genérica del comando), el ciclo (datos y sujetos), los bloqueos y la traza están en la capa. Los dos llamadores internos pasan el cable que ocupa el puerto como precondición; un cliente externo debe pasar `replaces`/`expect` para tener conflicto real.
+- **Efecto de conectar.** La copia modelo→agente de un enlace de control es copia de parámetros (sin red ni coste) y ahora la hace la capa para los dos caminos. Conectar nunca llama a un proveedor.
+- **Pantalla.** Que `broken` se dibuje como cable inválido en el lienzo es decisión visual pendiente (identidad protegida): hoy solo lo ven el resolvedor y el inspector.

@@ -1,4 +1,5 @@
-import { refNodeText } from './refText';
+import { incomingOf, resolveInputs, storeEnv } from '../nodecore/resolver';
+import { composePrompt } from '../nodecore/evaluate';
 import { normalizeAssetRevisions } from '../assetRevisions';
 import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
@@ -37,16 +38,9 @@ function linkTarget(graph: Graph, node: GraphNode, generations: Record<string, G
 export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<string, Generation>, library: Subject[] = [], ctx: RequestContext = {}) {
   const d = node.data;
   const previous = 'generationId' in d && d.generationId ? generations[d.generationId] : undefined;
-  const incoming = graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === node.id).map(e => {
-    const src = graph.nodes.find(n => n.id === e.source);
-    const data = src?.data;
-    const gen = data && 'generationId' in data && data.generationId ? generations[data.generationId] : undefined;
-    const value = data?.kind === 'text' ? data.text : data?.kind === 'ref' ? refNodeText(src) : data?.kind === 'asset' ? data.sketchAssetId ?? data.assetId
-      : gen?.text ?? (data && 'outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[e.outputIndex ?? data.outputIndex] : null);
-    return { port: e.targetHandle, value: value ?? null };
-  });
+  const incoming = incomingOf(resolveInputs(graph, node, { ...storeEnv(), generations, assets: ctx.assets ?? {} }));
   const promptText = incoming.find(e => e.port === 'prompt')?.value;
-  const prompt = 'prompt' in d ? [typeof promptText === 'string' ? promptText.trim() : '', d.prompt.trim()].filter(Boolean).join('\n') : '';
+  const prompt = composePrompt(d, promptText);
   const locals = [...(previous?.inputs?.subjects ?? [])];
   if ('subjects' in d) for (const binding of d.subjects ?? []) {
     const source = graph.nodes.find(n => n.id === binding.from.split('#')[0]);

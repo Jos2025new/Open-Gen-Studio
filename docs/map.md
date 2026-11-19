@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 378 | 285 |
-| [store.ts](../src/store/store.ts) | 258 | 274 |
+| [types.ts](../src/engine/types.ts) | 384 | 286 |
+| [store.ts](../src/store/store.ts) | 259 | 275 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 46 |
@@ -31,7 +31,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
 | [ops.ts](../src/engine/ops.ts) | 47 | 19 |
-| [id.ts](../src/lib/id.ts) | 45 | 0 |
+| [id.ts](../src/lib/id.ts) | 46 | 0 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 28 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
@@ -39,7 +39,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 36 | 28 |
 | [render.ts](../src/engine/design/render.ts) | 31 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 30 | 9 |
-| [pathNodes.ts](../src/engine/design/pathNodes.ts) | 27 | 15 |
+| [graph.ts](../src/engine/flow/graph.ts) | 29 | 15 |
 
 ## Por área
 
@@ -57,21 +57,22 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 349 |
+| `src/engine` | 69 | 350 |
 | `src/engine/agent` | 57 | 120 |
 | `src/engine/commands` | 7 | 14 |
 | `src/engine/design` | 163 | 204 |
-| `src/engine/flow` | 17 | 39 |
+| `src/engine/flow` | 17 | 40 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/nodes` | 6 | 19 |
+| `src/engine/nodecore` | 18 | 1 |
+| `src/engine/nodes` | 6 | 20 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 372 |
-| `src/store` | 18 | 276 |
+| `src/lib` | 35 | 373 |
+| `src/store` | 18 | 277 |
 
-221 de 681 módulos no tienen ningún test que los importe directamente.
+232 de 699 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -88,6 +89,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
+- [generation.ts](../src/engine/nodecore/generation.ts)
+- [asset.node.ts](../src/engine/nodecore/types/asset.node.ts)
+- [audio.node.ts](../src/engine/nodecore/types/audio.node.ts)
+- [image.node.ts](../src/engine/nodecore/types/image.node.ts)
+- [model3d.node.ts](../src/engine/nodecore/types/model3d.node.ts)
+- [ref.node.ts](../src/engine/nodecore/types/ref.node.ts)
+- [text.node.ts](../src/engine/nodecore/types/text.node.ts)
+- [tool.node.ts](../src/engine/nodecore/types/tool.node.ts)
+- [video.node.ts](../src/engine/nodecore/types/video.node.ts)
 - [commands.ts](../src/engine/nodes/commands.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)

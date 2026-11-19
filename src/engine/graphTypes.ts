@@ -109,6 +109,16 @@ export interface GraphEdge {
   kind?: LinkKind;
   /** Bidirectional; only on `ref` and `control` links. */
   both?: boolean;
+  /** Pinned reference (ADR 0031): the source revision this link was fixed to. Absent = moving (follows the current one). */
+  pin?: string;
+}
+
+/** A link whose node was deleted (ADR 0031 point 2): kept visible to the core as invalid, never silently dropped. */
+export interface BrokenLink {
+  edge: GraphEdge;
+  /** Which end of the link is gone. */
+  missing: 'source' | 'target';
+  at: number;
 }
 
 /** A named frame around some nodes (each node is in one group at most). */
@@ -129,4 +139,6 @@ export interface Graph {
   omniAt?: number;
   /** Asset ids already seen at `omniAt`, so new assets sharing that timestamp are not discarded. */
   omniAtIds?: string[];
+  /** Links whose node was deleted; the node core reports them as invalid. Cleared when the node comes back. */
+  broken?: BrokenLink[];
 }
