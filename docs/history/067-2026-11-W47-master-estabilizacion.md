@@ -49,10 +49,21 @@ Un Sonnet lo comprobó en el código (solo lectura) y la tabla de arriba exagera
 
 [propuesta-contratos-puertos](../propuesta-contratos-puertos.md), con los errores conocidos de Blender, Maya, Houdini y ComfyUI; [diagnostico-piezas-nodos](../diagnostico-piezas-nodos.md), con cada pieza de la app frente a su nodo.
 
+## Visión del usuario para la próxima tanda (2026-11-18, la manda)
+
+Palabras del usuario: cada cosa que sea como un componente desacoplable y reutilizable «se analice y se desacople en un envoltorio que tiene entradas y salidas, sin cambiar nada en sí de lo que existe»; «la app los visualice como un nodo y en la práctica las conexiones sean reales»; «no se trata de inventar nada nuevo sino de meter de por medio lo que se necesite»; «un space tiene un start y un end que indican: esto es un nodo... también».
+
+Cómo se hace:
+1. **Diagnóstico de puntos de desacople**, solo leyendo. Por cada componente de cada space: qué lee hoy (entradas), qué escribe o emite (salidas) y dónde está esa frontera (archivo:línea). La tabla es la lista de puertos. Se enseña al usuario antes de programar.
+2. **Un único envoltorio genérico** que traduce entradas y salidas a selectores y acciones que ya existen, y el **inicio y fin de space**: el space es un grupo con su entrada y su salida, como el subnet de Houdini o el Group Input/Output de Blender. Al abrirlo se ven dentro los componentes envueltos, en un marco.
+3. **Envolver los componentes uno a uno.** Lo que funciona sigue igual; solo gana conexiones reales. Esto sustituye la idea de crear tipos de nodo nuevos pieza por pieza, que dejó la tanda de 2026-11-17 a medias.
+
+**Equipo:** Sonnet implementa; Hydrogen supervisa; GPT hace tests adversariales por cada commit; la sesión maestra orquesta en orden y supervisa según esta visión, y lo verifica en el código antes de dar nada por hecho.
+
 ## Para retomar, en orden
 
 1. Resultado de la suite completa de `task/sqlite-adopt`; si está en verde, arrancar el reparto.
-2. Reparto sin solapar archivos, todos desde `task/sqlite-adopt`: Grok, punto 8 (puertos y cables entre ventanas); Hydrogen, el resto de contratos (imagen de doc y library, nodos no idempotentes, esquema versionado), después de Grok; GPT, solo tests adversariales; Argon, prueba en el sandbox (varios agentes, nodo `prompt`, abrir un space, migración del historial guardado). `pendientes.md` y `docs/map.md` solo los toca la sesión maestra al fusionar.
+2. Empezar la tanda del envoltorio (visión de arriba) con su equipo. Lo demás, sin solapar archivos, todos desde `task/sqlite-adopt`: Grok, punto 8 (puertos y cables entre ventanas); Hydrogen, el resto de contratos (imagen de doc y library, nodos no idempotentes, esquema versionado), después de Grok; GPT, solo tests adversariales; Argon, prueba en el sandbox (varios agentes, nodo `prompt`, abrir un space, migración del historial guardado). `pendientes.md` y `docs/map.md` solo los toca la sesión maestra al fusionar.
 3. Propuesto y sin confirmar: procedencia de los resultados (cada resultado guarda la revisión que usó) y marcar como desactualizado sin regenerar solo.
 4. Del usuario: diseño del panel de exportación y decisión del idioma.
 5. Otra tanda: A3-A6 (agente) y B1-B2 (dinero).
