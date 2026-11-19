@@ -1,5 +1,5 @@
 import type { Graph } from '../types';
-import { GONE_HANDLE, NO_RESULT, resultHandle } from './graph';
+import { GONE_HANDLE, NO_RESULT, resultHandle } from './results';
 
 interface Entry { before: Graph; after: Graph; label: string; key: string; time: number }
 interface Stack { past: Entry[]; future: Entry[]; latest: Map<string, Graph['nodes'][number]> }
