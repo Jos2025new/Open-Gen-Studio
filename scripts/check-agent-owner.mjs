@@ -33,11 +33,10 @@ export function check(root = '.') {
       };
       // `agent` is also the name of a settings key and of a message's label (a string): those are not an agent's state.
       const plain = (v) => v?.type === 'Literal' || v?.type === 'TemplateLiteral' || (v?.type === 'Identifier' && v.name === 'undefined') || (v?.type === 'ConditionalExpression' && plain(v.consequent) && plain(v.alternate));
-      const plainProp = (p) => plain(p.value);
       const settingsLike = (o) => o.properties.some((p) => p.type === 'SpreadElement' && (p.argument?.property?.name === 'settings' || p.argument?.name === 'settings'));
       // The syntax tree: line breaks, a variable in between or `Object.assign` do not hide a write.
       let inSettings = 0; // `setSettings((s) => ({ agent: { ...s.agent } }))`: `s` is the settings, whose `agent` is the model choice
-      const opensSettings = (node) => node.type === 'CallExpression' && /^setSettings$|^set$/.test(node.callee?.name ?? '');
+      const opensSettings = (node) => node.type === 'CallExpression' && /^setSettings$/.test(node.callee?.name ?? '');
       return {
         enter: (node, report) => {
           const flag = (n, why) => report(n, `${why}. ${HINT}`);
@@ -54,7 +53,7 @@ export function check(root = '.') {
           // `const { agent, keys } = get().settings` is the settings' model choice; destructuring a thread out of anything else is a read by position.
           const fromSettings = (i) => (i?.property?.name ?? i?.name) === 'settings';
           if (node.type === 'VariableDeclarator' && node.id?.type === 'ObjectPattern' && !fromSettings(node.init) && node.id.properties.some((p) => p.type === 'Property' && (THREAD_KEYS.has(keyName(p)) || keyName(p) === 'agent'))) flag(node, 'destructures an agent thread out of an object');
-          if (node.type === 'Property' && THREAD_KEYS.has(keyName(node)) && node.parent !== 'pattern' && !plainProp(node) && !inSettings) flag(node, `writes \`${keyName(node)}:\` into a session by hand`);
+          if (node.type === 'Property' && THREAD_KEYS.has(keyName(node)) && node.parent !== 'pattern' && !inSettings) flag(node, `writes \`${keyName(node)}:\` into a session by hand`);
         },
         leave: (node) => { if (opensSettings(node)) inSettings--; },
       };

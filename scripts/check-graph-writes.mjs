@@ -24,19 +24,28 @@ export function check(root = '.') {
       const calls = new Set(CALLS);
       for (const d of program.body) if (d.type === 'ImportDeclaration') for (const sp of d.specifiers) if (sp.type === 'ImportSpecifier' && CALLS.has(sp.imported?.name ?? sp.imported?.value)) calls.add(sp.local.name);
       // `x.graph…` in a member chain: a direct mutation of a session's graph.
-      const throughGraph = (n) => { for (let o = n; o?.type === 'MemberExpression'; o = o.object) if ((o.property?.name ?? o.property?.value) === 'graph') return true; return false; };
+      // A name that holds a session's graph (`const { graph } = s`, `const g = s.graph`) or an object carrying one (`const patch = { graph }`), from where it is declared on.
+      const aliases = new Set(), carriers = new Set();
+      const throughGraph = (n) => { let o = n; for (; o?.type === 'MemberExpression'; o = o.object) if ((o.property?.name ?? o.property?.value) === 'graph') return true; return o?.type === 'Identifier' && aliases.has(o.name) && n !== o; };
       const hasGraphKey = (o) => o.type === 'ObjectExpression' && o.properties.some((p) => p.type === 'Property' && keyName(p) === 'graph');
       // The syntax tree, not lines: a call or an object split over several lines is the same write.
       const flag = (node, report) => report(node, `writes the graph outside the editing layer. ${HINT}`);
       return {
         enter: (node, report) => {
+          if (node.type === 'VariableDeclarator') {
+            if (node.id?.type === 'ObjectPattern') for (const p of node.id.properties) if (p.type === 'Property' && keyName(p) === 'graph' && p.value?.type === 'Identifier') aliases.add(p.value.name);
+            if (node.id?.type === 'Identifier' && node.init && throughGraph(node.init)) aliases.add(node.id.name);
+            if (node.id?.type === 'Identifier' && node.init && hasGraphKey(node.init)) carriers.add(node.id.name);
+          }
+          const carrier = (a) => a?.type === 'Identifier' && carriers.has(a.name);
+          if (node.type === 'ObjectExpression' && node.properties.some((p) => p.type === 'SpreadElement' && carrier(p.argument))) flag(node, report);
           if (node.type === 'CallExpression') {
             const fn = node.callee;
             const name = fn.type === 'Identifier' ? fn.name : fn.type === 'MemberExpression' ? fn.property?.name : '';
             if (calls.has(name)) flag(node, report);
             // `Object.assign(session, { graph })`, `Object.assign(session.graph, …)`, `session.graph.nodes.push(n)`: writes with no assignment sign.
             const isAssign = fn.type === 'MemberExpression' && fn.object?.name === 'Object' && fn.property?.name === 'assign';
-            if (isAssign && (node.arguments.some(hasGraphKey) || throughGraph(node.arguments[0]))) flag(node, report);
+            if (isAssign && (node.arguments.some((a) => hasGraphKey(a) || carrier(a)) || throughGraph(node.arguments[0]))) flag(node, report);
             if (fn.type === 'MemberExpression' && MUTATORS.has(fn.property?.name) && throughGraph(fn.object)) flag(node, report);
           }
           if ((node.type === 'AssignmentExpression' && throughGraph(node.left)) || (node.type === 'UpdateExpression' && throughGraph(node.argument)) || (node.type === 'UnaryExpression' && node.operator === 'delete' && throughGraph(node.argument))) flag(node, report);
