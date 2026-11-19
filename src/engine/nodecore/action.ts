@@ -79,7 +79,7 @@ function settle(runId: string, patch: Partial<ActionRecord>) {
 
 /** The snapshot of a preview the user reviewed in the interface: the approval is the signature they saw. */
 export function adoptPreview(session: string, targets: string[], force: boolean, preview: NodeRunPreview): ActionSnapshot {
-  const id = `appr:${session}:${digest(preview.signature)}`;
+  const id = `appr:${session}:${digest(`${preview.signature}|${force ? 1 : 0}|${targets.join(',')}`)}`;
   const snapshot: ActionSnapshot = { id, session, targets: [...targets], force, preview, pins: pinsFor(session, [...preview.runIds, ...preview.inputIds]), at: Date.now() };
   snapshots.set(id, snapshot);
   return snapshot;
@@ -99,6 +99,9 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
     if (known.approval !== snapshot.id) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: 'This run id belongs to another approval; approve again and use a new id.' });
     return known.done;
   }
+  // An approval whose send failed may have reached the provider: a new run id does not buy a second send.
+  const spent = [...ledger.values()].find((r) => r.approval === snapshot.id && r.status === 'failed' && r.sends > 0);
+  if (spent) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: `The earlier send under this approval may have reached the provider (${spent.runId}); prepare the action again.` });
   const session = useStore.getState().sessions[snapshot.session];
   const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, seq: ++counter, done: undefined as never };
   ledger.set(runId, record);

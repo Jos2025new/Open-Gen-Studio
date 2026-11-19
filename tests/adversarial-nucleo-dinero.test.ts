@@ -97,7 +97,6 @@ describe('money boundaries through the reviewed Run path', () => {
     const preview = await prepareNodeRun(HOME, ['gen']);
     execute.mockImplementation(async () => completed());
     await runApproved(HOME, ['gen'], true, preview, 'same-id');
-    // FALLO REAL: adoptPreview identifies the approval by session and preview signature, omitting targets.
     expect(await runApproved(HOME, ['other'], true, preview, 'same-id')).toMatchObject({ status: 'stale' });
     expect(execute).toHaveBeenCalledTimes(1);
   });
@@ -114,7 +113,6 @@ describe('money boundaries through the reviewed Run path', () => {
     }).mockResolvedValue(completed());
     const launch = (runId: string) => run({ cmd: 'nodes.action.run', args: { approval, runId }, on }, options);
     expect(await launch('command-first')).toMatchObject({ ok: false, error: { message: 'response lost after acceptance' } });
-    // FALLO REAL: the ledger deduplicates run IDs but lets a new ID spend again under the same prepared approval.
     expect.soft((await launch('command-retry')).ok).toBe(false);
     expect(execute).toHaveBeenCalledTimes(1);
   });
