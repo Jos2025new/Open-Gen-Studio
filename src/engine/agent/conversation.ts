@@ -37,7 +37,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const canvas = agentCanvas();
   // The recipient is explicit end to end (ADR 0031, strip 2): this agent's own state, history, cards and model.
   const to = recipientOf(sessionId, opts.agentNodeId, opts.chatNodeId);
-  if (!agentAccepts(to.id)) return;
+  if (!agentAccepts(sessionId, to.id)) return;
   if (to.error) { notice(sessionId, canvas, to.error, 'error'); return; }
   if (!text.trim() && ![...(opts.attachments ?? st.composer.attachments)].length) return;
   enterLane(sessionId, to.id);

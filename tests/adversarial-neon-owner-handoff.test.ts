@@ -64,6 +64,6 @@ describe('adversarial: writerHandoff con agentes en paralelo', () => {
 
     expect(tab1.lock.getWriterState().requested).toBe(true);
     // B está ocioso y otra pestaña pidió el lock: no debería aceptar nuevos turnos.
-    expect(tab1.gate.agentAccepts('agentB')).toBe(false);
+    expect(tab1.gate.agentAccepts(sid, 'agentB')).toBe(false);
   });
 });

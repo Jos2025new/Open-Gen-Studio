@@ -89,7 +89,7 @@ describe('Stop frees a turn stuck in "Checking the plan…"', () => {
   it('(b) the user can write right after Stop, and the old turn\'s late result does not touch the new one', async () => {
     const { turn } = await stuckInCheck();
     stopAgent(useStore.getState().activeSessionId, 'main');
-    expect(agentAccepts('main')).toBe(true);
+    expect(agentAccepts(useStore.getState().activeSessionId, 'main')).toBe(true);
     replies = ['Here you are.'];
     await sendAgentMessage('hello');
     await turn;

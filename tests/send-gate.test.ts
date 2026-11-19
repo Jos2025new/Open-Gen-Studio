@@ -27,7 +27,7 @@ describe('sendAgentMessage uses agentAccepts', () => {
 
   it('refuses exactly when agentAccepts is false: missing session', () => {
     useStore.setState({ activeSessionId: 'no-such-session' });
-    expect(agentAccepts('main')).toBe(false);
+    expect(agentAccepts(useStore.getState().activeSessionId, 'main')).toBe(false);
     const before = Object.keys(useStore.getState().sessions).length;
     void sendAgentMessage('hola');
     expect(Object.keys(useStore.getState().sessions).length).toBe(before);
@@ -36,14 +36,14 @@ describe('sendAgentMessage uses agentAccepts', () => {
 
   it('refuses exactly when agentAccepts is false: busy session', () => {
     setBusy(true);
-    expect(agentAccepts('main')).toBe(false);
+    expect(agentAccepts(useStore.getState().activeSessionId, 'main')).toBe(false);
     const before = feedCount();
     void sendAgentMessage('hola');
     expect(feedCount()).toBe(before);
   });
 
   it('proceeds exactly when agentAccepts is true', () => {
-    expect(agentAccepts('main')).toBe(true);
+    expect(agentAccepts(useStore.getState().activeSessionId, 'main')).toBe(true);
     const before = feedCount();
     void sendAgentMessage('hola');
     expect(feedCount()).toBeGreaterThan(before);

@@ -23,7 +23,7 @@ export function HomeBar() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!canSend || !agentAccepts(recipientOf(sessionId).id)) return;
+    if (!canSend || !agentAccepts(sessionId, recipientOf(sessionId).id)) return;
     const message = text.trim();
     setText('');
     openSpace(SPACES[0]);
