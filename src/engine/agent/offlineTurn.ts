@@ -29,7 +29,7 @@ async function offlinePass(sessionId: string, workspace: Workspace, runId: strin
     workflow: workflowById(st.composer.workflowId),
     doc: docDims ? { width: docDims.width, height: docDims.height } : undefined,
   });
-  const meta = messageMeta(workspace, { agent: 'Local planner', provider: 'offline', model: 'Local planner', runId });
+  const meta = messageMeta(workspace, { agent: 'Local planner', provider: 'offline', model: 'Local planner', runId }, sessionId);
   if (action.kind === 'reply') {
     appendFeed(sessionId, {
       ...feedBase(workspace),

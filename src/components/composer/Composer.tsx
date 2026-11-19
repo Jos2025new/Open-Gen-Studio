@@ -233,7 +233,7 @@ export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKin
   );
 }
 
-export function Composer() {
+export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
   const mode = useStore((s) => s.composer.mode);
   const text = useStore((s) => s.composer.text);
   const attachments = useStore((s) => s.composer.attachments);
@@ -387,7 +387,7 @@ export function Composer() {
 
   const submit = () => {
     if (mode === 'agent') {
-      if (canSendAgent) void sendAgentMessage(text);
+      if (canSendAgent) void sendAgentMessage(text, chatNodeId ? { chatNodeId } : {});
       return;
     }
     const check = checkDirect(mode);

@@ -43,7 +43,7 @@ export function ChatNode({ data, selected }: NodeProps<FlowNode>) {
             {empty ? <p className="faint">Nothing yet. Say what you want to make.</p> : <FeedList sessionId={sessionId} studio />}
           </div></div>
         </div>
-        <div className="omni-chat-composer nodrag nowheel"><Composer /></div>
+        <div className="omni-chat-composer nodrag nowheel"><Composer chatNodeId={node.id} /></div>
         {undocked ? (
           <ul className="nc-sys-models omni-connections" aria-label="Connected agent and models">
             {(live?.connections ?? []).map((c) => <li key={c.nodeId} data-kind={c.kind}><span>{c.kind === 'agent' ? 'Agent · ' : ''}{c.title}</span><small>{c.detail}</small></li>)}

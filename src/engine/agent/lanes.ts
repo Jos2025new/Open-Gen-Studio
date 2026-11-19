@@ -1,4 +1,4 @@
-import { patchSession, useStore } from '../../store/store';
+import { patchSession, toast, useStore } from '../../store/store';
 import type { AgentState } from '../types';
 
 /*
@@ -41,10 +41,15 @@ export function laneOfItem(sessionId: string, itemId: string): string | undefine
   return item?.meta?.agentNodeId;
 }
 
-/** A card action belongs to the agent that raised the card: bring its state forward first. */
-export function enterLaneOfItem(sessionId: string, itemId: string): void {
+/**
+ * A card action belongs to the agent that raised the card: bring its state forward first. Returns the reason it cannot
+ * (another agent is mid-turn) after telling the user, so the caller stops before changing anything.
+ */
+export function claimLaneOfItem(sessionId: string, itemId: string): string | null {
   const owner = laneOfItem(sessionId, itemId);
-  if (owner) enterLane(sessionId, owner);
+  const why = owner ? enterLane(sessionId, owner) : null;
+  if (why) toast(why, 'error');
+  return why;
 }
 
 /** The state of an agent instance, active or parked (read-only). */

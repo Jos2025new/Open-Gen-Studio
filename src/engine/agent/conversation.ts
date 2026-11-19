@@ -27,18 +27,31 @@ import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
 import { llmTurn } from './llmTurn';
-import { enterLane, enterLaneOfItem } from './lanes';
+import { claimLaneOfItem, enterLane } from './lanes';
 import { recipientOf } from './recipient';
 
-export async function sendAgentMessage(text: string, opts: { attachments?: string[]; agentNodeId?: string } = {}): Promise<void> {
+export async function sendAgentMessage(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string } = {}): Promise<void> {
   const st = get();
   const sessionId = st.activeSessionId;
   if (!agentAccepts()) return;
+  const canvas = agentCanvas();
   // The recipient is explicit end to end (ADR 0031, strip 2): this agent's own state, history, cards and model.
-  const to = recipientOf(sessionId, opts.agentNodeId);
-  if (to.error) { notice(sessionId, agentCanvas(), to.error, 'error'); return; }
+  const to = recipientOf(sessionId, opts.agentNodeId, opts.chatNodeId);
+  if (to.error) { notice(sessionId, canvas, to.error, 'error'); return; }
+  if (!text.trim() && ![...(opts.attachments ?? st.composer.attachments)].length) return;
   const blocked = to.id ? enterLane(sessionId, to.id) : null;
-  if (blocked) { notice(sessionId, agentCanvas(), blocked, 'info'); return; }
+  if (blocked) { notice(sessionId, canvas, blocked, 'info'); return; }
+  // The turn is reserved before the first wait (attachments, the Designer page): nothing else can enter this session meanwhile.
+  patchAgent(sessionId, { busy: true, phase: 'working' });
+  try {
+    await deliver(text, opts, sessionId, to, st);
+  } finally {
+    // A turn that ran clears its own flag; one that stopped before starting must not leave the agent reserved.
+    if (!controllers.has(sessionId) && session(sessionId)?.agent.busy) patchAgent(sessionId, { busy: false, phase: undefined });
+  }
+}
+
+async function deliver(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string }, sessionId: string, to: { id?: string }, st: ReturnType<typeof get>): Promise<void> {
   // Studio is the chat canvas whatever its board shows (agentCanvas).
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace);
@@ -53,7 +66,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   const runId = uid('turn');
   autoTitleSession(sessionId, clean || 'Edit');
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(to.id ? { agentNodeId: to.id, toAgentNodeIds: [to.id] } : {}) }) });
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(opts.chatNodeId ? { chatNodeId: opts.chatNodeId } : {}), ...(to.id ? { agentNodeId: to.id, toAgentNodeIds: [to.id] } : {}) }, sessionId) });
   if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
@@ -122,7 +135,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     await offlineTurn(sessionId, workspace, 'new', runId);
     return;
   }
-  startRequest(sessionId, { request: clean, workspace, engine: engineLabel(), attachments: attachments.length });
+  startRequest(sessionId, { request: clean, workspace, engine: engineLabel(sessionId), attachments: attachments.length });
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
   const parts = await visibleAttachments(sessionId, workspace, attachments, runId);
   // The Designer page travels with a new request, so "draw on this" needs no extra round.
@@ -185,7 +198,7 @@ export function pushHistory(sessionId: string, msg: LlmMessage): void {
 
 /** The card reports what it shows selected, so typing instead of pressing Continue sends it. */
 export function pickAnswers(sessionId: string, itemId: string, answers: Record<string, string>): void {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   const s = get().sessions[sessionId];
   if (!s) return;
   const cur = s.agent.cardPick;
@@ -195,7 +208,7 @@ export function pickAnswers(sessionId: string, itemId: string, answers: Record<s
 
 /** Answers chosen in a questions card. */
 export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips', runId?: string): Promise<void> {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -205,7 +218,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   const workspace = turnCanvas(item.workspace);
   const pending = s.agent.pending;
   patchAgent(sessionId, { pending: undefined, cardPick: undefined });
-  const engine = agentEngine();
+  const engine = agentEngine(sessionId);
   if (engine.kind === 'llm') {
     const lines = item.questions.map((q) => `- ${q.question}: ${answers[q.id] ?? '(no answer)'}`);
     if (answers.note) lines.push(`- User note: ${answers.note}`);
@@ -224,7 +237,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
 
 /** "Skip, plan now" on a questions card: no more questions, plan with sensible defaults. */
 export async function skipQuestions(sessionId: string, itemId: string): Promise<void> {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -232,7 +245,7 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
   updateFeedItem<QuestionsFeedItem>(sessionId, itemId, { status: 'skipped' });
   const pending = s.agent.pending;
   patchAgent(sessionId, { pending: undefined, cardPick: undefined, questionRound: get().settings.guidedRounds });
-  const engine = agentEngine();
+  const engine = agentEngine(sessionId);
   if (engine.kind === 'llm') {
     const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
     replyToCard(sessionId, pending?.toolCallId, `The user skipped the questions. Use sensible defaults and call propose_plan now.\n\n${ctx}`);
@@ -244,14 +257,14 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
 
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
 export function selectSettings(sessionId: string, itemId: string, index: number, chosen: SettingsChoice): void {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { sections: sectionsOf(item).map((x, i) => (i === index ? { ...x, chosen } : x)) });
 }
 
 /** "Continue" on the settings card (phase 2): the agent gets the confirmed values and each model's prompting guide. */
 export async function confirmSettings(sessionId: string, itemId: string, chosen: SettingsChoice[], note?: string): Promise<void> {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -263,7 +276,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
   patchAgent(sessionId, (a) => confirmedState(a, item, sections));
   for (const x of sections) if (x.chosen && sections.filter((p) => p.kind === x.kind).length === 1) rememberSessionModel(sessionId, x.kind, x.chosen, true);
-  if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
+  if (agentEngine(sessionId).kind !== 'llm' || !pending?.toolCallId) return;
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
   pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` });
   await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'settings-confirm' });
@@ -275,11 +288,11 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
  * a model search) are kept and not repeated. The half-written answer and the error notice are removed.
  */
 export async function retryAgentTurn(sessionId: string, noticeId: string): Promise<void> {
-  enterLaneOfItem(sessionId, noticeId);
+  if (claimLaneOfItem(sessionId, noticeId)) return;
   toCanvasOfItem(sessionId, noticeId);
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === noticeId);
-  if (!s || s.agent.busy || item?.type !== 'notice' || !item.retry || agentEngine().kind !== 'llm') return;
+  if (!s || s.agent.busy || item?.type !== 'notice' || !item.retry || agentEngine(sessionId).kind !== 'llm') return;
   if (item.retry.partialItemId) removeFeedItem(sessionId, item.retry.partialItemId);
   removeFeedItem(sessionId, noticeId);
   await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'retry' });

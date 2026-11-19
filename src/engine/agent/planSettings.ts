@@ -165,7 +165,7 @@ function stepInputs(s: GenStep): string {
  * images each step sends, with the agent's video rules. The agent is told that the card's writer wrote them, not it.
  */
 export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[]): Promise<void> {
-  const engine = agentEngine();
+  const engine = agentEngine(sessionId);
   const item = planOf(sessionId, itemId);
   const steps = item?.plan.steps.filter(isGen).filter((s) => s.kind === kind && s.prompt.trim() && (stepIds ? stepIds.includes(s.id) : !groupModelRef || modelGroup(s.modelRef) === modelGroup(groupModelRef))) ?? [];
   if (engine.kind !== 'llm' || !item || !steps.length) return;

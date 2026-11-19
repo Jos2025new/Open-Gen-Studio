@@ -29,11 +29,13 @@ export function AgentLlmSelect({ sessionId, nodeId, llm }: { sessionId: string; 
 export function ChatRecipientSelect({ sessionId, nodeId, recipient }: { sessionId: string; nodeId: string; recipient?: string }) {
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
   const agents = useMemo(() => (graph ? chatAgents(sessionId, nodeId).flatMap((id) => { const n = graph.nodes.find((x) => x.id === id); return n ? [{ id, title: n.data.title }] : []; }) : []), [graph, sessionId, nodeId]);
-  if (agents.length < 2) return null;
+  const stale = Boolean(recipient) && !agents.some((a) => a.id === recipient);
+  if (agents.length < 2 && !stale) return null;
   return (
     <label className="nc-sys-llm nodrag">
       <span>To</span>
-      <select aria-label="Send messages to" value={recipient && agents.some((a) => a.id === recipient) ? recipient : agents[0].id} onChange={(e) => patchNodeData(sessionId, nodeId, { recipient: e.target.value })}>
+      <select aria-label="Send messages to" value={stale ? recipient : recipient ?? agents[0].id} onChange={(e) => patchNodeData(sessionId, nodeId, { recipient: e.target.value })}>
+        {stale ? <option value={recipient}>Not connected — choose one</option> : null}
         {agents.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
       </select>
     </label>

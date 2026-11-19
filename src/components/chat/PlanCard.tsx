@@ -188,7 +188,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const spent = spentLabel(plannedSpend(item.stepGenerations, generations));
   const stopRun = () => { stopPlanRun(plan.id); for (const id of Object.values(item.stepGenerations)) if (generations[id] && ['running', 'queued'].includes(generations[id].status)) cancelGeneration(id); };
   /** Only a waiting plan can be edited: the other states show the same lines without the Edit button. */
-  const editable = (label: string, node: React.ReactNode, step?: PlanStep) => (awaiting ? <EditLine label={label} references={step ? stepReferenceChoices(step, plan.steps, assets, library, plan.subjects, 'modelRef' in step ? schemas[step.modelRef]?.slots.promptRefs : undefined) : []}>{node}</EditLine> : node);
+  const editable = (label: string, node: React.ReactNode, step?: PlanStep) => (awaiting ? <EditLine agentNodeId={item.meta?.agentNodeId} label={label} references={step ? stepReferenceChoices(step, plan.steps, assets, library, plan.subjects, 'modelRef' in step ? schemas[step.modelRef]?.slots.promptRefs : undefined) : []}>{node}</EditLine> : node);
 
   return (
     <article className={`plan-card cc-w status-${item.status}${sections.length ? ' is-auto' : ''}`} data-pop-bound>
@@ -203,7 +203,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           {reused && !sections.length ? (
             <p className="plan-summary faint">
               {reused.kind === 'draft' ? DRAFT : reused.kind === 'hq' ? HQ : (reused.text ?? '').trim().slice(0, 40)} (como antes)
-              {awaiting ? <> <Button size="sm" variant="ghost" onClick={() => { void sendAgentMessage('Quiero cambiar la elección de borrador/calidad', { attachments: [] }); }}>Cambiar</Button></> : null}
+              {awaiting ? <> <Button size="sm" variant="ghost" onClick={() => { void sendAgentMessage('Quiero cambiar la elección de borrador/calidad', { attachments: [], ...(item.meta?.agentNodeId ? { agentNodeId: item.meta.agentNodeId } : {}) }); }}>Cambiar</Button></> : null}
             </p>
           ) : null}
         </div>
@@ -323,7 +323,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
       {item.error ? <p className="plan-error">{item.error}</p> : null}
       {awaiting && rewriteFailed ? <RewriteFailed text={rewriteFailed} item={item} sessionId={sessionId} sections={sections} /> : null}
       {item.status === 'error' || item.status === 'partial' ? <PlanRecoveryChips sessionId={sessionId} item={item} /> : null}
-      {awaiting && suggest ? <SuggestBox onDone={() => setSuggest(false)} /> : null}
+      {awaiting && suggest ? <SuggestBox agentNodeId={item.meta?.agentNodeId} onDone={() => setSuggest(false)} /> : null}
       <footer className="plan-foot">
         {item.status === 'awaiting' ? (
           <>

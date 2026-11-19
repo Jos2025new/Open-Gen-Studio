@@ -1,4 +1,4 @@
-import { enterLaneOfItem } from './lanes';
+import { claimLaneOfItem } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
@@ -48,7 +48,7 @@ export function removeDraftNodes(sessionId: string, planId: string): void {
 
 
 export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -301,6 +301,7 @@ async function executePlanItem(
 
 /** Claim the waiting step synchronously; another click cannot authorize or send it again. */
 export async function resolveStepCostReview(sessionId: string, itemId: string, stepId: string, decision: 'continue' | 'cancel'): Promise<void> {
+  if (claimLaneOfItem(sessionId, itemId)) return;
   const item = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
   const review = item?.stepCostReviews?.[stepId];
   const generationId = item?.stepGenerations[stepId];
@@ -343,7 +344,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
 async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
-  if (!s || agentEngine().kind !== 'llm' || s.agent.busy || s.agent.pending) return;
+  if (!s || agentEngine(sessionId).kind !== 'llm' || s.agent.busy || s.agent.pending) return;
   const at = s.feed.findIndex((f) => f.id === itemId);
   if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
   const item = s.feed[at];
@@ -368,6 +369,7 @@ export { planRecovery, planRecoveryProblem, type PlanRecoveryMode };
  * Returns a short summary for the agent.
  */
 export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode): Promise<string> {
+  { const busy = claimLaneOfItem(sessionId, itemId); if (busy) return busy; }
   toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan') return 'No such plan.';
@@ -429,7 +431,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
 }
 
 export function cancelPlan(sessionId: string, itemId: string): void {
-  enterLaneOfItem(sessionId, itemId);
+  if (claimLaneOfItem(sessionId, itemId)) return;
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);

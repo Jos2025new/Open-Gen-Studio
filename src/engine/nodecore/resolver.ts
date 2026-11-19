@@ -39,13 +39,19 @@ export interface ResolvedInput {
 /** An edge whose image was deleted keeps this index: it can never match a result (see graph.ts NO_RESULT). */
 const GONE = -1;
 
-/** Chat/agent text straight from the session feed. The single store read of the resolver. */
+/**
+ * Chat/agent text straight from the session feed: the single store read of the resolver. An agent node delivers the
+ * last reply written by that agent, a chat node the last message written in that chat. Rows from before agents and
+ * chats carried an id belong to the session's first agent / first chat, as everywhere else.
+ */
 export function sessionChatText(node: GraphNode): string | undefined {
   const d = node.data;
   if (d.kind !== 'ref' || (d.type !== 'chat' && d.type !== 'agent')) return undefined;
-  const feed = useStore.getState().sessions[d.ref]?.feed ?? [];
+  const s = useStore.getState().sessions[d.ref];
+  const first = s?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === d.type)?.id;
   const wanted = d.type === 'chat' ? 'user' : 'assistant';
-  const last = [...feed].reverse().find((f) => f.type === wanted && 'text' in f);
+  const owner = (f: { meta?: { agentNodeId?: string; chatNodeId?: string } }) => (d.type === 'chat' ? f.meta?.chatNodeId : f.meta?.agentNodeId) ?? first;
+  const last = [...(s?.feed ?? [])].reverse().find((f) => f.type === wanted && 'text' in f && owner(f as never) === node.id);
   return last && 'text' in last ? last.text : undefined;
 }
 

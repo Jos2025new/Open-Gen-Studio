@@ -59,14 +59,14 @@ export function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace: rowCanvas(workspace) };
 }
 
-export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}): ChatMessageMeta {
-  const sender = extra.agentNodeId ?? get().sessions[get().activeSessionId]?.agentLane;
-  const e = agentEngine(get().activeSessionId, sender);
+export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}, sessionId: string = get().activeSessionId): ChatMessageMeta {
+  const sender = extra.agentNodeId ?? get().sessions[sessionId]?.agentLane;
+  const e = agentEngine(sessionId, sender);
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
     agent: e.kind === 'offline' ? 'Local planner' : 'Director',
-    ...(agentNodeOf(undefined, sender)?.id ? { agentNodeId: agentNodeOf(undefined, sender)!.id } : {}),
-    ...(chatNodeOf() ? { chatNodeId: chatNodeOf() } : {}),
+    ...(agentNodeOf(sessionId, sender)?.id ? { agentNodeId: agentNodeOf(sessionId, sender)!.id } : {}),
+    ...(chatNodeOf(sessionId) ? { chatNodeId: chatNodeOf(sessionId) } : {}),
     space: placeFor(get().ui, workspace),
     provider: e.kind === 'offline' ? 'offline' : e.provider,
     model: e.kind === 'offline' ? 'Local planner' : e.model,
@@ -141,8 +141,8 @@ export function agentEngine(sessionId: string = get().activeSessionId, agentNode
   return { kind: 'llm', provider: agent.provider, model: agent.model, key };
 }
 
-export function engineLabel(): string {
-  const e = agentEngine();
+export function engineLabel(sessionId: string = get().activeSessionId): string {
+  const e = agentEngine(sessionId);
   return e.kind === 'offline' ? 'Local planner' : `${e.model.replace(/^[^/]+\//, '')} · ${LLM_LABELS[e.provider]}`;
 }
 
@@ -257,7 +257,7 @@ export function showQuestions(
     maxRounds: roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     status: 'pending',
     ...(toolCallId ? { toolCallId } : {}),
-    meta: meta ?? messageMeta(workspace),
+    meta: meta ?? messageMeta(workspace, {}, sessionId),
   };
   appendFeed(sessionId, item);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.presented', reason: 'agent asked for user information', sessionId, approvalId: item.id, after: { questionIds: questions.map((q) => q.id), round, maxRounds: item.maxRounds } });
@@ -321,7 +321,7 @@ export async function presentPlan(
     stepStates: Object.fromEntries(plan.steps.map((st) => [st.id, 'pending' as StepState])),
     stepGenerations: {},
     estimate: total,
-    meta: meta ?? messageMeta(workspace),
+    meta: meta ?? messageMeta(workspace, {}, sessionId),
   };
   const replaced = closeRevisedPlan(sessionId, revision);
   if (replaced) item.revised = true;

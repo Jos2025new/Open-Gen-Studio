@@ -1,3 +1,4 @@
+import { claimLaneOfItem } from './lanes';
 import { modelSummary } from '../catalog';
 import type { FeedItem, LlmMessage, QuestionsFeedItem, SettingsFeedItem, EditLogEntry } from '../types';
 import { patchSession, removeFeedItem, setUi, updateFeedItem } from '../../store/store';
@@ -47,6 +48,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || s.agent.busy || item?.type !== 'user' || (!text.trim() && !item.attachments.length)) return;
+  if (claimLaneOfItem(sessionId, itemId)) return;
   const i = historyIndexOf(sessionId, itemId);
   const at = s.feed.indexOf(item);
   logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.length - at - 1 });
@@ -64,7 +66,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
     phase: undefined,
   }));
   if (get().ui.workspace !== 'chat' && get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
-  await sendAgentMessage(text, { attachments: item.attachments });
+  await sendAgentMessage(text, { attachments: item.attachments, ...(item.meta?.agentNodeId ? { agentNodeId: item.meta.agentNodeId } : {}), ...(item.meta?.chatNodeId ? { chatNodeId: item.meta.chatNodeId } : {}) });
 }
 
 /** What the user changed back in the conversation: kept in the session for us, never sent to the agent. */

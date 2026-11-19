@@ -64,7 +64,7 @@ export function Collapsible({ head, name, children, preview }: { head?: ReactNod
  * A line the user can ask to change: "Edit" shows on hover or focus and opens a short field. What is written goes to the
  * agent as a comment on the waiting plan (the existing revision path), prefixed with the line it is about.
  */
-export function EditLine({ label, children, references = [] }: { label: string; children: ReactNode; references?: ReferenceChoice[] }) {
+export function EditLine({ label, children, references = [], agentNodeId }: { label: string; children: ReactNode; references?: ReferenceChoice[]; agentNodeId?: string }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const field = useRef<HTMLInputElement>(null);
@@ -72,7 +72,7 @@ export function EditLine({ label, children, references = [] }: { label: string; 
   const send = () => {
     const t = text.trim();
     if (!t) return;
-    void sendAgentMessage(`${label}: ${t}`, { attachments: [] });
+    void sendAgentMessage(`${label}: ${t}`, { attachments: [], ...(agentNodeId ? { agentNodeId } : {}) });
     setOpen(false);
     setText('');
   };
@@ -110,12 +110,12 @@ export function SuggestButton({ open, onClick }: { open: boolean; onClick: () =>
 }
 
 /** The agent revises the waiting plan with this comment (the same path as typing in the chat); nothing is spent. */
-export function SuggestBox({ onDone }: { onDone: () => void }) {
+export function SuggestBox({ onDone, agentNodeId }: { onDone: () => void; agentNodeId?: string }) {
   const [text, setText] = useState('');
   const send = () => {
     const t = text.trim();
     if (!t) return;
-    void sendAgentMessage(t, { attachments: [] });
+    void sendAgentMessage(t, { attachments: [], ...(agentNodeId ? { agentNodeId } : {}) });
     onDone();
   };
   return (

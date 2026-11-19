@@ -50,6 +50,9 @@ const HURRY_NOTE =
 export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId?: string }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
+  // A turn belongs to the agent whose state is loaded; a call that names another one never borrows it.
+  const lane = session(sessionId)?.agentLane;
+  if (opts.agentNodeId && lane && lane !== opts.agentNodeId) return;
   const engine = agentEngine(sessionId, opts.agentNodeId);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
@@ -89,7 +92,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     clearTimeout(silenceTimer);
     silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
   };
-  const turnMeta = () => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
+  const turnMeta = () => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId);
   const clearPending = () => {
     pendingUsage = undefined;
     pendingCost = 0;
@@ -177,8 +180,8 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
             armSilence();
             if (!textItemId) {
               firstOutput();
-              textItemMeta = messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId });
-              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel(), meta: textItemMeta };
+              textItemMeta = messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId);
+              const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel(sessionId), meta: textItemMeta };
               textItemId = item.id;
               appendFeed(sessionId, item);
             } else {
