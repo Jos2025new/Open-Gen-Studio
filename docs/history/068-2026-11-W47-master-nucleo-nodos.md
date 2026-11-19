@@ -56,6 +56,7 @@ Rama `task/nucleo-nodos` (worktree `ogs-nucleo-nodos`, desde `task/sqlite-adopt`
 
 ## Pendiente, en orden
 
+0. **Revisar un cambio de comportamiento** (`b07c5090`). Con el estado por agente, dos agentes de un mismo chat pueden trabajar a la vez y cada uno contesta sus tarjetas, aunque el otro esté ocupado. Antes eso se rechazaba. Sonnet cambió 4 tests viejos en ese sentido. Es coherente con «un chat tiene varios agentes», pero el usuario no lo ha aprobado; que lo ataque el Neon nuevo y lo confirme el usuario.
 1. Commit del estado por agente (Sonnet) y suite completa.
 2. Boceto de avisos para aprobar, e implementarlo después.
 3. Un Neon nuevo que revise las propuestas y todo lo hecho; decidir con el usuario qué hacer con lo que señale.
