@@ -67,7 +67,7 @@ export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSect
 }
 
 /** The draft choice shown on an Auto plan with video (the session's, Borrador by default). */
-export const planDraft = (sessionId: string, owner: string | undefined): DraftMode => laneState(sessionId, owner)?.draftMode ?? draftMode('draft');
+export const planDraft = (sessionId: string, owner: string): DraftMode => laneState(sessionId, owner)?.draftMode ?? draftMode('draft');
 
 /** The model this step runs on for a picked line: the variant its inputs need (edit, image-to-video). */
 const stepModel = (ref: string, s: GenStep) => (needsImage(s) ? inputVariant(ref, s.kind)?.ref ?? ref : ref);
@@ -78,7 +78,7 @@ function applyChoice(s: GenStep, c: SettingsChoice): GenStep {
 }
 
 /** The session's confirmed choice of this kind follows the card, so the next request starts from it. */
-function remember(sessionId: string, owner: string | undefined, kind: GenKind, c: SettingsChoice, draft?: DraftMode) {
+function remember(sessionId: string, owner: string, kind: GenKind, c: SettingsChoice, draft?: DraftMode) {
   rememberSessionModel(sessionId, owner, kind, c, true);
   if (draft) patchLane(sessionId, owner, { draftMode: draft });
   const feed = get().sessions[sessionId].feed;
@@ -141,7 +141,7 @@ export async function recheckPlanPrice(sessionId: string, itemId: string): Promi
 const fenced = (text: string) => text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
 
 /** The plan card's prompt writer is on unless the user turned it off (then prompts are sent as written). */
-export const promptWriterOn = (sessionId: string, owner: string | undefined) => laneState(sessionId, owner)?.enhance !== false;
+export const promptWriterOn = (sessionId: string, owner: string) => laneState(sessionId, owner)?.enhance !== false;
 
 /** The switch on the plan card; turning it on adapts the prompts to the card as it is now. */
 export function setPromptWriter(sessionId: string, itemId: string, on: boolean): void {

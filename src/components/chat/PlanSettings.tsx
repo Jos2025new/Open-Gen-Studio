@@ -1,4 +1,5 @@
 import { WandSparkles } from '../ui/icons';
+import { resolveOwner } from '../../engine/agent/lanes';
 import { changePlanChoice, changePlanDraft, planDraft, promptWriterOn, rewritePrompts, setPromptWriter, usePlanRewrite, type GenKind } from '../../engine/agent/planSettings';
 import type { PlanFeedItem, SettingsSection } from '../../engine/types';
 import { useStore } from '../../store/store';
@@ -8,7 +9,7 @@ import { DraftChoice, SettingsSectionBlock } from './SettingsCard';
 
 /** Auto's one card: the settings card's draft choice, model and values, on the waiting plan (engine/agent/planSettings). */
 export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem; sessionId: string; sections: SettingsSection[] }) {
-  const owner = item.meta?.agentNodeId; // the agent that owns this card, not the one on screen
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId); // the agent that owns this card, not the one on screen
   useStore(() => laneState(sessionId, owner)?.draftMode);
   useStore(() => laneState(sessionId, owner)?.enhance);
   const writer = promptWriterOn(sessionId, owner);

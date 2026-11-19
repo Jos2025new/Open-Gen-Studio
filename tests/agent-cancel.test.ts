@@ -48,13 +48,13 @@ describe('agent cancellation is per session', () => {
     await tick();
     expect(signals).toHaveLength(2);
 
-    stopAgent(b); // Stop in B
+    stopAgent(b, 'main'); // Stop in B
     await turnB;
     expect(signals[1].aborted).toBe(true);
     expect(signals[0].aborted).toBe(false);
     expect(viewed(useStore.getState().sessions[a]).busy).toBe(true);
 
-    stopAgent(a); // A can still be stopped after B finished
+    stopAgent(a, 'main'); // A can still be stopped after B finished
     await turnA;
     expect(signals[0].aborted).toBe(true);
     expect(viewed(useStore.getState().sessions[a]).busy).toBe(false);

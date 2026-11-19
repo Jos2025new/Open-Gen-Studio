@@ -27,7 +27,7 @@ export function partsOfSteps(steps: Array<{ kind: string; op?: string; model?: s
 }
 
 /** The settings sections of these parts (what confirm_settings shows or Auto confirms), or what stops them: an unknown model, a length the model cannot make. */
-export async function sectionsOfParts(sessionId: string, owner: string | undefined, parts: SettingsPart[], until: <T>(work: Promise<T>) => Promise<T>, log: { action(e: { icon: string; label: string; detail?: string }): void }): Promise<{ sections: SettingsSection[]; failed: string }> {
+export async function sectionsOfParts(sessionId: string, owner: string, parts: SettingsPart[], until: <T>(work: Promise<T>) => Promise<T>, log: { action(e: { icon: string; label: string; detail?: string }): void }): Promise<{ sections: SettingsSection[]; failed: string }> {
   const ag = () => agentOf(sessionId, owner);
   const sections: SettingsSection[] = [];
   for (const d of parts) {
@@ -49,7 +49,7 @@ export async function sectionsOfParts(sessionId: string, owner: string | undefin
 }
 
 /** Auto confirms these sections itself: what the agent reads (values, guide), plus a line for a resolution the model lacks. */
-export async function autoAnswer(sessionId: string, owner: string | undefined, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[], log?: Parameters<typeof sectionsOfParts>[4], meta?: import('../feedMeta').ChatMessageMeta): Promise<string> {
+export async function autoAnswer(sessionId: string, owner: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[], log?: Parameters<typeof sectionsOfParts>[4], meta?: import('../feedMeta').ChatMessageMeta): Promise<string> {
   const request = offerRequest(agentOf(sessionId, owner));
   const text = await autoConfirmSettings(sessionId, owner, workspace, toolCallId, summary, sections, parts, meta);
   // What follows reads the model the app chose (a composer pick or another provider may replace the recommended one).
@@ -85,7 +85,7 @@ export async function imagesFit(ref: string, parts: SettingsPart[]): Promise<str
 }
 
 /** Reuse an already resolved set; a new explicit model still uses the same internal settings path. */
-export async function modelsNeedSettings(sessionId: string, owner: string | undefined, steps: Parameters<typeof partsOfSteps>[0]): Promise<boolean> {
+export async function modelsNeedSettings(sessionId: string, owner: string, steps: Parameters<typeof partsOfSteps>[0]): Promise<boolean> {
   const a = agentOf(sessionId, owner);
   for (const p of partsOfSteps(steps).filter((p) => p.model && p.user_requested)) {
     const confirmed = (a.settingsParts ?? []).filter((x) => x.kind === p.kind);
@@ -99,7 +99,7 @@ export async function modelsNeedSettings(sessionId: string, owner: string | unde
  * Auto: a plan with image or video steps came before any settings were confirmed. The app runs the confirm path itself
  * and answers with the effective settings; the plan sent is not shown, so the prompts are written for them first.
  */
-export async function settingsForPlan(sessionId: string, owner: string | undefined, workspace: Workspace, toolCallId: string, steps: Parameters<typeof partsOfSteps>[0], until: <T>(work: Promise<T>) => Promise<T>, log: Parameters<typeof sectionsOfParts>[4], meta?: import('../feedMeta').ChatMessageMeta): Promise<string | null> {
+export async function settingsForPlan(sessionId: string, owner: string, workspace: Workspace, toolCallId: string, steps: Parameters<typeof partsOfSteps>[0], until: <T>(work: Promise<T>) => Promise<T>, log: Parameters<typeof sectionsOfParts>[4], meta?: import('../feedMeta').ChatMessageMeta): Promise<string | null> {
   const parts = partsOfSteps(steps);
   const { sections, failed } = await sectionsOfParts(sessionId, owner, parts, until, log);
   if (failed || !sections.length) return failed || 'The plan has no image or video step to confirm settings for.';
@@ -109,7 +109,7 @@ export async function settingsForPlan(sessionId: string, owner: string | undefin
 }
 
 /** A comparison is matched per model, never against the first part of its kind. */
-async function fitsChosen(sessionId: string, owner: string | undefined, parts: SettingsPart[]): Promise<boolean> {
+async function fitsChosen(sessionId: string, owner: string, parts: SettingsPart[]): Promise<boolean> {
   const a = agentOf(sessionId, owner);
   for (const p of parts) {
     const all = (a.settingsParts ?? []).filter((x) => x.kind === p.kind);

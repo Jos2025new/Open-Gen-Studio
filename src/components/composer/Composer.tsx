@@ -5,7 +5,8 @@ import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, Layers, Pencil, X, Zap } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
-import { sendAgentMessage } from '../../engine/agent/runtime';
+import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
+import { recipientOf } from '../../engine/agent/recipient';
 import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';
 import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
@@ -244,7 +245,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
   const workspace = useStore((s) => s.ui.workspace);
   const focusTick = useStore((s) => s.ui.focusComposer);
   const sessionId = useStore((s) => s.activeSessionId);
-  const busy = useRecipientThread(sessionId, (a) => a.busy, false); // the agent that would take this message, not whichever is on screen
+  const busy = useRecipientThread(sessionId, chatNodeId, (a) => a.busy, false); // the agent that would take this message, not whichever is on screen
   const assets = useStore((s) => s.assets);
   const acceptsImages = useStore((s) => {
     if (s.composer.mode === 'agent') return true;
@@ -532,7 +533,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
             aria-label="Prompt"
           />
           {mentions.menu}
-          {mode === 'agent' ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} /> : <SendDirect kind={mode} compact />}
+          {mode === 'agent' ? <AgentSend busy={busy} canSend={canSendAgent} submit={submit} stop={() => stopAgent(sessionId, recipientOf(sessionId, undefined, chatNodeId).id)} /> : <SendDirect kind={mode} compact />}
         </div>
         {editing ? <div className="composer-bar">
           <span className="editing-chip" data-tip={editingPrompt}>

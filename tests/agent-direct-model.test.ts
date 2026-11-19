@@ -75,13 +75,13 @@ describe('Direct video guides follow the models that can run', () => {
       composer: { ...before.composer, agentStyle: 'direct', attachments: [], video: { ...before.composer.video, modelRef: 'nanogpt::seedance-2.0' }, videoRoutes: { image: 'atlas::kwaivgi/kling-v3.0-pro/image-to-video' } },
       sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], agents: agentsWith(before.sessions[sid], { settings: { video: { modelRef: 'atlas::alibaba/wan-3.0/text-to-video', needsImage: false } } }) } },
     });
-    expect(directModelRefs(sid, undefined, 'video')).toEqual(['atlas::alibaba/wan-3.0/text-to-video']);
-    expect(earlyModelGuide(sid, undefined, 'model:seedance')).toContain('direct mode');
-    expect(earlyModelGuide(sid, undefined, 'model:kling')).toContain('direct mode');
-    expect(earlyModelGuide(sid, undefined, 'model:wan')).toBeUndefined();
+    expect(directModelRefs(sid, 'main', 'video')).toEqual(['atlas::alibaba/wan-3.0/text-to-video']);
+    expect(earlyModelGuide(sid, 'main', 'model:seedance')).toContain('direct mode');
+    expect(earlyModelGuide(sid, 'main', 'model:kling')).toContain('direct mode');
+    expect(earlyModelGuide(sid, 'main', 'model:wan')).toBeUndefined();
     useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agents: agentsWith(s.sessions[sid], { settings: undefined }) } } }));
-    expect(directModelRefs(sid, undefined, 'video')).toEqual(expect.arrayContaining(['nanogpt::seedance-2.0', 'atlas::kwaivgi/kling-v3.0-pro/image-to-video']));
-    expect(earlyModelGuide(sid, undefined, 'model:wan')).toContain('direct mode');
+    expect(directModelRefs(sid, 'main', 'video')).toEqual(expect.arrayContaining(['nanogpt::seedance-2.0', 'atlas::kwaivgi/kling-v3.0-pro/image-to-video']));
+    expect(earlyModelGuide(sid, 'main', 'model:wan')).toContain('direct mode');
   });
 });
 

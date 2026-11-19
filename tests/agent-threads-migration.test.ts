@@ -3,7 +3,7 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
 import '../src/engine/nodecore/migrate';
 import { migrateAgents } from '../src/engine/nodecore/migrate';
-import { MAIN_THREAD, threadOf } from '../src/engine/agent/threads';
+import { MAIN_THREAD, shownThread } from '../src/engine/agent/threads';
 import { createSession, useStore } from '../src/store/store';
 import type { AgentState, Session } from '../src/engine/types';
 
@@ -22,7 +22,7 @@ describe('saved sessions load with one thread per agent', () => {
     const s = migrateAgents(saved({ agent: agent(['B talk']), agentLane: 'agentB', agents: { agentA: agent(['A talk']), agentB: agent(['stale B']) } }));
     expect(s.agents.agentA.history[0].content).toBe('A talk');
     expect(s.agents.agentB.history[0].content).toBe('B talk');
-    expect(threadOf(s, undefined)?.history[0].content).toBe('B talk');
+    expect(shownThread(s)?.history[0].content).toBe('B talk');
   });
   it('the oldest shape (`agentLanes`) folds in too', () => {
     const s = migrateAgents(saved({ agent: agent(['now']), agentLane: 'agentA', agentLanes: { agentB: agent(['parked B']) } }));

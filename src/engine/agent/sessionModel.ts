@@ -6,7 +6,7 @@ import { laneState, patchLane } from './lanes';
 type Kind = 'image' | 'video';
 
 /** Remember an explicit model choice for one session; optionally make it the composer's next default. */
-export function rememberSessionModel(sessionId: string, owner: string | undefined, kind: Kind, choice: SettingsChoice, explicit = false): void {
+export function rememberSessionModel(sessionId: string, owner: string, kind: Kind, choice: SettingsChoice, explicit = false): void {
   if (!useStore.getState().sessions[sessionId]) return;
   choice = { ...choice, modelRef: lineRoutes(choice.modelRef).text ?? choice.modelRef };
   patchLane(sessionId, owner, (a) => ({ settings: { ...a.settings, [kind]: choice } }));
@@ -15,7 +15,7 @@ export function rememberSessionModel(sessionId: string, owner: string | undefine
 }
 
 /** Make the model remembered by a session the next composer defaults. */
-export async function setSessionModelAsDefault(sessionId: string, kind: Kind, owner?: string): Promise<void> {
+export async function setSessionModelAsDefault(sessionId: string, kind: Kind, owner: string): Promise<void> {
   const choice = laneState(sessionId, owner)?.settings?.[kind]; // no owner: the agent on screen, where the button is
   if (!choice) return;
   await applyComposerChoice(kind, choice);

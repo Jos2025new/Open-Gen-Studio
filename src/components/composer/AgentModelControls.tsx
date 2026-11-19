@@ -1,4 +1,5 @@
 import { ModelBrandIcon } from '../ui/ModelBrandIcon';
+import { recipientOf } from '../../engine/agent/recipient';
 import { useRecipientThread } from '../../engine/agent/useThread';
 import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
@@ -108,7 +109,7 @@ export function AgentModelControls() {
   const agent = useStore((s) => s.settings.agent);
   const ops = useStore((s) => s.settings.ops);
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const sessionChoices = useRecipientThread(activeSessionId, (a) => a.settings, undefined);
+  const sessionChoices = useRecipientThread(activeSessionId, undefined, (a) => a.settings, undefined);
   useStore((s) => s.catalog.models);
 
   // Saved route overrides remain visible as a category choice until the user replaces or releases it.
@@ -134,7 +135,7 @@ export function AgentModelControls() {
   const choose = (ref: string | null) => {
     if (!picker || picker === 'director') return;
     releaseOverrides(picker);
-    if (ref) void pickComposerModel(picker, ref);
+    if (ref) void pickComposerModel(picker, ref, true, recipientOf(activeSessionId).id);
     else void resetComposerModel(picker);
     setPicker(null);
   };
@@ -172,7 +173,7 @@ export function AgentModelControls() {
                 const kind = r.id === 'image' || r.id === 'video' ? r.id : null;
                 const choice = kind ? sessionChoices?.[kind] : undefined;
                 const setAsDefault = kind && choice?.modelRef && choice.modelRef !== composer[kind].modelRef
-                  ? () => { void setSessionModelAsDefault(activeSessionId, kind); }
+                  ? () => { void setSessionModelAsDefault(activeSessionId, kind, recipientOf(activeSessionId).id); }
                   : undefined;
                 return <SummaryRow key={r.id} {...r} onClick={() => setPicker(r.id)} setAsDefault={setAsDefault} />;
               })}

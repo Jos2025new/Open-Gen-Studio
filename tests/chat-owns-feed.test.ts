@@ -45,6 +45,6 @@ describe('chat node owns its feed', () => {
     setAgentLlm(sid, second, { provider: 'atlas', model: 'second/model' });
     expect(agentEngine(sid, second)).toMatchObject({ provider: 'atlas', model: 'second/model' });
     expect(agentEngine(sid, 'sys_agent')).toMatchObject({ model: 'global/model' });
-    expect(messageMeta('chat', { agentNodeId: second }, sid, undefined)).toMatchObject({ agentNodeId: second, provider: 'atlas', model: 'second/model', chatNodeId: chatNodeOf(sid) });
+    expect(messageMeta('chat', { agentNodeId: second }, sid, 'main')).toMatchObject({ agentNodeId: second, provider: 'atlas', model: 'second/model', chatNodeId: chatNodeOf(sid) });
   });
 });

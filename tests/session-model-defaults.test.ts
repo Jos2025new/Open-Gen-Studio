@@ -14,28 +14,28 @@ afterEach(() => useStore.setState(before));
 
 describe('session model choices and composer defaults', () => {
   it('remembers a session choice without changing defaults when the setting is off', () => {
-    rememberSessionModel(sid, undefined, 'image', choice);
+    rememberSessionModel(sid, 'main', 'image', choice);
     expect(viewed(useStore.getState().sessions[sid]).settings?.image).toEqual(choice);
     expect(useStore.getState().composer).toEqual(before.composer);
   });
 
   it('copies an explicitly chosen model into composer defaults when enabled', () => {
     useStore.setState({ settings: { ...before.settings, agent: { ...before.settings.agent, updateComposerDefaults: true } } as typeof before.settings });
-    rememberSessionModel(sid, undefined, 'image', choice, true);
+    rememberSessionModel(sid, 'main', 'image', choice, true);
     expect(viewed(useStore.getState().sessions[sid]).settings?.image).toEqual(choice);
     expect(useStore.getState().composer.image.modelRef).toBe(choice.modelRef);
     expect(useStore.getState().composer.userPicked?.image).toBe(true);
   });
 
   it('sets the current session choice as a composer default on request', async () => {
-    rememberSessionModel(sid, undefined, 'image', choice);
-    await setSessionModelAsDefault(sid, 'image');
+    rememberSessionModel(sid, 'main', 'image', choice);
+    await setSessionModelAsDefault(sid, 'image', 'main');
     expect(useStore.getState().composer.image.modelRef).toBe(choice.modelRef);
     expect(useStore.getState().composer.userPicked?.image).toBe(true);
   });
 
   it('a picked composer model is a session choice; an automatic variant switch is not', async () => {
-    rememberSessionModel(sid, undefined, 'image', choice);
+    rememberSessionModel(sid, 'main', 'image', choice);
     await pickComposerModel('image', 'atlas::other/image', false);
     expect(viewed(useStore.getState().sessions[sid]).settings?.image?.modelRef).toBe(choice.modelRef);
     await pickComposerModel('image', 'atlas::other/image');

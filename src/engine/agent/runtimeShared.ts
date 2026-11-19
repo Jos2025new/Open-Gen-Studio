@@ -1,4 +1,4 @@
-import { freshAgent, laneState, patchLane, viewedLane } from './lanes';
+import { freshAgent, laneState, patchLane, resolveOwner } from './lanes';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -51,7 +51,7 @@ export function session(id: string): Session {
 }
 
 /** The operations the current request names, fired or not by its attachments and parameters (agent/force.ts). */
-export function requestGate(sessionId: string, owner: string | undefined) {
+export function requestGate(sessionId: string, owner: string) {
   const draft = agentOf(sessionId, owner).draft;
   const inputs = (draft?.attachments ?? []).flatMap((id) => (get().assets[id] ? [get().assets[id]] : []));
   return gateOps(draft?.request ?? '', inputs, get().composer.agentStyle === 'direct');
@@ -59,15 +59,15 @@ export function requestGate(sessionId: string, owner: string | undefined) {
 
 
 /** Write an agent's state: the one named by `agentNodeId` (a turn always names its own), else the agent on screen. */
-export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>), agentNodeId: string | undefined): void {
+export function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>), agentNodeId: string): void {
   patchLane(sessionId, agentNodeId, patch);
 }
 
 /** An agent's state by id (explicit); `undefined` is the agent on screen, for a caller no agent owns. */
-export const agentOf = (sessionId: string, owner: string | undefined): AgentState => laneState(sessionId, owner) ?? freshAgent();
+export const agentOf = (sessionId: string, owner: string): AgentState => laneState(sessionId, owner) ?? freshAgent();
 
 /** One abort controller per running turn: an agent's key is its own, so two agents of one session can run at once. */
-export const turnKey = (sessionId: string, agentNodeId?: string): string => (agentNodeId ? `${sessionId}|${agentNodeId}` : sessionId);
+export const turnKey = (sessionId: string, owner: string): string => `${sessionId}|${owner}`;
 
 /** Where a row is shown: Studio's chat keeps every row as chat, also while the agent works on a canvas it opened in the board. */
 export const rowCanvas = (workspace: Workspace): Workspace => (get().ui.workspace === 'chat' ? 'chat' : workspace);
@@ -80,7 +80,7 @@ export function feedBase(workspace: Workspace) {
 
 /** The chat each agent's current conversation comes from (set when a message is sent from a chat node): one per agent, so two agents of a session never share it. */
 const turnChats = new Map<string, string>();
-export const setTurnChat = (sessionId: string, chatNodeId: string | undefined, owner: string | undefined) => { const k = turnKey(sessionId, owner); if (chatNodeId) turnChats.set(k, chatNodeId); else turnChats.delete(k); };
+export const setTurnChat = (sessionId: string, chatNodeId: string | undefined, owner: string) => { const k = turnKey(sessionId, owner); if (chatNodeId) turnChats.set(k, chatNodeId); else turnChats.delete(k); };
 
 function lastChatOfAgent(sessionId: string, agentNodeId: string | undefined): string | undefined {
   if (!agentNodeId) return undefined;
@@ -93,7 +93,7 @@ function lastChatOfAgent(sessionId: string, agentNodeId: string | undefined): st
 }
 
 /** The metadata of a row. `owner` is the agent it is written for (explicit: pass `undefined` only for a row no agent owns). */
-export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta>, sessionId: string, owner: string | undefined): ChatMessageMeta {
+export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta>, sessionId: string, owner: string): ChatMessageMeta {
   const sender = extra.agentNodeId ?? owner;
   // After a reload the map is empty: the chat is the one this agent's own last row was written in.
   const chat = turnChats.get(turnKey(sessionId, sender)) ?? lastChatOfAgent(sessionId, sender) ?? chatNodeOf(sessionId);
@@ -167,7 +167,7 @@ export function feedOfChat(sessionId: string, chatNodeId: string) {
 }
 
 /** The feed one agent owns: what carries its id, plus what predates agent ids (the first agent's). No owner: the whole feed. */
-export function feedOfAgent(sessionId: string, owner: string | undefined) {
+export function feedOfAgent(sessionId: string, owner: string) {
   const feed = get().sessions[sessionId]?.feed ?? [];
   if (!owner) return feed;
   const first = agentNodeOf(sessionId)?.id;
@@ -176,7 +176,7 @@ export function feedOfAgent(sessionId: string, owner: string | undefined) {
 
 /** The provider and model of the agent a turn is for: the node's own choice, else the global one. */
 export function agentChoice(sessionId: string = get().activeSessionId, agentNodeId?: string): { provider: LlmProviderId | 'offline'; model: string } {
-  const own = agentNodeOf(sessionId, agentNodeId ?? viewedLane(get().sessions[sessionId]))?.data;
+  const own = agentNodeOf(sessionId, resolveOwner(sessionId, agentNodeId))?.data;
   const chosen = own?.kind === 'ref' ? own.llm : undefined;
   return chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
 }
@@ -190,7 +190,7 @@ export function agentEngine(sessionId: string = get().activeSessionId, agentNode
   return { kind: 'llm', provider: agent.provider, model: agent.model, key };
 }
 
-export function engineLabel(sessionId: string, owner: string | undefined): string {
+export function engineLabel(sessionId: string, owner: string): string {
   const e = agentEngine(sessionId, owner);
   return e.kind === 'offline' ? 'Local planner' : `${e.model.replace(/^[^/]+\//, '')} · ${LLM_LABELS[e.provider]}`;
 }
@@ -209,7 +209,7 @@ export function userBlock(text: string, canvas: Workspace): string {
 /**
  * One conversation per session; restore an older parked canvas only when history is empty and the agent idle.
  */
-export function toCanvas(sessionId: string, workspace: Workspace, owner: string | undefined): void {
+export function toCanvas(sessionId: string, workspace: Workspace, owner: string): void {
   const a = session(sessionId) ? agentOf(sessionId, owner) : undefined;
   if (!a || a.busy || a.canvas === workspace) return;
   const there = a.parked?.[workspace];
@@ -223,21 +223,21 @@ export function toCanvas(sessionId: string, workspace: Workspace, owner: string 
 /** The conversation of the canvas a feed item belongs to. */
 export function toCanvasOfItem(sessionId: string, itemId: string): void {
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
-  if (item) toCanvas(sessionId, turnCanvas(item.workspace), (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId);
+  if (item) toCanvas(sessionId, turnCanvas(item.workspace), resolveOwner(sessionId, (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId));
 }
 
 /** What the user wrote in this session (messages and answers): a model named there is the user's choice. */
-function userWords(sessionId: string, owner: string | undefined): string {
+function userWords(sessionId: string, owner: string): string {
   const draft = agentOf(sessionId, owner).draft;
   const said = feedOfAgent(sessionId, owner).flatMap((f) => (f.type === 'user' ? [f.text ?? ''] : f.type === 'questions' && f.answers ? Object.values(f.answers) : []));
   return [...said, draft?.request ?? '', ...Object.values(draft?.answers ?? {})].join('\n');
 }
 
-function planContext(sessionId: string, workspace: Workspace, strict: boolean, owner: string | undefined) {
+function planContext(sessionId: string, workspace: Workspace, strict: boolean, owner: string) {
   const doc = workspace === 'designer' ? activeDoc(sessionId) : null;
   return {
     workspace,
-    getModel: watchModel(sessionId, resolveModel),
+    getModel: watchModel(sessionId, owner, resolveModel),
     variantModel: (ref: string, route: import('../variants').VariantRoute) => {
       const routes = lineRoutes(ref);
       return routes[route] ?? (route === 'edit' ? routes.reference : undefined);
@@ -281,7 +281,7 @@ function planContext(sessionId: string, workspace: Workspace, strict: boolean, o
 // Entry points
 
 /** A reply to a waiting card is part of the request: what the app reads for a model or provider the user named (userRequest) includes it. */
-export function addReplyToRequest(sessionId: string, text: string, attachments: string[], owner: string | undefined): void {
+export function addReplyToRequest(sessionId: string, text: string, attachments: string[], owner: string): void {
   const draft = agentOf(sessionId, owner).draft;
   patchAgent(sessionId, { draft: { request: `${draft?.request ?? ''} ${text}`.trim(), answers: draft?.answers ?? {}, attachments: [...(draft?.attachments ?? []), ...attachments.filter((id) => !draft?.attachments?.includes(id))] } }, owner);
 }
@@ -293,7 +293,7 @@ export function showQuestions(
   intro: string | undefined,
   questions: AgentQuestion[],
   toolCallId: string | null,
-  owner: string | undefined,
+  owner: string,
   meta?: ChatMessageMeta,
 ): void {
   const round = (laneState(sessionId, owner)?.questionRound ?? 0) + 1;
@@ -320,7 +320,7 @@ export async function presentPlan(
   workspace: Workspace,
   raw: RawPlan,
   toolCallId: string | null,
-  owner: string | undefined,
+  owner: string,
   revision = false,
   /** Agent time so far, for the request's metrics (LLM turns only). */
   agentMs?: number,
@@ -401,14 +401,14 @@ export async function presentPlan(
  * The plan the user commented on: a revision replaces it (removed from the feed, the new card says "Revised");
  * any other outcome closes it as canceled, so two plans never mix. Returns whether it was replaced.
  */
-export function keepCommentedPlan(sessionId: string, owner: string | undefined): void {
+export function keepCommentedPlan(sessionId: string, owner: string): void {
   const id = agentOf(sessionId, owner).revising;
   if (!id) return;
   const plan = session(sessionId).feed.find((f) => f.id === id);
   patchAgent(sessionId, (a) => ({ revising: undefined, ...(plan?.type === 'plan' && plan.status === 'awaiting' && !a.pending ? { pending: { toolCallId: null, kind: 'plan', feedItemId: id } } : {}) }), owner);
 }
 
-export function closeRevisedPlan(sessionId: string, replace: boolean, owner: string | undefined): boolean {
+export function closeRevisedPlan(sessionId: string, replace: boolean, owner: string): boolean {
   const id = agentOf(sessionId, owner).revising;
   if (!id) return false;
   patchAgent(sessionId, { revising: undefined }, owner);

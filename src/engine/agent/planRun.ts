@@ -1,4 +1,4 @@
-import { claimLaneOfItem, laneOfItem, laneState, patchLane, viewedLane } from './lanes';
+import { claimLaneOfItem, laneOfItem, laneState, patchLane, resolveOwner, viewedLane } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun } from '../flow/actions';
@@ -90,7 +90,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (closesRequest) closeRequest(sessionId, 'approved', total.usd);
 }
 
-export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null, meta?: ChatMessageMeta, owner?: string): Promise<{ errors: string[]; itemId?: string }> {
+export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null, meta?: ChatMessageMeta, owner: string = resolveOwner(sessionId)): Promise<{ errors: string[]; itemId?: string }> {
   if (!targets.length) return { errors: ['Select at least one existing node.'] };
   const graph = session(sessionId).graph;
   const missing = targets.find(id => !graph.nodes.some(n => n.id === id && runsGeneration(n.data)));

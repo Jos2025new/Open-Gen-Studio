@@ -35,33 +35,33 @@ const img = (id: string, modelRef: string, over: Record<string, unknown> = {}) =
 describe('approving an Auto plan confirms what it runs', () => {
   it('confirms the model and values of the first step of each kind', () => {
     setup();
-    confirmApproved(sid(), undefined, [img('s1', TEXT), img('s2', TEXT, { settings: { aspect: '9:16', count: 1, advanced: {} } })]);
+    confirmApproved(sid(), 'main', [img('s1', TEXT), img('s2', TEXT, { settings: { aspect: '9:16', count: 1, advanced: {} } })]);
     expect(confirmed()?.image).toMatchObject({ modelRef: TEXT, aspect: '16:9', count: 2, resolution: '2K', needsImage: false });
   });
 
   it('confirms the line, not the edit variant a step with images runs on', () => {
     setup();
-    confirmApproved(sid(), undefined, [img('s1', EDIT, { refs: ['asset:a'] })]);
+    confirmApproved(sid(), 'main', [img('s1', EDIT, { refs: ['asset:a'] })]);
     expect(confirmed()?.image).toMatchObject({ modelRef: TEXT, needsImage: true });
   });
 
   it('keeps the confirmed choice when the plan compares two models of a kind', () => {
     setup();
     const composer = useStore.getState().composer;
-    confirmApproved(sid(), undefined, [img('s1', TEXT), img('s2', OTHER)]);
+    confirmApproved(sid(), 'main', [img('s1', TEXT), img('s2', OTHER)]);
     expect(confirmed()?.image?.modelRef).toBe(OTHER);
     expect(useStore.getState().composer).toEqual(composer);
   });
 
   it('keeps the prior choice when only one comparison group is selected to run', () => {
     setup();
-    confirmApproved(sid(), undefined, [img('s1', TEXT)], ['image']);
+    confirmApproved(sid(), 'main', [img('s1', TEXT)], ['image']);
     expect(confirmed()?.image?.modelRef).toBe(OTHER);
   });
 
   it('an operation step sets nothing', () => {
     setup();
-    confirmApproved(sid(), undefined, [{ id: 'o1', kind: 'op', op: 'angle', title: 'o', from: 'asset:a' } as unknown as PlanStep]);
+    confirmApproved(sid(), 'main', [{ id: 'o1', kind: 'op', op: 'angle', title: 'o', from: 'asset:a' } as unknown as PlanStep]);
     expect(confirmed()?.image?.modelRef).toBe(OTHER);
   });
 });

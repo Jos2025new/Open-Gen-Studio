@@ -1,4 +1,5 @@
 import { uid } from '../../lib/id';
+import { resolveOwner } from './lanes';
 import { updateFeedItem } from '../../store/store';
 import type { PlanFeedItem } from '../types';
 import { prepareNodeRun, previewRun } from '../flow/actions';
@@ -23,7 +24,7 @@ export function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<v
 }
 
 async function approveNodeRunNow(sessionId: string, item: PlanFeedItem): Promise<void> {
-  const owner = item.meta?.agentNodeId;
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const request = item.nodeRun!;
   const preview = await prepareNodeRun(sessionId, request.targets, request.force);
   if (preview.signature !== request.signature || preview.errors.length) {

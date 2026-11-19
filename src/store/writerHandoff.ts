@@ -1,6 +1,6 @@
 import { WRITER_HANDOFF } from '../engine/checkStatus';
 import { controllers } from '../engine/jobs';
-import { stopAgent } from '../engine/agent/runtime';
+import { stopSession } from '../engine/agent/runtime';
 import { onWriterLockGranted, onWriterLockLost, setWriterHooks, type WorkReport } from '../lib/writerLock';
 import { resetSaveStatus } from './saveStatus';
 import { saveNow, useStore } from './store';
@@ -30,7 +30,7 @@ setWriterHooks({
   report: workReport,
   agentBusy: () => busySessions().length > 0,
   abortTransferable: () => abortGenerations((g) => Boolean(g.remoteJob)),
-  abortAll: () => { abortGenerations(() => true); busySessions().forEach((id) => stopAgent(id)); },
+  abortAll: () => { abortGenerations(() => true); busySessions().forEach((id) => stopSession(id)); },
   flush: saveNow,
 });
 

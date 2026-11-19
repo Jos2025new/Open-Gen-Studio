@@ -1,7 +1,7 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
 import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound, RotateCw } from '../ui/icons';
-import { laneState } from '../../engine/agent/lanes';
+import { laneState, resolveOwner } from '../../engine/agent/lanes';
 import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
 import { cancelGeneration } from '../../engine/jobs';
 import { plannedSpend, spentLabel } from './planSpent';
@@ -141,7 +141,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const remaining = remainingBudget();
   const workspace = useStore((s) => s.ui.workspace);
   // While the agent revises this plan after a comment, it must not run in its old form.
-  const revising = useStore(() => laneState(sessionId, item.meta?.agentNodeId)?.revising === item.id); // the agent that owns the card, not the one on screen
+  const revising = useStore(() => laneState(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId))?.revising === item.id); // the agent that owns the card, not the one on screen
   const reused = useStore((s) => reusedDraft(s.sessions[sessionId]?.feed ?? [], item.id));
   const { plan } = item;
   const awaiting = item.status === 'awaiting';

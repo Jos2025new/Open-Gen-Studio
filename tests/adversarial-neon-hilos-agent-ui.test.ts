@@ -293,8 +293,8 @@ describe('adversarial: agente equivocado, Stop, borrado y regresiones de UI', ()
       },
     }));
 
-    // Tal como lo llama AgentModelControls.tsx:175 (sin owner)
-    await setSessionModelAsDefault(HOME, 'image');
+    // Tal como lo llama AgentModelControls.tsx: con el destinatario del chat (owner obligatorio)
+    await setSessionModelAsDefault(HOME, 'image', 'agentB');
     expect(useStore.getState().composer.image.modelRef).toBe('openrouter::model-B');
   });
 
@@ -347,13 +347,13 @@ describe('adversarial: agente equivocado, Stop, borrado y regresiones de UI', ()
     let releaseA!: () => void;
     let releaseB!: () => void;
 
-    const runA = checkingPlan(HOME, acA.signal, async () => {
+    const runA = checkingPlan(HOME, 'agentA', acA.signal, async () => {
       await new Promise<void>((r) => { releaseA = r; });
-      const lookup = watchModel(HOME, async () => null);
+      const lookup = watchModel(HOME, 'agentA', async () => null);
       await lookup('openrouter::slow-model-A');
     }, { begin: (k) => eventsA.push(`begin:${k}`), end: (k) => eventsA.push(`end:${k}`) });
 
-    const runB = checkingPlan(HOME, acB.signal, async () => {
+    const runB = checkingPlan(HOME, 'agentB', acB.signal, async () => {
       await new Promise<void>((r) => { releaseB = r; });
     }, { begin: (k) => eventsB.push(`begin:${k}`), end: (k) => eventsB.push(`end:${k}`) });
 
@@ -406,6 +406,6 @@ describe('adversarial: agente equivocado, Stop, borrado y regresiones de UI', ()
     expect(S().agents.agentA.history.some((m) => m.role === 'assistant' && m.content === 'Respuesta A intacta')).toBe(true);
     expect(S().agents.agentB.history).toHaveLength(0);
     expect(S().agents.agentA.busy).toBe(false);
-    stopAgent(HOME);
+    stopAgent(HOME, 'agentA');
   });
 });

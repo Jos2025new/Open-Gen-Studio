@@ -1,8 +1,8 @@
 import { patchSession, toast, useStore } from '../../store/store';
 import type { AgentState, Session } from '../types';
-import { allThreads, freshAgent, shownKey, threadOf, withThread } from './threads';
+import { allThreads, firstAgentId, freshAgent, shownKey, shownThread, threadOf, withThread } from './threads';
 
-export { allThreads, freshAgent, threadOf };
+export { allThreads, freshAgent, shownThread, threadOf };
 
 /*
  * One thread per agent node, `session.agents[id]` (agent/threads.ts). An operation names the agent it belongs to and reads or
@@ -17,7 +17,7 @@ export function enterLane(sessionId: string, nodeId: string): string | null {
   const s = useStore.getState().sessions[sessionId];
   if (!s || s.agentLane === nodeId) return null;
   patchSession(sessionId, (x) => {
-    const from = threadOf(x, undefined);
+    const from = shownThread(x);
     const agents = withThread(x.agents, nodeId);
     // The shared choices fill what the target lacks; they never overwrite its own (it may be mid-turn).
     const target = agents[nodeId];
@@ -27,10 +27,16 @@ export function enterLane(sessionId: string, nodeId: string): string | null {
   return null;
 }
 
-/** The agent node that owns a feed item (its message or card), when it names one. */
-export function laneOfItem(sessionId: string, itemId: string): string | undefined {
+/** The agent whose thread a thing belongs to: the one named, else the session's first agent node, else its main thread. Never the one on screen. */
+export function resolveOwner(sessionId: string, named?: string): string {
+  if (named) return named;
+  return firstAgentId(useStore.getState().sessions[sessionId]?.graph);
+}
+
+/** The agent that owns a feed item (its message or card): the one it names, else (a row from before agent ids) the first. */
+export function laneOfItem(sessionId: string, itemId: string): string {
   const item = useStore.getState().sessions[sessionId]?.feed.find((f) => f.id === itemId) as { meta?: { agentNodeId?: string } } | undefined;
-  return item?.meta?.agentNodeId;
+  return resolveOwner(sessionId, item?.meta?.agentNodeId);
 }
 
 /**
@@ -48,14 +54,14 @@ export function claimLaneOfItem(sessionId: string, itemId: string): string | nul
 export const viewedLane = (s: Session | undefined): string | undefined => s?.agentLane;
 
 /** The state of an agent instance (read-only). An id the session has no thread for reads as no state. */
-export const laneState = (sessionId: string, nodeId: string | undefined): AgentState | undefined => threadOf(useStore.getState().sessions[sessionId], nodeId);
+export const laneState = (sessionId: string, nodeId: string): AgentState | undefined => threadOf(useStore.getState().sessions[sessionId], nodeId);
 
 /**
  * Write to one agent's state by id: an operation that belongs to an agent (its turn, the end of its plan, a rewrite on
  * its card, the edit of its message) never lands in whichever agent happens to be on screen. Without an id it is the
  * agent on screen.
  */
-export function patchLane(sessionId: string, nodeId: string | undefined, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
+export function patchLane(sessionId: string, nodeId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   patchSession(sessionId, (x) => {
     const key = nodeId ?? shownKey(x);
     const agents = withThread(x.agents, key);

@@ -4,13 +4,13 @@ import { recipientOf } from './recipient';
 import { allThreads, threadOf } from './lanes';
 
 /** A value of one agent's thread (the agent that owns the row, card or message), never of whichever is on screen. */
-export function useThread<T>(sessionId: string, owner: string | undefined, pick: (a: AgentState) => T, none: T): T {
+export function useThread<T>(sessionId: string, owner: string, pick: (a: AgentState) => T, none: T): T {
   return useStore((s) => { const a = threadOf(s.sessions[sessionId], owner); return a ? pick(a) : none; });
 }
 
 /** A value of the thread that would take a message from the composer now (its recipient), for what depends on who is spoken to. */
-export function useRecipientThread<T>(sessionId: string, pick: (a: AgentState) => T, none: T): T {
-  return useStore((s) => { const a = threadOf(s.sessions[sessionId], recipientOf(sessionId).id); return a ? pick(a) : none; });
+export function useRecipientThread<T>(sessionId: string, chatNodeId: string | undefined, pick: (a: AgentState) => T, none: T): T {
+  return useStore((s) => { const a = threadOf(s.sessions[sessionId], recipientOf(sessionId, undefined, chatNodeId).id); return a ? pick(a) : none; });
 }
 
 /** Whether any of the session's agents satisfies `test` (is working, has a card waiting): for what concerns the whole session. */

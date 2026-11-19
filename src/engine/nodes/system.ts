@@ -1,4 +1,5 @@
 import { uid } from '../../lib/id';
+import { firstAgentId } from '../agent/threads';
 import { threadOf } from '../agent/lanes';
 import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
 import { laneState, patchLane } from '../agent/lanes';
@@ -71,7 +72,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
   };
 
   if (!hasAnyRefNode) {
-    const firstAgent = threadOf(session, session.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent')?.id); // its choices seed the default model nodes
+    const firstAgent = threadOf(session, firstAgentId(session.graph)); // its choices seed the default model nodes
     const llmRef = st.settings.agent.provider === 'offline' ? 'offline' : st.settings.agent.model || 'offline';
     const imgRef = firstAgent?.settings?.image?.modelRef ?? st.composer.image.modelRef;
 

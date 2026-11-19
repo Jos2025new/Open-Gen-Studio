@@ -20,7 +20,7 @@ import { rememberSessionModel } from './sessionModel';
  * choice is the session's last one, Borrador by default, unless this request clearly asks for another (askedQuality). The plan card shows all of it and lets the user change it.
  * Returns the tool result for the agent.
  */
-export async function autoConfirmSettings(sessionId: string, owner: string | undefined, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string; refs?: number; start_image?: boolean }>, meta?: ChatMessageMeta): Promise<string> {
+export async function autoConfirmSettings(sessionId: string, owner: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string; refs?: number; start_image?: boolean }>, meta?: ChatMessageMeta): Promise<string> {
   const agent = () => agentOf(sessionId, owner);
   // Both confirm_settings and propose_plan arrive with the same resolved model priority.
   const chosen = sections;

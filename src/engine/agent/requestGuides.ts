@@ -10,10 +10,10 @@ import { readGuide, STAGED_GUIDE } from '../skills';
  */
 
 const get = useStore.getState;
-const agentOf = (sessionId: string, owner: string | undefined) => laneState(sessionId, owner) ?? freshAgent();
+const agentOf = (sessionId: string, owner: string) => laneState(sessionId, owner) ?? freshAgent();
 
 /** Whether a text is already somewhere in the conversation sent to the model (guides go once). */
-export function inConversation(sessionId: string, owner: string | undefined, t: string): boolean {
+export function inConversation(sessionId: string, owner: string, t: string): boolean {
   return agentOf(sessionId, owner).history.some((m) => {
     const c = m.content;
     return typeof c === 'string' ? c.includes(t) : Array.isArray(c) && c.some((p) => p.type === 'text' && p.text.includes(t));
@@ -21,7 +21,7 @@ export function inConversation(sessionId: string, owner: string | undefined, t: 
 }
 
 /** Model guides for the plan's image and video steps, as a block for a message; '' when none is new. */
-export function modelGuidesFor(sessionId: string, owner: string | undefined, workflowGuideId: string): string {
+export function modelGuidesFor(sessionId: string, owner: string, workflowGuideId: string): string {
   // Every workflow is a staged piece: its shared rules come in the same result, once per conversation. Model guides
   // do not: they come with the confirmed settings (phase 2), for the model the user actually chose.
   return workflowGuideId.startsWith('workflow:') && !inConversation(sessionId, owner, STAGED_GUIDE) ? `\n\n---\n${STAGED_GUIDE}` : '';
@@ -30,7 +30,7 @@ export function modelGuidesFor(sessionId: string, owner: string | undefined, wor
 const isDirect = () => get().composer.agentStyle === 'direct';
 
 /** Whether the request being handled carries an attachment of a kind (its draft, or the composer before sending). */
-function requestHas(sessionId: string, owner: string | undefined, kind: string): boolean {
+function requestHas(sessionId: string, owner: string, kind: string): boolean {
   const ids = agentOf(sessionId, owner).draft?.attachments ?? get().composer.attachments ?? [];
   return ids.some((id) => get().assets[id]?.kind === kind);
 }
@@ -40,7 +40,7 @@ function requestHas(sessionId: string, owner: string | undefined, kind: string):
  * (or the stated fallback), and for video the per-route models set in the composer. In Direct the composer is the choice:
  * nothing confirmed earlier in the session replaces it.
  */
-export function directModelRefs(sessionId: string, owner: string | undefined, kind: 'image' | 'video'): string[] {
+export function directModelRefs(sessionId: string, owner: string, kind: 'image' | 'video'): string[] {
   const c = get().composer;
   const selected = agentOf(sessionId, owner).settings?.[kind]?.modelRef;
   const ref = selected ?? c[kind].modelRef;
@@ -51,7 +51,7 @@ export function directModelRefs(sessionId: string, owner: string | undefined, ki
 }
 
 /** The prompting guide of each model Direct can run, once per guide and per conversation. */
-function directModelGuides(sessionId: string, owner: string | undefined): string {
+function directModelGuides(sessionId: string, owner: string): string {
   if (!isDirect()) return '';
   let out = '';
   const sent = new Set<string>();
@@ -72,14 +72,14 @@ function directModelGuides(sessionId: string, owner: string | undefined): string
  * model's guide comes later, with the confirmed settings (phase 2), so it is the model the user actually chose. In
  * Direct, the guides of the composer's models come with the request.
  */
-export function pickedWorkflowGuides(sessionId: string, owner: string | undefined, askFirst = false): string {
+export function pickedWorkflowGuides(sessionId: string, owner: string, askFirst = false): string {
   const id = get().composer.workflowId;
   // Before the agent has asked (a request that may need questions), the workflow is left to read_guide.
   return (id && !askFirst ? modelGuidesFor(sessionId, owner, `workflow:${id}`) : '') + directModelGuides(sessionId, owner);
 }
 
 /** Why a video model's guide cannot be loaded yet (phase 2 not confirmed, or another model was confirmed); undefined when it can. */
-export function earlyModelGuide(sessionId: string, owner: string | undefined, id: string): string | undefined {
+export function earlyModelGuide(sessionId: string, owner: string, id: string): string | undefined {
   const [type, gid] = id.trim().split(':');
   const guide = type === 'model' ? modelGuide(gid ?? '') : undefined;
   if (!guide || guide.optional || guide.id === 'video-edit') return undefined;

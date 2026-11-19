@@ -1,5 +1,5 @@
 import { patchSession, useStore } from '../../store/store';
-import { patchLane } from './lanes';
+import { patchLane, resolveOwner } from './lanes';
 import type { StepAuthorization, StepCostReview } from '../types';
 
 export interface StepPriceDecision {
@@ -27,14 +27,14 @@ export function priceDecisionNote(planId: string, stepId: string, record: StepPr
 }
 
 /** Drain in one persisted update; notices are independent immutable tail messages. */
-export function drainAgentNotes(sessionId: string, owner: string | undefined): void {
+export function drainAgentNotes(sessionId: string, owner: string): void {
   patchLane(sessionId, owner, (a) => (a.notes.length ? { notes: [], history: [...a.history, ...a.notes.map((note) => ({ role: 'user' as const, content: note.startsWith('[app]') ? note : `[app] ${note}` }))] } : {}));
 }
 
 /** Reconcile terminal generations without any provider/LLM call, including after reload. */
 export function recordPriceResults(sessionId: string, itemId: string): void {
   const generations = useStore.getState().generations;
-  let toOwner: { owner: string | undefined; notes: string[] } | undefined;
+  let toOwner: { owner: string; notes: string[] } | undefined;
   patchSession(sessionId, (s) => {
     const item = s.feed.find((f) => f.id === itemId);
     if (item?.type !== 'plan') return s;
@@ -52,7 +52,7 @@ export function recordPriceResults(sessionId: string, itemId: string): void {
     }));
     if (!notes.length) return s;
     // The note goes to the agent that owns the plan, not to the one on screen.
-    const owner = (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId;
+    const owner = resolveOwner(sessionId, (item as { meta?: { agentNodeId?: string } }).meta?.agentNodeId);
     toOwner = { owner, notes };
     return { ...s, feed: s.feed.map((f) => f.id === itemId ? { ...item, stepCostReviews: reviews } : f) };
   });

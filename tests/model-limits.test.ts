@@ -285,13 +285,13 @@ describe('a model the app keeps is said, not offered again (item 3)', () => {
     return id;
   };
   it('Auto: states the model kept and why, and never asks for confirm_settings', () => {
-    const text = earlyModelGuide(confirmed('auto'), undefined, 'model:kling')!;
+    const text = earlyModelGuide(confirmed('auto'), 'main', 'model:kling')!;
     expect(text).toContain('keeps Seedance 2.0 Mini');
     expect(text).toContain('the user did not name another model');
     expect(text).not.toContain('confirm_settings');
   });
   it('Guided keeps its text', () => {
-    expect(earlyModelGuide(confirmed('guided'), undefined, 'model:kling')).toContain('To use another model, call confirm_settings again.');
+    expect(earlyModelGuide(confirmed('guided'), 'main', 'model:kling')).toContain('To use another model, call confirm_settings again.');
   });
 });
 

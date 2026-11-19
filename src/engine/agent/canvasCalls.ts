@@ -37,7 +37,7 @@ import { generationStatus, generationStatusSchema } from './jobStatus';
 type CallCtx = {
   sessionId: string;
   /** The agent whose turn this is: everything the call writes goes to it. */
-  owner: string | undefined;
+  owner: string;
   workspace: Workspace;
   call: ChatResult['toolCalls'][number];
   parsed: { value: unknown };

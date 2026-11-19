@@ -58,7 +58,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   }
 }
 
-async function deliver(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string }, sessionId: string, to: { id?: string }, st: ReturnType<typeof get>, stop: AbortSignal): Promise<void> {
+async function deliver(text: string, opts: { attachments?: string[]; agentNodeId?: string; chatNodeId?: string }, sessionId: string, to: { id: string }, st: ReturnType<typeof get>, stop: AbortSignal): Promise<void> {
   // Studio is the chat canvas whatever its board shows (agentCanvas).
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace, to.id);
@@ -177,12 +177,12 @@ async function visibleAttachments(sessionId: string, workspace: Workspace, attac
   return attachmentParts(attachments);
 }
 
-function contextOpts(sessionId: string, owner: string | undefined, workspace: Workspace, attachments: string[]) {
+function contextOpts(sessionId: string, owner: string, workspace: Workspace, attachments: string[]) {
   const agent = agentOf(sessionId, owner);
   return { workspace, style: get().composer.agentStyle, round: agent.questionRound, maxRounds: get().settings.guidedRounds, attachments, agent };
 }
 
-function resolvePendingAsSuperseded(sessionId: string, owner: string | undefined): void {
+function resolvePendingAsSuperseded(sessionId: string, owner: string): void {
   const s = session(sessionId);
   const p = agentOf(sessionId, owner).pending;
   if (!p) return;
@@ -198,12 +198,12 @@ function resolvePendingAsSuperseded(sessionId: string, owner: string | undefined
 }
 
 /** The answer to a card: the tool result when its call is open, else a user message (a plan kept after a text-only reply has no call). */
-function replyToCard(sessionId: string, toolCallId: string | null | undefined, content: string, owner: string | undefined): void {
+function replyToCard(sessionId: string, toolCallId: string | null | undefined, content: string, owner: string): void {
   pushHistory(sessionId, toolCallId ? { role: 'tool', tool_call_id: toolCallId, content } : userMessage(`[app] ${content}`, []), owner);
 }
 
-/** The one way into an agent's history: it names the agent (`undefined` = the one on screen, only for a caller no agent owns). */
-export function pushHistory(sessionId: string, msg: LlmMessage, agentNodeId: string | undefined): void {
+/** The one way into an agent's history: it names the agent. */
+export function pushHistory(sessionId: string, msg: LlmMessage, agentNodeId: string): void {
   patchAgent(sessionId, (a) => ({ history: [...a.history, msg] }), agentNodeId);
 }
 
@@ -315,12 +315,17 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
 }
 
 /** Stop every agent working in the given session (by default the one on screen's session): Stop leaves nothing running in the background. */
-export function stopAgent(sessionId: string = get().activeSessionId): void {
-  for (const [key, c] of [...controllers]) {
-    if (key !== sessionId && !key.startsWith(`${sessionId}|`)) continue;
-    c.abort();
-    ending.get(c)?.();
-  }
+/** Stops one agent's turn: the other agents of the session keep working. */
+export function stopAgent(sessionId: string, owner: string): void {
+  const c = controllers.get(turnKey(sessionId, owner));
+  if (!c) return;
+  c.abort();
+  ending.get(c)?.();
+}
+
+/** Stops every agent of a session (deleting it, the writer handoff). */
+export function stopSession(sessionId: string): void {
+  for (const key of [...controllers.keys()]) if (key.startsWith(`${sessionId}|`)) stopAgent(sessionId, key.slice(sessionId.length + 1));
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +340,7 @@ export function guideLabel(id: string): string {
 }
 
 /** Delete under a garbled reply: removes it and the warning. */
-export function flushToolResults(sessionId: string, results: LlmMessage[], owner: string | undefined): void {
+export function flushToolResults(sessionId: string, results: LlmMessage[], owner: string): void {
   if (results.length) patchAgent(sessionId, (a) => ({ history: [...a.history, ...results] }), owner);
   results.length = 0;
 }

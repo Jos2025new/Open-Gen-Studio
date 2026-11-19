@@ -14,7 +14,7 @@ import { createSession, useStore } from '../src/store/store';
 
 let sid = '';
 // The agent node's own thread (the model link writes by agent id).
-const agentSettings = () => { const s = useStore.getState().sessions[sid]; return threadOf(s, s.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent')?.id)?.settings; };
+const agentSettings = () => { const s = useStore.getState().sessions[sid]; return threadOf(s, s.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent')?.id ?? 'main')?.settings; };
 beforeEach(() => {
   const session = createSession('Ports');
   sid = session.id;

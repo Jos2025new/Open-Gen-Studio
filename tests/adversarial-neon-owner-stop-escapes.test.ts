@@ -110,7 +110,7 @@ describe('adversarial: Stop a medias, requestGate y escapes de check-agent-owner
     expect(laneState(HOME, 'agentA')?.busy).toBe(true);
 
     // El usuario pulsa Stop mientras A está ocupado.
-    stopAgent(HOME);
+    stopAgent(HOME, 'agentA');
     releaseBlob();
     await aTurn;
 
@@ -140,7 +140,7 @@ describe('adversarial: Stop a medias, requestGate y escapes de check-agent-owner
     const aTurn = sendAgentMessage('make an image with Img B', { agentNodeId: 'agentA', chatNodeId: 'chat' });
     await vi.waitFor(() => expect(releaseSwitch).toBeTypeOf('function'));
 
-    stopAgent(HOME);
+    stopAgent(HOME, 'agentA');
     expect(laneState(HOME, 'agentA')?.busy).toBe(false);
 
     releaseSwitch();

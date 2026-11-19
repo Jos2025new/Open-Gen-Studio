@@ -1,4 +1,5 @@
 import { useRef, type FormEvent } from 'react';
+import { recipientOf } from '../../engine/agent/recipient';
 import { useRecipientThread } from '../../engine/agent/useThread';
 import { ArrowRight, Paperclip, X } from '../ui/icons';
 import { setComposer, setUi, useStore } from '../../store/store';
@@ -13,7 +14,7 @@ export function HomeBar() {
   const text = useStore((s) => s.ui.homeDrafts?.[s.activeSessionId]) ?? '';
   const setText = (value: string) => setUi((u) => ({ homeDrafts: { ...u.homeDrafts, [sessionId]: value } }));
   const fileRef = useRef<HTMLInputElement>(null);
-  const busy = useRecipientThread(sessionId, (a) => a.busy, false); // the agent that would take this message
+  const busy = useRecipientThread(sessionId, undefined, (a) => a.busy, false); // the agent that would take this message
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const live = attachments.filter((id) => assets[id]);
@@ -22,7 +23,7 @@ export function HomeBar() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!canSend || !agentAccepts()) return;
+    if (!canSend || !agentAccepts(recipientOf(sessionId).id)) return;
     const message = text.trim();
     setText('');
     openSpace(SPACES[0]);

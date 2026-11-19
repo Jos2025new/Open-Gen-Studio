@@ -12,7 +12,7 @@ vi.mock('../src/engine/providers/llm', async (orig) => ({ ...(await orig<typeof 
 
 import { check as ownerCheck } from '../scripts/check-agent-owner.mjs';
 import { useStore } from '../src/store/store';
-import { sendAgentMessage, stopAgent } from '../src/engine/agent/conversation';
+import { sendAgentMessage, stopSession } from '../src/engine/agent/conversation';
 import { laneState, patchLane } from '../src/engine/agent/lanes';
 import { directModelRefs, inConversation } from '../src/engine/agent/requestGuides';
 import { buildContext } from '../src/engine/agent/context';
@@ -87,7 +87,7 @@ describe('parallel agents: A runs in the background while B is on screen', () =>
 
   it('Stop stops the agents working in the background too', async () => {
     const { a } = await start();
-    stopAgent(HOME);
+    stopSession(HOME);
     await a;
     expect(laneState(HOME, 'agentA')?.busy).toBe(false);
     expect(text(laneState(HOME, 'agentA')?.history)).not.toContain('A final');

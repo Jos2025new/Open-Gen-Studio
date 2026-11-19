@@ -1,4 +1,5 @@
 import { memo, useState } from 'react';
+import { resolveOwner } from '../../engine/agent/lanes';
 import { useThread, useWorkingPhase } from '../../engine/agent/useThread';
 import { ignoreExcess, openBudgetSettings } from '../../engine/budget';
 import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from '../ui/icons';
@@ -66,7 +67,7 @@ function RichText({ text }: { text: string }) {
 
 /** One of the user's messages; copy, edit and delete show on hover or focus. Editing makes the answer again. */
 function UserMessage({ item, sessionId }: { item: Extract<FeedItem, { type: 'user' }>; sessionId: string }) {
-  const busy = useThread(sessionId, item.meta?.agentNodeId, (a) => a.busy, false);
+  const busy = useThread(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId), (a) => a.busy, false);
   const later = useStore((s) => {
     const feed = s.sessions[sessionId]?.feed ?? [];
     return feed.length - 1 - feed.findIndex((f) => f.id === item.id);
@@ -137,7 +138,7 @@ function UserMessage({ item, sessionId }: { item: Extract<FeedItem, { type: 'use
 export function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: string }) {
   // Retry only on the latest item: after a new message it would answer out of order.
   const isLast = useStore((s) => s.sessions[sessionId]?.feed.at(-1)?.id === item.id);
-  const busy = useThread(sessionId, item.meta?.agentNodeId, (a) => a.busy, false);
+  const busy = useThread(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId), (a) => a.busy, false);
   return (
     <div className={`notice notice-${item.level}`}>
       {item.level === 'error' ? <CircleAlert size={14} /> : <Info size={14} />}

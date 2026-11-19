@@ -14,7 +14,7 @@ const sid = initial.activeSessionId;
 describe('Direct remembers the values of the approved plan in its session', () => {
   it('stores the approved model and settings without changing composer defaults', () => {
     const composer = useStore.getState().composer;
-    inheritApproved(sid, undefined, [clip]);
+    inheritApproved(sid, 'main', [clip]);
     const choice = viewed(useStore.getState().sessions[sid]).settings?.video;
     expect(choice).toMatchObject({ modelRef: 'local::studio-video', aspect: '9:16', resolution: '1080p', duration: 8, needsImage: false });
     expect(useStore.getState().composer).toEqual(composer);
@@ -25,7 +25,7 @@ describe('Direct remembers the values of the approved plan in its session', () =
   });
   it('a comparison between model lines changes neither the session choice nor composer defaults', () => {
     const composer = useStore.getState().composer;
-    inheritApproved(sid, undefined, [clip, { ...clip, id: 's2', modelRef: 'local::another-video' } as PlanStep]);
+    inheritApproved(sid, 'main', [clip, { ...clip, id: 's2', modelRef: 'local::another-video' } as PlanStep]);
     expect(viewed(useStore.getState().sessions[sid]).settings).toBeUndefined();
     expect(useStore.getState().composer).toEqual(composer);
   });

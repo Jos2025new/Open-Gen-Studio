@@ -7,12 +7,12 @@ import { offlinePlan } from './offline';
 import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
 import { agentOf, designerDims, feedBase, get, messageMeta, notice, presentPlan, showQuestions } from './runtimeShared';
 
-export async function offlineTurn(sessionId: string, owner: string | undefined, workspace: Workspace, route: TurnRoute, runId = uid('turn')): Promise<void> {
+export async function offlineTurn(sessionId: string, owner: string, workspace: Workspace, route: TurnRoute, runId = uid('turn')): Promise<void> {
   const end = startTurnLog(sessionId, 'offline', route, runId);
   end(await offlinePass(sessionId, owner, workspace, runId));
 }
 
-async function offlinePass(sessionId: string, owner: string | undefined, workspace: Workspace, runId: string): Promise<TurnOutcome> {
+async function offlinePass(sessionId: string, owner: string, workspace: Workspace, runId: string): Promise<TurnOutcome> {
   const draft = agentOf(sessionId, owner).draft ?? { request: '', answers: {}, attachments: [] };
   const st = get();
   const docDims = workspace === 'designer' ? activeDoc(sessionId) ?? designerDims() : undefined;

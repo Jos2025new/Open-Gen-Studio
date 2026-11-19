@@ -14,7 +14,7 @@ beforeEach(() => {
 
 describe('adversarial agent/chat ownership', () => {
   it('an unknown sender ID is not silently attributed to the first agent', () => {
-    expect(messageMeta('chat', { agentNodeId: 'deleted-agent' }, useStore.getState().activeSessionId, undefined)).not.toHaveProperty('agentNodeId', 'sys_agent');
+    expect(messageMeta('chat', { agentNodeId: 'deleted-agent' }, useStore.getState().activeSessionId, 'main')).not.toHaveProperty('agentNodeId', 'sys_agent');
   });
   it('a chat with two agents preserves distinct engines and sender metadata', () => {
     const second = addSystemNode(sid, { type: 'agent', ref: sid });
@@ -25,7 +25,7 @@ describe('adversarial agent/chat ownership', () => {
     expect(chatAgents(sid)).toEqual(['sys_agent', second]);
     expect(agentEngine(sid, 'sys_agent')).toMatchObject({ provider: 'openrouter', model: 'first/model' });
     expect(agentEngine(sid, second)).toMatchObject({ provider: 'atlas', model: 'second/model' });
-    expect(messageMeta('chat', { agentNodeId: second }, useStore.getState().activeSessionId, undefined)).toMatchObject({ agentNodeId: second, provider: 'atlas', model: 'second/model' });
+    expect(messageMeta('chat', { agentNodeId: second }, useStore.getState().activeSessionId, 'main')).toMatchObject({ agentNodeId: second, provider: 'atlas', model: 'second/model' });
   });
   it('legacy chat migration retains exact feed cardinality and unique message IDs', () => {
     const old = Array.from({ length: 37 }, (_, i) => ({ id: `legacy-${i}`, type: i % 2 ? 'assistant' : 'user', text: `message-${i}`, createdAt: i }));
@@ -50,6 +50,6 @@ describe('adversarial agent/chat ownership', () => {
   });
   it('the displayed engine label follows the selected provider/model pair', () => {
     useStore.setState(st => ({ settings: { ...st.settings, agent: { ...st.settings.agent, provider: 'atlas', model: 'vendor/real-model' } } }));
-    expect(engineLabel(useStore.getState().activeSessionId, undefined)).toMatch(/real-model.*Atlas/i);
+    expect(engineLabel(useStore.getState().activeSessionId, 'main')).toMatch(/real-model.*Atlas/i);
   });
 });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { resolveOwner } from '../../engine/agent/lanes';
 import { useThread } from '../../engine/agent/useThread';
 import { BookOpen, Braces, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from '../ui/icons';
 import type { ActivityEntry, ActivityFeedItem, AgentState } from '../../engine/types';
@@ -36,7 +37,7 @@ function summary(entries: ActivityEntry[]): string {
 
 /** One agent turn: how long it worked, its reasoning (when streamed) and what it did (L3). Open while it runs, folded to one line once it ends. */
 export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; sessionId: string }) {
-  const owner = item.meta?.agentNodeId; // the turn's own agent
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId); // the turn's own agent
   const busy = useThread(sessionId, owner, (a) => a.busy, false);
   const phase = useThread(sessionId, owner, (a) => a.phase ?? 'working', 'working');
   const waiting = useThread(sessionId, owner, (a) => a.waiting ?? NO_WAITS, NO_WAITS);

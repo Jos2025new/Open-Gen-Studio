@@ -71,7 +71,7 @@ const feedSnapshot = () => JSON.stringify(sess().feed.map((f) => [f.id, f.type])
 describe('Stop frees a turn stuck in "Checking the plan…"', () => {
   it('(a) busy is false and the turn is over at once; the late schema adds nothing', async () => {
     const { turn } = await stuckInCheck();
-    stopAgent();
+    stopAgent(useStore.getState().activeSessionId, 'main');
     expect(viewed(sess()).busy).toBe(false);
     expect(viewed(sess()).phase).toBeUndefined();
     await turn; // the turn itself ends, without the hang being resolved
@@ -88,8 +88,8 @@ describe('Stop frees a turn stuck in "Checking the plan…"', () => {
 
   it('(b) the user can write right after Stop, and the old turn\'s late result does not touch the new one', async () => {
     const { turn } = await stuckInCheck();
-    stopAgent();
-    expect(agentAccepts()).toBe(true);
+    stopAgent(useStore.getState().activeSessionId, 'main');
+    expect(agentAccepts('main')).toBe(true);
     replies = ['Here you are.'];
     await sendAgentMessage('hello');
     await turn;
@@ -122,7 +122,7 @@ describe('Stop frees a turn stuck in "Checking the plan…"', () => {
     const turn = sendAgentMessage('switch to the new model');
     await vi.advanceTimersByTimeAsync(4000);
     expect(viewed(sess()).waiting?.some((w) => /Grok Imagine Video 1.5 Lite/.test(w.name))).toBe(true);
-    stopAgent();
+    stopAgent(useStore.getState().activeSessionId, 'main');
     await turn;
   });
 });

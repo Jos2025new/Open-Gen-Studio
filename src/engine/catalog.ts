@@ -1,4 +1,5 @@
 import { coerceSettings } from './params';
+import { resolveOwner } from './agent/lanes';
 import { withOfficialLimits } from './officialLimits';
 import { byCost, lineKey, variantRoute, type VariantRoute } from './variants';
 import { ADAPTERS, PREFERRED, REMOTE_PROVIDERS, editCounterpart, i2vCounterpart } from './providers/registry';
@@ -230,7 +231,7 @@ export function ensureComposerModels(preferRemote = false): void {
 }
 
 /** The user picks a model in the selector: from now on it is their choice, and the agent's default for that kind (C2). */
-export function pickComposerModel(kind: MediaKind, ref: string, remember = true): Promise<void> {
+export function pickComposerModel(kind: MediaKind, ref: string, remember = true, owner?: string): Promise<void> {
   const sessionId = get().activeSessionId;
   setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: true } }));
   // One image model everywhere: its edit twin becomes the edit model (tools, agent edits) too.
@@ -247,7 +248,7 @@ export function pickComposerModel(kind: MediaKind, ref: string, remember = true)
     if (state.composer[kind].modelRef !== ref) return;
     const settings = state.composer[kind].settings;
     const routes = lineRoutes(ref);
-    rememberSessionModel(sessionId, undefined, kind, {
+    rememberSessionModel(sessionId, owner ?? resolveOwner(sessionId), kind, {
       modelRef: routes.text ?? ref,
       needsImage: false,
       ...(settings.aspect ? { aspect: settings.aspect } : {}),

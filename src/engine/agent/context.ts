@@ -1,5 +1,6 @@
 import { limitsLine } from './modelLimits';
 import { threadOf } from './lanes';
+import { firstAgentId } from './threads';
 import { OPS } from '../ops';
 import { captureLines } from './captureContext';
 import { DRAFT_RULE } from './draftFirst';
@@ -293,7 +294,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (videoOverrides.length) {
     lines.push(`video route models picked by the user: ${videoOverrides.map(([mode, ref]) => `${mode} → ${ref}`).join(', ')}; use each only for that input route`);
   }
-  const confirmed = Object.entries((opts.agent ?? threadOf(session, undefined))?.settings ?? {}).filter(([, c]) => c);
+  const confirmed = Object.entries((opts.agent ?? threadOf(session, firstAgentId(session.graph)))?.settings ?? {}).filter(([, c]) => c);
   if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user, kept for these kinds (confirm_settings again only to change them): ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}${takes(c!.modelRef)}`).join('; ')}`);
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);

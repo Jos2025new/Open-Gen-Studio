@@ -10,6 +10,12 @@ export const MAIN_THREAD = 'main';
 
 export const freshAgent = (): AgentState => ({ history: [], questionRound: 0, notes: [], busy: false });
 
+/** The first agent node of a graph (the one a row from before agent ids belongs to), else the main thread. */
+export const firstAgentId = (graph: Pick<Session['graph'], 'nodes'> | undefined): string => graph?.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'agent')?.id ?? MAIN_THREAD;
+
+/** The thread the UI shows (display only). */
+export const shownThread = (s: Pick<Session, 'agents' | 'agentLane'> | undefined): AgentState | undefined => (s?.agents ? s.agents[shownKey(s)] ?? s.agents[MAIN_THREAD] : undefined);
+
 /** The key of the thread the UI shows. */
 export const shownKey = (s: Pick<Session, 'agents' | 'agentLane'>): string => s.agentLane ?? MAIN_THREAD;
 
@@ -17,9 +23,8 @@ export const shownKey = (s: Pick<Session, 'agents' | 'agentLane'>): string => s.
  * One thread by agent id, from a session value. An id the session has no thread for reads as nothing, except that the session's
  * only thread (still under MAIN_THREAD) is the first agent's. No id: the thread the UI shows.
  */
-export function threadOf(s: Pick<Session, 'agents' | 'agentLane'> | undefined, nodeId: string | undefined): AgentState | undefined {
+export function threadOf(s: Pick<Session, 'agents' | 'agentLane'> | undefined, nodeId: string): AgentState | undefined {
   if (!s?.agents) return undefined;
-  if (!nodeId) return s.agents[shownKey(s)] ?? s.agents[MAIN_THREAD];
   return s.agents[nodeId] ?? (onlyMain(s.agents) ? s.agents[MAIN_THREAD] : undefined);
 }
 

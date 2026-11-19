@@ -1,4 +1,4 @@
-import { claimLaneOfItem, laneState, patchLane } from './lanes';
+import { claimLaneOfItem, laneState, patchLane, resolveOwner } from './lanes';
 import { modelSummary } from '../catalog';
 import type { FeedItem, LlmMessage, QuestionsFeedItem, SettingsFeedItem, EditLogEntry } from '../types';
 import { patchSession, removeFeedItem, setUi, updateFeedItem } from '../../store/store';
@@ -22,7 +22,7 @@ function historyIndexOf(sessionId: string, itemId: string): number {
   const item = s.feed.find((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && f.id === itemId);
   if (!item) return -1;
   // The conversation of the agent the message was written to: its history, and only its messages count.
-  const owner = item.meta?.agentNodeId;
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user' && f.meta?.agentNodeId === owner);
   const same = users.filter((f) => f.text === item.text);
   const needle = `\n${item.text || '(no text)'}\n</user_message>`;
@@ -33,14 +33,14 @@ function historyIndexOf(sessionId: string, itemId: string): number {
 }
 
 /** The agent that wrote the message is mid-turn (not the one on screen): its conversation must not change under it. */
-const ownerBusy = (sessionId: string, item: { meta?: { agentNodeId?: string } }) => !!laneState(sessionId, item.meta?.agentNodeId)?.busy;
+const ownerBusy = (sessionId: string, item: { meta?: { agentNodeId?: string } }) => !!laneState(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId))?.busy;
 
 /** Delete one of the user's messages: gone from the chat, and from what the agent reads (a short note keeps the turn order valid). */
 export function deleteUserMessage(sessionId: string, itemId: string): void {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || item?.type !== 'user' || ownerBusy(sessionId, item)) return;
-  const owner = item.meta?.agentNodeId;
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const i = historyIndexOf(sessionId, itemId);
   if (i >= 0) patchLane(sessionId, owner, (a) => ({ history: a.history.map((m, j) => (j === i ? { ...m, content: DELETED_MESSAGE } : m)) }));
   else if (item.text) patchLane(sessionId, owner, (a) => ({ notes: [...a.notes, `The user deleted an earlier message of theirs ("${item.text.slice(0, 80)}"): ignore it.`] }));
@@ -56,7 +56,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   const item = s?.feed.find((f) => f.id === itemId);
   if (!s || item?.type !== 'user' || ownerBusy(sessionId, item) || (!text.trim() && !item.attachments.length)) return;
   if (claimLaneOfItem(sessionId, itemId)) return;
-  const owner = item.meta?.agentNodeId;
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const i = historyIndexOf(sessionId, itemId);
   const at = s.feed.indexOf(item);
   logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.slice(at + 1).filter((x) => !owner || (x as { meta?: { agentNodeId?: string } }).meta?.agentNodeId === owner).length });
@@ -87,7 +87,7 @@ function logEdit(sessionId: string, e: Omit<EditLogEntry, 'at'>): void {
 export function canReopenCard(sessionId: string, itemId: string): boolean {
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === itemId);
-  const own = agentOf(sessionId, item?.meta?.agentNodeId);
+  const own = agentOf(sessionId, resolveOwner(sessionId, item?.meta?.agentNodeId));
   if (!s || own.busy || !item || (item.type !== 'questions' && item.type !== 'settings') || item.status === 'pending') return false;
   const id = cardCallId(sessionId, item);
   return Boolean(id) && own.history.some((m) => m.role === 'tool' && m.tool_call_id === id);
@@ -101,7 +101,7 @@ function cardCallId(sessionId: string, item: QuestionsFeedItem | SettingsFeedIte
   if (item.toolCallId) return item.toolCallId;
   const s = session(sessionId);
   const tool = item.type === 'questions' ? 'ask_questions' : 'confirm_settings';
-  const calls = agentOf(sessionId, item.meta?.agentNodeId).history.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).filter((c) => c.function.name === tool).map((c) => c.id) : []));
+  const calls = agentOf(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId)).history.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).filter((c) => c.function.name === tool).map((c) => c.id) : []));
   const cards = s.feed.filter((f) => f.type === item.type && f.workspace === item.workspace && f.status !== 'pending');
   return calls.length === cards.length ? calls[cards.indexOf(item)] : undefined;
 }
@@ -116,7 +116,7 @@ export function reopenCard(sessionId: string, itemId: string): void {
   if (claimLaneOfItem(sessionId, itemId)) return; // the card's agent comes forward first; if it cannot, nothing changes
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId)! as QuestionsFeedItem | SettingsFeedItem;
-  const owner = item.meta?.agentNodeId;
+  const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const at = s.feed.indexOf(item);
   const callId = cardCallId(sessionId, item)!;
   const cut = agentOf(sessionId, owner).history.findIndex((m) => m.role === 'tool' && m.tool_call_id === callId);

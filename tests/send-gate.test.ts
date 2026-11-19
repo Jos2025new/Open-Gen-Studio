@@ -18,32 +18,32 @@ import { agentsWith } from './helpers/threads';
 const setBusy = (busy: boolean) => useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agents: agentsWith(s.sessions[s.activeSessionId], { busy }) } } }));
 const feedCount = () => useStore.getState().sessions[useStore.getState().activeSessionId]?.feed.length ?? 0;
 
-describe('sendAgentMessage uses agentAccepts()', () => {
+describe('sendAgentMessage uses agentAccepts', () => {
   beforeEach(() => {
     setUi({ home: false });
     newSession();
     setBusy(false);
   });
 
-  it('refuses exactly when agentAccepts() is false: missing session', () => {
+  it('refuses exactly when agentAccepts is false: missing session', () => {
     useStore.setState({ activeSessionId: 'no-such-session' });
-    expect(agentAccepts()).toBe(false);
+    expect(agentAccepts('main')).toBe(false);
     const before = Object.keys(useStore.getState().sessions).length;
     void sendAgentMessage('hola');
     expect(Object.keys(useStore.getState().sessions).length).toBe(before);
     expect(useStore.getState().sessions['no-such-session']).toBeUndefined();
   });
 
-  it('refuses exactly when agentAccepts() is false: busy session', () => {
+  it('refuses exactly when agentAccepts is false: busy session', () => {
     setBusy(true);
-    expect(agentAccepts()).toBe(false);
+    expect(agentAccepts('main')).toBe(false);
     const before = feedCount();
     void sendAgentMessage('hola');
     expect(feedCount()).toBe(before);
   });
 
-  it('proceeds exactly when agentAccepts() is true', () => {
-    expect(agentAccepts()).toBe(true);
+  it('proceeds exactly when agentAccepts is true', () => {
+    expect(agentAccepts('main')).toBe(true);
     const before = feedCount();
     void sendAgentMessage('hola');
     expect(feedCount()).toBeGreaterThan(before);

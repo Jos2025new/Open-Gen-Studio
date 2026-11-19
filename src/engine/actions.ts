@@ -24,7 +24,7 @@ import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { dropHistory } from './design/history';
-import { designerDims, stopAgent } from './agent/runtime';
+import { designerDims, stopSession } from './agent/runtime';
 import { sheetCut } from './sheet';
 import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
 import {
@@ -754,7 +754,7 @@ export function deleteSession(sessionId: string): void {
   const st = get();
   const s = st.sessions[sessionId];
   if (!s) return;
-  stopAgent(sessionId);
+  stopSession(sessionId);
   // Images of library items outlive the session that made them.
   const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
   // Running generations are not canceled (the provider may charge anyway): they finish and jobs.purgeDiscarded removes them.

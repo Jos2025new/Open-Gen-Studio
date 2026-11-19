@@ -27,9 +27,9 @@ const watchers = new Map<string, Watcher>();
 type Resolved = { model: ModelSummary; schema: ModelSchema } | null;
 
 /** The model lookup of a session's plan check, telling the watcher about each schema load it makes (cached schemas are no wait). */
-export function watchModel(sessionId: string, lookup: (ref: string) => Promise<Resolved>): (ref: string) => Promise<Resolved> {
+export function watchModel(sessionId: string, owner: string, lookup: (ref: string) => Promise<Resolved>): (ref: string) => Promise<Resolved> {
   return (ref) => {
-    const watch = watchers.get(sessionId);
+    const watch = watchers.get(`${sessionId}|${owner}`);
     if (!watch) return lookup(ref);
     const cached = useStore.getState().catalog.schemas[ref];
     const loads = !cached || cached.source === 'derived';
@@ -51,15 +51,15 @@ export function watchModel(sessionId: string, lookup: (ref: string) => Promise<R
 }
 
 /** Runs the plan check stoppable, Schema loads, which are what it waits for, are reported through `waits` while the check runs. */
-export async function checkingPlan<T>(sessionId: string, signal: AbortSignal, run: () => Promise<T>, waits?: WaitHooks): Promise<T> {
+export async function checkingPlan<T>(sessionId: string, owner: string, signal: AbortSignal, run: () => Promise<T>, waits?: WaitHooks): Promise<T> {
   // A late continuation after Stop writes nothing: the turn no longer has its activity block or pending marks.
   const live = <A extends unknown[]>(f: (...a: A) => void) => (...a: A) => { if (!signal.aborted) f(...a); };
-  watchers.set(sessionId, {
+  watchers.set(`${sessionId}|${owner}`, {
     waits: waits && { begin: live(waits.begin), end: live(waits.end) },
   });
   try {
     return await untilStopped(run(), signal);
   } finally {
-    watchers.delete(sessionId);
+    watchers.delete(`${sessionId}|${owner}`);
   }
 }
