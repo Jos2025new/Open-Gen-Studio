@@ -26,6 +26,8 @@
 .node-canvas .react-flow__arrowhead polyline { stroke: var(--text-2); fill: var(--text-2); }
 
 /* Omnicanvas nodes (step 12): layout only; colours, radii and fonts are the theme's. */
+/* The wrapper is wider than the ordinary 16.25rem (omniWidth); the card fills it so the ports sit on its edge. */
+.nc.omni-space, .nc.omni-chat { width: 100%; }
 .omni-look { display: flex; align-items: center; justify-content: space-between; gap: 0.375rem; padding: 0.25rem 0; }
 .omni-open { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 5px; color: var(--text-2); }
 .omni-open:hover { color: var(--text); background: var(--surface-2); }

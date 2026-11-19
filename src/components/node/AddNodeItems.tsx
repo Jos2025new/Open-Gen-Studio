@@ -76,7 +76,7 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
   };
   const chips: Array<Kind | 'all'> = ['all', 'image', 'video', 'audio', 'model3d', 'text'];
   return <div className="node-lib" onKeyDown={keys}>
-    <label className="node-lib-search"><Search size={16} aria-hidden /><input ref={field} type="search" aria-label="Search nodes and tools" placeholder="Search nodes and tools" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
+    <label className="search-input node-lib-search"><Search size={14} aria-hidden /><input ref={field} type="search" aria-label="Search nodes and tools" placeholder="Search nodes and tools" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
     <div className="node-lib-chips" role="group" aria-label="Kind">
       {chips.map((c) => <button key={c} type="button" className={`node-lib-chip${kind === c ? ' is-on' : ''}`} aria-pressed={kind === c} onClick={() => setKind(c)}>{c === 'all' ? 'All' : KIND_LABEL[c]}</button>)}
     </div>
@@ -120,7 +120,7 @@ export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = 
   }
   return (
     <div className="menu">
-      {searchable ? <label className="node-add-search"><Search size={14} aria-hidden /><input autoFocus type="search" aria-label="Search compatible nodes" placeholder="Search nodes and tools…" value={query} onChange={(e) => setQuery(e.target.value)} /></label> : null}
+      {searchable ? <label className="search-input node-add-search"><Search size={14} aria-hidden /><input autoFocus type="search" aria-label="Search compatible nodes" placeholder="Search nodes and tools…" value={query} onChange={(e) => setQuery(e.target.value)} /></label> : null}
       {onImport ? <MenuItem icon={Upload} label="Import images" onClick={onImport} /> : null}
       {!accepts && matches('Text prompt copy') ? <MenuItem icon={Type} label="Text" tip="Prompt or copy that feeds other nodes" tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('text'))} /> : null}
       {takes('image') && matches('Image generation reference') ? <MenuItem icon={ImageIcon} label="Image" tip={accepts === 'image' ? 'Use it as a reference' : 'Generate images'} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('image'))} /> : null}

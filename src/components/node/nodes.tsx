@@ -789,7 +789,7 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const showTools = Boolean(selected) && solo;
   return (
     <>
-      <NodeToolbar isVisible={showTools} position={Position.Top} offset={34}>
+      <NodeToolbar isVisible={showTools} position={Position.Top} offset={28}>
         <NodeActions node={node} out={out} panel={inPanel} />
       </NodeToolbar>
       {panel ? (
