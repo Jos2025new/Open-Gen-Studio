@@ -60,15 +60,10 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   if (!s || item?.type !== 'user' || ownerBusy(sessionId, item) || (!text.trim() && !item.attachments.length)) return;
   claimLaneOfItem(sessionId, itemId);
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
-  const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
   const i = historyIndexOf(sessionId, itemId);
-  const at = s.feed.indexOf(item);
-  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.slice(at + 1).filter((x) => mine.has(x.id)).length });
-  // What comes after it in this agent's conversation goes; the other agent's messages and cards stay.
-  for (const f of s.feed.slice(at).filter((x) => x.id === item.id || mine.has(x.id))) {
-    if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
-    removeFeedItem(sessionId, f.id);
-  }
+  // The message and what comes after it in this agent's conversation go; the other agent's messages and cards stay.
+  const removed = removeOwnedFrom(sessionId, owner, s.feed.indexOf(item));
+  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: removed - 1 });
   patchAgent(sessionId, (a) => ({
     history: i >= 0 ? a.history.slice(0, i) : a.history,
     notes: i >= 0 ? [] : [...a.notes, 'The user edited an earlier message; the answers after it were discarded.'],
@@ -80,6 +75,18 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   }), owner);
   if (get().ui.workspace !== 'chat' && get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
   await sendAgentMessage(text, { attachments: item.attachments, ...(item.meta?.agentNodeId ? { agentNodeId: item.meta.agentNodeId } : {}), ...(item.meta?.chatNodeId ? { chatNodeId: item.meta.chatNodeId } : {}) });
+}
+
+/** The owner's rows from index `from` on leave the chat (a plan still awaiting takes its draft nodes along); returns how many. Others' rows stay. */
+function removeOwnedFrom(sessionId: string, owner: string, from: number): number {
+  const s = session(sessionId);
+  const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
+  const gone = s.feed.slice(from).filter((f) => mine.has(f.id));
+  for (const f of gone) {
+    if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
+    removeFeedItem(sessionId, f.id);
+  }
+  return gone.length;
 }
 
 /** What the user changed back in the conversation: kept in the session for us, never sent to the agent. */
@@ -121,7 +128,6 @@ export function reopenCard(sessionId: string, itemId: string): void {
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId)! as QuestionsFeedItem | SettingsFeedItem;
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
-  const mine = new Set(feedOfAgentIn(s, owner).map((f) => f.id));
   const at = s.feed.indexOf(item);
   const callId = cardCallId(sessionId, item)!;
   const cut = agentOf(sessionId, owner).history.findIndex((m) => m.role === 'tool' && m.tool_call_id === callId);
@@ -129,11 +135,7 @@ export function reopenCard(sessionId: string, itemId: string): void {
     ? Object.entries(item.answers ?? {}).map(([k, v]) => `${item.questions.find((q) => q.id === k)?.question ?? k}: ${v}`).join(' | ')
     : sectionsOf(item).map((x) => `${x.kind}: ${describeChoice(modelSummary((x.chosen ?? x.recommended).modelRef)?.name ?? '', x.chosen ?? x.recommended)}`).join(' | ');
   logEdit(sessionId, { kind: item.type, itemId, before, removed: s.feed.length - at - 1 });
-  // Only this agent's rows after the card go: the other agent's messages and cards stay.
-  for (const f of s.feed.slice(at + 1).filter((x) => mine.has(x.id))) {
-    if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
-    removeFeedItem(sessionId, f.id);
-  }
+  removeOwnedFrom(sessionId, owner, at + 1); // only this agent's rows after the card go
   if (item.type === 'questions') updateFeedItem<QuestionsFeedItem>(sessionId, itemId, { status: 'pending', toolCallId: callId });
   else updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'pending', toolCallId: callId });
   patchAgent(sessionId, (a) => ({
