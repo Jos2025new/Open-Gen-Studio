@@ -37,14 +37,12 @@ describe('two agent adversarial routes', () => {
     expect(patchNodeData(HOME, 'chat', { recipient: 'b' })).toBeNull();
     expect(disconnectEdges(HOME, ['ea', 'eb'])).toBeNull();
     expect(current().graph.edges).toEqual([]);
-    // FALLO REAL: recipient.ts accepts a saved agent when connected is empty; a disconnected recipient must block the send.
     await sendAgentMessage('do not route', { chatNodeId: 'chat' });
     expect.soft(turn).not.toHaveBeenCalled();
     expect(current().feed.at(-1)).toMatchObject({ type: 'notice' });
   });
 
   it('uses the chosen agent vision capability for its attachment', async () => {
-    // FALLO REAL: attachments.ts reads global settings rather than the chosen agent model; blind B must not receive an image.
     await sendAgentMessage('describe', { agentNodeId: 'b', attachments: ['picture'] });
     expect.soft(blob).not.toHaveBeenCalled();
     expect.soft(current().feed.some((f) => f.type === 'notice' && f.text.includes('cannot see images'))).toBe(true);

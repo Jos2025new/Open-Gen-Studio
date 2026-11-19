@@ -130,11 +130,16 @@ export function feedOfChat(sessionId: string, chatNodeId: string) {
   return (s?.feed ?? []).filter((f) => ((f as { meta?: { chatNodeId?: string } }).meta?.chatNodeId ?? first) === chatNodeId);
 }
 
-export function agentEngine(sessionId: string = get().activeSessionId, agentNodeId?: string): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
-  const { keys } = get().settings;
+/** The provider and model of the agent a turn is for: the node's own choice, else the global one. */
+export function agentChoice(sessionId: string = get().activeSessionId, agentNodeId?: string): { provider: LlmProviderId | 'offline'; model: string } {
   const own = agentNodeOf(sessionId, agentNodeId ?? get().sessions[sessionId]?.agentLane)?.data;
   const chosen = own?.kind === 'ref' ? own.llm : undefined;
-  const agent = chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
+  return chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
+}
+
+export function agentEngine(sessionId: string = get().activeSessionId, agentNodeId?: string): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
+  const { keys } = get().settings;
+  const agent = agentChoice(sessionId, agentNodeId);
   if (agent.provider === 'offline') return { kind: 'offline' };
   const key = keys[agent.provider]?.trim();
   if (!key || !agent.model) return { kind: 'offline' };

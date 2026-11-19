@@ -3,6 +3,7 @@ import { getAssetBlob } from '../../lib/idb';
 import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d, fetchBlob, blobToCanvas, videoFrameSheet } from '../../lib/media';
 import type { Asset, LlmContentPart, LlmMessage } from '../types';
 import { useStore } from '../../store/store';
+import { agentChoice } from './runtimeShared';
 
 /*
  * What the agent sees of the user's attachments: the images themselves (and four moments of a video on one sheet), reduced,
@@ -19,12 +20,12 @@ export function assetContextName(asset: Pick<Asset, 'id' | 'kind' | 'name'>): st
   return asset.name?.trim() || `${asset.kind}-${asset.id.slice(-8)}`;
 }
 
-/** Whether the selected agent model takes images. Unknown counts as yes (Settings already prefers vision models). */
-export function agentSeesImages(): boolean {
-  const { settings, catalog } = useStore.getState();
-  const provider = settings.agent.provider;
+/** Whether the model of the chosen agent (else the global one) takes images. Unknown counts as yes (Settings already prefers vision models). */
+export function agentSeesImages(sessionId?: string, agentNodeId?: string): boolean {
+  const { catalog } = useStore.getState();
+  const { provider, model: id } = agentChoice(sessionId, agentNodeId);
   if (provider === 'offline') return false;
-  const model = catalog.llm[provider]?.find((m) => m.id === settings.agent.model);
+  const model = catalog.llm[provider]?.find((m) => m.id === id);
   return model?.vision !== false;
 }
 

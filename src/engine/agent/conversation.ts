@@ -106,7 +106,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`);
-          const parts = await visibleAttachments(sessionId, workspace, attachments, runId);
+          const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
@@ -138,9 +138,9 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(sessionId), attachments: attachments.length });
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
-  const parts = await visibleAttachments(sessionId, workspace, attachments, runId);
+  const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
   // The Designer page travels with a new request, so "draw on this" needs no extra round.
-  if (workspace === 'designer' && agentSeesImages()) {
+  if (workspace === 'designer' && agentSeesImages(sessionId, to.id)) {
     const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');
     if (typeof view !== 'string') parts.push(...view);
   }
@@ -159,9 +159,9 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
-async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[], runId?: string) {
+async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[], runId?: string, agentNodeId?: string) {
   if (!attachments.some((id) => ['image', 'video', 'model3d'].includes(get().assets[id]?.kind ?? ''))) return [];
-  if (!agentSeesImages()) {
+  if (!agentSeesImages(sessionId, agentNodeId)) {
     notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info', undefined, runId ? { runId } : undefined);
     return [];
   }

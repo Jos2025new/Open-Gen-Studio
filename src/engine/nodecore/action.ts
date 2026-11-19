@@ -36,6 +36,8 @@ export interface ActionRecord {
   sends: number;
   result?: ExecResult | null;
   error?: string;
+  /** The generations this run's sends produced. */
+  generationIds?: string[];
   /** Order of the run in this app session, to find the latest. */
   seq: number;
 }
@@ -113,7 +115,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
     const moved = Object.entries(snapshot.pins).find(([key, rev]) => pinsFor(snapshot.session, [key.split('.')[0]])[key] !== rev);
     if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${moved[0].split(':')[0]}). Review it again.` }); return finish(); }
     try {
-      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (_step, state, info) => { if (state === 'running' && info?.generationId) record.sends += 1; });
+      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (_step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } });
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }
       settle(runId, { status: result.failed.length ? 'failed' : 'done', result, ...(result.failed.length ? { error: result.failed[0].error } : {}) });
     } catch (err) {
@@ -125,7 +127,9 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run')):
   return record.done;
 }
 
-/** The latest run of this session that had this node as a destination. */
-export function lastRunFor(session: string, node: string): ActionRecord | undefined {
-  return [...ledger.values()].filter((r) => r.session === session && r.targets.includes(node)).sort((a, b) => b.seq - a.seq)[0];
+/** The run that produced this generation; with none given, the latest run that sent something, else the latest attempt. */
+export function lastRunFor(session: string, node: string, generationId?: string): ActionRecord | undefined {
+  const mine = [...ledger.values()].filter((r) => r.session === session && r.targets.includes(node)).sort((a, b) => b.seq - a.seq);
+  if (generationId) return mine.find((r) => r.generationIds?.includes(generationId));
+  return mine.find((r) => r.sends > 0) ?? mine[0];
 }

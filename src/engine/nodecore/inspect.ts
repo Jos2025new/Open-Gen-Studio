@@ -44,7 +44,7 @@ export function inspectNode(session: string, nodeId: string, ctx: RequestContext
     const bad = inputs.find((i) => i.status === 'invalid');
     staleReason = !gen ? 'It has not run yet.' : gen.status !== 'done' ? `The last run is ${gen.status}.` : bad ? `An input is invalid: ${bad.reason}` : 'Its parameters or inputs changed since the last result.';
   }
-  const run = gen ? lastRunFor(session, nodeId) : undefined;
+  const run = gen ? lastRunFor(session, nodeId, gen.id) : undefined;
   return {
     node: nodeId, kind: node.data.kind, version: d?.version ?? 0, revision: ownerRev(graph, nodeId), inputs,
     signature: digest(`${node.data.kind}@${d?.version ?? 0}:${stable(request)}`), fresh, ...(staleReason ? { staleReason } : {}),

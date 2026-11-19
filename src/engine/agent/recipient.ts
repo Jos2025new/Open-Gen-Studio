@@ -15,7 +15,7 @@ export function recipientOf(sessionId: string, explicit?: string, chatNodeId?: s
   const set = chat?.kind === 'ref' ? chat.recipient : undefined;
   const connected = chatAgents(sessionId, chatId);
   if (set) {
-    if (isAgent(set) && (!connected.length || connected.includes(set))) return { id: set };
+    if (isAgent(set) && connected.includes(set)) return { id: set };
     return { error: 'The agent chosen for this chat is no longer connected. Choose another one in “To”.' };
   }
   return { id: connected[0] ?? agentNodeOf(sessionId)?.id };
