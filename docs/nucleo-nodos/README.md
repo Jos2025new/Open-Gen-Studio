@@ -11,3 +11,4 @@ Material de entrada del [ADR 0031](../decisions/0031-nucleo-de-nodos.md) (2026-1
 - [informe-neon](informe-neon.md): crítica y tests adversariales de Gemini 4 Neon (2026-11-19): 27 fallos reales en 32; causas de raíz.
 - [blender-avisos](blender-avisos.md): cómo resuelve Blender 5.2.3 los avisos, los cables inválidos y los grupos, leído en su código (2026-11-19).
 - [revision-neon-externa](revision-neon-externa.md): Gemini 4 Neon revisa el informe externo de la sesión (2026-11-19): doble gasto, escape de `deleteGeneration` y corrupción entre agentes en paralelo.
+- [informe-neon-owner](informe-neon-owner.md): Neon ataca el historial por agente (2026-11-19): 20 fallos de dinero, borrado, Stop y recarga; propone un hilo por agente.
