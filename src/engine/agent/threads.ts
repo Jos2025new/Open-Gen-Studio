@@ -55,10 +55,10 @@ export function migrateAgents(s: Session): Session {
   const raw = s as Session & { agent?: AgentState; agentLanes?: Record<string, AgentState> };
   const { agent, agentLanes, ...rest } = raw;
   const agents: Record<string, AgentState> = { ...agentLanes, ...raw.agents };
-  // The single `agent` was the one on screen: the lane it names, else the agent of the last row, else the first agent of the graph.
-  const lastOwner = [...s.feed].reverse().map((f) => (f as { meta?: { agentNodeId?: string } }).meta?.agentNodeId).find((id) => id && s.graph.nodes.some((n) => n.id === id));
-  // With no lane named, the old agent goes to a node that has no thread yet: it never replaces one that is there.
-  const free = [lastOwner, ...s.graph.nodes.filter((n) => n.data.kind === 'ref' && n.data.type === 'agent').map((n) => n.id)].find((id) => id && !agents[id]);
+  // The single `agent` was the one on screen: the lane it names. With none named the session predates agent instances (before ddf27bcb,
+  // `agentLane` absent meant exactly that, and the first agent written to inherited `session.agent`): it belongs to the first agent of the
+  // graph that has no thread yet, never to whoever wrote last (the last author may be an agent added later) and never over a thread that exists.
+  const free = (s.graph?.nodes ?? []).filter((n) => n.data.kind === 'ref' && n.data.type === 'agent').map((n) => n.id).find((id) => !agents[id]);
   if (agent) agents[raw.agentLane ?? free ?? MAIN_THREAD] = agent;
   if (!Object.keys(agents).length) agents[MAIN_THREAD] = freshAgent();
   return { ...rest, agents: Object.fromEntries(Object.entries(agents).map(([k, a]) => [k, interrupted(a)])) } as Session;
