@@ -1,3 +1,4 @@
+import { enterLaneOfItem } from './lanes';
 import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
@@ -47,6 +48,7 @@ export function removeDraftNodes(sessionId: string, planId: string): void {
 
 
 export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
+  enterLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -427,6 +429,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
 }
 
 export function cancelPlan(sessionId: string, itemId: string): void {
+  enterLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);

@@ -6,6 +6,7 @@ import { resolveSystemNodeLive, systemNodePorts, type LiveSystemSummary } from '
 import type { GraphEdge, PortSpec, PortType, SystemNodeType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import type { FlowNode } from './nodes';
+import { AgentLlmSelect } from './AgentNodeControls';
 
 /* System parts as cards (docs/propuesta-todo-es-un-nodo-plan.md, step 8). Same card as the other nodes (.nc):
  * the body only reads the data where it already lives; nothing is copied. */
@@ -85,6 +86,7 @@ export function SystemNode({ data, selected }: NodeProps<FlowNode>) {
         </div>
         <div className="nc-sys-body">
           <p className="nc-sys-sub">{live?.subtitle ?? ''}</p>
+          {d.type === 'agent' ? <AgentLlmSelect sessionId={sessionId} nodeId={node.id} llm={d.llm} /> : null}
           {live?.invalid ? <p className="nc-sys-sub" role="alert">{live.details[0]}</p> : null}
           {live?.attachedModels?.length ? (
             <ul className="nc-sys-models" aria-label="Attached models">

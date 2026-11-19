@@ -8,6 +8,7 @@ import { FeedList } from '../chat/FeedList';
 import { Composer } from '../composer/Composer';
 import { PortDot, useLive } from '../node/SystemNode';
 import type { FlowNode } from '../node/nodes';
+import { ChatRecipientSelect } from '../node/AgentNodeControls';
 
 /* The chat as a node (plan "todo es un nodo", steps 10 and 12): the Studio chat itself (its feed and its composer),
  * not a copy. Docked it looks like Studio's chat; undocked it also shows the agent and models connected to it. */
@@ -36,6 +37,7 @@ export function ChatNode({ data, selected }: NodeProps<FlowNode>) {
         <div className="omni-look nodrag">
           <Segmented size="sm" value={undocked ? 'undocked' : 'docked'} options={[{ value: 'docked', label: 'Chat', tip: 'Looks like the Studio chat' }, { value: 'undocked', label: 'Connections', tip: 'Shows its agent and models' }]} onChange={(v) => setChatUndocked(sessionId, node.id, v === 'undocked')} />
         </div>
+        <ChatRecipientSelect sessionId={sessionId} nodeId={node.id} recipient={d.recipient} />
         <div className="omni-chat-feed nodrag nowheel">
           <div className="chat"><div className="chat-column">
             {empty ? <p className="faint">Nothing yet. Say what you want to make.</p> : <FeedList sessionId={sessionId} studio />}

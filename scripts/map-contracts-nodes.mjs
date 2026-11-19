@@ -50,4 +50,21 @@ export default [{
     ['src/engine/flow/actions.ts', 'export async function runNodes'],
   ],
   tests: ['tests/nodecore-core.test.ts', 'tests/nodecore-strip1.test.ts'],
+}, {
+  id: 'agent-recipient',
+  what: 'ADR 0031 tira 2: el mensaje del chat va a un agente explícito (nombrado, el del nodo chat o el primero conectado); cada agente tiene su historial, tarjetas abiertas y LLM; el nodo agente elige su modelo y el chat su destinatario.',
+  sides: [
+    ['src/engine/agent/recipient.ts', 'export function recipientOf'],
+    ['src/engine/agent/conversation.ts', 'recipientOf(sessionId, opts.agentNodeId)'],
+    ['src/engine/agent/conversation.ts', 'enterLaneOfItem(sessionId, itemId)'],
+    ['src/engine/agent/lanes.ts', 'export function enterLane'],
+    ['src/engine/agent/llmTurn.ts', 'agentEngine(sessionId, opts.agentNodeId)'],
+    ['src/engine/agent/runtimeShared.ts', 'agentNodeId ?? get().sessions[sessionId]?.agentLane'],
+    ['src/engine/graphTypes.ts', 'recipient?: string;'],
+    ['src/components/node/AgentNodeControls.tsx', 'export function AgentLlmSelect'],
+    ['src/components/node/SystemNode.tsx', '<AgentLlmSelect'],
+    ['src/components/omni/ChatNode.tsx', '<ChatRecipientSelect'],
+    ['src/engine/nodes/system.ts', 'export function setAgentLlm'],
+  ],
+  tests: ['tests/nodecore-strip2.test.ts'],
 }];

@@ -75,6 +75,8 @@ export interface RefNodeData {
   attachMode?: ModelAttachMode;
   /** Agent node: its own LLM. Absent = follows the default in settings.agent (nothing to migrate). */
   llm?: { provider: string; model: string };
+  /** Chat node: the agent node its messages go to when several are connected. Absent = the first connected. */
+  recipient?: string;
   /** Prompt node: its own text. Absent with ref 'composer' = the composer's text (the Studio prompt box). */
   promptText?: string;
   dockedTo?: string;

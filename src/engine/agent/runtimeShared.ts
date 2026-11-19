@@ -60,7 +60,7 @@ export function feedBase(workspace: Workspace) {
 }
 
 export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta> = {}): ChatMessageMeta {
-  const sender = extra.agentNodeId;
+  const sender = extra.agentNodeId ?? get().sessions[get().activeSessionId]?.agentLane;
   const e = agentEngine(get().activeSessionId, sender);
   const meta: ChatMessageMeta = {
     timeZone: localTimeZone(),
@@ -132,7 +132,7 @@ export function feedOfChat(sessionId: string, chatNodeId: string) {
 
 export function agentEngine(sessionId: string = get().activeSessionId, agentNodeId?: string): { kind: 'llm'; provider: 'openrouter' | 'nanogpt' | 'atlas'; model: string; key: string } | { kind: 'offline' } {
   const { keys } = get().settings;
-  const own = agentNodeOf(sessionId, agentNodeId)?.data;
+  const own = agentNodeOf(sessionId, agentNodeId ?? get().sessions[sessionId]?.agentLane)?.data;
   const chosen = own?.kind === 'ref' ? own.llm : undefined;
   const agent = chosen ? { provider: chosen.provider as LlmProviderId | 'offline', model: chosen.model } : get().settings.agent;
   if (agent.provider === 'offline') return { kind: 'offline' };

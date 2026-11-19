@@ -22,16 +22,23 @@ import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { promptsWiredToAgent } from '../nodes/spec';
-import { addReplyToRequest, agentEngine, agentNodeOf, chatAgents, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { addReplyToRequest, agentEngine, agentNodeOf, controllers, ending, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
 import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
 import { llmTurn } from './llmTurn';
+import { enterLane, enterLaneOfItem } from './lanes';
+import { recipientOf } from './recipient';
 
-export async function sendAgentMessage(text: string, opts: { attachments?: string[] } = {}): Promise<void> {
+export async function sendAgentMessage(text: string, opts: { attachments?: string[]; agentNodeId?: string } = {}): Promise<void> {
   const st = get();
   const sessionId = st.activeSessionId;
   if (!agentAccepts()) return;
+  // The recipient is explicit end to end (ADR 0031, strip 2): this agent's own state, history, cards and model.
+  const to = recipientOf(sessionId, opts.agentNodeId);
+  if (to.error) { notice(sessionId, agentCanvas(), to.error, 'error'); return; }
+  const blocked = to.id ? enterLane(sessionId, to.id) : null;
+  if (blocked) { notice(sessionId, agentCanvas(), blocked, 'info'); return; }
   // Studio is the chat canvas whatever its board shows (agentCanvas).
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace);
@@ -41,12 +48,12 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const clean = text.trim();
   if (!clean && !attachments.length) return;
   // Independent prompt nodes wired into the agent add their text to what the model reads (the chat shows only what was typed).
-  const agentNode = agentNodeOf(sessionId);
+  const agentNode = agentNodeOf(sessionId, to.id);
   const wired = agentNode ? promptsWiredToAgent(sessionId, agentNode.id) : [];
 
   const runId = uid('turn');
   autoTitleSession(sessionId, clean || 'Edit');
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(chatAgents(sessionId).length ? { toAgentNodeIds: chatAgents(sessionId) } : {}) }) });
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments, meta: messageMeta(workspace, { runId, agent: undefined, ...(to.id ? { agentNodeId: to.id, toAgentNodeIds: [to.id] } : {}) }) });
   if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
@@ -65,13 +72,13 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.reply_received', reason: 'typed message is not confirmation', sessionId, approvalId: pendingItem.id, before: { status: pendingItem.status, confirmed: false }, after: { status: 'skipped', confirmed: false } });
     updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
-    const engine = agentEngine();
+    const engine = agentEngine(sessionId, to.id);
     if (engine.kind === 'llm') {
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       replyToCard(sessionId, pending.toolCallId, `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`);
       patchAgent(sessionId, { pending: undefined });
-      await llmTurn(sessionId, workspace, { route: 'settings-reply', runId });
+      await llmTurn(sessionId, workspace, { route: 'settings-reply', runId, agentNodeId: to.id });
       return;
     }
     patchAgent(sessionId, { pending: undefined });
@@ -79,7 +86,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // Typing while a plan waits: the agent revises it (only what was asked) or treats it as a new request.
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'plan-revision', event: 'plan.comment_received', reason: 'user replied while plan awaits approval', sessionId, planId: pendingItem.plan.id, approvalId: pendingItem.id, before: { status: pendingItem.status, adjustments: pendingItem.plan.adjustments } });
-    const engine = agentEngine();
+    const engine = agentEngine(sessionId, to.id);
     // The engine decides who answers; a plan kept after a text-only reply has no open tool call, so it gets a user message.
     if (engine.kind === 'llm') {
       addReplyToRequest(sessionId, clean, attachments);
@@ -89,7 +96,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
-      await llmTurn(sessionId, workspace, { route: 'plan-comment', runId });
+      await llmTurn(sessionId, workspace, { route: 'plan-comment', runId, agentNodeId: to.id });
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
       removeDraftNodes(sessionId, pendingItem.plan.id);
@@ -105,7 +112,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   beginJourney(sessionId, 'settings-response');
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
   patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined });
-  const engine = agentEngine();
+  const engine = agentEngine(sessionId, to.id);
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
     if (agent.provider !== 'offline') {
@@ -134,7 +141,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // The route goes first: one buried after the context was followed after the prompt's own steps.
   const askFirst = session(sessionId).agent.questionRound === 0;
   pushHistory(sessionId, userMessage(`${forced}${userBlock([clean, ...wired].filter(Boolean).join('\n\n') || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
-  await llmTurn(sessionId, workspace, { route: 'new', runId });
+  await llmTurn(sessionId, workspace, { route: 'new', runId, agentNodeId: to.id });
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
@@ -178,6 +185,7 @@ export function pushHistory(sessionId: string, msg: LlmMessage): void {
 
 /** The card reports what it shows selected, so typing instead of pressing Continue sends it. */
 export function pickAnswers(sessionId: string, itemId: string, answers: Record<string, string>): void {
+  enterLaneOfItem(sessionId, itemId);
   const s = get().sessions[sessionId];
   if (!s) return;
   const cur = s.agent.cardPick;
@@ -187,6 +195,7 @@ export function pickAnswers(sessionId: string, itemId: string, answers: Record<s
 
 /** Answers chosen in a questions card. */
 export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips', runId?: string): Promise<void> {
+  enterLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -215,6 +224,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
 
 /** "Skip, plan now" on a questions card: no more questions, plan with sensible defaults. */
 export async function skipQuestions(sessionId: string, itemId: string): Promise<void> {
+  enterLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -234,12 +244,14 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
 
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
 export function selectSettings(sessionId: string, itemId: string, index: number, chosen: SettingsChoice): void {
+  enterLaneOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { sections: sectionsOf(item).map((x, i) => (i === index ? { ...x, chosen } : x)) });
 }
 
 /** "Continue" on the settings card (phase 2): the agent gets the confirmed values and each model's prompting guide. */
 export async function confirmSettings(sessionId: string, itemId: string, chosen: SettingsChoice[], note?: string): Promise<void> {
+  enterLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
@@ -263,6 +275,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
  * a model search) are kept and not repeated. The half-written answer and the error notice are removed.
  */
 export async function retryAgentTurn(sessionId: string, noticeId: string): Promise<void> {
+  enterLaneOfItem(sessionId, noticeId);
   toCanvasOfItem(sessionId, noticeId);
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === noticeId);

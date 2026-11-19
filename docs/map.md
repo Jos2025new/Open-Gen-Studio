@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 385 | 287 |
-| [store.ts](../src/store/store.ts) | 262 | 276 |
+| [types.ts](../src/engine/types.ts) | 385 | 288 |
+| [store.ts](../src/store/store.ts) | 263 | 277 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 46 |
@@ -51,28 +51,28 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 15 | 15 |
 | `src/components/designer` | 101 | 56 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 19 | 17 |
+| `src/components/node` | 20 | 17 |
 | `src/components/omni` | 7 | 4 |
 | `src/components/shell` | 38 | 29 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 351 |
-| `src/engine/agent` | 58 | 120 |
+| `src/engine` | 69 | 352 |
+| `src/engine/agent` | 59 | 121 |
 | `src/engine/commands` | 7 | 14 |
 | `src/engine/design` | 163 | 204 |
-| `src/engine/flow` | 17 | 41 |
+| `src/engine/flow` | 17 | 42 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 21 | 2 |
-| `src/engine/nodes` | 6 | 20 |
+| `src/engine/nodes` | 6 | 21 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/providers` | 15 | 61 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 374 |
-| `src/store` | 18 | 278 |
+| `src/lib` | 35 | 375 |
+| `src/store` | 18 | 279 |
 
-234 de 703 módulos no tienen ningún test que los importe directamente.
+232 de 705 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -88,7 +88,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [OmniWorkspace.tsx](../src/components/omni/OmniWorkspace.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
-- [lanes.ts](../src/engine/agent/lanes.ts)
 - [layer.commands.ts](../src/engine/design/layer.commands.ts)
 - [commands.ts](../src/engine/nodecore/commands.ts)
 - [generation.ts](../src/engine/nodecore/generation.ts)

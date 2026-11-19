@@ -47,10 +47,10 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string }): Promise<void> {
+export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId?: string }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
-  const engine = agentEngine();
+  const engine = agentEngine(sessionId, opts.agentNodeId);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
   const runId = opts.runId ?? uid('turn');

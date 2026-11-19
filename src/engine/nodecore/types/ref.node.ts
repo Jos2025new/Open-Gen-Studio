@@ -6,7 +6,7 @@ import { evaluateNode } from '../evaluate';
 export default defineNode({
   kind: 'ref',
   version: 1,
-  params: ['title', 'llm', 'promptText', 'attachMode', 'dockedTo', 'mergedModels', 'mediaKind', 'undocked', 'view'],
+  params: ['title', 'llm', 'recipient', 'promptText', 'attachMode', 'dockedTo', 'mergedModels', 'mediaKind', 'undocked', 'view'],
   inputs: inputPorts,
   output: outputPort,
   required: [],
