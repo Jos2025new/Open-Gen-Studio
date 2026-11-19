@@ -237,13 +237,9 @@ export function ensureSystemNodes(sessionId: string, opts: { recordHistory?: boo
   return addedIds;
 }
 
-function commitSystemGraph(sessionId: string, update: (g: Graph) => Graph): string | null {
-  // A system link, unlink or attach is an explicit act on its cable: the cables it replaces or removes are its own.
-  return editCompound(sessionId, 'system-link', (g) => {
-    const next = update(g);
-    const alive = new Set(next.nodes.map((n) => n.id));
-    return { graph: next, dropped: g.edges.filter((e) => alive.has(e.source) && alive.has(e.target) && !next.edges.some((x) => x.id === e.id)).map((e) => e.id) };
-  });
+/** A system change names the cables it removes (`dropped`): the layer checks the rest of the graph kept every cable. */
+function commitSystemGraph(sessionId: string, update: (g: Graph) => { graph: Graph; dropped: string[] }): string | null {
+  return editCompound(sessionId, 'system-link', update);
 }
 
 export function addSystemNode(
@@ -421,7 +417,9 @@ export function attachModelToNode(
         .filter((gr) => gr.nodeIds.length > 1);
     }
 
-    return { ...g, nodes, edges, ...(groups.length ? { groups } : { groups: undefined }) };
+    // The cable this attach replaces: any other control cable from this model to this host.
+    const dropped = g.edges.filter((e) => e.id !== edgeId && e.source === modelNodeId && e.target === hostId && (e.kind ?? 'data') === 'control').map((e) => e.id);
+    return { graph: { ...g, nodes, edges, ...(groups.length ? { groups } : { groups: undefined }) }, dropped };
   });
 
   if (!error) applyModelLinkToAgent(sessionId, modelNodeId, hostId);
@@ -459,17 +457,12 @@ export function detachModelFromNode(
       }
       return n;
     });
-    const edges = modelNode
-      ? g.edges.filter(
-          (e) =>
-            !((e.kind ?? 'data') === 'control' &&
-              ((e.source === modelNode.id && e.target === hostId) || (e.source === hostId && e.target === modelNode.id))),
-        )
-      : g.edges;
+    const gone = (e: GraphEdge) => Boolean(modelNode) && (e.kind ?? 'data') === 'control' && ((e.source === modelNode!.id && e.target === hostId) || (e.source === hostId && e.target === modelNode!.id));
+    const edges = g.edges.filter((e) => !gone(e));
     const groups = (g.groups ?? [])
       .map((gr) => (modelNode ? { ...gr, nodeIds: gr.nodeIds.filter((id) => id !== modelNode.id) } : gr))
       .filter((gr) => gr.nodeIds.length > 1);
-    return { ...g, nodes, edges, ...(groups.length ? { groups } : { groups: undefined }) };
+    return { graph: { ...g, nodes, edges, ...(groups.length ? { groups } : { groups: undefined }) }, dropped: g.edges.filter(gone).map((e) => e.id) };
   });
 
   return { error };
@@ -576,11 +569,14 @@ export function setLinkBoth(sessionId: string, edgeId: string, both: boolean): s
   if (!graph || !edge) return `No such edge: ${edgeId}.`;
   if (both && (edge.kind ?? 'data') === 'data') return 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
   return commitSystemGraph(sessionId, (g) => ({
-    ...g,
-    edges: g.edges.map((e) => {
-      if (e.id !== edgeId) return e;
-      const { both: _old, ...rest } = e;
-      return both ? { ...rest, both: true } : rest;
-    }),
+    graph: {
+      ...g,
+      edges: g.edges.map((e) => {
+        if (e.id !== edgeId) return e;
+        const { both: _old, ...rest } = e;
+        return both ? { ...rest, both: true } : rest;
+      }),
+    },
+    dropped: [],
   }));
 }
