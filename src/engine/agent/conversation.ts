@@ -22,7 +22,7 @@ import { rememberSessionModel } from './sessionModel';
 import { agentCanvas } from './agentCanvas';
 import { canvasParts } from './canvasView';
 import { promptsWiredToAgent } from '../nodes/spec';
-import { addReplyToRequest, agentEngine, agentOf, agentNodeOf, chatNodeOf, controllers, ending, turnKey, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, setTurnChat, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
+import { addReplyToRequest, agentEngine, agentOf, agentNodeOf, chatNodeOf, controllers, turnKey, engineLabel, feedBase, get, messageMeta, notice, patchAgent, requestGate, session, setTurnChat, toCanvas, toCanvasOfItem, turnCanvas, userBlock } from './runtimeShared';
 import { uid } from '../../lib/id';
 import { offlineTurn } from './offlineTurn';
 import { removeDraftNodes } from './planRun';
@@ -312,20 +312,6 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
   if (item.retry.partialItemId) removeFeedItem(sessionId, item.retry.partialItemId);
   removeFeedItem(sessionId, noticeId);
   await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'retry', agentNodeId: owner });
-}
-
-/** Stop every agent working in the given session (by default the one on screen's session): Stop leaves nothing running in the background. */
-/** Stops one agent's turn: the other agents of the session keep working. */
-export function stopAgent(sessionId: string, owner: string): void {
-  const c = controllers.get(turnKey(sessionId, owner));
-  if (!c) return;
-  c.abort();
-  ending.get(c)?.();
-}
-
-/** Stops every agent of a session (deleting it, the writer handoff). */
-export function stopSession(sessionId: string): void {
-  for (const key of [...controllers.keys()]) if (key.startsWith(`${sessionId}|`)) stopAgent(sessionId, key.slice(sessionId.length + 1));
 }
 
 // ---------------------------------------------------------------------------

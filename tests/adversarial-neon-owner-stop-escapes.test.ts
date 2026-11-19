@@ -18,7 +18,8 @@ vi.mock('../src/engine/catalog', async (orig) => {
 
 import { check as ownerCheck } from '../scripts/check-agent-owner.mjs';
 import { useStore } from '../src/store/store';
-import { sendAgentMessage, stopAgent } from '../src/engine/agent/conversation';
+import { sendAgentMessage } from '../src/engine/agent/conversation';
+import { stopAgent } from '../src/engine/agent/runtimeShared';
 import { enterLane, laneState, patchLane } from '../src/engine/agent/lanes';
 import { controllers } from '../src/engine/agent/runtimeShared';
 

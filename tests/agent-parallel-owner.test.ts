@@ -12,7 +12,8 @@ vi.mock('../src/engine/providers/llm', async (orig) => ({ ...(await orig<typeof 
 
 import { check as ownerCheck } from '../scripts/check-agent-owner.mjs';
 import { useStore } from '../src/store/store';
-import { sendAgentMessage, stopSession } from '../src/engine/agent/conversation';
+import { sendAgentMessage } from '../src/engine/agent/conversation';
+import { stopSession } from '../src/engine/agent/runtimeShared';
 import { laneState, patchLane } from '../src/engine/agent/lanes';
 import { directModelRefs, inConversation } from '../src/engine/agent/requestGuides';
 import { buildContext } from '../src/engine/agent/context';

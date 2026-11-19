@@ -34,13 +34,24 @@ export const controllers = new Map<string, AbortController>();
 /** Ends a turn at once (Stop, the cap), without waiting for what it awaits. */
 export const ending = new WeakMap<AbortController, () => void>();
 
+/** Stops one agent's turn (abort, then end it at once): the other agents of the session keep working. */
+export function stopAgent(sessionId: string, owner: string): void {
+  const c = controllers.get(turnKey(sessionId, owner));
+  if (!c) return;
+  c.abort();
+  ending.get(c)?.();
+}
+
+/** Stops every agent of a session (deleting it, the writer handoff). */
+export function stopSession(sessionId: string): void {
+  for (const key of [...controllers.keys()]) if (key.startsWith(`${sessionId}|`)) stopAgent(sessionId, key.slice(sessionId.length + 1));
+}
+
 // An agent node that goes stops its own turn: nothing keeps working (and spending) for a node that is not there.
 onNodesRemoved((sessionId, removed) => {
   for (const n of removed) {
     if (n.data.kind !== 'ref' || n.data.type !== 'agent') continue;
-    const c = controllers.get(turnKey(sessionId, n.id));
-    c?.abort();
-    if (c) ending.get(c)?.();
+    stopAgent(sessionId, n.id);
     dropThread(sessionId, n.id);
   }
 });
