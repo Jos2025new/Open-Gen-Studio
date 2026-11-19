@@ -6,6 +6,7 @@ import { graphEditProblem } from '../flow/locks';
 import { applyModelLinkToAgent } from '../nodes/system';
 import type { Graph, GraphEdge, GraphNode, GraphNodeData, LinkKind, PortSpec } from '../types';
 import { findCycle } from './deps';
+import { stampNew } from './migrate';
 import { descriptorOf } from './registry';
 import { ownerRev } from './revision';
 
@@ -233,6 +234,7 @@ export function applyEdit(req: EditRequest): EditResult {
     const left = next.broken.filter((b) => !(single && added && b.edge.target === added.target && b.edge.targetHandle === added.targetHandle && (b.edge.kind ?? 'data') === (added.kind ?? 'data')));
     next = { ...next, broken: left.length ? left : undefined };
   }
+  next = stampNew(graph, next);
   const locked = graphEditProblem(req.session, graph, next);
   if (locked) { toast(locked, 'error'); return refuse(req, locked); }
   if ((op.op === 'compound' || op.op === 'present' || op.op === 'travel') && op.silent) {

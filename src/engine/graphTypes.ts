@@ -2,11 +2,22 @@ import type { AdvancedValue, GenSettings, MediaKind, OpId, PlanSubject } from '.
 
 /* The node graph: creative nodes, system nodes that point to data where it lives, and classed links. Re-exported by types.ts. */
 
-export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset' | 'ref';
+/**
+ * Open registry (ADR 0031): a new node type is ONE file, `nodecore/types/<kind>.node.ts`, that declares its data here by
+ * merging (`declare module '../../graphTypes' { interface ExtraNodeKinds { <kind>: MyData } }`). Nothing in this file changes.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ExtraNodeKinds {}
+/** Same for a system part: its file merges `interface ExtraSystemTypes { <type>: true }`. */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ExtraSystemTypes {}
+export type BaseNodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset' | 'ref';
+export type NodeKind = BaseNodeKind | keyof ExtraNodeKinds;
 export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
 /** Link classes: `data` carries values and runs in order; `ref` points; `control` governs. `both` only on ref and control. */
 export type LinkKind = 'data' | 'ref' | 'control';
-export type SystemNodeType = 'chat' | 'agent' | 'provider' | 'model' | 'session' | 'space' | 'designer.doc' | 'library' | 'toolset' | 'prompt' | 'mediaSettings';
+export type BaseSystemNodeType = 'chat' | 'agent' | 'provider' | 'model' | 'session' | 'space' | 'designer.doc' | 'library' | 'toolset' | 'prompt' | 'mediaSettings';
+export type SystemNodeType = BaseSystemNodeType | keyof ExtraSystemTypes;
 export type ModelAttachMode = 'wired' | 'docked' | 'grouped' | 'merged';
 
 export interface PortSpec {
@@ -88,7 +99,8 @@ export interface RefNodeData {
   undocked?: boolean;
 }
 
-export type GraphNodeData = TextNodeData | GenNodeData | ToolNodeData | AssetNodeData | RefNodeData;
+/** `v`: the descriptor version this node's data was last written at; absent = 1 (see nodecore/migrate.ts). */
+export type GraphNodeData = (TextNodeData | GenNodeData | ToolNodeData | AssetNodeData | RefNodeData | ExtraNodeKinds[keyof ExtraNodeKinds]) & { v?: number };
 
 export interface GraphNode {
   id: string;

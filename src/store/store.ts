@@ -327,6 +327,10 @@ export async function saveNow(): Promise<void> {
   if (localFailed != null) throw new Error('Could not save to browser storage');
 }
 
+/** Set by nodecore/migrate.ts (it cannot be imported here: the registry's descriptors import this store). */
+let loadMigration = (g: Session['graph']): Session['graph'] => g;
+export const setLoadMigration = (f: typeof loadMigration): void => { loadMigration = f; };
+
 const idbStorage: PersistStorage<Persisted> = {
   getItem: async (name) => {
     const raw = await stateDb.get(name);
@@ -387,8 +391,8 @@ export const useStore = create<AppState>()(
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;
       const restored = p.sessions && Object.keys(p.sessions).length ? p.sessions : current.sessions;
-      // A reload interrupts agent calls.
-      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, agent: { ...s.agent, busy: false, phase: undefined, revising: undefined, waiting: undefined } }]));
+      // A reload interrupts agent calls; nodes saved at an older descriptor version are migrated.
+      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, graph: loadMigration(s.graph), agent: { ...s.agent, busy: false, phase: undefined, revising: undefined, waiting: undefined } }]));
       const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] && !sessions[p.activeSessionId].hidden ? p.activeSessionId : Object.keys(sessions).find((id) => !sessions[id].hidden) ?? Object.keys(sessions)[0];
       const assets = p.assets ?? {};
       const ui = sanitizeUi({ ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) });
