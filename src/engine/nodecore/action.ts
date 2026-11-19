@@ -133,11 +133,13 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
   // a new run id does not buy a second one. Trying again means preparing again and approving again.
   const spent = [...ledger.values()].find((r) => r.approval === snapshot.id && (r.attempted || r.sends > 0 || r.status === 'running'));
   if (spent) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: `This approval was already used (${spent.runId}); prepare the action again and approve it again.` });
+  // An approval the registry no longer holds (evicted by trim, or already attempted) is not an approval: trim never turns a used one back into a fresh one.
+  if (!snapshots.has(snapshot.id)) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: 'This approval is no longer valid; prepare the action again and approve it again.' });
   const session = useStore.getState().sessions[snapshot.session];
   const record: ActionRecord & { done: Promise<ActionRecord> } = { runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'running', sends: 0, seq: ++counter, done: undefined as never };
   ledger.set(runId, record);
   trim();
-  const finish = (): ActionRecord => ({ runId, approval: snapshot.id, session: record.session, targets: record.targets, status: record.status, sends: record.sends, seq: record.seq, result: record.result, error: record.error });
+  const finish = (): ActionRecord => ({ runId, approval: snapshot.id, session: record.session, targets: record.targets, status: record.status, sends: record.sends, seq: record.seq, attempted: record.attempted, result: record.result, error: record.error });
   record.done = (async () => {
     if (!session) { settle(runId, { status: 'failed', error: 'The session of this action no longer exists.' }); return finish(); }
     const missing = snapshot.targets.find((t) => !session.graph.nodes.some((n) => n.id === t));
@@ -146,6 +148,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
     if (moved) { settle(runId, { status: 'stale', error: `An input changed after you approved (${(JSON.parse(moved[0]) as string[]).slice(0, 2).join('.')}). Review it again.` }); return finish(); }
     try {
       record.attempted = true;
+      snapshots.delete(snapshot.id); // one send per approval: from here it is only a record
       const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } onState?.(step, state, info); });
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }
       settle(runId, { status: result.failed.length ? 'failed' : 'done', result, ...(result.failed.length ? { error: result.failed[0].error } : {}) });

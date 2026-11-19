@@ -41,17 +41,20 @@ async function approveNodeRunNow(sessionId: string, item: PlanFeedItem): Promise
   });
   const record = await running;
   const result = record.result;
-  if (!result) {
+  // A send that was attempted and threw may have reached the provider: the approval is spent and the card does not go back to awaiting.
+  const lost = !result && record.status !== 'stale';
+  if (!result && !lost) {
     const next = previewRun(sessionId, request.targets, request.force);
     updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || rerunNote(next.estimate, sessionId) });
     return;
   }
-  const status = result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';
-  updateFeedItem<PlanFeedItem>(sessionId, item.id, { status, error: result.failed.map(f => `${f.stepId}: ${f.error}`).join(' · ') || undefined });
+  const status = !result ? 'error' : result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';
+  const failure = !result ? `${record.error ?? 'The execution failed.'} It may have reached the provider: check Results before running it again.` : result.failed.map(f => `${f.stepId}: ${f.error}`).join(' · ') || undefined;
+  updateFeedItem<PlanFeedItem>(sessionId, item.id, { status, error: failure });
   const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === item.id;
   if (closesRequest) {
-    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...result.outputs].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` }, owner);
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...(result?.outputs ?? [])].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` }, owner);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined }, owner);
   }
   await wrapUpPlan(sessionId, item.id, item.plan.title, status, `${status}: ${preview.runIds.join(', ')}`);
