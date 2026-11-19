@@ -68,6 +68,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [064: menos llamadas del agente con `run_commands` (2026-11-14)](064-2026-11-W46-menos-llamadas.md).
 - [065: persistencia en SQLite, mediciones y pruebas (2026-11-15)](065-2026-11-W46-persistencia-sqlite.md).
 - [067: sesión maestra, frentes visibles, C0 y estabilización de referencias (2026-11-16/18)](067-2026-11-W47-master-estabilizacion.md).
+- [068: sesión maestra, núcleo de nodos (ADR 0031) en rama experimental (2026-11-18/19)](068-2026-11-W47-master-nucleo-nodos.md).
 - [066: visor, historial de versiones y fusión (2026-11-16)](066-2026-11-W47-visor-historial-fusion.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
