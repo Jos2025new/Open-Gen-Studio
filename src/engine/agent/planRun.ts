@@ -196,7 +196,7 @@ async function executePlanItem(
       if (info?.generationId) {
         // The Designer shows each generation's card in its conversation too (it also lands on the page).
         if (workspace === 'chat' || workspace === 'designer') {
-          appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: info.generationId });
+          appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: info.generationId, ...(item.meta ? { meta: item.meta } : {}) }); // in the chat and of the agent that ran the plan
         } else if (workspace === 'node') {
           const nodeId = stepId.startsWith(`${plan.id}_`) ? stepId : nodeOf(stepId);
           const bound = session(sessionId).graph.nodes.find((n) => n.id === nodeId);

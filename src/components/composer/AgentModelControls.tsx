@@ -102,14 +102,14 @@ function DirectorList({ done }: { done: () => void }) {
   );
 }
 
-export function AgentModelControls() {
+export function AgentModelControls({ chatNodeId }: { chatNodeId?: string } = {}) {
   const pop = usePopover();
   const [picker, setPicker] = useState<PickerId | null>(null);
   const composer = useStore((s) => s.composer);
   const agent = useStore((s) => s.settings.agent);
   const ops = useStore((s) => s.settings.ops);
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const sessionChoices = useRecipientThread(activeSessionId, undefined, (a) => a.settings, undefined);
+  const sessionChoices = useRecipientThread(activeSessionId, chatNodeId, (a) => a.settings, undefined);
   useStore((s) => s.catalog.models);
 
   // Saved route overrides remain visible as a category choice until the user replaces or releases it.
@@ -135,7 +135,7 @@ export function AgentModelControls() {
   const choose = (ref: string | null) => {
     if (!picker || picker === 'director') return;
     releaseOverrides(picker);
-    if (ref) void pickComposerModel(picker, ref, true, recipientOf(activeSessionId).id);
+    if (ref) void pickComposerModel(picker, ref, true, recipientOf(activeSessionId, undefined, chatNodeId).id);
     else void resetComposerModel(picker);
     setPicker(null);
   };
@@ -173,7 +173,7 @@ export function AgentModelControls() {
                 const kind = r.id === 'image' || r.id === 'video' ? r.id : null;
                 const choice = kind ? sessionChoices?.[kind] : undefined;
                 const setAsDefault = kind && choice?.modelRef && choice.modelRef !== composer[kind].modelRef
-                  ? () => { void setSessionModelAsDefault(activeSessionId, kind, recipientOf(activeSessionId).id); }
+                  ? () => { void setSessionModelAsDefault(activeSessionId, kind, recipientOf(activeSessionId, undefined, chatNodeId).id); }
                   : undefined;
                 return <SummaryRow key={r.id} {...r} onClick={() => setPicker(r.id)} setAsDefault={setAsDefault} />;
               })}

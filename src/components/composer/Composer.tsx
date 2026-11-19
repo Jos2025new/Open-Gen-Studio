@@ -460,7 +460,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
     <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
       {workspace !== 'chat' && workspace !== 'node' ? <ThreadPeek workspace={workspace} /> : null}
       <ComposerAlerts />
-      {showTools ? null : <ComposerStrip target={workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null} />}
+      {showTools ? null : <ComposerStrip chatNodeId={chatNodeId} target={workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null} />}
       <div
         className={`composer ${dragOver ? 'is-drop' : ''}${showTools && promptHidden ? ' is-prompt-hidden' : ''}`}
         data-mention-box
