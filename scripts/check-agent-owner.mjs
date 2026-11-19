@@ -42,7 +42,7 @@ export function check(root = '.') {
     const visit = (node) => {
       if (!node || typeof node.type !== 'string') return;
       // `{ ...session, agent: … }` (a session rebuilt with an agent put in it), however it is laid out.
-      if (node.type === 'ObjectExpression' && node.properties.some((p) => p.type === 'SpreadElement') && !settingsLike(node) && node.properties.some((p) => p.type === 'Property' && keyName(p) === 'agent' && !plain(p.value))) flag(node, "puts an agent into a session by hand (it lands in the agent on screen)");
+      if (node.type === 'ObjectExpression' && node.properties.some((p) => p.type === 'SpreadElement') && !settingsLike(node) && node.properties.some((p) => p.type === 'Property' && keyName(p) === 'agent' && !plain(p.value))) flag(node, "writes an agent's state by hand (puts an agent into a session: it lands in the agent on screen)");
       // `Object.assign(session.agent, …)`, `session.agent.busy = …`, `session.agent.notes.push(…)`.
       if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression' && node.callee.object?.name === 'Object' && node.callee.property?.name === 'assign' && touchesAgent(node.arguments[0])) flag(node, "mutates an agent's state by hand");
       if (node.type === 'AssignmentExpression' && touchesAgent(node.left)) flag(node, "assigns into an agent's state by hand");
