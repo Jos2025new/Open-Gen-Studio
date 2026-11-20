@@ -33,7 +33,7 @@ export interface SettingsDeps {
   composerChosen: (kind: 'video' | 'image') => boolean;
   routeModel: (mode: 'text' | 'image' | 'reference') => string | undefined;
   defaultModel: (kind: 'video' | 'image', needsImage: boolean) => string | null;
-  /** The family's edit / image-to-video endpoint for a text-only model (one resolution point, catalog.inputVariant). */
+  /** The family's edit / image-to-video endpoint for a text-only model (one resolution point, catalog.sentModelRef). */
   inputVariant?: (ref: string, kind: 'video' | 'image') => string | undefined;
 }
 

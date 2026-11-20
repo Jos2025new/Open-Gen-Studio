@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ensureSchema, inputVariant, lineRoutes, modelSummary } from '../catalog';
+import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
 import { chat } from '../providers/llm';
 import { VIDEO_DIRECTION_POLICY } from '../procedure';
@@ -71,7 +71,7 @@ export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSect
 export const planDraft = (sessionId: string, owner: string): DraftMode => laneState(sessionId, owner)?.draftMode ?? draftMode('draft');
 
 /** The model this step runs on for a picked line: the variant its inputs need (edit, image-to-video). */
-const stepModel = (ref: string, s: GenStep) => (needsImage(s) ? inputVariant(ref, s.kind)?.ref ?? ref : ref);
+const stepModel = (ref: string, s: GenStep) => (needsImage(s) ? sentModelRef(ref, s.kind, true) : ref);
 
 function applyChoice(s: GenStep, c: SettingsChoice): GenStep {
   const settings = { ...s.settings, aspect: c.aspect, resolution: c.resolution, ...(s.kind === 'video' ? { duration: c.duration ?? s.settings.duration } : { count: c.count ?? s.settings.count }) };

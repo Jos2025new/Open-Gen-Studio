@@ -1,4 +1,4 @@
-import { composerChosen, defaultModelFor, inputVariant, modelSummary, resolveModel } from '../catalog';
+import { composerChosen, defaultModelFor, modelSummary, resolveModel, sentModelRef } from '../catalog';
 import { offerRequest, partModel } from '../modelNamed';
 import { OPS } from '../ops';
 import { useStore } from '../../store/store';
@@ -37,7 +37,7 @@ export async function sectionsOfParts(sessionId: string, owner: string, parts: S
     const selection = modelPriority({ session: ag().settings?.[d.kind]?.modelRef, composer: defaultModelFor(d.kind, Boolean(d.refs || d.start_image)) ?? undefined, proposed: partModel(d, ag().settings), userRequested: d.user_requested, comparison: new Set(parts.filter((p) => p.kind === d.kind).map((p) => p.model).filter(Boolean)).size > 1 });
     const built = await until(buildSettings(
       { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: selection.modelRef, provider: selection.reason === 'user request' || selection.reason === 'comparison' ? d.provider : undefined },
-      { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => useStore.getState().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
+      { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => useStore.getState().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => sentModelRef(r, k, true) },
     ));
     if ('error' in built) return { sections, failed: `${d.kind}: ${built.error}` };
     const long = d.kind === 'video' ? durationProblem(built.recommended.modelRef, d.duration, offerRequest(ag()), Object.keys(ag().draft?.answers ?? {}).length > 0) : undefined;

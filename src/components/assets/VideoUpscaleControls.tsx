@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown } from '../ui/icons';
-import { isVideoOpEngine } from '../../engine/ops';
+import { isVideoOpEngine, type VideoOpEngine } from '../../engine/ops';
 import { ensureSchema, opModelFor, videoOpFits } from '../../engine/catalog';
 import type { AdvancedValue } from '../../engine/types';
 import { useStore } from '../../store/store';
@@ -10,7 +10,7 @@ import { Chip } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 
 /** One upscale-only control, shared by the node and asset/chat operation forms. */
-export function VideoUpscaleControls({ params, onChange, engine = 'video_upscale' }: { params: Record<string, AdvancedValue>; onChange: (params: Record<string, AdvancedValue>) => void; engine?: 'video_upscale' | 'video_edit' | 'video_extend' | 'video' }) {
+export function VideoUpscaleControls({ params, onChange, engine = 'video_upscale' }: { params: Record<string, AdvancedValue>; onChange: (params: Record<string, AdvancedValue>) => void; engine?: VideoOpEngine | 'video' }) {
   const catalog = useStore(s => s.catalog);
   useStore(s => s.settings.ops);
   const ref = typeof params._modelRef === 'string' ? params._modelRef : opModelFor(engine).ref;

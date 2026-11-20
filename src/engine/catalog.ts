@@ -6,7 +6,7 @@ import { ADAPTERS, PREFERRED, REMOTE_PROVIDERS, editCounterpart, i2vCounterpart 
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from './providers/demo';
 import { listLlmModels, pickDefaultLlm } from './providers/llm';
 import { parseModelRef } from './providers/types';
-import { isVideoOpEngine, type OpEngine } from './ops';
+import { isVideoOpEngine, VIDEO_OP_ENGINES, type OpEngine } from './ops';
 import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId, TranscriberSummary } from './types';
 import { rememberSessionModel } from './agent/sessionModel';
 import { setCatalog, setComposer, setComposerMedia, setSettings, useStore } from '../store/store';
@@ -451,7 +451,7 @@ export function opModelForAsset(engine: OpEngine, assetId: string | undefined): 
 }
 
 /** Video ops whose model the user can pick in the op form (node and chat). */
-export const PICKABLE_VIDEO_OPS: readonly string[] = ['video_upscale', 'video_edit', 'video_extend', 'video'];
+export const PICKABLE_VIDEO_OPS: readonly string[] = [...VIDEO_OP_ENGINES, 'video'];
 
 /** Models that really do this video op: upscale = dedicated upscalers; edit/extend = video-input models named for it. */
 export function videoOpFits(engine: string, m: ModelSummary): boolean {

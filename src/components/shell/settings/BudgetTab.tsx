@@ -56,7 +56,7 @@ export function BudgetTab() {
           />
         </SetRow>
       ) : null}
-      {settings.budgetOn && !settings.budgetNoAsk && (sessionNoAsk || untilNext) ? (
+      {settings.budgetOn && !noAskEverywhere(settings) && (sessionNoAsk || untilNext) ? (
         <SetRow label="This session" className="set-row-3">
           <span>{untilNext && !sessionNoAsk ? 'not asking until you open another chat' : 'not asking'}</span>
           <Button size="sm" variant="ghost" onClick={() => askAgain()}>Ask again</Button>

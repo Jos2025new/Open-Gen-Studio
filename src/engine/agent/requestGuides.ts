@@ -1,6 +1,6 @@
 import { useStore } from '../../store/store';
 import { agentOf } from './lanes';
-import { defaultModelFor, inputVariant, modelSummary } from '../catalog';
+import { defaultModelFor, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel, modelGuide } from '../guides';
 import { readGuide, STAGED_GUIDE } from '../skills';
 
@@ -44,7 +44,7 @@ export function directModelRefs(sessionId: string, owner: string, kind: 'image' 
   const selected = agentOf(sessionId, owner).settings?.[kind]?.modelRef;
   const ref = selected ?? c[kind].modelRef;
   const refs = [ref];
-  if (requestHas(sessionId, owner, 'image')) refs.push(selected ? inputVariant(ref, kind)?.ref ?? ref : defaultModelFor(kind, true));
+  if (requestHas(sessionId, owner, 'image')) refs.push(selected ? sentModelRef(ref, kind, true) : defaultModelFor(kind, true));
   if (kind === 'video' && !selected) refs.push(...Object.values(c.videoRoutes ?? {}));
   return [...new Set(refs.filter((r): r is string => Boolean(r)))];
 }

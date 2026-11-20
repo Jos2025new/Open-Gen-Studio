@@ -129,6 +129,43 @@ describe('6. the approved price of an operation is the sent one', () => {
   });
 });
 
+describe('4b. one rule, no copies', () => {
+  it('the composer reads firstFrame once when the model pins it into keyframes', async () => {
+    const { acceptsImages } = await import('../src/engine/actions');
+    const ref = 'atlas::acme/kf-video';
+    const m = { ref, provider: 'atlas', id: 'acme/kf-video', name: 'KF', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] } as ModelSummary;
+    const sch: ModelSchema = { ref, params: [], source: 'catalog', slots: { prompt: 'prompt', firstFrame: { key: 'image', format: 'url' }, keyframes: { key: 'kf', max: 4, min: 0 } as never } };
+    const st = useStore.getState();
+    useStore.setState({ catalog: { ...st.catalog, models: { ...st.catalog.models, [ref]: m }, schemas: { ...st.catalog.schemas, [ref]: sch } }, composer: { ...st.composer, video: { modelRef: ref, settings: { count: 1, advanced: {} } } } });
+    expect(acceptsImages('video').max).toBe(4);
+  });
+  it('the 3D model limit is the one refsLimit answers', () => {
+    const ref = 'atlas::acme/m3d';
+    const m = { ref, provider: 'atlas', id: 'acme/m3d', name: 'M3D', kind: 'model3d', acceptsText: true, acceptsImage: true, tags: [] } as ModelSummary;
+    const sch: ModelSchema = { ref, params: [], source: 'catalog', slots: { prompt: 'prompt', images: { key: 'imgs', max: 4, min: 0, multiple: true, format: 'url', total: 2 } } };
+    const st = useStore.getState();
+    useStore.setState({ catalog: { ...st.catalog, models: { ...st.catalog.models, [ref]: m }, schemas: { ...st.catalog.schemas, [ref]: sch } },
+      composer: { ...st.composer, mode: 'model3d', text: 'x', attachments: ['a0', 'a1', 'a2'], model3d: { modelRef: ref, settings: { count: 1, advanced: {} } } } as never });
+    expect(checkDirect('model3d')).toMatchObject({ ok: false, reason: expect.stringMatching(/up to 1 image/) });
+  });
+  it('each rule lives in one place (scan of src/)', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const files: string[] = [];
+    const walk = (d: string) => readdirSync(d).forEach((n) => { const f = join(d, n); if (/\.tsx?$/.test(n)) files.push(f); else if (!n.includes('.')) try { walk(f); } catch { /* a file without extension */ } });
+    walk('src');
+    const rules: Array<[RegExp, string[], string]> = [
+      [/(?<![.\w])inputVariant\(/, ['src/engine/catalog.ts'], 'ask catalog.sentModelRef(), the one variant rule'],
+      [/budgetUsd - spent\b/, [], 'use budget.remainingBudget()'],
+      [/!settings\.budgetNoAsk/, [], 'use budget.noAskEverywhere(settings)'],
+      [/'video_upscale',\s*'video_edit',\s*'video_extend'/, ['src/engine/ops.ts', 'src/store/reuse.ts'], 'use ops.VIDEO_OP_ENGINES / isVideoOpEngine (reuse.ts: batch D)'],
+      [/setNoAskProbe/, [], 'noAsk.ts is a pure leaf: no probes'],
+    ];
+    const hits = rules.flatMap(([re, allowed, hint]) => files.filter((f) => !allowed.includes(f.replace(/\\/g, '/')) && re.test(readFileSync(f, 'utf8'))).map((f) => `${f}: ${re} -> ${hint}`));
+    expect(hits).toEqual([]);
+  });
+});
+
 describe('7. video-to-video engines', () => {
   it('one predicate lists them', async () => {
     const { isVideoOpEngine } = await import('../src/engine/ops');

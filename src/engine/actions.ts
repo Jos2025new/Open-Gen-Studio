@@ -246,8 +246,8 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     const model = st.catalog.models[modelRef];
     const problem = model ? model3dProblem(model.id, model, text, imageAtt.map((id) => ({ size: 0, width: st.assets[id].width, height: st.assets[id].height }))) : null;
     if (problem) return { ok: false, reason: `This model ${problem.message}`, estimate };
-    const slot = schema.slots.images;
-    if (slot && imageAtt.length > slot.max) return { ok: false, reason: `This model accepts up to ${slot.max} image${slot.max > 1 ? 's' : ''}.`, estimate };
+    const limit = refsLimit(schema, settings.count);
+    if (schema.slots.images && imageAtt.length > limit) return { ok: false, reason: `This model accepts up to ${limit} image${limit > 1 ? 's' : ''}.`, estimate };
   } else if (kind === 'audio') {
     const odd = wrongRef(attachments, st.assets, 'audio'); if (odd) return { ok: false, reason: odd, estimate };
     const audioProblem = audioInputProblem(schema.slots, audioAtt.length);
@@ -797,7 +797,7 @@ export function acceptsImages(kind: MediaKind): { accepts: boolean; max: number 
   if (kind === 'image') return { accepts: Boolean(schema?.slots.images), max: refsLimit(schema, st.composer.image.settings.count) };
   const slots = schema?.slots ?? {};
   const refs = refsLimit(schema, st.composer.video.settings.count);
-  return { accepts: Boolean(slots.firstFrame || refs), max: (slots.firstFrame ? 1 : 0) + refs };
+  return { accepts: Boolean(slots.firstFrame || refs), max: (slots.firstFrame && !slots.keyframes ? 1 : 0) + refs };
 }
 
 export function hasParam(kind: MediaKind, role: Parameters<typeof paramByRole>[1]): boolean {

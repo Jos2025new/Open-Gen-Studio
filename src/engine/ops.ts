@@ -471,9 +471,10 @@ export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
 }
 
 /** Video-to-video engines: they run on a clip, priced by its length. The one place that lists them. */
-export type VideoOpEngine = 'video_upscale' | 'video_edit' | 'video_extend';
+export const VIDEO_OP_ENGINES = ['video_upscale', 'video_edit', 'video_extend'] as const;
+export type VideoOpEngine = (typeof VIDEO_OP_ENGINES)[number];
 export function isVideoOpEngine(engine: string): engine is VideoOpEngine {
-  return engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend';
+  return (VIDEO_OP_ENGINES as readonly string[]).includes(engine);
 }
 
 /** The upscale factor a price authorization is scaled by (2 when unset); other operations have none. */
