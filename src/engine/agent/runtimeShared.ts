@@ -16,7 +16,7 @@ import { autoLayout, graphBounds, planToGraph, nodeOutputAsset } from '../flow/g
 import { activeDoc } from '../design/actions';
 import { LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, lineRoutes } from '../catalog';
-import type { AgentQuestion, AgentState, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, PlanStep, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
+import type { AgentQuestion, AgentState, Estimate, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, PlanStep, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
 import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
 import { placeFor } from '../place';
 import { appendFeed, patchSession, toast, updateFeedItem, useStore } from '../../store/store';
@@ -398,12 +398,17 @@ export async function presentPlan(
     const models = [...new Set(plan.steps.flatMap((st) => ('modelRef' in st && st.modelRef ? [st.modelRef] : [])))];
     recordMetric(sessionId, { type: 'plan', ms: agentMs, revision: replaced, models, usd: total.usd, checkMs: Date.now() - started });
   }
-  if (style === 'auto' && !needsSpendCheck(total)) {
+  if (autoApproves(style, total, prepared?.estimate)) {
     void approvePlan(sessionId, item.id);
   } else if (get().ui.workspace !== 'chat') {
     setThreadOpen(true);
   }
   return { errors: [], itemId: item.id };
+}
+
+/** Auto style approves a plan by itself only when it costs nothing. A Nodes plan's price is the prepared one (it adds the upstream nodes it must update), not the sum of its own steps. */
+export function autoApproves(style: string, planTotal: Estimate, preparedTotal?: Estimate): boolean {
+  return style === 'auto' && !needsSpendCheck(preparedTotal ?? planTotal);
 }
 
 /**

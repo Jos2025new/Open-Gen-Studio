@@ -17,7 +17,7 @@ import { ADAPTERS } from '../src/engine/providers/registry';
 import { costAuthorization } from '../src/engine/priceAuthorization';
 import { resumePlan } from '../src/engine/agent/runtime';
 import type { ModelSummary, PlanFeedItem } from '../src/engine/types';
-import { agentsWith, mainThread } from './helpers/threads';
+import { mainThread } from './helpers/threads';
 
 /* Retry with the REAL retryGeneration and a simulated adapter (the plan-recovery test replaces jobs): the first send is lost, the retry runs once, and the step that waited for it gets the NEW attempt's result. */
 const REF = 'nanogpt::test-image';
