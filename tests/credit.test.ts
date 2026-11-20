@@ -133,6 +133,14 @@ describe('the equivalent model when a provider has no credit', () => {
     const labels = (useAlerts.getState().alerts[0].actions ?? []).map((a) => a.label);
     expect(labels).toHaveLength(1);
     expect(labels[0]).toMatch(/nano-banana-2-lite.*pricier/);
+    // The manual click must not claim "same price or less": the note names the real price ratio and reads fresh notes.
+    useStore.setState((s) => ({ generations: { ...s.generations, g1: { ...s.generations.g1, notes: ['earlier'] } } }));
+    useAlerts.getState().alerts[0].actions![0].run();
+    await vi.waitFor(() => expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2-lite'));
+    const notes = useStore.getState().generations.g1.notes ?? [];
+    expect(notes[0]).toBe('earlier');
+    expect(notes.join(' ')).toMatch(/about 1\.3× the price/);
+    expect(notes.join(' ')).not.toMatch(/same price or less/);
   });
 
   it('when the only equivalent was dropped for its price, the alert says so instead of claiming there is none', async () => {

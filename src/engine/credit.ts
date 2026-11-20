@@ -148,23 +148,29 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   markEmpty(cur.provider);
   const empty = PROVIDER_LABELS[cur.provider];
   const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g), g.settings);
-  const switchTo = (m: ModelSummary) => {
+  /** The note says what really changed: the same model at the same price or less, or the exact model and how much dearer. */
+  const switchTo = (o: CreditOption) => {
+    const m = o.model;
     const to = parseModelRef(m.ref)?.provider ?? m.provider;
-    const note = `${empty} had no credit, so this ran on ${PROVIDER_LABELS[to]} (same model, same price or less).`;
-    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: to, error: undefined, notes: [...(g.notes ?? []), note] });
+    const detail = o.same ? 'same model, same price or less'
+      : `${lineKey(m) === lineKey(cur) ? 'same model' : `model ${m.name}`}, ${o.ratio !== undefined && o.ratio > 1 ? `about ${Math.round(o.ratio * 10) / 10}× the price` : 'price not comparable'}`;
+    const note = `${empty} had no credit, so this ran on ${PROVIDER_LABELS[to]} (${detail}).`;
+    // Read the notes now, not when the alert was built: the user may click long after.
+    const notes = [...(get().generations[genId]?.notes ?? []), note];
+    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: to, error: undefined, notes });
     return rerun(genId);
   };
   const auto = options.find((o) => o.same);
   if (auto) {
     pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
-    await switchTo(auto.model);
+    await switchTo(auto);
     return true;
   }
   if (options.length) {
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run, dearer ones marked), or recharge ${empty}:`,
-      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
+      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); void switchTo(o).catch(logged('switch model after no credit')); } })),
     });
     return false;
   }
