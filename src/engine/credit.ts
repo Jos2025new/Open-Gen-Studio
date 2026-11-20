@@ -183,7 +183,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const item = get().sessions[g.sessionId]?.feed.find((f) => f.type === 'plan' && f.plan.id === g.planId);
     if (!superseded() && (g.origin !== 'node' || nodeId) && (!g.planId || !g.stepId ||
       (item?.type === 'plan' && item.stepGenerations[g.stepId] === genId && item.stepStates[g.stepId] === 'error' &&
-        (item.status === 'error' || item.status === 'partial')))) return false;
+        (item.status === 'error' || item.status === 'partial' || item.status === 'running')))) return false;
     pushAlert({ level: 'info', text: `${cur.name} was already tried again (or is no longer failed): nothing was sent.` });
     return true;
   };

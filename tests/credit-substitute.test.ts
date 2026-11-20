@@ -11,15 +11,15 @@ vi.mock('../src/lib/idb', () => ({
 vi.mock('../src/lib/media', async (original) => ({ ...await original<typeof import('../src/lib/media')>(),
   probeMedia: async () => ({ width: 1, height: 1 }) }));
 
-import { patchGeneration, useStore } from '../src/store/store';
+import { patchGeneration, updateFeedItem, useStore } from '../src/store/store';
 import { createGeneration, retryGeneration, runGeneration } from '../src/engine/jobs';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
 import { forgetBalances, onGenerationCredit } from '../src/engine/credit';
 import { useAlerts } from '../src/engine/alerts';
-import { regenerate } from '../src/engine/actions';
+import { generateDirect, regenerate } from '../src/engine/actions';
 import { runNodes } from '../src/engine/flow/actions';
-import { resumePlan } from '../src/engine/agent/runtime';
+import { approvePlan, resumePlan } from '../src/engine/agent/runtime';
 import { overLimit, withOncePass } from '../src/engine/budget';
 import { planRecovery } from '../src/engine/agent/planRecovery';
 import { costAuthorization } from '../src/engine/priceAuthorization';
@@ -56,7 +56,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-const gen = (planId?: string) => createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'a', modelRef: NANO, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, planId });
+const gen = (planId?: string, origin: 'composer' | 'node' = 'composer') => createGeneration({ sessionId: sid(), origin, kind: 'image', prompt: 'a', modelRef: NANO, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, planId });
 
 describe('a substitute after no credit', () => {
   it('a dearer substitute that goes over the limit asks first; Cancel sends nothing, Continue once sends once', async () => {
@@ -159,6 +159,116 @@ function addNode() {
 }
 
 describe('402 recovery at the spending gate', () => {
+  it.each(['Retry', '402 alert'])('recovers a standalone plan Regenerate via %s exactly once', async (recovery) => {
+    setup(0.08, { on: false, usd: 5 });
+    const original = failedPlan();
+    patchGeneration(original.id, { status: 'done' });
+    updateFeedItem<PlanFeedItem>(sid(), 'card', { status: 'done', stepStates: { s1: 'done' } });
+    await regenerate(original.id);
+    const attempt = Object.values(useStore.getState().generations).find((g) => g.parentId === original.id)!;
+    await vi.waitFor(() => expect(action('Yes, this time')).toBeDefined());
+    if (recovery === 'Retry') {
+      vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+      await Promise.all([retryGeneration(attempt.id), retryGeneration(attempt.id)]);
+      expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(2);
+      expect(atlasSends).toBe(0);
+    } else {
+      const offer = action('Yes, this time')!;
+      offer.run();
+      offer.run();
+      await vi.waitFor(() => expect(useStore.getState().generations[attempt.id].status).toBe('done'));
+      expect(atlasSends).toBe(1);
+      expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(1);
+    }
+    expect(planCard().stepGenerations).toEqual({ s1: original.id });
+    expect(useStore.getState().spendLog).toHaveLength(1);
+  });
+
+  it('sends a confirmed Regenerate once after the source plan leaves the feed', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    const original = failedPlan();
+    patchGeneration(original.id, { status: 'done' });
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [] } } }));
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+    await regenerate(original.id);
+    const attempt = Object.values(useStore.getState().generations).find((g) => g.parentId === original.id)!;
+    await vi.waitFor(() => expect(useStore.getState().generations[attempt.id].status).toBe('done'));
+    expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a 402 substitute selected during a parallel step and sends it only on plan Retry', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    failedPlan();
+    const { plan } = planCard();
+    updateFeedItem<PlanFeedItem>(sid(), 'card', {
+      status: 'awaiting', stepStates: {}, stepGenerations: {},
+      plan: { ...plan, steps: [...plan.steps, { ...plan.steps[0], id: 's2', prompt: 'parallel' } as typeof plan.steps[0]] },
+    });
+    let finish!: () => void;
+    const parallel = new Promise<void>((resolve) => { finish = resolve; });
+    vi.mocked(ADAPTERS.nanogpt.generate).mockImplementation(async ({ prompt }) => {
+      if (!prompt.includes('parallel')) throw new HttpError(402, 'Insufficient balance', null);
+      await parallel;
+      return imageResult();
+    });
+    const run = approvePlan(sid(), 'card');
+    try {
+      await vi.waitFor(() => expect(planCard().stepStates).toMatchObject({ s1: 'error', s2: 'running' }));
+      const offer = action('Yes, this time')!;
+      offer.run();
+      offer.run();
+      expect(atlasSends).toBe(0);
+      expect(useStore.getState().generations[planCard().stepGenerations.s1].modelRef).toBe(ATLAS);
+      await resumePlan(sid(), 'card', 'retry', true);
+      expect(atlasSends).toBe(0);
+    } finally {
+      finish();
+      await run;
+    }
+    await Promise.all([resumePlan(sid(), 'card', 'retry', true), resumePlan(sid(), 'card', 'retry', true)]);
+    expect(atlasSends).toBe(1);
+    expect(planCard().status).toBe('done');
+    expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries only the latest node attempt after Run follows a legacy composer generation', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    addNode();
+    const original = gen(undefined, 'node');
+    patchGeneration(original.id, { status: 'error' });
+    const session = useStore.getState().sessions[sid()];
+    const [node] = session.graph.nodes;
+    useStore.setState({ sessions: { ...useStore.getState().sessions, [sid()]: {
+      ...session, graph: { ...session.graph, nodes: [{ ...node, data: { ...node.data, generationId: original.id } } as typeof node] },
+    } } });
+    await runNodes(sid(), ['n1']);
+    const latest = Object.values(useStore.getState().generations).find((g) => g.stepId === 'n1' && g.status === 'error')!;
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+    await retryGeneration(original.id);
+    await Promise.all([retryGeneration(latest.id), retryGeneration(latest.id)]);
+    expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(2);
+    expect(useStore.getState().spendLog).toHaveLength(1);
+    expect(Object.values(useStore.getState().generations).find((g) => g.parentId === latest.id)?.status).toBe('done');
+  });
+
+  it('blocks Retry of a composer node attempt after a successful Run relinks the node', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    useStore.setState((s) => ({
+      ui: { ...s.ui, workspace: 'node', space: undefined },
+      composer: { ...s.composer, text: 'a', attachments: [], image: { ...s.composer.image, modelRef: NANO, settings: { count: 1, advanced: {} } } },
+    }));
+    await generateDirect('image');
+    const [original] = Object.values(useStore.getState().generations);
+    const node = useStore.getState().sessions[sid()].graph.nodes.find((n) => n.data.kind === 'image')!;
+    await vi.waitFor(() => expect(action('Yes, this time')).toBeDefined());
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+    const run = await runNodes(sid(), [node.id]);
+    expect(run?.outputs.get(node.id)?.assetIds).toHaveLength(1);
+    await retryGeneration(original.id);
+    expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(2);
+    expect(useStore.getState().spendLog).toHaveLength(1);
+  });
+
   it.each([undefined, 0.14])('budgets the selected plan substitute (%s) with price margin off', async (price) => {
     setup(price, { on: true, usd: 0.12 });
     const g = failedPlan();

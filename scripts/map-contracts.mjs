@@ -211,7 +211,7 @@ export default [
   },
   {
     id: 'credit-recovery',
-    what: 'El sustituto tras un 402 se presupuesta en Retry del plan. En Nodos se usa el bloqueo de Regenerate.',
+    what: 'El sustituto 402 elegido mientras corre el plan se envía por Retry. Regenerate tiene aprobación propia. En Nodos se comparte su bloqueo.',
     sides: [
       ['src/engine/credit.ts', 'const held = holdAttemptNode(g, nodes())'],
       ['src/engine/flow/locks.ts', 'export function holdAttemptNode'],

@@ -1,7 +1,7 @@
 import { updateFeedItem, useStore } from '../store/store';
 import { toast } from '../store/toasts';
 import { overLimit, overLimitText } from './budget';
-import { holdAttemptNode } from './flow/locks';
+import { attemptNode, holdAttemptNode } from './flow/locks';
 import { applyEdit } from './nodecore/edit';
 import { estimateForRetry } from './retryPartial';
 import type { Generation, GenerationFeedItem, GraphNode, PlanFeedItem } from './types';
@@ -34,8 +34,10 @@ export function holdRetry(g: Generation, planItemId?: string): ReturnType<typeof
     const estimate = estimateForRetry(g);
     if (overLimit(estimate, g.sessionId)) { toast(overLimitText(estimate), 'info'); return; }
   }
-  if (newerAttempt(g, g.origin === 'node' ? g.stepId : undefined)) return;
-  return holdAttemptNode(g, session?.graph.nodes ?? []);
+  const nodes = session?.graph.nodes ?? [];
+  const nodeId = g.origin === 'node' ? g.stepId ?? attemptNode(g, nodes)?.id : undefined;
+  if (newerAttempt(g, nodeId)) return;
+  return holdAttemptNode(g, nodes);
 }
 
 /** A retry made a new attempt: the node, the card and the plan step that showed the failed one show the new one. */

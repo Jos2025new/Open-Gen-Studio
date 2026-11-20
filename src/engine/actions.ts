@@ -384,9 +384,10 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
     data: { kind: 'asset', title: 'Reference', assetId },
     handle,
   }));
-  const g = createGeneration(spec);
+  const nodeId = uid('nd');
+  const g = createGeneration({ ...spec, stepId: nodeId });
   const genNode: GraphNode = {
-    id: uid('nd'),
+    id: nodeId,
     position: origin,
     data: {
       kind,
@@ -425,10 +426,8 @@ function specFrom(g: Generation): GenerationSpec {
     op: g.op,
     origin: g.origin,
     parentId: g.id,
-    // Preserve operation id: regenerate is another attempt of the same operation.
     operationId: g.operationId ?? g.id,
-    planId: g.planId,
-    stepId: g.stepId,
+    stepId: g.planId ? undefined : g.stepId,
   };
 }
 
