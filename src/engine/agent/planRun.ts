@@ -261,6 +261,8 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const generationId = item?.stepGenerations[stepId];
   if (!item || !review || !generationId || !reviewOpen(item, stepId)) return;
   if (item.plan.workspace === 'node') return; // Nodes spend only through runAction: nothing here may decide or send for them
+  // «Continuar» raises what this step spends above what was approved: over an active limit it needs the same pass as any other spend (PlanCard gives it with «Continue once»).
+  if (decision === 'continue' && overLimit(review.proposed.estimate, sessionId)) { toast(overLimitText(review.proposed.estimate), 'error'); return; }
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,

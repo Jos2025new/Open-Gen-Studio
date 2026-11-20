@@ -16,6 +16,7 @@ import { createGeneration } from '../src/engine/jobs';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { costAuthorization } from '../src/engine/priceAuthorization';
 import { resolveStepCostReview, resumePlan, sendAgentMessage, settleInterruptedPlans } from '../src/engine/agent/runtime';
+import { withOncePass } from '../src/engine/budget';
 import { recordPriceResults } from '../src/engine/agent/priceNotes';
 import type { LlmMessage, ModelSummary, PlanFeedItem } from '../src/engine/types';
 
@@ -108,6 +109,18 @@ describe('price notices reach the model over the existing channel', () => {
     expect(mediaCalls).toBe(0);
     expect(plan().stepCostReviews?.s1.decisions ?? []).toHaveLength(0);
     expect(useStore.getState().generations[gid].status).toBe('review');
+  });
+
+  it('Continue over the budget sends nothing until it runs with a once-pass', async () => {
+    const gid = reviewedStep();
+    useStore.setState((st) => ({ spentUsd: 0, settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: undefined, budgetNoAsk: false } }));
+    await resolveStepCostReview(sid(), 'card', 's1', 'continue');
+    expect(mediaCalls).toBe(0);
+    expect(useStore.getState().generations[gid].status).toBe('review');
+    expect(plan().stepCostReviews?.s1.decisions ?? []).toHaveLength(0);
+    await withOncePass(sid(), () => resolveStepCostReview(sid(), 'card', 's1', 'continue'));
+    expect(mediaCalls).toBe(1);
+    useStore.setState((st) => ({ settings: { ...st.settings, budgetOn: false } }));
   });
 
   it('Cancel remains blocked even after notes are consumed and Retry is requested', async () => {

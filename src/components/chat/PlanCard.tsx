@@ -288,7 +288,10 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                 {state === 'review' && item.status !== 'canceled' && item.stepCostReviews?.[s.id] ? (
                   <span className="step-script">
                     <p>{item.stepCostReviews[s.id].message}</p>
-                    <Button size="sm" variant="primary" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'continue'); }}>Continuar</Button>
+                    {(() => {
+                      const stepOver = overLimit(item.stepCostReviews[s.id].proposed.estimate, sessionId);
+                      return <Button size="sm" variant="primary" data-tip={stepOver ? overLimitText(item.stepCostReviews[s.id].proposed.estimate) : undefined} onClick={() => { void (stepOver ? withOncePass(sessionId, () => resolveStepCostReview(sessionId, item.id, s.id, 'continue')) : resolveStepCostReview(sessionId, item.id, s.id, 'continue')); }}>{stepOver ? 'Continuar una vez' : 'Continuar'}</Button>;
+                    })()}
                     <Button size="sm" variant="ghost" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'cancel'); }}>Cancelar paso</Button>
                   </span>
                 ) : null}
