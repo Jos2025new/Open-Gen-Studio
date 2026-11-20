@@ -56,7 +56,8 @@ vi.mock('../src/engine/providers/registry', async (orig) => {
   };
 });
 
-import { ATLAS_RETRY_WAITS, createGeneration, runGeneration } from '../src/engine/jobs';
+import { createGeneration, runGeneration } from '../src/engine/jobs';
+import { ATLAS_RETRY_WAITS } from '../src/engine/providers/atlas';
 import { useStore } from '../src/store/store';
 import type { ModelSummary } from '../src/engine/types';
 

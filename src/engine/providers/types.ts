@@ -113,6 +113,18 @@ export interface ProviderAdapter {
   createStyle?(req: { images: MediaInput[]; apiKey: string; signal: AbortSignal; onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }): Promise<GenResult>;
   /** Kling custom voice from a speech sample; result (voice_id) in `text`. */
   createVoice?(req: { input: MediaInput; apiKey: string; signal: AbortSignal; onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }): Promise<GenResult>;
+  /**
+   * Exact price of one request before it is sent (USD), when the provider can quote it; null when it has no answer.
+   * The engine adds it up as the cost of a request whose result reports none. It never blocks a send.
+   */
+  quote?(model: ModelSummary, schema: ModelSchema, settings: GenSettings, count: number): Promise<number | null>;
+  /** Requests with the same key run one at a time, in every canvas; null means no limit for that model. */
+  serialKey?(model: ModelSummary): string | null;
+  /**
+   * Refusals the provider accepts later: only that request is tried again, after each wait, while the error message
+   * matches. `label` and `reason` fill the notice the card shows.
+   */
+  retry?: { waits: number[]; matches(message: string): boolean; label: string; reason: string };
   /** Spendable USD on the account, when the provider exposes it to a normal API key. */
   balance?(apiKey: string, signal?: AbortSignal): Promise<number | undefined>;
 }

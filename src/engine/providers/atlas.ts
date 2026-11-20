@@ -5,12 +5,16 @@ import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
 import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
+import { atlasQuoteBody, fetchAtlasQuote } from '../quotes';
 import { takesSourceAsReference } from '../modelRules';
 import { modelMime } from '../../lib/model3d';
 
 const BASE = 'https://api.atlascloud.ai';
 const STATIC = 'https://static.atlascloud.ai';
 const DAY = 24 * 3600 * 1000;
+/** Waits before trying a refused Atlas request again (then the error stands). */
+export const ATLAS_RETRY_MS = 5_000;
+export const ATLAS_RETRY_WAITS = [ATLAS_RETRY_MS, 20_000, 60_000];
 
 interface AtlasModel {
   model: string;
@@ -77,6 +81,13 @@ export function atlasVideoCaps(id: string, cats: string[]): { text: boolean; ima
 export const atlas: ProviderAdapter = {
   id: 'atlas',
   label: 'Atlas Cloud',
+
+  // Atlas prices a request without a key and at no cost (quotes.ts); a quote never blocks a send.
+  quote: (model, schema, settings, count) => fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, count), 3000),
+  // Developer variants: one request at a time per model, in every canvas (T4).
+  serialKey: (model) => (model.id.endsWith('-developer') ? `atlas:${model.id}` : null),
+  // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts it later.
+  retry: { waits: ATLAS_RETRY_WAITS, matches: (message) => /upstream access denied/i.test(message), label: 'Atlas', reason: 'Upstream access denied' },
 
   async listModels() {
     const models = await fetchCatalog();

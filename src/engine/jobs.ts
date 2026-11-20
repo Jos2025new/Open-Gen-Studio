@@ -14,11 +14,10 @@ import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
-import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, sentModelRef, RECRAFT_STYLE_REF, resolveModel } from './catalog';
+import { apiKeyFor, creatorProvider, OP_PROVIDERS, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, sentModelRef, RECRAFT_STYLE_REF, resolveModel } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
 import { withVariation } from './sentPrompt';
-import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { deliveryNotes } from './delivery';
 import { isCreditError, onGenerationCredit } from './credit';
 import { InputError } from './errors';
@@ -33,7 +32,7 @@ import { resolveSendable, SchemaUnavailableError } from './schemaGuard';
 import { partialRetryCharge, retrySpec } from './retryPartial';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
-import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
+import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput, type ProviderAdapter } from './providers/types';
 import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
@@ -286,16 +285,8 @@ async function joinClips(g: Generation, ids: string[], signal: AbortSignal, musi
   return [asset.id];
 }
 
-/** Atlas developer variants: one request at a time per model, in every canvas (T4). */
-export const ATLAS_RETRY_MS = 5_000;
-/** Waits before trying a refused Atlas request again (then the error stands). */
-export const ATLAS_RETRY_WAITS = [ATLAS_RETRY_MS, 20_000, 60_000];
-const ACCESS_DENIED = /upstream access denied/i;
+/** One at a time per serialKey. */
 const series = new Map<string, Promise<unknown>>();
-
-function seriesKey(model: { id: string; provider: string }): string | null {
-  return model.provider === 'atlas' && model.id.endsWith('-developer') ? `atlas:${model.id}` : null;
-}
 
 /** Run `send` when the previous request to the same model is done; different models never wait for each other. */
 function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
@@ -326,7 +317,7 @@ export function runGeneration(id: string): Promise<string[]> {
   return p;
 }
 
-/** Retry provider credit and Atlas access failures as appropriate. */
+/** Retry provider credit failures as appropriate (a provider's own refusals: ProviderAdapter.retry). */
 async function attempt(id: string): Promise<string[]> {
   try {
     return await execute(id);
@@ -395,6 +386,7 @@ async function execute(id: string): Promise<string[]> {
     if (schema.missing?.length) throw new Error(`${model.name} needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
     const apiKey = apiKeyFor(model.provider);
     if (model.provider !== 'local' && !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
+    const adapter = ADAPTERS[model.provider];
 
     // Inputs
     let refs: MediaInput[] = [];
@@ -583,13 +575,13 @@ async function execute(id: string): Promise<string[]> {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
-      // Preserve Atlas quote accounting; a quote is not a provider-reported charge in the agent notice.
-      const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
+      // A quote is not a provider-reported charge in the agent notice.
+      const quote = adapter.quote ? await adapter.quote(model, schema, settings, n) : null;
       const send = async () => {
         await markSending(id);
         signal.throwIfAborted();
         if (proposed) checkStepAuthorization(g, proposed);
-        return ADAPTERS[model.provider].generate({
+        return adapter.generate({
         kind,
         model,
         schema,
@@ -628,10 +620,9 @@ async function execute(id: string): Promise<string[]> {
         },
       });
       };
-      const serial = seriesKey(model);
+      const serial = adapter.serialKey?.(model) ?? null;
       const once = () => (serial ? oneAtATime(serial, send) : send());
-      // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts it later: only that
-      // request is retried, spaced out; finished images are kept and not paid again.
+      // ProviderAdapter.retry: only the refused request is retried, spaced out; finished images are kept.
       let result: Awaited<ReturnType<typeof send>> | undefined;
       for (let retry = 0; ; retry++) {
         try {
@@ -640,14 +631,16 @@ async function execute(id: string): Promise<string[]> {
           patchGeneration(id, { sending: undefined });
           break;
         } catch (err) {
-          const wait = ATLAS_RETRY_WAITS[retry];
-          if (wait == null || submitted || signal.aborted || !ACCESS_DENIED.test((err as Error).message)) throw err;
+          const policy = adapter.retry;
+          const wait = policy?.waits[retry];
+          if (!policy || wait == null || submitted || signal.aborted || !policy.matches((err as Error).message)) throw err;
           const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
+          const refused = `${policy.label} refused access`;
           patchGeneration(id, {
-            statusText: `Atlas refused access${which}; trying again in ${wait / 1000} s`,
-            notes: [...(get().generations[id]?.notes ?? []).filter((x) => !x.startsWith('Atlas refused access')), `Atlas refused access ("Upstream access denied")${which}; it was tried again on its own.`],
+            statusText: `${refused}${which}; trying again in ${wait / 1000} s`,
+            notes: [...(get().generations[id]?.notes ?? []).filter((x) => !x.startsWith(refused)), `${refused} ("${policy.reason}")${which}; it was tried again on its own.`],
           });
-          logEvent('retry', { generation: id, model: g.modelName, reason: 'upstream access denied', waitMs: wait, attempt: retry + 2, image: done + 1 });
+          logEvent('retry', { generation: id, model: g.modelName, reason: policy.reason.toLowerCase(), waitMs: wait, attempt: retry + 2, image: done + 1 });
           await sleep(wait, signal);
         }
       }
@@ -734,16 +727,25 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
   finishText(g.id, result.text ?? '', result.costUsd);
 }
 
-/** Kling custom voice (fal): 5–30 s of speech → voice_id. */
+/** Adapter (by parseModelRef) and key for the one-off creations. */
+function creatorOf(g: Generation, what: string): { adapter: ProviderAdapter; apiKey: string } {
+  const provider = parseModelRef(g.modelRef)?.provider;
+  const adapter = provider ? ADAPTERS[provider] : undefined;
+  const apiKey = provider ? apiKeyFor(provider) : undefined;
+  if (!provider || !adapter || !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[provider ?? 'local']} key in Settings to create ${what}.`);
+  return { adapter, apiKey };
+}
+
+/** Custom voice (Kling): 5–30 s of speech → voice_id. */
 async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void> {
-  const apiKey = apiKeyFor('fal');
-  if (!apiKey || !ADAPTERS.fal.createVoice) throw new Error('Add your fal.ai key in Settings to create Kling voices.');
+  const { adapter, apiKey } = creatorOf(g, 'Kling voices');
+  if (!adapter.createVoice) throw new Error(`${adapter.label} cannot create voices.`);
   const seconds = get().assets[g.op!.sourceAssetId]?.duration;
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
   const input = await mediaInput(g.op!.sourceAssetId);
   await markSending(g.id);
   checkSpecialSend(g, signal);
-  const result = await ADAPTERS.fal.createVoice({
+  const result = await adapter.createVoice({
     input,
     apiKey,
     signal,
@@ -753,16 +755,16 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
   finishText(g.id, result.text ?? '', result.costUsd);
 }
 
-/** Recraft V4 style (fal): the generation's reference images → style_id. */
+/** Custom style (Recraft V4): the generation's reference images → style_id. */
 async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void> {
-  const apiKey = apiKeyFor('fal');
-  if (!apiKey || !ADAPTERS.fal.createStyle) throw new Error('Add your fal.ai key in Settings to create Recraft styles.');
+  const { adapter, apiKey } = creatorOf(g, 'Recraft styles');
+  if (!adapter.createStyle) throw new Error(`${adapter.label} cannot create styles.`);
   const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
   if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
   const inputs = await Promise.all(images.map((r) => mediaInput(r)));
   await markSending(g.id);
   checkSpecialSend(g, signal);
-  const result = await ADAPTERS.fal.createStyle({
+  const result = await adapter.createStyle({
     images: inputs,
     apiKey,
     signal,
@@ -1069,8 +1071,9 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'voice') {
-    if (!isConnected('fal')) throw new Error('Creating Kling voices needs fal.ai. Connect it in Settings.');
-    return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: 'fal bills the voice when it is created' } };
+    const host = creatorProvider(KLING_VOICE_REF);
+    if (!isConnected(host)) throw new Error(`Creating Kling voices needs ${PROVIDER_LABELS[host]}. Connect it in Settings.`);
+    return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: `${PROVIDER_LABELS[host]} bills the voice when it is created` } };
   }
   if (def.engine === 'transcribe') {
     const t = transcriberForRun(input.modelRef);
@@ -1083,7 +1086,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error(def.engine === 'video_upscale' ? 'Choose a dedicated video upscaler, not a video generation/edit model.' : `Choose a connected model that can ${def.label.toLowerCase()}.`);
   const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? reusedOpChoice(input) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
-  if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
+  if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect ${OP_PROVIDERS.map((p) => PROVIDER_LABELS[p]).join(', ').replace(/, ([^,]*)$/, ' or $1')}.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
   if (def.engine === 'video_upscale' && (!schema || schema.source === 'derived')) throw new Error('The video upscaler parameter schema is unavailable. Choose another model or reload its provider.');

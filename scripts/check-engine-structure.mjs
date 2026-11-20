@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 // 1. jobs.ts is provider-neutral: a provider's quirks are optional capabilities of its ProviderAdapter.
 // 2. Providers reach the IndexedDB cache only through cachedJson / peekCached in providers/shared.ts.
 // 3. jobs.ts holds the send, not the operation specs (opSpec.ts) or the remote-job recovery (jobRecovery.ts).
-const RULES = { jobs: false };
+const RULES = { neutral: true, split: false };
 const NAMED_PROVIDER = /\b(atlas|fal)\b/i;
 const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|inputKindOf|recover\w*|resumeRemote\w*)\b/;
 
@@ -16,11 +16,11 @@ export function structureProblems(files) {
     const lines = text.split('\n');
     lines.forEach((line, i) => {
       const at = `${path}:${i + 1}`;
-      if (path === 'src/engine/jobs.ts' && RULES.jobs) {
+      if (path === 'src/engine/jobs.ts') {
         const named = line.match(NAMED_PROVIDER);
-        if (named) problems.push(`provider-neutral-engine · ${at} · jobs.ts names the provider «${named[1]}» · move it to an optional ProviderAdapter capability (quote?, serialKey?, retry?, createVoice?, createStyle?) and pick the adapter with parseModelRef(g.modelRef)`);
+        if (named && RULES.neutral) problems.push(`provider-neutral-engine · ${at} · jobs.ts names the provider «${named[1]}» · move it to an optional ProviderAdapter capability (quote?, serialKey?, retry?, createVoice?, createStyle?) and pick the adapter with parseModelRef(g.modelRef)`);
         const moved = line.match(MOVED_OUT);
-        if (moved) problems.push(`jobs-split · ${at} · jobs.ts defines ${moved[1]} · it lives in src/engine/opSpec.ts (operation specs) or src/engine/jobRecovery.ts (remote recovery)`);
+        if (moved && RULES.split) problems.push(`jobs-split · ${at} · jobs.ts defines ${moved[1]} · it lives in src/engine/opSpec.ts (operation specs) or src/engine/jobRecovery.ts (remote recovery)`);
       }
       if (/^src\/engine\/providers\//.test(path) && path !== 'src/engine/providers/shared.ts' && /\bcacheDb\b/.test(line)) {
         problems.push(`cache-through-shared · ${at} · provider uses cacheDb directly · use cachedJson(key, ttlMs, load) or peekCached(key, ttlMs) from providers/shared.ts`);
