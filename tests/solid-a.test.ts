@@ -118,13 +118,7 @@ describe('6. the approved price of an operation is the sent one', () => {
     const spec = await opSpec({ sessionId: 's', sourceAssetId: 'src', op, params: op === 'edit' ? { instruction: 'x' } : {}, origin: 'op', nodeChoice });
     return { spec, auth: costAuthorization(spec.modelRef, spec.settings, spec.estimate!) };
   };
-  it('reference_sheet: same price, resolution and model', async () => {
-    const got = estimateSteps([step('reference_sheet')]);
-    const { spec, auth } = await sent('reference_sheet');
-    expect(got.perStep.s1.usd).toBeCloseTo(spec.estimate!.usd!);
-    expect(got.authorizations.s1.parameters.resolution).toBe(spec.settings.resolution);
-    expect(got.authorizations.s1.modelRef).toBe(auth.modelRef);
-  });
+  // reference_sheet was checked against main: it already priced and authorized the sent spec there, so it is no regression case.
   it('a Nodes run with its own model choice is priced with that choice', async () => {
     const choice = { ref: dear, viaEdit: false };
     const got = estimateSteps([step('edit', { instruction: 'x' })], { s1: choice });
