@@ -18,3 +18,7 @@ La validación exige igualdad del grafo en la ida y vuelta y que el nodo de abaj
 
 ## Estado actual (2026-10-28)
 Lo anterior es el diseño aprobado y se conserva como historial. El código de desacoplar existe (`arrange.ts`, `Operations.tsx`) con su test; la verificación visual sigue sin hacerse. Las operaciones `join_clips` y las ediciones con máscara entran del chat como resultado (`chatToNodes`, `fromChat.ts:26`); si se ejecutan desde un nodo, sin leer; los selectores de nodo aún ofrecen `edit_region` y `remove_object` (rastreo 5.8, requiere prueba).
+
+## Puertos en Omnicanvas y nombres de agentes (2026-11-19)
+El box de `.port` no se redimensiona con el zoom: React Flow ancla los cables desde su medida al montar. Un `::before` centrado dibuja la forma y recoge el arrastre con ≥ 12 px en pantalla (`--rf-zoom` acotado en 0,25). Un cable soltado sobre un puerto incompatible avisa el motivo en cualquier sentido. Los agentes se llaman «Agent N»; al cargar, los «Agent» repetidos se numeran (un «Agent» manual repetido también: el esquema no distingue manual de defecto).
+

@@ -433,7 +433,7 @@ onWriterLockGranted(() => void useStore.persist.rehydrate());
 
 /** Before the global library, subjects lived in each session: copied once (first name wins); sessions keep theirs. */
 /** A loaded session: nodes migrated, threads folded from the old shapes (agent/threads.ts), agents idle. */
-function loadedSession(s: Session): Session {
+export function loadedSession(s: Session): Session {
   const m = migrateAgents(s);
   return { ...m, graph: normalizeAgentTitles(loadMigration(m.graph)) };
 }
