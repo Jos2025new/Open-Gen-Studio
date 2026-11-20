@@ -48,7 +48,7 @@ export interface EditRequest { session: string; op: EditOp; expect?: Record<stri
 
 export type EditResult =
   | { ok: true; edgeId?: string; rev: Record<string, string> }
-  | { ok: false; error: string; conflict?: { node: string; expected: string; actual: string }; draft: EditRequest };
+  | { ok: false; error: string; notified?: boolean; conflict?: { node: string; expected: string; actual: string }; draft: EditRequest };
 
 /** The nodes whose revision the edit depends on. */
 const touched = (op: EditOp): string[] => op.op === 'compound' || op.op === 'present' || op.op === 'travel' ? [] : op.op === 'connect' ? [op.source, op.target] : op.op === 'disconnect' ? [] : op.op === 'set' ? [op.node] : op.op === 'add' ? (op.connect ? [op.connect.source] : []) : op.nodes;
@@ -257,7 +257,7 @@ export function applyEdit(req: EditRequest): EditResult {
   }
   next = pruneBroken(stampNew(graph, next));
   const locked = graphEditProblem(req.session, graph, next);
-  if (locked) { toast(locked, 'error'); return refuse(req, locked); }
+  if (locked) { toast(locked, 'error'); return { ...refuse(req, locked), notified: true }; }
   if ((op.op === 'compound' || op.op === 'present' || op.op === 'travel') && op.silent) {
     // The system keeps its own parts in step without an undo step (the same graph rules held above).
     useStore.setState((s0) => s0.sessions[req.session] ? { sessions: { ...s0.sessions, [req.session]: { ...s0.sessions[req.session], graph: next } } } : s0);

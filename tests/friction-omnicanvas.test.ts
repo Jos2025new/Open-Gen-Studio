@@ -110,3 +110,17 @@ describe('omnicanvas entry and ports', () => {
     expect(src).toMatch(/rf\.getZoom\(\)/);
   });
 });
+
+describe('a locked delete is announced once', () => {
+  it('flags the refused edit as already notified so addNode does not toast a second time', async () => {
+    const { applyEdit } = await import('../src/engine/nodecore/edit');
+    const { lockNodes } = await import('../src/engine/flow/locks');
+    graphWith();
+    const done = applyEdit({ session: sid, op: { op: 'delete', nodes: ['p'] } });
+    expect(done.ok).toBe(true);
+    const release = lockNodes(sid, ['i']);
+    const refused = applyEdit({ session: sid, op: { op: 'delete', nodes: ['i'] } });
+    release();
+    expect(refused).toMatchObject({ ok: false, notified: true });
+  });
+});

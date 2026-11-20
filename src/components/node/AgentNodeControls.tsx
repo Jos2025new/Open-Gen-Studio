@@ -18,6 +18,7 @@ export function AgentTitle({ sessionId, nodeId, title }: { sessionId: string; no
   };
   if (draft != null)
     return (
+      <span className="nc-title-edit nodrag">
       <input
         autoFocus
         className="nc-title nodrag"
@@ -33,6 +34,7 @@ export function AgentTitle({ sessionId, nodeId, title }: { sessionId: string; no
           e.stopPropagation();
         }}
       />
+      </span>
     );
   return <span className="nc-title-text" title="Double-click to rename" onDoubleClick={(e) => { e.stopPropagation(); setDraft(title); }}>{title}</span>;
 }
