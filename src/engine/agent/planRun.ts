@@ -280,17 +280,14 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const blocked = new Map<string, string>();
   const waiting = new Set<string>();
   const reuseGenerations: Record<string, string> = {};
-  // The executor knows a Nodes plan's steps by node id (`<plan>_<step>`): what it reuses or holds back is keyed the same way.
-  const exec = (id: string) => (latest.plan.workspace === 'node' ? `${latest.plan.id}_${id}` : id);
-  for (const [k, v] of [...prior]) { prior.delete(k); prior.set(exec(k), v); }
   for (const st of chosen) {
     const gid = latest.stepGenerations[st.id];
     const gen = gid ? get().generations[gid] : undefined;
-    if (gen?.status === 'done') prior.set(exec(st.id), { assetIds: gen.assetIds, text: gen.text });
-    else if (gen?.status === 'review') waiting.add(exec(st.id));
-    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[exec(st.id)] = gen.id;
-    else if (gen?.status === 'running') blocked.set(exec(st.id), 'Interrupted by reload; check the existing generation before retrying.');
-    else if (latest.stepStates[st.id] === 'error') blocked.set(exec(st.id), gen?.error ?? 'Failed');
+    if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
+    else if (gen?.status === 'review') waiting.add(st.id);
+    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[st.id] = gen.id;
+    else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
+    else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({ ...it, status: 'running', stepStates: { ...it.stepStates, ...Object.fromEntries([...blocked.keys()].map(id => [id, 'error' as StepState])) } }));
   await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked, waiting, reuseGenerations });
