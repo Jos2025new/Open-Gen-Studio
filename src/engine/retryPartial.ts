@@ -18,11 +18,20 @@ export function retrySpec(g: Generation) {
 }
 
 export function planRetryEstimate(steps: PlanStep[], perStep: Record<string, Estimate>, item: PlanFeedItem, generations: Record<string, Generation>): Estimate {
-  return sumEstimates(steps.map((step) => {
+  let unpricedSubstitute = false;
+  const total = sumEstimates(steps.map((step) => {
     const g = generations[item.stepGenerations[step.id] ?? ''];
     const estimate = perStep[step.id];
-    return item.stepStates[step.id] === 'error' && g?.assetIds.length ? retryEstimate(g.retryBaseEstimate ?? estimate, g.retryTotal ?? (g.variants ? g.assetIds.length + g.variants.length : g.settings.count), g.assetIds.length) : estimate;
+    if (item.stepStates[step.id] !== 'error' || !g) return estimate;
+    const plannedModel = 'modelRef' in step ? step.modelRef : item.stepAuthorizations?.[step.id]?.modelRef;
+    if (plannedModel && g.modelRef !== plannedModel) {
+      const actual = estimateForRetry(g);
+      unpricedSubstitute ||= actual.usd == null || Boolean(actual.lowerBound);
+      return actual;
+    }
+    return g.assetIds.length ? retryEstimate(g.retryBaseEstimate ?? estimate, g.retryTotal ?? (g.variants ? g.assetIds.length + g.variants.length : g.settings.count), g.assetIds.length) : estimate;
   }));
+  return unpricedSubstitute ? { ...total, usd: null } : total;
 }
 
 export function partialRetryCharge(g: Generation, parent?: Generation): number {

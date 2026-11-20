@@ -1,7 +1,42 @@
-import { updateFeedItem } from '../store/store';
-import { useStore } from '../store/store';
+import { updateFeedItem, useStore } from '../store/store';
+import { toast } from '../store/toasts';
+import { overLimit, overLimitText } from './budget';
+import { holdAttemptNode } from './flow/locks';
 import { applyEdit } from './nodecore/edit';
-import type { GenerationFeedItem, GraphNode, PlanFeedItem } from './types';
+import { estimateForRetry } from './retryPartial';
+import type { Generation, GenerationFeedItem, GraphNode, PlanFeedItem } from './types';
+
+export function newerAttempt(g: Generation, nodeId?: string): boolean {
+  const operationId = g.operationId ?? g.id;
+  let afterOriginal = false;
+  return Object.values(useStore.getState().generations).some((other) => {
+    if (other.id === g.id) { afterOriginal = true; return false; }
+    if (other.sessionId !== g.sessionId) return false;
+    if (other.parentId === g.id) return true;
+    // A Run starts a new operation. In the same millisecond, insertion order breaks the tie.
+    if (other.createdAt < g.createdAt || (other.createdAt === g.createdAt && !afterOriginal)) return false;
+    return (other.operationId ?? other.id) === operationId ||
+      Boolean(nodeId && other.origin === 'node' && other.stepId === nodeId);
+  });
+}
+
+/** The plan claims its steps only after checking the aggregate price. Standalone Retry checks its own price. */
+export function holdRetry(g: Generation, planItemId?: string): ReturnType<typeof holdAttemptNode> {
+  const session = useStore.getState().sessions[g.sessionId];
+  if (g.planId) {
+    const item = session?.feed.find((f) => f.id === planItemId);
+    if (item?.type !== 'plan' || item.plan.id !== g.planId || item.status !== 'running' ||
+      !g.stepId || item.stepStates[g.stepId] !== 'running' || item.stepGenerations[g.stepId] !== g.id) {
+      toast('Use Retry on the plan to run this step.', 'info');
+      return;
+    }
+  } else {
+    const estimate = estimateForRetry(g);
+    if (overLimit(estimate, g.sessionId)) { toast(overLimitText(estimate), 'info'); return; }
+  }
+  if (newerAttempt(g, g.origin === 'node' ? g.stepId : undefined)) return;
+  return holdAttemptNode(g, session?.graph.nodes ?? []);
+}
 
 /** A retry made a new attempt: the node, the card and the plan step that showed the failed one show the new one. */
 export function relinkAttempt(oldId: string, newId: string): void {

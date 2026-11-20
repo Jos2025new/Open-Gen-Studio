@@ -210,6 +210,16 @@ export default [
     tests: ['tests/engine.test.ts'],
   },
   {
+    id: 'credit-recovery',
+    what: 'El sustituto tras un 402 se presupuesta en Retry del plan. En Nodos se usa el bloqueo de Regenerate.',
+    sides: [
+      ['src/engine/credit.ts', 'const held = holdAttemptNode(g, nodes())'],
+      ['src/engine/flow/locks.ts', 'export function holdAttemptNode'],
+      ['src/engine/retryPartial.ts', 'export function planRetryEstimate'],
+    ],
+    tests: ['tests/credit-substitute.test.ts', 'tests/regenerate-node-lock.test.ts'],
+  },
+  {
     id: 'upscale-note',
     what: 'El aviso de upscale se calcula del factor que se ejecuta; si no llega a lo pedido, la tarjeta lo muestra sin plegar.',
     sides: [

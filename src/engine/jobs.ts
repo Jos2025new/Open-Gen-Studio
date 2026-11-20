@@ -37,7 +37,7 @@ import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
-import { relinkAttempt } from './relinkAttempt';
+import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { markSending, interruptedByReload } from './sendMark';
 import { consumeOnce, noteExcess } from './budget';
 
@@ -332,7 +332,7 @@ async function attempt(id: string): Promise<string[]> {
   } catch (err) {
     if (isCreditError(err)) {
       let rerun: Promise<string[]> | undefined;
-      await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration);
+      await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration, requestEstimate);
       if (rerun) return rerun;
       throw err;
     }
@@ -348,6 +348,7 @@ async function execute(id: string): Promise<string[]> {
   const signal = controller.signal;
   patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
   let g = get().generations[id];
+  let submitted = false;
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
       const assetIds = await runLocalOp(g, signal);
@@ -584,8 +585,9 @@ async function execute(id: string): Promise<string[]> {
       // Preserve Atlas quote accounting; a quote is not a provider-reported charge in the agent notice.
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
       const send = async () => {
-        if (proposed) checkStepAuthorization(g, proposed);
         await markSending(id);
+        signal.throwIfAborted();
+        if (proposed) checkStepAuthorization(g, proposed);
         return ADAPTERS[model.provider].generate({
         kind,
         model,
@@ -609,6 +611,7 @@ async function execute(id: string): Promise<string[]> {
         signal,
         onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
         onRemoteJob: (job) => {
+          submitted = true;
           const sent = get().generations[id]?.sent;
           patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sending: undefined, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
         },
@@ -632,11 +635,12 @@ async function execute(id: string): Promise<string[]> {
       for (let retry = 0; ; retry++) {
         try {
           result = await once();
+          submitted = false;
           patchGeneration(id, { sending: undefined });
           break;
         } catch (err) {
           const wait = ATLAS_RETRY_WAITS[retry];
-          if (wait == null || signal.aborted || !ACCESS_DENIED.test((err as Error).message)) throw err;
+          if (wait == null || submitted || signal.aborted || !ACCESS_DENIED.test((err as Error).message)) throw err;
           const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
           patchGeneration(id, {
             statusText: `Atlas refused access${which}; trying again in ${wait / 1000} s`,
@@ -666,7 +670,10 @@ async function execute(id: string): Promise<string[]> {
     finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined);
     return assetIds;
   } catch (err) {
-    if (err instanceof PriceReviewRequired) throw err;
+    if (err instanceof PriceReviewRequired) {
+      patchGeneration(id, { sending: undefined });
+      throw err;
+    }
     const cur = get().generations[id];
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
@@ -676,7 +683,7 @@ async function execute(id: string): Promise<string[]> {
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
-    const lostJob = !remoteJob && err instanceof NetworkError;
+    const lostJob = !remoteJob && (err instanceof NetworkError || (submitted && isCreditError(err)));
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
@@ -695,6 +702,11 @@ function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefine
   return err instanceof JobFailedError ? undefined : job;
 }
 
+function checkSpecialSend(g: Generation, signal: AbortSignal): void {
+  signal.throwIfAborted();
+  if (g.planId) checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
+}
+
 /** Audio → text with the transcriber recorded on the generation. */
 async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> {
   const model = get().catalog.transcribers?.[g.modelRef];
@@ -708,6 +720,7 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     throw new InputError('AUDIO_TOO_LARGE', `${model.name} takes files up to ${mb(model.maxDirectBytes)} MB from the app; this one is ${mb(input.blob.size)} MB. Use a shorter or compressed (MP3) clip.`);
   }
   await markSending(g.id);
+  checkSpecialSend(g, signal);
   const result = await adapter.transcribe({
     model,
     input,
@@ -728,6 +741,7 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
   const input = await mediaInput(g.op!.sourceAssetId);
   await markSending(g.id);
+  checkSpecialSend(g, signal);
   const result = await ADAPTERS.fal.createVoice({
     input,
     apiKey,
@@ -746,6 +760,7 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
   if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
   const inputs = await Promise.all(images.map((r) => mediaInput(r)));
   await markSending(g.id);
+  checkSpecialSend(g, signal);
   const result = await ADAPTERS.fal.createStyle({
     images: inputs,
     apiKey,
@@ -843,19 +858,26 @@ export async function resumeInterrupted(): Promise<void> {
   }
 }
 
-export function retryGeneration(id: string): Promise<string[]> {
+export function retryGeneration(id: string, planItemId?: string): Promise<string[]> {
   const ongoing = retrying.get(id);
   if (ongoing) return ongoing;
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
-  // Create a new Generation as another attempt of the same operation.
-  const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
-  patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
-  // The failed attempt's card now shows this one, so the retry's result is seen.
-  relinkAttempt(g.id, newG.id);
-  const retry = runGeneration(newG.id).finally(() => retrying.delete(id));
-  retrying.set(id, retry);
-  return retry;
+  const held = holdRetry(g, planItemId);
+  if (!held) return Promise.resolve(g.assetIds);
+  try {
+    // Create a new Generation as another attempt of the same operation.
+    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
+    patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
+    // The failed attempt's card now shows this one, so the retry's result is seen.
+    relinkAttempt(g.id, newG.id);
+    const retry = runGeneration(newG.id).finally(() => { retrying.delete(id); held.release(); });
+    retrying.set(id, retry);
+    return retry;
+  } catch (err) {
+    held.release();
+    return Promise.reject(err);
+  }
 }
 
 /**

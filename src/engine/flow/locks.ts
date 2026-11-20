@@ -1,4 +1,4 @@
-import type { Graph, GraphNode } from '../types';
+import type { Generation, Graph, GraphNode } from '../types';
 import { useStore } from '../../store/store';
 import { toast } from '../../store/toasts';
 
@@ -44,9 +44,17 @@ export function assetsInUse(ids: string[]): boolean {
   return [...assetLocks].some(held => ids.some(id => held.has(id)));
 }
 
-/** Regenerate on a node: the node holding any attempt of `g`'s operation (the card may show an older one) is held while the new attempt runs, so a second click cannot pay again. Toasts and returns undefined when it is already running. */
-export function holdAttemptNode(g: { id: string; sessionId: string; operationId?: string }, nodes: GraphNode[]): { node?: GraphNode; release: () => void } | undefined {
+type NodeAttempt = Pick<Generation, 'id' | 'sessionId' | 'operationId' | 'origin' | 'stepId'>;
+
+export function attemptNode(g: NodeAttempt, nodes: GraphNode[]): GraphNode | undefined {
+  // Run may fail before linking its result. Its step id is the node id.
+  if (g.origin === 'node' && g.stepId) return nodes.find((n) => n.id === g.stepId);
   const gens = useStore.getState().generations;
-  const node = nodes.find((n) => 'generationId' in n.data && n.data.generationId && (gens[n.data.generationId]?.operationId ?? n.data.generationId) === (g.operationId ?? g.id));
+  return nodes.find((n) => 'generationId' in n.data && n.data.generationId && (gens[n.data.generationId]?.operationId ?? n.data.generationId) === (g.operationId ?? g.id));
+}
+
+/** Regenerate, Retry and a late 402 answer hold the same node for the duration of their attempt. */
+export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[]): { node?: GraphNode; release: () => void } | undefined {
+  const node = attemptNode(g, nodes);
   try { return { node, release: node ? lockNodes(g.sessionId, [node.id]) : () => {} }; } catch (e) { toast((e as Error).message, 'error'); }
 }

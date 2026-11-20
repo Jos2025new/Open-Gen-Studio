@@ -11,13 +11,19 @@ vi.mock('../src/lib/idb', () => ({
 vi.mock('../src/lib/media', async (original) => ({ ...await original<typeof import('../src/lib/media')>(),
   probeMedia: async () => ({ width: 1, height: 1 }) }));
 
-import { useStore } from '../src/store/store';
+import { patchGeneration, useStore } from '../src/store/store';
 import { createGeneration, retryGeneration, runGeneration } from '../src/engine/jobs';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
 import { forgetBalances, onGenerationCredit } from '../src/engine/credit';
 import { useAlerts } from '../src/engine/alerts';
-import type { ModelSummary } from '../src/engine/types';
+import { regenerate } from '../src/engine/actions';
+import { runNodes } from '../src/engine/flow/actions';
+import { resumePlan } from '../src/engine/agent/runtime';
+import { overLimit, withOncePass } from '../src/engine/budget';
+import { planRecovery } from '../src/engine/agent/planRecovery';
+import { costAuthorization } from '../src/engine/priceAuthorization';
+import type { ModelSummary, PlanFeedItem } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
 
 /* After a 402, a dearer or unpriced substitute still asks before going over the limit; a plan step is never resent outside its plan. */
@@ -35,7 +41,7 @@ function setup(atlasUsd: number | undefined, budget: { on: boolean; usd: number 
     generations: {}, quotes: {}, assets: {}, spendLog: [], spentUsd: 0,
     settings: { ...st.settings, autoSwitchProvider: mode, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' }, budgetOn: budget.on, budgetUsd: budget.usd, budgetNoAsk: false, budgetAccepted: null },
     catalog: { ...st.catalog, models: { [NANO]: mk('nanogpt', 0.1), [ATLAS]: mk('atlas', atlasUsd) }, schemas: { [NANO]: { ref: NANO, ...schema }, [ATLAS]: { ref: ATLAS, ...schema } } as never },
-    sessions: { ...st.sessions, [st.activeSessionId]: { ...st.sessions[st.activeSessionId], noAskOverLimit: false, feed: [], agents: mainThread({ history: [], notes: [], questionRound: 0, busy: false }) } },
+    sessions: { ...st.sessions, [st.activeSessionId]: { ...st.sessions[st.activeSessionId], noAskOverLimit: false, graph: { nodes: [], edges: [] }, feed: [], agents: mainThread({ history: [], notes: [], questionRound: 0, busy: false }) } },
   });
 }
 
@@ -99,6 +105,7 @@ describe('a substitute after no credit', () => {
       useAlerts.setState({ alerts: [] });
       forgetBalances();
       const g = gen('plan-1');
+      patchGeneration(g.id, { status: 'error' });
       const rerun = vi.fn(async () => []);
       const later = vi.fn(async () => []);
       await onGenerationCredit(g.id, rerun, later);
@@ -124,5 +131,165 @@ describe('a substitute after no credit', () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(atlasSends).toBe(0);
     expect(alerts().some((a) => /already/.test(a.text))).toBe(true);
+  });
+});
+
+const imageResult = () => ({ outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.1 });
+const action = (label: string) => alerts().flatMap((a) => a.actions ?? []).find((a) => a.label.includes(label));
+const planCard = () => useStore.getState().sessions[sid()].feed.find((f): f is PlanFeedItem => f.type === 'plan')!;
+
+function failedPlan() {
+  const settings = { count: 1, advanced: {} };
+  const g = createGeneration({ sessionId: sid(), origin: 'agent', kind: 'image', prompt: 'a', modelRef: NANO, settings, inputs: { refs: [] }, planId: 'P', stepId: 's1' });
+  const item: PlanFeedItem = {
+    id: 'card', workspace: 'chat', createdAt: 1, type: 'plan', style: 'guided', status: 'error',
+    plan: { id: 'P', title: 'P', summary: '', workspace: 'chat', steps: [{ id: 's1', title: 'Image', kind: 'image', prompt: 'a', modelRef: NANO, settings, refs: [] }], adjustments: [] },
+    stepStates: { s1: 'error' }, stepGenerations: { s1: g.id },
+    stepAuthorizations: { s1: costAuthorization(NANO, settings, g.estimate) }, estimate: g.estimate,
+  };
+  useStore.setState((s) => ({ settings: { ...s.settings, priceMargin: 'off' }, sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [item] } } }));
+  return g;
+}
+
+function addNode() {
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], graph: {
+    nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Image', prompt: 'a', modelRef: NANO, outputIndex: 0, settings: { count: 1, advanced: {} } } }],
+    edges: [],
+  } } } }));
+}
+
+describe('402 recovery at the spending gate', () => {
+  it.each([undefined, 0.14])('budgets the selected plan substitute (%s) with price margin off', async (price) => {
+    setup(price, { on: true, usd: 0.12 });
+    const g = failedPlan();
+    await runGeneration(g.id).catch(() => undefined);
+    action('Atlas')!.run();
+    const estimate = planRecovery(planCard())!.estimate;
+    expect(estimate.usd).toBe(price ?? null);
+    expect(overLimit(estimate, sid())).toBe(true);
+    await resumePlan(sid(), 'card', 'retry', true);
+    expect(atlasSends).toBe(0);
+    await withOncePass(sid(), () => resumePlan(sid(), 'card', 'retry', true));
+    expect(planCard().status).toBe('done');
+    expect(atlasSends).toBe(1);
+  });
+
+  it('holds the node during a 402 resend even if the failed attempt was not linked', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    addNode();
+    await runNodes(sid(), ['n1']);
+    const first = Object.values(useStore.getState().generations)[0];
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    vi.mocked(ADAPTERS.atlas.generate).mockImplementation(async () => { atlasSends++; await pending; return imageResult(); });
+    action('Yes, this time')!.run();
+    try {
+      await vi.waitFor(() => expect(atlasSends).toBe(1));
+      await regenerate(first.id);
+      await runNodes(sid(), ['n1']).catch(() => null);
+      expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(1);
+      expect(Object.keys(useStore.getState().generations)).toEqual([first.id]);
+    } finally {
+      finish();
+      await vi.waitFor(() => expect(useStore.getState().generations[first.id].status).toBe('done'));
+    }
+  });
+
+  it('ignores a node offer after runNodes already ran that node again', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    addNode();
+    await runNodes(sid(), ['n1']);
+    const old = action('Don’t ask again')!;
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+    await runNodes(sid(), ['n1']);
+    old.run();
+    expect(alerts().some((a) => /already/.test(a.text))).toBe(true);
+    expect(useStore.getState().settings.autoSwitchProvider).toBe('ask');
+    expect(atlasSends).toBe(0);
+  });
+
+  it('does not open a budget prompt for an already retried attempt', async () => {
+    setup(0.14, { on: true, usd: 0.12 });
+    const g = gen();
+    await runGeneration(g.id).catch(() => undefined);
+    const old = action('Atlas')!;
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+    await retryGeneration(g.id);
+    old.run();
+    expect(action('Continue once')).toBeUndefined();
+    expect(atlasSends).toBe(0);
+  });
+
+  it('leaves the old plan attempt unchanged after Retry', async () => {
+    setup(0.14, { on: true, usd: 0.12 });
+    const g = failedPlan();
+    await runGeneration(g.id).catch(() => undefined);
+    const old = action('Atlas')!;
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue(imageResult());
+    await resumePlan(sid(), 'card', 'retry', true);
+    old.run();
+    expect(useStore.getState().generations[g.id].modelRef).toBe(NANO);
+    expect(atlasSends).toBe(0);
+  });
+
+  it('checks the live budget before direct Retry creates an attempt', async () => {
+    setup(0.08, { on: true, usd: 0.05 });
+    const g = gen();
+    patchGeneration(g.id, { status: 'error' });
+    await retryGeneration(g.id).catch(() => undefined);
+    expect(ADAPTERS.nanogpt.generate).not.toHaveBeenCalled();
+    expect(Object.keys(useStore.getState().generations)).toEqual([g.id]);
+  });
+
+  it('a plan generation cannot be retried directly outside the plan gate', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    const g = failedPlan();
+    patchGeneration(g.id, { status: 'error' });
+    await retryGeneration(g.id).catch(() => undefined);
+    expect(ADAPTERS.nanogpt.generate).not.toHaveBeenCalled();
+    expect(planCard().stepGenerations.s1).toBe(g.id);
+  });
+
+  it('keeps a recorded remote job for checking instead of falling back after 402', async () => {
+    setup(0.08, { on: false, usd: 5 }, 'always');
+    vi.mocked(ADAPTERS.nanogpt.generate).mockImplementationOnce(async ({ onRemoteJob }) => {
+      onRemoteJob?.({ id: 'submitted', provider: 'nanogpt', meta: {} });
+      throw new HttpError(402, 'Insufficient balance', null);
+    });
+    const g = gen();
+    await runGeneration(g.id).catch(() => undefined);
+    expect(atlasSends).toBe(0);
+    expect(useStore.getState().generations[g.id].remoteJob?.id).toBe('submitted');
+  });
+
+  it('does not resend a submitted batch request after 402 even without a resumable job', async () => {
+    setup(0.08, { on: false, usd: 5 }, 'always');
+    vi.mocked(ADAPTERS.nanogpt.generate).mockImplementationOnce(async ({ onRemoteJob }) => {
+      onRemoteJob?.({ id: 'submitted', provider: 'nanogpt', meta: {} });
+      throw new HttpError(402, 'Insufficient balance', null);
+    });
+    const g = gen();
+    patchGeneration(g.id, { settings: { ...g.settings, count: 2 } });
+    await runGeneration(g.id).catch(() => undefined);
+    expect(useStore.getState().generations[g.id].lostJob).toBe(true);
+    expect(atlasSends).toBe(0);
+  });
+
+  it('rechecks plan approval after marking a send and before calling the adapter', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    const g = failedPlan();
+    const unsub = useStore.subscribe((s) => {
+      const session = s.sessions[sid()];
+      if (session.feed.length && s.generations[g.id]?.sending != null) {
+        useStore.setState({ sessions: { ...s.sessions, [sid()]: { ...session, feed: [] } } });
+      }
+    });
+    try {
+      await runGeneration(g.id).catch(() => undefined);
+      expect(ADAPTERS.nanogpt.generate).not.toHaveBeenCalled();
+      expect(useStore.getState().generations[g.id].error).toMatch(/approval is gone/);
+    } finally {
+      unsub();
+    }
   });
 });

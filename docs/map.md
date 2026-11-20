@@ -35,7 +35,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 29 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
-| [actions.ts](../src/engine/actions.ts) | 37 | 31 |
+| [actions.ts](../src/engine/actions.ts) | 37 | 32 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
 | [render.ts](../src/engine/design/render.ts) | 31 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 31 | 9 |
@@ -58,10 +58,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
 | `src/engine` | 72 | 392 |
-| `src/engine/agent` | 62 | 148 |
+| `src/engine/agent` | 62 | 149 |
 | `src/engine/commands` | 7 | 21 |
 | `src/engine/design` | 163 | 206 |
-| `src/engine/flow` | 18 | 61 |
+| `src/engine/flow` | 18 | 62 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 22 | 30 |
@@ -72,7 +72,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 35 | 417 |
 | `src/store` | 18 | 324 |
 
-232 de 714 módulos no tienen ningún test que los importe directamente.
+231 de 714 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

@@ -365,7 +365,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         return;
       }
       // A step that fails again rejects here; its card shows the error, the plan must still settle.
-      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
+      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id, itemId)).catch(() => undefined);
       // A retry creates a new attempt and relinks the plan's step → generation mapping itself (jobs.ts relinkAttempt).
       // The latest attempt of the same operation is the one whose status counts.
       const opId = g.operationId ?? g.id;

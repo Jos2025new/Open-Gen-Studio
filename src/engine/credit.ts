@@ -7,10 +7,14 @@ import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
 import { lineKey, modelFamily } from './variants';
 import { estimateMedia } from './costs';
-import type { GenSettings, Generation, ModelSummary, ProviderId } from './types';
+import type { Estimate, GenSettings, Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
 import { overLimit, overLimitText } from './budget';
+import { attemptNode, holdAttemptNode } from './flow/locks';
+import { estimateForRetry } from './retryPartial';
+import { newerAttempt } from './relinkAttempt';
+import { applyEdit } from './nodecore/edit';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -59,8 +63,14 @@ function priceOf(m: ModelSummary): { usd: number; unit: string } | undefined {
   return sku ? { usd: sku.usd, unit: sku.unit } : undefined;
 }
 
-/** What this job costs on `m` with its own settings (B11); without a job or a price, the first published price. */
-function jobPrice(m: ModelSummary, job: { settings: GenSettings; needsImage: boolean } | undefined): { usd: number; unit: string } | undefined {
+type CreditJob = { settings: GenSettings; needsImage: boolean; estimate?: (ref: string) => Estimate };
+
+/** What this job costs on `m` with its own settings (B11). */
+function jobPrice(m: ModelSummary, job: CreditJob | undefined): { usd: number; unit: string } | undefined {
+  if (job?.estimate) {
+    const price = job.estimate(m.ref);
+    return price.usd == null || price.lowerBound ? undefined : { usd: price.usd, unit: 'job' };
+  }
   if (job && (m.kind === 'image' || m.kind === 'video' || m.kind === 'audio')) {
     const usd = estimateMedia(m.ref, m.kind, job.settings, job.needsImage, true).usd;
     if (usd != null) return { usd, unit: 'job' };
@@ -105,12 +115,11 @@ export async function creditOptions(ref: string, needsImage?: boolean): Promise<
 }
 
 /** creditOptions plus the equivalents the price cap dropped (cheapest first), so the alert can say they exist. */
-async function creditCandidates(ref: string, needsImage?: boolean, settings?: GenSettings): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
+async function creditCandidates(ref: string, needsImage?: boolean, job?: CreditJob): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
   const cur = modelSummary(ref);
   if (!cur) return { options: [], pricey: [] };
   const key = lineKey(cur);
   const family = modelFamily(cur).key;
-  const job = settings ? { settings, needsImage: Boolean(needsImage) } : undefined;
   const price = jobPrice(cur, job);
   const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && takesInputsOf(cur, m, needsImage));
   const out: CreditOption[] = [];
@@ -147,42 +156,71 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
  * failed model's price), a plan step is never resent outside its plan (its model changes and the plan's Retry runs it),
  * and an answer that comes after the card was retried or regenerated sends nothing.
  */
-export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun): Promise<boolean> {
+export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun, estimateJob?: (g: Generation) => Estimate): Promise<boolean> {
   const g = get().generations[genId];
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
   markEmpty(cur.provider);
+  if (g.remoteJob || g.lostJob) return false;
   const empty = PROVIDER_LABELS[cur.provider];
-  const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g), g.settings);
-  const switchTo = (m: ModelSummary, run = rerun) => {
-    patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: m.provider, error: undefined });
-    return run(genId);
+  const nodes = () => get().sessions[g.sessionId]?.graph.nodes ?? [];
+  const nodeId = attemptNode(g, nodes())?.id;
+  const needsImage = jobNeedsImage(g);
+  const estimate = estimateJob && ((modelRef: string) => estimateJob({ ...g, modelRef }));
+  const { options, pricey } = await creditCandidates(g.modelRef, needsImage, { settings: g.settings, needsImage, estimate });
+
+  const substitute = (o: CreditOption) => {
+    const { ref: modelRef, name: modelName, provider } = o.model;
+    const price = estimate?.(modelRef) ?? { usd: o.usd ?? null, approximate: true };
+    return { modelRef, modelName, provider, estimate: price, retryBaseEstimate: price };
   };
-  // The user's answer to an alert. A plan step: its attempt already failed the plan, so a resend here would be orphaned.
-  const answer = (o: CreditOption, what: string) => {
+  const superseded = () => {
+    const now = get().generations[genId];
+    return !now || now.status !== 'error' || now.startedAt !== g.startedAt || now.modelRef !== g.modelRef || newerAttempt(g, nodeId) ||
+      Boolean(nodeId && !nodes().some((n) => n.id === nodeId));
+  };
+  const stale = () => {
+    const item = get().sessions[g.sessionId]?.feed.find((f) => f.type === 'plan' && f.plan.id === g.planId);
+    if (!superseded() && (g.origin !== 'node' || nodeId) && (!g.planId || !g.stepId ||
+      (item?.type === 'plan' && item.stepGenerations[g.stepId] === genId && item.stepStates[g.stepId] === 'error' &&
+        (item.status === 'error' || item.status === 'partial')))) return false;
+    pushAlert({ level: 'info', text: `${cur.name} was already tried again (or is no longer failed): nothing was sent.` });
+    return true;
+  };
+
+  const answer = (o: CreditOption, what: string, remember = false) => {
+    if (stale()) return;
+    if (remember) setSettings({ autoSwitchProvider: 'always' });
+    const patch = substitute(o);
+    // The plan's Retry prices the whole recovery and is the only entry point for this step.
     if (g.planId) {
-      patchGeneration(genId, { modelRef: o.model.ref, modelName: o.model.name, provider: o.model.provider });
-      pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Press Retry on the plan to run the step; its approved price still applies.` });
+      patchGeneration(genId, patch);
+      pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Review the updated price on the plan before choosing Retry.` });
       return;
     }
-    // Answered late: the card was retried or regenerated (a newer attempt of the operation), or it is no longer failed. Sending now would pay twice.
-    const stale = () => {
-      const now = get().generations[genId];
-      const op = now?.operationId ?? genId;
-      return !now || now.status !== 'error' || Object.values(get().generations).some((x) => x.id !== genId && (x.parentId === genId || ((x.operationId ?? x.id) === op && x.createdAt > now.createdAt)));
+    const go = async () => {
+      if (stale()) return;
+      const held = holdAttemptNode(g, nodes());
+      if (!held) return;
+      try {
+        patchGeneration(genId, patch);
+        await later(genId);
+        if (held.node && get().generations[genId]?.status === 'done') {
+          applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
+        }
+      } finally {
+        held.release();
+      }
     };
-    const go = () => {
-      if (stale()) { pushAlert({ level: 'info', text: `${cur.name} was already tried again (or is no longer failed): nothing was sent.` }); return; }
-      void switchTo(o.model, later).catch(logged(what));
-    };
-    const e = { usd: o.usd ?? null, approximate: true };
-    const dearer = o.ratio === undefined || o.ratio > 1;
-    if (!dearer || !overLimit(e, g.sessionId)) return go();
+    const send = () => { void go().catch(logged(what)); };
+    const retry = estimateForRetry({ ...g, ...patch });
+    const e = retry.lowerBound ? { ...retry, usd: null } : retry;
+    if (!overLimit(e, g.sessionId)) return send();
     const id = pushAlert({
       level: 'warn',
       text: `${label(o.model, o.ratio, o.usd)}: ${overLimitText(e, '\u201cContinue once\u201d runs only this generation on that model.')}`,
       actions: [
-        { label: 'Continue once', run: () => { dismissAlert(id); go(); } },
+        { label: 'Continue once', run: () => { dismissAlert(id); send(); } },
         { label: 'Cancel', run: () => dismissAlert(id) },
       ],
     });
@@ -196,14 +234,16 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       text: `${empty} has no credit for ${cur.name}. Run it on ${PROVIDER_LABELS[auto.model.provider]} instead (${label(auto.model, undefined, auto.usd)}, same model, same price or less)?`,
       actions: [
         { label: 'Yes, this time', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit'); } },
-        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); setSettings({ autoSwitchProvider: 'always' }); answer(auto, 'switch provider after no credit'); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', true); } },
       ],
     });
     return false;
   }
   if (auto && mode === 'always') {
+    if (superseded()) return false;
     pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
-    await switchTo(auto.model);
+    patchGeneration(genId, substitute(auto));
+    await rerun(genId);
     return true;
   }
   if (options.length) {
