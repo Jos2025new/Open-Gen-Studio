@@ -9,7 +9,6 @@ import { parseRef } from '../plan';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
 import type {
   Asset,
-  AudioStep,
   GenNodeData,
   ToolNodeData,
   Generation,
@@ -17,17 +16,13 @@ import type {
   GraphEdge,
   GraphNode,
   GraphNodeData,
-  ImageStep,
   LinkKind,
-  Model3dStep,
-  OpStep,
   Plan,
   PlanStep,
   PortSpec,
   PortType,
   TextStep,
   Subject,
-  VideoStep,
 } from '../types';
 
 /* Node editor model: ports, validation, plan ↔ graph conversion and auto layout. */
@@ -396,50 +391,10 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       }
       return src.id;
     };
+    const plan = descriptorOf(d.kind)?.plan;
+    if (!plan) continue;
     const promptFrom = textFrom('prompt');
-    if (d.kind === 'image' || d.kind === 'model3d') {
-      const refs = inEdges
-        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
-        .map((e) => refFor(e.source, e.outputIndex, e.pin != null))
-        .filter((r): r is string => Boolean(r));
-      steps.push({ id, kind: d.kind, title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep | Model3dStep);
-    } else if (d.kind === 'video') {
-      const first = inEdges.find((e) => e.targetHandle === 'first');
-      const last = inEdges.find((e) => e.targetHandle === 'last');
-      const refs = inEdges
-        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo' || e.targetHandle === 'audio')
-        .map((e) => refFor(e.source, e.outputIndex, e.pin != null))
-        .filter((r): r is string => Boolean(r));
-      steps.push({
-        id,
-        kind: 'video',
-        title: d.title,
-        prompt: d.prompt,
-        promptFrom,
-        modelRef: d.modelRef,
-        settings: d.settings,
-        firstFrame: first ? refFor(first.source, first.outputIndex, first.pin != null) ?? undefined : undefined,
-        lastFrame: last ? refFor(last.source, last.outputIndex, last.pin != null) ?? undefined : undefined,
-        refs: refs.length ? refs : undefined,
-      } satisfies VideoStep);
-    } else if (d.kind === 'audio') {
-      steps.push({
-        id,
-        kind: 'audio',
-        title: d.title,
-        prompt: d.prompt,
-        promptFrom,
-        lyricsFrom: textFrom('lyrics'),
-        modelRef: d.modelRef,
-        settings: d.settings,
-        ...(d.textOutput ? { textOutput: true } : {}),
-      } satisfies AudioStep);
-    } else if (d.kind === 'tool') {
-      const input = inEdges.find((e) => e.targetHandle === 'input');
-      const ref = input ? refFor(input.source, input.outputIndex, input.pin != null) : null;
-      if (!ref) errors.push(`"${d.title}" needs an ${OPS[d.op].input} input.`);
-      steps.push({ id, kind: 'op', title: d.title, op: d.op, input: ref ?? '', params: d.params } satisfies OpStep);
-    }
+    steps.push(plan(d, { id, inEdges, textFrom, refFor: (e) => refFor(e.source, e.outputIndex, e.pin != null), errors, promptFrom }));
   }
   for (const s of steps) {
     const d = byId.get(s.id)!.data;

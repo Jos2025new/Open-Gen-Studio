@@ -1,0 +1,260 @@
+{
+ "image": {
+  "steps": [
+   {
+    "id": "t",
+    "kind": "text",
+    "title": "t",
+    "text": "a cat"
+   },
+   {
+    "id": "i",
+    "kind": "image",
+    "title": "i",
+    "prompt": "own",
+    "promptFrom": "t",
+    "modelRef": "m",
+    "settings": {
+     "n": 2
+    },
+    "refs": [
+     "asset:A1"
+    ]
+   }
+  ],
+  "runIds": [
+   "i"
+  ],
+  "errors": []
+ },
+ "imageNoPrompt": {
+  "steps": [
+   {
+    "id": "i",
+    "kind": "image",
+    "title": "i",
+    "prompt": " ",
+    "refs": []
+   },
+   {
+    "id": "m",
+    "kind": "model3d",
+    "title": "m",
+    "prompt": "",
+    "refs": []
+   }
+  ],
+  "runIds": [
+   "i",
+   "m"
+  ],
+  "errors": [
+   "\"i\" needs a prompt.",
+   "\"m\" needs a prompt."
+  ]
+ },
+ "chain": {
+  "steps": [
+   {
+    "id": "i1",
+    "kind": "image",
+    "title": "i1",
+    "prompt": "one",
+    "refs": []
+   },
+   {
+    "id": "i2",
+    "kind": "image",
+    "title": "i2",
+    "prompt": "two",
+    "refs": [
+     "i1"
+    ]
+   },
+   {
+    "id": "m",
+    "kind": "model3d",
+    "title": "m",
+    "prompt": "solid",
+    "refs": [
+     "i2"
+    ]
+   }
+  ],
+  "runIds": [
+   "i1",
+   "i2",
+   "m"
+  ],
+  "errors": []
+ },
+ "video": {
+  "steps": [
+   {
+    "id": "t",
+    "kind": "text",
+    "title": "t",
+    "text": "pan"
+   },
+   {
+    "id": "v",
+    "kind": "video",
+    "title": "v",
+    "prompt": "",
+    "promptFrom": "t",
+    "modelRef": "vm",
+    "settings": {},
+    "firstFrame": "asset:F",
+    "lastFrame": "asset:L",
+    "refs": [
+     "asset:R",
+     "asset:RV",
+     "asset:AU"
+    ]
+   }
+  ],
+  "runIds": [
+   "v"
+  ],
+  "errors": []
+ },
+ "videoNeedsPrompt": {
+  "steps": [
+   {
+    "id": "v",
+    "kind": "video",
+    "title": "v",
+    "prompt": ""
+   }
+  ],
+  "runIds": [
+   "v"
+  ],
+  "errors": [
+   "\"v\" needs a prompt."
+  ]
+ },
+ "audio": {
+  "steps": [
+   {
+    "id": "t",
+    "kind": "text",
+    "title": "t",
+    "text": "sing"
+   },
+   {
+    "id": "ly",
+    "kind": "text",
+    "title": "ly",
+    "text": "la la"
+   },
+   {
+    "id": "a",
+    "kind": "audio",
+    "title": "a",
+    "prompt": "p",
+    "promptFrom": "t",
+    "lyricsFrom": "ly",
+    "textOutput": true
+   },
+   {
+    "id": "a2",
+    "kind": "audio",
+    "title": "a2",
+    "prompt": "",
+    "lyricsFrom": "a"
+   }
+  ],
+  "runIds": [
+   "a",
+   "a2"
+  ],
+  "errors": []
+ },
+ "tool": {
+  "steps": [
+   {
+    "id": "i",
+    "kind": "image",
+    "title": "i",
+    "prompt": "x",
+    "refs": []
+   },
+   {
+    "id": "tl",
+    "kind": "op",
+    "title": "tl",
+    "op": "upscale",
+    "input": "i",
+    "params": {
+     "scale": 2
+    }
+   },
+   {
+    "id": "tl2",
+    "kind": "op",
+    "title": "tl2",
+    "op": "upscale",
+    "input": "asset:A1",
+    "params": {}
+   }
+  ],
+  "runIds": [
+   "i",
+   "tl",
+   "tl2"
+  ],
+  "errors": []
+ },
+ "toolNoInput": {
+  "steps": [
+   {
+    "id": "tl",
+    "kind": "op",
+    "title": "tl",
+    "op": "upscale",
+    "input": "",
+    "params": {}
+   }
+  ],
+  "runIds": [
+   "tl"
+  ],
+  "errors": [
+   "\"tl\" needs an image input."
+  ]
+ },
+ "subjects": {
+  "steps": [
+   {
+    "id": "i1",
+    "kind": "image",
+    "title": "i1",
+    "prompt": "face",
+    "refs": []
+   },
+   {
+    "id": "i2",
+    "kind": "image",
+    "title": "i2",
+    "prompt": "scene",
+    "refs": [],
+    "nodeSubjects": [
+     {
+      "id": "s",
+      "name": "S",
+      "from": "i1"
+     }
+    ],
+    "after": [
+     "i1"
+    ]
+   }
+  ],
+  "runIds": [
+   "i1",
+   "i2"
+  ],
+  "errors": []
+ }
+}

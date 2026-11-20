@@ -1,5 +1,5 @@
 import type { Asset, GraphNodeData, PortType } from '../types';
-import type { GraphEdge, GraphNode } from '../types';
+import type { GraphEdge, GraphNode, PlanStep } from '../types';
 import type { ResolveEnv } from './resolver';
 
 /*
@@ -13,6 +13,20 @@ export type NodeActionId = 'generate' | 'run-tool' | 'send';
 
 /** What a node delivers on an edge now: the value and the revision label of that value (`edited` when a source asset was revised). */
 export interface Delivery { value: string | null; revision: string | null; edited?: true }
+
+/** What a type needs to turn its node into one run step: the data cables of this pass and the planner's resolvers. */
+export interface StepContext {
+  id: string;
+  /** The usable data cables into the node. */
+  inEdges: readonly GraphEdge[];
+  /** The step id of the text wired into a port (undefined: none). Reports its own errors. */
+  textFrom(handle: string): string | undefined;
+  /** The step/asset reference a cable's source gives (null: nothing; the reason is already reported). */
+  refFor(edge: GraphEdge): string | null;
+  errors: string[];
+  /** The text wired into `prompt`, resolved once before `plan` runs. */
+  promptFrom: string | undefined;
+}
 
 export interface PortInfo { id: string; type: PortType; label: string; multi: boolean }
 
@@ -30,6 +44,8 @@ export interface NodeDescriptor {
   affects: Readonly<Record<string, boolean>>;
   /** What the node delivers on one edge. The resolver asks it for every input; it reads only the env it is given. */
   evaluate(node: GraphNode, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): Delivery;
+  /** The run step of a node that runs: absent for text, asset and system nodes. */
+  plan?(data: GraphNodeData, ctx: StepContext): PlanStep;
   actions: readonly NodeActionId[];
   migrate?: Readonly<Record<number, (data: GraphNodeData) => GraphNodeData>>;
 }
