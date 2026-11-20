@@ -10,6 +10,7 @@ import { estimateMedia } from './costs';
 import type { GenSettings, Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
+import { overLimit, overLimitText } from './budget';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -142,6 +143,8 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
  * A generation failed for lack of credit: switch it to the same model elsewhere (same or lower price, with credit)
  * and run it again, or show the choices above the prompt box. `rerun` runs it again inside the attempt that just failed;
  * `later` runs it from an alert the user answers afterwards (the attempt is over: it must go through the single door, runGeneration).
+ * From an alert, a dearer or unpriced substitute that would go over the limit asks first (the run was approved at the
+ * failed model's price), and a plan step is never resent outside its plan: its model changes and the plan's Retry runs it.
  */
 export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun): Promise<boolean> {
   const g = get().generations[genId];
@@ -154,6 +157,26 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: m.provider, error: undefined });
     return run(genId);
   };
+  // The user's answer to an alert. A plan step: its attempt already failed the plan, so a resend here would be orphaned.
+  const answer = (o: CreditOption, what: string) => {
+    if (g.planId) {
+      patchGeneration(genId, { modelRef: o.model.ref, modelName: o.model.name, provider: o.model.provider });
+      pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Press Retry on the plan to run the step; its approved price still applies.` });
+      return;
+    }
+    const go = () => void switchTo(o.model, later).catch(logged(what));
+    const e = { usd: o.usd ?? null, approximate: true };
+    const dearer = o.ratio === undefined || o.ratio > 1;
+    if (!dearer || !overLimit(e, g.sessionId)) return go();
+    const id = pushAlert({
+      level: 'warn',
+      text: `${label(o.model, o.ratio, o.usd)}: ${overLimitText(e, '\u201cContinue once\u201d runs only this generation on that model.')}`,
+      actions: [
+        { label: 'Continue once', run: () => { dismissAlert(id); go(); } },
+        { label: 'Cancel', run: () => dismissAlert(id) },
+      ],
+    });
+  };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
   if (auto && mode === 'ask') {
@@ -162,8 +185,8 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it on ${PROVIDER_LABELS[auto.model.provider]} instead (${label(auto.model, undefined, auto.usd)}, same model, same price or less)?`,
       actions: [
-        { label: 'Yes, this time', run: () => { dismissAlert(id); void switchTo(auto.model, later).catch(logged('switch provider after no credit')); } },
-        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); setSettings({ autoSwitchProvider: 'always' }); void switchTo(auto.model, later).catch(logged('switch provider after no credit')); } },
+        { label: 'Yes, this time', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit'); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); setSettings({ autoSwitchProvider: 'always' }); answer(auto, 'switch provider after no credit'); } },
       ],
     });
     return false;
@@ -177,7 +200,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run, dearer ones marked), or recharge ${empty}:`,
-      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); void switchTo(o.model, later).catch(logged('switch model after no credit')); } })),
+      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); answer(o, 'switch model after no credit'); } })),
     });
     return false;
   }
