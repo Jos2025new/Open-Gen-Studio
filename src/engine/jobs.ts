@@ -1,6 +1,6 @@
 import { isRestart } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
-import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
+import { checkStepAuthorization, costAuthorization, PriceReviewRequired, stepApproved } from './priceAuthorization';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
 import { getAssetBlob } from '../lib/idb';
@@ -25,7 +25,7 @@ import type { Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaK
 import { addAssets, addSpend, patchGeneration, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { markSending, interruptedByReload } from './sendMark';
-import { consumeOnce, noteExcess } from './budget';
+import { assertWithinLimit, consumeOnce, noteExcess } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { followRemote } from './jobRecovery';
 import { videoOpSeconds } from './opSpec';
@@ -96,9 +96,11 @@ export function requestEstimate(spec: GenerationSpec): Estimate {
 }
 
 export function createGeneration(spec: GenerationSpec): Generation {
+  const estimate = spec.estimate ?? estimateSpec(spec);
+  // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
+  assertWithinLimit(estimate, spec.sessionId, stepApproved(spec.sessionId, spec.planId, spec.stepId));
   consumeOnce(spec.sessionId);
   const parsed = parseModelRef(spec.modelRef);
-  const estimate = spec.estimate ?? estimateSpec(spec);
   const g: Generation = {
     id: uid('gen'),
     sessionId: spec.sessionId,

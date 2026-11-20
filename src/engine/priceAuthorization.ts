@@ -30,6 +30,15 @@ function parameterKey(a: StepAuthorization): string {
   return JSON.stringify({ ...p, advanced: Object.fromEntries(Object.entries(p.advanced).sort(([a], [b]) => a.localeCompare(b))) });
 }
 
+/** The plan step this generation belongs to was approved by the user (its card holds the price, or the Nodes run was approved). */
+export function stepApproved(sessionId: string, planId: string | undefined, stepId: string | undefined): boolean {
+  if (!planId || !stepId) return false;
+  const item = useStore.getState().sessions[sessionId]?.feed.find((f): f is PlanFeedItem => f.type === 'plan' && f.plan.id === planId);
+  if (!item) return false;
+  const key = item.plan.workspace === 'node' ? stepId.replace(`${planId}_`, '') : stepId;
+  return Boolean(item.stepAuthorizations?.[key]) || (Boolean(item.nodeRun) && item.status === 'running');
+}
+
 /** Only plan generations with a persisted approval are guarded; direct and existing-node runs keep their contract. */
 export function checkStepAuthorization(g: Generation, proposed: StepAuthorization): void {
   if (!g.planId || !g.stepId) return;

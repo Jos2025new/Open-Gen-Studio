@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { overLimit, overLimitText } from './budget';
+import { overLimit, overLimitText, withOncePass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -221,15 +221,15 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
         held.release();
       }
     };
-    const send = () => { void go().catch(logged(what)); };
+    const send = () => go().catch(logged(what));
     const retry = estimateForRetry({ ...g, ...patch });
     const e = retry.lowerBound ? { ...retry, usd: null } : retry;
-    if (!overLimit(e, g.sessionId)) return send();
+    if (!overLimit(e, g.sessionId)) return void send();
     const id = pushAlert({
       level: 'warn',
       text: `${label(o.model, o.ratio, o.usd)}: ${overLimitText(e, '\u201cContinue once\u201d runs only this generation on that model.')}`,
       actions: [
-        { label: 'Continue once', run: () => { dismissAlert(id); send(); } },
+        { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(g.sessionId, send); } },
         { label: 'Cancel', run: () => dismissAlert(id) },
       ],
     });
