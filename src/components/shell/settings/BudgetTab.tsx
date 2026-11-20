@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Bell, BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
 import { formatUsd } from '../../../lib/format';
-import { askAgain, subscribeUntilNextSession, untilNextSessionActive } from '../../../engine/budget';
+import { askAgain, noAskEverywhere, subscribeUntilNextSession, untilNextSessionActive } from '../../../engine/budget';
 import { NOTICES, setMuted, useNotice, autoSwitchMode, type AutoSwitch } from '../../../engine/notices';
 import { priceMargin } from '../../../engine/priceAuthorization';
 import { setSettings, setUi, useStore } from '../../../store/store';
@@ -49,7 +49,7 @@ export function BudgetTab() {
       {settings.budgetOn ? (
         <SetRow icon={BellOff} label="Don’t ask in any session" tip="Over-limit runs go ahead without asking, in every session.">
           <Segmented
-            value={settings.budgetNoAsk || settings.budgetAccepted === settings.budgetUsd ? 'on' : 'off'}
+            value={noAskEverywhere(settings) ? 'on' : 'off'}
             options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'On' }]}
             onChange={(v) => setSettings({ budgetNoAsk: v === 'on', budgetAccepted: null })}
             size="sm"

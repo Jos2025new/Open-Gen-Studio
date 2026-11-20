@@ -6,6 +6,7 @@ import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { LLM_LABELS } from '../../engine/providers/llm';
 import type { SpendCategory } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
+import { noAskEverywhere } from '../../engine/budget';
 import { IconButton, Segmented } from '../ui/primitives';
 import { usePref } from '../ui/hooks';
 import { ResultsMenu } from '../ui/ResultsMenu';
@@ -56,7 +57,7 @@ export function SpendingPanel() {
     return ref.includes('::') ? ref.split('::')[1] : ref;
   };
   const limitLeft = settings.budgetOn ? settings.budgetUsd - spent : null;
-  const accepted = settings.budgetOn && (settings.budgetNoAsk || settings.budgetAccepted === settings.budgetUsd);
+  const accepted = settings.budgetOn && noAskEverywhere(settings);
 
   return (
     <div className="spending">

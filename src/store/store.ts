@@ -23,6 +23,7 @@ import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import { formatUsd } from '../lib/format';
+import { noAskActive } from '../engine/noAsk';
 import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
 import { pinPaintMode } from '../engine/design/paintMode';
@@ -585,8 +586,8 @@ export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): v
     spentUsd: Math.round((st.spentUsd + usd) * 10000) / 10000,
     spendLog: entry ? [...st.spendLog, { ...entry, at: Date.now(), usd }].slice(-MAX_SPEND_LOG) : st.spendLog,
   }));
-  const { budgetOn, budgetUsd, budgetAccepted, budgetNoAsk } = get().settings;
-  const quiet = budgetNoAsk || budgetAccepted === budgetUsd || get().sessions[entry?.sessionId ?? '']?.noAskOverLimit;
+  const { budgetOn, budgetUsd } = get().settings;
+  const quiet = noAskActive(entry?.sessionId);
   if (budgetOn && !quiet && before <= budgetUsd && get().spentUsd > budgetUsd) {
     toast(`You passed your spending limit (${formatUsd(budgetUsd)}). What is running continues; new paid runs will ask first.`, 'error');
   }

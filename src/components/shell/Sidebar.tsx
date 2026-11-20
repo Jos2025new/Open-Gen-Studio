@@ -7,6 +7,7 @@ import { usePref } from '../ui/hooks';
 import { SidebarNav } from './SidebarNav';
 import { openHome } from './navModel';
 import '../../styles/sidebar-peek.css';
+import { remainingBudget } from '../../engine/budget';
 
 /** The house icon, shared by the sidebar's Home item and the top bar's Home button. */
 export function HomeIcon({ size = 18 }: { size?: number }) {
@@ -40,7 +41,7 @@ function useNarrowScreen(): boolean {
 export function Sidebar() {
   const workspace = useStore((s) => s.ui.workspace);
   const panel = useStore((s) => s.ui.panel);
-  const remaining = useStore((s) => (s.settings.budgetOn ? s.settings.budgetUsd - s.spentUsd : null));
+  const remaining = useStore((s) => remainingBudget(s));
   const spent = useStore((s) => s.spentUsd);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const home = useStore((s) => !!s.ui.home);

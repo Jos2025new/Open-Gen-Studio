@@ -4,7 +4,7 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
 import { addSpend, setSettings, useStore } from '../src/store/store';
-import { askAgain, consumeOnce, overLimit, remainingBudget, withOncePass } from '../src/engine/budget';
+import { askAgain, consumeOnce, dontAskUntilNextSession, overLimit, remainingBudget, withOncePass } from '../src/engine/budget';
 import { budgetProblem } from '../src/engine/actions';
 import { periodStart, summarizeSpend } from '../src/engine/spending';
 import { llmCallUsd } from '../src/engine/agent/runtime';
@@ -103,5 +103,18 @@ describe('spending panel aggregates (G3)', () => {
     expect(week.byCategory.find((r) => r.key === 'agent')?.estimated).toBe(true);
     expect(week.recent[0].model).toBe('glm');
     expect(summarizeSpend(log, periodStart('all', now)).total).toBeCloseTo(6.52);
+  });
+});
+
+describe('one rule for «don’t ask» (review SOLID #7)', () => {
+  it('the passed-the-limit notice does not promise a question the run will not ask', () => {
+    useStore.setState((s) => ({ spentUsd: 0.9, ui: { ...s.ui, toasts: [] } }));
+    dontAskUntilNextSession(); // the old check ignored this; the run itself will not ask
+    addSpend(0.3, entry);
+    expect(toasts().filter((t) => /passed your spending limit/.test(t))).toHaveLength(0);
+  });
+  it('remainingBudget reads the state it is given (the Sidebar badge)', () => {
+    expect(remainingBudget({ settings: { budgetOn: true, budgetUsd: 2 }, spentUsd: 0.5 })).toBeCloseTo(1.5);
+    expect(remainingBudget({ settings: { budgetOn: false, budgetUsd: 2 }, spentUsd: 0.5 })).toBeNull();
   });
 });

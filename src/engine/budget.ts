@@ -4,6 +4,9 @@ import { formatUsd } from '../lib/format';
 import { uid } from '../lib/id';
 import { appendFeed, patchSession, setUi, updateFeedItem, useStore } from '../store/store';
 import type { Estimate, NoticeFeedItem } from './types';
+import { noAskActive, setNoAskProbe } from './noAsk';
+
+export { noAskActive };
 
 /*
  * The spending limit warns, it does not block: with no limit, or once the user chose to go past it, runs go
@@ -13,8 +16,8 @@ import type { Estimate, NoticeFeedItem } from './types';
 const get = useStore.getState;
 
 /** Money left under the limit, or null when there is no limit. */
-export function remainingBudget(): number | null {
-  const { settings, spentUsd } = get();
+export function remainingBudget(state: { settings: { budgetOn: boolean; budgetUsd: number }; spentUsd: number } = get()): number | null {
+  const { settings, spentUsd } = state;
   return settings.budgetOn ? settings.budgetUsd - spentUsd : null;
 }
 
@@ -92,10 +95,15 @@ function sessionNoAsk(sessionId?: string): boolean {
   return Boolean(s.sessions[sessionId ?? s.activeSessionId]?.noAskOverLimit);
 }
 
+/** "Don't ask in any session" (or a limit accepted by an older version). */
+export function noAskEverywhere(s: { budgetUsd: number; budgetAccepted?: number | null; budgetNoAsk?: boolean }): boolean {
+  return Boolean(s.budgetNoAsk) || s.budgetAccepted === s.budgetUsd;
+}
+
 /** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", "Don't ask again until next session", or a pass just given. */
 export function overLimitAccepted(sessionId?: string): boolean {
-  const { budgetOn, budgetUsd, budgetAccepted, budgetNoAsk } = get().settings;
-  return !budgetOn || Boolean(budgetNoAsk) || budgetAccepted === budgetUsd || untilNextSessionActive() || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
+  const { budgetOn } = get().settings;
+  return !budgetOn || noAskEverywhere(get().settings) || untilNextSessionActive() || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
 }
 
 function passFor(sessionId: string): boolean {
@@ -202,3 +210,5 @@ export function ignoreExcess(sessionId: string, itemId: string): void {
 export function rerunNote(e: Estimate, sessionId?: string): string {
   return overLimit(e, sessionId) ? overLimitText(e) : 'The execution changed. Review and approve again.';
 }
+
+setNoAskProbe(overLimitAccepted);
