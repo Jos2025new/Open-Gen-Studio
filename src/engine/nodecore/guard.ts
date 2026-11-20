@@ -5,7 +5,7 @@ import { resolveInputs, storeEnv, type ResolveEnv } from './resolver';
 
 /**
  * What stops an action before anything is spent (ADR 0031 points 2 and 4): a cycle through a node it runs, and an
- * invalid cable on a required input. The planner handles type mismatches as absent inputs. A deletion tombstone
+ * invalid cable on a required input. The planner handles unpinned type mismatches as absent inputs. A deletion tombstone
  * only blocks while the required port it used is still empty.
  */
 export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): string[] {
@@ -18,8 +18,8 @@ export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): st
     const required = descriptorOf(node.data.kind)?.required ?? [];
     const inputs = resolveInputs(graph, node, env);
     for (const input of inputs) {
-      if (input.status !== 'invalid' || input.incompatible || !required.includes(input.port)) continue;
-      if (input.lost && inputs.some(i => i.port === input.port && i.status !== 'invalid')) continue;
+      if (input.status !== 'invalid' || (input.incompatible && input.mode === 'moving') || !required.includes(input.port)) continue;
+      if (input.lost && inputs.some(i => i.port === input.port && i.status !== 'invalid' && !i.incompatible)) continue;
       // A deleted source is not an invalid cable: the input is simply empty, and the run waits for it.
       problems.push(input.lost ? `“${node.data.title}”: the ${input.port} input is empty (its source was deleted).` : `“${node.data.title}”: the ${input.port} cable is invalid. ${input.reason ?? ''}`.trim());
     }

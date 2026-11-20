@@ -91,12 +91,14 @@ function systemPortsFor(src: GraphNode, tgt: GraphNode, assets: Record<string, A
   return usesSystemPorts(src, tgt, c) ? resolveSystemConnection(nodePorts(src.data, assets), nodePorts(tgt.data, assets), c) : undefined;
 }
 
+export const NO_SOURCE_OUTPUT = 'The source has no output yet.';
+
 function portProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset>, c: ConnectionPorts,
   resolved: ReturnType<typeof systemPortsFor>, unknownAsset = false): string | null {
   if (resolved) {
     if (resolved.classMismatch) return resolved.classMismatch;
     if (!resolved.tgtPort) return 'This node has no such input.';
-    if (!resolved.srcPort) return unknownAsset ? null : 'The source has no output yet.';
+    if (!resolved.srcPort) return unknownAsset ? null : NO_SOURCE_OUTPUT;
     const kind = resolved.kind ?? resolved.tgtPort.kind;
     if (c.both && kind === 'data') return 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
     if (resolved.srcPort.kind !== resolved.tgtPort.kind) return `Link class mismatch: cannot connect ${resolved.srcPort.kind} to ${resolved.tgtPort.kind}.`;
@@ -108,13 +110,16 @@ function portProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asse
   const out = outputPort(src.data, assets);
   const port = inputPorts(tgt.data).find((p) => p.id === c.targetHandle);
   if (!port) return 'This node has no such input.';
-  if (!out) return unknownAsset ? null : 'The source has no output yet.';
+  if (!out) return unknownAsset ? null : NO_SOURCE_OUTPUT;
   if (!portFits(out, port.type)) return `${port.label} expects ${port.type}, got ${out}.`;
   return null;
 }
 
 /** A cable can outlive a port's former type. Its original endpoints stay in the graph. */
 export function cablePortProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset> | undefined, edge: GraphEdge): string | null {
+  // Preserve existing agent-to-text links when reading a graph.
+  if (src.data.kind === 'ref' && src.data.type === 'agent' && tgt.data.kind === 'text' &&
+      edge.sourceHandle === 'out' && edge.targetHandle === 'in' && (edge.kind ?? 'data') === 'data' && !edge.both) return null;
   // An omitted inventory leaves the type unknown. An empty inventory can confirm deletion.
   const unknownAsset = !assets && src.data.kind === 'asset' && !!src.data.assetId;
   const inventory = assets ?? {};

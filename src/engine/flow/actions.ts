@@ -192,7 +192,7 @@ function requestContext(sessionId: string) {
     if (n.data.kind !== 'tool') return undefined;
     const engine = OPS[n.data.op].engine;
     if (['local', 'voice'].includes(engine)) return undefined;
-    const input = resolveInputs(graph, n, env).find(i => i.port === 'input' && i.from && i.status !== 'invalid');
+    const input = resolveInputs(graph, n, env).find(i => i.port === 'input' && i.from && i.status !== 'invalid' && !i.incompatible);
     const edge = input && graph.edges.find(e => e.id === input.edgeId);
     const sourceNode = input && graph.nodes.find(src => src.id === input.from);
     const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations, edge?.outputIndex) : null;

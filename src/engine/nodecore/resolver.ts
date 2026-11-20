@@ -1,6 +1,6 @@
 import { useStore } from '../../store/store';
 import type { Asset, Generation, Graph, GraphEdge, GraphNode } from '../types';
-import { cablePortProblem } from '../flow/graph';
+import { cablePortProblem, NO_SOURCE_OUTPUT } from '../flow/graph';
 import type { RefMode, RefStatus } from './address';
 import { deliverGenerated, NOTHING } from './deliver';
 import type { Delivery } from './descriptor';
@@ -38,6 +38,7 @@ export interface ResolvedInput {
   kind?: import('../types').LinkKind;
   /** Set when the cable is invalid because its pin no longer matches. */
   pinMoved?: true;
+  /** A port mismatch or an unavailable source port excludes the cable from the graph's run. */
   incompatible?: true;
   currentRevision?: string | null;
   /** The revision, only for a source whose content was revised: it joins the freshness signature. */
@@ -84,12 +85,15 @@ export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'o
 export function resolveCableInput(src: GraphNode | undefined, node: GraphNode, e: GraphEdge, env: ResolveEnv): ResolvedInput {
   const base = { port: e.targetHandle, edgeId: e.id, from: src?.id ?? null, mode: (e.pin ? 'pinned' : 'moving') as RefMode };
   if (!src) return { ...base, status: 'invalid', reason: 'The source node no longer exists.', value: null, revision: null };
-  const incompatible = cablePortProblem(src, node, env.assets, e);
-  if (incompatible) return { ...base, status: 'invalid', incompatible: true, reason: incompatible, value: null, revision: null };
+  const portProblem = cablePortProblem(src, node, env.assets, e);
+  // A missing asset makes the input empty while the existing cable still needs a notice.
+  const noAssetOutput = src.data.kind === 'asset' && portProblem === NO_SOURCE_OUTPUT;
+  if (portProblem && !noAssetOutput) return { ...base, status: 'invalid', incompatible: true, reason: portProblem, value: null, revision: null };
   if (e.outputIndex === GONE) return { ...base, status: 'invalid', reason: 'The image this link used was deleted.', value: null, revision: null };
-  const { value, revision, edited } = sourceValue(src, e, env);
+  const { value, revision, edited } = noAssetOutput ? NOTHING : sourceValue(src, e, env);
   if (e.pin && revision !== e.pin) return { ...base, status: 'invalid', pinMoved: true, currentRevision: revision, reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
-  return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: 'The source has no output yet.' } : {}), value, revision, ...(edited ? { rev: revision! } : {}) };
+  if (noAssetOutput) return { ...base, status: 'empty', incompatible: true, reason: NO_SOURCE_OUTPUT, value, revision };
+  return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: NO_SOURCE_OUTPUT } : {}), value, revision, ...(edited ? { rev: revision! } : {}) };
 }
 
 /** Every data input of a node, resolved: the value, its revision, and whether the link is usable. */
