@@ -1,3 +1,4 @@
+import { isStepKind, isVisualStep, stepInfo } from '../planSteps/inspect';
 import { agentOf, dropThread, laneState, patchLane, resolveOwner } from './lanes';
 import { MAIN_THREAD, feedOfAgentIn, feedOfChatIn } from './threads';
 import { costAskMessage, needsConfirmation, roundsFor } from '../procedure';
@@ -16,7 +17,7 @@ import { autoLayout, graphBounds, planToGraph, nodeOutputAsset } from '../flow/g
 import { activeDoc } from '../design/actions';
 import { LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, lineRoutes, sentModelRef } from '../catalog';
-import type { AgentQuestion, AgentState, Estimate, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, PlanStep, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
+import type { AgentQuestion, AgentState, Estimate, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
 import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
 import { placeFor } from '../place';
 import { appendFeed, patchSession, toast, updateFeedItem, useStore } from '../../store/store';
@@ -342,16 +343,12 @@ export async function presentPlan(
   if (plan && carried.length) plan.agentNotes = carried;
   if (signal?.aborted) return { errors: [] };
   const journey = revision ? 'plan-revision' : 'settings-correction';
-  const summarizeInputs = (step: PlanStep) => step.kind === 'video'
-    ? { references: step.refs, firstFrame: step.firstFrame, lastFrame: step.lastFrame }
-    : step.kind === 'image' || step.kind === 'model3d' ? { references: step.refs }
-      : undefined;
-  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey, event: plan ? 'plan.normalized' : 'plan.rejected', reason: plan ? 'normalizer accepted resolved steps' : 'normalizer rejected plan', sessionId, planId, before: (raw.steps ?? []).map((step) => ({ stepId: step.id, kind: step.kind, model: step.model, references: step.refs, firstFrame: step.first_frame, lastFrame: step.last_frame })), after: plan ? plan.steps.map((step) => ({ stepId: step.id, kind: step.kind, modelRef: 'modelRef' in step ? step.modelRef : undefined, inputs: summarizeInputs(step), settings: 'settings' in step ? step.settings : undefined, adjustments: plan.adjustments.filter((a) => a.startsWith(`${step.id}:`)) })) : { errors } });
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey, event: plan ? 'plan.normalized' : 'plan.rejected', reason: plan ? 'normalizer accepted resolved steps' : 'normalizer rejected plan', sessionId, planId, before: (raw.steps ?? []).map((step) => ({ stepId: step.id, kind: step.kind, model: step.model, references: step.refs, firstFrame: step.first_frame, lastFrame: step.last_frame })), after: plan ? plan.steps.map((step) => ({ stepId: step.id, kind: step.kind, modelRef: 'modelRef' in step ? step.modelRef : undefined, inputs: stepInfo(step).traceInputs(), settings: 'settings' in step ? step.settings : undefined, adjustments: plan.adjustments.filter((a) => a.startsWith(`${step.id}:`)) })) : { errors } });
   if (!plan) return { errors };
   const { total } = estimateSteps(plan.steps);
   // Automation policy (§11) on the normalized plan: cost and candidates are known only here.
   // Nothing is shown before this check: a plan that needs the settings card is not presented.
-  const settingKinds = plan.steps.map((st) => st.kind).filter((k): k is 'image' | 'video' => k === 'image' || k === 'video');
+  const settingKinds = plan.steps.filter(isVisualStep).map((st) => st.kind);
   // Direct mode decides nothing before the plan card: the composer picks the models, the card approves the cost.
   if (workspace !== 'node' && settingKinds.length && get().composer.agentStyle !== 'direct') {
     const action = needsConfirmation({
@@ -373,7 +370,7 @@ export async function presentPlan(
   let prepared: Awaited<ReturnType<typeof prepareNodeRun>> | undefined;
   if (workspace === 'node') {
     materializeNodes(sessionId, plan);
-    const targets = plan.steps.filter(s => s.kind !== 'text').map(s => `${plan.id}_${s.id}`);
+    const targets = plan.steps.filter(s => !isStepKind(s, 'text')).map(s => `${plan.id}_${s.id}`);
     prepared = await prepareNodeRun(sessionId, targets);
     nodeRun = { targets, force: true, signature: prepared.signature };
   }

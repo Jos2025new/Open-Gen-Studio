@@ -11,6 +11,7 @@ import { useStore } from '../store/store';
 import { clearPlanStop, isPlanStopped, stoppedError } from './planStop';
 import { placeFor } from './place';
 import { ESTIMATE_STEP, RUN_STEP } from './planSteps/exec';
+import { serialStep } from './planSteps/inspect';
 import type { EstimateStep, RunStep } from './planSteps/exec/env';
 
 const get = useStore.getState;
@@ -87,9 +88,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       if (id && byId.has(id) && !ids.includes(id)) ids.push(id);
     }
     // Layer steps apply in plan order so the stack matches the plan.
-    if (s.kind === 'layer') {
+    if (serialStep(s)) {
       const idx = order.indexOf(s.id);
-      const prevLayer = order.slice(0, idx).reverse().find((id) => byId.get(id)?.kind === 'layer');
+      const prevLayer = order.slice(0, idx).reverse().find((id) => serialStep(byId.get(id)));
       if (prevLayer && !ids.includes(prevLayer)) ids.push(prevLayer);
     }
     depsOf.set(s.id, ids);
@@ -231,7 +232,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         }
         if (!ds.every((d) => state.get(d) === 'done')) continue;
         // Layer steps mutate the document; run them one at a time.
-        if (active >= limit || (s.kind === 'layer' && active > 0)) continue;
+        if (active >= limit || (serialStep(s) && active > 0)) continue;
         state.set(id, 'running');
         ctx.onState(id, 'running');
         active++;

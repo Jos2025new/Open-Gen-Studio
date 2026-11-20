@@ -4,7 +4,8 @@ import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor } from '../catalog';
-import { routeVideoInputs, videoInputProblem } from '../params';
+import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
+import { isStepKind } from '../planSteps/inspect';
 import { nodeRequest, stable } from './freshness';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
@@ -255,7 +256,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     if ('sketchAssetId' in n.data && n.data.sketchAssetId && !st.assets[n.data.sketchAssetId]) errors.push(`“${n.data.title}”: the Sketch asset is missing.`);
   }
   for (const step of run.steps) {
-    for (const ref of step.kind === 'op' ? [step.input, ...Object.values(step.params).filter((v): v is string => typeof v === 'string' && v.startsWith('asset:'))] : step.kind === 'video' ? [step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((r): r is string => Boolean(r)) : 'refs' in step ? step.refs ?? [] : []) {
+    for (const ref of nodePreviewRefs(step)) {
       if (ref.startsWith('asset:') && !st.assets[ref.slice(6)]) errors.push(`${step.title}: an input asset was deleted.`);
     }
     if (!('modelRef' in step)) continue;
@@ -265,20 +266,11 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     const request = nodeRequest(graph, node, st.generations, st.library, context);
     const subjects = 'subjects' in request ? request.subjects ?? [] : [];
     if (subjects.some(s => !step.nodeSubjects?.some(b => b.name === s.name && !b.from.startsWith('asset:')) && (!s.frontal || !st.assets[s.frontal]))) errors.push(`${step.title}: a mentioned subject needs an available image.`);
-    if (step.kind === 'image' && step.refs.length + subjects.length < (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0)) errors.push(`${step.title}: the model needs an input image.`);
-    if (step.kind === 'video') {
-      const refs = step.refs ?? [];
-      const kind = (ref: string) => ref.startsWith('asset:') ? st.assets[ref.slice(6)]?.kind : graph.nodes.find(n => n.id === ref.split('#')[0])?.data.kind;
-      const images = refs.filter(r => kind(r) === 'image');
-      const videos = refs.filter(r => kind(r) === 'video');
-      const audios = refs.filter(r => kind(r) === 'audio');
-      const routed = routeVideoInputs(schema.slots, images, videos, step.firstFrame);
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), lastFrame: Boolean(step.lastFrame), sourceVideo: false, images: routed.images.length + subjects.length, videos: routed.videos.length, audios: audios.length, resolution: step.settings.resolution });
-      if (problem) errors.push(`${step.title}: ${problem}`);
-    }
-    if (step.kind === 'audio' && step.lyricsFrom && !schema.params.some(p => /lyrics/i.test(p.key))) errors.push(`${step.title}: the model takes no lyrics.`);
+    const problem = nodePreviewInputProblem(step, schema, subjects.length, (ref) =>
+      ref.startsWith('asset:') ? st.assets[ref.slice(6)]?.kind : graph.nodes.find(n => n.id === ref.split('#')[0])?.data.kind);
+    if (problem) errors.push(`${step.title}: ${problem}`);
   }
-  errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
+  errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
   const { total } = estimateSteps(run.steps, nodeOperationsOf(context, graph, run.runIds));
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id);
@@ -303,7 +295,7 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
     if (subjects.length) patchNodeData(sessionId, n.id, { subjects });
   }
   const preview = previewRun(sessionId, targets, force);
-  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [PICKABLE_VIDEO_OPS.includes(OPS[s.op].engine) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
+  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') ? [PICKABLE_VIDEO_OPS.includes(OPS[s.op].engine) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
   await Promise.all([...new Set(refs)].filter(Boolean).map(ref => ensureSchema(ref)));
   return previewRun(sessionId, targets, force);
 }

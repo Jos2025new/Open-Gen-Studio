@@ -1,3 +1,4 @@
+import { isStepKind } from '../planSteps/inspect';
 import type { AgentStyle, FeedItem, SettingsChoice } from '../types';
 
 /** The draft choice every video settings card carries; `locked`: the app fixed the resolution (draft) and only the padlock lifts it; `unlocked`: it was lifted. */
@@ -85,7 +86,7 @@ export function latestDraft(feed: FeedItem[]): DraftMode | undefined {
 export function reusedDraft(feed: FeedItem[], planId: string): DraftMode | undefined {
   const at = feed.findIndex((f) => f.id === planId);
   const plan = feed[at];
-  if (plan?.type !== 'plan' || plan.style !== 'auto' || !plan.plan.steps.some((s) => s.kind === 'video')) return undefined;
+  if (plan?.type !== 'plan' || plan.style !== 'auto' || !plan.plan.steps.some((s) => isStepKind(s, 'video'))) return undefined;
   const before = feed.slice(0, at);
   return draftAnswer(before) ? undefined : latestDraft(before);
 }

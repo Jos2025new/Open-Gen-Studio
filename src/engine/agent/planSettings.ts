@@ -1,3 +1,4 @@
+import { isVisualStep as isGen, isStepKind, stepInfo } from '../planSteps/inspect';
 import { create } from 'zustand';
 import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
@@ -32,8 +33,7 @@ export const usePlanRewrite = create<{ busy: Record<string, boolean>; failed: Re
 const setRewrite = (id: string, busy: boolean, failed?: string) => usePlanRewrite.setState((s) => ({ busy: { ...s.busy, [id]: busy }, failed: { ...s.failed, [id]: failed ?? '' } }));
 const runs = new Map<string, number>();
 
-const isGen = (s: PlanStep): s is GenStep => s.kind === 'image' || s.kind === 'video';
-const needsImage = (s: GenStep) => Boolean(s.refs?.length || (s.kind === 'video' && s.firstFrame));
+const needsImage = (s: GenStep) => Boolean(s.refs?.length || stepInfo(s).firstFrame());
 const planOf = (sessionId: string, itemId: string): PlanFeedItem | undefined => {
   const it = get().sessions[sessionId]?.feed.find((f) => f.id === itemId);
   return it?.type === 'plan' && it.status === 'awaiting' ? it : undefined;
@@ -74,7 +74,7 @@ export const planDraft = (sessionId: string, owner: string): DraftMode => laneSt
 const stepModel = (ref: string, s: GenStep) => (needsImage(s) ? sentModelRef(ref, s.kind, true) : ref);
 
 function applyChoice(s: GenStep, c: SettingsChoice): GenStep {
-  const settings = { ...s.settings, aspect: c.aspect, resolution: c.resolution, ...(s.kind === 'video' ? { duration: c.duration ?? s.settings.duration } : { count: c.count ?? s.settings.count }) };
+  const settings = { ...s.settings, aspect: c.aspect, resolution: c.resolution, ...stepInfo(s).countOrDuration(c) };
   return { ...s, modelRef: stepModel(c.modelRef, s), settings } as GenStep;
 }
 
@@ -119,14 +119,14 @@ export function changePlanDraft(sessionId: string, itemId: string, kind: DraftMo
   const schemas = get().catalog.schemas;
   let chosen: SettingsChoice | undefined;
   const steps = item.plan.steps.map((s) => {
-    if (!isGen(s) || s.kind !== 'video' || unlock || (kind === 'other' && prev.kind === 'other')) return s;
+    if (!isStepKind(s, 'video') || unlock || (kind === 'other' && prev.kind === 'other')) return s;
     const c = withModeResolution({ modelRef: s.modelRef, resolution: s.settings.resolution, needsImage: needsImage(s) }, mode, settingsOptions(schemas[s.modelRef], 'video').resolutions, s.settings.resolution);
     chosen ??= c;
     return { ...s, settings: { ...s.settings, resolution: c.resolution } } as GenStep;
   });
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...item.plan, steps } });
   const video = planSections(feedOfAgentIn(get().sessions[sessionId], laneOfItem(sessionId, itemId)), { ...item, plan: { ...item.plan, steps } }).find((x) => x.kind === 'video');
-  const comparison = item.comparisonKinds?.includes('video') || new Set(item.plan.steps.filter(isGen).filter((s) => s.kind === 'video').map((s) => modelGroup(s.modelRef))).size > 1;
+  const comparison = item.comparisonKinds?.includes('video') || new Set(item.plan.steps.filter((s) => isStepKind(s, 'video')).map((s) => modelGroup(s.modelRef))).size > 1;
   if (video && !comparison) remember(sessionId, laneOfItem(sessionId, itemId), 'video', { ...video.recommended, ...(chosen ? { resolution: chosen.resolution } : {}) }, mode);
   else patchLane(sessionId, laneOfItem(sessionId, itemId), { draftMode: mode });
 }
@@ -152,13 +152,14 @@ export function setPromptWriter(sessionId: string, itemId: string, on: boolean):
 }
 
 const MAX_PROMPT = 4000;
-const assetsOf = (s: GenStep) => [s.kind === 'video' ? s.firstFrame : undefined, ...(s.refs ?? [])].filter((r): r is string => Boolean(r?.startsWith('asset:'))).map((r) => r.slice(6));
+const assetsOf = (s: GenStep) => [stepInfo(s).firstFrame(), ...(s.refs ?? [])].filter((r): r is string => Boolean(r?.startsWith('asset:'))).map((r) => r.slice(6));
 
 /** What the writer must know of a step besides its prompt: the card's values and what each input image is for. */
 function stepInputs(s: GenStep): string {
   const v = s.settings;
   const out = [`${s.kind}${v.duration ? `, ${v.duration} s` : ''}${v.aspect ? `, ${v.aspect}` : ''}${v.resolution ? `, ${v.resolution}` : ''}`];
-  if (s.kind === 'video' && s.firstFrame) out.push(`start image ${s.firstFrame}: the clip opens on it; describe what moves and changes from it, never cite it as @Image`);
+  const firstFrame = stepInfo(s).firstFrame();
+  if (firstFrame) out.push(`start image ${firstFrame}: the clip opens on it; describe what moves and changes from it, never cite it as @Image`);
   if (s.refs?.length) out.push(`references in order ${s.refs.join(', ')}: cite them with the model's syntax (@Image1… in this order), each with its role`);
   return out.join('; ');
 }

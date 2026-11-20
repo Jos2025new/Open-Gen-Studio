@@ -1,21 +1,16 @@
+import { stepInfo } from './planSteps/inspect';
 import type { ModelSchema, PlanContinuity, PlanStep, PlanSubject, Subject } from './types';
 
-const promptTexts = (step: PlanStep) => step.kind === 'image' || step.kind === 'video' || step.kind === 'model3d' || step.kind === 'audio'
-  ? [step.prompt, ...(step.kind === 'video' ? step.settings.shots?.map(s => s.prompt) ?? [] : [])]
-  : [];
-const mentioned = (step: PlanStep) => [...new Set(promptTexts(step).flatMap(p => [...p.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)].map(m => m[1].toLowerCase())))];
+const mentioned = (step: PlanStep) => [...new Set(stepInfo(step).prompts().flatMap(p => [...p.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)].map(m => m[1].toLowerCase())))];
 const libraryRefs = (s: Subject) => [s.frontalAssetId, ...(s.refAssetIds ?? []), s.videoAssetId].filter((x): x is string => Boolean(x)).map(x => `asset:${x}`);
 export const transportsNamedSubjects = (slots?: ModelSchema['slots']) => Boolean(slots?.elements?.max || (!slots?.keyframes && (slots?.images?.max || slots?.mixedRefs?.max)));
 
 /** Actual content inputs only: scheduling and prompt text are not preservation sources. */
 function inputs(step: PlanStep, subjects: PlanSubject[], library: Subject[], implicitSubjects: boolean): string[] {
-  const own = step.kind === 'image' || step.kind === 'model3d' ? step.refs
-    : step.kind === 'video' ? [step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((x): x is string => Boolean(x))
-    : step.kind === 'op' ? [step.input, ...(step.more ?? []), ...(typeof step.params.music === 'string' && step.params.music ? [step.params.music] : [])]
-    : step.kind === 'layer' && step.source ? [step.source] : [];
+  const info = stepInfo(step);
+  const own = info.contentRefs();
   // Only image/video subject mentions are transported by the current subject contract.
-  if (step.kind !== 'image' && step.kind !== 'video') return own;
-  if (!implicitSubjects) return own;
+  if (!info.visual || !implicitSubjects) return own;
   const names = new Set(mentioned(step));
   const localNames = new Set(subjects.map(s => s.name.toLowerCase()));
   return [...own, ...subjects.filter(s => names.has(s.name.toLowerCase())).map(s => s.from), ...library.filter(s => names.has(s.name.toLowerCase()) && !localNames.has(s.name.toLowerCase())).flatMap(s => s.frontalAssetId ? [`asset:${s.frontalAssetId}`] : [])];
@@ -55,7 +50,7 @@ export function continuityErrors(groups: PlanContinuity[], steps: PlanStep[], su
 /** Agent proposals with a recurring named subject must declare all visual consumers of one actual source. */
 export function recurringSubjectErrors(steps: PlanStep[], subjects: PlanSubject[], library: Subject[], groups: PlanContinuity[]): string[] {
   const consumers = new Map<string, Set<string>>();
-  for (const step of steps) if (step.kind === 'image' || step.kind === 'video') {
+  for (const step of steps) if (stepInfo(step).visual) {
     for (const name of mentioned(step)) {
       if (!subjects.some(s => s.name.toLowerCase() === name) && !library.some(s => s.name.toLowerCase() === name)) continue;
       const ids = consumers.get(name) ?? new Set<string>();
@@ -102,7 +97,5 @@ export function exposeShotSubjects(prompt: string, shots: Array<{ prompt: string
 
 export function applyPlanStyle(step: PlanStep, style: string): void {
   const apply = (prompt: string) => prompt.includes(style) ? prompt : `${prompt}\n\nStyle: ${style}`;
-  if (step.kind !== 'image' && step.kind !== 'video') return;
-  step.prompt = apply(step.prompt);
-  if (step.kind === 'video' && step.settings.shots) step.settings.shots = step.settings.shots.map(shot => ({ ...shot, prompt: apply(shot.prompt) }));
+  stepInfo(step).editPrompts(apply);
 }

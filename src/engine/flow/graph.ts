@@ -6,6 +6,8 @@ import { ignoredRunCable, resolveInputs, sessionChatText } from '../nodecore/res
 import { descriptorOf } from '../nodecore/registry';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
+import { graphStepNeedsPrompt, graphStepNode, linkGraphStep } from '../planSteps/graph';
+import { stepInfo } from '../planSteps/inspect';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
 import type {
   Asset,
@@ -203,13 +205,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
   const nid = (stepId: string) => `${plan.id}_${stepId}`;
 
   for (const s of plan.steps) {
-    let data: GraphNodeData | null = null;
-    if (s.kind === 'text') data = { kind: 'text', title: s.title, text: s.text };
-    else if (s.kind === 'image' || s.kind === 'model3d' || s.kind === 'video')
-      data = { kind: s.kind, title: s.title, prompt: s.prompt, modelRef: s.modelRef, settings: s.settings, outputIndex: 0 };
-    else if (s.kind === 'audio')
-      data = { kind: 'audio', title: s.title, prompt: s.prompt, modelRef: s.modelRef, settings: s.settings, outputIndex: 0, ...(s.textOutput ? { textOutput: true } : {}) };
-    else if (s.kind === 'op') data = { kind: 'tool', title: s.title, op: s.op, params: s.params, outputIndex: 0 };
+    const data = graphStepNode(s);
     if (!data) continue;
     const id = nid(s.id);
     nodeOf.set(s.id, id);
@@ -252,26 +248,11 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     const p = parseRef(ref);
     if (p?.type === 'asset') return kindOf(p.id);
     const step = p?.type === 'step' ? plan.steps.find((x) => x.id === p.id) : undefined;
-    return step?.kind === 'op' ? OPS[step.op].output : step?.kind;
+    return step && stepInfo(step).graphOutput();
   };
-  const isVideo = (ref: string) => kindOfRef(ref) === 'video';
   for (const s of plan.steps) {
     const target = nodeOf.get(s.id);
-    if (!target) continue;
-    if (s.kind === 'image' || s.kind === 'model3d') {
-      link(s.promptFrom, target, 'prompt');
-      s.refs.forEach((r) => link(r, target, isVideo(r) ? 'clip' : 'ref'));
-    } else if (s.kind === 'video') {
-      link(s.promptFrom, target, 'prompt');
-      link(s.firstFrame, target, 'first');
-      link(s.lastFrame, target, 'last');
-      (s.refs ?? []).forEach((r) => link(r, target, kindOfRef(r) === 'audio' ? 'audio' : isVideo(r) ? 'refVideo' : 'ref'));
-    } else if (s.kind === 'audio') {
-      link(s.promptFrom, target, 'prompt');
-      link(s.lyricsFrom, target, 'lyrics');
-    } else if (s.kind === 'op') {
-      link(s.input, target, 'input');
-    }
+    if (target) linkGraphStep(s, (ref, port) => link(ref, target, port), kindOfRef);
   }
   return { nodes, edges };
 }
@@ -455,15 +436,9 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       s.after = s.nodeSubjects.flatMap(subj => { const p = parseRef(subj.from); return p?.type === 'step' ? [p.id] : []; });
     }
 
-    if ((s.kind === 'image' || s.kind === 'model3d' || s.kind === 'video') && !s.prompt.trim() && !s.promptFrom) {
-      const needsPrompt = !hasPromptAlternative(s.kind, s.refs?.length, s.kind === 'video' && !!s.firstFrame);
-      if (needsPrompt) errors.push(`"${s.title}" needs a prompt.`);
-    }
+    if (graphStepNeedsPrompt(s)) errors.push(`"${s.title}" needs a prompt.`);
   }
   return { steps: [...textSteps.values(), ...steps], runIds: [...run], errors };
 }
 
-/** Image/reference-driven models can run without text when the plan has a visual input. */
-export function hasPromptAlternative(kind: 'image' | 'video' | 'model3d', referenceCount = 0, hasFirstFrame = false): boolean {
-  return referenceCount > 0 || (kind === 'video' && hasFirstFrame);
-}
+export { hasPromptAlternative } from '../planSteps/graph';

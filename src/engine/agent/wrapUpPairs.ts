@@ -1,3 +1,4 @@
+import { isStepKind } from '../planSteps/inspect';
 import { useStore } from '../../store/store';
 import { parseRef } from '../plan';
 import type { LlmContentPart, PlanFeedItem } from '../types';
@@ -16,10 +17,11 @@ export async function editPairParts(item: PlanFeedItem): Promise<LlmContentPart[
   let pairs = 0;
   for (const st of item.plan.steps) {
     if (pairs >= MAX_PAIRS) break;
-    const source = st.kind === 'op' ? parseRef(st.input) : null;
+    if (!isStepKind(st, 'op')) continue;
+    const source = parseRef(st.input);
     const out = item.stepOutputs?.[st.id]?.assetIds ?? [];
     if (source?.type !== 'asset' || out.length !== 1 || assets[source.id]?.kind !== 'image' || assets[out[0]]?.kind !== 'image') continue;
-    const asked = ((st.kind === 'op' && st.note) || st.title).slice(0, 200);
+    const asked = (st.note || st.title).slice(0, 200);
     const original = await attachmentParts([source.id]);
     const result = await attachmentParts([out[0]]);
     if (![original, result].every((p) => p.some((x) => x.type === 'image_url'))) continue;

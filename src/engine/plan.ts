@@ -2,14 +2,15 @@ import { fitTotal, totalNote } from './planSent';
 import { type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, recurringSubjectErrors } from './continuity';
 import { parsePath } from './design/path';
-import { OPS } from './ops';
 import { normalizeStepRefs, type RefSpec } from './refRoles';
 import { type Realism } from './realism';
 import { fitPlanSteps, fitState } from './agent/fit';
 import { type RouteMode } from './routing';
-import type { AssetKind, GenSettings, MediaKind, ModelSchema, ModelSummary, OpId, OpStep, Plan, PlanStep, PlanSubject, PlanContinuity, ShapeSpec, StrokeSpec, StepRef, TextStyle, Workspace, SubjectKind, SettingsChoice, Subject } from './types';
+import type { AssetKind, GenSettings, MediaKind, ModelSchema, ModelSummary, OpStep, Plan, PlanStep, PlanSubject, PlanContinuity, ShapeSpec, StrokeSpec, StepRef, TextStyle, Workspace, SubjectKind, SettingsChoice, Subject } from './types';
 import { derivedSchemaErrors } from './schemaGuard';
 import { NORMALIZE_STEP } from './planSteps';
+import { isJoin, stepInfo } from './planSteps/inspect';
+import { rawStepInfo } from './planSteps/raw';
 import type { StepEnv } from './planSteps/env';
 import { num } from './planSteps/shared';
 
@@ -149,45 +150,15 @@ export function parseRef(ref: string): ParsedRef | null {
 }
 
 export function stepOutputKind(step: PlanStep): OutputKind {
-  switch (step.kind) {
-    case 'text':
-      return 'text';
-    case 'image':
-      return 'image';
-    case 'model3d':
-      return 'model3d';
-    case 'video':
-      return 'video';
-    case 'audio':
-      return step.textOutput ? 'text' : 'audio';
-    case 'op':
-      return OPS[step.op].output;
-    case 'layer':
-      return 'layer';
-  }
+  return stepInfo(step).output();
 }
 
 export function stepDeps(step: PlanStep): StepRef[] {
-  const own = ownDeps(step);
-  return step.kind === 'layer' ? own : [...own, ...(step.after ?? [])];
+  return stepInfo(step).deps();
 }
 
 export function ownDeps(step: PlanStep): StepRef[] {
-  switch (step.kind) {
-    case 'text':
-      return [];
-    case 'image':
-    case 'model3d':
-      return [...(step.promptFrom ? [step.promptFrom] : []), ...step.refs];
-    case 'video':
-      return [step.promptFrom, step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((r): r is string => Boolean(r));
-    case 'audio':
-      return [step.promptFrom, step.lyricsFrom].filter((r): r is string => Boolean(r));
-    case 'op':
-      return [step.input, ...(step.more ?? []), ...(step.refs ?? []).map((r) => r.ref), ...(typeof step.params?.music === 'string' && step.params.music ? [step.params.music] : [])];
-    case 'layer':
-      return [...(step.source ? [step.source] : []), ...(step.after ?? [])];
-  }
+  return stepInfo(step).ownDeps();
 }
 
 /**
@@ -325,8 +296,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   if (!rawSteps.length) return { plan: null, errors: ['The plan has no steps.'] };
   // A total length is split evenly over video steps that set none (snapped to the model's lengths).
   const total = Number(raw.total_duration);
-  const unset = rawSteps.filter((s) => s.kind === 'video' && s.duration == null);
-  const setSecs = rawSteps.reduce((sum, s) => sum + (s.kind === 'video' && s.duration != null ? Number(s.duration) || 0 : 0), 0);
+  const unset = rawSteps.filter((s) => rawStepInfo(s)?.clip && s.duration == null);
+  const setSecs = rawSteps.reduce((sum, s) => sum + (rawStepInfo(s)?.clip && s.duration != null ? Number(s.duration) || 0 : 0), 0);
   const share = Number.isFinite(total) && total > 0 && unset.length ? Math.max(1, Math.round((total - setSecs) / unset.length)) : undefined;
   if (share) adjustments.push(`total ${total}s: about ${share}s for each of ${unset.map((s) => s.id).join(', ')}`);
   if (rawSteps.length > maxSteps) errors.push(`Too many steps (${rawSteps.length}); the limit is ${maxSteps}.`);
@@ -340,16 +311,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
 
   const kindById = new Map<string, OutputKind>();
   for (const s of rawSteps) {
-    const k = s.kind;
-    if (k === 'text') kindById.set(s.id!, 'text');
-    else if (k === 'image' || k === 'video' || k === 'model3d') kindById.set(s.id!, k);
-    else if (k === 'audio') {
-      // A lyrics model answers with text: later steps read it through prompt_from / lyrics_from.
-      const ref = s.model?.trim() || ctx.defaultModel('audio', false);
-      kindById.set(s.id!, ref && (await ctx.getModel(ref))?.model.textOutput ? 'text' : 'audio');
-    }
-    else if (k === 'op' && s.op && s.op in OPS) kindById.set(s.id!, OPS[s.op as OpId].output);
-    else if (k === 'layer') kindById.set(s.id!, 'layer');
+    const output = rawStepInfo(s)?.output(s, ctx);
+    const kind = output instanceof Promise ? await output : output;
+    if (kind) kindById.set(s.id!, kind);
   }
 
   const refKind = (ref: string | undefined, where: string): OutputKind | 'raster' | null => {
@@ -396,7 +360,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     }
     if (p?.type === 'step') {
       const st = steps.find((x) => x.id === p.id);
-      return st?.kind === 'image' ? st.settings.aspect : undefined;
+      return st && stepInfo(st).imageAspect();
     }
     return undefined;
   };
@@ -424,15 +388,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   // A clip chained to a clip starts where the previous one ends (its last frame) and ends where the next one
   // starts (its first frame).
   for (const s of rawSteps) {
-    if (s.kind !== 'video') continue;
-    if (isVideo(s.first_frame)) {
-      adjustments.push(`${s.id}: first_frame ${s.first_frame} is a clip → its last frame`);
-      s.first_frame = frameOf(s.first_frame!, 'last', s.id!);
-    }
-    if (isVideo(s.last_frame)) {
-      adjustments.push(`${s.id}: last_frame ${s.last_frame} is a clip → its first frame`);
-      s.last_frame = frameOf(s.last_frame!, 'first', s.id!);
-    }
+    rawStepInfo(s)?.repairFrames?.(s, isVideo, frameOf, adjustments);
   }
   const env: StepEnv = { ctx, raw, rawSteps, errors, adjustments, steps, st, ids, share, total, stepRoles, fit, refKind, expectImage, inputAspect, frameOf, frames };
   for (const s of rawSteps) {
@@ -442,7 +398,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     else errors.push(`${where}: unknown kind "${s.kind}". Use text, image, video, audio, op or layer.`);
   }
 
-  if (ctx.workspace === 'node' && steps.some((s) => s.kind === 'layer')) errors.push('Layer steps are not valid in the Node workspace.');
+  if (ctx.workspace === 'node') {
+    const problems = new Set(steps.flatMap((s) => stepInfo(s).nodePlanProblem ?? []));
+    errors.push(...problems);
+  }
   const library = ctx.librarySubjects?.() ?? [];
   const knownNames = [...(ctx.subjectNames?.() ?? []), ...library.map((x) => x.name)];
   const subjects = planSubjects(raw.subjects, steps, refKind, errors, adjustments, knownNames);
@@ -460,13 +419,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   }
   // Candidates end a plan: no later step may take one of several results the user has not picked (not in Nodes).
   if (ctx.workspace !== 'node') {
-    // Steps with count > 1, and ops that make several.
-    const several = (st: PlanStep) => ((st.kind === 'image' || st.kind === 'video') && (st.settings.count ?? 1) > 1) || (st.kind === 'op' && Number(st.params.count ?? 1) > 1);
-    const candidates = new Set(steps.filter(several).map((st) => st.id));
+    const candidates = new Set(steps.filter((st) => stepInfo(st).hasCandidates()).map((st) => st.id));
     for (const st of steps) {
       const uses = stepDeps(st).map((r) => parseRef(r)).filter((p) => p?.type === 'step' && candidates.has(p.id)).map((p) => p!.id);
       for (const id of new Set(uses)) {
-        errors.push(`${st.id}: uses ${id}, which makes ${steps.find((x) => x.id === id)!.kind === 'video' ? 'several clips' : 'several images'} for the user to choose from — the user has not picked one yet. Fix: end this plan at ${id} (drop ${st.id} and every step after it that needs ${id}); after the user picks, the next plan uses the chosen result.`);
+        errors.push(`${st.id}: uses ${id}, which makes ${stepInfo(steps.find((x) => x.id === id)!).candidateLabel} for the user to choose from — the user has not picked one yet. Fix: end this plan at ${id} (drop ${st.id} and every step after it that needs ${id}); after the user picks, the next plan uses the chosen result.`);
       }
     }
   }
@@ -543,8 +500,7 @@ function planSubjects(
     if (p?.type !== 'step') continue;
     for (const st of steps) {
       if (st.id === p.id) continue;
-      const text = st.kind === 'image' || st.kind === 'video' || st.kind === 'model3d' || st.kind === 'audio' ? st.prompt : st.kind === 'op' ? Object.values(st.params).join(' ') : undefined;
-      if ((mentions(text, subj.name) || (st.kind === 'video' && st.settings.shots?.some((shot) => mentions(shot.prompt, subj.name)))) && !(st.after ?? []).includes(p.id)) st.after = [...(st.after ?? []), p.id];
+      if (stepInfo(st).prompts().some((text) => mentions(text, subj.name)) && !(st.after ?? []).includes(p.id)) st.after = [...(st.after ?? []), p.id];
     }
   }
   return out;
@@ -557,18 +513,15 @@ const REF_SYNTAX = /^(image|video|audio|element)\d+$/i;
 function unknownMentions(steps: PlanStep[], known: string[], errors: string[]): void {
   const names = new Set(known.map((n) => n.toLowerCase()));
   for (const st of steps) {
-    if (st.kind !== 'image' && st.kind !== 'video') continue;
-    const prompts = [st.prompt, ...(st.kind === 'video' ? st.settings.shots?.map((shot) => shot.prompt) ?? [] : [])];
+    const info = stepInfo(st);
+    if (!info.visual) continue;
+    const prompts = info.prompts();
     for (const m of prompts.flatMap((prompt) => [...prompt.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)])) {
       const n = m[1];
       if (REF_SYNTAX.test(n) || names.has(n.toLowerCase())) continue;
       errors.push(`step ${st.id}: @${n} is not in the library; for temporary use of an existing image, carry it in refs and cite its role with the model reference syntax, or describe without @ if no reference is needed. A subject from an image step is temporary; use subjects from asset:<id> only when the user explicitly asked to save or accepted an offer to save.`);
     }
   }
-}
-
-function isJoin(s: PlanStep): s is OpStep {
-  return s.kind === 'op' && OPS[s.op].multiInput === true;
 }
 
 /**

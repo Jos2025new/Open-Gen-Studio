@@ -11,7 +11,8 @@ export default [
       ['src/engine/actions.ts', 'sourceVideo: false'],
       ['src/engine/planSteps/media.ts', 'sourceVideo: false'],
       ['src/engine/planFix.ts', 'export function videoFix'],
-      ['src/engine/flow/actions.ts', 'sourceVideo: false'],
+      ['src/engine/flow/actions.ts', 'nodePreviewInputProblem(step'],
+      ['src/engine/planSteps/graph.ts', 'sourceVideo: false'],
       ['src/engine/agent/providerFit.ts', 'sourceVideo: false'],
       ['src/engine/providers/nanogpt.ts', 'const frameRules ='],
       ['src/engine/providers/openrouter.ts', 'export const openrouter'],
@@ -24,7 +25,7 @@ export default [
     sides: [
       ['src/engine/continuity.ts', 'export function recurringSubjectErrors'],
       ['src/engine/plan.ts', 'ctx.strictContinuity'],
-      ['src/engine/plan.ts', 'st.settings.shots'],
+      ['src/engine/planSteps/inspect.ts', 'if (step.settings.shots)'],
       ['src/engine/agent/runtimeShared.ts', 'strictContinuity:'],
       ['src/engine/sendInputs.ts', 'schema.slots.shots?.exclusivePrompt'],
       ['src/engine/subjectPrompts.ts', 'export function mapSubjectPrompts'],

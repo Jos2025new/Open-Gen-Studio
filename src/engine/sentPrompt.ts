@@ -1,5 +1,6 @@
 import { opRealism } from './realism';
 import { variantPrompt } from './variantPrompt';
+import { isVisualStep, stepInfo } from './planSteps/inspect';
 import type { PlanStep } from './types';
 
 type RealismSource = Parameters<typeof opRealism>[0];
@@ -21,7 +22,7 @@ export const withVariation = (shown: string, variation?: string): string => (var
  * from another step, a storyboard that replaces the prompt, references that fail to load).
  */
 export function stepSentPrompt(s: PlanStep, modelId: string, variation?: string): string {
-  if (s.kind !== 'image' && s.kind !== 'video') return '';
-  const g: RealismSource = { settings: s.settings, inputs: { refs: s.refs ?? [], firstFrame: s.kind === 'video' ? s.firstFrame : undefined } };
+  if (!isVisualStep(s)) return '';
+  const g: RealismSource = { settings: s.settings, inputs: { refs: s.refs ?? [], firstFrame: stepInfo(s).firstFrame() } };
   return sentPrompt(g, s.kind, s.prompt, modelId, variation);
 }

@@ -1,3 +1,4 @@
+import { stepInfo } from '../planSteps/inspect';
 import { claimLaneOfItem, laneOfItem, laneState, patchLane, viewedLane } from './lanes';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun } from '../flow/actions';
@@ -379,7 +380,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   for (const st of chosen) {
     if (item.stepStates[st.id] !== 'done' && !recovered.has(st.id)) continue;
     const g = genNow(st.id);
-    prior.set(st.id, g ? { assetIds: g.assetIds, text: g.text } : st.kind === 'text' ? { assetIds: [], text: st.text } : { assetIds: [], layerId: null });
+    prior.set(st.id, g ? { assetIds: g.assetIds, text: g.text } : stepInfo(st).resumedOutput());
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
     ...it,

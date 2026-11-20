@@ -1,3 +1,4 @@
+import { isVisualStep, stepInfo } from '../planSteps/inspect';
 import { lineRoutes } from '../catalog';
 import type { PlanStep, SettingsChoice } from '../types';
 import { rememberSessionModel } from './sessionModel';
@@ -7,8 +8,7 @@ import { rememberSessionModel } from './sessionModel';
  * A rejected or never-approved plan never reaches this.
  */
 export function inheritApproved(sessionId: string, owner: string, steps: PlanStep[], comparisons: readonly ('image' | 'video')[] = []): void {
-  type Gen = Extract<PlanStep, { kind: 'image' | 'video' }>;
-  const gens = steps.filter((step): step is Gen => step.kind === 'image' || step.kind === 'video');
+  const gens = steps.filter(isVisualStep);
   for (const kind of ['image', 'video'] as const) {
     if (comparisons.includes(kind)) continue;
     const of = gens.filter((step) => step.kind === kind && step.modelRef);
@@ -19,8 +19,8 @@ export function inheritApproved(sessionId: string, owner: string, steps: PlanSte
       modelRef: line(step.modelRef),
       aspect: step.settings.aspect,
       resolution: step.settings.resolution,
-      needsImage: Boolean(step.refs?.length || (step.kind === 'video' && step.firstFrame)),
-      ...(step.kind === 'video' ? { duration: step.settings.duration } : { count: step.settings.count }),
+      needsImage: Boolean(step.refs?.length || stepInfo(step).firstFrame()),
+      ...stepInfo(step).countOrDuration(),
     };
     rememberSessionModel(sessionId, owner, kind, choice, true);
   }
@@ -35,15 +35,14 @@ export function inheritApproved(sessionId: string, owner: string, steps: PlanSte
  * kind, so they never set it.
  */
 export function confirmApproved(sessionId: string, owner: string, steps: PlanStep[], comparisons: readonly ('image' | 'video')[] = []): void {
-  type Gen = Extract<PlanStep, { kind: 'image' | 'video' }>;
-  const gens = steps.filter((s): s is Gen => s.kind === 'image' || s.kind === 'video');
+  const gens = steps.filter(isVisualStep);
   for (const kind of ['image', 'video'] as const) {
     if (comparisons.includes(kind)) continue;
     const of = gens.filter((s) => s.kind === kind && s.modelRef);
     const line = (ref: string) => lineRoutes(ref).text ?? ref;
     if (!of.length || new Set(of.map((s) => line(s.modelRef))).size > 1) continue;
     const s = of[0];
-    const choice: SettingsChoice = { modelRef: line(s.modelRef), aspect: s.settings.aspect, resolution: s.settings.resolution, needsImage: Boolean(s.refs?.length || (s.kind === 'video' && s.firstFrame)), ...(s.kind === 'video' ? { duration: s.settings.duration } : { count: s.settings.count }) };
+    const choice: SettingsChoice = { modelRef: line(s.modelRef), aspect: s.settings.aspect, resolution: s.settings.resolution, needsImage: Boolean(s.refs?.length || stepInfo(s).firstFrame()), ...stepInfo(s).countOrDuration() };
     rememberSessionModel(sessionId, owner, kind, choice);
   }
 }
