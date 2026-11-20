@@ -50,6 +50,15 @@ describe('a Nodes plan has one door to the provider', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('a plan generation whose card is gone from the feed is refused at the send, not sent', async () => {
+    const { checkStepAuthorization } = await import('../src/engine/priceAuthorization');
+    const st = useStore.getState();
+    useStore.setState({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [] } } });
+    const g = { id: 'g', sessionId: sid, planId: 'pln', stepId: 'pln_s1', inputs: { refs: [] } } as never;
+    const proposed = { modelRef: 'local::studio-image', parameters: { count: 1, advanced: {} }, estimate: { usd: 0.01 } } as never;
+    expect(() => checkStepAuthorization(g, proposed)).toThrow(/no longer in the chat/);
+  });
+
   it('a plan step nobody authorized is refused at the send, not sent', async () => {
     const { checkStepAuthorization } = await import('../src/engine/priceAuthorization');
     const st = useStore.getState();
