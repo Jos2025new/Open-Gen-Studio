@@ -36,15 +36,16 @@ function branchesInProject({ program, checker }: Project, kinds: string[]): stri
     ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken,
     ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken,
   ]);
+  const root = `${process.cwd()}/`;
+  const engineRoot = `${root}src/engine/`;
   function isStepKindProperty(symbol: TypeSymbol | undefined, source: string): boolean {
     return symbol?.declarations.some((handle) => {
       const decl = handle.resolve();
-      if (!decl) return false;
-      if (!ts.isInterfaceDeclaration(decl.parent)) return false;
-      const file = decl.getSourceFile().fileName;
-      return (file.endsWith('/engine/types.ts') && decl.parent.heritageClauses?.some((clause) =>
+      if (!decl || !ts.isInterfaceDeclaration(decl.parent)) return false;
+      if (!decl.getSourceFile().fileName.startsWith(engineRoot)) return false;
+      return Boolean(decl.parent.heritageClauses?.some((clause) =>
         clause.types.some((type) => type.expression.getText() === 'StepBase')))
-        || (file.endsWith('/engine/plan.ts') && decl.parent.name.text === 'RawStep' && source.endsWith('/engine/plan.ts'));
+        || (decl.parent.name.text === 'RawStep' && source.endsWith('/engine/plan.ts'));
     }) ?? false;
   }
   function isStepKind(expression: ts.Expression): boolean {
@@ -58,7 +59,7 @@ function branchesInProject({ program, checker }: Project, kinds: string[]): stri
       }
       if (!declaration || !ts.isVariableOrParameterDeclaration(declaration)) return false;
       const type = declaration.type;
-      if (type && ts.isIndexedAccessTypeNode(type) && type.objectType.getText() === 'PlanStep'
+      if (type && ts.isIndexedAccessTypeNode(type) && (type.objectType.getText() === 'PlanStep' || (type.objectType.getText() === 'RawStep' && source.endsWith('/engine/plan.ts')))
         && ts.isLiteralTypeNode(type.indexType) && ts.isStringLiteral(type.indexType.literal) && type.indexType.literal.text === 'kind') return true;
       const initializer = declaration.initializer;
       return Boolean(initializer && (ts.isPropertyAccessExpression(initializer) || ts.isElementAccessExpression(initializer)) && isStepKind(initializer));
@@ -74,7 +75,6 @@ function branchesInProject({ program, checker }: Project, kinds: string[]): stri
     return false;
   }
   const isKindLiteral = (expression: ts.Expression) => (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) && kinds.includes(expression.text);
-  const root = `${process.cwd()}/`;
   for (const fileName of program.getSourceFileNames()) {
     if (!fileName.startsWith(root)) continue;
     const path = fileName.slice(root.length);
