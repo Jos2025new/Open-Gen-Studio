@@ -67,7 +67,7 @@ export const commands = [
   nodeCommand({
     id: 'nodes.action.run',
     title: 'Run an approved action',
-    description: 'Runs a prepared snapshot under a run id. The same run id again never sends twice: it returns the running or finished run, and after a failure re-runs only what is still stale. Spends money.',
+    description: 'Runs a prepared snapshot under a run id. One approval pays for one send: the same run id again returns the running or finished run (failed included) and never sends twice; another id with a used approval is refused. After a failure, or after a reload (approvals are not kept), prepare and approve again. Spends money.',
     args: z.object({ approval: z.string().min(1).max(80), runId: z.string().min(1).max(80).optional() }).strict(),
     effect: 'spend',
     estimate: (_on, args) => snapshotById(args.approval)?.preview.estimate ?? { usd: 0 } as never,
