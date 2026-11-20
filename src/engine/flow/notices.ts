@@ -59,9 +59,19 @@ export function graphNotices(graph: Graph, env: ResolveEnv): GraphNotice[] {
   });
 }
 
-export function countNotices(notices: readonly GraphNotice[], nodeIds: readonly string[]): number {
+export interface NoticeSummary { count: number; hasErrors: boolean }
+
+export function summarizeNotices(notices: readonly GraphNotice[]): NoticeSummary {
+  return { count: notices.length, hasErrors: notices.some(n => n.kind !== 'pin') };
+}
+
+export function groupNotices(notices: readonly GraphNotice[], nodeIds: readonly string[]) {
   const members = new Set(nodeIds);
-  return notices.filter(n => members.has(n.nodeId)).length;
+  return summarizeNotices(notices.filter(n => members.has(n.nodeId)));
+}
+
+export function countNotices(notices: readonly GraphNotice[], nodeIds: readonly string[]): number {
+  return groupNotices(notices, nodeIds).count;
 }
 
 /** Adopting a revision is an explicit edit of this cable. A stale hover action cannot fix it to a different revision. */

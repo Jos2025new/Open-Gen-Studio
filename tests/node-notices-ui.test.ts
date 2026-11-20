@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { Position, ReactFlowProvider } from '@xyflow/react';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { CableMarker, NOTICE_IN, ProblemBadge, ProblemList } from '../src/components/node/CanvasNotices';
-import { canvasGroups } from '../src/components/node/CanvasElements';
+import { CableMarker, NOTICE_IN, noticeEdgeTypes, ProblemBadge, ProblemList } from '../src/components/node/CanvasNotices';
+import { TooltipLayer } from '../src/components/ui/TooltipLayer';
+import { canvasGroups, closedGroupNotices } from '../src/components/node/CanvasElements';
 import { flowEdges } from '../src/components/node/LinkBar';
 import type { CableNotice, PortNotice } from '../src/engine/flow/notices';
 import type { Graph } from '../src/engine/types';
@@ -32,6 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
 });
 
 it('keeps an invalid cable drawable using an anchor when the old port is gone', () => {
@@ -57,8 +60,9 @@ it('shows the problem count and each row dispatches its own jump', () => {
 
 it('projects a count for closed groups and hides only their nodes and drawn cables', () => {
   const notices = [prompt, { ...invalid, nodeId: 'other' }];
-  const open = canvasGroups(graph, new Map(), 'session', new Set(), notices, vi.fn());
-  const closed = canvasGroups(graph, new Map(), 'session', new Set(['group']), notices, vi.fn());
+  const folded = new Set(['group']);
+  const open = canvasGroups(graph, new Map(), 'session', new Set(), new Map(), vi.fn());
+  const closed = canvasGroups(graph, new Map(), 'session', folded, closedGroupNotices(graph.groups, folded, notices), vi.fn());
   expect(open.frames[0].data.problems).toBe(0);
   expect(closed.frames[0].data.problems).toBe(1);
   expect([...closed.hidden]).toEqual(['image', 'text']);
@@ -69,14 +73,34 @@ it('projects a count for closed groups and hides only their nodes and drawn cabl
   expect(container.textContent).toBe('1');
 });
 
-it('marks a moved pin separately and keeping it dismisses the hover actions', () => {
+it('keeps a moved pin visible and explains why the old value cannot be used', () => {
   const moved: CableNotice = { ...invalid, kind: 'pin', pin: 'old', next: 'new' };
   act(() => root.render(createElement(CableMarker, { notice: moved, sessionId: 'session' })));
   expect(container.querySelector('.node-cable-marker')?.classList.contains('is-invalid')).toBe(false);
   const [useNew, keep] = container.querySelectorAll<HTMLButtonElement>('.node-pin-actions button');
   expect(useNew.textContent).toBe('Use new value');
   expect(keep.textContent).toBe('Keep pinned');
+  expect(keep.disabled).toBe(true);
+  expect(keep.getAttribute('aria-description')).toMatch(/unavailable/i);
   act(() => keep.click());
-  expect(container.querySelector('.node-pin-actions')).toBeNull();
+  expect(container.querySelector('.node-pin-actions')).not.toBeNull();
   expect(container.querySelector('.node-cable-marker')).not.toBeNull();
+});
+
+
+it('shows the incompatible-cable reason when hovering over its interaction stroke', () => {
+  vi.useFakeTimers();
+  act(() => root.render(createElement(ReactFlowProvider, null,
+    createElement('svg', null, createElement(noticeEdgeTypes.notice, {
+      id: 'edge', data: { notice: invalid, sessionId: 'session' },
+      source: 'image', target: 'text', sourceX: 10, sourceY: 10, targetX: 200, targetY: 90,
+      sourcePosition: Position.Right, targetPosition: Position.Left, interactionWidth: 20,
+    })),
+    createElement(TooltipLayer),
+  )));
+  expect(document.querySelector('[role=tooltip]')).toBeNull();
+  const path = container.querySelector('.react-flow__edge-interaction')!;
+  act(() => path.dispatchEvent(new Event('pointerover', { bubbles: true })));
+  act(() => vi.advanceTimersByTime(400));
+  expect(document.querySelector('[role=tooltip]')?.textContent).toBe(invalid.message);
 });

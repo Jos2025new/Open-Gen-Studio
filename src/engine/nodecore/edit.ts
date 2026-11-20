@@ -82,7 +82,7 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
     const again = graph.edges.find(dup);
     if (again?.pin && op.replaces !== again.id) return replaceConflict(again, op.replaces, target, targetHandle, graph) ?? { error: `The cable ${again.id} is pinned; name it to wire it again.` };
     next = { ...graph, edges: withEdge(graph.edges, edge, !multi) };
-    return finishConnect(graph, next, edge.id, source, target, kind);
+    return finishConnect(next, edge.id, source, target, kind, assets);
   }
   const problem = connectionError(graph, assets, { source, target, targetHandle: op.targetHandle, sourceHandle: op.sourceHandle, kind: op.kind, both: op.both });
   if (problem) return { error: problem };
@@ -100,7 +100,7 @@ function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, asset
   const sameSource = !!replacedEdge && !!added && sameSourcePort(replacedEdge, added) && op.replaces == null && !replacedEdge.pin; // wiring the same cable again is not a replacement
   const refused = isSingle && !sameSource ? replaceConflict(replacedEdge, op.replaces, target, targetHandle, graph) : null;
   if (refused) return refused;
-  return finishConnect(graph, next, added?.id ?? '', source, target, kind);
+  return finishConnect(next, added?.id ?? '', source, target, kind, assets);
 }
 
 function replaceConflict(occupant: GraphEdge | undefined, replaces: string | null | undefined, target: string, port: string, graph: Graph) {
@@ -111,16 +111,16 @@ function replaceConflict(occupant: GraphEdge | undefined, replaces: string | nul
   return { error: `The input "${port}" already has a cable (${occupant.id}); name it as the one to replace.`, conflict: { node: target, expected: replaces ?? 'none', actual: occupant.id } };
 }
 
-function finishConnect(_before: Graph, next: Graph, edgeId: string, source: string, target: string, kind: LinkKind) {
+function finishConnect(next: Graph, edgeId: string, source: string, target: string, kind: LinkKind, assets: Record<string, import('../types').Asset>) {
   if (kind === 'data') {
-    const loop = findCycle(next);
+    const loop = findCycle(next, assets);
     if (loop) return { error: `That connection would create a loop (${loop.join(' → ')}).` };
   }
   return { next, edgeId, source, target };
 }
 
 /** Why a composed change is refused, or null. */
-function compoundProblem(before: Graph, after: Graph, dropped: string[]): string | null {
+function compoundProblem(before: Graph, after: Graph, dropped: string[], assets: Record<string, import('../types').Asset>): string | null {
   const alive = new Set(after.nodes.map((n) => n.id));
   const rewired = after.edges.find((e) => { const was = before.edges.find((x) => x.id === e.id); return was && !dropped.includes(e.id) && (was.source !== e.source || was.target !== e.target || was.sourceHandle !== e.sourceHandle || was.targetHandle !== e.targetHandle || was.outputIndex !== e.outputIndex || was.pin !== e.pin || was.kind !== e.kind); });
   if (rewired) return `That change would silently rewire the cable ${rewired.id}; name it in the dropped list and add a new one.`;
@@ -137,7 +137,7 @@ function compoundProblem(before: Graph, after: Graph, dropped: string[]): string
   if (fake) return `The invalid cable ${fake.edge.id} would not be a real loss (its consumer must be there, its source gone).`;
   const twice = after.broken?.find((b, i) => after.broken!.findIndex((c) => c.edge.id === b.edge.id) !== i);
   if (twice) return `The invalid cable ${twice.edge.id} would be listed twice.`;
-  const loop = findCycle(after);
+  const loop = findCycle(after, assets);
   return loop ? `That would create a loop (${loop.join(' → ')}).` : null;
 }
 
@@ -209,7 +209,11 @@ export function applyEdit(req: EditRequest): EditResult {
         if (stray) return refuse(req, `"${stray}" is not a parameter of a ${node.data.kind} node.`);
       }
       next = { ...graph, nodes: graph.nodes.map((n) => n.id === op.node ? { ...n, data: { ...n.data, ...op.patch } as GraphNodeData } : n) };
-      if ('subjects' in op.patch) { const loop = findCycle(next); if (loop) return refuse(req, `That would create a loop (${loop.join(' → ')}).`); }
+      // Changing a port's type can reactivate a cable kept on the graph.
+      if ('subjects' in op.patch || 'textOutput' in op.patch || 'op' in op.patch) {
+        const loop = findCycle(next, st.assets);
+        if (loop) return refuse(req, `That would create a loop (${loop.join(' → ')}).`);
+      }
       break;
     }
     case 'add': {
@@ -225,7 +229,7 @@ export function applyEdit(req: EditRequest): EditResult {
     case 'compound': {
       const made = op.change(graph);
       const { graph: after, dropped } = 'graph' in made ? made : { graph: made as Graph, dropped: [] as string[] };
-      const problem = compoundProblem(graph, after, dropped);
+      const problem = compoundProblem(graph, after, dropped, st.assets);
       if (problem) return refuse(req, problem);
       next = after;
       break;

@@ -27,7 +27,7 @@ import type { PortNotice } from '../../engine/flow/notices';
 export { RunButton } from './NodeRunButton';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. `panel`: the canvas shows the Selection panel, which holds the result's tools. */
-export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean; missing?: PortNotice[]; noticeIn?: boolean; noticeOut?: boolean; spaceProblems?: number };
+export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean; missing?: PortNotice[]; noticeIn?: boolean; noticeOut?: boolean; spaceProblems?: number; spaceHasErrors?: boolean };
 export type FlowNode = Node<FlowNodeData>;
 
 export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage, ref: Layers } as const;

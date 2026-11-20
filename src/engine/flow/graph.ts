@@ -109,6 +109,12 @@ export function nodePorts(data: GraphNodeData, assets: Record<string, Asset> = {
 }
 
 function reaches(edges: GraphEdge[], from: string, to: string): boolean {
+  const next = new Map<string, string[]>();
+  for (const e of edges) {
+    const targets = next.get(e.source);
+    if (targets) targets.push(e.target);
+    else next.set(e.source, [e.target]);
+  }
   const stack = [from];
   const seen = new Set<string>();
   while (stack.length) {
@@ -116,7 +122,7 @@ function reaches(edges: GraphEdge[], from: string, to: string): boolean {
     if (n === to) return true;
     if (seen.has(n)) continue;
     seen.add(n);
-    edges.filter((e) => (e.kind ?? 'data') === 'data' && e.source === n).forEach((e) => stack.push(e.target));
+    for (const target of next.get(n) ?? []) stack.push(target);
   }
   return false;
 }
@@ -143,9 +149,7 @@ function systemPortsFor(src: GraphNode, tgt: GraphNode, assets: Record<string, A
 }
 
 function portProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset>, c: ConnectionPorts,
-  resolved: ReturnType<typeof systemPortsFor>, existing = false): string | null {
-  // Callers without the asset inventory cannot infer an existing asset cable's type.
-  const unknownAsset = existing && src.data.kind === 'asset' && !!src.data.assetId && !assets[src.data.assetId];
+  resolved: ReturnType<typeof systemPortsFor>, unknownAsset = false): string | null {
   if (resolved) {
     if (resolved.classMismatch) return resolved.classMismatch;
     if (!resolved.tgtPort) return 'This node has no such input.';
@@ -167,8 +171,20 @@ function portProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asse
 }
 
 /** A cable can outlive a port's former type. Its original endpoints stay in the graph. */
-export function cablePortProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset>, edge: GraphEdge): string | null {
-  return portProblem(src, tgt, assets, edge, systemPortsFor(src, tgt, assets, edge), true);
+export function cablePortProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset> | undefined, edge: GraphEdge): string | null {
+  // An omitted inventory leaves the type unknown. An empty inventory can confirm deletion.
+  const unknownAsset = !assets && src.data.kind === 'asset' && !!src.data.assetId;
+  const inventory = assets ?? {};
+  return portProblem(src, tgt, inventory, edge, systemPortsFor(src, tgt, inventory, edge), unknownAsset);
+}
+
+export function compatibleDataEdges(graph: Graph, assets?: Record<string, Asset>): GraphEdge[] {
+  const nodes = new Map(graph.nodes.map(n => [n.id, n]));
+  return graph.edges.filter(edge => {
+    if ((edge.kind ?? 'data') !== 'data') return false;
+    const source = nodes.get(edge.source), target = nodes.get(edge.target);
+    return source && target && !cablePortProblem(source, target, assets, edge);
+  });
 }
 
 export function connectionError(
@@ -184,7 +200,7 @@ export function connectionError(
   const problem = portProblem(src, tgt, assets, c, system);
   if (problem) return problem;
   const kind = system?.kind ?? system?.tgtPort?.kind ?? 'data';
-  return kind === 'data' && reaches(graph.edges, c.target, c.source) ? 'That connection would create a loop.' : null;
+  return kind === 'data' && reaches(compatibleDataEdges(graph, assets), c.target, c.source) ? 'That connection would create a loop.' : null;
 }
 
 export { resultHandle, NO_RESULT, GONE_HANDLE } from './results';
@@ -350,8 +366,14 @@ function finishedText(node: GraphNode, generations: Record<string, Generation>):
   return g?.status === 'done' && g.text != null ? g.text : undefined;
 }
 
-/** Topological execution order determined strictly by `data` links (never by screen position). */
-export function executionOrder(graph: Graph, targets?: string[]): string[] {
+/** Topological execution order through compatible data links and subject bindings. */
+export function executionOrder(graph: Graph, targets?: string[], assets?: Record<string, Asset>): string[] {
+  const sources = new Map<string, string[]>();
+  for (const edge of compatibleDataEdges(graph, assets)) {
+    const incoming = sources.get(edge.target);
+    if (incoming) incoming.push(edge.source);
+    else sources.set(edge.target, [edge.source]);
+  }
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const roots = targets?.length ? targets : graph.nodes.filter((n) => runsGeneration(n.data)).map((n) => n.id);
   const visited = new Set<string>();
@@ -363,7 +385,7 @@ export function executionOrder(graph: Graph, targets?: string[]): string[] {
     if (!n) return;
     visiting.add(id);
     const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap((s) => { const p = parseRef(s.from); return p?.type === 'step' ? [p.id] : []; }) : [];
-    const dataSources = graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === id).map((e) => e.source);
+    const dataSources = sources.get(id) ?? [];
     for (const srcId of [...dataSources, ...subjectIds]) visit(srcId);
     visiting.delete(id);
     visited.add(id);
@@ -386,7 +408,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const targetSet = new Set(targets);
   // The plan takes its cables from the resolver (ADR 0031 point 3): an invalid one (a pinned revision that moved, a
   // deleted image) delivers nothing, so it is neither run for nor handed to the provider.
-  const env = { generations, assets: options.assets ?? {}, chatText: sessionChatText };
+  const env = { generations, assets: options.assets, chatText: sessionChatText };
   const badEdges = new Map<string, Set<string>>();
   const unusable = (id: string): Set<string> => {
     if (!badEdges.has(id)) { const n = byId.get(id); badEdges.set(id, new Set(n ? resolveInputs(graph, n, env).filter(ignoredRunCable).map(i => i.edgeId) : [])); }

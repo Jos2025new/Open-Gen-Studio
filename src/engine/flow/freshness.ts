@@ -41,7 +41,7 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
   const previous = 'generationId' in d && d.generationId ? generations[d.generationId] : undefined;
   // A port the descriptor declares as not affecting the result is not part of the request (same rule as the invalidation walk).
   const affects = descriptorOf(d.kind)?.affects ?? {};
-  const incoming = incomingOf(resolveInputs(graph, node, { ...storeEnv(), generations, assets: ctx.assets ?? {} })).filter(e => affects[e.port] !== false);
+  const incoming = incomingOf(resolveInputs(graph, node, { ...storeEnv(), generations, assets: ctx.assets })).filter(e => affects[e.port] !== false);
   const promptText = incoming.find(e => e.port === 'prompt')?.value;
   const prompt = composePrompt(d, promptText);
   const locals = [...(previous?.inputs?.subjects ?? [])];

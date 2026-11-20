@@ -73,7 +73,7 @@ export function SpaceNode({ data, selected }: NodeProps<FlowNode>) {
         <div className="nc-label">
           <Icon size={12} />
           <span className="nc-title-text">{live?.title ?? d.title}</span>
-          {space === 'nodes' && live?.badge === 'Space' && <ProblemBadge count={data.spaceProblems ?? 0} />}
+          {space === 'nodes' && live?.badge === 'Space' && <ProblemBadge count={data.spaceProblems ?? 0} hasErrors={data.spaceHasErrors} />}
           {live?.badge ? <span className="nc-sys-badge">{live.badge}</span> : null}
         </div>
         <div className="omni-look nodrag">

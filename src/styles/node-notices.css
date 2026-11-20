@@ -37,7 +37,7 @@
   font-size: var(--fs-xs);
   line-height: 1.2;
 }
-.node-cable-marker.is-invalid { color: var(--danger); }
+.node-cable-marker.is-invalid, .node-problem-badge.is-error { color: var(--danger); }
 .node-notice-details {
   display: none;
   position: absolute;
@@ -70,6 +70,7 @@
   border-radius: var(--r-s);
 }
 .node-pin-actions button { width: auto; white-space: nowrap; }
+.node-pin-actions button:disabled { opacity: 0.55; pointer-events: none; }
 .node-notice-details button:is(:hover, :focus-visible) { background: var(--surface-2); }
 .group-frame.is-collapsed { border: 0; }
 .group-frame.is-collapsed > .group-head { bottom: auto; top: 0; left: 0; }

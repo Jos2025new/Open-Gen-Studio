@@ -94,7 +94,7 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect }: { session
 
 const COLORS = [undefined, '#d8ff3a', '#5ec8ff', '#b892ff', '#ff7ab6', '#ffc25e', '#86e3a5'];
 
-export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collapsed: boolean; problems: number; toggle(groupId: string): void }, 'group'>;
+export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collapsed: boolean; problems: number; hasErrors?: boolean; toggle(groupId: string): void }, 'group'>;
 
 /**
  * A group as a container on the canvas: a frame behind its nodes, sized from them (it follows them as they move).
@@ -102,11 +102,11 @@ export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collaps
  * optional background color (none by default).
  */
 export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<GroupFlowNode>) {
-  const { group, sessionId, collapsed, problems, toggle } = data;
+  const { group, sessionId, collapsed, problems, hasErrors, toggle } = data;
   const [editing, setEditing] = useState(false);
   const [palette, setPalette] = useState(false);
   return (
-    <div className={`group-frame ${selected ? 'is-selected' : ''}${collapsed ? ' is-collapsed' : ''}`} style={group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : undefined}>
+    <div className={`group-frame ${selected ? 'is-selected' : ''}${collapsed ? ' is-collapsed' : ''}`} style={!collapsed && group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : undefined}>
       <div className="group-head">
         <button type="button" className="nt-btn nodrag" aria-expanded={!collapsed}
           aria-label={collapsed ? 'Expand group' : 'Collapse group'} data-tip={collapsed ? 'Expand group' : 'Collapse group'}
@@ -130,9 +130,9 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
             {group.title}
           </span>
         )}
-        <ProblemBadge count={problems} />
+        <ProblemBadge count={problems} hasErrors={hasErrors} />
         {'detachedOutputs' in group ? <button type="button" className="nt-btn nodrag" onClick={() => ungroup(sessionId, group.id)}>Reattach outputs</button> : null}
-        <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
+        <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={!collapsed && group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
         {palette ? (
           <span className="group-palette nodrag">
             {COLORS.map((c) => (

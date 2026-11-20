@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react';
 import { setUi, toast, useStore } from '../../store/store';
 import { editPresentation } from '../../engine/nodecore/edit';
-import { ensureOmniNodes, ordinaryGraph } from '../../engine/nodes/omni';
+import { ensureOmniNodes } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
@@ -45,9 +45,9 @@ import { chatItem, loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
-import { canvasGroups, useCanvasElements } from './CanvasElements';
+import { canvasGroups, closedGroupNotices, useCanvasElements } from './CanvasElements';
 import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
-import { useCanvasNotices } from './useCanvasNotices';
+import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
@@ -58,16 +58,16 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const sessionId = useStore((s) => s.activeSessionId);
   const fullGraph = useStore((s) => s.sessions[s.activeSessionId].graph);
   // The ordinary canvas draws what it always drew: the omnicanvas-only nodes (system parts, Spaces) stay out of it.
-  const graph = useMemo(() => (omni ? fullGraph : ordinaryGraph(fullGraph)), [fullGraph, omni]);
+  const { graph, revision, fullRevision, ordinaryRevision } = useCanvasGraphs(fullGraph, omni);
   // Opening the omnicanvas brings the session's parts in as nodes (idempotent; no undo step).
   useEffect(() => { if (omni) ensureOmniNodes(sessionId); }, [omni, sessionId]);
   const assets = useStore((s) => s.assets);
-  const generations = useStore((s) => s.generations);
-  const feed = useStore((s) => s.sessions[s.activeSessionId].feed);
+  const generations = useStore((s) => embedded || omni ? undefined : s.generations);
+  const feed = useStore((s) => embedded || omni ? undefined : s.sessions[s.activeSessionId].feed);
   // Chat results not on this canvas yet: one click (or "continue here" to the agent) brings them as connected nodes.
   const fromChat = useMemo(
-    () => chatWorkNotInNodes(sessionId).map(chatItem),
-    [sessionId, graph, generations, feed],
+    () => embedded || omni ? [] : chatWorkNotInNodes(sessionId).map(chatItem),
+    [sessionId, revision, generations, feed, embedded, omni],
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
@@ -75,7 +75,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     if (removedNodes.length) setSelected((prev) => { const next = new Set(prev); removedNodes.forEach((id) => next.delete(id)); return next; });
     if (removedEdges.length) setSelectedEdges((prev) => { const next = new Set(prev); removedEdges.forEach((id) => next.delete(id)); return next; });
   });
-  const selectNodes = (ids: Iterable<string>) => { setSelected(new Set(ids)); setSelectedEdges(new Set()); };
+  const selectNodes = useCallback((ids: Iterable<string>) => { setSelected(new Set(ids)); setSelectedEdges(new Set()); }, []);
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
   // Cut (scissors, X) is a passing tool: it is not remembered, and X or Escape returns to the last one.
@@ -146,7 +146,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
 
-  const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullGraph, graph);
+  const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const toggleGroup = useCallback((id: string) => {
     setClosed(prev => {
@@ -157,21 +157,22 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     setSelected(new Set());
     setSelectedEdges(new Set());
   }, []);
+  const groupNotices = useMemo(() => closedGroupNotices(revision.groups, closed, notices), [revision.groups, closed, notices]);
   const { frames, hidden } = useMemo(
-    () => canvasGroups(graph, measured, sessionId, closed, notices, toggleGroup),
-    [graph, measured, sessionId, closed, notices, toggleGroup],
+    () => canvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup),
+    [graph, measured, sessionId, closed, groupNotices, toggleGroup],
   );
-  const jumpToNode = (id: string) => {
-    if (hidden.has(id)) {
-      const groups = graph.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
+  const jumpToNode = useCallback((id: string) => {
+    const groups = revision.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
+    if (groups.some(g => closed.has(g.id))) {
       setClosed(prev => new Set([...prev].filter(gid => !groups.some(g => g.id === gid))));
     }
     selectNodes([id]);
     focusNodes(sessionId, [id]);
-  };
+  }, [revision.groups, closed, selectNodes, sessionId]);
 
   const { nodes, edges } = useCanvasElements({
-    graph, assets, generations, selected, selectedEdges, measured, frames, hidden,
+    graph, revision, assets, selected, selectedEdges, measured, frames, hidden,
     byPort, byCable, spaceProblems, sessionId, omni, embedded,
   });
 
@@ -362,7 +363,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     return () => window.removeEventListener('keydown', key);
   }, [sessionId, selected]);
 
-  const runIds = runnableIds(graph.nodes);
+  const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 
   const liveSelected = useMemo(() => {
     const ids = new Set(graph.nodes.map((n) => n.id));

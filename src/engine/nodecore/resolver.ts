@@ -12,7 +12,7 @@ import { feedOwner } from '../agent/threads';
  */
 export interface ResolveEnv {
   generations: Record<string, Generation>;
-  assets: Record<string, Asset>;
+  assets?: Record<string, Asset>;
   /** The last user message of a chat node / last reply of an agent node (undefined: none, or its session is gone). */
   chatText(node: GraphNode): string | undefined;
 }
@@ -84,7 +84,7 @@ export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'o
   else if (data.kind === 'ref') value = env.chatText(src!);
   else if (data.kind === 'asset') {
     value = data.sketchAssetId ?? data.assetId;
-    const rev = data.assetId ? normalizeAssetRevisions(env.assets[data.assetId]) : undefined;
+    const rev = data.assetId ? normalizeAssetRevisions(env.assets?.[data.assetId]) : undefined;
     if (value) revision = `${value}@${rev ? `${rev.index}/${rev.versions.length}` : '0'}`;
     if (rev && rev.versions.length > 1) edited = true;
   } else {

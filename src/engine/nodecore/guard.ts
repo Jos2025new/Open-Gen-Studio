@@ -10,7 +10,7 @@ import { resolveInputs, storeEnv, type ResolveEnv } from './resolver';
  */
 export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): string[] {
   const problems: string[] = [];
-  const cycle = findCycle(graph);
+  const cycle = findCycle(graph, env.assets);
   if (cycle && cycle.some((id) => runIds.includes(id))) problems.push(`The graph contains a cycle (${cycle.join(' → ')}).`);
   for (const id of runIds) {
     const node = graph.nodes.find((n) => n.id === id);

@@ -211,12 +211,15 @@ export function runnableIds(nodes: GraphNode[]): string[] {
 
 function requestContext(sessionId: string) {
   const st = get(), graph = st.sessions[sessionId].graph;
+  const env = storeEnv();
   return { schemas: st.catalog.schemas, assets: st.assets, operation: (n: GraphNode) => {
     if (n.data.kind !== 'tool') return undefined;
     const engine = OPS[n.data.op].engine;
     if (['local', 'voice'].includes(engine)) return undefined;
-    const sourceNode = graph.nodes.find(src => src.id === graph.edges.find(e => e.target === n.id && e.targetHandle === 'input')?.source);
-    const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations) : null;
+    const input = resolveInputs(graph, n, env).find(i => i.port === 'input' && i.from && i.status !== 'invalid');
+    const edge = input && graph.edges.find(e => e.id === input.edgeId);
+    const sourceNode = input && graph.nodes.find(src => src.id === input.from);
+    const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations, edge?.outputIndex) : null;
     const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
     const fromModel = opFollowsSource(engine) ? opModelFromRef(sourceRef, engine === 'edit' ? 'image' : 'video') : null;
     // A step from a confirmed plan carries the model the user approved (and the estimate priced): it wins over the source's model.
@@ -396,7 +399,7 @@ export function restoreNodes(sessionId: string, deleted: DeletedNodes): { error:
     if (occupied || problem) { skipped.push(`${edge.id}: ${occupied ? 'port changed since deletion' : problem}`); continue; }
     const candidate = { ...next, edges: [...next.edges, { ...edge }] };
     // Subjects can close a loop the cable-to-cable check does not see.
-    if (findCycle(candidate)) { skipped.push(`${edge.id}: would create a loop`); continue; }
+    if (findCycle(candidate, get().assets)) { skipped.push(`${edge.id}: would create a loop`); continue; }
     next = candidate;
   }
   return { error: editCompound(sessionId, 'restore', () => next), skipped };

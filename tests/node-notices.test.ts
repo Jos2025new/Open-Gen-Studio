@@ -116,3 +116,51 @@ describe('canvas notices', () => {
     expect(graphNotices(current(), env)).toEqual([]);
   });
 });
+
+it('ignores incompatible backlinks for connecting, cycle guards, consumers and execution order', async () => {
+  const { connectionError, executionOrder } = await import('../src/engine/flow/graph');
+  const { consumersOf, findCycle } = await import('../src/engine/nodecore/deps');
+  const other = { ...image('other'), id: 'other' };
+  const back = cable('other', 'image', 'prompt');
+  const forward = { ...cable('image', 'other', 'ref'), id: 'forward' };
+  const graph = { nodes: [image('local'), other], edges: [back] };
+  const cyclicOnPaper = { ...graph, edges: [back, forward] };
+  expect.soft(connectionError(graph, assets, forward)).toBeNull();
+  expect.soft(executionOrder(graph, ['image'])).toEqual(['image']);
+  expect.soft(findCycle(cyclicOnPaper)).toBeNull();
+  expect.soft(consumersOf(cyclicOnPaper, ['other'])).toEqual([]);
+  expect.soft(runProblems(cyclicOnPaper, ['image'], storeEnv())).toEqual([]);
+  expect.soft(executionOrder(cyclicOnPaper, ['other'])).toEqual(['image', 'other']);
+  load(graph);
+  expect(tryConnect(sessionId, forward)).toBe(true);
+  expect(connectionError(current(), assets, { ...back, targetHandle: 'ref' })).toMatch(/loop/);
+  expect(findCycle({ ...cyclicOnPaper, edges: [{ ...back, targetHandle: 'ref' }, forward] })).not.toBeNull();
+});
+
+const inventories: Record<string, Asset>[] = [{}, { another: assets.picture }];
+it.each(inventories)('marks a deleted asset with an explicit inventory %j', async inventory => {
+  const { graphNotices } = await import('../src/engine/flow/notices');
+  const graph = { nodes: [asset, tool], edges: [cable('asset', 'tool', 'input')] };
+  expect(graphNotices(graph, { ...storeEnv(), assets: inventory })).toEqual([
+    expect.objectContaining({ kind: 'cable', edgeId: 'cable', message: 'The source has no output yet.' }),
+  ]);
+});
+
+it.each(['incompatible', 'expired pin'])('excludes an %s source from operation model selection', async reason => {
+  const catalog = await import('../src/engine/catalog');
+  const modelForAsset = vi.spyOn(catalog, 'opModelForAsset');
+  try {
+    const src = { ...asset, data: { ...asset.data, assetId: 'picture' } } as GraphNode;
+    const edit: GraphNode = { ...tool, data: { kind: 'tool', title: 'Variations', op: 'variations', params: {}, outputIndex: 0 } };
+    const graph = { nodes: [src, edit], edges: [cable('asset', 'tool', 'input', reason === 'expired pin' ? 'old' : undefined)] };
+    load(graph);
+    if (reason === 'incompatible') useStore.setState({ assets: { picture: { ...assets.picture, kind: 'video' } } });
+    expect(previewRun(sessionId, ['tool']).steps).toMatchObject([{ input: '' }]);
+    expect(modelForAsset).not.toHaveBeenCalled();
+    load({ ...graph, edges: [cable('asset', 'tool', 'input')] });
+    expect(previewRun(sessionId, ['tool']).steps).toMatchObject([{ input: 'asset:picture' }]);
+    expect(modelForAsset).toHaveBeenCalledWith('edit', 'picture');
+  } finally {
+    modelForAsset.mockRestore();
+  }
+});

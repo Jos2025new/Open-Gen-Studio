@@ -1,3 +1,4 @@
+import { useStore } from '../../store/store';
 import { z } from 'zod';
 import { edgeRef, graphOf, hasTarget, nodeCommand, nodeRef } from '../flow/commandKit';
 import { executionOrder } from '../flow/graph';
@@ -252,12 +253,12 @@ export const commands = [
   nodeCommand({
     id: 'nodes.system.execution_order',
     title: 'Execution order from data links',
-    description: 'Computes the topological execution order of runnable nodes strictly from data links, never from screen position.',
+    description: 'Computes the topological execution order of runnable nodes from compatible data links and subject bindings.',
     args: z.object({ targets: z.array(nodeRef).max(40).optional() }).strict(),
     effect: 'read',
     undo: false,
     run: (on, args) => ({
-      order: executionOrder(graphOf(on), args.targets),
+      order: executionOrder(graphOf(on), args.targets, useStore.getState().assets),
     }),
   }),
 ];

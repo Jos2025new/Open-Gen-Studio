@@ -51,7 +51,7 @@ export function inspectNode(session: string, nodeId: string, ctx: RequestContext
   return {
     node: nodeId, kind: node.data.kind, version: d?.version ?? 0, revision: ownerRev(graph, nodeId), inputs,
     signature: digest(`${node.data.kind}@${d?.version ?? 0}:${stable(request)}`), fresh, ...(staleReason ? { staleReason } : {}),
-    consumers: consumersOf(graph, [nodeId]),
+    consumers: consumersOf(graph, [nodeId], st.assets),
     ...(gen ? { lastRun: { generationId: gen.id, status: gen.status, ...(run ? { runId: run.runId, sends: run.sends } : {}) } } : {}),
     ...(attempt ? { lastAttempt: { runId: attempt.runId, status: attempt.status, sends: attempt.sends, ...(attempt.error ? { error: attempt.error } : {}) } } : {}),
   };
