@@ -144,7 +144,8 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
  * and run it again, or show the choices above the prompt box. `rerun` runs it again inside the attempt that just failed;
  * `later` runs it from an alert the user answers afterwards (the attempt is over: it must go through the single door, runGeneration).
  * From an alert, a dearer or unpriced substitute that would go over the limit asks first (the run was approved at the
- * failed model's price), and a plan step is never resent outside its plan: its model changes and the plan's Retry runs it.
+ * failed model's price), a plan step is never resent outside its plan (its model changes and the plan's Retry runs it),
+ * and an answer that comes after the card was retried or regenerated sends nothing.
  */
 export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun): Promise<boolean> {
   const g = get().generations[genId];
@@ -164,7 +165,16 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Press Retry on the plan to run the step; its approved price still applies.` });
       return;
     }
-    const go = () => void switchTo(o.model, later).catch(logged(what));
+    // Answered late: the card was retried or regenerated (a newer attempt of the operation), or it is no longer failed. Sending now would pay twice.
+    const stale = () => {
+      const now = get().generations[genId];
+      const op = now?.operationId ?? genId;
+      return !now || now.status !== 'error' || Object.values(get().generations).some((x) => x.id !== genId && (x.parentId === genId || ((x.operationId ?? x.id) === op && x.createdAt > now.createdAt)));
+    };
+    const go = () => {
+      if (stale()) { pushAlert({ level: 'info', text: `${cur.name} was already tried again (or is no longer failed): nothing was sent.` }); return; }
+      void switchTo(o.model, later).catch(logged(what));
+    };
     const e = { usd: o.usd ?? null, approximate: true };
     const dearer = o.ratio === undefined || o.ratio > 1;
     if (!dearer || !overLimit(e, g.sessionId)) return go();

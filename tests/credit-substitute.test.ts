@@ -12,7 +12,7 @@ vi.mock('../src/lib/media', async (original) => ({ ...await original<typeof impo
   probeMedia: async () => ({ width: 1, height: 1 }) }));
 
 import { useStore } from '../src/store/store';
-import { createGeneration, runGeneration } from '../src/engine/jobs';
+import { createGeneration, retryGeneration, runGeneration } from '../src/engine/jobs';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
 import { forgetBalances, onGenerationCredit } from '../src/engine/credit';
@@ -110,5 +110,19 @@ describe('a substitute after no credit', () => {
       expect(useStore.getState().generations[g.id].modelRef).toBe(ATLAS);
       expect(alerts().some((x) => /Retry/.test(x.text))).toBe(true);
     }
+  });
+
+  it('an old alert answered after the card was retried sends nothing (the operation is not paid twice)', async () => {
+    setup(0.08, { on: false, usd: 5 });
+    const g = gen();
+    await runGeneration(g.id).catch(() => undefined);
+    const offer = alerts().find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
+    // The user recharges and presses Retry on the card: a new attempt of the same operation succeeds on NanoGPT.
+    vi.mocked(ADAPTERS.nanogpt.generate).mockResolvedValue({ outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.1 } as never);
+    await retryGeneration(g.id);
+    offer.actions!.find((x) => x.label === 'Yes, this time')!.run();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(atlasSends).toBe(0);
+    expect(alerts().some((a) => /already/.test(a.text))).toBe(true);
   });
 });
