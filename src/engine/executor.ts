@@ -1,7 +1,8 @@
 import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
-import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, sentModelRef } from './catalog';
+import { ensureSchema, sentModelRef } from './catalog';
+import { opChoice } from './opSpec';
 import { StepStillRunning, isLiveStatus, settleGeneration } from './settle';
 import { cancelGeneration, createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
@@ -75,11 +76,9 @@ export function estimateSteps(steps: PlanStep[], nodeOperations?: ExecContext['n
         // The same spec the send builds (jobs.opSpecForModel): its model, settings and price, so the approved price is the sent one.
         const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
         const node = nodeOperations?.[s.id];
-        const picked = typeof s.params._modelRef === 'string' ? s.params._modelRef : undefined;
-        const fixed = opModelFor(engine);
-        const followed = opFollowsSource(engine) ? picked ?? (src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, engine === 'edit' ? 'image' : 'video') : null)) : undefined;
-        opRef = isVideoOpEngine(engine) ? picked ?? node?.ref ?? fixed.ref : node?.ref ?? followed ?? fixed.ref;
-        const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node }, opRef, node ? node.viaEdit : fixed.ref === opRef && fixed.viaEdit, get().catalog.schemas[opRef]);
+        const choice = opChoice({ op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node, upstreamModelRef: upstream && 'modelRef' in upstream ? upstream.modelRef : undefined });
+        opRef = choice.ref;
+        const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node }, opRef, choice.viaEdit, get().catalog.schemas[opRef]);
         opSettings = spec.settings;
         perStep[s.id] = spec.estimate ?? estimateOp(s.op, s.params, src, spec.settings, opRef);
         if (isVideoOpEngine(engine)) {

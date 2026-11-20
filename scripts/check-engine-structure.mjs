@@ -5,14 +5,26 @@ import { fileURLToPath } from 'node:url';
 // Structure rules of the send engine (Opus #4, #8, #10, 2026-11-20). Each prints rule · file:line · problem · fix.
 // 1. jobs.ts is provider-neutral: a provider's quirks are optional capabilities of its ProviderAdapter.
 // 2. Providers reach the IndexedDB cache only through cachedJson / peekCached in providers/shared.ts.
+// 4. The model an operation runs with is chosen in one place, opChoice() (opSpec.ts): the send, the estimate
+//    (executor.ts) and the Nodes preview (flow/actions.ts) call it and keep no chain of their own.
 // 3. jobs.ts holds the send, not the operation specs (opSpec.ts) or the remote-job recovery (jobRecovery.ts).
 const RULES = { neutral: true, split: true };
 const NAMED_PROVIDER = /\b(atlas|fal)\b/i;
 const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|inputKindOf|recover\w*|resumeRemote\w*)\b/;
 
+const OWN_CHOICE = /\b(opModelForAsset|opModelFromRef|reusedOpChoice)\(/;
+const CHOICE_CALLERS = ['src/engine/executor.ts', 'src/engine/flow/actions.ts'];
+
 export function structureProblems(files) {
   const problems = [];
   for (const [path, text] of Object.entries(files)) {
+    if (CHOICE_CALLERS.includes(path)) {
+      if (!/\bopChoice\(/.test(text)) problems.push(`one-op-choice · ${path}:1 · does not call opChoice() · ask opChoice() (opSpec.ts) which model the operation runs with`);
+      text.split('\n').forEach((line, i) => {
+        const own = line.match(OWN_CHOICE);
+        if (own) problems.push(`one-op-choice · ${path}:${i + 1} · own model choice (${own[1]}) · replace the chain with opChoice() from opSpec.ts`);
+      });
+    }
     const lines = text.split('\n');
     lines.forEach((line, i) => {
       const at = `${path}:${i + 1}`;
@@ -31,7 +43,8 @@ export function structureProblems(files) {
 }
 
 export function checkEngineStructure(root) {
-  const files = { 'src/engine/jobs.ts': readFileSync(join(root, 'src/engine/jobs.ts'), 'utf8') };
+  const files = {};
+  for (const path of ['src/engine/jobs.ts', ...CHOICE_CALLERS]) files[path] = readFileSync(join(root, path), 'utf8');
   for (const name of readdirSync(join(root, 'src/engine/providers'))) {
     if (name.endsWith('.ts')) files[`src/engine/providers/${name}`] = readFileSync(join(root, 'src/engine/providers', name), 'utf8');
   }

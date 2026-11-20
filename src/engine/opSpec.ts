@@ -1,7 +1,7 @@
 /* Operation specs: the generation an operation on an asset sends (moved out of jobs.ts, Opus #4). */
 import { reusedOpChoice, transcriberForRun } from './opRunModel';
 import { fxOpDetail } from './fx/op';
-import { creatorProvider, OP_PROVIDERS, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, resolveModel } from './catalog';
+import { KLING_VOICE_PROVIDER, OP_PROVIDERS, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, resolveModel } from './catalog';
 import { estimateOp, estimateTranscribe } from './costs';
 import { OPS, opCount, isVideoOpEngine, type VideoOpEngine } from './ops';
 import { coerceSettings, durationChoices, isAutoOption, matchInputOption, preferredResolution, nearestAspect, paramByRole } from './params';
@@ -66,6 +66,34 @@ export function videoOpSeconds(engine: VideoOpEngine, settings: GenSettings, cli
   return engine === 'video_extend' ? settings.duration : clipSeconds;
 }
 
+export type OpChoiceInput = Pick<OpSpecInput, 'op' | 'params' | 'sourceAssetId' | 'nodeChoice' | 'modelRef' | 'parentId'> & {
+  /** The model of the step that makes the source, while the source is a clip still to be made. */
+  upstreamModelRef?: string;
+};
+
+/**
+ * The one choice of the model an operation runs with, asked by the send (opSpec), the estimate (executor) and the
+ * Nodes preview (flow/actions), so the approved price is the sent one. In order: the model picked in the op form
+ * (`pinned`: the send checks it fits), the node's reviewed choice, the one the plan carries, a replay of the original
+ * run, the model that made the source (or the step that will), then the Settings model of the engine.
+ */
+export function opChoice(input: OpChoiceInput): { ref: string; viaEdit: boolean; pinned?: boolean } {
+  const engine = OPS[input.op].engine;
+  const carried = typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
+  const pinned = (PICKABLE_VIDEO_OPS.includes(engine) ? carried : undefined) ?? (engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
+  if (pinned) return { ref: pinned, viaEdit: false, pinned: true };
+  if (input.nodeChoice) return { ref: input.nodeChoice.ref, viaEdit: input.nodeChoice.viaEdit };
+  if (opFollowsSource(engine) && carried) return { ref: carried, viaEdit: false };
+  const reused = reusedOpChoice(input);
+  if (reused) return reused;
+  if (opFollowsSource(engine)) {
+    if (input.modelRef) return { ref: input.modelRef, viaEdit: false };
+    const upstream = !useStore.getState().assets[input.sourceAssetId] && input.upstreamModelRef ? opModelFromRef(input.upstreamModelRef, engine === 'edit' ? 'image' : 'video') : null;
+    if (upstream) return { ref: upstream, viaEdit: false };
+  }
+  return input.sourceAssetId ? opModelForAsset(engine, input.sourceAssetId) : opModelFor(engine);
+}
+
 export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const def = OPS[input.op];
   const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
@@ -79,7 +107,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'voice') {
-    const host = creatorProvider(KLING_VOICE_REF);
+    const host = KLING_VOICE_PROVIDER;
     if (!isConnected(host)) throw new Error(`Creating Kling voices needs ${PROVIDER_LABELS[host]}. Connect it in Settings.`);
     return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: `${PROVIDER_LABELS[host]} bills the voice when it is created` } };
   }
@@ -90,10 +118,9 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const language = String(input.params.language ?? 'auto');
     return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
   }
-  const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
-  const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
+  const choice = opChoice(input);
+  const upscaleRef = choice.pinned ? choice.ref : undefined;
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error(def.engine === 'video_upscale' ? 'Choose a dedicated video upscaler, not a video generation/edit model.' : `Choose a connected model that can ${def.label.toLowerCase()}.`);
-  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? reusedOpChoice(input) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect ${OP_PROVIDERS.map((p) => PROVIDER_LABELS[p]).join(', ').replace(/, ([^,]*)$/, ' or $1')}.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
