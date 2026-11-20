@@ -12,7 +12,7 @@ import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
 import { patchGeneration } from '../../store/store';
 import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
-import { graphToSteps, runsGeneration } from '../flow/graph';
+import { runsGeneration } from '../flow/graph';
 import { lockNodes } from '../flow/locks';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { modelSummary } from '../catalog';
@@ -150,15 +150,10 @@ async function executePlanItem(
   let steps = chosen;
   const nodeOf = (stepId: string) => `${plan.id}_${stepId}`;
   if (workspace === 'node') {
-    // Run what is on the canvas now (the user may have edited the drafted nodes).
-    const graph = session(sessionId).graph;
-    const ids = graph.nodes.filter((n) => n.planId === plan.id && !off.has(n.id.replace(`${plan.id}_`, ''))).map((n) => n.id);
-    const run = graphToSteps(graph, ids, get().generations, { assets: get().assets });
-    if (run.errors.length) {
-      updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: run.errors.join(' ') });
-      return;
-    }
-    steps = run.steps;
+    // The single door for Nodes spending is runAction (approved snapshot, one send per approval). This executor
+    // recompiled the live graph with every destination forced and no approval: it never runs a Nodes plan.
+    updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: 'A Nodes plan runs only from an approved node run, never from here.' });
+    return;
   }
   let docId: string | undefined;
   if (workspace === 'designer') docId = ensureDoc(sessionId, designerDims()).id;
@@ -283,6 +278,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const review = item?.stepCostReviews?.[stepId];
   const generationId = item?.stepGenerations[stepId];
   if (!item || !review || !generationId || !reviewOpen(item, stepId)) return;
+  if (item.plan.workspace === 'node') return; // Nodes spend only through runAction: nothing here may decide or send for them
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
