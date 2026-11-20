@@ -1,4 +1,5 @@
 import type { Generation, Graph, GraphNode } from '../types';
+import { storeHooks } from '../storeBindings';
 import { useStore } from '../../store/store';
 import { toast } from '../../store/toasts';
 
@@ -58,3 +59,5 @@ export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[]): { node?: Gr
   const node = attemptNode(g, nodes);
   try { return { node, release: node ? lockNodes(g.sessionId, [node.id]) : () => {} }; } catch (e) { toast((e as Error).message, 'error'); }
 }
+
+storeHooks.graphEditProblem = graphEditProblem;

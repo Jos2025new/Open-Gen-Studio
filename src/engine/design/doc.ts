@@ -4,6 +4,8 @@ import { scaleStroke, translateStroke } from './strokes';
 import { scaleLook } from './shapeLook';
 import { composeShape, pageBox } from './shapeTransform';
 import type { DesignDoc, Layer, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
+import { DEFAULT_TEXT_STYLE } from '../storeBindings';
+export { DEFAULT_TEXT_STYLE } from '../storeBindings';
 
 /* Pure document/layer operations for the Designer. Layers are ordered bottom → top. */
 
@@ -21,16 +23,6 @@ export const FONT_NAMES = Object.keys(FONT_STACKS);
 export function fontStack(name: string): string {
   return FONT_STACKS[name] ?? FONT_STACKS.Inter;
 }
-
-export const DEFAULT_TEXT_STYLE: TextStyle = {
-  fontFamily: 'Inter',
-  fontSize: 96,
-  fontWeight: 700,
-  color: '#ffffff',
-  align: 'left',
-  lineHeight: 1.1,
-  letterSpacing: 0,
-};
 
 export const DOC_PRESETS: Array<{ id: string; label: string; width: number; height: number }> = [
   { id: 'square', label: 'Square 1:1', width: 1080, height: 1080 },

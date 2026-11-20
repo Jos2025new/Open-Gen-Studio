@@ -18,6 +18,11 @@ const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|
 const OWN_CHOICE = /\b(opModelForAsset|opModelFromRef|reusedOpChoice)\(/;
 const CHOICE_CALLERS = ['src/engine/planSteps/exec/op.ts', 'src/engine/flow/actions.ts'];
 
+function isTypeOnlyDecl(node) {
+  if (node.importKind === 'type' || node.exportKind === 'type') return true;
+  return Boolean(node.specifiers?.length && node.specifiers.every((spec) => spec.importKind === 'type' || spec.exportKind === 'type'));
+}
+
 function importProblems(path, text) {
   const store = path === 'src/store/store.ts';
   if (!store && !path.startsWith('src/engine/providers/')) return [];
@@ -26,12 +31,13 @@ function importProblems(path, text) {
   const problems = [];
   function visit(node) {
     if (!node || typeof node.type !== 'string') return;
+    if (store && isTypeOnlyDecl(node)) return;
     const spec = node.source;
     if (spec?.type === 'Literal' && typeof spec.value === 'string' && spec.value.startsWith('.')) {
       const target = posix.join(posix.dirname(path), spec.value);
       const line = text.slice(0, spec.start).split('\n').length;
       if (store && /^src\/engine\/(design|flow)(\/|$)/.test(target)) {
-        problems.push(`store-domain-boundary · ${path}:${line} · store imports Designer or Nodes · use the domain bridge`);
+        problems.push(`store-domain-boundary · ${path}:${line} · store imports Designer or Nodes · invert via storeHooks`);
       }
       if (!store && /^src\/engine\/quotes(?:\.ts)?$/.test(target)) {
         problems.push(`provider-neutral-engine · ${path}:${line} · provider imports engine quotes · implement quote on the adapter`);
@@ -95,11 +101,27 @@ function cycleProblems(files, existingCycles) {
       continue;
     }
     for (const node of program.body) {
-      if (!node.source?.value?.startsWith('.') || node.importKind === 'type' || node.exportKind === 'type') continue;
-      if (node.specifiers?.length && node.specifiers.every((spec) => spec.importKind === 'type' || spec.exportKind === 'type')) continue;
+      if (!node.source?.value?.startsWith('.') || isTypeOnlyDecl(node)) continue;
       const base = posix.join(posix.dirname(path), node.source.value);
       const to = [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`].find((file) => Object.hasOwn(files, file));
       if (to && /^src\/(engine|store)\//.test(to)) edges.push({ to, line: text.slice(0, node.start).split('\n').length });
+    }
+  }
+
+  // Transitive store -> design/flow check: barrels cannot hide domain imports from store.ts.
+  const seen = new Set(['src/store/store.ts']);
+  const queue = [{ file: 'src/store/store.ts', trail: ['src/store/store.ts'] }];
+  while (queue.length) {
+    const { file, trail } = queue.shift();
+    for (const { to, line } of graph.get(file) ?? []) {
+      if (/^src\/engine\/(design|flow)\//.test(to)) {
+        problems.push(`store-domain-boundary · ${file}:${line} · store reaches ${to} (${trail.join(' -> ')} -> ${to}) · invert via storeHooks`);
+        continue;
+      }
+      if (!seen.has(to)) {
+        seen.add(to);
+        queue.push({ file: to, trail: [...trail, to] });
+      }
     }
   }
 

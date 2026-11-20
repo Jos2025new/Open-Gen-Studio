@@ -1,4 +1,5 @@
 import type { Graph } from '../types';
+import { storeHooks } from '../storeBindings';
 import { GONE_HANDLE, NO_RESULT, resultHandle } from './results';
 
 interface Entry { before: Graph; after: Graph; label: string; key: string; time: number }
@@ -137,3 +138,5 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
   notify();
   return true;
 }
+
+storeHooks.recordGraph = recordGraph;

@@ -5,12 +5,13 @@ import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } 
 import { reportSave } from './saveReport';
 import { persistState } from './persistJson';
 import { pickUi, type PageUiPrefs } from './persistUi';
-import {
-  DEFAULT_STROKE_STYLE, DEFAULT_TEXT_STYLE, graphEditProblem, historyDepth, loadRaster,
-  objectPicks, pendingRaster, pinPaintMode, recordGraph, useLayerSelection,
-  type BrushPreset, type BrushUi, type DesignTool, type RulerKind, type SelectCombine,
-  type SelectShape, type SnapByMode, type StrokeRuler,
-} from '../engine/storeBindings';
+import { DEFAULT_STROKE_STYLE, DEFAULT_TEXT_STYLE, storeHooks } from '../engine/storeBindings';
+import type { BrushPreset, BrushUi } from '../engine/design/brushPresets';
+import type { SelectCombine } from '../engine/design/pixelSelection';
+import type { DesignTool } from '../engine/design/rules';
+import type { SelectShape } from '../engine/design/selectShape';
+import type { SnapByMode } from '../engine/design/snap';
+import type { RulerKind, StrokeRuler } from '../engine/design/strokeRuler';
 import { sessionLoadHooks } from '../lib/sessionLoadHooks';
 import { mergePersistedState, type Persisted } from './mergePersistedState';
 import { create } from 'zustand';
@@ -317,7 +318,7 @@ function flushWrite(): Promise<void> {
 export async function saveNow(): Promise<void> {
   if (!pendingWrite && lastWrite && saveStatus.getState().phase === 'error') pendingWrite = lastWrite;
   const state = flushWrite();
-  const { flushRaster } = await loadRaster();
+  const { flushRaster } = await storeHooks.loadRaster();
   await Promise.all([state, flushRaster()]);
   if (localFailed != null) throw new Error('Could not save to browser storage');
 }
@@ -486,15 +487,15 @@ export function setGraph(sessionId: string, fn: (g: Graph) => Graph): void {
     // explicitly (edit.ts): another cable on a multi-cable port never hides it.
     const live = edited.broken?.filter((b) => edited.nodes.some((n) => n.id === b.edge.target) && !edited.nodes.some((n) => n.id === b.edge.source));
     const graph = edited.broken && live?.length !== edited.broken.length ? { ...edited, broken: live?.length ? live : undefined } : edited;
-    const problem = graphEditProblem(sessionId, s.graph, graph);
+    const problem = storeHooks.graphEditProblem(sessionId, s.graph, graph);
     if (problem) { queueMicrotask(() => toast(problem, 'error')); return s; }
-    recordGraph(sessionId, s.graph, graph);
+    storeHooks.recordGraph(sessionId, s.graph, graph);
     return { ...s, graph };
   });
 }
 
 export function setDoc(sessionId: string, docId: string, fn: (d: DesignDoc) => DesignDoc): void {
-  patchSession(sessionId, (s) => ({ ...s, docs: s.docs.map((d) => (d.id === docId ? fn(pinPaintMode(d)) : d)) }));
+  patchSession(sessionId, (s) => ({ ...s, docs: s.docs.map((d) => (d.id === docId ? fn(storeHooks.pinPaintMode(d)) : d)) }));
 }
 
 export function setComposer(patch: Partial<ComposerState> | ((c: ComposerState) => Partial<ComposerState>)): void {
@@ -585,14 +586,15 @@ if (typeof window !== 'undefined' && window.location?.port === '5183') {
   Object.assign(window, { __OGS_TEST__: () => {
     const state = useStore.getState(), session = state.sessions[state.activeSessionId];
     const doc = session?.docs.find((d) => d.id === session.activeDocId) ?? session?.docs[0];
+    const info = storeHooks.designerTestInfo(doc?.id);
     return JSON.parse(JSON.stringify({
       hydrated: state.hydrated,
       sessionId: session?.id,
       document: doc ? { id: doc.id, width: doc.width, height: doc.height, background: doc.background,
         layers: doc.layers, groups: doc.groups ?? [], activeLayerId: doc.activeLayerId } : null,
-      selection: { layers: doc ? useLayerSelection.getState().byDoc[doc.id] ?? [] : [], objects: doc ? objectPicks(doc.id) : [] },
-      history: doc ? historyDepth(doc.id) : { undo: 0, redo: 0 },
-      saving: { state: Boolean(pendingWrite), raster: pendingRaster() },
+      selection: info.selection,
+      history: info.history,
+      saving: { state: Boolean(pendingWrite), raster: info.raster },
     }));
   } });
 }

@@ -1,5 +1,5 @@
 import type { UiState } from './store';
-import { PAGE_UNITS, type PageUnit } from '../engine/design/pageUnits';
+import { PAGE_UNITS, type PageUnit } from '../engine/storeBindings';
 
 /** Canvas size card: the unit the page is shown in and the DPI used for mm/in. */
 export interface PageUiPrefs { pageUnit?: PageUnit; pageDpi?: number; showGuides?: boolean; lockGuides?: boolean; /** Generations panel: the smallest a tile may be, in px (the tiles then grow to fill the row). */ tileSize?: number }

@@ -14,16 +14,7 @@ export const MIN_STROKE_SIZE = 0.5;
  * so an edit makes a new object and the old cache entry simply goes away with it.
  */
 
-export const DEFAULT_STROKE_STYLE: StrokeStyle = {
-  color: '#ffffff',
-  size: 8,
-  thinning: 0.6,
-  smoothing: 0.5,
-  streamline: 0.5,
-  taperStart: 0,
-  taperEnd: 0,
-  opacity: 1,
-};
+export { DEFAULT_STROKE_STYLE } from '../storeBindings';
 
 export function strokeOptions(s: Stroke, last = true): StrokeOptions {
   return {

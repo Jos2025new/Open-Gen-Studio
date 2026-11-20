@@ -124,10 +124,6 @@
   "src/engine/nodes/system.ts -> src/engine/nodes/spec.ts",
   "src/engine/params/duration.ts -> src/engine/params/settings.ts",
   "src/engine/params/settings.ts -> src/engine/params/duration.ts",
-  "src/engine/storeBindings.ts -> src/engine/design/history.ts",
-  "src/engine/storeBindings.ts -> src/engine/design/raster.ts",
-  "src/engine/storeBindings.ts -> src/engine/flow/locks.ts",
-  "src/store/store.ts -> src/engine/storeBindings.ts",
   "src/store/store.ts -> src/store/toasts.ts",
   "src/store/toasts.ts -> src/store/store.ts"
 ]

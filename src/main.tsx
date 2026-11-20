@@ -11,6 +11,8 @@ import '@xyflow/react/dist/style.css';
 import { startKeySync } from './engine/providerKeys';
 // Registers the load migration into the store; explicit so a saved v1 graph is upgraded whatever else loads first.
 import './engine/nodecore/migrate';
+// Registers Designer and Nodes hooks into storeBindings so src/store/store.ts never statically imports domain modules.
+import './engine/storeWiring';
 import './styles/tokens.css';
 import './styles/accents.css';
 import './styles/soft-contrast.css';

@@ -1,6 +1,6 @@
+import type { PageUnit } from '../storeBindings';
+export { PAGE_UNITS, type PageUnit } from '../storeBindings';
 /** Page units and format presets for the Sizes card. The document always stays in px; units only change what the fields show. */
-export type PageUnit = 'px' | 'mm' | 'in';
-export const PAGE_UNITS: PageUnit[] = ['px', 'mm', 'in'];
 export const DEFAULT_DPI = 96;
 const MM_PER_IN = 25.4;
 

@@ -1,4 +1,5 @@
 import type { DesignDoc, Layer, RasterLayer } from '../types';
+import { storeHooks } from '../storeBindings';
 
 /*
  * Drawing or Design (ADR 0016). Drawing: a brush stroke goes straight into the layer's pixels, as in Krita, GIMP or
@@ -40,4 +41,6 @@ export function hasEditableStrokes(layer: Layer | null | undefined): boolean {
 export function paintsPixelsDirectly(doc: Pick<DesignDoc, 'paintMode' | 'layers'>, layer: RasterLayer): boolean {
   return paintModeOf(doc) === 'drawing' && !hasEditableStrokes(layer);
 }
+
+storeHooks.pinPaintMode = pinPaintMode;
 
