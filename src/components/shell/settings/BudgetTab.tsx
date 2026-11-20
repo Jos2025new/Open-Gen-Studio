@@ -2,11 +2,20 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
 import { formatUsd } from '../../../lib/format';
 import { askAgain, subscribeUntilNextSession, untilNextSessionActive } from '../../../engine/budget';
-import { NOTICES, setMuted, isMuted, autoSwitchMode, type AutoSwitch } from '../../../engine/notices';
+import { NOTICES, setMuted, useNotice, autoSwitchMode, type AutoSwitch } from '../../../engine/notices';
 import { priceMargin } from '../../../engine/priceAuthorization';
 import { setSettings, setUi, useStore } from '../../../store/store';
 import { Button, Segmented } from '../../ui/primitives';
 import { SetGroup, SetRow } from './SettingsRows';
+
+/** One row of the register of silenceable notices; it follows the store, so a change shows at once. */
+function NoticeRow({ notice: n }: { notice: (typeof NOTICES)[number] }) {
+  const { muted, text } = useNotice(n.id);
+  return <SetRow label={n.label} tip={n.tip} className="set-row-3">
+    <span className="faint">{text}</span>
+    {muted ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, false)}>{n.bringBack}</Button> : n.canSilence ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, true)}>Don’t show again</Button> : null}
+  </SetRow>;
+}
 
 /** Settings → Budget: the spending limit and when it asks, then the price margin and what was spent. */
 export function BudgetTab() {
@@ -58,12 +67,7 @@ export function BudgetTab() {
       <SetRow icon={Wallet} label="Auto-switch provider when out of credit" tip="When a provider has no credit and the same model is at another provider for the same price or less. Ask: you choose each time (default). It never switches to another model or a higher price by itself.">
         <Segmented value={autoSwitchMode()} options={[{ value: 'ask', label: 'Ask' }, { value: 'always', label: 'Always' }, { value: 'never', label: 'Never' }]} onChange={(v) => setSettings({ autoSwitchProvider: v as AutoSwitch })} size="sm" />
       </SetRow>
-      {NOTICES.map((n) => (
-        <SetRow key={n.id} label={n.label} tip={n.tip} className="set-row-3">
-          <span>{isMuted(n.id) ? 'silenced' : 'shown'}</span>
-          {isMuted(n.id) ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, false)}>Show again</Button> : n.canSilence ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, true)}>Don’t show again</Button> : null}
-        </SetRow>
-      ))}
+      {NOTICES.map((n) => <NoticeRow key={n.id} notice={n} />)}
     </SetGroup>
     <SetGroup icon={Receipt} title="Prices">
       <SetRow icon={Percent} label="Price margin" tip="If a step would cost more than its approved price by more than this (at least 1¢), it waits for you. Off: it runs and the card shows the difference.">

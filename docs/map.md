@@ -20,13 +20,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 391 | 326 |
-| [store.ts](../src/store/store.ts) | 269 | 320 |
+| [types.ts](../src/engine/types.ts) | 391 | 327 |
+| [store.ts](../src/store/store.ts) | 269 | 322 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 75 | 46 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 65 | 5 |
-| [media.ts](../src/lib/media.ts) | 58 | 55 |
+| [media.ts](../src/lib/media.ts) | 58 | 56 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [id.ts](../src/lib/id.ts) | 50 | 0 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 28 |
@@ -53,11 +53,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 21 | 18 |
 | `src/components/omni` | 7 | 4 |
-| `src/components/shell` | 38 | 30 |
+| `src/components/shell` | 38 | 31 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 72 | 391 |
+| `src/engine` | 72 | 392 |
 | `src/engine/agent` | 62 | 148 |
 | `src/engine/commands` | 7 | 21 |
 | `src/engine/design` | 163 | 206 |
@@ -67,12 +67,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/nodecore` | 22 | 30 |
 | `src/engine/nodes` | 6 | 25 |
 | `src/engine/params` | 9 | 21 |
-| `src/engine/providers` | 15 | 75 |
+| `src/engine/providers` | 15 | 76 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 35 | 415 |
-| `src/store` | 18 | 322 |
+| `src/lib` | 35 | 417 |
+| `src/store` | 18 | 324 |
 
-234 de 714 módulos no tienen ningún test que los importe directamente.
+232 de 714 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
