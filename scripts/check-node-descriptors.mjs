@@ -33,7 +33,7 @@ export function check(root = '.') {
     if (!existsSync(at(file))) { errors.push(`${file}:1: node type "${kind}" has no descriptor. Add this file: \`export default defineNode({ kind: '${kind}', … })\` (copy text.node.ts).`); continue; }
     const text = readFileSync(at(file), 'utf8');
     if (!/export default /.test(text)) { errors.push(`${file}:1: no \`export default\`; the registry reads the default export.`); continue; }
-    const factory = /export default generationNode\('([a-z0-9]+)'\)/.exec(text);
+    const factory = /export default generationNode\('([a-z0-9]+)'/.exec(text);
     if (factory) {
       if (factory[1] !== kind) errors.push(`${file}:${lineOf(text, factory.index)}: generationNode('${factory[1]}') in the file of "${kind}".`);
       const gen = 'src/engine/nodecore/generation.ts';

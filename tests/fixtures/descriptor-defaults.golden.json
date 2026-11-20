@@ -1,0 +1,370 @@
+{
+ "text": {
+  "kind": "text",
+  "title": "Prompt",
+  "text": ""
+ },
+ "image": {
+  "kind": "image",
+  "title": "Image",
+  "prompt": "",
+  "modelRef": "local::studio-image",
+  "settings": {
+   "aspect": "1:1",
+   "resolution": "1K",
+   "count": 1,
+   "advanced": {}
+  },
+  "outputIndex": 0
+ },
+ "video": {
+  "kind": "video",
+  "title": "Video",
+  "prompt": "",
+  "modelRef": "local::studio-video",
+  "settings": {
+   "aspect": "16:9",
+   "resolution": "720p",
+   "duration": 5,
+   "count": 1,
+   "advanced": {}
+  },
+  "outputIndex": 0
+ },
+ "audio": {
+  "kind": "audio",
+  "title": "Audio",
+  "prompt": "",
+  "modelRef": "",
+  "settings": {
+   "count": 1,
+   "advanced": {}
+  },
+  "outputIndex": 0
+ },
+ "model3d": {
+  "kind": "model3d",
+  "title": "3D model",
+  "prompt": "",
+  "modelRef": "",
+  "settings": {
+   "count": 1,
+   "advanced": {}
+  },
+  "outputIndex": 0
+ },
+ "asset": {
+  "kind": "asset",
+  "title": "Asset",
+  "assetId": null
+ },
+ "assetWith": {
+  "kind": "asset",
+  "title": "Asset",
+  "assetId": "a9"
+ },
+ "tool:relight": {
+  "kind": "tool",
+  "title": "Relight",
+  "op": "relight",
+  "params": {
+   "preset": "golden-hour",
+   "direction": "left",
+   "intensity": "medium",
+   "note": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:angle": {
+  "kind": "tool",
+  "title": "Change angle",
+  "op": "angle",
+  "params": {
+   "angle": "three-quarter-left",
+   "note": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:upscale": {
+  "kind": "tool",
+  "title": "Upscale",
+  "op": "upscale",
+  "params": {
+   "factor": "2"
+  },
+  "outputIndex": 0
+ },
+ "tool:remove_bg": {
+  "kind": "tool",
+  "title": "Remove background",
+  "op": "remove_bg",
+  "params": {},
+  "outputIndex": 0
+ },
+ "tool:reframe": {
+  "kind": "tool",
+  "title": "Reframe",
+  "op": "reframe",
+  "params": {
+   "aspect": "16:9",
+   "note": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:reference_sheet": {
+  "kind": "tool",
+  "title": "Reference sheet",
+  "op": "reference_sheet",
+  "params": {
+   "subject": "character",
+   "sheet": "turnaround",
+   "panels": "3",
+   "aspect": "16:9",
+   "count": "1",
+   "note": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:variations": {
+  "kind": "tool",
+  "title": "Variations",
+  "op": "variations",
+  "params": {
+   "strength": "medium",
+   "count": "2"
+  },
+  "outputIndex": 0
+ },
+ "tool:edit": {
+  "kind": "tool",
+  "title": "Edit with prompt",
+  "op": "edit",
+  "params": {
+   "instruction": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:replace_background": {
+  "kind": "tool",
+  "title": "Replace background",
+  "op": "replace_background",
+  "params": {
+   "background": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:animate": {
+  "kind": "tool",
+  "title": "Animate",
+  "op": "animate",
+  "params": {
+   "motion": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:extract_frame": {
+  "kind": "tool",
+  "title": "Extract frame",
+  "op": "extract_frame",
+  "params": {
+   "which": "last",
+   "seconds": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:continue": {
+  "kind": "tool",
+  "title": "Continue shot",
+  "op": "continue",
+  "params": {
+   "motion": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:contact_sheet": {
+  "kind": "tool",
+  "title": "Contact sheet",
+  "op": "contact_sheet",
+  "params": {
+   "angles": "9",
+   "note": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:grid_split": {
+  "kind": "tool",
+  "title": "Grid-split",
+  "op": "grid_split",
+  "params": {
+   "grid": "3"
+  },
+  "outputIndex": 0
+ },
+ "tool:join_clips": {
+  "kind": "tool",
+  "title": "Join clips",
+  "op": "join_clips",
+  "params": {
+   "music": "",
+   "loudness": "off"
+  },
+  "outputIndex": 0
+ },
+ "tool:video_upscale": {
+  "kind": "tool",
+  "title": "Upscale video",
+  "op": "video_upscale",
+  "params": {},
+  "outputIndex": 0
+ },
+ "tool:video_edit": {
+  "kind": "tool",
+  "title": "Edit video",
+  "op": "video_edit",
+  "params": {
+   "instruction": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:video_extend": {
+  "kind": "tool",
+  "title": "Extend video",
+  "op": "video_extend",
+  "params": {
+   "instruction": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:edit_region": {
+  "kind": "tool",
+  "title": "Edit region",
+  "op": "edit_region",
+  "params": {
+   "instruction": ""
+  },
+  "outputIndex": 0
+ },
+ "tool:remove_object": {
+  "kind": "tool",
+  "title": "Remove object",
+  "op": "remove_object",
+  "params": {},
+  "outputIndex": 0
+ },
+ "tool:create_voice": {
+  "kind": "tool",
+  "title": "Create Kling voice",
+  "op": "create_voice",
+  "params": {},
+  "outputIndex": 0
+ },
+ "tool:transcribe": {
+  "kind": "tool",
+  "title": "Transcribe",
+  "op": "transcribe",
+  "params": {
+   "language": "auto"
+  },
+  "outputIndex": 0
+ },
+ "tool:fx": {
+  "kind": "tool",
+  "title": "Filters & effects",
+  "op": "fx",
+  "params": {
+   "effect": "brightness",
+   "amount": ""
+  },
+  "outputIndex": 0
+ },
+ "tool": {
+  "kind": "tool",
+  "title": "Relight",
+  "op": "relight",
+  "params": {
+   "preset": "golden-hour",
+   "direction": "left",
+   "intensity": "medium",
+   "note": ""
+  },
+  "outputIndex": 0
+ },
+ "ref": {
+  "kind": "ref",
+  "type": "chat",
+  "ref": "SES",
+  "title": "Chat"
+ },
+ "refGiven": {
+  "kind": "ref",
+  "type": "chat",
+  "ref": "given",
+  "title": "Chat"
+ },
+ "ref:chat": {
+  "kind": "ref",
+  "type": "chat",
+  "ref": "SES",
+  "title": "Chat"
+ },
+ "ref:agent": {
+  "kind": "ref",
+  "type": "agent",
+  "ref": "SES",
+  "title": "Agent 1"
+ },
+ "ref:model": {
+  "kind": "ref",
+  "type": "model",
+  "ref": "local::studio-image",
+  "title": "Model"
+ },
+ "ref:provider": {
+  "kind": "ref",
+  "type": "provider",
+  "ref": "openrouter",
+  "title": "Provider"
+ },
+ "ref:session": {
+  "kind": "ref",
+  "type": "session",
+  "ref": "SES",
+  "title": "Session"
+ },
+ "ref:space": {
+  "kind": "ref",
+  "type": "space",
+  "ref": "create",
+  "title": "Space"
+ },
+ "ref:designer.doc": {
+  "kind": "ref",
+  "type": "designer.doc",
+  "ref": "active",
+  "title": "Designer Doc"
+ },
+ "ref:library": {
+  "kind": "ref",
+  "type": "library",
+  "ref": "library",
+  "title": "Library"
+ },
+ "ref:prompt": {
+  "kind": "ref",
+  "type": "prompt",
+  "ref": "composer",
+  "title": "Prompt"
+ },
+ "ref:mediaSettings": {
+  "kind": "ref",
+  "type": "mediaSettings",
+  "ref": "image",
+  "title": "Media settings"
+ },
+ "ref:toolset": {
+  "kind": "ref",
+  "type": "toolset",
+  "ref": "toolset",
+  "title": "Tools"
+ }
+}

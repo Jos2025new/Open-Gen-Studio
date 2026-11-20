@@ -1,15 +1,15 @@
-import { inputPorts, outputPort } from '../../flow/graph';
 import { defineNode } from '../descriptor';
-import { evaluateNode } from '../evaluate';
+import { deliverAsset } from '../deliver';
 
 export default defineNode({
   kind: 'asset',
   version: 1,
   params: ['title', 'assetId'],
-  inputs: inputPorts,
-  output: outputPort,
+  inputs: () => [],
+  output: (data, assets) => (data.kind === 'asset' && data.assetId ? assets[data.assetId]?.kind ?? null : null),
   required: [],
   affects: {},
-  evaluate: evaluateNode,
+  evaluate: (n, _e, env) => deliverAsset(n, env),
+  defaults: (opts) => ({ kind: 'asset', title: 'Asset', assetId: opts.assetId ?? null }),
   actions: [],
 });

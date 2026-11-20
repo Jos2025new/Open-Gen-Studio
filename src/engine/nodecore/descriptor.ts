@@ -1,5 +1,7 @@
 import type { Asset, GraphNodeData, PortType } from '../types';
-import type { Evaluation, ResolvedLite } from './evaluate';
+import type { GraphEdge, GraphNode, OpId, PlanStep, SystemNodeType } from '../types';
+import type { useStore } from '../../store/store';
+import type { ResolveEnv } from './resolver';
 
 /*
  * One descriptor per node type (ADR 0031 point 1). A file in `types/` declares what a type owns (parameters), its
@@ -9,6 +11,27 @@ import type { Evaluation, ResolvedLite } from './evaluate';
 export type NodeKindId = GraphNodeData['kind'];
 /** An explicit action: the only things that spend or send. Connecting and editing are never actions. */
 export type NodeActionId = 'generate' | 'run-tool' | 'send';
+
+/** What a node delivers on an edge now: the value and the revision label of that value (`edited` when a source asset was revised). */
+export interface Delivery { value: string | null; revision: string | null; edited?: true }
+
+/** What a type needs to turn its node into one run step: the data cables of this pass and the planner's resolvers. */
+export interface StepContext {
+  id: string;
+  /** The usable data cables into the node. */
+  inEdges: readonly GraphEdge[];
+  /** The step id of the text wired into a port (undefined: none). Reports its own errors. */
+  textFrom(handle: string): string | undefined;
+  /** The step/asset reference a cable's source gives (null: nothing; the reason is already reported). */
+  refFor(edge: GraphEdge): string | null;
+  errors: string[];
+  /** The text wired into `prompt`, resolved once before `plan` runs. */
+  promptFrom: string | undefined;
+}
+
+/** What a new node of a type may be born with (a picked op, a dropped asset, a system type). */
+export interface NewNodeOptions { op?: OpId; assetId?: string; type?: SystemNodeType; ref?: string }
+export type StoreState = ReturnType<typeof useStore.getState>;
 
 export interface PortInfo { id: string; type: PortType; label: string; multi: boolean }
 
@@ -24,8 +47,12 @@ export interface NodeDescriptor {
   required: readonly string[];
   /** Input port id → whether a change there makes the output stale. A port missing from the map affects it. */
   affects: Readonly<Record<string, boolean>>;
-  /** Pure: no store, no provider. The same data and inputs always give the same evaluation. */
-  evaluate(data: GraphNodeData, incoming: ResolvedLite): Evaluation;
+  /** What the node delivers on one edge. The resolver asks it for every input; it reads only the env it is given. */
+  evaluate(node: GraphNode, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): Delivery;
+  /** The run step of a node that runs: absent for text, asset and system nodes. */
+  plan?(data: GraphNodeData, ctx: StepContext): PlanStep;
+  /** The data of a node the user adds: its title, defaults and what the composer last chose. */
+  defaults?(opts: NewNodeOptions, st: StoreState): GraphNodeData;
   actions: readonly NodeActionId[];
   migrate?: Readonly<Record<number, (data: GraphNodeData) => GraphNodeData>>;
 }

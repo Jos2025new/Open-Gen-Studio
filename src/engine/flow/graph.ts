@@ -3,12 +3,12 @@ import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
 import { refNodeText } from './refText';
 import { resolveInputs, sessionChatText } from '../nodecore/resolver';
+import { descriptorOf } from '../nodecore/registry';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
 import type {
   Asset,
-  AudioStep,
   GenNodeData,
   ToolNodeData,
   Generation,
@@ -16,17 +16,13 @@ import type {
   GraphEdge,
   GraphNode,
   GraphNodeData,
-  ImageStep,
   LinkKind,
-  Model3dStep,
-  OpStep,
   Plan,
   PlanStep,
   PortSpec,
   PortType,
   TextStep,
   Subject,
-  VideoStep,
 } from '../types';
 
 /* Node editor model: ports, validation, plan ↔ graph conversion and auto layout. */
@@ -44,64 +40,11 @@ export function portFits(out: PortType | null, input: PortType | undefined): boo
 }
 
 export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): PortType | null {
-  switch (data.kind) {
-    case 'text':
-      return 'text';
-    case 'image':
-      return 'image';
-    case 'model3d':
-      return 'model3d';
-    case 'video':
-      return 'video';
-    case 'audio':
-      return data.textOutput ? 'text' : 'audio';
-    case 'tool':
-      return OPS[data.op].output;
-    case 'asset':
-      return data.assetId ? assets[data.assetId]?.kind ?? null : null;
-    case 'ref':
-      if (data.type === 'chat' || data.type === 'agent' || data.type === 'prompt') return 'text';
-      if (data.type === 'designer.doc' || data.type === 'space' || data.type === 'library') return 'image';
-      return null;
-  }
+  return descriptorOf(data.kind)?.output(data, assets) ?? null;
 }
 
 export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortType; label: string; multi: boolean }> {
-  switch (data.kind) {
-    case 'image':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        { id: 'ref', type: 'image', label: 'References', multi: true },
-        // Clip models (Nano Banana 2 reference-to-image): a trimmed reference video.
-        { id: 'clip', type: 'video', label: 'Video clip', multi: true },
-      ];
-    case 'model3d':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        { id: 'ref', type: 'image', label: 'Reference images', multi: true },
-      ];
-    case 'video':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        { id: 'first', type: 'image', label: 'First frame', multi: false },
-        { id: 'last', type: 'image', label: 'Last frame', multi: false },
-        // Reference-to-video models take these as references; keyframe models pin them in order.
-        { id: 'ref', type: 'image', label: 'References / keyframes', multi: true },
-        { id: 'refVideo', type: 'video', label: 'Reference videos', multi: true },
-        // Lip-sync speech, a soundtrack or reference audio, as the model takes it.
-        { id: 'audio', type: 'audio', label: 'Audio', multi: true },
-      ];
-    case 'audio':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        // Song lyrics: a text node, a lyrics node or a transcription.
-        { id: 'lyrics', type: 'text', label: 'Lyrics', multi: false },
-      ];
-    case 'tool':
-      return [{ id: 'input', type: OPS[data.op].input, label: 'Input', multi: false }];
-    default:
-      return [];
-  }
+  return descriptorOf(data.kind)?.inputs(data) ?? [];
 }
 
 export function nodePorts(data: GraphNodeData, assets: Record<string, Asset> = {}): PortSpec[] {
@@ -448,50 +391,10 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       }
       return src.id;
     };
+    const plan = descriptorOf(d.kind)?.plan;
+    if (!plan) continue;
     const promptFrom = textFrom('prompt');
-    if (d.kind === 'image' || d.kind === 'model3d') {
-      const refs = inEdges
-        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
-        .map((e) => refFor(e.source, e.outputIndex, e.pin != null))
-        .filter((r): r is string => Boolean(r));
-      steps.push({ id, kind: d.kind, title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep | Model3dStep);
-    } else if (d.kind === 'video') {
-      const first = inEdges.find((e) => e.targetHandle === 'first');
-      const last = inEdges.find((e) => e.targetHandle === 'last');
-      const refs = inEdges
-        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo' || e.targetHandle === 'audio')
-        .map((e) => refFor(e.source, e.outputIndex, e.pin != null))
-        .filter((r): r is string => Boolean(r));
-      steps.push({
-        id,
-        kind: 'video',
-        title: d.title,
-        prompt: d.prompt,
-        promptFrom,
-        modelRef: d.modelRef,
-        settings: d.settings,
-        firstFrame: first ? refFor(first.source, first.outputIndex, first.pin != null) ?? undefined : undefined,
-        lastFrame: last ? refFor(last.source, last.outputIndex, last.pin != null) ?? undefined : undefined,
-        refs: refs.length ? refs : undefined,
-      } satisfies VideoStep);
-    } else if (d.kind === 'audio') {
-      steps.push({
-        id,
-        kind: 'audio',
-        title: d.title,
-        prompt: d.prompt,
-        promptFrom,
-        lyricsFrom: textFrom('lyrics'),
-        modelRef: d.modelRef,
-        settings: d.settings,
-        ...(d.textOutput ? { textOutput: true } : {}),
-      } satisfies AudioStep);
-    } else if (d.kind === 'tool') {
-      const input = inEdges.find((e) => e.targetHandle === 'input');
-      const ref = input ? refFor(input.source, input.outputIndex, input.pin != null) : null;
-      if (!ref) errors.push(`"${d.title}" needs an ${OPS[d.op].input} input.`);
-      steps.push({ id, kind: 'op', title: d.title, op: d.op, input: ref ?? '', params: d.params } satisfies OpStep);
-    }
+    steps.push(plan(d, { id, inEdges, textFrom, refFor: (e) => refFor(e.source, e.outputIndex, e.pin != null), errors, promptFrom }));
   }
   for (const s of steps) {
     const d = byId.get(s.id)!.data;

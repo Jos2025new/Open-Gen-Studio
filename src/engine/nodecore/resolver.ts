@@ -1,7 +1,9 @@
 import { useStore } from '../../store/store';
-import { normalizeAssetRevisions } from '../assetRevisions';
 import type { Asset, Generation, Graph, GraphEdge, GraphNode } from '../types';
-import { digest, type RefMode, type RefStatus } from './address';
+import type { RefMode, RefStatus } from './address';
+import { deliverGenerated, NOTHING } from './deliver';
+import type { Delivery } from './descriptor';
+import { descriptorOf } from './registry';
 import { feedOwner } from '../agent/threads';
 
 /*
@@ -70,26 +72,9 @@ export function storeEnv(): ResolveEnv {
 }
 
 /** What a source node delivers on one edge: its value and the revision label of that value. */
-export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): { value: string | null; revision: string | null; edited?: true } {
-  const data = src?.data;
-  if (!data) return { value: null, revision: null };
-  const gen = 'generationId' in data && data.generationId ? env.generations[data.generationId] : undefined;
-  let value: string | null | undefined;
-  let revision: string | null = null;
-  let edited: true | undefined;
-  if (data.kind === 'text') value = data.text;
-  else if (data.kind === 'ref') value = env.chatText(src!);
-  else if (data.kind === 'asset') {
-    value = data.sketchAssetId ?? data.assetId;
-    const rev = data.assetId ? normalizeAssetRevisions(env.assets[data.assetId]) : undefined;
-    if (value) revision = `${value}@${rev ? `${rev.index}/${rev.versions.length}` : '0'}`;
-    if (rev && rev.versions.length > 1) edited = true;
-  } else {
-    value = gen?.text ?? ('outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[edge.outputIndex ?? data.outputIndex] : null);
-    if (value && gen) revision = `${gen.id}:${value}`;
-  }
-  if (value == null) return { value: null, revision: null };
-  return { value, revision: revision ?? digest(value), ...(edited ? { edited } : {}) };
+export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): Delivery {
+  if (!src) return NOTHING;
+  return (descriptorOf(src.data.kind)?.evaluate ?? deliverGenerated)(src, edge, env);
 }
 
 /** Every data input of a node, resolved: the value, its revision, and whether the link is usable. */

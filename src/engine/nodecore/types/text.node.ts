@@ -1,15 +1,15 @@
-import { inputPorts, outputPort } from '../../flow/graph';
 import { defineNode } from '../descriptor';
-import { evaluateNode } from '../evaluate';
+import { delivered } from '../deliver';
 
 export default defineNode({
   kind: 'text',
   version: 1,
   params: ['title', 'text'],
-  inputs: inputPorts,
-  output: outputPort,
+  inputs: () => [],
+  output: () => 'text',
   required: [],
   affects: {},
-  evaluate: evaluateNode,
+  evaluate: (n) => delivered(n.data.kind === 'text' ? n.data.text : null),
+  defaults: () => ({ kind: 'text', title: 'Prompt', text: '' }),
   actions: [],
 });
