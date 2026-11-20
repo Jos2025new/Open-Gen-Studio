@@ -37,7 +37,7 @@ type Tab = Awaited<ReturnType<typeof openTab>>;
 const hydrated = (t: Tab) => until(() => t.state().hydrated);
 function generation(t: Tab, remote: boolean) {
   const st = t.state();
-  t.store.useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } } });
+  t.store.useStore.setState({ settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k' } } });
   const g = t.jobs.createGeneration({ sessionId: st.activeSessionId, kind: 'image', prompt: 'x', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
   t.store.patchGeneration(g.id, { status: 'running', ...(remote ? { remoteJob: { provider: 'atlas', id: `job_${g.id}` } as never } : {}) });
   return g.id;

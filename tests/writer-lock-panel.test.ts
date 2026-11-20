@@ -110,7 +110,7 @@ describe('test 15e: the read-only panel', () => {
     expect(b.lock.holdsWriterLock()).toBe(false);
     calls.length = 0; // tab A's own loading is not the question
     const st = b.store.useStore.getState();
-    b.store.useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } } });
+    b.store.useStore.setState({ settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k' } } });
     const g = b.jobs!.createGeneration({ sessionId: st.activeSessionId, kind: 'image', prompt: 'x', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
     await expect(b.jobs!.runGeneration(g.id)).rejects.toThrow('open in another tab');
     expect(b.store.useStore.getState().generations[g.id].status).not.toBe('running');
