@@ -37,7 +37,6 @@ describe('node core: descriptors and identity (points 1-2)', () => {
   it('collects one descriptor per node type by itself', () => {
     expect(descriptors().map((d) => d.kind).sort()).toEqual(['asset', 'audio', 'image', 'model3d', 'ref', 'text', 'tool', 'video']);
     expect(descriptorOf('tool')?.required).toEqual(['input']);
-    expect(descriptorOf('image')?.actions).toEqual(['generate']);
   });
   it('keeps a cable to a deleted source visible as invalid, never silently gone', () => {
     expect(tryConnect(sid, { source: 't1', target: 'img', targetHandle: 'prompt' })).toBe(true);

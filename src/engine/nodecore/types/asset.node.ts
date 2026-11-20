@@ -11,5 +11,4 @@ export default defineNode({
   affects: {},
   evaluate: (n, _e, env) => deliverAsset(n, env),
   defaults: (opts) => ({ kind: 'asset', title: 'Asset', assetId: opts.assetId ?? null }),
-  actions: [],
 });

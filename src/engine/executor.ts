@@ -1,19 +1,17 @@
 import { isAbort } from '../lib/http';
-import { estimateMedia, estimateOp } from './costs';
-import { applyLayerStep, layerToAsset } from './design/actions';
-import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, sentModelRef } from './catalog';
+import { layerToAsset } from './design/actions';
 import { StepStillRunning, isLiveStatus, settleGeneration } from './settle';
-import { cancelGeneration, createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds } from './jobs';
-import { lyricsBody, lyricsParam } from './params';
-import { OPS, opCount, operationFactor, isVideoOpEngine } from './ops';
+import { cancelGeneration, type OpSpecInput, runGeneration } from './jobs';
 import { parseRef, stepDeps, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
-import type { Estimate, GenSettings, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
-import { costAuthorization, PriceReviewRequired } from './priceAuthorization';
+import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
+import { PriceReviewRequired } from './priceAuthorization';
 import { useStore } from '../store/store';
 import { clearPlanStop, isPlanStopped, stoppedError } from './planStop';
 import { placeFor } from './place';
+import { ESTIMATE_STEP, RUN_STEP } from './planSteps/exec';
+import type { EstimateStep, RunStep } from './planSteps/exec/env';
 
 const get = useStore.getState;
 
@@ -58,41 +56,9 @@ export function estimateSteps(steps: PlanStep[], nodeOperations?: ExecContext['n
   const authorizations: Record<string, StepAuthorization> = {};
   const videoSettings = get().composer.video.settings;
   for (const s of steps) {
-    let opRef: string | undefined;
-    let opSettings: GenSettings | undefined;
-    // Priced as sent: inputs on a text-only model run as its image twin (jobs.ts, sentModelRef).
-    const sent = s.kind === 'image' || s.kind === 'video' ? sentModelRef(s.modelRef, s.kind, Boolean(s.refs?.length || (s.kind === 'video' && s.firstFrame))) : undefined;
-    if (s.kind === 'image') perStep[s.id] = estimateMedia(sent!, 'image', s.settings, s.refs.length > 0);
-    else if (s.kind === 'model3d') perStep[s.id] = estimateMedia(s.modelRef, 'model3d', s.settings, s.refs.length > 0);
-    else if (s.kind === 'video') perStep[s.id] = estimateMedia(sent!, 'video', s.settings, Boolean(s.firstFrame || s.refs?.length));
-    else if (s.kind === 'audio') perStep[s.id] = estimateMedia(s.modelRef, 'audio', s.settings, false, false, s.prompt.length);
-    else if (s.kind === 'op') {
-      const p = parseRef(s.input);
-      const src = p?.type === 'asset' ? get().assets[p.id] : undefined;
-      const engine = OPS[s.op].engine;
-      if (['local', 'transcribe', 'voice'].includes(engine)) perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings);
-      else {
-        // The same spec the send builds (jobs.opSpecForModel): its model, settings and price, so the approved price is the sent one.
-        const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
-        const node = nodeOperations?.[s.id];
-        const picked = typeof s.params._modelRef === 'string' ? s.params._modelRef : undefined;
-        const fixed = opModelFor(engine);
-        const followed = opFollowsSource(engine) ? picked ?? (src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, engine === 'edit' ? 'image' : 'video') : null)) : undefined;
-        opRef = isVideoOpEngine(engine) ? picked ?? node?.ref ?? fixed.ref : node?.ref ?? followed ?? fixed.ref;
-        const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node }, opRef, node ? node.viaEdit : fixed.ref === opRef && fixed.viaEdit, get().catalog.schemas[opRef]);
-        opSettings = spec.settings;
-        perStep[s.id] = spec.estimate ?? estimateOp(s.op, s.params, src, spec.settings, opRef);
-        if (isVideoOpEngine(engine)) {
-          // A clip still to be made: its step's duration.
-          const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
-          const est = estimateOp(s.op, s.params, src, { ...spec.settings, duration: videoOpSeconds(engine, spec.settings, clip) }, opRef);
-          perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
-        }
-      }
-    } else perStep[s.id] = { usd: 0, approximate: false };
-    if ('modelRef' in s) authorizations[s.id] = costAuthorization(sent ?? s.modelRef, { ...s.settings, ...(s.kind === 'image' && s.variations?.length ? { count: s.variations.length } : {}) }, perStep[s.id]);
-    else if (s.kind === 'op') authorizations[s.id] = costAuthorization(opRef ?? '', opSettings ?? { count: opCount(OPS[s.op], s.params), advanced: {} }, perStep[s.id], operationFactor({ id: s.op, params: s.params }));
-    else authorizations[s.id] = costAuthorization(`local::${s.kind}`, { count: 1, advanced: {} }, perStep[s.id]);
+    const { estimate, authorization } = (ESTIMATE_STEP[s.kind] as EstimateStep<typeof s.kind>)(s as never, { steps, nodeOperations, videoSettings });
+    perStep[s.id] = estimate;
+    authorizations[s.id] = authorization;
   }
   return { total: sumEstimates(Object.values(perStep)), perStep, authorizations };
 }
@@ -188,6 +154,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const local: Subject[] = [];
   const withLocal = <T extends object>(inputs: T) => ({ ...inputs, ...(local.length ? { subjects: [...local] } : {}), ...(ctx.nodeLibrary ? { nodeLibrary: ctx.nodeLibrary } : {}) });
 
+  const runEnv = { ctx, outputs, requireAsset, resolveAsset, promptFor, runSettled, stepOutputs };
+
   const runStep = async (s: PlanStep): Promise<StepOutput> => {
     const reuse = ctx.reuseGenerations?.[s.id];
     if (reuse) {
@@ -202,93 +170,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     }
     const inputsFor = <T extends object>(inputs: T) => ({ ...withLocal(inputs), ...(nodeSubjects.length ? { subjects: nodeSubjects } : {}) });
     const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id };
-    switch (s.kind) {
-      case 'text':
-        return { assetIds: [], text: s.text };
-      case 'image': {
-        const refs: string[] = [];
-        for (const r of s.refs) {
-          refs.push(await requireAsset(r));
-        }
-        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }), variants: s.variations });
-        ctx.onState(s.id, 'running', { generationId: g.id });
-        return stepOutputs(g.id, await runSettled(g.id));
-      }
-      case 'model3d': {
-        const refs: string[] = [];
-        for (const r of s.refs) {
-          refs.push(await requireAsset(r));
-        }
-        const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
-        ctx.onState(s.id, 'running', { generationId: g.id });
-        return stepOutputs(g.id, await runSettled(g.id));
-      }
-      case 'video': {
-        const firstFrame = s.firstFrame ? await requireAsset(s.firstFrame, 'first frame') : undefined;
-        const lastFrame = s.lastFrame ? await requireAsset(s.lastFrame, 'last frame') : undefined;
-        const refs: string[] = [];
-        const times: Record<string, number> = {};
-        for (const [i, r] of (s.refs ?? []).entries()) {
-          const a = await requireAsset(r);
-          refs.push(a);
-          const t = s.times?.[i];
-          if (t != null) times[a] = t;
-        }
-        const inputs = inputsFor({ refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined });
-        const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
-        ctx.onState(s.id, 'running', { generationId: g.id });
-        return stepOutputs(g.id, await runSettled(g.id));
-      }
-      case 'audio': {
-        // Lyrics from an earlier step (a lyrics result keeps only the song text) into the model's lyrics field.
-        let settings = s.settings;
-        if (s.lyricsFrom) {
-          const p = parseRef(s.lyricsFrom);
-          const text = p?.type === 'step' ? outputs.get(p.id)?.text ?? '' : '';
-          const key = lyricsParam((await ensureSchema(s.modelRef)) ?? undefined)?.key;
-          if (!key) throw new Error(`${s.title}: the model takes no lyrics.`);
-          settings = { ...settings, extras: { ...settings.extras, [key]: lyricsBody(text) } };
-        }
-        const kind = s.textOutput ? 'text' : 'audio';
-        const g = createGeneration({ ...base, kind, prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: inputsFor({ refs: [] }) });
-        ctx.onState(s.id, 'running', { generationId: g.id });
-        const out = stepOutputs(g.id, await runSettled(g.id));
-        return { ...out, text: get().generations[g.id]?.text };
-      }
-      case 'op': {
-        const source = await resolveAsset(s.input);
-        if (!source) throw new Error(`No input for ${OPS[s.op].label}.`);
-        let params = s.params;
-        if (s.more?.length) {
-          const rest: string[] = [];
-          for (const r of s.more) {
-            rest.push(await requireAsset(r));
-          }
-          params = { ...params, clips: rest.join(',') };
-          // Music under the joined video: an audio step of this plan or an audio asset.
-          if (typeof params.music === 'string' && params.music) params = { ...params, music: (await resolveAsset(params.music)) ?? '' };
-        }
-        if (s.refs?.length) {
-          const got: Array<{ asset: string; role?: string; note?: string }> = [];
-          for (const r of s.refs) {
-            got.push({ asset: await requireAsset(r.ref), role: r.role, note: r.note });
-          }
-          params = { ...params, _refs: got.map((g) => g.asset).join(','), _refRoles: JSON.stringify(got) };
-        }
-        const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
-        const g = createGeneration(spec);
-        ctx.onState(s.id, 'running', { generationId: g.id });
-        const out = stepOutputs(g.id, await runSettled(g.id));
-        // Text results (Transcribe) feed later prompts through prompt_from.
-        return { ...out, text: useStore.getState().generations[g.id]?.text };
-      }
-      case 'layer': {
-        if (!ctx.docId) throw new Error('No design document to place layers in.');
-        const source = s.layerType === 'raster' ? await resolveAsset(s.source) : null;
-        const layerId = await applyLayerStep(ctx.sessionId, ctx.docId, s, source);
-        return { assetIds: [], layerId };
-      }
-    }
+    return (RUN_STEP[s.kind] as RunStep<typeof s.kind>)(s as never, { ...runEnv, base, inputsFor });
   };
 
   // Asset subjects save/reuse library entries. Step subjects serve this plan without saving to the library.

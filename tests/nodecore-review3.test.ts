@@ -102,7 +102,7 @@ describe('review finding 8: affects, inspector and the descriptor check', () => 
     const root = mkdtempSync(join(tmpdir(), 'nd-'));
     mkdirSync(join(root, 'src/engine/nodecore/types'), { recursive: true });
     writeFileSync(join(root, 'src/engine/graphTypes.ts'), "export type NodeKind = 'text';\n");
-    const file = (v: string, extra = '') => `export default defineNode({\n  kind: 'text',\n  version: ${v},\n  params: [], inputs, output, required: [], affects: {}, evaluate, actions: [],${extra}\n});\n`;
+    const file = (v: string, extra = '') => `export default defineNode({\n  kind: 'text',\n  version: ${v},\n  params: [], inputs, output, required: [], affects: {}, evaluate,${extra}\n});\n`;
     writeFileSync(join(root, 'src/engine/nodecore/types/text.node.ts'), file('2'));
     expect(check(root).errors).toEqual([expect.stringMatching(/text\.node\.ts:\d+: version 2 needs `migrate`/)]);
     writeFileSync(join(root, 'src/engine/nodecore/types/text.node.ts'), file('2', ' migrate: { 1: (d) => d },'));

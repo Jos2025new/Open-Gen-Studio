@@ -316,8 +316,6 @@ export const STUDIO_ACTIONS: Record<string, string> = {
   createSubjectVoice: '- library: wrapped in library.commands.ts',
   uploadFiles: '- takes File objects from the browser',
   attachFiles: '- takes File objects from the browser',
-  assetObjectUrl: '- returns a browser object URL',
   copyText: '- writes to the browser clipboard',
   downloadAsset: '- initiates a browser download',
-  needsSpendCheck: '- shared budget helper, not a Studio action',
 };

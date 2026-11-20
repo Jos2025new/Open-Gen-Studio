@@ -7,7 +7,7 @@ import { opSessionId } from './opSession';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
-import { deleteAssetBlobs, loadAssetUrl, putAssetBlob } from '../lib/idb';
+import { deleteAssetBlobs, putAssetBlob } from '../lib/idb';
 import { probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
@@ -17,7 +17,6 @@ import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
-import { needsSpendCheck } from './pricing';
 import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { ensureSpaceSession } from '../store/spaceSession';
@@ -196,8 +195,6 @@ export async function createSubjectVoice(sessionId: string, subjectId: string): 
 export function budgetProblem(e: Estimate, sessionId?: string): string | null {
   return overLimit(e, sessionId) ? overLimitText(e) : null;
 }
-
-export { needsSpendCheck };
 
 // ---------------------------------------------------------------------------
 // Composer: direct image / video generation
@@ -777,10 +774,6 @@ export function deleteSession(sessionId: string): void {
   void deleteAssetBlobs(assetIds);
   void deleteBuffers(rasterIds);
   s.docs.forEach((d) => dropHistory(d.id));
-}
-
-export async function assetObjectUrl(assetId: string): Promise<string | null> {
-  return (await loadAssetUrl(assetId)) ?? get().assets[assetId]?.remoteUrl ?? null;
 }
 
 export function schemaReady(ref: string): boolean {

@@ -7,7 +7,7 @@ export default [
       ['src/engine/agent/modelPriority.ts', 'export function modelPriority'],
       ['src/engine/agent/settingsParts.ts', 'userRequested: d.user_requested'],
       ['src/engine/agent/tools.ts', 'user_requested: z.boolean()'],
-      ['src/engine/plan.ts', 'Choose one confirmed model explicitly'],
+      ['src/engine/planSteps/media.ts', 'Choose one confirmed model explicitly'],
       ['src/engine/agent/sessionModel.ts', 'export function rememberSessionModel'],
       ['src/engine/catalog.ts', 'rememberSessionModel('],
       ['src/components/composer/AgentModelControls.tsx', 'Set as default'],
@@ -47,7 +47,7 @@ export default [
     id: 'model-switch',
     what: 'DELICADO: un modelo que el usuario nombra en la petición actual, o solo otro proveedor del mismo modelo (ADR 0025 D), se cambia solo con la tarjeta de una pregunta (plan rechazado, tarjeta compacta, parte añadida) en Guided; en Auto se aplica sin tarjeta (autoConfirmSettings).',
     sides: [
-      ['src/engine/plan.ts', 'call confirm_settings for ${kind} with model'],
+      ['src/engine/planSteps/media.ts', 'call confirm_settings for ${kind} with model'],
       ['src/engine/agent/llmTurn.ts', 'switchSection('],
       ['src/engine/agent/autoSettings.ts', 'const chosen = sections'],
       ['src/engine/agent/switchModel.ts', 'export function confirmedState'],

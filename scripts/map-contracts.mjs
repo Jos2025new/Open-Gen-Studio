@@ -234,7 +234,7 @@ export default [
     id: 'user-model-notes',
     what: 'Los cambios sobre un modelo elegido por el usuario («your … model») se ven siempre en la tarjeta y como aviso.',
     sides: [
-      ['src/engine/plan.ts', 'your ${kind} model has no variant'],
+      ['src/engine/planSteps/media.ts', 'your ${kind} model has no variant'],
       ['src/components/chat/PlanCard.tsx', 'const aboutUserModel'],
       ['src/engine/agent/runtimeShared.ts', '/\\byour [\\w-]+ model\\b/'],
     ],

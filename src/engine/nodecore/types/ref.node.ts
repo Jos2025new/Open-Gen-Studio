@@ -25,5 +25,4 @@ export default defineNode({
     const session = st.sessions[st.activeSessionId];
     return { kind: 'ref', type, ref: opts.ref ?? systemRefDefault(type, st.activeSessionId, st.composer.image.modelRef, session), title: type === 'agent' ? nextAgentTitle(session?.graph) : SYSTEM_NODE_TYPES[type].title };
   },
-  actions: ['send'],
 });

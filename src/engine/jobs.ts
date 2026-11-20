@@ -308,8 +308,6 @@ function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
   return mine;
 }
 
-export function generationInFlight(id: string): boolean { return running.has(id); }
-
 /** Execute a queued generation. Resolves with the created asset ids. */
 export function runGeneration(id: string): Promise<string[]> {
   const existing = running.get(id);

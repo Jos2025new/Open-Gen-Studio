@@ -105,7 +105,7 @@ export function OpChip({ assetId, op, parentId, compact, fullLabel }: { assetId:
 }
 
 /** Operations available for an asset, by type: grouped dock tabs (or one "Tools ▾" menu when `menuOnly` on cards). */
-export function AssetActions({ assetId, parentId, compact = false, showQuick: _showQuick = true, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean; menuOnly?: boolean }) {
+export function AssetActions({ assetId, parentId, compact = false, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; menuOnly?: boolean }) {
   const asset = useStore((s) => s.assets[assetId]);
   const more = usePopover();
   const [view, setView] = useState<'menu' | OpId>('menu');

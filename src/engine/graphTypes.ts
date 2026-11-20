@@ -33,7 +33,6 @@ export interface NodeTypeSpec {
   type: SystemNodeType;
   title: string;
   ports: PortSpec[];
-  commands: string[];
 }
 
 export interface TextNodeData {

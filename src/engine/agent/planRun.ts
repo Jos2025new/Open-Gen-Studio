@@ -10,7 +10,7 @@ import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
 import { patchGeneration } from '../../store/store';
-import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
+import { isRunning, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
 import { runsGeneration } from '../flow/graph';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
 import type { ChatMessageMeta } from '../feedMeta';
@@ -281,7 +281,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
     const gen = gid ? get().generations[gid] : undefined;
     if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
     else if (gen?.status === 'review') waiting.add(st.id);
-    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[st.id] = gen.id;
+    else if (gen?.status === 'queued' || (gen?.status === 'running' && isRunning(gen.id))) reuseGenerations[st.id] = gen.id;
     else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
     else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
   }
