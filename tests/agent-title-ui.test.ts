@@ -13,6 +13,7 @@ vi.mock('../src/lib/idb', () => ({
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { AgentTitle, ChatRecipientSelect } from '../src/components/node/AgentNodeControls';
+import { graphHistory } from '../src/engine/flow/history';
 import { createSession, loadedSession, useStore } from '../src/store/store';
 import type { Graph } from '../src/engine/types';
 
@@ -66,6 +67,11 @@ describe('AgentTitle', () => {
     type(input, '   ');
     key(input, 'Enter');
     expect(titleOf('a')).toBe('Agent 1');
+    const steps = graphHistory(sid, 'undo').length;
+    input = open();
+    type(input, 'Agent 1');
+    key(input, 'Enter');
+    expect(graphHistory(sid, 'undo').length).toBe(steps);
   });
 });
 
@@ -92,10 +98,11 @@ describe('ChatRecipientSelect', () => {
 describe('loadedSession', () => {
   it('numbers repeated default agents on load, keeping ids, cables, recipient, llm and threads', () => {
     const s = createSession('Old');
-    const graph: Graph = { nodes: [chat, agent('a', 'Agent', { llm: { provider: 'p', model: 'm' } }), agent('b', 'Agent')], edges: [{ id: 'e1', source: 'chat', target: 'a', kind: 'control' } as never] };
+    const graph: Graph = { nodes: [chat, agent('a', 'Agent', { llm: { provider: 'p', model: 'm' } }), agent('b', 'Agent')].map((n) => n.id === 'chat' ? { ...n, data: { ...n.data, recipient: 'b' } } : n), edges: [{ id: 'e1', source: 'chat', target: 'a', kind: 'control' } as never] };
     const loaded = loadedSession({ ...s, graph, agents: { a: { threads: [] } } } as never);
     expect(loaded.graph.nodes.map((n) => [n.id, n.data.title])).toEqual([['chat', 'Chat'], ['a', 'Agent 1'], ['b', 'Agent 2']]);
     expect(loaded.graph.nodes[1].data).toMatchObject({ llm: { provider: 'p', model: 'm' } });
+    expect(loaded.graph.nodes[0].data).toMatchObject({ recipient: 'b' });
     expect(loaded.graph.edges.map((e) => e.id)).toEqual(['e1']);
     expect((loaded as never as { agents: unknown }).agents).toMatchObject({ a: { threads: [] } });
     expect(loadedSession(loaded).graph).toEqual(loaded.graph);
