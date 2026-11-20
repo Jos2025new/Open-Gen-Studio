@@ -220,7 +220,7 @@ describe('Add node on the omnicanvas: one click adds and closes the menu', () =>
     await act(async () => {
       root.render(createElement(AddNodeMenu, { onAdd: vi.fn(), onImport: vi.fn(), omni: { has: () => false, onSpace: vi.fn(), onSystem } }));
     });
-    const open = host.querySelector<HTMLButtonElement>('button[aria-label="Add node"]')!;
+    const open = host.querySelector<HTMLButtonElement>('button[aria-label="Add node…"]')!;
     await act(async () => { open.click(); });
     const provider = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((el) => el.querySelector('.node-lib-text > span')?.textContent === 'Provider')!;
     expect(provider).toBeDefined();

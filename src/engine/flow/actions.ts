@@ -84,7 +84,9 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
 
 export function addNode(sessionId: string, data: GraphNodeData, position: { x: number; y: number }): string {
   const id = uid('nd');
-  applyEdit({ session: sessionId, op: { op: 'add', node: { id, position, data } } });
+  const done = applyEdit({ session: sessionId, op: { op: 'add', node: { id, position, data } } });
+  // A refused add says why instead of leaving the user clicking an entry that does nothing; no node, no id.
+  if (!done.ok) { toast(`Could not add the node: ${done.error}`, 'error'); return ''; }
   return id;
 }
 
