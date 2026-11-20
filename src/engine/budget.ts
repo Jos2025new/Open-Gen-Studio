@@ -4,9 +4,9 @@ import { formatUsd } from '../lib/format';
 import { uid } from '../lib/id';
 import { appendFeed, patchSession, setUi, updateFeedItem, useStore } from '../store/store';
 import type { Estimate, NoticeFeedItem } from './types';
-import { noAskActive, setNoAskProbe } from './noAsk';
+import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
 
-export { noAskActive };
+export { noAskEverywhere };
 
 /*
  * The spending limit warns, it does not block: with no limit, or once the user chose to go past it, runs go
@@ -58,29 +58,28 @@ function runWithPass<T>(end: () => void, action: () => T): T {
  * when they chose it stays the open one. It ends when the user opens a chat in another session, when the spending limit
  * changes, or when the user turns it off (`askAgain`). The rule is `untilNextSessionStillHolds`: change it there.
  */
-let untilNextSession: { chat: string; budgetOn: boolean; budgetUsd: number } | null = null;
 const untilNextListeners = new Set<() => void>();
 const notifyUntilNext = () => untilNextListeners.forEach((fn) => fn());
 
-function untilNextSessionStillHolds(grant: NonNullable<typeof untilNextSession>): boolean {
-  const { settings, activeSessionId } = get();
-  return activeSessionId === grant.chat && settings.budgetOn === grant.budgetOn && settings.budgetUsd === grant.budgetUsd;
+function untilNextSessionStillHolds(grant: UntilNextGrant): boolean {
+  return untilNextHolds(get(), grant);
 }
 
 let unwatchUntilNext: (() => void) | null = null;
 function endUntilNextSession(): void {
   unwatchUntilNext?.();
   unwatchUntilNext = null;
-  if (untilNextSession) {
-    untilNextSession = null;
+  if (untilNextGrant()) {
+    setUntilNextGrant(null);
     notifyUntilNext();
   }
 }
 
 /** Is "until next session" on right now? */
 export function untilNextSessionActive(): boolean {
-  if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) endUntilNextSession();
-  return untilNextSession !== null;
+  const grant = untilNextGrant();
+  if (grant && !untilNextSessionStillHolds(grant)) endUntilNextSession();
+  return untilNextGrant() !== null;
 }
 
 /** For `useSyncExternalStore`: tells when "until next session" turns on or off. */
@@ -89,21 +88,10 @@ export function subscribeUntilNextSession(fn: () => void): () => void {
   return () => void untilNextListeners.delete(fn);
 }
 
-/** The session whose runs no longer ask (the active one by default). */
-function sessionNoAsk(sessionId?: string): boolean {
-  const s = get();
-  return Boolean(s.sessions[sessionId ?? s.activeSessionId]?.noAskOverLimit);
-}
-
-/** "Don't ask in any session" (or a limit accepted by an older version). */
-export function noAskEverywhere(s: { budgetUsd: number; budgetAccepted?: number | null; budgetNoAsk?: boolean }): boolean {
-  return Boolean(s.budgetNoAsk) || s.budgetAccepted === s.budgetUsd;
-}
-
 /** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", "Don't ask again until next session", or a pass just given. */
 export function overLimitAccepted(sessionId?: string): boolean {
   const { budgetOn } = get().settings;
-  return !budgetOn || noAskEverywhere(get().settings) || untilNextSessionActive() || sessionNoAsk(sessionId) || passFor(sessionId ?? get().activeSessionId);
+  return !budgetOn || noAskDurable(get(), sessionId) || passFor(sessionId ?? get().activeSessionId);
 }
 
 function passFor(sessionId: string): boolean {
@@ -163,10 +151,11 @@ export const allowForSession = dontAskAgain;
 export function dontAskUntilNextSession(): void {
   endUntilNextSession();
   const { settings, activeSessionId } = get();
-  untilNextSession = { chat: activeSessionId, budgetOn: settings.budgetOn, budgetUsd: settings.budgetUsd };
+  setUntilNextGrant({ chat: activeSessionId, budgetOn: settings.budgetOn, budgetUsd: settings.budgetUsd });
   // Eager end: leaving the chat and coming back must not bring it back.
   unwatchUntilNext = useStore.subscribe(() => {
-    if (untilNextSession && !untilNextSessionStillHolds(untilNextSession)) endUntilNextSession();
+    const grant = untilNextGrant();
+    if (grant && !untilNextSessionStillHolds(grant)) endUntilNextSession();
   });
   notifyUntilNext();
 }
@@ -210,5 +199,3 @@ export function ignoreExcess(sessionId: string, itemId: string): void {
 export function rerunNote(e: Estimate, sessionId?: string): string {
   return overLimit(e, sessionId) ? overLimitText(e) : 'The execution changed. Review and approve again.';
 }
-
-setNoAskProbe(overLimitAccepted);
