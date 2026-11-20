@@ -1,11 +1,11 @@
-import { acceptsReuseValue } from './reuseValues';
-import { FX_DEFS, isFxKind } from '../engine/fx/defs';
-import { ensureSchema, opFollowsSource, videoOpFits } from '../engine/catalog';
-import { OPS, defaultOpParams } from '../engine/ops';
-import { coerceSettings } from '../engine/params';
-import type { Generation, MediaKind } from '../engine/types';
-import { setComposer, setUi, toast, useStore, type UiState } from './store';
-import type { ToolSeed } from './spaceUi';
+import { acceptsReuseValue } from '../store/reuseValues';
+import { FX_DEFS, isFxKind } from './fx/defs';
+import { ensureSchema, opFollowsSource, videoOpFits } from './catalog';
+import { OPS, defaultOpParams, isVideoOpEngine } from './ops';
+import { coerceSettings } from './params';
+import type { Generation, MediaKind } from './types';
+import { setComposer, setUi, toast, useStore, type UiState } from '../store/store';
+import type { ToolSeed } from '../store/spaceUi';
 
 /** Match Create/Tools navigation, including when Library was opened over Designer. */
 function openReuseSpace(patch: Partial<UiState>): void {
@@ -30,8 +30,8 @@ export async function reuseGeneration(g: Generation): Promise<void> {
     const def = OPS[g.op.id];
     const candidate = st.catalog.models[g.modelRef];
     const transcriber = def.engine === 'transcribe' && st.catalog.transcribers?.[g.modelRef];
-    const modelRef = transcriber || (candidate && (['video_upscale', 'video_edit', 'video_extend', 'video'].includes(def.engine) ? videoOpFits(def.engine, candidate) : candidate.kind === def.output)) ? g.modelRef : undefined;
-    const dynamic = ['video_upscale', 'video_edit', 'video_extend', 'video'].includes(def.engine);
+    const dynamic = def.engine === 'video' || isVideoOpEngine(def.engine);
+    const modelRef = transcriber || (candidate && (dynamic ? videoOpFits(def.engine, candidate) : candidate.kind === def.output)) ? g.modelRef : undefined;
     const requested = g.op.params._modelRef;
     const requestedModel = typeof requested === 'string' ? st.catalog.models[requested] : undefined;
     const ref = requestedModel && videoOpFits(def.engine, requestedModel) ? requestedModel.ref : modelRef;

@@ -4,16 +4,15 @@ import { MAIN_THREAD, freshAgent, migrateAgents } from '../engine/agent/threads'
 import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
 import { reportSave } from './saveReport';
 import { persistState } from './persistJson';
-import { keptDrafts } from './homeDrafts';
-import { pickUi, sanitizeUi, type PageUiPrefs, type PersistedUi } from './persistUi';
-import { historyDepth } from '../engine/design/history';
-import type { SelectShape } from '../engine/design/selectShape';
-import type { SelectCombine } from '../engine/design/pixelSelection';
-import { pendingRaster } from '../engine/design/raster';
-import { useLayerSelection } from '../engine/design/selection';
-import { objectPicks } from '../engine/design/objectSelection';
-import { recordGraph } from '../engine/flow/history';
-import { graphEditProblem } from '../engine/flow/locks';
+import { pickUi, type PageUiPrefs } from './persistUi';
+import {
+  DEFAULT_STROKE_STYLE, DEFAULT_TEXT_STYLE, graphEditProblem, historyDepth, loadRaster,
+  objectPicks, pendingRaster, pinPaintMode, recordGraph, useLayerSelection,
+  type BrushPreset, type BrushUi, type DesignTool, type RulerKind, type SelectCombine,
+  type SelectShape, type SnapByMode, type StrokeRuler,
+} from '../engine/storeBindings';
+import { sessionLoadHooks } from '../lib/sessionLoadHooks';
+import { mergePersistedState, type Persisted } from './mergePersistedState';
 import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { uid } from '../lib/id';
@@ -22,13 +21,6 @@ import { holdsWriterLock, onWriterLockGranted } from '../lib/writerLock';
 import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
-import { formatUsd } from '../lib/format';
-import { noAskDurable } from '../engine/noAsk';
-import type { DesignTool } from '../engine/design/rules';
-import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
-import { pinPaintMode } from '../engine/design/paintMode';
-import { DEFAULT_STROKE_STYLE } from '../engine/design/strokes';
-import type { SnapByMode } from '../engine/design/snap';
 import type { ShapeSpec, StrokeStyle } from '../engine/types';
 import type {
   Asset,
@@ -79,9 +71,9 @@ export interface UiState extends PageUiPrefs {
   toasts: Toast[];
   tool: DesignTool;
   /** Brush and eraser; the tip fields (hardness, pressure, texture, blend, Keep Opacity) are design/brushEngine.ts. */
-  brush: import('../engine/design/brushPresets').BrushUi;
+  brush: BrushUi;
   /** Brush presets the user saved. */
-  brushPresets?: import('../engine/design/brushPresets').BrushPreset[];
+  brushPresets?: BrushPreset[];
   /** Designer colors: recent and saved. */
   swatches?: { recent: string[]; saved: string[] };
   /** Select shape. */
@@ -94,8 +86,8 @@ export interface UiState extends PageUiPrefs {
   wand?: { threshold: number; expand: number; smooth: number; mode: SelectCombine; sample: 'layer' | 'all' };
   rulers?: boolean; showGuides?: boolean; lockGuides?: boolean;
   /** Stroke ruler (SAI 2): the guide the brush follows, and the kind the Ruler tool places next (strokeRuler.ts). */
-  strokeRuler?: import('../engine/design/strokeRuler').StrokeRuler | null;
-  strokeRulerKind?: import('../engine/design/strokeRuler').RulerKind;
+  strokeRuler?: StrokeRuler | null;
+  strokeRulerKind?: RulerKind;
   /** Shape edit: Rx and Ry move together, as with Ctrl (ShapeKnots). */
   shapeLockRadii?: boolean;
   /** The help line above the Designer canvas (ToolHelp.tsx); on unless turned off. */
@@ -325,14 +317,10 @@ function flushWrite(): Promise<void> {
 export async function saveNow(): Promise<void> {
   if (!pendingWrite && lastWrite && saveStatus.getState().phase === 'error') pendingWrite = lastWrite;
   const state = flushWrite();
-  const { flushRaster } = await import('../engine/design/raster');
+  const { flushRaster } = await loadRaster();
   await Promise.all([state, flushRaster()]);
   if (localFailed != null) throw new Error('Could not save to browser storage');
 }
-
-/** Set by nodecore/migrate.ts (it cannot be imported here: the registry's descriptors import this store). */
-let loadMigration = (g: Session['graph']): Session['graph'] => g;
-export const setLoadMigration = (f: typeof loadMigration): void => { loadMigration = f; };
 
 const idbStorage: PersistStorage<Persisted> = {
   getItem: async (name) => {
@@ -368,11 +356,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
-  composer: Omit<ComposerState, 'editing'>;
-  ui: PersistedUi;
-};
-
 export const useStore = create<AppState>()(
   persist(() => initial, {
     name: 'ogs-app',
@@ -391,38 +374,7 @@ export const useStore = create<AppState>()(
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
       ui: pickUi(s.ui),
     }),
-    merge: (persisted, current) => {
-      const p = (persisted ?? {}) as Partial<Persisted>;
-      const restored = p.sessions && Object.keys(p.sessions).length ? p.sessions : current.sessions;
-      // A reload interrupts agent calls; nodes saved at an older descriptor version are migrated.
-      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, loadedSession(s)]));
-      const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] && !sessions[p.activeSessionId].hidden ? p.activeSessionId : Object.keys(sessions).find((id) => !sessions[id].hidden) ?? Object.keys(sessions)[0];
-      const assets = p.assets ?? {};
-      const ui = sanitizeUi({ ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) });
-      // Home and a Space never show together; a missing tool input is dropped.
-      if (ui.home && ui.space) ui.home = false;
-      if (ui.toolAsset && !assets[ui.toolAsset]) ui.toolAsset = undefined;
-      return {
-        ...current,
-        settings: {
-          ...DEFAULT_SETTINGS,
-          ...p.settings,
-          keys: { ...DEFAULT_SETTINGS.keys, ...p.settings?.keys },
-          agent: { ...DEFAULT_SETTINGS.agent, ...p.settings?.agent },
-          ops: { ...DEFAULT_SETTINGS.ops, ...p.settings?.ops },
-          notifications: { ...DEFAULT_SETTINGS.notifications, ...p.settings?.notifications },
-        },
-        spentUsd: p.spentUsd ?? 0,
-        spendLog: p.spendLog ?? [],
-        sessions,
-        activeSessionId,
-        generations: p.generations ?? {},
-        assets,
-        library: p.library ?? legacySubjects(restored),
-        composer: { ...current.composer, ...p.composer, editing: null },
-        ui,
-      };
-    },
+    merge: (persisted, current) => mergePersistedState(persisted, current, DEFAULT_SETTINGS, loadedSession),
     onRehydrateStorage: () => (_state, error) => {
       if (error) console.error('State restore failed', error);
       useStore.setState({ hydrated: true });
@@ -432,20 +384,13 @@ export const useStore = create<AppState>()(
 
 onWriterLockGranted(() => void useStore.persist.rehydrate());
 
-/** Before the global library, subjects lived in each session: copied once (first name wins); sessions keep theirs. */
 /** A loaded session: nodes migrated, threads folded from the old shapes (agent/threads.ts), agents idle. */
 export function loadedSession(s: Session): Session {
   const m = migrateAgents(s);
-  return { ...m, graph: normalizeAgentTitles(loadMigration(m.graph)) };
+  return { ...m, graph: normalizeAgentTitles(sessionLoadHooks.migrateGraph(m.graph)) };
 }
 
-export function legacySubjects(sessions: Record<string, Session>): Subject[] {
-  const out: Subject[] = [];
-  for (const s of Object.values(sessions)) {
-    for (const x of s.subjects ?? []) if (!out.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) out.push(x);
-  }
-  return out;
-}
+export { legacySubjects } from './mergePersistedState';
 
 // ------------------
 // Mutators
@@ -576,23 +521,7 @@ export function setCatalog(patch: Partial<CatalogState> | ((c: CatalogState) => 
   set((st) => ({ catalog: { ...st.catalog, ...(typeof patch === 'function' ? patch(st.catalog) : patch) } }));
 }
 
-export const MAX_SPEND_LOG = 5000;
-
-/** Count money spent (never blocks). With `entry` it is itemized in the Spending panel; crossing the limit shows one notice. */
-export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): void {
-  if (!Number.isFinite(usd) || usd <= 0) return;
-  const before = get().spentUsd;
-  set((st) => ({
-    spentUsd: Math.round((st.spentUsd + usd) * 10000) / 10000,
-    spendLog: entry ? [...st.spendLog, { ...entry, at: Date.now(), usd }].slice(-MAX_SPEND_LOG) : st.spendLog,
-  }));
-  const { budgetOn, budgetUsd } = get().settings;
-  // Only the lasting rules silence it: a one-off or sequence pass ends, and the next run asks.
-  const quiet = noAskDurable(get(), entry?.sessionId);
-  if (budgetOn && !quiet && before <= budgetUsd && get().spentUsd > budgetUsd) {
-    toast(`You passed your spending limit (${formatUsd(budgetUsd)}). What is running continues; new paid runs will ask first.`, 'error');
-  }
-}
+export { addSpend, MAX_SPEND_LOG } from './spend';
 
 import { toast } from './toasts';
 export { toast, dismissToast } from './toasts';

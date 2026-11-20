@@ -1,4 +1,4 @@
-import { setLoadMigration } from '../../store/store';
+import { sessionLoadHooks } from '../../lib/sessionLoadHooks';
 import type { Graph, GraphNode, GraphNodeData } from '../types';
 import { descriptorOf } from './registry';
 
@@ -44,7 +44,7 @@ export function stampNew(prev: Graph, next: Graph): Graph {
   return changed ? { ...next, nodes } : next;
 }
 
-setLoadMigration(migrateGraph);
+sessionLoadHooks.migrateGraph = migrateGraph;
 
 /** Saved sessions with the single `agent` (or `agentLanes`) load with one thread per agent (agent/threads.ts). */
 export { migrateAgents } from '../agent/threads';

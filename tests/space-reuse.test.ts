@@ -10,7 +10,7 @@ vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('.
 import { generateDirect } from '../src/engine/actions';
 import { ToolsPanel } from '../src/components/space/ToolsPanel';
 import { ReuseButton } from '../src/components/assets/ReuseButton';
-import { canReuse, reuseGeneration } from '../src/store/reuse';
+import { canReuse, reuseGeneration } from '../src/engine/reuse';
 import { setUi, useStore } from '../src/store/store';
 import { opSpec } from '../src/engine/jobs';
 import { pickUi } from '../src/store/persistUi';

@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined, setInterval, clearInterval }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 
 const cache = new Map<string, unknown>();
-vi.mock('../src/lib/idb', () => ({
-  stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
+vi.mock('../src/lib/cacheDb', () => ({
   cacheDb: {
     get: async (k: string) => cache.get(k),
     set: async (k: string, v: unknown) => void cache.set(k, v),
   },
+}));
+vi.mock('../src/lib/idb', () => ({
+  stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   getAssetBlob: async () => undefined,
   putAssetBlob: async () => undefined,
 }));

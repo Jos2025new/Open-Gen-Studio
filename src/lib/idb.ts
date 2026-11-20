@@ -3,18 +3,18 @@ import { assembleText, splitText, type V2Parts } from '../store/formatV2';
 import { disk, diskAvailable, type DiskWriteResult, type KeepVersion } from './disk';
 import { guard, setProblem, sha256Hex, type Pending } from './saveGuard';
 import { holdsWriterLock } from './writerLock';
+import { forgetAssetUrl, loadAssetUrl as loadObjectUrl, replaceAssetUrl } from './assetUrls';
+import { clearCatalogCache } from './cacheDb';
 import type { StateJson } from '../store/persistJson';
 
 /**
  * IndexedDB stores:
  *  - `state`: the persisted app state (one JSON document)
  *  - `blobs`: media bytes for assets and designer raster layers
- *  - `cache`: provider catalogs and model schemas (with timestamps)
- * State and blobs are mirrored to disk by the local server when it runs (see ./disk.ts); the cache is not.
+ * State and blobs are mirrored to disk by the local server when it runs (see ./disk.ts).
  */
 const stateStore = createStore('ogs-state', 'kv');
 const blobStore = createStore('ogs-blobs', 'kv');
-const cacheStore = createStore('ogs-cache', 'kv');
 
 // The saved state is one JSON document; a leading `savedAt` stamp tells which copy (browser or disk) is newer.
 const savedAt = (value: string | null | undefined) => Number(/^\{"savedAt":(\d+)/.exec(value ?? '')?.[1] ?? 0);
@@ -145,7 +145,12 @@ export function deleteDatabases(names: readonly string[]): Promise<void> {
  */
 export async function wipeLocalDatabases(): Promise<void> {
   if (!holdsWriterLock()) return;
-  await Promise.all([stateStore, blobStore, cacheStore, v2Store].map((store) => clear(store).catch(() => undefined)));
+  await Promise.all([
+    clear(stateStore).catch(() => undefined),
+    clear(blobStore).catch(() => undefined),
+    clearCatalogCache().catch(() => undefined),
+    clear(v2Store).catch(() => undefined),
+  ]);
   await deleteDatabases(ALL_DB_NAMES);
 }
 
@@ -367,83 +372,26 @@ export async function syncBlobsToDisk(): Promise<void> {
   }
 }
 
-interface Cached<T> {
-  at: number;
-  value: T;
-}
-
-export const cacheDb = {
-  async get<T>(key: string, maxAgeMs: number): Promise<T | undefined> {
-    try {
-      const hit = await get<Cached<T>>(key, cacheStore);
-      if (!hit) return undefined;
-      if (Date.now() - hit.at > maxAgeMs) return undefined;
-      return hit.value;
-    } catch {
-      return undefined;
-    }
-  },
-  async set<T>(key: string, value: T): Promise<void> {
-    try {
-      await set(key, { at: Date.now(), value } satisfies Cached<T>, cacheStore);
-    } catch {
-      /* cache is best effort */
-    }
-  },
-  del: (key: string) => del(key, cacheStore),
-};
-
-// ---------------------------------------------------------------------------
-// Asset URL cache: object URLs for blobs we hold locally.
-
-const urlCache = new Map<string, string>();
-const pending = new Map<string, Promise<string | null>>();
-
 export function assetBlobKey(assetId: string): string {
   return `asset:${assetId}`;
 }
 
 export async function putAssetBlob(assetId: string, blob: Blob): Promise<string> {
   await blobDb.set(assetBlobKey(assetId), blob);
-  const old = urlCache.get(assetId);
-  if (old) URL.revokeObjectURL(old);
-  const url = URL.createObjectURL(blob);
-  urlCache.set(assetId, url);
-  return url;
+  return replaceAssetUrl(assetId, blob);
 }
 
 export async function getAssetBlob(assetId: string): Promise<Blob | undefined> {
   return blobDb.get(assetBlobKey(assetId));
 }
 
-export function peekAssetUrl(assetId: string): string | undefined {
-  return urlCache.get(assetId);
-}
+export { peekAssetUrl } from './assetUrls';
 
 export function loadAssetUrl(assetId: string): Promise<string | null> {
-  const hit = urlCache.get(assetId);
-  if (hit) return Promise.resolve(hit);
-  const inflight = pending.get(assetId);
-  if (inflight) return inflight;
-  const p = blobDb
-    .get(assetBlobKey(assetId))
-    .then((blob) => {
-      if (!blob) return null;
-      const url = URL.createObjectURL(blob);
-      urlCache.set(assetId, url);
-      return url;
-    })
-    .catch(() => null)
-    .finally(() => pending.delete(assetId));
-  pending.set(assetId, p);
-  return p;
+  return loadObjectUrl(assetId, () => blobDb.get(assetBlobKey(assetId)));
 }
 
 export async function deleteAssetBlobs(assetIds: string[]): Promise<void> {
-  for (const id of assetIds) {
-    const url = urlCache.get(id);
-    if (url) URL.revokeObjectURL(url);
-    urlCache.delete(id);
-  }
+  for (const id of assetIds) forgetAssetUrl(id);
   if (assetIds.length) await blobDb.delMany(assetIds.map(assetBlobKey));
 }

@@ -89,7 +89,7 @@ export default [{
   what: 'Cada agente nuevo es «Agent N» sin renumerar; el título se renombra en la cabecera por la capa del grafo; al cargar se normalizan los «Agent» repetidos (un «Agent» manual repetido se numera también: el esquema no distingue manual de defecto).',
   sides: [
     ['src/engine/nodes/agentNames.ts', 'export function normalizeAgentTitles'],
-    ['src/store/store.ts', 'normalizeAgentTitles(loadMigration'],
+    ['src/store/store.ts', 'normalizeAgentTitles(sessionLoadHooks.migrateGraph'],
     ['src/components/node/AgentNodeControls.tsx', 'export function AgentTitle'],
   ],
   tests: ['tests/agent-names.test.ts', 'tests/agent-title-ui.test.ts'],

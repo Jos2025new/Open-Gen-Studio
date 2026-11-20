@@ -1,4 +1,4 @@
-import { cacheDb } from '../../lib/idb';
+import { cacheDb } from '../../lib/cacheDb';
 import { blobToDataUrl, base64ToBlob, guessMimeFromUrl, prepareImageForUpload } from '../../lib/media';
 import type { ImageInputFormat, InputSlots, MediaKind } from '../types';
 import { HttpError, isAbort, isTransient, JobFailedError, sleep } from '../../lib/http';

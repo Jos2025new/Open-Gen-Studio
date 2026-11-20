@@ -158,7 +158,7 @@ describe('4b. one rule, no copies', () => {
       [/(?<![.\w])inputVariant\(/, ['src/engine/catalog.ts'], 'ask catalog.sentModelRef(), the one variant rule'],
       [/budgetUsd - spent\b/, [], 'use budget.remainingBudget()'],
       [/!settings\.budgetNoAsk/, [], 'use budget.noAskEverywhere(settings)'],
-      [/'video_upscale',\s*'video_edit',\s*'video_extend'/, ['src/engine/ops.ts', 'src/store/reuse.ts'], 'use ops.VIDEO_OP_ENGINES / isVideoOpEngine (reuse.ts: batch D)'],
+      [/'video_upscale',\s*'video_edit',\s*'video_extend'/, ['src/engine/ops.ts'], 'use ops.VIDEO_OP_ENGINES / isVideoOpEngine'],
       [/setNoAskProbe/, [], 'noAsk.ts is a pure leaf: no probes'],
     ];
     const hits = rules.flatMap(([re, allowed, hint]) => files.filter((f) => !allowed.includes(f.replace(/\\/g, '/')) && re.test(readFileSync(f, 'utf8'))).map((f) => `${f}: ${re} -> ${hint}`));

@@ -48,7 +48,7 @@ export default [
     id: 'space-reuse',
     what: 'Reusar devuelve un resultado de Space a su formulario; Tools consume y limpia un seed aunque ya esté abierto. El seed y textView no se persisten; el transcriptor se elige por ejecución.',
     sides: [
-      ['src/store/reuse.ts', 'export async function reuseGeneration'],
+      ['src/engine/reuse.ts', 'export async function reuseGeneration'],
       ['src/store/spaceUi.ts', 'export interface ToolSeed'],
       ['src/store/store.ts', 'finishSpaceUi(ui, st.ui)'],
       ['src/store/persistUi.ts', 'export function pickUi'],

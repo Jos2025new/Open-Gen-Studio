@@ -1,5 +1,5 @@
 import type { Generation } from '../../engine/types';
-import { canReuse, reuseGeneration } from '../../store/reuse';
+import { canReuse, reuseGeneration } from '../../engine/reuse';
 import { useStore } from '../../store/store';
 import './reuse-button.css';
 import { Button } from '../ui/primitives';

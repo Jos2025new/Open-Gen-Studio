@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseSync } from 'rolldown/utils';
 
 // Structure rules of the send engine (Opus #4, #8, #10, 2026-11-20). Each prints rule · file:line · problem · fix.
 // 1. jobs.ts is provider-neutral: a provider's quirks are optional capabilities of its ProviderAdapter.
@@ -15,9 +16,40 @@ const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|
 const OWN_CHOICE = /\b(opModelForAsset|opModelFromRef|reusedOpChoice)\(/;
 const CHOICE_CALLERS = ['src/engine/planSteps/exec/op.ts', 'src/engine/flow/actions.ts'];
 
+function importProblems(path, text) {
+  const store = path === 'src/store/store.ts';
+  if (!store && !path.startsWith('src/engine/providers/')) return [];
+  const { program, errors } = parseSync(path, text);
+  if (errors.length) return [`import-boundary · ${path}:1 · could not parse imports · ${errors[0].message}`];
+  const problems = [];
+  function visit(node) {
+    if (!node || typeof node.type !== 'string') return;
+    const spec = node.source;
+    if (spec?.type === 'Literal' && typeof spec.value === 'string' && spec.value.startsWith('.')) {
+      const target = posix.join(posix.dirname(path), spec.value);
+      const line = text.slice(0, spec.start).split('\n').length;
+      if (store && /^src\/engine\/(design|flow)(\/|$)/.test(target)) {
+        problems.push(`store-domain-boundary · ${path}:${line} · store imports Designer or Nodes · use the domain bridge`);
+      }
+      if (!store && /^src\/lib\/idb(?:\.[cm]?[jt]sx?)?$/.test(target)) {
+        problems.push(`provider-storage-boundary · ${path}:${line} · provider imports user persistence · use providers/shared.ts for catalog caching`);
+      }
+    }
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) child.forEach(visit); else visit(child);
+    }
+  }
+  visit(program);
+  return problems;
+}
+
 export function structureProblems(files) {
   const problems = [];
   for (const [path, text] of Object.entries(files)) {
+    problems.push(...importProblems(path, text));
+    if (path === 'src/store/reuse.ts') {
+      problems.push(`reuse-domain-boundary · ${path}:1 · Reuse lives in the store · move it to src/engine/reuse.ts and use isVideoOpEngine()`);
+    }
     if (CHOICE_CALLERS.includes(path)) {
       if (!/\bopChoice\(/.test(text)) problems.push(`one-op-choice · ${path}:1 · does not call opChoice() · ask opChoice() (opSpec.ts) which model the operation runs with`);
       text.split('\n').forEach((line, i) => {
@@ -44,7 +76,9 @@ export function structureProblems(files) {
 
 export function checkEngineStructure(root) {
   const files = {};
-  for (const path of ['src/engine/jobs.ts', ...CHOICE_CALLERS]) files[path] = readFileSync(join(root, path), 'utf8');
+  for (const path of ['src/engine/jobs.ts', 'src/store/store.ts', ...CHOICE_CALLERS]) files[path] = readFileSync(join(root, path), 'utf8');
+  const oldReuse = 'src/store/reuse.ts';
+  if (existsSync(join(root, oldReuse))) files[oldReuse] = readFileSync(join(root, oldReuse), 'utf8');
   for (const name of readdirSync(join(root, 'src/engine/providers'))) {
     if (name.endsWith('.ts')) files[`src/engine/providers/${name}`] = readFileSync(join(root, 'src/engine/providers', name), 'utf8');
   }
