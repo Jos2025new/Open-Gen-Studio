@@ -109,6 +109,26 @@ export function overLimit(e: Estimate, sessionId?: string): boolean {
   return left != null && !overLimitAccepted(sessionId) && (e.usd == null || e.usd > left + 1e-9);
 }
 
+/** A send that would pass the spending limit and nobody agreed: createGeneration refuses it (the safety net behind every entry). */
+export class OverLimitError extends Error {
+  constructor(readonly estimate: Estimate) {
+    super(overLimitText(estimate));
+    this.name = 'OverLimitError';
+  }
+}
+
+/**
+ * The central check of the promise «new paid runs will ask first»: an entry that forgot to ask is stopped here.
+ * Free runs, runs within the limit, accepted ones (no limit, passes, "Don't ask again") and steps of a plan the user
+ * approved go through; so does everything an entry already approved, because those hold their pass. Only a known
+ * price over what is left is stopped here: an unpublished price is still asked about by the entries (overLimit),
+ * and stopping it here too would refuse every send of a model with no price.
+ */
+export function assertWithinLimit(e: Estimate, sessionId: string, approvedByPlan: boolean): void {
+  if (approvedByPlan || e.usd == null || e.usd === 0 || !overLimit(e, sessionId)) return;
+  throw new OverLimitError(e);
+}
+
 /** What the confirmation says when a run goes over the limit. */
 export function overLimitText(e: Estimate, choices = '“Continue once” lets only this run through; “Don\u2019t ask again” stops asking in this session. Nothing running is stopped.'): string {
   const { budgetUsd } = get().settings;

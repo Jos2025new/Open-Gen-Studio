@@ -4,7 +4,6 @@
   "src/engine/agent/context.ts": 44464,
   "src/engine/agent/tools.ts": 31490,
   "src/engine/flow/actions.ts": 31176,
-  "src/engine/jobs.ts": 67471,
   "src/engine/providers/nanogpt.ts": 32487,
   "src/engine/types.ts": 37306,
   "src/styles/shell.css": 42582

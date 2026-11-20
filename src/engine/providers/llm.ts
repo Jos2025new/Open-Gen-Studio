@@ -1,9 +1,9 @@
-import { cacheDb } from '../../lib/idb';
 import { providerFetch } from '../../lib/providerFetch';
 import { AbortedError, HttpError, NetworkError, extractErrorMessage, isAbort, readSse, requestJson } from '../../lib/http';
 import type { LlmMessage, LlmProviderId } from '../types';
 import { NANO_BASE } from './nanogpt';
 import { orHeaders } from './openrouter';
+import { cachedJson } from './shared';
 
 /* OpenAI-compatible chat completions for the agent (OpenRouter, NanoGPT, Atlas Cloud). */
 
@@ -100,9 +100,10 @@ function perMillion(v: unknown, unit: 'token' | 'million'): number | undefined {
 }
 
 export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]> {
-  const cacheKey = `llm:v4:${provider}`;
-  const cached = await cacheDb.get<LlmModel[]>(cacheKey, 12 * 3600 * 1000);
-  if (cached) return cached;
+  return (await cachedJson(`llm:v4:${provider}`, 12 * 3600 * 1000, () => fetchLlmModels(provider)))!;
+}
+
+async function fetchLlmModels(provider: LlmProviderId): Promise<LlmModel[]> {
   const res = await requestJson<{ data: Loose[] }>(ENDPOINTS[provider].models);
   const out: LlmModel[] = [];
   for (const m of res.data ?? []) {
@@ -159,7 +160,6 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
       outputPrice,
     });
   }
-  await cacheDb.set(cacheKey, out);
   return out;
 }
 

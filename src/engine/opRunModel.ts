@@ -1,4 +1,4 @@
-import type { OpSpecInput } from './jobs';
+import type { OpChoiceInput } from './opSpec';
 import { isConnected, transcriberFor } from './catalog';
 import { useStore } from '../store/store';
 
@@ -9,7 +9,7 @@ export function transcriberForRun(ref?: string) {
 }
 
 /** Fixed-model tools can replay the original run without replacing the user's Settings choice. */
-export function reusedOpChoice(input: OpSpecInput): { ref: string; viaEdit: boolean } | null {
+export function reusedOpChoice(input: Pick<OpChoiceInput, 'op' | 'modelRef' | 'parentId' | 'sourceAssetId'>): { ref: string; viaEdit: boolean } | null {
   if (!input.modelRef || !input.parentId) return null;
   const st = useStore.getState();
   const original = st.generations[input.parentId];

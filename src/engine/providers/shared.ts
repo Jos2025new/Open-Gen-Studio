@@ -1,7 +1,26 @@
+import { cacheDb } from '../../lib/idb';
 import { blobToDataUrl, base64ToBlob, guessMimeFromUrl, prepareImageForUpload } from '../../lib/media';
 import type { ImageInputFormat, InputSlots, MediaKind } from '../types';
 import { HttpError, isAbort, isTransient, JobFailedError, sleep } from '../../lib/http';
 import type { GenOutput, GenResult, MediaInput, ResumeContext } from './types';
+
+/**
+ * The one place providers read and write the IndexedDB cache (Opus #10): the value saved under `key` while it is
+ * younger than `ttlMs`; otherwise `load()` runs and its answer is saved. An `undefined` answer (a failed or
+ * partial load) is returned but not saved, so the next call asks again. Keys and TTLs belong to the caller.
+ */
+export async function cachedJson<T>(key: string, ttlMs: number, load: () => Promise<T | undefined>): Promise<T | undefined> {
+  const cached = await cacheDb.get<T>(key, ttlMs);
+  if (cached) return cached;
+  const fresh = await load();
+  if (fresh !== undefined) await cacheDb.set(key, fresh);
+  return fresh;
+}
+
+/** The saved value only, never the network (listings that must stay instant). */
+export function peekCached<T>(key: string, ttlMs: number): Promise<T | undefined> {
+  return cacheDb.get<T>(key, ttlMs);
+}
 
 /** Encode an input image for a JSON body (data URL, or an OpenAI-style content part). */
 export async function encodeImage(input: MediaInput, format: ImageInputFormat, upload?: (blob: Blob) => Promise<string>): Promise<unknown> {

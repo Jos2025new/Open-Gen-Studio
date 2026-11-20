@@ -343,8 +343,10 @@ describe('402 recovery at the spending gate', () => {
   });
 
   it('checks the live budget before direct Retry creates an attempt', async () => {
-    setup(0.08, { on: true, usd: 0.05 });
+    // The failed attempt already exists; the limit is lowered afterwards (createGeneration itself refuses an unasked run over a limit).
+    setup(0.08, { on: false, usd: 5 });
     const g = gen();
+    useStore.setState((s) => ({ settings: { ...s.settings, budgetOn: true, budgetUsd: 0.05 } }));
     patchGeneration(g.id, { status: 'error' });
     await retryGeneration(g.id).catch(() => undefined);
     expect(ADAPTERS.nanogpt.generate).not.toHaveBeenCalled();

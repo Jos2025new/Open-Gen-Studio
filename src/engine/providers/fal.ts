@@ -1,9 +1,8 @@
-import { cacheDb } from '../../lib/idb';
 import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, promptExpansion, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -46,20 +45,19 @@ async function listPage(url: string, apiKey: string | undefined): Promise<{ mode
 
 async function fetchCategory(category: string, apiKey: string | undefined): Promise<FalModel[]> {
   const cacheKey = `fal:models:${category}`;
-  const cached = await cacheDb.get<FalModel[]>(cacheKey, DAY / 2);
-  if (cached) return cached;
-  const all: FalModel[] = [];
-  let cursor: string | null = null;
-  // Categories run to a few hundred models (image-to-image ~400); the cap only guards against a runaway cursor.
-  for (let page = 0; page < 10; page++) {
-    const url = `${API}/models?category=${category}&status=active&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
-    const res = await listPage(url, apiKey);
-    all.push(...res.models);
-    if (!res.has_more || !res.next_cursor) break;
-    cursor = res.next_cursor;
-  }
-  await cacheDb.set(cacheKey, all);
-  return all;
+  return (await cachedJson<FalModel[]>(cacheKey, DAY / 2, async () => {
+    const all: FalModel[] = [];
+    let cursor: string | null = null;
+    // Categories run to a few hundred models (image-to-image ~400); the cap only guards against a runaway cursor.
+    for (let page = 0; page < 10; page++) {
+      const url = `${API}/models?category=${category}&status=active&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+      const res = await listPage(url, apiKey);
+      all.push(...res.models);
+      if (!res.has_more || !res.next_cursor) break;
+      cursor = res.next_cursor;
+    }
+    return all;
+  }))!;
 }
 
 function toolTags(id: string): string[] {
@@ -72,28 +70,20 @@ function toolTags(id: string): string[] {
 async function falPrice(id: string, apiKey: string | undefined): Promise<PriceRule | undefined> {
   if (!apiKey) return undefined;
   const cacheKey = `fal:price:${id}`;
-  const cached = await cacheDb.get<PriceRule>(cacheKey, DAY);
-  if (cached) return cached;
   try {
-    const res = await requestJson<{ prices?: Array<{ endpoint_id: string; unit_price: number; unit: string }> }>(
-      `${API}/models/pricing?endpoint_id=${encodeURIComponent(id)}`,
-      { headers: falHeaders(apiKey) },
-    );
-    const p = res.prices?.find((x) => x.endpoint_id === id) ?? res.prices?.[0];
-    if (!p || !Number.isFinite(p.unit_price)) return undefined;
-    const unit = p.unit.toLowerCase();
-    let rule: PriceRule;
-    if (/^(image|images|video|videos|generation|generations|request|requests)$/.test(unit)) {
-      rule = { skus: [{ unit: 'output', usd: p.unit_price }] };
-    } else if (/^seconds?$/.test(unit) || unit === 'video_seconds') {
-      rule = { skus: [{ unit: 'second', usd: p.unit_price }] };
-    } else if (/megapixel/.test(unit)) {
-      rule = { skus: [{ unit: 'megapixel', usd: p.unit_price }] };
-    } else {
-      rule = { skus: [], note: `Billed per ${p.unit.replace(/_/g, ' ')} ($${p.unit_price})` };
-    }
-    await cacheDb.set(cacheKey, rule);
-    return rule;
+    return await cachedJson<PriceRule>(cacheKey, DAY, async () => {
+      const res = await requestJson<{ prices?: Array<{ endpoint_id: string; unit_price: number; unit: string }> }>(
+        `${API}/models/pricing?endpoint_id=${encodeURIComponent(id)}`,
+        { headers: falHeaders(apiKey) },
+      );
+      const p = res.prices?.find((x) => x.endpoint_id === id) ?? res.prices?.[0];
+      if (!p || !Number.isFinite(p.unit_price)) return undefined;
+      const unit = p.unit.toLowerCase();
+      if (/^(image|images|video|videos|generation|generations|request|requests)$/.test(unit)) return { skus: [{ unit: 'output', usd: p.unit_price }] };
+      if (/^seconds?$/.test(unit) || unit === 'video_seconds') return { skus: [{ unit: 'second', usd: p.unit_price }] };
+      if (/megapixel/.test(unit)) return { skus: [{ unit: 'megapixel', usd: p.unit_price }] };
+      return { skus: [], note: `Billed per ${p.unit.replace(/_/g, ' ')} ($${p.unit_price})` };
+    });
   } catch {
     return undefined;
   }
@@ -137,8 +127,7 @@ export const fal: ProviderAdapter = {
   async loadSchema(model, apiKey) {
     // v3: reference slots, fixed/missing required fields, sizes as framing.
     const cacheKey = `fal:schema:v4:${model.id}`;
-    let schema = await cacheDb.get<ModelSchema>(cacheKey, DAY);
-    if (!schema) {
+    const schema = (await cachedJson<ModelSchema>(cacheKey, DAY, async () => {
       const qs = `endpoint_id=${encodeURIComponent(model.id)}`;
       const doc = await fetchJsonWithRelay<{
         paths?: Record<string, { post?: { requestBody?: { content?: Record<string, { schema?: JsonProp }> } } }>;
@@ -150,7 +139,7 @@ export const fal: ProviderAdapter = {
       const inputRef = post?.requestBody?.content?.['application/json']?.schema?.$ref;
       const input = (inputRef ? resolve(inputRef) : undefined) ?? Object.entries(schemas).find(([k]) => /Input$/.test(k))?.[1];
       if (!input?.properties) throw new Error(`fal.ai schema for ${model.id} has no input definition`);
-      schema = schemaFromJson({
+      return schemaFromJson({
         ref: model.ref,
         kind: model.kind,
         properties: input.properties as Record<string, JsonProp>,
@@ -159,8 +148,7 @@ export const fal: ProviderAdapter = {
         imageFormat: 'data-url',
         source: 'openapi',
       });
-      await cacheDb.set(cacheKey, schema);
-    }
+    }))!;
     const price = await falPrice(model.id, apiKey);
     return { ...schema, price: price ?? schema.price };
   },

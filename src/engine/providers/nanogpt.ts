@@ -1,9 +1,8 @@
-import { cacheDb } from '../../lib/idb';
 import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
 import { fitBody, NANOGPT_BODY_LIMIT } from './bodyBudget';
 import type { GenOutput, GenRequest, GenResult, ProviderAdapter, RecoverQuery, ResumeContext } from './types';
 import { modelRef } from './types';
@@ -95,19 +94,11 @@ const videoRaw = new Map<string, NanoVideoModel>();
 
 
 async function fetchImages(): Promise<NanoImageModel[]> {
-  const cached = await cacheDb.get<NanoImageModel[]>('nano:v2:images', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: NanoImageModel[] }>(`${BASE}/v1/images/models`);
-  await cacheDb.set('nano:v2:images', res.data);
-  return res.data;
+  return (await cachedJson('nano:v2:images', DAY / 2, async () => (await requestJson<{ data: NanoImageModel[] }>(`${BASE}/v1/images/models`)).data))!;
 }
 
 async function fetchVideos(): Promise<NanoVideoModel[]> {
-  const cached = await cacheDb.get<NanoVideoModel[]>('nano:v3:videos', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: NanoVideoModel[] }>(`${BASE}/v1/video-models?detailed=true`);
-  await cacheDb.set('nano:v3:videos', res.data);
-  return res.data;
+  return (await cachedJson('nano:v3:videos', DAY / 2, async () => (await requestJson<{ data: NanoVideoModel[] }>(`${BASE}/v1/video-models?detailed=true`)).data))!;
 }
 
 function num(v: unknown): number | undefined {
@@ -342,11 +333,7 @@ export const NANO_3D_MODELS = new Set(['wavespeed-ai/trellis-2/image-to-3d', 'by
 const model3dRaw = new Map<string, Nano3dModel>();
 
 async function fetch3dModels(): Promise<Nano3dModel[]> {
-  const cached = await cacheDb.get<Nano3dModel[]>('nano:v1:3d', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: Nano3dModel[] }>(`${BASE}/v1/3d-models?detailed=true`);
-  await cacheDb.set('nano:v1:3d', res.data);
-  return res.data;
+  return (await cachedJson('nano:v1:3d', DAY / 2, async () => (await requestJson<{ data: Nano3dModel[] }>(`${BASE}/v1/3d-models?detailed=true`)).data))!;
 }
 
 export function parseNano3dPrice(p: Nano3dModel['pricing']): PriceRule | undefined {

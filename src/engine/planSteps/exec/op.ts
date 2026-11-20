@@ -1,6 +1,6 @@
 import { estimateOp } from '../../costs';
-import { opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from '../../catalog';
 import { createGeneration, opSpec, opSpecForModel, videoOpSeconds } from '../../jobs';
+import { opChoice } from '../../opSpec';
 import { OPS, opCount, operationFactor, isVideoOpEngine } from '../../ops';
 import { parseRef } from '../../plan';
 import { costAuthorization } from '../../priceAuthorization';
@@ -50,11 +50,9 @@ export const estimateOperation: EstimateStep<'op'> = (s, { steps, nodeOperations
     // The same spec the send builds (jobs.opSpecForModel): its model, settings and price, so the approved price is the sent one.
     const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
     const node = nodeOperations?.[s.id];
-    const picked = typeof s.params._modelRef === 'string' ? s.params._modelRef : undefined;
-    const fixed = opModelFor(engine);
-    const followed = opFollowsSource(engine) ? picked ?? (src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, engine === 'edit' ? 'image' : 'video') : null)) : undefined;
-    opRef = isVideoOpEngine(engine) ? picked ?? node?.ref ?? fixed.ref : node?.ref ?? followed ?? fixed.ref;
-    const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node }, opRef, node ? node.viaEdit : fixed.ref === opRef && fixed.viaEdit, get().catalog.schemas[opRef]);
+    const choice = opChoice({ op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node, upstreamModelRef: upstream && 'modelRef' in upstream ? upstream.modelRef : undefined });
+    opRef = choice.ref;
+    const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node }, opRef, choice.viaEdit, get().catalog.schemas[opRef]);
     opSettings = spec.settings;
     estimate = spec.estimate ?? estimateOp(s.op, s.params, src, spec.settings, opRef);
     if (isVideoOpEngine(engine)) {

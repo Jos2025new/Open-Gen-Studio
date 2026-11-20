@@ -1,8 +1,9 @@
 import { videoOpSettings } from '../jobs';
+import { opChoice } from '../opSpec';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
-import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
+import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor } from '../catalog';
 import { routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
@@ -197,10 +198,9 @@ function requestContext(sessionId: string) {
     const sourceNode = input && graph.nodes.find(src => src.id === input.from);
     const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations, edge?.outputIndex) : null;
     const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
-    const fromModel = opFollowsSource(engine) ? opModelFromRef(sourceRef, engine === 'edit' ? 'image' : 'video') : null;
-    // A step from a confirmed plan carries the model the user approved (and the estimate priced): it wins over the source's model.
-    const chosen = (PICKABLE_VIDEO_OPS.includes(engine) || opFollowsSource(engine)) && typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : undefined;
-    const choice = chosen ? { ref: chosen, viaEdit: false } : source && st.assets[source] ? opModelForAsset(engine, source) : fromModel ? { ref: fromModel, viaEdit: false } : opModelFor(engine);
+    // A step from a confirmed plan carries the model the user approved (and the estimate priced): opChoice puts it before the source's model.
+    const { ref, viaEdit } = opChoice({ op: n.data.op, params: n.data.params, sourceAssetId: source && st.assets[source] ? source : '', upstreamModelRef: sourceRef });
+    const choice = { ref, viaEdit };
     return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : isVideoOpEngine(engine) ? { settings: videoOpSettings(engine, st.catalog.schemas[choice.ref], n.data.params) } : {}) };
   } };
 }

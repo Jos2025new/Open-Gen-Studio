@@ -351,6 +351,10 @@ function pickDefault(kind: MediaKind, needsImage: boolean): string {
 export const KLING_VOICE_REF = 'fal::fal-ai/kling-video/create-voice';
 /** fal endpoint that creates Recraft V4 styles from reference images. */
 export const RECRAFT_STYLE_REF = 'fal::fal-ai/recraft/v4/create-style';
+/** The provider that hosts the voice-creation endpoint: read from its ref, never named by the engine. */
+export const KLING_VOICE_PROVIDER: ProviderId = parseModelRef(KLING_VOICE_REF)?.provider ?? 'local';
+/** Providers that run the operations the app offers (labels for «connect one of these» messages). */
+export const OP_PROVIDERS: ProviderId[] = ['atlas', 'nanogpt', 'fal'];
 
 /** Speech-to-text model for the Transcribe operation: the settings override, then the preferred list, then any. */
 export function transcriberFor(): TranscriberSummary | undefined {
@@ -475,7 +479,7 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
   const ops = get().settings.ops;
   const valid = (ref: string | null) => Boolean(ref && isConnected(parseModelRef(ref)?.provider ?? 'local') && (ref.startsWith('local::') || modelSummary(ref)));
   if (engine === 'transcribe') return { ref: transcriberFor()?.ref ?? '', viaEdit: false };
-  if (engine === 'voice') return { ref: isConnected('fal') ? KLING_VOICE_REF : '', viaEdit: false };
+  if (engine === 'voice') return { ref: isConnected(KLING_VOICE_PROVIDER) ? KLING_VOICE_REF : '', viaEdit: false };
   if (engine === 'inpaint' || engine === 'remove_object') {
     // Only mask-capable models: the settings override, then each provider's list; object removal falls back to inpainting with an instruction.
     const key = engine === 'inpaint' ? 'editRegion' : 'removeObject';
