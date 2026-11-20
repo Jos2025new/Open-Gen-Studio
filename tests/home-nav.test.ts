@@ -89,7 +89,7 @@ describe('rendering', () => {
   });
   it('the narrow bar shows the three spaces and the omnicanvas as icons, then Create and Tools flyouts, with no text of its own', () => {
     const html = renderToStaticMarkup(createElement(SidebarNav, { wide: false }));
-    for (const s of ['Studio', 'Canvas', 'Designer', 'Omnicanvas', 'Create', 'Tools']) expect(html).toContain(`aria-label="${s}"`);
+    for (const s of ['Studio', 'Canvas', 'Designer', 'Omnicanvas · Node canvas', 'Create', 'Tools']) expect(html).toContain(`aria-label="${s}"`);
     expect(html.match(/<button/g)).toHaveLength(6);
     expect(html.replace(/<[^>]+>/g, '')).toBe('');
   });

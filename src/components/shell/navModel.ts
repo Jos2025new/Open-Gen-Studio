@@ -15,7 +15,7 @@ export const SPACES: SpaceItem[] = [
 ];
 
 /** The omnicanvas sits next to the three Spaces: the session's parts as nodes. */
-export const OMNI_ITEM = { id: 'omni', label: 'Omnicanvas', hint: 'The session as nodes: Spaces, chat, agent, models and assets', icon: Network } as const;
+export const OMNI_ITEM = { id: 'omni', label: 'Omnicanvas · Node canvas', hint: 'The session as nodes: Spaces, chat, agent, models and assets', icon: Network } as const;
 
 export interface CreateItem { id: 'image' | 'video' | 'audio' | 'model3d'; label: string; hint: string; icon: LucideIcon; kind: AssetKind; mode: ComposerMode; soon?: boolean }
 export const CREATE: CreateItem[] = [
