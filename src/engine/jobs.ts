@@ -24,6 +24,7 @@ import { isCreditError, onGenerationCredit } from './credit';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
+import { refsLimit } from './officialLimits';
 import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { mapSubjectPrompts } from './subjectPrompts';
@@ -515,7 +516,7 @@ async function execute(id: string): Promise<string[]> {
         const incomplete = chosen.find((s) => !s.frontalAssetId);
         if (incomplete) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${incomplete.name}" needs a frontal image to be used with ${model.name}.`);
         const used = schema.slots.mixedRefs ? refs.length + refVideos.length + refAudios.length : refs.length;
-        const max = schema.slots.mixedRefs?.max ?? schema.slots.images!.max;
+        const max = refsLimit(schema, g.settings.count);
         const room = max - used;
         if (chosen.length > room) throw new InputError('SUBJECTS_MAX', `${model.name} takes ${max} reference image${max === 1 ? '' : 's'}; the step already has ${used}, so ${chosen.length} subject${chosen.length === 1 ? '' : 's'} do not fit.`);
         const frontals = await Promise.all(chosen.map((s) => mediaInput(s.frontalAssetId!)));
@@ -1101,7 +1102,7 @@ export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: bo
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';
   if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
     const settings = videoOpSettings(def.engine, schema, input.params);
-    // No "auto" option: keep the source's shape with the nearest ratio, or the model picks its own (16:9) and reframes.
+    // No "auto": keep the source shape with the nearest ratio, or the model picks 16:9 and reframes.
     const aspectOpts = paramByRole(schema, 'aspect')?.options;
     if (settings.aspect == null && aspectOpts?.length && source?.width && source.height) settings.aspect = matchInputOption(aspectOpts) ?? nearestAspect(aspectOpts, source.width / source.height, undefined) ?? undefined;
     const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: modelRef, settings, op };
@@ -1137,7 +1138,7 @@ export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: bo
     // Reframe and a reference sheet take their own format; every other op keeps the source's shape.
     const ownFormat = input.op === 'reframe' || input.op === 'reference_sheet';
     const target = ownFormat ? String(input.params.aspect) : source ? source.width / source.height : undefined;
-    // Keep the source's shape (Reframe: the chosen format). "auto" lets some models pick another shape (GPT Image turned a
+    // Keep the source shape (Reframe: the chosen format). "auto" lets some models pick another (GPT Image turned a
     // portrait into a landscape), so only an explicit "match input" option is used, else the nearest ratio.
     const auto = aspectParam.options.find(isAutoOption);
     const keep = !ownFormat ? matchInputOption(aspectParam.options) : undefined;

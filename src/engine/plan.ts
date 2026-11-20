@@ -1,5 +1,5 @@
 import { countFollowsCard } from './planCount';
-import { refsCap } from './officialLimits';
+import { refsLimit } from './officialLimits';
 import { fitTotal, promptTooLong, totalNote } from './planSent';
 import { aspectFor } from './planAspect';
 import { type VariantRoute } from './variants';
@@ -673,7 +673,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;
           const extra = schema.slots.source ? 1 : 0;
-          const cap = refsCap(slot, s.count) + extra;
+          const cap = refsLimit(schema, s.count);
           if (imageRefs.length && !slot) errors.push(`${where}: model "${modelRef}" does not accept reference images. Fix: ${s.model ? 'leave "model" out (the app switches to a variant that takes images) or ' : ''}drop refs.`);
           else if (slot && imageRefs.length > cap) errors.push(`${where}: model "${modelRef}" accepts at most ${cap} reference image(s)${slot.total ? ` next to ${s.count ?? 1} result(s): references + results ≤ ${slot.total} per call` : ''}. Fix: refs: [${imageRefs.slice(0, cap).map((r) => `"${r}"`).join(', ')}] (drop ${imageRefs.slice(cap).join(', ')}), split the results, or merge refs first in one image step.`);
           if (imageRefs.length < (slot?.min ?? 0) + extra) errors.push(`${where}: model "${modelRef}" requires ${extra ? 'a source image first, then reference images' : 'an input image'} (refs). Fix: ${!imageRefs.length ? `if this step makes a new image from text, ${s.model ? 'name the text-to-image variant or leave "model" out' : 'leave refs empty and name a text-to-image model'}; add refs only when it really edits or uses an image — never an unrelated image just to satisfy the model.` : `put the image it edits (an image step or asset:<id>) in refs.`}`);

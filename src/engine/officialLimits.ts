@@ -1,4 +1,4 @@
-import type { ModelSchema, ModelSummary } from './types';
+import type { InputSlots, ModelSchema, ModelSummary } from './types';
 
 /*
  * The model maker's own sheet (docs/features/agente-auto-tarjeta.md, "Fichas oficiales"): what a model takes per call,
@@ -66,4 +66,17 @@ export function withOfficialLimits(schema: ModelSchema, model: Pick<ModelSummary
 export function refsCap(slot: { max: number; total?: number } | undefined, count = 1): number {
   if (!slot) return 0;
   return slot.total ? Math.min(slot.max, Math.max(0, slot.total - count)) : slot.max;
+}
+
+/**
+ * The one answer to "how many reference images does this call take": the button, the plan, the routing and the send
+ * all ask here. One order: the typed list (`mixedRefs`), then keyframes, then the image slot; the image slot adds its
+ * `source` image and keeps the per-call total (references + `count` results).
+ */
+export function refsLimit(schema: { slots: InputSlots } | undefined, count = 1): number {
+  const slots = schema?.slots;
+  if (!slots) return 0;
+  if (slots.mixedRefs) return slots.mixedRefs.max;
+  if (slots.keyframes) return slots.keyframes.max;
+  return slots.images ? refsCap(slots.images, count) + (slots.source ? 1 : 0) : 0;
 }

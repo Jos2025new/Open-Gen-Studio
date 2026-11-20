@@ -1,5 +1,6 @@
 import { wrongRef } from './wrongRef';
 import { directModelRef } from './directModel';
+import { refsLimit } from './officialLimits';
 import { assetsInUse } from './flow/locks';
 import { dropResults } from './flow/dropResults';
 import { opSessionId } from './opSession';
@@ -235,9 +236,9 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (clips && videoAtt.length < clips.min) return { ok: false, reason: 'This model needs a reference video clip.', estimate };
     const slot = schema.slots.images;
     if (imageAtt.length && !slot) return { ok: false, reason: 'This model does not accept reference images.', estimate };
-    // A `source` slot (Ideogram Character remix) takes the first image; the rest are references.
-    const extra = schema.slots.source ? 1 : 0;
-    if (slot && imageAtt.length > slot.max + extra) return { ok: false, reason: `This model accepts up to ${slot.max + extra} images.`, estimate };
+    const extra = schema.slots.source ? 1 : 0; // Ideogram Character remix: the first image is the source
+    const limit = refsLimit(schema, settings.count);
+    if (slot && imageAtt.length > limit) return { ok: false, reason: `This model accepts up to ${limit} images.`, estimate };
     if (slot && imageAtt.length < slot.min + extra) return { ok: false, reason: extra ? 'This model needs a source image first, then reference images.' : 'This model needs an input image.', estimate };
     if (!text && schema.slots.promptRequired !== false && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
   } else if (kind === 'model3d') {
@@ -792,9 +793,9 @@ export async function prepareModel(ref: string): Promise<void> {
 export function acceptsImages(kind: MediaKind): { accepts: boolean; max: number } {
   const st = get();
   const schema = st.catalog.schemas[st.composer[kind].modelRef];
-  if (kind === 'image') return { accepts: Boolean(schema?.slots.images), max: (schema?.slots.images?.max ?? 0) + (schema?.slots.source ? 1 : 0) };
+  if (kind === 'image') return { accepts: Boolean(schema?.slots.images), max: refsLimit(schema, st.composer.image.settings.count) };
   const slots = schema?.slots ?? {};
-  const refs = slots.mixedRefs?.max ?? slots.images?.max ?? 0;
+  const refs = refsLimit(schema, st.composer.video.settings.count);
   return { accepts: Boolean(slots.firstFrame || refs), max: (slots.firstFrame ? 1 : 0) + refs };
 }
 

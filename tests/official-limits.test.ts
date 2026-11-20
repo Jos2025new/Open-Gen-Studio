@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { OFFICIAL_SHEETS, refsCap, withOfficialLimits } from '../src/engine/officialLimits';
+import { OFFICIAL_SHEETS, refsCap, refsLimit, withOfficialLimits } from '../src/engine/officialLimits';
 import type { ModelSchema } from '../src/engine/types';
 
 /*
@@ -63,5 +63,19 @@ describe('video sheets', () => {
   it('OpenRouter declares no max: the most the model allows, never past it (D1, 2026-10-25)', () => {
     const s: ModelSchema = { ref: 'openrouter::bytedance/seedance-2.0', params: [], slots: { prompt: 'prompt', images: { key: 'input_references', max: Number.MAX_SAFE_INTEGER, from: 'assumed', min: 0, multiple: true, format: 'content-part' } }, source: 'catalog' };
     expect(withOfficialLimits(s, { id: 'bytedance/seedance-2.0', name: 'Seedance 2.0', kind: 'video' }).slots.images).toMatchObject({ max: 9, from: 'official' });
+  });
+});
+
+describe('refsLimit: one answer for the button, the plan, the routing and the send', () => {
+  const slots = (s: Partial<ModelSchema['slots']>) => ({ slots: s });
+  const images = { key: 'i', max: 14, min: 0, multiple: true, format: 'url' as const, total: 15 };
+  it('applies the per-call total and the source image', () => {
+    expect(refsLimit(slots({ images }), 1)).toBe(14);
+    expect(refsLimit(slots({ images }), 6)).toBe(9);
+    expect(refsLimit(slots({ images: { ...images, total: undefined, max: 4 }, source: { key: 's', format: 'url' } }), 6)).toBe(5);
+  });
+  it('typed references win over the image slot, in every caller', () => {
+    expect(refsLimit(slots({ images: { ...images, max: 3, total: undefined }, mixedRefs: { key: 'm', max: 9, min: 0 } }))).toBe(9);
+    expect(refsLimit(undefined)).toBe(0);
   });
 });

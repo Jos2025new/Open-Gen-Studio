@@ -1,4 +1,5 @@
 import type { ModelSchema } from './types';
+import { refsLimit } from './officialLimits';
 
 /** The exact change that makes a video step's inputs fit its model (O2: constructive errors, one round). */
 export function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; lastFrame?: boolean; sourceVideo?: boolean; images: string[]; videos: string[]; audios?: number; resolution?: string }, named: boolean): string {
@@ -11,7 +12,7 @@ export function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; 
   if (rules?.lastNeedsFirst && n.lastFrame && !n.firstFrame) return `add first_frame (an image step or asset:<id>) for last_frame.${other}`;
   if (rules?.firstFrameResolutions && n.firstFrame && n.resolution && !rules.firstFrameResolutions.includes(n.resolution)) return `choose a resolution supported with first_frame (${rules.firstFrameResolutions.join(', ')}), or drop first_frame "${n.firstFrame}".${other}`;
   if (n.firstFrame && !slots.firstFrame) return `move first_frame "${n.firstFrame}" into refs, or drop it.${other}`;
-  const imageMax = slots.mixedRefs?.max ?? slots.keyframes?.max ?? slots.images?.max ?? 0;
+  const imageMax = refsLimit({ slots });
   if (n.images.length > imageMax) {
     if (!imageMax && slots.firstFrame && !n.firstFrame) return `first_frame: the image the clip opens on (a character or scene, never a storyboard sheet) and drop refs.${other}`;
     return imageMax ? `refs: [${n.images.slice(0, imageMax).map((r) => `"${r}"`).join(', ')}] (drop ${n.images.slice(imageMax).join(', ')}).${other}` : `drop ${n.images.join(', ')} from refs (this model takes only first_frame).${other}`;

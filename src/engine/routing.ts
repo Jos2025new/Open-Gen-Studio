@@ -1,5 +1,6 @@
 import type { ModelSchema, ModelSummary } from './types';
 import { durationChoices } from './params';
+import { refsLimit } from './officialLimits';
 
 /*
  * Video model by purpose (PLAN_ROUTING_COST.md, decided by the user 2026-09-26). The agent says what a video
@@ -73,8 +74,7 @@ export function routeFits(
   if (step.mode === 'text' && !model.acceptsText) return false;
   if (step.mode === 'image' && !(schema.slots.firstFrame || schema.slots.images || schema.slots.mixedRefs)) return false;
   if (step.mode === 'reference') {
-    const max = schema.slots.images?.max ?? schema.slots.mixedRefs?.max ?? 0;
-    if (max < step.refs) return false;
+    if (refsLimit(schema) < step.refs) return false;
   }
   if (step.duration && step.duration > 0) {
     const choices = durationChoices(schema).filter((d) => d > 0);

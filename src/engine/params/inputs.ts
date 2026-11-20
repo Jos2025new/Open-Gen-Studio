@@ -1,6 +1,7 @@
 import type { InputSlots, MediaKind, ModelSchema, ParamDef } from '../types';
 import { normKey } from './keys';
 import { lyricsParam } from './audio';
+import { refsLimit } from '../officialLimits';
 
 export function castOption(p: ParamDef, value: string): string | number {
   const match = p.options?.find((o) => String(o) === String(value));
@@ -59,7 +60,7 @@ export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; l
     return null;
   }
   const kf = slots.keyframes;
-  const imageMax = kf?.max ?? slots.images?.max ?? 0;
+  const imageMax = refsLimit({ slots });
   const what = kf ? 'keyframe images' : 'reference images';
   if (n.images > imageMax) return imageMax ? `accepts up to ${imageMax} ${what}.` : slots.firstFrame ? 'takes one start image.' : 'does not accept reference images.';
   if (n.images < (kf?.min ?? slots.images?.min ?? 0)) return kf ? 'needs at least one keyframe image.' : 'needs a reference image.';
