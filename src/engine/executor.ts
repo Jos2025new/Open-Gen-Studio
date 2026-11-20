@@ -26,6 +26,7 @@ export interface StepOutput {
 export interface ExecContext {
   sessionId: string;
   planId?: string;
+  batchToken?: symbol;
   workspace: Workspace;
   origin: GenerationOrigin;
   docId?: string;
@@ -171,7 +172,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       nodeSubjects.push({ id: subject.name, name: subject.name, description: subject.description ?? '', kind: subject.kind ?? 'character', frontalAssetId: asset, refAssetIds: [] });
     }
     const inputsFor = <T extends object>(inputs: T) => ({ ...withLocal(inputs), ...(nodeSubjects.length ? { subjects: nodeSubjects } : {}) });
-    const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id };
+    const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id, ...(ctx.batchToken ? { batchToken: ctx.batchToken } : {}) };
     return (RUN_STEP[s.kind] as RunStep<typeof s.kind>)(s as never, { ...runEnv, base, inputsFor });
   };
 

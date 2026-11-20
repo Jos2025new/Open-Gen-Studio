@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener() {} }, document: { addEventListener() {}, visibilityState: 'visible' } }));
-vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
+vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => new Blob([new Uint8Array([1])], { type: 'image/png' }), putAssetBlob: async () => undefined }));
+vi.mock('../src/lib/media', async (orig) => ({ ...(await orig<typeof import('../src/lib/media')>()), probeMedia: async () => ({ width: 64, height: 64, size: 1 }), jpegThumbnail: async () => undefined }));
 import { useStore } from '../src/store/store';
 import { askAgain, dontAskAgain, beginOncePass, dontAskUntilNextSession, OverLimitError, withOncePass } from '../src/engine/budget';
 import { costAuthorization } from '../src/engine/priceAuthorization';
 import { createGeneration, type GenerationSpec } from '../src/engine/jobs';
-import type { PlanFeedItem } from '../src/engine/types';
+import { runNodes } from '../src/engine/flow/actions';
+import { approvePlan, presentNodeRun } from '../src/engine/agent/runtime';
+import { ADAPTERS } from '../src/engine/providers/registry';
+import type { Graph, ModelSchema, ModelSummary, PlanFeedItem } from '../src/engine/types';
 
 /*
  * Opus #6: «new paid runs will ask first» is checked where the send is made (createGeneration), not only at the
@@ -90,11 +94,52 @@ describe('(b) what an entry already approved keeps going without a second questi
     expect(() => createGeneration(spec({ origin: 'agent', planId: 'P', stepId: 's2' }))).toThrow(OverLimitError);
     expect(() => createGeneration(spec({ origin: 'agent', planId: 'GONE', stepId: 's1' }))).toThrow(OverLimitError);
   });
-  it('a Nodes run approved on its card (nodeRun, running) goes through', () => {
-    const item = { id: 'card', workspace: 'node', createdAt: 1, type: 'plan', style: 'guided', status: 'running', nodeRun: { targets: ['a'], force: false, signature: 's' },
-      plan: { id: 'N', title: 'N', summary: 'x', workspace: 'node', steps: [], adjustments: [] }, stepStates: {}, stepGenerations: {}, estimate: { usd: 1, approximate: false } } as unknown as PlanFeedItem;
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [item] } } }));
-    createGeneration(spec({ origin: 'node', planId: 'N', stepId: 'N_a' }));
-    expect(count()).toBe(1);
+  it('a multi-step Nodes run with an active limit and unknown price sends every step once confirmed (both direct runNodes and a nodeRun card)', async () => {
+    const modelRef = 'fal::unpriced-img';
+    const model: ModelSummary = { ref: modelRef, provider: 'fal', id: 'unpriced-img', name: 'Unpriced Img', kind: 'image', acceptsText: true, acceptsImage: true };
+    const schema: ModelSchema = { ref: modelRef, source: 'schema', slots: { images: { min: 0, max: 4 }, promptRequired: true }, params: [] };
+    const node = (id: string, title: string) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'image' as const, title, prompt: title, modelRef, settings: { count: 1, advanced: {} }, outputIndex: 0 } });
+    const graph: Graph = { nodes: [node('a', 'Step A'), node('b', 'Step B')], edges: [{ id: 'e1', source: 'a', target: 'b', sourceHandle: 'out', targetHandle: 'ref' }] };
+    const st = useStore.getState();
+    useStore.setState({
+      assets: {},
+      catalog: { ...st.catalog, models: { ...st.catalog.models, [modelRef]: model }, schemas: { ...st.catalog.schemas, [modelRef]: schema } },
+      settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'test-key' }, agent: { ...st.settings.agent, provider: 'offline' } },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph, feed: [], noAskOverLimit: false } },
+    });
+    const out = { outputs: [{ blob: new Blob([new Uint8Array([1])], { type: 'image/png' }), mime: 'image/png' }] };
+    let midRunRefused = false;
+    const gen = vi.spyOn(ADAPTERS.fal, 'generate').mockImplementation(async () => {
+      // Once the approved Nodes run started, an unrelated send cannot piggyback on its pass.
+      try { createGeneration(spec()); } catch (err) { if (err instanceof OverLimitError) midRunRefused = true; }
+      return out;
+    });
+    try {
+      // Unapproved: stopped before starting.
+      expect(await runNodes(sid, ['b'])).toBeNull();
+      expect(count()).toBe(0);
+
+      // Direct Nodes run (Run / Run all) confirmed once: both steps run.
+      const res = await withOncePass(sid, () => runNodes(sid, ['b']));
+      expect(res?.failed).toEqual([]);
+      expect(res?.outputs.size).toBe(2);
+      expect(gen).toHaveBeenCalledTimes(2);
+      expect(count()).toBe(2);
+      expect(midRunRefused).toBe(true);
+      expect(() => createGeneration(spec())).toThrow(OverLimitError);
+
+      // Nodes run approved on its PlanCard (nodeRun): both steps run through the real runNodes path.
+      gen.mockClear();
+      useStore.setState((s) => ({ generations: {}, sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], graph, feed: [] } } }));
+      const card = await presentNodeRun(sid, ['b'], null, undefined, 'main');
+      expect(card.errors).toEqual([]);
+      await withOncePass(sid, () => approvePlan(sid, card.itemId!));
+      const feedItem = useStore.getState().sessions[sid].feed.find((f) => f.id === card.itemId) as PlanFeedItem;
+      expect(feedItem.status).toBe('done');
+      expect(gen).toHaveBeenCalledTimes(2);
+      expect(count()).toBe(2);
+    } finally {
+      gen.mockRestore();
+    }
   });
 });

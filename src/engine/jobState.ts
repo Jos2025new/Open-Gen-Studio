@@ -30,6 +30,8 @@ export interface GenerationSpec {
   operationId?: string;
   planId?: string;
   stepId?: string;
+  /** Runtime token covering the steps of an approved Nodes run; never persisted. */
+  batchToken?: symbol;
   estimate?: Estimate;
   variants?: string[];
 }

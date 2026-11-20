@@ -17,6 +17,7 @@ import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
+import { beginBatchPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
@@ -324,9 +325,10 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
   const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
+  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id));
   try {
     const result = await executeSteps(preview.steps, {
-      sessionId, workspace: 'node', origin: 'node', nodeLibrary: library, nodeOperations,
+      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLibrary: library, nodeOperations,
       onState: (stepId, state, info) => {
         if (info?.generationId) pending.set(stepId, info.generationId);
         const generationId = pending.get(stepId);
@@ -344,7 +346,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     });
     if (result.failed.length) toast(`${result.failed.length} node(s) failed: ${result.failed[0].error}`, 'error');
     return result;
-  } finally { releaseAssets(); release(); }
+  } finally { batch.end(); releaseAssets(); release(); }
 }
 
 export interface DeletedNodes { nodes: GraphNode[]; edges: import('../types').GraphEdge[] }

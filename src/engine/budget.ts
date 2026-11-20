@@ -29,6 +29,8 @@ export function remainingBudget(state: { settings: { budgetOn: boolean; budgetUs
 const oncePasses = new Map<string, Set<symbol>>();
 /** Sequence-level passes for "Allow this time": each grant stays alive across all spend steps of its sequence until ended. */
 const sequencePasses = new Map<string, Set<symbol>>();
+/** Approved multi-step batches (Nodes runs): scoped to one run's steps so unrelated sends still ask. */
+const approvedBatches = new Map<symbol, { sessionId: string; steps: Set<string> }>();
 
 function addPass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
   let tokens = store.get(sessionId);
@@ -152,6 +154,24 @@ export function beginOncePass(sessionId: string): () => void {
   const token = Symbol();
   addPass(sequencePasses, sessionId, token);
   return () => removePass(sequencePasses, sessionId, token);
+}
+
+/**
+ * Cover every step of an approved multi-step Nodes run. Spends any once-pass for `sessionId` immediately so
+ * unrelated runs in the same session still ask while this batch is executing.
+ */
+export function beginBatchPass(sessionId: string, stepIds: Iterable<string>): { token: symbol; end: () => void } {
+  consumeOnce(sessionId);
+  const token = Symbol('batch');
+  approvedBatches.set(token, { sessionId, steps: new Set(stepIds) });
+  return { token, end: () => void approvedBatches.delete(token) };
+}
+
+/** True while `stepId` belongs to a running approved batch for `sessionId`. */
+export function batchStepApproved(sessionId: string, token: symbol | undefined, stepId: string | undefined): boolean {
+  if (!token || !stepId) return false;
+  const batch = approvedBatches.get(token);
+  return Boolean(batch && batch.sessionId === sessionId && batch.steps.has(stepId));
 }
 
 /** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */

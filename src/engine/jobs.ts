@@ -23,7 +23,7 @@ import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { markSending, interruptedByReload } from './sendMark';
-import { assertWithinLimit, consumeOnce } from './budget';
+import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -51,7 +51,7 @@ export function modelName(ref: string): string {
 export function createGeneration(spec: GenerationSpec): Generation {
   const estimate = spec.estimate ?? estimateSpec(spec);
   // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
-  assertWithinLimit(estimate, spec.sessionId, stepApproved(spec.sessionId, spec.planId, spec.stepId));
+  assertWithinLimit(estimate, spec.sessionId, stepApproved(spec.sessionId, spec.planId, spec.stepId) || batchStepApproved(spec.sessionId, spec.batchToken, spec.stepId));
   consumeOnce(spec.sessionId);
   const parsed = parseModelRef(spec.modelRef);
   const g: Generation = {

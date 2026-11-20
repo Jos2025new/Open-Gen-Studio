@@ -26,6 +26,7 @@ export interface OpSpecInput {
   parentId?: string;
   planId?: string;
   stepId?: string;
+  batchToken?: symbol;
   /** Dimensions of the source when it is not an asset yet (designer layers). */
   sourceDims?: { width: number; height: number };
   /** Model picked for this run (replay, edit / video / transcribe engines); by default the source's model or the engine's. */
@@ -97,7 +98,7 @@ export function opChoice(input: OpChoiceInput): { ref: string; viaEdit: boolean;
 
 export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const def = OPS[input.op];
-  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
+  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId, batchToken: input.batchToken };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   if (input.op === 'join_clips') {
     const n = 1 + String(input.params.clips ?? '').split(',').filter(Boolean).length;
@@ -134,7 +135,7 @@ export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: bo
   const def = OPS[input.op];
   const source = get().assets[input.sourceAssetId] ?? input.sourceDims;
   const prompt = def.instruction ? opRolesLine(input.params, input.sourceAssetId, modelRef, schema) + def.instruction(input.params) : def.label;
-  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
+  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId, batchToken: input.batchToken };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';
   if (isVideoOpEngine(def.engine)) {
