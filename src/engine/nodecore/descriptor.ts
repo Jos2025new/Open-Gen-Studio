@@ -1,5 +1,6 @@
 import type { Asset, GraphNodeData, PortType } from '../types';
-import type { Evaluation, ResolvedLite } from './evaluate';
+import type { GraphEdge, GraphNode } from '../types';
+import type { ResolveEnv } from './resolver';
 
 /*
  * One descriptor per node type (ADR 0031 point 1). A file in `types/` declares what a type owns (parameters), its
@@ -9,6 +10,9 @@ import type { Evaluation, ResolvedLite } from './evaluate';
 export type NodeKindId = GraphNodeData['kind'];
 /** An explicit action: the only things that spend or send. Connecting and editing are never actions. */
 export type NodeActionId = 'generate' | 'run-tool' | 'send';
+
+/** What a node delivers on an edge now: the value and the revision label of that value (`edited` when a source asset was revised). */
+export interface Delivery { value: string | null; revision: string | null; edited?: true }
 
 export interface PortInfo { id: string; type: PortType; label: string; multi: boolean }
 
@@ -24,8 +28,8 @@ export interface NodeDescriptor {
   required: readonly string[];
   /** Input port id → whether a change there makes the output stale. A port missing from the map affects it. */
   affects: Readonly<Record<string, boolean>>;
-  /** Pure: no store, no provider. The same data and inputs always give the same evaluation. */
-  evaluate(data: GraphNodeData, incoming: ResolvedLite): Evaluation;
+  /** What the node delivers on one edge. The resolver asks it for every input; it reads only the env it is given. */
+  evaluate(node: GraphNode, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): Delivery;
   actions: readonly NodeActionId[];
   migrate?: Readonly<Record<number, (data: GraphNodeData) => GraphNodeData>>;
 }

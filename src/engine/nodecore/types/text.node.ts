@@ -1,5 +1,5 @@
 import { defineNode } from '../descriptor';
-import { evaluateNode } from '../evaluate';
+import { delivered } from '../deliver';
 
 export default defineNode({
   kind: 'text',
@@ -9,6 +9,6 @@ export default defineNode({
   output: () => 'text',
   required: [],
   affects: {},
-  evaluate: evaluateNode,
+  evaluate: (n) => delivered(n.data.kind === 'text' ? n.data.text : null),
   actions: [],
 });

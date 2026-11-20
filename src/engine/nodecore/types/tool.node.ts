@@ -1,6 +1,6 @@
 import { OPS } from '../../ops';
 import { defineNode } from '../descriptor';
-import { evaluateNode } from '../evaluate';
+import { deliverGenerated } from '../deliver';
 
 export default defineNode({
   kind: 'tool',
@@ -10,6 +10,6 @@ export default defineNode({
   output: (data) => (data.kind === 'tool' ? OPS[data.op].output : null),
   required: ['input'],
   affects: { input: true },
-  evaluate: evaluateNode,
+  evaluate: deliverGenerated,
   actions: ['run-tool'],
 });

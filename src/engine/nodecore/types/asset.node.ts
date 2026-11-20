@@ -1,5 +1,5 @@
 import { defineNode } from '../descriptor';
-import { evaluateNode } from '../evaluate';
+import { deliverAsset } from '../deliver';
 
 export default defineNode({
   kind: 'asset',
@@ -9,6 +9,6 @@ export default defineNode({
   output: (data, assets) => (data.kind === 'asset' && data.assetId ? assets[data.assetId]?.kind ?? null : null),
   required: [],
   affects: {},
-  evaluate: evaluateNode,
+  evaluate: (n, _e, env) => deliverAsset(n, env),
   actions: [],
 });

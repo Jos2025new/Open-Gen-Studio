@@ -1,6 +1,6 @@
 import type { PortType } from '../types';
 import { defineNode, type NodeDescriptor, type PortInfo } from './descriptor';
-import { evaluateNode } from './evaluate';
+import { deliverGenerated } from './deliver';
 
 const PROMPT: PortInfo = { id: 'prompt', type: 'text', label: 'Prompt', multi: false };
 
@@ -14,7 +14,7 @@ export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d', po
     output: (data) => (typeof ports.output === 'function' ? ports.output('textOutput' in data ? data.textOutput : undefined) : ports.output),
     required: [],
     affects: { prompt: true, ref: true, clip: true, first: true, last: true, refVideo: true, audio: true, lyrics: true },
-    evaluate: evaluateNode,
+    evaluate: deliverGenerated,
     actions: ['generate'],
   });
 }

@@ -1,5 +1,5 @@
 import { defineNode } from '../descriptor';
-import { evaluateNode } from '../evaluate';
+import { delivered } from '../deliver';
 
 /** System nodes (chat, agent, model, session…): their ports live in nodes/spec.ts; chat and agent can `send`. */
 export default defineNode({
@@ -15,6 +15,7 @@ export default defineNode({
   },
   required: [],
   affects: {},
-  evaluate: evaluateNode,
+  // The live text of a chat/agent/prompt node: what the resolver delivers (the former `evaluate` said null; nothing read it).
+  evaluate: (n, _e, env) => delivered(env.chatText(n)),
   actions: ['send'],
 });
