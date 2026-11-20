@@ -288,9 +288,10 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
   const st = get();
   const workspace = st.ui.workspace;
   const sessionId = st.ui.space ? ensureSpaceSession() : st.activeSessionId;
-  const { modelRef, settings } = st.composer[kind];
+  const { settings } = st.composer[kind];
   const text = st.composer.text.trim();
   const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
+  const modelRef = directModelRef(kind, st.composer[kind].modelRef, attachments.length > 0);
   const videoAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'video');
   const audioAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'audio');
   // Video: the first image is the start frame when the model has one; the rest are references.

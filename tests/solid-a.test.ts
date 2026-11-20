@@ -67,3 +67,18 @@ describe('3. subjects counted from the list the send uses', () => {
   });
 });
 
+describe('4. direct video resolves the model before routing the inputs', () => {
+  it('a text-only video model with an image sends the first frame to its image-to-video twin', async () => {
+    const t = 'atlas::acme/vid-4/text-to-video';
+    const i = 'atlas::acme/vid-4/image-to-video';
+    const mk = (ref: string, acceptsImage: boolean) => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref, kind: 'video', acceptsText: true, acceptsImage, tags: [] }) as ModelSummary;
+    const sch = (ref: string, first: boolean): ModelSchema => ({ ref, params: [], source: 'catalog', slots: { prompt: 'prompt', ...(first ? { firstFrame: { key: 'image', format: 'url' as const } } : {}) } });
+    const st = useStore.getState();
+    useStore.setState({ catalog: { ...st.catalog, models: { ...st.catalog.models, [t]: mk(t, false), [i]: mk(i, true) }, schemas: { ...st.catalog.schemas, [t]: sch(t, false), [i]: sch(i, true) } },
+      composer: { ...st.composer, mode: 'video', text: 'move', attachments: ['a0'], video: { modelRef: t, settings: { count: 1, advanced: {} } } } });
+    await generateDirect('video');
+    const g = Object.values(useStore.getState().generations).find((x) => x.prompt === 'move');
+    expect(g?.modelRef).toBe(i);
+    expect(g?.inputs.firstFrame).toBe('a0');
+  });
+});
