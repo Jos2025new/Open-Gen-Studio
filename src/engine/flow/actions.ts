@@ -205,6 +205,11 @@ function requestContext(sessionId: string) {
   } };
 }
 
+/** The model and settings each tool node runs with: what the confirmation prices and what the send uses. */
+function nodeOperationsOf(context: ReturnType<typeof requestContext>, graph: import('../types').Graph, ids: string[]) {
+  return Object.fromEntries(ids.map(id => [id, context.operation(graph.nodes.find(n => n.id === id)!)]));
+}
+
 export interface NodeRunPreview {
   estimate: Estimate;
   count: number;
@@ -274,7 +279,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     if (step.kind === 'audio' && step.lyricsFrom && !schema.params.some(p => /lyrics/i.test(p.key))) errors.push(`${step.title}: the model takes no lyrics.`);
   }
   errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
-  const { total } = estimateSteps(run.steps);
+  const { total } = estimateSteps(run.steps, nodeOperationsOf(context, graph, run.runIds));
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) return [id, 'missing']; // already reported as an error above
@@ -326,7 +331,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const pending = new Map<string, string>();
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
-  const nodeOperations = Object.fromEntries(preview.runIds.map(id => [id, context.operation(get().sessions[sessionId].graph.nodes.find(n => n.id === id)!)]));
+  const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
   try {
     const result = await executeSteps(preview.steps, {
       sessionId, workspace: 'node', origin: 'node', nodeLibrary: library, nodeOperations,

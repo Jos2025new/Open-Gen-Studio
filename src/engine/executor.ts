@@ -3,13 +3,13 @@ import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
 import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, sentModelRef } from './catalog';
 import { StepStillRunning, isLiveStatus, settleGeneration } from './settle';
-import { cancelGeneration, createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
+import { cancelGeneration, createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
-import { OPS, opCount } from './ops';
+import { OPS, opCount, operationFactor, isVideoOpEngine } from './ops';
 import { parseRef, stepDeps, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
-import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
+import type { Estimate, GenSettings, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
 import { costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { useStore } from '../store/store';
 import { clearPlanStop, isPlanStopped, stoppedError } from './planStop';
@@ -53,13 +53,13 @@ export interface ExecResult {
   stopped?: boolean;
 }
 
-export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Record<string, Estimate>; authorizations: Record<string, StepAuthorization> } {
+export function estimateSteps(steps: PlanStep[], nodeOperations?: ExecContext['nodeOperations']): { total: Estimate; perStep: Record<string, Estimate>; authorizations: Record<string, StepAuthorization> } {
   const perStep: Record<string, Estimate> = {};
   const authorizations: Record<string, StepAuthorization> = {};
   const videoSettings = get().composer.video.settings;
   for (const s of steps) {
     let opRef: string | undefined;
-    let opSettings = videoSettings;
+    let opSettings: GenSettings | undefined;
     // Priced as sent: inputs on a text-only model run as its image twin (jobs.ts, sentModelRef).
     const sent = s.kind === 'image' || s.kind === 'video' ? sentModelRef(s.modelRef, s.kind, Boolean(s.refs?.length || (s.kind === 'video' && s.firstFrame))) : undefined;
     if (s.kind === 'image') perStep[s.id] = estimateMedia(sent!, 'image', s.settings, s.refs.length > 0);
@@ -70,36 +70,29 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
       const p = parseRef(s.input);
       const src = p?.type === 'asset' ? get().assets[p.id] : undefined;
       const engine = OPS[s.op].engine;
-      if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
-        // Same estimate as the direct operation on that clip (jobs.opSpec). A clip still to be made: its step's duration.
-        const ref = typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(engine).ref;
-        const settings = videoOpSettings(engine, get().catalog.schemas[ref], s.params);
+      if (['local', 'transcribe', 'voice'].includes(engine)) perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings);
+      else {
+        // The same spec the send builds (jobs.opSpecForModel): its model, settings and price, so the approved price is the sent one.
         const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
-        const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
-        opRef = ref;
-        opSettings = { ...settings, duration: videoOpSeconds(engine, settings, clip) };
-        const est = estimateOp(s.op, s.params, src, { ...settings, duration: videoOpSeconds(engine, settings, clip) }, ref);
-        perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
-      } else {
-        // Edit / video operations run on the model that made their input (jobs.opSpec); a step still to run: its model.
-        const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
-        const kind = engine === 'edit' ? 'image' : 'video';
-        const ref = opFollowsSource(engine) ? (typeof s.params._modelRef === 'string' ? s.params._modelRef : src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, kind) : null) ?? opModelFor(engine).ref) : undefined;
-        opRef = ref ?? opModelFor(engine).ref;
-        perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings, ref);
+        const node = nodeOperations?.[s.id];
+        const picked = typeof s.params._modelRef === 'string' ? s.params._modelRef : undefined;
+        const fixed = opModelFor(engine);
+        const followed = opFollowsSource(engine) ? picked ?? (src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, engine === 'edit' ? 'image' : 'video') : null)) : undefined;
+        opRef = isVideoOpEngine(engine) ? picked ?? node?.ref ?? fixed.ref : node?.ref ?? followed ?? fixed.ref;
+        const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: src?.id ?? '', nodeChoice: node }, opRef, node ? node.viaEdit : fixed.ref === opRef && fixed.viaEdit, get().catalog.schemas[opRef]);
+        opSettings = spec.settings;
+        perStep[s.id] = spec.estimate ?? estimateOp(s.op, s.params, src, spec.settings, opRef);
+        if (isVideoOpEngine(engine)) {
+          // A clip still to be made: its step's duration.
+          const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
+          const est = estimateOp(s.op, s.params, src, { ...spec.settings, duration: videoOpSeconds(engine, spec.settings, clip) }, opRef);
+          perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
+        }
       }
     } else perStep[s.id] = { usd: 0, approximate: false };
     if ('modelRef' in s) authorizations[s.id] = costAuthorization(sent ?? s.modelRef, { ...s.settings, ...(s.kind === 'image' && s.variations?.length ? { count: s.variations.length } : {}) }, perStep[s.id]);
-    else if (s.kind === 'op') {
-      const engine = OPS[s.op].engine;
-      const source = parseRef(s.input);
-      if (!['local', 'transcribe', 'voice'].includes(engine) && opRef) {
-        const choice = opModelFor(engine);
-        const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: source?.type === 'asset' ? source.id : '' }, opRef, choice.ref === opRef && choice.viaEdit, get().catalog.schemas[opRef]);
-        opSettings = spec.settings;
-      } else opSettings = { count: opCount(OPS[s.op], s.params), advanced: {} };
-      authorizations[s.id] = costAuthorization(opRef ?? '', opSettings, perStep[s.id], s.op === 'upscale' ? Number(s.params.factor) || 2 : undefined);
-    } else authorizations[s.id] = costAuthorization(`local::${s.kind}`, { count: 1, advanced: {} }, perStep[s.id]);
+    else if (s.kind === 'op') authorizations[s.id] = costAuthorization(opRef ?? '', opSettings ?? { count: opCount(OPS[s.op], s.params), advanced: {} }, perStep[s.id], operationFactor({ id: s.op, params: s.params }));
+    else authorizations[s.id] = costAuthorization(`local::${s.kind}`, { count: 1, advanced: {} }, perStep[s.id]);
   }
   return { total: sumEstimates(Object.values(perStep)), perStep, authorizations };
 }

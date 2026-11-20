@@ -25,7 +25,7 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { refsLimit } from './officialLimits';
-import { OPS, opCount } from './ops';
+import { OPS, opCount, operationFactor, type VideoOpEngine } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { mapSubjectPrompts } from './subjectPrompts';
 import { ADAPTERS } from './providers/registry';
@@ -566,7 +566,7 @@ async function execute(id: string): Promise<string[]> {
     const progressTotal = priorCount + total;
     const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
     const approvalSettings = { ...genSettings, count: total };
-    const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
+    const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), operationFactor(g.op)) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
     const shown = opRealism(g, kind, prompt, model.id);
     genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
@@ -1024,8 +1024,6 @@ export interface OpSpecInput {
 }
 
 /** Build the generation spec for an operation on an asset (model, instruction and settings). */
-type VideoOpEngine = 'video_upscale' | 'video_edit' | 'video_extend';
-
 /** Settings a video operation runs with: the source's framing and, for edits and upscales, its length. */
 export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | undefined, params: Record<string, AdvancedValue> = {}): GenSettings {
   const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });

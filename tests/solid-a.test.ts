@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async (id: string) => id }));
 vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('../src/engine/jobs')>()), runGeneration: vi.fn(async () => []) }));
 import { checkDirect, generateDirect } from '../src/engine/actions';
+import { estimateSteps } from '../src/engine/executor';
+import { opSpec } from '../src/engine/jobs';
+import { costAuthorization } from '../src/engine/priceAuthorization';
 import { useStore } from '../src/store/store';
 import { routeFits } from '../src/engine/routing';
 import type { Asset, ModelSchema, ModelSummary } from '../src/engine/types';
@@ -80,5 +83,37 @@ describe('4. direct video resolves the model before routing the inputs', () => {
     const g = Object.values(useStore.getState().generations).find((x) => x.prompt === 'move');
     expect(g?.modelRef).toBe(i);
     expect(g?.inputs.firstFrame).toBe('a0');
+  });
+});
+
+describe('6. the approved price of an operation is the sent one', () => {
+  const cheap = 'atlas::acme/edit-cheap';
+  const dear = 'atlas::acme/edit-dear';
+  const sch = (ref: string): ModelSchema => ({ ref, params: [{ key: 'resolution', label: 'Resolution', role: 'resolution', type: 'enum', options: ['1K', '2K'], default: '1K' } as never], source: 'catalog', slots: { prompt: 'prompt', images: { key: 'imgs', max: 4, min: 1, multiple: true, format: 'url' } } });
+  const mk = (ref: string, usd: number) => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref, kind: 'image', acceptsText: true, acceptsImage: true, tags: [], price: { skus: [{ usd, unit: 'output' }] } }) as unknown as ModelSummary;
+  beforeEach(() => {
+    const st = useStore.getState();
+    useStore.setState({ assets: { src: asset('src') }, catalog: { ...st.catalog, models: { ...st.catalog.models, [cheap]: mk(cheap, 0.1), [dear]: mk(dear, 0.5) }, schemas: { ...st.catalog.schemas, [cheap]: sch(cheap), [dear]: sch(dear) } },
+      settings: { ...st.settings, ops: { ...st.settings.ops, edit: cheap } } });
+  });
+  const step = (op: 'reference_sheet' | 'edit', params: Record<string, string | number> = {}) => ({ id: 's1', kind: 'op' as const, title: 't', op, input: 'asset:src', params });
+  const sent = async (op: 'reference_sheet' | 'edit', nodeChoice?: { ref: string; viaEdit: boolean }) => {
+    const spec = await opSpec({ sessionId: 's', sourceAssetId: 'src', op, params: op === 'edit' ? { instruction: 'x' } : {}, origin: 'op', nodeChoice });
+    return { spec, auth: costAuthorization(spec.modelRef, spec.settings, spec.estimate!) };
+  };
+  it('reference_sheet: same price, resolution and model', async () => {
+    const got = estimateSteps([step('reference_sheet')]);
+    const { spec, auth } = await sent('reference_sheet');
+    expect(got.perStep.s1.usd).toBeCloseTo(spec.estimate!.usd!);
+    expect(got.authorizations.s1.parameters.resolution).toBe(spec.settings.resolution);
+    expect(got.authorizations.s1.modelRef).toBe(auth.modelRef);
+  });
+  it('a Nodes run with its own model choice is priced with that choice', async () => {
+    const choice = { ref: dear, viaEdit: false };
+    const got = estimateSteps([step('edit', { instruction: 'x' })], { s1: choice });
+    const { spec } = await sent('edit', choice);
+    expect(spec.modelRef).toBe(dear);
+    expect(got.perStep.s1.usd).toBeCloseTo(spec.estimate!.usd!);
+    expect(got.authorizations.s1.modelRef).toBe(dear);
   });
 });

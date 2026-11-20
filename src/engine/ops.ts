@@ -470,6 +470,17 @@ export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
   return Object.fromEntries(op.fields.map((f) => [f.key, f.default]));
 }
 
+/** Video-to-video engines: they run on a clip, priced by its length. The one place that lists them. */
+export type VideoOpEngine = 'video_upscale' | 'video_edit' | 'video_extend';
+export function isVideoOpEngine(engine: string): engine is VideoOpEngine {
+  return engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend';
+}
+
+/** The upscale factor a price authorization is scaled by (2 when unset); other operations have none. */
+export function operationFactor(op: { id: string; params: Record<string, AdvancedValue> } | undefined): number | undefined {
+  return op?.id === 'upscale' ? Number(op.params.factor) || 2 : undefined;
+}
+
 export function opCount(op: OpDef, params: Record<string, AdvancedValue>): number {
   if (op.id === 'variations' || op.id === 'reference_sheet') return Math.max(1, Math.min(4, Number(params.count) || 1));
   if (op.id === 'grid_split') {
