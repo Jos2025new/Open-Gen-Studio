@@ -1,0 +1,134 @@
+import { drawShape } from '../../../engine/design/drawShape';
+import type { DesignTool } from '../../../engine/design/rules';
+import { useStore, setUi, type UiState } from '../../../store/store';
+import { pathBox, toolPath, type PathTool } from '../../../engine/design/shapeTools';
+import { PRIM_TOOLS, placedPath, primFromUi, primShape } from '../../../engine/design/primitives';
+import { boxShape } from '../../../engine/design/shapeDraw';
+import { snapAngle } from '../../../engine/design/selectGeometry';
+import type { View } from '../../../engine/design/viewCoordinates';
+import { uid } from '../../../lib/id';
+import { ShapeLookFields } from '../ShapeLookFields';
+import { InlineColor, InlineSlider } from '../InlineControls';
+import type { ComponentType } from 'react';
+import type { GestureMap, ToolDescriptor } from './types';
+
+export type ShapeDrag = {
+  kind: 'shape';
+  tool: ShapeTool;
+  strokeOnly: boolean;
+  customPath?: PathTool;
+  trace?: ShapeOptions['trace'];
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+};
+
+export type ShapeTool = Extract<DesignTool,
+  'rect' | 'ellipse' | 'polygon' | 'star' | 'sector' | 'arc' | 'chord' | 'line' | 'curve' | 'arrow'>;
+
+type ShapeOptions = {
+  strokeOnly?: boolean;
+  customPath?: PathTool;
+  trace?: (path: Path2D, drag: ShapeDrag, style: UiState['shape'], box: { x: number; y: number; w: number; h: number }) => void;
+  fields?: ComponentType;
+  fill?: boolean;
+  corners?: boolean;
+};
+
+export function shapeTool(tool: ShapeTool, { strokeOnly = false, customPath, trace, fields: Fields, fill = true, corners = false }: ShapeOptions = {}): ToolDescriptor {
+  return {
+    quick: fill ? ['strokeWidth', 'stroke', 'fill'] : ['strokeWidth', 'stroke'],
+    down({ state: { drag, setPreview }, p }) {
+      drag.current = { kind: 'shape', tool, strokeOnly, customPath, trace, x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+      setPreview(drag.current);
+    },
+    settings: ({ compact }) => <ShapeSettings compact={compact} fill={fill} corners={corners} fields={Fields} />,
+  };
+}
+
+export function ShapeSettings({ compact, fill = true, corners = false, fields: Fields }: { compact?: boolean; fill?: boolean; corners?: boolean; fields?: ComponentType }) {
+  const shape = useStore((s) => s.ui.shape);
+  return <>
+    {fill && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
+    <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
+    <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
+    {Fields && <Fields />}
+    <ShapeLookFields value={shape} corners={corners} compact={compact} onChange={(p) => setUi({ shape: { ...shape, ...p } })} />
+  </>;
+}
+
+export const shapeGestures = {
+  shape: {
+    move({ state, d, p, e }) {
+      const { setPreview } = state;
+      let x1 = p.x;
+      let y1 = p.y;
+      if (e.shiftKey) {
+        if (d.strokeOnly) {
+          ({ x: x1, y: y1 } = snapAngle({ x: d.x0, y: d.y0 }, p));
+        } else {
+          const s = Math.max(Math.abs(x1 - d.x0), Math.abs(y1 - d.y0));
+          x1 = d.x0 + Math.sign(x1 - d.x0 || 1) * s;
+          y1 = d.y0 + Math.sign(y1 - d.y0 || 1) * s;
+        }
+      }
+      d.x1 = x1;
+      d.y1 = y1;
+      setPreview({ ...d });
+    },
+    up({ state, d }) {
+      const { doc, sessionId, view, setPreview, shapeStyle } = state;
+      setPreview(null);
+      const w = d.x1 - d.x0;
+      const h = d.y1 - d.y0;
+      if (Math.hypot(w, h) * view.zoom < 4) return;
+      const lineLike = d.strokeOnly;
+      const pfit = PRIM_TOOLS.has(d.tool) ? primShape(d.x0, d.y0, d.x1, d.y1, primFromUi(d.tool, shapeStyle)) : null;
+      const d0 = !pfit && d.customPath ? toolPath(d.customPath, d.x0, d.y0, d.x1, d.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: Math.max(1, shapeStyle.strokeWidth) }) : null;
+      const pbox = d0 ? pathBox(d0) : null;
+      if (d0 && !pbox) return;
+      // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
+      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, look = { join, cap, miter, dash, dashOffset, paintOrder };
+      const shape = pfit || pbox ? {
+        id: uid('shp'),
+        ...(pfit ?? { type: 'path' as const, d: d0!, box0: pbox!, ...pbox! }),
+        fill: lineLike ? null : shapeStyle.fill,
+        stroke: lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
+        strokeWidth: lineLike ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
+        radius: 0,
+        ...look,
+      } : boxShape(uid('shp'), d.tool as 'rect' | 'ellipse' | 'line', d.x0, d.y0, d.x1, d.y1, shapeStyle, look);
+      // Inside the active layer, or a new one when that cannot take it; the shape stays picked (drawShape.ts).
+      drawShape(sessionId, doc.id, shape);
+    },
+  },
+} satisfies Partial<GestureMap>;
+
+export function drawShapePreview(ctx: CanvasRenderingContext2D, view: View, preview: ShapeDrag, shapeStyle: UiState['shape']) {
+  const { strokeOnly, customPath, trace } = preview;
+  const x = Math.min(preview.x0, preview.x1);
+  const y = Math.min(preview.y0, preview.y1);
+  const w = Math.abs(preview.x1 - preview.x0);
+  const h = Math.abs(preview.y1 - preview.y0);
+  ctx.save();
+  ctx.translate(view.x, view.y);
+  ctx.scale(view.zoom, view.zoom);
+  ctx.globalAlpha = 0.85;
+  const lineLike = strokeOnly;
+  const previewFit = PRIM_TOOLS.has(preview.tool) ? primShape(preview.x0, preview.y0, preview.x1, preview.y1, primFromUi(preview.tool, shapeStyle)) : null;
+  const path = previewFit ? placedPath(previewFit) : customPath
+    ? new Path2D(toolPath(customPath, preview.x0, preview.y0, preview.x1, preview.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: shapeStyle.strokeWidth }))
+    : new Path2D();
+  trace?.(path, preview, shapeStyle, { x, y, w, h });
+  if (!lineLike && shapeStyle.fill) {
+    ctx.fillStyle = shapeStyle.fill;
+    ctx.fill(path);
+  }
+  ctx.strokeStyle = lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke ?? 'rgba(212,242,90,0.6)';
+  ctx.lineWidth = (lineLike || shapeStyle.stroke ? shapeStyle.strokeWidth : 1) || 1;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke(path);
+  ctx.restore();
+}

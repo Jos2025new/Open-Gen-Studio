@@ -8,7 +8,7 @@ related: [atajos, alinear-editar, navegacion-zoom, guias, tira-contextual]
 ---
 # Gestos y modificadores del lienzo (Stage)
 
-Todo lo de aquí vive en `Stage` (`Stage.tsx:588`) y no tiene botón. La lista sigue el orden del código; las filas marcadas «sin confirmar» se tomaron del texto de ayuda (`TOOL_HELP`, `ToolHelp.tsx:12`) y no se leyó la rama completa del puntero.
+`Stage` coordina el puntero y las guías. El [registro de herramientas](../../src/components/designer/tools/registry.ts) lleva a cada manejador. Las líneas de la tabla corresponden al inventario anterior a la extracción. Las filas marcadas «sin confirmar» conservan su estado de verificación.
 
 | Control | Dónde está hoy | Qué estado modifica | Cuándo aparece | Notas | Dónde quedaría en la propuesta | Estado | Mockup |
 | --- | --- | --- | --- | --- | --- | --- | --- |

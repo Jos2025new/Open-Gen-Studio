@@ -104,7 +104,8 @@ import { readFileSync } from 'node:fs';
 import { historyDepth as depth, unrecord } from '../src/engine/design/history';
 
 describe('D26: no undo step for a gesture that changed nothing', () => {
-  const stage = readFileSync('src/components/designer/Stage.tsx', 'utf8');
+  const paintTool = readFileSync('src/components/designer/tools/paint.tsx', 'utf8');
+  const moveTool = readFileSync('src/components/designer/tools/move.tsx', 'utf8');
   it('unrecord takes back the step just recorded', () => {
     const doc = createDoc('d26', 8, 8);
     record(doc);
@@ -116,10 +117,10 @@ describe('D26: no undo step for a gesture that changed nothing', () => {
     dropHistory(doc.id);
   });
   it('the stage drops the step when the stroke stops on a loading layer, and records a corner scale only once it moves', () => {
-    expect(stage).toMatch(/toast\(pixelsNotReady\(\[target\.id, target\.paintBaseId\]\), 'error'\);\s*if \(getDoc\([^\n]*unrecord\(current\)/);
-    expect(stage).not.toMatch(/record\(current\);\s*drag\.current = \{ kind: 'scale'/);
-    expect(stage).toMatch(/kind: 'scale'[^\n]*pre: current/);
-    expect(stage).toMatch(/else if \(d\.kind === 'scale' && started\(d, p\)\)/);
+    expect(paintTool).toMatch(/toast\(pixelsNotReady\(\[target\.id, target\.paintBaseId\]\), 'error'\);\s*if \(getDoc\([^\n]*unrecord\(current\)/);
+    expect(moveTool).not.toMatch(/record\(current\);\s*drag\.current = \{ kind: 'scale'/);
+    expect(moveTool).toMatch(/kind: 'scale'[^\n]*pre: current/);
+    expect(moveTool).toMatch(/scale: \{\s*move\([\s\S]*?if \(!started\(d, p, view\)\) return;\s*const k =/);
   });
 });
 

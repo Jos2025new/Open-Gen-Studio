@@ -8,12 +8,11 @@ import { documentToScreen, screenToDocument, type View } from '../../engine/desi
  * The stroke ruler on the page (engine/design/strokeRuler.ts): a dashed guide, and with the Ruler tool, dragging on
  * the page places a new one and its round handles move its ends (line) or corners (ellipse).
  */
-export function StrokeRulerOverlay({ view, docId, tool }: { view: View; docId: string; tool: string }) {
+export function StrokeRulerOverlay({ view, docId, placing = false }: { view: View; docId: string; placing?: boolean }) {
   const ruler = useStore((s) => s.ui.strokeRuler);
   const kind = useStore((s) => s.ui.strokeRulerKind ?? 'line');
   const ref = useRef<SVGSVGElement>(null);
   const drag = useRef<{ end: 'a' | 'b'; base: StrokeRuler } | null>(null);
-  const placing = tool === 'ruler';
   const r = ruler && ruler.docId === docId ? ruler : null;
   if (!r && !placing) return null;
   const at = (e: { clientX: number; clientY: number }) => screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect());

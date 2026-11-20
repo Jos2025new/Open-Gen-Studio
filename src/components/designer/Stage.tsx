@@ -1,515 +1,46 @@
-import { clickPick, expandPicks } from '../../engine/design/objectGroupTree';
-import type { RefObject } from 'react';
-import { flushSync } from 'react-dom';
-import { useBoardFocus } from '../studio/useBoardFocus';
-import { canDragGuides, drawGuides } from './drawGuides';
-import { sameGuides, type GuideLines } from './guideLines';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { DesignDoc, Layer, Stroke, TextLayer, VectorLayer } from '../../engine/types';
-import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
-import { brushPoint } from '../../engine/design/brushControl';
-import { drawStroke } from '../../engine/design/brushTextures';
-import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
-import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
-import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
-import { snapSessionOf } from '../../engine/design/snapSession';
-import { snapIdleFeed, snapIdleStop } from './snapIdle';
+import { canDragGuides } from './drawGuides';
+import { useEffect } from 'react';
+import type { Layer, TextLayer } from '../../engine/types';
+import { endDragPreview } from '../../engine/design/render';
+import { activeLayer } from '../../engine/design/doc';
+import { snapIdleStop } from './snapIdle';
 import { SnapIndicator } from './SnapIndicator';
 import { AgentGlow } from './AgentGlow';
-import { moveMode, neighbourGaps } from '../../engine/design/neighbourGaps';
-import { stageWheel } from './wheelZoom';
-import { fitView, useKeepCenter } from './fitView';
-import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
-import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
-import { beginLiveStroke } from '../../engine/design/raster';
-import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
-import { rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots } from './ShapeKnots';
-import { worldPoints } from '../../engine/design/strokes';
-import { checkerTile, drawTransformOverlay, handleCursor, sameHandle } from './stageSprites';
+import { handleCursor } from './stageSprites';
 import { GradientKnots } from './ShapeHandles';
-import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
-import {withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface} from '../../engine/design/raster';
-import { commitPaintedMove, dragGroups, moveGroups, otherGroups, outlinePicked, pickedTargets, snapBox, topObjectLayer, type ObjGroup } from './stageObjMove';
-import { record, unrecord } from '../../engine/design/history';
-import { drawShape } from '../../engine/design/drawShape';
-import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
-import { addTextLayer, ensurePaintLayer, getDoc, noticeSkippedLayer, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
-import { setDoc, toast, useStore } from '../../store/store';
-import { secondaryOf } from '../../engine/design/colorPair';
-import { beginSample, moveSample, runFill, sampleUp, samplingGesture, showLoupe, type SampleDrag } from './StageSample';
-import { SampleLoupe, type SampleLoupeHandle } from './SampleLoupe';
-import { clearGuides, placeGuide, removeGuide, rulerStep, type GuideAxis } from '../../engine/design/guides';
-import { pathBox, toolPath } from '../../engine/design/shapeTools';
-import { PRIM_TOOLS, placedPath, primFromUi, primShape } from '../../engine/design/primitives';
-import { boxShape } from '../../engine/design/shapeDraw';
-import { gestureBuffers, transformLayer } from '../../engine/design/affine';
-import { type Mat } from '../../engine/design/matrix';
-import { applyGradient, GRADIENT_DEFAULT, paintGradient, type GradientSpec } from '../../engine/design/gradient';
-import { editShape, isPicked, objectPicks, pickedIn, pickObject, setObjectPick, setObjectPicks, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
-import { layerObjects, objectAt, objectsBox } from '../../engine/design/objectOps';
-import { pickBelow } from '../../engine/design/objectBelow';
-import { getSelection, selectionClipFor, useSelectionVersion } from '../../engine/design/pixelSelection';
-import { drawSelect, selectIdle, selectMove, selectPress, selectUp, useSelectSession, type SelectGesture } from './StageSelect';
+import type { DesignTool } from '../../engine/design/rules';
+import { getDoc, patchLayer, placeAsset } from '../../engine/design/actions';
+import { toast, useStore } from '../../store/store';
+import { SampleLoupe } from './SampleLoupe';
+import { clearGuides, type GuideAxis } from '../../engine/design/guides';
+import { getSelection } from '../../engine/design/pixelSelection';
 import { SelectCursor } from './SelectCursor';
-import { useModifierKeys } from './useModifierKeys';
-import { eventMods, markDown } from '../../engine/design/modifierGate';
-import { keepAxis, lockedAxis, lockedPoint } from '../../engine/design/axisLock';
-import { snapAngle } from '../../engine/design/selectGeometry';
-import { xformMatrix } from '../../engine/design/xformMatrix';
-import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
-import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoordinates';
-import { useCursorPreview } from '../../engine/design/useCursorPreview';
+import { markDown } from '../../engine/design/modifierGate';
 import { BrushCursor } from './BrushCursor';
-import { uid } from '../../lib/id';
-import { clickCandidate, pixelTarget } from '../../engine/design/autoSelect';
-import { usePanRequest } from './usePanRequest';
-import { commitStagePaintGesture, drawingChoiceFirst, paintStart, pixelsNotReady, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
-import { paintsPixelsDirectly } from '../../engine/design/paintMode';
+import { useStageState, type StageProps } from './stageState';
+import { useStageCanvas } from './stageCanvas';
+import { getDesignerTool, moveGesture, releaseGesture } from './tools/registry';
+import { beginPan } from './tools/hand';
+import { trySample } from './tools/eyedropper';
+import { Ruler } from './StageRuler';
 
-
-type Drag =
-  | { kind: 'pixelMove'; move: PixelMove; start: { x: number; y: number } }
-  | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
-  | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
-  | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer; startX: number; startY: number; pre: DesignDoc; moved?: boolean }
-  | ({ kind: 'objMove'; startX: number; startY: number; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; others?: ObjGroup[] } & ObjGroup)
-  | EditMarqueeDrag
-  | StagePaintGesture
-  | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
-  | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
-  | SelectGesture
-  | SampleDrag
-  | { kind: 'shape'; tool: ShapeTool; x0: number; y0: number; x1: number; y1: number }
-  | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
-  | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
-
-const HANDLE = 8;
-type XformOp = 'scale' | 'rotate' | 'skew' | 'pivot';
-/** A transform handle on the selection box: where it sits, what it does, and (for scale) which axes it moves. */
-
-interface Handle { op: XformOp; x: number; y: number; fx: number; fy: number }
-/** Inkscape's two sets: scale (corners and sides), or rotate (corners), skew (sides) and the rotation center. */
-function boxHandles(b: { x: number; y: number; w: number; h: number }, mode: 'scale' | 'rotate', pivot: { x: number; y: number }): Handle[] {
-  const xs = [b.x, b.x + b.w / 2, b.x + b.w], ys = [b.y, b.y + b.h / 2, b.y + b.h];
-  const out: Handle[] = [];
-  for (const iy of [0, 1, 2]) for (const ix of [0, 1, 2]) {
-    if (ix === 1 && iy === 1) continue;
-    const corner = ix !== 1 && iy !== 1;
-    out.push({ op: mode === 'scale' ? 'scale' : corner ? 'rotate' : 'skew', x: xs[ix], y: ys[iy], fx: ix - 1, fy: iy - 1 });
-  }
-  if (mode === 'rotate') out.push({ op: 'pivot', x: pivot.x, y: pivot.y, fx: 0, fy: 0 });
-  return out;
-}
-const RULER = 18;
-/** A theme token for canvas drawing, so rulers and the page edge follow the base. */
-const tok = (n: string, f: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
-/** The selection colour (the highlight's --accent, a hex) at an alpha: handles and picks follow the chosen highlight. */
-const accentA = (a = 1) => { const n = parseInt(tok('--accent', '#d4f25a').slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
-const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
-type ShapeTool = keyof typeof SHAPE_NAMES;
-/** Drawn between two points (stroke only), not inside a box. */
-const STROKE_ONLY = (t: ShapeTool) => t === 'line' || t === 'curve' || t === 'arrow' || t === 'arc';
-
-type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
-
-/** A ruler along the top or left edge of the stage: page units, ticks that follow the zoom. Drag from it to make a guide. */
-function Ruler({ side, view, size, guides, ...handlers }: { side: 'top' | 'left'; view: View; size: { w: number; h: number }; guides?: DesignDoc['guides'] } & Pick<React.HTMLAttributes<HTMLCanvasElement>, 'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel' | 'onContextMenu'>) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const len = side === 'top' ? size.w : size.h;
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = side === 'top' ? len : RULER, h = side === 'top' ? RULER : len;
-    c.width = Math.round(w * dpr);
-    c.height = Math.round(h * dpr);
-    const ctx = c.getContext('2d')!;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = tok('--surface', '#18181c');
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = tok('--text-3', '#8e8e98');
-    ctx.strokeStyle = tok('--border-strong', '#55555e');
-    ctx.font = '9px system-ui, sans-serif';
-    const step = rulerStep(view.zoom);
-    const origin = side === 'top' ? view.x : view.y;
-    const first = Math.floor(-origin / view.zoom / step) * step;
-    ctx.beginPath();
-    for (let v = first; origin + v * view.zoom < len; v += step / 5) {
-      const at = Math.round(origin + v * view.zoom) + 0.5;
-      const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
-      const tick = major ? RULER : RULER / 3;
-      if (side === 'top') { ctx.moveTo(at, RULER); ctx.lineTo(at, RULER - tick); }
-      else { ctx.moveTo(RULER, at); ctx.lineTo(RULER - tick, at); }
-      if (major) {
-        const label = String(Math.round(v));
-        if (side === 'top') ctx.fillText(label, at + 2, 9);
-        else { ctx.save(); ctx.translate(9, at + 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'right'; ctx.fillText(label, 0, 0); ctx.restore(); }
-      }
-    }
-    ctx.stroke();
-    // Guide marks on the ruler.
-    ctx.fillStyle = '#2fb8ff';
-    for (const g of (side === 'top' ? guides?.x : guides?.y) ?? []) {
-      const at = origin + g * view.zoom;
-      if (side === 'top') ctx.fillRect(at - 1, RULER - 5, 3, 5);
-      else ctx.fillRect(RULER - 5, at - 1, 5, 3);
-    }
-  }, [side, len, view, guides]);
-  const style: React.CSSProperties = side === 'top'
-    ? { position: 'absolute', left: 0, top: 0, width: len, height: RULER, cursor: 'row-resize' }
-    : { position: 'absolute', left: 0, top: 0, width: RULER, height: len, cursor: 'col-resize' };
-  return <canvas ref={ref} className="stage-ruler" style={style} data-tip={side === 'top' ? 'Drag down for a guide · right-click clears guides' : 'Drag right for a guide · right-click clears guides'} {...handlers} />;
-}
-
-/**
- * Inkscape-style arrows for the rotate set: at a corner a curved two-headed arrow bowing out of the box (turn), on a
- * side a straight two-headed arrow along it (slide = skew). Drawn twice: a dark outline, then the accent.
- */
 /** `board`: Studio's embedded Designer: the box whose focus gates the keys, and the room the fit leaves at the bottom. */
-export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }: { sessionId: string; doc: DesignDoc; selectedCurve: CurveSelection; setSelectedCurve: (value: CurveSelection) => void; board?: { scope: RefObject<HTMLElement | null>; bottom: number } }) {
-  const insideRef = useBoardFocus(board?.scope);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [size, setSize] = useState({ w: 800, h: 600 });
-  const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
-  const wheel = useRef(stageWheel(setView)).current;
-  wheel.sync(view);
-  const ctrlAtDown = useRef(false);
-  usePanRequest(setView);
-  useLayerSelection((st) => st.byDoc[doc.id]);
-  const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
-
-  // Snap guides while moving (screen overlay only).
-  const [guideLines, setGuideLines] = useState<GuideLines>({});
-  const showGuides = (g: GuideLines) => setGuideLines((cur) => sameGuides(cur, g) ? cur : g);
-  const [editingText, setEditingText] = useState<string | null>(null);
-  // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
-  const [paintFrame, setPaintFrame] = useState(0);
-  const paintRaf = useRef<number | null>(null);
-  const liveRaf = useRef<number | null>(null);
-  const flushPaintFrame = () => {
-    if (paintRaf.current != null) cancelAnimationFrame(paintRaf.current);
-    paintRaf.current = null;
-    setPaintFrame((f) => f + 1);
-  };
-  const [preview, setPreview] = useState<Drag | null>(null);
-  const [spaceDown, setSpaceDown] = useState(false);
-  // Picked strokes of one raster layer (Ctrl-click adds more of the same layer in Objects mode).
-  // Objects picked inside a layer (Edit, Objects mode), shared with the bar's Align and Transform.
-  const objPick = useObjectSelection((st) => st.byDoc[doc.id]);
-  // Shape edit mode (ShapeKnots): the shape's own knots instead of the transform handles.
-  const shapeEditing = !!useShapeEdit((st) => st.byDoc[doc.id]);
-  const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
-  /** Edit acts on whole layers (Layer mode) instead of the objects inside them. */
-  const editLayers = selectMode === 'layers';
-  // Transform handles (Inkscape): scale by default; clicking the selection again toggles rotate/skew.
-  const [handleMode, setHandleMode] = useState<'scale' | 'rotate'>('scale');
-  const [pivot, setPivot] = useState<{ x: number; y: number } | null>(null);
-  const [hoverHandle, setHoverHandle] = useState<Handle | null>(null);
-  const xformRaf = useRef<number | null>(null);
-  const xformAt = useRef<{ d: Extract<Drag, { kind: 'xform' }>; m: Mat } | null>(null);
-  const { shift: shiftDown, held: modsHeld } = useModifierKeys(insideRef);
-  const drag = useRef<Drag | null>(null);
+export function Stage(props: StageProps) {
   const tool = useStore((s) => s.ui.tool);
-  const brush = useStore((s) => s.ui.brush);
-  const lineart = useStore((s) => s.ui.lineart);
-  const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
-  const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
-  // The stroke being drawn stays here until pointer up: one change and undo step per gesture.
-  const [live, setLive] = useState<Stroke | null>(null);
-  const shapeStyle = useStore((s) => s.ui.shape);
-  const textStyle = useStore((s) => s.ui.text);
-  const rv = useSyncExternalStore(subscribeRaster, rasterVersion);
-  const selVersion = useSelectionVersion();
-  const rulers = useStore((s) => s.ui.rulers ?? false) && !board;
-  const guidesShown = useStore((s) => s.ui.showGuides ?? true) && !board, guidesLocked = useStore((s) => !!s.ui.lockGuides);
-  // A guide being dragged (from a ruler or an existing guide), shown until pointer up.
-  // Edit tool over a guide: the cursor says it can be dragged.
-  const [guideHover, setGuideHover] = useState<GuideAxis | null>(null);
-  const [guidePreview, setGuidePreview] = useState<{ axis: GuideAxis; at: number; index?: number } | null>(null);
-  const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
-  const gradientUi = useStore((s) => s.ui.gradient) ?? GRADIENT_DEFAULT;
-  const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color, color2: secondaryOf(brush, gradientUi) };
-  // The selection being drawn (page coordinates), shown until pointer up.
-  const [selDraft, setSelDraft] = useState<Array<[number, number]> | null>(null);
-  const loupe = useRef<SampleLoupeHandle>(null);
-  useSelectSession(doc.id, tool, selectShape, setSelDraft, doc.activeLayerId, drag, view.zoom);
-  const [editMarquee, setEditMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const fitted = useRef<string | null>(null);
-
-  const active = activeLayer(doc);
-  const cursor = useCursorPreview(view, canvasRef, { tool, brushSize: brush.size, lineartSize: lineart.size, lineartMode, influence, active, curveSelected: Boolean(selectedCurve) }, drag.current?.kind === 'bend' ? drag.current : null);
-
-  /** What the transform handles act on: the picked objects (Objects mode; an image or text is its own object) or
-      picked layers (Layer mode). Locked, hidden and FX (no geometry) layers are out. */
-  const xformTargets = (d0: DesignDoc): Array<{ layer: Layer; ids: string[] | null }> => {
-    const ok = (l: Layer | undefined | null): l is Layer => Boolean(l?.visible && !l.locked && l.type !== 'fx');
-    if (!editLayers) {
-      const objs = pickedTargets(d0, objectPicks(d0.id), ok);
-      if (objs.length) return objs;
-      // Several layers picked (Ctrl/Shift-click), no objects: transform them all.
-      const picked = layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id));
-      if (picked.length > 1) return picked.map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
-      const a = activeLayer(d0);
-      return ok(a) && a.type !== 'vector' && !layerObjects(a).length ? [{ layer: a, ids: null }] : [];
-    }
-    return layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
-  };
-  const targetsBox = (ts: Array<{ layer: Layer; ids: string[] | null }>) => unionBox(ts.map((t) => (t.ids ? objectsBox(t.layer, t.ids) : layerBox(t.layer))).filter((b): b is NonNullable<typeof b> => Boolean(b)));
-  // Empty click: nothing shown selected; the layer stays active.
-  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
-  const nothingPicked = !objPick?.length && !pickedLayers(doc.id, doc.layers.map((l) => l.id)).length;
-  const dismissed = nothingPicked && dismissedFor != null && dismissedFor === doc.activeLayerId;
-  const targets = tool === 'move' && !editingText && !dismissed ? xformTargets(doc) : [];
-  const tBox = targets.length ? targetsBox(targets) : null;
-  const targetSig = targets.map((t) => `${t.layer.id}:${t.ids?.join(',') ?? '*'}`).join('|');
-  // A new selection starts with the scale handles and its own center.
-  useEffect(() => { setHandleMode('scale'); setPivot(null); }, [targetSig, shapeEditing]);
-  const pivotAt = tBox ? pivot ?? { x: tBox.x + tBox.w / 2, y: tBox.y + tBox.h / 2 } : null;
-  const handles = tBox && pivotAt && !shapeEditing ? boxHandles(tBox, handleMode, pivotAt) : [];
-
-  // Load pixels of raster layers after a reload.
-  useEffect(() => {
-    void ensureBuffers(doc.layers);
-  }, [doc.layers]);
-
-  useLayoutEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    // Synchronous refit and redraw: a folded or pinned panel never paints a stretched frame.
-    const ro = new ResizeObserver(() => flushSync(() => setSize({ w: el.clientWidth, h: el.clientHeight })));
-    ro.observe(el);
-    setSize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
-  }, []);
-
-  const fit = useCallback(() => setView((untouched.current = fitView(size, doc, board))), [size, doc.width, doc.height, board?.bottom]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const untouched = useRef<View | null>(null);
-  useKeepCenter(size, setView);
-  useLayoutEffect(() => {
-    const key = `${doc.id}:${doc.width}x${doc.height}`;
-    if (size.w && (fitted.current !== key || view === untouched.current)) {
-      fitted.current = key;
-      fit();
-    }
-  }, [doc.id, doc.width, doc.height, size.w, size.h, fit]);
-
-  // Expose view controls to the toolbar.
-  useEffect(() => {
-    const onFit = () => fit();
-    const onZoom = (e: Event) => {
-      const factor = (e as CustomEvent<number>).detail;
-      setView((v) => zoomAt(v, size.w / 2, size.h / 2, factor));
-    };
-    window.addEventListener('ogs:designer-fit', onFit);
-    window.addEventListener('ogs:designer-zoom', onZoom);
-    return () => {
-      window.removeEventListener('ogs:designer-fit', onFit);
-      window.removeEventListener('ogs:designer-zoom', onZoom);
-    };
-  }, [fit, size]);
-
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent('ogs:designer-view', { detail: view.zoom }));
-  }, [view.zoom]);
-
-  const toDoc = useCallback((clientX: number, clientY: number) => {
-    const r = canvasRef.current!.getBoundingClientRect();
-    return screenToDocument({ x: clientX, y: clientY }, view, r);
-  }, [view]);
-
-  // ---------------------------------------------------------------------------
-  // Rendering
-
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    if (canvas.width !== Math.round(size.w * dpr) || canvas.height !== Math.round(size.h * dpr)) {
-      canvas.width = Math.round(size.w * dpr);
-      canvas.height = Math.round(size.h * dpr);
-    }
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size.w, size.h);
-    ctx.save();
-    ctx.translate(view.x, view.y);
-    ctx.scale(view.zoom, view.zoom);
-    // Checkerboard shows transparency.
-    if (!doc.background) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, doc.width, doc.height);
-      ctx.clip();
-      // 12 px screen cells anchored at the page corner, as one repeated tile (one fill instead of a rect per cell,
-      // which grew with the square of the zoom). Drawn in screen space; the clip above still holds.
-      const pattern = ctx.createPattern(checkerTile(), 'repeat');
-      if (pattern) {
-        pattern.setTransform(new DOMMatrix().translate(view.x, view.y));
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.fillStyle = pattern;
-        ctx.fillRect(view.x, view.y, doc.width * view.zoom, doc.height * view.zoom);
-      }
-      ctx.restore();
-    }
-    drawDoc(ctx, doc, { hideLayerId: editingText ?? undefined });
-    // Gradient being dragged: drawn live over the page, as it will land.
-    if (preview?.kind === 'gradient') paintGradient(ctx, doc, gradientSpec, preview.x0, preview.y0, preview.x1, preview.y1, getSelection(doc.id));
-    drawSelect(ctx, doc, view, selDraft, modsHeld.current);
-    // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
-    ctx.strokeStyle = tok('--border-strong', '#55555e');
-    ctx.lineWidth = 1 / view.zoom;
-    ctx.strokeRect(0, 0, doc.width, doc.height);
-    if (live) drawStroke(ctx, live);
-    ctx.restore();
-
-    // Overlays in screen space.
-    // The document context has been restored: draw the marquee in screen space here so its
-    // view offset and zoom are applied exactly once, like the other screen-space overlays.
-    if (editMarquee) drawEditMarquee(ctx, editMarquee, view);
-    const sx = (x: number) => view.x + x * view.zoom;
-    const sy = (y: number) => view.y + y * view.zoom;
-    ctx.strokeStyle = tok('--border', 'rgba(255,255,255,0.08)');
-    ctx.lineWidth = 1;
-    ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
-    // Ruler guides across the whole view (the one being dragged replaces its saved position).
-    if (guidesShown) drawGuides(ctx, doc.guides, guidePreview, sx, sy, size);
-    // Snap guides: the line the moving layer sticks to, across the view.
-    const g = guideLines;
-    if (g.x != null || g.y != null) {
-      ctx.save();
-      ctx.strokeStyle = '#ff4fd8';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 3]);
-      if (g.x != null) { ctx.beginPath(); ctx.moveTo(Math.round(sx(g.x)) + 0.5, 0); ctx.lineTo(Math.round(sx(g.x)) + 0.5, size.h); ctx.stroke(); }
-      if (g.y != null) { ctx.beginPath(); ctx.moveTo(0, Math.round(sy(g.y)) + 0.5); ctx.lineTo(size.w, Math.round(sy(g.y)) + 0.5); ctx.stroke(); }
-      ctx.restore();
-    }
-    // Several layers picked: each one's box (dashed) and the box around all of them.
-    if (picked.length > 1 && !editingText) {
-      const boxes = picked.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is Layer => Boolean(l && l.visible)).map((l) => layerBox(l)).filter((b): b is NonNullable<typeof b> => Boolean(b));
-      ctx.save();
-      ctx.strokeStyle = accentA(0.75);
-      ctx.setLineDash([5, 4]);
-      for (const b of boxes) ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
-      const all = unionBox(boxes);
-      ctx.setLineDash([]);
-      ctx.strokeStyle = accentA(0.35);
-      if (all) ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
-      ctx.restore();
-    }
-    // Framed by the two-tone box: no accent outline on top.
-    const framed = !!tBox && (handles.length > 0 || shapeEditing) && !editingText;
-    if (active && active.visible && !editingText && drag.current?.kind !== 'xform') {
-      const objectsMode = tool === 'move' && !editLayers && !shiftDown;
-      const objects = objectsMode ? layerObjects(active) : [];
-      if (objectsMode && objects.length && !dismissed) {
-        // Objects mode: every object of the active layer faintly, the picked ones in the accent; no layer handles.
-        const ids = pickedIn(objPick, active.id);
-        ctx.save();
-        ctx.lineWidth = 1;
-        for (const o of objects) {
-          const on = ids.includes(o.id);
-          if (on && framed) continue;
-          ctx.strokeStyle = on ? accentA() : accentA(0.28);
-          ctx.strokeRect(sx(o.box.x) + 0.5, sy(o.box.y) + 0.5, o.box.w * view.zoom, o.box.h * view.zoom);
-        }
-        const all = ids.length > 1 ? objectsBox(active, ids) : null;
-        if (all && !framed) {
-          ctx.setLineDash([5, 4]);
-          ctx.strokeStyle = accentA(0.55);
-          ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
-        }
-        ctx.restore();
-      } else {
-        const b = layerBox(active);
-        if (b && !framed && !dismissed) {
-          ctx.strokeStyle = accentA();
-          ctx.lineWidth = 1;
-          ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
-        }
-      }
-    }
-    if (tool === 'move' && !editLayers && !shiftDown && !editingText && !framed) outlinePicked(ctx, doc, objPick, active?.id, accentA(), (b) => [sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom]);
-    // Transform handles and box (stageSprites.ts: drawTransformOverlay).
-    const xformLive = drag.current?.kind === 'xform' && drag.current.op !== 'pivot' ? drag.current : null;
-    if (tBox && (xformLive || ((handles.length || shapeEditing) && !editingText))) drawTransformOverlay(ctx, { x: sx(tBox.x), y: sy(tBox.y), w: tBox.w * view.zoom, h: tBox.h * view.zoom }, xformLive && { op: xformLive.op, x: sx(xformLive.cx), y: sy(xformLive.cy) }, handles.map((h) => ({ ...h, x: sx(h.x), y: sy(h.y) })), handleMode === 'scale', hoverHandle, accentA());
-    if ((tool === 'move' || (tool === 'lineart' && lineartMode === 'edit')) && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
-      const stroke = active.strokes?.find((s) => s.id === selectedCurve.strokeId);
-      if (stroke) {
-        ctx.strokeStyle = accentA();
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        worldPoints(stroke).forEach(([x, y], i) => i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y)));
-        ctx.stroke();
-        for (const i of selectedCurve.handles) {
-          const point = worldPoints(stroke)[i];
-          if (!point) continue;
-          ctx.beginPath();
-          ctx.arc(sx(point[0]), sy(point[1]), 4, 0, Math.PI * 2);
-          ctx.fillStyle = i === 0 || i === stroke.points.length - 1 ? accentA() : tok('--surface', '#18181c');
-          ctx.fill(); ctx.stroke();
-        }
-      }
-    }
-    if (preview?.kind === 'gradient') {
-      // The drag line with its two ends, so the direction and length read clearly.
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(sx(preview.x0), sy(preview.y0));
-      ctx.lineTo(sx(preview.x1), sy(preview.y1));
-      ctx.strokeStyle = '#16161a';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      for (const [x, y] of [[preview.x0, preview.y0], [preview.x1, preview.y1]]) {
-        ctx.beginPath();
-        ctx.arc(sx(x), sy(y), 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    if (preview?.kind === 'shape') {
-      const x = Math.min(preview.x0, preview.x1);
-      const y = Math.min(preview.y0, preview.y1);
-      const w = Math.abs(preview.x1 - preview.x0);
-      const h = Math.abs(preview.y1 - preview.y0);
-      ctx.save();
-      ctx.translate(view.x, view.y);
-      ctx.scale(view.zoom, view.zoom);
-      ctx.globalAlpha = 0.85;
-      const lineLike = STROKE_ONLY(preview.tool);
-      const previewFit = PRIM_TOOLS.has(preview.tool) ? primShape(preview.x0, preview.y0, preview.x1, preview.y1, primFromUi(preview.tool, shapeStyle)) : null;
-      const path = previewFit ? placedPath(previewFit) : preview.tool === 'curve' || preview.tool === 'arrow'
-        ? new Path2D(toolPath(preview.tool, preview.x0, preview.y0, preview.x1, preview.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: shapeStyle.strokeWidth }))
-        : new Path2D();
-      if (preview.tool === 'rect') { const r = cornerRadii({ ...shapeStyle, w, h }); traceRoundRect(path, { x, y, w, h }, r.rx, r.ry); }
-      else if (preview.tool === 'ellipse') path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-      else if (preview.tool === 'line') { path.moveTo(preview.x0, preview.y0); path.lineTo(preview.x1, preview.y1); }
-      if (!lineLike && shapeStyle.fill) {
-        ctx.fillStyle = shapeStyle.fill;
-        ctx.fill(path);
-      }
-      ctx.strokeStyle = lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke ?? 'rgba(212,242,90,0.6)';
-      ctx.lineWidth = (lineLike || shapeStyle.stroke ? shapeStyle.strokeWidth : 1) || 1;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke(path);
-      ctx.restore();
-    }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, editMarquee, rulers, guidesShown, guidesLocked, guidePreview, paintFrame, targetSig, dismissed, handleMode, pivot, hoverHandle, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
-
+  const descriptor = getDesignerTool(tool);
+  const { objectEditing, overlay: ToolOverlay } = descriptor;
+  const state = useStageState(props, tool, !!objectEditing);
+  const {
+    sessionId, doc, insideRef, wrapRef, canvasRef, view, size, wheel, cursor, drag, spaceDown, setSpaceDown,
+    editingText, setEditingText, ctrlAtDown, rulers, guidesShown, guidesLocked, guideHover, setGuideHover,
+    guidePreview, setGuidePreview, hoverHandle, setHoverHandle, loupe, guideLines, active, blocked, tBox,
+    selectedCurve, shapeEditing, editLayers, editMarquee, handleMode, toDoc, lineartMode,
+  } = state;
+  useStageCanvas(state, descriptor);
   // ---------------------------------------------------------------------------
   // Keyboard
 
@@ -533,10 +64,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Pointer interactions
-
-  const blocked = toolBlockReason(tool, active);
-
   const onPointerDown = (e: React.PointerEvent) => {
     ctrlAtDown.current = e.ctrlKey || e.metaKey;
     markDown(e);
@@ -544,34 +71,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     cursor.move(e);
     const p = toDoc(e.clientX, e.clientY);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    if (tool === 'hand' || spaceDown || e.button === 1) {
-      drag.current = { kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
-      return;
-    }
+    if (descriptor.pan || spaceDown || e.button === 1) return beginPan(state, e);
     if (e.button !== 0) return;
     const current = getDoc(sessionId, doc.id);
     if (!current) return;
-    const act = activeLayer(current);
 
-    if (samplingGesture(tool, e)) {
-      const s = beginSample(current, p, tool, e);
-      if (s) { drag.current = s; showLoupe(loupe, view, p, s.color); }
-      return;
-    }
-
-    if (tool === 'gradient') {
-      drag.current = { kind: 'gradient', x0: p.x, y0: p.y, x1: p.x, y1: p.y };
-      setPreview(drag.current);
-      return;
-    }
-
-    if (tool === 'select') {
-      drag.current = selectPress({ doc: current, p, shape: selectShape, mods: eventMods(e), zoom: view.zoom }, setSelDraft);
-      return;
-    }
-
-    if (tool === 'fill') return runFill(sessionId, current, p, e);
-
+    if (trySample(state, current, p, e)) return;
     // Edit tool on a guide: drag it (back onto its ruler removes it).
     if (canDragGuides(tool, guidesShown, guidesLocked)) {
       const r = canvasRef.current!.getBoundingClientRect();
@@ -586,444 +91,20 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       }
     }
 
-    if (tool === 'move') {
-      const move = startPixelMove(sessionId, current, p, 3 / view.zoom);
-      if (move) { if (move !== true) drag.current = { kind: 'pixelMove', move, start: p }; return; }
-      const tol = (HANDLE + 4) / view.zoom;
-      const hHit = [...handles].reverse().find((h) => Math.abs(p.x - h.x) <= tol && Math.abs(p.y - h.y) <= tol);
-      if (hHit && tBox && pivotAt) {
-        const ts = xformTargets(current);
-        drag.current = { kind: 'xform', pre: current, op: hHit.op, h: hHit, startX: p.x, startY: p.y, cx: pivotAt.x, cy: pivotAt.y, box: tBox, bases: ts.map((t) => ({ ...t, buffers: gestureBuffers(t.layer) })) };
-        return;
-      }
-      // Point editing of a picked Lineart curve comes first, in either mode.
-      if (act?.type === 'vector' && act.visible && !act.locked && selectedCurve?.layerId === act.id) {
-        const index = act.strokes?.findIndex((s) => s.id === selectedCurve.strokeId) ?? -1;
-        const stroke = act.strokes?.[index];
-        const point = stroke ? selectedCurve.handles.find((i) => stroke.points[i] && Math.hypot(stroke.points[i][0] - p.x, stroke.points[i][1] - p.y) <= 8 / view.zoom) : undefined;
-        if (point !== undefined) {
-          drag.current = { kind: 'bend', layerId: act.id, stroke: index, point, startX: p.x, startY: p.y, base: act.strokes!, influence };
-          return;
-        }
-      }
-      setSelectedCurve(null);
-      setDismissedFor(null);
-
-      const marquee = beginEditMarquee({ doc: current, point: p, layersMode: editLayers, shift: e.shiftKey, alt: e.altKey, autoSelect: useStore.getState().ui.autoSelect ?? false });
-      if (marquee) {
-        drag.current = marquee;
-        setEditMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
-        return;
-      }
-
-      if (!editLayers && (e.ctrlKey || e.metaKey) && e.altKey) return void pickBelow(sessionId, current, p.x, p.y);
-      // Objects mode: modifiers pick parts, or whole layers across layers.
-      if (!editLayers) {
-        const additive = e.ctrlKey || e.metaKey || e.shiftKey;
-        const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
-        const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => !!objectAt(l, p.x, p.y));
-        let layer: Layer | null = null;
-        const picks = objectPicks(doc.id);
-        const pickedLayerIds = pickedLayers(doc.id, current.layers.map((l) => l.id));
-        if (additive) {
-          if (pickedLayerIds.length < 2) layer = topObjectLayer(current, p.x, p.y);
-        } else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
-        const id = layer ? objectAt(layer, p.x, p.y) : null;
-        if (layer && id) {
-          if (layer.type === 'raster' && id !== layer.id && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast(pixelsNotReady([layer.paintBaseId]), 'error');
-          if (additive) {
-            const had = isPicked(picks, layer.id, id);
-            if (!had) pickObject(doc.id, layer.id, id, true);
-            setLayerPicks(doc.id, []);
-            if (layer.type === 'vector' && !had) { const cur = objectPicks(doc.id); setObjectPicks(doc.id, cur.map((pk) => (pk.layerId === layer!.id ? { ...pk, ids: expandPicks(layer as VectorLayer, pk.ids) } : pk))); }
-            const now = objectPicks(doc.id);
-            drag.current = { kind: 'objMove', layerId: layer.id, ids: pickedIn(now, layer.id), startX: p.x, startY: p.y, base: layer, others: otherGroups(current, now, layer.id), ctrlToggle: had ? id : undefined, pre: current };
-            return;
-          }
-          setActiveLayer(sessionId, doc.id, layer.id);
-          const grp = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-          if (grp.length > 1 && grp.includes(layer.id)) return void (drag.current = { kind: 'move', layerId: layer.id, startX: p.x, startY: p.y, base: layer, others: otherPickedLayers(current, layer.id), pre: current });
-          setLayerPicks(doc.id, []);
-          // Dragging one of several picked objects moves them all; another object starts a new pick.
-          const again = isPicked(picks, layer.id, id);
-          const ids = again ? pickedIn(picks, layer.id) : layer.type === 'vector' ? clickPick(layer, id) : [id];
-          if (!again) setObjectPick(doc.id, { layerId: layer.id, ids });
-          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, others: again ? otherGroups(current, picks, layer.id) : undefined, again, pre: current };
-          return;
-        }
-        if (additive) {
-          const hit = hitTestPixel(current, p.x, p.y);
-          if (hit && hit.visible && !hit.locked) {
-            const cur = objectPicks(doc.id);
-            const ids = cur.length ? cur.map((p) => p.layerId) : layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-            if (cur.length) setObjectPick(doc.id, null);
-            const had = ids.length > 1 && ids.includes(hit.id);
-            if (!had) pickLayer(doc.id, hit.id, true, ids);
-            setActiveLayer(sessionId, doc.id, had ? ids.find((id) => id !== hit.id) ?? current.activeLayerId : hit.id);
-            const next = getDoc(sessionId, doc.id) ?? current;
-            drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(next, hit.id), ctrlToggle: had ? hit.id : undefined, pre: current };
-          }
-          return;
-        }
-        // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
-        const auto = useStore.getState().ui.autoSelect ?? false;
-        const whole = auto ? hitTestPixel(current, p.x, p.y) : pixelTarget(current, p.x, p.y, false);
-        if (!whole && !auto && hitTestPixel(current, p.x, p.y)) return;
-        setObjectPick(doc.id, null);
-        // Plain click on empty canvas clears both stores; a hit replaces a different layer group.
-        if (!whole) {
-          setLayerPicks(doc.id, []);
-          setDismissedFor(current.activeLayerId);
-          return;
-        }
-        const pickedNow = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-        if (!pickedNow.includes(whole.id)) pickLayer(doc.id, whole.id, false, pickedNow);
-        if (whole && !layerObjects(whole).length && whole.type !== 'vector') {
-          const again = current.activeLayerId === whole.id && !dismissed;
-          setActiveLayer(sessionId, doc.id, whole.id);
-          if (!whole.locked) {
-            // One of several picked layers: they all move together (as in Inkscape).
-            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole, others: otherPickedLayers(current, whole.id), again, pre: current };
-          }
-        }
-        return;
-      }
-
-      // Layer mode: Ctrl/Cmd-click adds the layer under the pointer to the selection (or takes it out).
-      setObjectPick(doc.id, null);
-      if (e.ctrlKey || e.metaKey || e.shiftKey) {
-        // Ctrl- or Shift-press adds the layer; a drag moves all picked; a click on a picked one removes it.
-        const hit = hitTestPixel(current, p.x, p.y);
-        if (hit) {
-          const ids = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-          const had = ids.length > 1 && ids.includes(hit.id);
-          if (!had) pickLayer(doc.id, hit.id, true, ids);
-          setActiveLayer(sessionId, doc.id, hit.id);
-          if (!hit.locked) drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined, pre: current };
-        }
-        return;
-      }
-      const onTop = hitTestPixel(current, p.x, p.y);
-      const picks = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-      // Another layer drawn on top at this point, not picked: the click is for it, not the active layer's box.
-      const otherOnTop = Boolean(onTop && onTop.id !== act?.id && !picks.includes(onTop.id));
-      if (act && !act.locked && act.visible && !otherOnTop) {
-        const b = layerBox(act);
-        if (b) {
-          const tol = HANDLE / view.zoom;
-          const hit = corners(b).findIndex(([hx, hy]) => Math.abs(p.x - hx) <= tol && Math.abs(p.y - hy) <= tol);
-          if (hit >= 0) {
-            const [ax, ay] = corners(b)[(hit + 2) % 4];
-            drag.current = { kind: 'scale', layerId: act.id, ax, ay, startDist: Math.hypot(p.x - ax, p.y - ay) || 1, base: act, startX: p.x, startY: p.y, pre: current };
-            return;
-          }
-          if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
-            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: otherPickedLayers(current, act.id), again: !dismissed, pre: current };
-            return;
-          }
-        }
-      }
-      const hit = hitTest(current, p.x, p.y);
-      const sel = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-      // A click outside the selection starts a new one; inside, the group moves.
-      if (!hit || !sel.includes(hit.id)) pickLayer(doc.id, hit?.id ?? '', false, sel);
-      setActiveLayer(sessionId, doc.id, hit?.id ?? null);
-      if (hit && !hit.locked) {
-        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(current, hit.id), pre: current, again: sel.includes(hit.id) && !dismissed };
-      }
-      return;
-    }
-
-    if (tool === 'brush' || tool === 'eraser') {
-      const erase = tool === 'eraser';
-      if (erase && (blocked || !act || act.type !== 'raster')) {
-        toast(blocked ?? 'Select a raster layer to erase.', 'error');
-        return;
-      }
-      if (drawingChoiceFirst(sessionId, doc.id, current, erase, { x: e.clientX, y: e.clientY })) return;
-      if (!prepareStagePaint(current, erase)) return;
-      record(current);
-      // Brush never touches protected images: it paints on its own layer.
-      const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
-      if (!target || target.type !== 'raster') return;
-      if (!getRasterSurface(target.id) || (!target.paintFlattened && target.paintBaseId && !getRasterSurface(target.paintBaseId))) {
-        toast(pixelsNotReady([target.id, target.paintBaseId]), 'error');
-        if (getDoc(sessionId, doc.id)?.layers === current.layers) unrecord(current);
-        return;
-      }
-      const direct = paintsPixelsDirectly(current, target);
-      const prepared = direct ? (target.paintBaseId ? { ...target, paintBaseId: undefined, paintStrokes: undefined } : target) : target.paintFlattened ? target : withPaintBase(target);
-      if (prepared !== target) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === target.id ? prepared : l) }));
-      // The pixels before the stroke (kept by the undo step, so no copy is needed) are the base it is laid over.
-      const before = getRasterSurface(target.id)!.canvas;
-      beginEdit(prepared);
-      const stroke = newBrushStroke(brush, erase);
-      // With a pixel selection, the stroke lands only inside it.
-      const clip = selectionClipFor(current, prepared);
-      const { p0, p1 } = paintStart(doc, target.id, erase, e.shiftKey, p);
-      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p1, control: p1, time: e.timeStamp, erase, direct };
-      paintSegment(target, p0, p0, penPressure(e));
-      if (p1 !== p0) paintSegment(target, p0, p1, penPressure(e));
-      return;
-    }
-
-    if (tool === 'lineart') {
-      if (lineartMode === 'edit') {
-        if (act?.type === 'vector' && act.visible && !act.locked && selectedCurve?.layerId === act.id) {
-          const index = act.strokes?.findIndex((s) => s.id === selectedCurve.strokeId) ?? -1;
-          const stroke = act.strokes?.[index];
-          if (stroke) {
-            const point = selectedCurve.handles.find((i) => stroke.points[i] && Math.hypot(stroke.points[i][0] - p.x, stroke.points[i][1] - p.y) <= 8 / view.zoom);
-            if (point !== undefined) {
-              drag.current = { kind: 'bend', layerId: act.id, stroke: index, point, startX: p.x, startY: p.y, base: act.strokes!, influence };
-              return;
-            }
-          }
-        }
-        for (const layer of [...current.layers].reverse()) {
-          if (layer.type !== 'vector' || !layer.visible || layer.locked || layer.opacity === 0) continue;
-          const stroke = [...(layer.strokes ?? [])].reverse().find((s) => s.opacity > 0 && nearStroke(s, p.x, p.y, 8 / view.zoom));
-          if (!stroke) continue;
-          setActiveLayer(sessionId, doc.id, layer.id);
-          setSelectedCurve({ layerId: layer.id, strokeId: stroke.id, handles: strokeHandles(stroke) });
-          // Editing a curve's points also picks it, so Properties styles just that stroke.
-          setObjectPick(doc.id, { layerId: layer.id, ids: [stroke.id] });
-          return;
-        }
-        setSelectedCurve(null);
-        return;
-      }
-      // Strokes go to the active visible Lineart layer, else a new one (a hidden layer would hide them).
-      const target = act && act.type === 'vector' && !act.locked && act.visible && !act.shapes.length ? act : null;
-      // Alt-drag near a point bends that stroke; its neighbours follow smoothly.
-      if (e.altKey && target?.strokes?.length) {
-        const hit = nearestPoint(target.strokes, p.x, p.y, 12 / view.zoom);
-        if (hit) {
-          record(current);
-          drag.current = { kind: 'bend', layerId: target.id, ...hit, startX: p.x, startY: p.y, base: target.strokes, recorded: true };
-          return;
-        }
-      }
-      const pen = e.pointerType === 'pen';
-      drag.current = { kind: 'stroke', layerId: target?.id ?? null, points: [[p.x, p.y, pen ? e.pressure || 0.5 : 0.5]], pen };
-      setLive(newStroke(drag.current.points, lineart, !pen));
-      return;
-    }
-
-    if (tool in SHAPE_NAMES) {
-      drag.current = { kind: 'shape', tool: tool as ShapeTool, x0: p.x, y0: p.y, x1: p.x, y1: p.y };
-      setPreview(drag.current);
-      return;
-    }
-
-    if (tool === 'text') {
-      const hit = hitTest(current, p.x, p.y);
-      if (hit?.type === 'text' && !hit.locked) {
-        setActiveLayer(sessionId, doc.id, hit.id);
-        setEditingText(hit.id);
-        return;
-      }
-      // width 0 = auto width: the box follows the text as it is typed.
-      const id = addTextLayer(sessionId, doc.id, 'Text', { x: p.x, y: p.y, width: 0 }, textStyle);
-      if (id) setEditingText(id);
-    }
-  };
-
-  // Brush and eraser (design/brushStroke.ts): size and density follow the pen's pressure.
-  const paintSegment = (layer: Layer, a: { x: number; y: number }, b: { x: number; y: number }, pressure: number) => {
-    const d = drag.current, buf = layer.type === 'raster' && beginEditCurrent(layer.id);
-    if (buf && layer.type === 'raster' && d?.kind === 'paint') addBrushSegment(d.stroke, d.live, buf, brushSegment(layer, a, b, brush, pressure, doc.width));
-  };
-
-  const rasterMoveAt = useRef<{ d: Extract<Drag, { kind: 'objMove' }>; x: number; y: number } | null>(null);
-  const rasterMoveFrame = useRef<number | null>(null);
-  const applyRasterMove = () => {
-    if (rasterMoveFrame.current != null) cancelAnimationFrame(rasterMoveFrame.current);
-    rasterMoveFrame.current = null;
-    const at = rasterMoveAt.current;
-    rasterMoveAt.current = null;
-    if (!at) return;
-    const { d } = at;
-    const moved = moveGroups(dragGroups(d), at.x - d.startX, at.y - d.startY);
-    if (!moved) return;
-    setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));
-  };
-
-  /** Lay the latest handle transform onto the layers as they were when the drag began (once a frame). */
-  const applyXform = (persist: boolean) => {
-    if (xformRaf.current != null) cancelAnimationFrame(xformRaf.current);
-    xformRaf.current = null;
-    const at = xformAt.current;
-    if (!at) return;
-    if (persist) xformAt.current = null;
-    const { d, m } = at;
-    if (d.op === 'pivot') return;
-    const next = new Map(d.bases.map((b) => [b.layer.id, transformLayer(b.layer, b.ids, m, b.buffers, persist)] as const));
-    setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => { const n = next.get(l.id); return n ? (n.type === 'raster' ? { ...n, rev: n.rev + 1 } : n) : l; }) }));
+    descriptor.down?.({ state, current, act: activeLayer(current), p, e });
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const p = toDoc(e.clientX, e.clientY);
     cursor.move(e);
     const d = drag.current;
-    if (!d && tool === 'move') {
-      // The cursor says what a handle does before it is pressed.
-      const tol = (HANDLE + 4) / view.zoom;
-      const h = [...handles].reverse().find((k) => Math.abs(p.x - k.x) <= tol && Math.abs(p.y - k.y) <= tol);
-      if (!sameHandle(h, hoverHandle)) setHoverHandle(h ?? null);
-    }
+    if (!d) descriptor.hover?.({ state, p, e });
     if (!d && canDragGuides(tool, guidesShown, guidesLocked)) {
       const near = (axis: GuideAxis) => (doc.guides?.[axis] ?? []).some((at) => Math.abs((axis === 'x' ? p.x : p.y) - at) * view.zoom <= 4);
       const over = near('x') ? 'x' : near('y') ? 'y' : null;
       if (over !== guideHover) setGuideHover(over);
     }
-    if (!d && tool === 'select') selectIdle(p, eventMods(e), setSelDraft);
     if (!d) return;
-    if (d.kind === 'sample') return void showLoupe(loupe, view, p, moveSample(d, doc, p));
-    snapIdleFeed(d, e, onPointerMove);
-    if (d.kind === 'pixelMove') { d.move.update(lockedPoint(p, d.start, e));
-    } else if (d.kind === 'pan') {
-      setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
-    } else if (d.kind === 'editMarquee') {
-      setEditMarquee(updateEditMarquee(d, p));
-    } else if (d.kind === 'xform' && d.op === 'pivot') {
-      setPivot({ x: p.x, y: p.y });
-    } else if (d.kind === 'xform') {
-      if (!started(d, p)) return;
-      // Scale handles snap too: the dragged side or corner meets page edges, guides and other layers (Alt: free).
-      let q = p;
-      const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
-      if (d.op === 'scale' && snap.on && !e.altKey) {
-        const ids = new Set(d.bases.map((b) => b.layer.id));
-        const t = snapSessionOf(d, doc, ids, '', snap, view, size).targets();
-        const tol = SNAP_PX / view.zoom;
-        const near = (v: number, lines: number[]) => lines.reduce<number | undefined>((best, l) => (Math.abs(l - v) <= tol && (best === undefined || Math.abs(l - v) < Math.abs(best - v)) ? l : best), undefined);
-        const gx = d.h.fx ? near(p.x, t.xs) : undefined, gy = d.h.fy ? near(p.y, t.ys) : undefined;
-        q = { x: gx ?? p.x, y: gy ?? p.y };
-        showGuides({ x: gx, y: gy });
-      }
-      xformAt.current = { d, m: xformMatrix(d, q, { shift: e.shiftKey || e.ctrlKey || e.metaKey, alt: e.altKey }) };
-      xformRaf.current ??= requestAnimationFrame(() => applyXform(false));
-    } else if (d.kind === 'objMove') {
-      if (!started(d, p)) return;
-      // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
-      // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
-      // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
-      const ax = lockedAxis(p.x - d.startX, p.y - d.startY, e);
-      let { x: ox, y: oy } = lockedPoint(p, { x: d.startX, y: d.startY }, e);
-      const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
-      // Raster strokes are painted, never snapped (Drawing); the switch applies to vector objects and layers.
-      const groups = dragGroups(d), b0 = snap.on && !e.altKey ? snapBox(groups) : null;
-      if (b0) {
-        const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
-        const s = snapSessionOf(d, doc, new Set(groups.map((g) => g.layerId)), d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
-        ox += s.dx; oy += s.dy;
-        const k = keepAxis({ dx: ox - d.startX, dy: oy - d.startY }, ax);
-        ox = d.startX + k.dx; oy = d.startY + k.dy;
-        showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
-      } else {
-        snapSessionOf(d, doc, new Set(groups.map((g) => g.layerId)), d.layerId, snap, view, size).clear();
-        showGuides({});
-      }
-      rasterMoveAt.current = { d, x: ox, y: oy };
-      rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
-    } else if (d.kind === 'move') {
-      if (!started(d, p)) return;
-      // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
-      const group = [d.base, ...(d.others ?? [])];
-      const ax = lockedAxis(p.x - d.startX, p.y - d.startY, e);
-      let { dx, dy } = keepAxis({ dx: p.x - d.startX, dy: p.y - d.startY }, ax);
-      const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
-      // Ctrl/Meta pressed in the drag: no snap, still measured (neighbourGaps.ts).
-      const mode = moveMode(snap.on, e.altKey, e.ctrlKey || e.metaKey, ctrlAtDown.current);
-      const box = mode.measure ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
-      if (box) {
-        const ids = new Set(group.map((l) => l.id));
-        const session = snapSessionOf(d, doc, ids, d.layerId, snap, view, size);
-        const s = mode.snap ? session.step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp) : (session.clear(), null);
-        dx += s?.dx ?? 0; dy += s?.dy ?? 0;
-        ({ dx, dy } = keepAxis({ dx, dy }, ax));
-        showGuides({ x: s?.viewGuides?.x, y: s?.viewGuides?.y, m: [...(s?.measures ?? []), ...neighbourGaps(box, doc.layers, ids, s)], a: s?.alignments });
-      } else {
-        snapSessionOf(d, doc, new Set(group.map((l) => l.id)), d.layerId, snap, view, size).clear();
-        showGuides({});
-      }
-      startDragPreview(doc);
-      const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));
-    } else if (d.kind === 'scale' && started(d, p)) {
-      const k = Math.max(0.02, Math.hypot(p.x - d.ax, p.y - d.ay) / d.startDist);
-      const scaled = scaleLayer(d.base, k, k, d.ax, d.ay);
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId ? scaled : l)) }));
-    } else if (d.kind === 'paint') {
-      const layer = getDoc(sessionId, doc.id)?.layers.find((l) => l.id === d.layerId);
-      const samples = e.nativeEvent.getCoalescedEvents?.() ?? [];
-      for (const sample of samples.length ? samples : [e.nativeEvent]) {
-        const point = toDoc(sample.clientX, sample.clientY);
-        const next = brushPoint(d.last, d.control, point, brush.smoothing ?? 0, brush.stabilization ?? 0, view.zoom, sample.timeStamp - d.time);
-        next.paint = rulerPoint(doc.id, next.paint);
-        if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint, penPressure(sample));
-        d.last = next.paint;
-        d.control = next.control;
-        d.time = sample.timeStamp;
-      }
-      // Pointer events can come faster than the screen: show the stroke once per frame.
-      paintRaf.current ??= requestAnimationFrame(flushPaintFrame);
-      window.dispatchEvent(new Event('ogs:paint'));
-    } else if (d.kind === 'stroke') {
-      const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
-      for (const ev of events.length ? events : [e.nativeEvent]) {
-        const q = toDoc(ev.clientX, ev.clientY);
-        d.points.push([q.x, q.y, d.pen ? ev.pressure || 0.5 : 0.5]);
-      }
-      // Rebuilt and shown once per frame, however many pointer events come in between.
-      liveRaf.current ??= requestAnimationFrame(() => {
-        liveRaf.current = null;
-        const cur = drag.current;
-        if (cur?.kind === 'stroke') setLive(newStroke([...cur.points], lineart, !cur.pen));
-      });
-    } else if (d.kind === 'bend') {
-      if (!d.recorded) {
-        if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom < 2) return;
-        const current = getDoc(sessionId, doc.id);
-        if (!current) return;
-        record(current);
-        d.recorded = true;
-      }
-      const strokes = d.base.map((s, i) => (i === d.stroke ? bendStroke(s, d.point, p.x - d.startX, p.y - d.startY, d.influence ?? Math.max(24, s.size * 4)) : s));
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'vector' ? { ...l, strokes } : l)) }));
-    } else if (d.kind === 'guide') {
-      d.at = d.axis === 'x' ? p.x : p.y;
-      setGuidePreview({ axis: d.axis, index: d.index, at: d.at });
-    } else if (d.kind === 'gradient') {
-      // Shift: the line snaps to 45° steps, as in SAI.
-      const q = e.shiftKey ? snapAngle({ x: d.x0, y: d.y0 }, p) : p;
-      d.x1 = q.x;
-      d.y1 = q.y;
-      setPreview({ ...d });
-    } else if (d.kind === 'select') {
-      setSelDraft(selectMove(d, p, view.zoom, eventMods(e)));
-    } else if (d.kind === 'shape') {
-      let x1 = p.x;
-      let y1 = p.y;
-      if (e.shiftKey) {
-        if (STROKE_ONLY(d.tool)) {
-          ({ x: x1, y: y1 } = snapAngle({ x: d.x0, y: d.y0 }, p));
-        } else {
-          const s = Math.max(Math.abs(x1 - d.x0), Math.abs(y1 - d.y0));
-          x1 = d.x0 + Math.sign(x1 - d.x0 || 1) * s;
-          y1 = d.y0 + Math.sign(y1 - d.y0 || 1) * s;
-        }
-      }
-      d.x1 = x1;
-      d.y1 = y1;
-      setPreview({ ...d });
-    }
-  };
-
-  /** A move starts past 3 screen px; only then is its undo step recorded. */
-  const started = (d: { moved?: boolean; pre?: DesignDoc; startX: number; startY: number }, p: { x: number; y: number }) => {
-    if (!d.moved && Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) { d.moved = true; if (d.pre) record(d.pre); }
-    return d.moved;
+    moveGesture(state, d, p, e, onPointerMove);
   };
 
   const onPointerUp = (e?: React.PointerEvent) => {
@@ -1032,105 +113,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     snapIdleStop();
     endDragPreview();
     if (!d) return;
-    if (d.kind === 'sample') return sampleUp(loupe, d, doc, e?.type === 'pointercancel' || !e ? null : toDoc(e.clientX, e.clientY));
-    if (d.kind === 'editMarquee') {
-      setEditMarquee(null);
-      finishEditMarquee({ drag: d, sessionId, doc, zoom: view.zoom, release: e ? toDoc(e.clientX, e.clientY) : undefined, cancelled: e?.type === 'pointercancel' });
-      const after = getDoc(sessionId, doc.id) ?? doc;
-      if (!objectPicks(doc.id).length && !pickedLayers(doc.id, after.layers.map((l) => l.id)).length) setDismissedFor(after.activeLayerId);
-      return;
-    }
-    if (d.kind === 'pixelMove') { if (e) d.move.update(lockedPoint(toDoc(e.clientX, e.clientY), d.start, e)); return; }
-    // A guide lands where the pointer is released (a quick drag may send no move in between).
-    if (d.kind === 'guide' && e) { const p = toDoc(e.clientX, e.clientY); d.at = d.axis === 'x' ? p.x : p.y; }
-    showGuides({});
-    // Clicking the selection again (no drag) switches between scale and rotate/skew handles, as in Inkscape.
-    if ((d.kind === 'objMove' || d.kind === 'move') && d.again && !d.moved) setHandleMode((m) => (m === 'scale' ? 'rotate' : 'scale'));
-    if (d.kind === 'xform') {
-      if (d.op === 'pivot' || !d.moved) return;
-      applyXform(true);
-      for (const b of d.bases) if (b.layer.type === 'raster') commitEdit(b.layer.id);
-      return;
-    }
-    if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
-    if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
-    // A Ctrl-click (no drag) on something already picked takes it out of the pick.
-    if (d.kind === 'objMove' && d.ctrlToggle && !d.moved) {
-      // Ctrl-click (no drag) on a picked group takes the whole group out; other objects toggle alone.
-      const l = (getDoc(sessionId, doc.id) ?? doc).layers.find((x) => x.id === d.layerId);
-      if (l?.type === 'vector') { const out = clickPick(l, d.ctrlToggle); setObjectPicks(doc.id, objectPicks(doc.id).map((pk) => (pk.layerId === l.id ? { ...pk, ids: pk.ids.filter((x) => !out.includes(x)) } : pk))); }
-      else pickObject(doc.id, d.layerId, d.ctrlToggle, true);
-    }
-    if (d.kind === 'move' && d.ctrlToggle && !d.moved) { const cur = getDoc(sessionId, doc.id) ?? doc; const ids = pickLayer(doc.id, d.ctrlToggle, true, layerSelection(doc.id, cur.activeLayerId, cur.layers.map((l) => l.id))); setActiveLayer(sessionId, doc.id, ids.at(-1) ?? null); }
-    if (d.kind === 'objMove') {
-      applyRasterMove();
-      // A click without moving changes nothing.
-      if (d.moved) commitPaintedMove(sessionId, doc.id, dragGroups(d));
-    }
-    if (d.kind === 'paint') commitStagePaintGesture({ sessionId, docId: doc.id, gesture: d, brush, clipped: !!d.live.clip, flushFrame: flushPaintFrame });
-    if (d.kind === 'stroke') {
-      if (liveRaf.current != null) cancelAnimationFrame(liveRaf.current);
-      liveRaf.current = null;
-      setLive(null);
-      const current = getDoc(sessionId, doc.id);
-      if (!current) return;
-      const stroke = newStroke(d.points, lineart, !d.pen);
-      record(current);
-      const target = d.layerId ? current.layers.find((l) => l.id === d.layerId) : undefined;
-      if (target && target.type === 'vector') {
-        setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === target.id && l.type === 'vector' ? { ...l, strokes: [...(l.strokes ?? []), stroke] } : l)) }));
-      } else {
-        const layer = newVectorLayer(`Lineart ${current.layers.length + 1}`);
-        layer.strokes = [stroke];
-        setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'top'));
-        noticeSkippedLayer(sessionId, doc.id, activeLayer(current));
-      }
-      return;
-    }
-    if (d.kind === 'guide') {
-      setGuidePreview(null);
-      // Dropped back on its ruler: a new guide is not made, an existing one is removed.
-      const onRuler = (d.axis === 'x' ? view.x + d.at * view.zoom : view.y + d.at * view.zoom) < RULER;
-      if (onRuler) { if (d.index != null) removeGuide(sessionId, doc.id, d.axis, d.index); }
-      else placeGuide(sessionId, doc.id, d.axis, d.at, d.index);
-      return;
-    }
-    if (d.kind === 'gradient') {
-      setPreview(null);
-      if (Math.hypot(d.x1 - d.x0, d.y1 - d.y0) * view.zoom < 4) return;
-      const current = getDoc(sessionId, doc.id);
-      if (current) applyGradient(sessionId, current, gradientSpec, d.x0, d.y0, d.x1, d.y1);
-      return;
-    }
-    if (d.kind === 'select') {
-      selectUp(d, { sessionId, doc, draft: selDraft, zoom: view.zoom });
-      setSelDraft(null);
-      return;
-    }
-    if (d.kind === 'shape') {
-      setPreview(null);
-      const w = d.x1 - d.x0;
-      const h = d.y1 - d.y0;
-      if (Math.hypot(w, h) * view.zoom < 4) return;
-      const lineLike = STROKE_ONLY(d.tool);
-      const pfit = PRIM_TOOLS.has(d.tool) ? primShape(d.x0, d.y0, d.x1, d.y1, primFromUi(d.tool, shapeStyle)) : null;
-      const d0 = !pfit && (d.tool === 'curve' || d.tool === 'arrow') ? toolPath(d.tool, d.x0, d.y0, d.x1, d.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: Math.max(1, shapeStyle.strokeWidth) }) : null;
-      const pbox = d0 ? pathBox(d0) : null;
-      if (d0 && !pbox) return;
-      // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
-      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, look = { join, cap, miter, dash, dashOffset, paintOrder };
-      const shape = pfit || pbox ? {
-        id: uid('shp'),
-        ...(pfit ?? { type: 'path' as const, d: d0!, box0: pbox!, ...pbox! }),
-        fill: lineLike ? null : shapeStyle.fill,
-        stroke: lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
-        strokeWidth: lineLike ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
-        radius: 0,
-        ...look,
-      } : boxShape(uid('shp'), d.tool as 'rect' | 'ellipse' | 'line', d.x0, d.y0, d.x1, d.y1, shapeStyle, look);
-      // Inside the active layer, or a new one when that cannot take it; the shape stays picked (drawShape.ts).
-      drawShape(sessionId, doc.id, shape);
-    }
+
+    releaseGesture(state, d, e);
   };
 
   const onWheel = (e: React.WheelEvent) => wheel.wheel(e, canvasRef.current!.getBoundingClientRect());
@@ -1144,32 +128,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     return () => c.removeEventListener('wheel', stop);
   }, []);
 
-  const onDoubleClick = (e: React.MouseEvent) => {
-    if (tool !== 'move') return;
-    const p = toDoc(e.clientX, e.clientY);
-    for (const layer of [...doc.layers].reverse()) {
-      if (layer.type !== 'vector' || !layer.visible || layer.locked || layer.opacity === 0) continue;
-      const stroke = [...(layer.strokes ?? [])].reverse().find((s) => s.opacity > 0 && nearStroke(s, p.x, p.y, 8 / view.zoom));
-      if (!stroke) continue;
-      setActiveLayer(sessionId, doc.id, layer.id);
-      setSelectedCurve({ layerId: layer.id, strokeId: stroke.id, handles: strokeHandles(stroke) });
-      // Editing a curve's points also picks it, so Properties styles just that stroke.
-      setObjectPick(doc.id, { layerId: layer.id, ids: [stroke.id] });
-      return;
-    }
-    const hit = hitTest(doc, p.x, p.y);
-    // A rectangle or ellipse: its edit mode (docs/plan-edicion-formas.md); Edit → Layer moves whole layers only.
-    const sh = hit?.type === 'vector' && !hit.locked && !editLayers ? editableShapeAt(hit, p.x, p.y) : null;
-    if (sh) { setActiveLayer(sessionId, doc.id, hit!.id); const ids = pickedIn(objectPicks(doc.id), hit!.id); if (sh.groupId && (ids.length !== 1 || ids[0] !== sh.id)) setObjectPick(doc.id, { layerId: hit!.id, ids: [sh.id] }); else editShape(doc.id, hit!.id, sh.id); return; }
-    if (hit?.type === 'text' && !hit.locked) {
-      setActiveLayer(sessionId, doc.id, hit.id);
-      setEditingText(hit.id);
-    }
-  };
 
-  const cursorStyle =
-    drag.current?.kind === 'xform' && drag.current.op === 'rotate' ? 'grabbing' : hoverHandle && tool === 'move' ? handleCursor(hoverHandle) : guidePreview || (guideHover && tool === 'move') ? ((guidePreview?.axis ?? guideHover) === 'x' ? 'col-resize' : 'row-resize') : tool === 'hand' || spaceDown ? 'grab' : tool === 'brush' || tool === 'eraser' ? (blocked ? 'not-allowed' : 'none') : tool === 'text' ? 'text' : tool === 'move' ? 'default' : 'crosshair';
-
+  const onDoubleClick = (e: React.MouseEvent) => descriptor.doubleClick?.(state, e);
+  const cursorStyle = drag.current?.kind === 'xform' && drag.current.op === 'rotate' ? 'grabbing'
+    : hoverHandle && objectEditing ? handleCursor(hoverHandle)
+    : guidePreview || (guideHover && objectEditing) ? ((guidePreview?.axis ?? guideHover) === 'x' ? 'col-resize' : 'row-resize')
+    : spaceDown ? 'grab' : descriptor.cursor?.(blocked) ?? 'crosshair';
   const editingLayer = editingText ? (doc.layers.find((l) => l.id === editingText) as TextLayer | undefined) : undefined;
 
   return (
@@ -1204,9 +168,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
       <SelectCursor tool={tool} point={cursor.point} view={view} mods={cursor.mods} />
       <SampleLoupe ref={loupe} />
-      <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
-      {(tool === 'move' ? !editLayers || shapeEditing : tool === 'shapeBuilder') && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
-      {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
+      <StrokeRulerOverlay view={view} docId={doc.id} placing={descriptor.placeStrokeRuler} />
+      {objectEditing && (!editLayers || shapeEditing) && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
+      {ToolOverlay && <ToolOverlay view={view} sessionId={sessionId} doc={doc} />}
+      {objectEditing && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
       <SnapIndicator view={view} measures={guideLines.m} alignments={guideLines.a} />
       <AgentGlow view={view} doc={doc} />
       {rulers && (['top', 'left'] as const).map((side) => (
@@ -1234,33 +199,17 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           }}
         />
       ) : null}
-      {tool === 'move' && getSelection(doc.id) ? <StageHint id="move-region">Drag inside the pixel selection to extract and move it · vectors stay editable</StageHint> : tool === 'move' && selectedCurve ? <StageHint id="curve-points">Drag points to edit · Click away to move again</StageHint> : tool === 'lineart' && lineartMode === 'edit' ? <StageHint id="lineart-edit">Select a stroke · Drag its points · Influence controls the bend</StageHint> : null}
-      {tool === 'move' ? <StageEditHint doc={doc} shapeEditing={shapeEditing} marquee={Boolean(editMarquee)}
+      {objectEditing && getSelection(doc.id) ? <StageHint id="move-region">Drag inside the pixel selection to extract and move it · vectors stay editable</StageHint> : objectEditing && selectedCurve ? <StageHint id="curve-points">Drag points to edit · Click away to move again</StageHint> : descriptor.curveHandles === 'edit' && lineartMode === 'edit' ? <StageHint id="lineart-edit">Select a stroke · Drag its points · Influence controls the bend</StageHint> : null}
+      {objectEditing ? <StageEditHint doc={doc} shapeEditing={shapeEditing} marquee={Boolean(editMarquee)}
         layersEmpty={editLayers && !tBox} canShowHandles={!getSelection(doc.id) && !selectedCurve && Boolean(tBox) && drag.current?.kind !== 'xform'}
         handleMode={handleMode} canShowObjects={!getSelection(doc.id) && drag.current?.kind !== 'xform' && !editLayers} active={active} /> : null}
-      {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
+      {blocked && descriptor.showBlockReason ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );
-}
-
-
-function corners(b: { x: number; y: number; w: number; h: number }): Array<[number, number]> {
-  return [
-    [b.x, b.y],
-    [b.x + b.w, b.y],
-    [b.x + b.w, b.y + b.h],
-    [b.x, b.y + b.h],
-  ];
 }
 
 function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   return Boolean(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable));
 }
-
-// The stroke's working canvas (its box), read per segment.
-function beginEditCurrent(layerId: string): HTMLCanvasElement | undefined {
-  return getRasterSurface(layerId)?.canvas;
-}
-
 export type { DesignTool };
