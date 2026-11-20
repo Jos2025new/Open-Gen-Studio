@@ -1,5 +1,4 @@
 import { claimLaneOfItem, laneOfItem, laneState, patchLane, viewedLane } from './lanes';
-import { shapeLabel } from '../delivery';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun } from '../flow/actions';
 import { uid } from '../../lib/id';
@@ -15,7 +14,6 @@ import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } fr
 import { graphToSteps, runsGeneration } from '../flow/graph';
 import { lockNodes } from '../flow/locks';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
-import { modelSummary } from '../catalog';
 import type { ChatMessageMeta } from '../feedMeta';
 import type { GraphNodeData, PlanFeedItem, PlanStep, StepState } from '../types';
 import { appendFeed, toast, updateFeedItem } from '../../store/store';
@@ -27,7 +25,7 @@ import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { overLimit, overLimitText } from '../budget';
 import { confirmApproved, inheritApproved } from './inherit';
-import { lineKey, variantRoute } from '../variants';
+import { ranFacts } from './ranFacts';
 import { failedStepSummary } from './failureContext';
 import { agentEngine, agentOf, closeRevisedPlan, feedOfAgent, designerDims, feedBase, get, messageMeta, patchAgent, session, setThreadOpen, toCanvasOfItem, turnCanvas } from './runtimeShared';
 import { pushHistory } from './conversation';
@@ -251,13 +249,9 @@ async function executePlanItem(
       // O3: what came back different from what was asked, for the closing message.
       const genId = session(sessionId).feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan')?.stepGenerations?.[st.id];
       const delivery = genId ? get().generations[genId]?.delivery : undefined;
-      // The model that really ran, not one only asked for.
-      const ran = genId ? get().generations[genId]?.modelRef : undefined;
-      // …and what came out (size, length).
+      const gen = genId ? get().generations[genId] : undefined;
       const first = out.assetIds[0] ? get().assets[out.assetIds[0]] : undefined;
-      // The confirmed model's own variant for these inputs is the same choice.
-      const conf = Object.values(agentOf(sessionId, laneOfItem(sessionId, itemId)).settings ?? {}).find((c) => c && c.modelRef !== ran && modelSummary(c.modelRef) && modelSummary(ran ?? '') && lineKey(modelSummary(c.modelRef)!) === lineKey(modelSummary(ran!)!));
-      const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}${conf ? ` (the ${variantRoute(modelSummary(ran!)!)} variant of the confirmed ${modelSummary(conf.modelRef)!.name}: the same model, not a change)` : ''}` : '', first?.width && first.height ? `${shapeLabel(first.width, first.height)}, ${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
+      const facts = ranFacts(gen, Object.values(agentOf(sessionId, laneOfItem(sessionId, itemId)).settings ?? {}), first);
       const by = facts.length ? ` (${facts.join(', ')})` : '';
       if (out.assetIds.length) return `${st.id}${by} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
