@@ -1,5 +1,5 @@
 import { OPS } from '../ops';
-import type { OutputKind, PlanContext, RawStep } from '../plan';
+import type { OutputKind, PlanContext, RawStep } from './env';
 import type { OpId, PlanStep } from '../types';
 
 type FrameOf = (ref: string, which: 'first' | 'last', forId: string) => string;

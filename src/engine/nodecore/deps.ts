@@ -1,4 +1,4 @@
-import { parseRef } from '../plan';
+import { parseRef } from '../planRef';
 import { descriptorOf } from './registry';
 import { compatibleDataEdges } from '../flow/graph';
 import type { Asset, Graph, GraphNode } from '../types';

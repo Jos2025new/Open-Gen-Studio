@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSync } from 'rolldown/utils';
@@ -10,7 +10,9 @@ import { parseSync } from 'rolldown/utils';
 //    (planSteps/exec/op.ts) and the Nodes preview (flow/actions.ts) call it and keep no chain of their own.
 // 3. jobs.ts holds the send, not the operation specs (opSpec.ts) or the remote-job recovery (jobRecovery.ts).
 const RULES = { neutral: true, split: true };
-const NAMED_PROVIDER = /\b(atlas|fal)\b/i;
+const NAMED_PROVIDER = /\b(atlas|fal|nanogpt|openrouter)\b|\bOP_PROVIDERS\b/i;
+const NEUTRAL_FILES = new Set(['jobs.ts', 'quotes.ts', 'costs.ts', 'opSpec.ts', 'specialSends.ts', 'planSteps/audio.ts']
+  .map((file) => `src/engine/${file}`));
 const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|inputKindOf|recover\w*|resumeRemote\w*)\b/;
 
 const OWN_CHOICE = /\b(opModelForAsset|opModelFromRef|reusedOpChoice)\(/;
@@ -31,6 +33,9 @@ function importProblems(path, text) {
       if (store && /^src\/engine\/(design|flow)(\/|$)/.test(target)) {
         problems.push(`store-domain-boundary · ${path}:${line} · store imports Designer or Nodes · use the domain bridge`);
       }
+      if (!store && /^src\/engine\/quotes(?:\.ts)?$/.test(target)) {
+        problems.push(`provider-neutral-engine · ${path}:${line} · provider imports engine quotes · implement quote on the adapter`);
+      }
       if (!store && /^src\/lib\/idb(?:\.[cm]?[jt]sx?)?$/.test(target)) {
         problems.push(`provider-storage-boundary · ${path}:${line} · provider imports user persistence · use providers/shared.ts for catalog caching`);
       }
@@ -43,7 +48,7 @@ function importProblems(path, text) {
   return problems;
 }
 
-export function structureProblems(files) {
+export function structureProblems(files, existingCycles = new Set()) {
   const problems = [];
   for (const [path, text] of Object.entries(files)) {
     problems.push(...importProblems(path, text));
@@ -60,9 +65,11 @@ export function structureProblems(files) {
     const lines = text.split('\n');
     lines.forEach((line, i) => {
       const at = `${path}:${i + 1}`;
+      if (NEUTRAL_FILES.has(path)) {
+        const named = /^(?:\s*\/\/|\s*\*)/.test(line) ? null : line.match(NAMED_PROVIDER);
+        if (named && RULES.neutral) problems.push(`provider-neutral-engine · ${at} · names «${named[0]}» · use adapter capabilities or provider labels`);
+      }
       if (path === 'src/engine/jobs.ts') {
-        const named = line.match(NAMED_PROVIDER);
-        if (named && RULES.neutral) problems.push(`provider-neutral-engine · ${at} · jobs.ts names the provider «${named[1]}» · move it to an optional ProviderAdapter capability (quote?, serialKey?, retry?, createVoice?, createStyle?) and pick the adapter with parseModelRef(g.modelRef)`);
         const moved = line.match(MOVED_OUT);
         if (moved && RULES.split) problems.push(`jobs-split · ${at} · jobs.ts defines ${moved[1]} · it lives in src/engine/opSpec.ts (operation specs) or src/engine/jobRecovery.ts (remote recovery)`);
       }
@@ -71,18 +78,72 @@ export function structureProblems(files) {
       }
     });
   }
+  return [...problems, ...cycleProblems(files, existingCycles)];
+}
+
+// Static runtime imports and re-exports participate in module initialization.
+function cycleProblems(files, existingCycles) {
+  const graph = new Map();
+  const problems = [];
+  for (const [path, text] of Object.entries(files)) {
+    if (!/^src\/(engine|store)\//.test(path)) continue;
+    const { program, errors } = parseSync(path, text);
+    const edges = [];
+    graph.set(path, edges);
+    if (errors.length) {
+      problems.push(`engine-import-cycle · ${path}:1 · could not parse imports · ${errors[0].message}`);
+      continue;
+    }
+    for (const node of program.body) {
+      if (!node.source?.value?.startsWith('.') || node.importKind === 'type' || node.exportKind === 'type') continue;
+      if (node.specifiers?.length && node.specifiers.every((spec) => spec.importKind === 'type' || spec.exportKind === 'type')) continue;
+      const base = posix.join(posix.dirname(path), node.source.value);
+      const to = [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`].find((file) => Object.hasOwn(files, file));
+      if (to && /^src\/(engine|store)\//.test(to)) edges.push({ to, line: text.slice(0, node.start).split('\n').length });
+    }
+  }
+
+  // Tarjan: each active vertex retains the lowest index it can reach on the stack.
+  const index = new Map();
+  const low = new Map();
+  const stack = new Set();
+  function visit(path) {
+    index.set(path, index.size);
+    low.set(path, index.get(path));
+    stack.add(path);
+    for (const { to } of graph.get(path)) {
+      if (!index.has(to)) {
+        visit(to);
+        low.set(path, Math.min(low.get(path), low.get(to)));
+      } else if (stack.has(to)) {
+        low.set(path, Math.min(low.get(path), index.get(to)));
+      }
+    }
+    if (low.get(path) !== index.get(path)) return;
+    const members = new Set();
+    for (const member of [...stack].reverse()) {
+      stack.delete(member);
+      members.add(member);
+      if (member === path) break;
+    }
+    for (const from of members) for (const { to, line } of graph.get(from)) {
+      if (members.has(to) && !existingCycles.has(`${from} -> ${to}`)) problems.push(`engine-import-cycle · ${from}:${line} · imports ${to} inside a cycle · move shared code to a leaf or use a type-only import`);
+    }
+  }
+  for (const path of graph.keys()) if (!index.has(path)) visit(path);
   return problems;
 }
 
 export function checkEngineStructure(root) {
   const files = {};
-  for (const path of ['src/engine/jobs.ts', 'src/store/store.ts', ...CHOICE_CALLERS]) files[path] = readFileSync(join(root, path), 'utf8');
-  const oldReuse = 'src/store/reuse.ts';
-  if (existsSync(join(root, oldReuse))) files[oldReuse] = readFileSync(join(root, oldReuse), 'utf8');
-  for (const name of readdirSync(join(root, 'src/engine/providers'))) {
-    if (name.endsWith('.ts')) files[`src/engine/providers/${name}`] = readFileSync(join(root, 'src/engine/providers', name), 'utf8');
+  for (const dir of ['src/engine', 'src/store']) {
+    for (const name of readdirSync(join(root, dir), { recursive: true }).sort()) {
+      if (/\.tsx?$/.test(name)) files[`${dir}/${name}`] = readFileSync(join(root, dir, name), 'utf8');
+    }
   }
-  const problems = structureProblems(files);
+  // Existing cycles outside this refactor are tracked by their exact edges.
+  const baseline = readFileSync(new URL('./engine-import-cycles-baseline.json', import.meta.url), 'utf8');
+  const problems = structureProblems(files, new Set(JSON.parse(baseline)));
   if (problems.length) throw new Error(`check-engine-structure: FAIL\n${problems.join('\n')}`);
   console.log('check-engine-structure: PASS');
 }

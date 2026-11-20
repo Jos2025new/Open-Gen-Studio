@@ -2,10 +2,9 @@ import { aspectOfShape, fitStepParams, longEdgeOf } from '../agent/fit';
 import { OPS } from '../ops';
 import { opStepRefs } from '../refRoles';
 import type { OpId, OpStep } from '../types';
-import type { RawStep } from '../plan';
-import { parseRef } from '../plan';
+import { parseRef } from '../planRef';
 import { didYouMean, familyRef } from './shared';
-import type { StepEnv } from './env';
+import type { RawStep, StepEnv } from './env';
 
 export async function normalizeOp(s: RawStep, env: StepEnv): Promise<void> {
   const { ctx, errors, adjustments, steps, stepRoles, fit, refKind } = env;

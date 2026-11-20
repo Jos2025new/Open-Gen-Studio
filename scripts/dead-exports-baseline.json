@@ -264,10 +264,6 @@
  "src/engine/fx/lut.ts": [
   "LUT_SIZE"
  ],
- "src/engine/jobs.ts": [
-  "ATLAS_RETRY_MS",
-  "inputKindOf"
- ],
  "src/engine/modelNamed.ts": [
   "providerNamed"
  ],
@@ -312,9 +308,6 @@
   "officialSheet"
  ],
  "src/engine/plan.ts": [
-  "MAX_AGENT_STROKES",
-  "MAX_STROKE_POINTS",
-  "normalizeTextStyle",
   "ownDeps"
  ],
  "src/engine/planSent.ts": [

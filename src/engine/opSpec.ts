@@ -1,18 +1,19 @@
 /* Operation specs: the generation an operation on an asset sends (moved out of jobs.ts, Opus #4). */
 import { reusedOpChoice, transcriberForRun } from './opRunModel';
 import { fxOpDetail } from './fx/op';
-import { KLING_VOICE_PROVIDER, OP_PROVIDERS, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, resolveModel } from './catalog';
+import { KLING_VOICE_PROVIDER, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, resolveModel } from './catalog';
 import { estimateOp, estimateTranscribe } from './costs';
 import { OPS, opCount, isVideoOpEngine, type VideoOpEngine } from './ops';
 import { coerceSettings, durationChoices, isAutoOption, matchInputOption, preferredResolution, nearestAspect, paramByRole } from './params';
+import { operationProviderLabels, preferredProviderLabel } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
 import { opRolesLine } from './refRoles';
-import type { AdvancedValue, AssetKind, GenSettings, Generation, GenerationOrigin, ModelSchema, OpId } from './types';
+import type { AdvancedValue, GenSettings, Generation, GenerationOrigin, ModelSchema, OpId } from './types';
 import { useStore } from '../store/store';
 
 const get = useStore.getState;
 
-import type { GenerationSpec } from './jobs';
+import type { GenerationSpec } from './jobState';
 
 export interface OpSpecInput {
   sessionId: string;
@@ -113,7 +114,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   }
   if (def.engine === 'transcribe') {
     const t = transcriberForRun(input.modelRef);
-    if (!t) throw new Error('No connected provider offers Transcribe. Connect NanoGPT.');
+    if (!t) throw new Error(`No connected provider offers Transcribe. Connect ${preferredProviderLabel('transcribe')}.`);
     const clip = get().assets[input.sourceAssetId];
     const language = String(input.params.language ?? 'auto');
     return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
@@ -121,7 +122,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const choice = opChoice(input);
   const upscaleRef = choice.pinned ? choice.ref : undefined;
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error(def.engine === 'video_upscale' ? 'Choose a dedicated video upscaler, not a video generation/edit model.' : `Choose a connected model that can ${def.label.toLowerCase()}.`);
-  if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect ${OP_PROVIDERS.map((p) => PROVIDER_LABELS[p]).join(', ').replace(/, ([^,]*)$/, ' or $1')}.`);
+  if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect ${operationProviderLabels()}.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
   if (def.engine === 'video_upscale' && (!schema || schema.source === 'derived')) throw new Error('The video upscaler parameter schema is unavailable. Choose another model or reload its provider.');
@@ -202,8 +203,4 @@ export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: bo
   const spec: GenerationSpec = { ...base, kind: 'image', prompt: dedicated ? '' : prompt, modelRef: modelRef, settings, op };
   const estimate = estimateOp(input.op, input.params, source, settings, modelRef);
   return { ...spec, estimate: sheetNote ? { ...estimate, note: [estimate.note, sheetNote].filter(Boolean).join('; ') } : estimate };
-}
-
-export function inputKindOf(assetId: string): AssetKind | undefined {
-  return get().assets[assetId]?.kind;
 }

@@ -1,6 +1,6 @@
 import { videoOpSettings } from '../jobs';
 import { opChoice } from '../opSpec';
-import { parseRef } from '../plan';
+import { parseRef } from '../planRef';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor } from '../catalog';

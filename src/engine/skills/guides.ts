@@ -13,7 +13,7 @@ import type { Workflow } from './types';
  * one clip or several, sequence). One source of truth: not repeated in the system prompt, not a pickable skill.
  * It travels with any workflow the agent loads (same tool result, no extra round).
  */
-export const STAGED_ID = 'staged';
+const STAGED_ID = 'staged';
 export const STAGED_GUIDE = stagedGuide;
 
 /** One line per workflow and skill, for the agent's system prompt: name and when to use it. */

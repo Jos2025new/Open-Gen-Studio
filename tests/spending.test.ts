@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
-import { addSpend, setSettings, useStore } from '../src/store/store';
+import { setSettings, useStore } from '../src/store/store';
+import { addSpend } from '../src/store/spend';
 import { askAgain, consumeOnce, dontAskUntilNextSession, overLimit, remainingBudget, withOncePass } from '../src/engine/budget';
 import { budgetProblem } from '../src/engine/actions';
 import { periodStart, summarizeSpend } from '../src/engine/spending';

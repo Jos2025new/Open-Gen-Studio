@@ -4,7 +4,7 @@ import { local } from './demo';
 import { fal } from './fal';
 import { nanogpt } from './nanogpt';
 import { openrouter } from './openrouter';
-import type { ProviderAdapter } from './types';
+import { PROVIDER_LABELS, type ProviderAdapter } from './types';
 
 export const ADAPTERS: Record<ProviderId, ProviderAdapter> = {
   local,
@@ -100,6 +100,18 @@ export const PREFERRED: Record<
     videoExtend: ['google/gemini-omni-1.1-flash/video-extend', 'xai/grok-imagine-video/extend-video', 'black-forest-labs/flux-3/extend-video', 'bytedance/seedance-2.5/reference-to-video'],
   },
 };
+
+/** Connection hints use the registered defaults, in the order used in operation messages. */
+export function operationProviderLabels(): string {
+  return [...REMOTE_PROVIDERS].reverse()
+    .filter((p) => PREFERRED[p].upscale.length || PREFERRED[p].removeBg.length || PREFERRED[p].videoUpscale.length)
+    .map((p) => PROVIDER_LABELS[p]).join(', ').replace(/, ([^,]*)$/, ' or $1');
+}
+
+export function preferredProviderLabel(kind: 'transcribe' | 'audio'): string {
+  return REMOTE_PROVIDERS.filter((p) => PREFERRED[p][kind].length).reverse()
+    .map((p) => PROVIDER_LABELS[p]).join(' or ');
+}
 
 /** Image-to-video counterparts for providers that split endpoints by task. */
 export function i2vCounterpart(provider: ProviderId, id: string): string | null {

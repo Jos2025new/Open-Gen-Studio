@@ -1,5 +1,5 @@
 import { OPS } from '../ops';
-import type { OutputKind } from '../plan';
+import type { OutputKind } from './env';
 import type { ImageStep, Model3dStep, PlanStep, StepRef, VideoStep } from '../types';
 
 type Kind = PlanStep['kind'];

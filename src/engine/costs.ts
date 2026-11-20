@@ -1,14 +1,24 @@
-import { knownAtlasQuote } from './quotes';
+import { knownQuote } from './quotes';
 import { estimate, FREE, UNKNOWN } from './pricing';
 import { durationChoices, longEdgeFor, ratioOf } from './params';
 import { OPS, opCount, isVideoOpEngine } from './ops';
-import { opModelFor } from './catalog';
+import { opModelFor, RECRAFT_STYLE_REF } from './catalog';
 import type { AdvancedValue, Asset, Estimate, GenSettings, MediaKind, OpId, PriceRule } from './types';
 import { useStore } from '../store/store';
-import { parseModelRef } from './providers/types';
+import { parseModelRef, PROVIDER_LABELS } from './providers/types';
+import { ADAPTERS } from './providers/registry';
 import { variant3dKey } from '../lib/model3d';
 
 const get = useStore.getState;
+
+function shortProviderLabel(ref: string): string {
+  const { provider } = parseModelRef(ref)!;
+  return ADAPTERS[provider].shortLabel ?? PROVIDER_LABELS[provider];
+}
+
+export function estimateRecraftStyle(): Estimate {
+  return { usd: null, approximate: true, note: `${shortProviderLabel(RECRAFT_STYLE_REF)} bills the style when it is created` };
+}
 
 export function priceOf(ref: string): PriceRule | undefined {
   const c = get().catalog;
@@ -34,9 +44,11 @@ function megapixels(settings: GenSettings): number {
 /** `chars`: the text a speech model speaks (its prompt), for models priced per character. */
 export function estimateMedia(ref: string, kind: MediaKind, settings: GenSettings, withImage: boolean, memoryOnly = false, chars?: number): Estimate {
   if (ref.startsWith('local::')) return FREE;
-  // Atlas prices the exact request (C3); until its quote arrives, the catalog estimate below shows.
-  const quoted = knownAtlasQuote(ref, settings, !memoryOnly);
-  if (quoted != null) return { usd: quoted, approximate: false, exact: true, note: 'Exact price from Atlas for this request' };
+  // Until the exact quote arrives, use the catalog estimate below.
+  const quoted = knownQuote(ref, settings, !memoryOnly);
+  if (quoted != null) {
+    return { usd: quoted, approximate: false, exact: true, note: `Exact price from ${shortProviderLabel(ref)} for this request` };
+  }
   const price = priceOf(ref);
   if (!price) return UNKNOWN;
   if (kind === 'model3d') {
@@ -61,7 +73,7 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
   });
 }
 
-/** Speech-to-text is billed per minute of audio (NanoGPT catalog). Short clips still bill a minimum second. */
+/** Speech-to-text is billed per minute of audio. Short clips still bill a minimum second. */
 export function estimateTranscribe(usdPerMinute: number | undefined, seconds: number | undefined): Estimate {
   if (usdPerMinute == null) return UNKNOWN;
   const usd = (usdPerMinute * Math.max(seconds ?? 60, 1)) / 60;

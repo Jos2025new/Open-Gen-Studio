@@ -1,3 +1,5 @@
+import { cornerRadii, traceRoundRect } from '../../../engine/design/shapeLook';
+import { CornerToolFields, EllipseToolFields, LineToolFields } from '../ShapeKindFields';
 import { drawShape } from '../../../engine/design/drawShape';
 import type { DesignTool } from '../../../engine/design/rules';
 import { useStore, setUi, type UiState } from '../../../store/store';
@@ -36,7 +38,7 @@ type ShapeOptions = {
   corners?: boolean;
 };
 
-export function shapeTool(tool: ShapeTool, { strokeOnly = false, customPath, trace, fields: Fields, fill = true, corners = false }: ShapeOptions = {}): ToolDescriptor {
+function shapeTool(tool: ShapeTool, { strokeOnly = false, customPath, trace, fields: Fields, fill = true, corners = false }: ShapeOptions = {}): ToolDescriptor {
   return {
     quick: fill ? ['strokeWidth', 'stroke', 'fill'] : ['strokeWidth', 'stroke'],
     down({ state: { drag, setPreview }, p }) {
@@ -132,3 +134,68 @@ export function drawShapePreview(ctx: CanvasRenderingContext2D, view: View, prev
   ctx.stroke(path);
   ctx.restore();
 }
+
+export const rect = shapeTool('rect', {
+  corners: true,
+  trace(path, _drag, style, box) {
+    const r = cornerRadii({ ...style, w: box.w, h: box.h });
+    traceRoundRect(path, box, r.rx, r.ry);
+  },
+});
+
+export const ellipse = shapeTool('ellipse', {
+  trace(path, _drag, _style, { x, y, w, h }) {
+    path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  },
+  fields: () => <EllipseToolFields tool="ellipse" />,
+});
+
+export const polygon = shapeTool('polygon', {
+  fields: () => <CornerToolFields tool="polygon" />,
+});
+
+export const star = shapeTool('star', {
+  fields: () => <CornerToolFields tool="star" />,
+});
+
+export const sector = shapeTool('sector', {
+  fields: () => <EllipseToolFields tool="sector" />,
+});
+
+export const arc = shapeTool('arc', {
+  strokeOnly: true,
+  fields: () => <EllipseToolFields tool="arc" />,
+});
+
+export const chord = shapeTool('chord', {
+  fields: () => <EllipseToolFields tool="chord" />,
+});
+
+export const line = shapeTool('line', {
+  trace(path, { x0, y0, x1, y1 }) {
+    path.moveTo(x0, y0);
+    path.lineTo(x1, y1);
+  },
+  strokeOnly: true,
+  fill: false,
+  fields: () => <LineToolFields tool="line" />,
+});
+
+function BendField() {
+  const shape = useStore((s) => s.ui.shape);
+  return <span data-tip="How far the curve bows from the straight line; negative bows to the other side"><InlineSlider label="Bend" unit="%" min={-100} max={100} value={shape.bend ?? 30} onChange={(v) => setUi({ shape: { ...shape, bend: v } })} /></span>;
+}
+
+export const curve = shapeTool('curve', {
+  strokeOnly: true,
+  fill: false,
+  customPath: 'curve',
+  fields: BendField,
+});
+
+export const arrow = shapeTool('arrow', {
+  strokeOnly: true,
+  fill: false,
+  customPath: 'arrow',
+  fields: () => <LineToolFields tool="arrow" />,
+});

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { useStore } from '../../store/store';
 import { LAYER_DOC } from '../agent/layerDoc';
-import { normalizeShapes } from '../plan';
+import { normalizeShapes } from '../planSteps/layer';
 import type { BlendMode, Layer } from '../types';
 import * as A from './actions';
 import { docCommand, docOf, hasTarget, layerOf, layerRef } from './commandKit';

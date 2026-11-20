@@ -1,152 +1,26 @@
 import { fitTotal, totalNote } from './planSent';
-import { type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, recurringSubjectErrors } from './continuity';
-import { parsePath } from './design/path';
-import { normalizeStepRefs, type RefSpec } from './refRoles';
-import { type Realism } from './realism';
+import { normalizeStepRefs } from './refRoles';
 import { fitPlanSteps, fitState } from './agent/fit';
-import { type RouteMode } from './routing';
-import type { AssetKind, GenSettings, MediaKind, ModelSchema, ModelSummary, OpStep, Plan, PlanStep, PlanSubject, PlanContinuity, ShapeSpec, StrokeSpec, StepRef, TextStyle, Workspace, SubjectKind, SettingsChoice, Subject } from './types';
+import type { OpStep, Plan, PlanStep, PlanSubject, StepRef } from './types';
 import { derivedSchemaErrors } from './schemaGuard';
 import { NORMALIZE_STEP } from './planSteps';
 import { isJoin, stepInfo } from './planSteps/inspect';
 import { rawStepInfo } from './planSteps/raw';
-import type { StepEnv } from './planSteps/env';
-import { num } from './planSteps/shared';
+import type { OutputKind, PlanContext, RawPlan, StepEnv } from './planSteps/env';
+import { parseRef } from './planRef';
+
+export type { OutputKind, PlanContext, RawPlan, RawStep } from './planSteps/env';
 
 /** Largest plan the agent may propose (tool schema, zod and normalizer share it). */
 export const MAX_PLAN_STEPS = 16;
 
 /* Plans are DAGs of steps proposed by the agent. This module validates them. */
 
-export interface RawStep {
-  id?: string;
-  kind?: string;
-  title?: string;
-  prompt?: string;
-  prompt_from?: string;
-  /** Audio steps: the text of an earlier step used as song lyrics. */
-  lyrics_from?: string;
-  model?: string;
-  user_requested?: boolean;
-  /** Video purpose. */
-  purpose?: string;
-  aspect?: string;
-  resolution?: string;
-  count?: number;
-  /** Image: one short variation per result (candidates that differ). */
-  variations?: string[];
-  duration?: number;
-  audio?: boolean;
-  seed?: number;
-  refs?: RefSpec[];
-  realism?: Realism;
-  shot?: string;
-  capture?: unknown;
-  times?: Array<number | null>;
-  shots?: Array<{ prompt: string; duration: number }>;
-  first_frame?: string;
-  last_frame?: string;
-  op?: string;
-  input?: string;
-  /** join_clips: the clips after `input`, in order. */
-  more?: string[];
-  params?: Record<string, unknown>;
-  text?: string;
-  layer_type?: string;
-  source?: string;
-  target?: string;
-  style?: Record<string, unknown>;
-  box?: { x?: number; y?: number; width?: number };
-  shapes?: Array<Record<string, unknown>>;
-  strokes?: Array<Record<string, unknown>>;
-}
-
-export interface RawPlan {
-  continuity?: PlanContinuity[];
-  title?: string;
-  summary?: string;
-  /** Seconds the video steps add up to; split over the video steps without their own duration. */
-  total_duration?: number;
-  steps?: RawStep[];
-  /** Subjects to save: { name, from: an image step or asset:<id>, description? }. */
-  subjects?: Array<{ name?: string; kind?: SubjectKind; from?: string; description?: string }>;
-  /** One style block the app appends to every image and video prompt. */
-  style?: string;
-  /** Notes of what a revision copied from the plan it replaces (set by the app, not the agent). */
-  carried?: string[];
-}
-
-export type OutputKind = AssetKind | 'text' | 'layer';
-
-export interface PlanContext {
-  workspace: Workspace;
-  getModel: (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
-  defaultModel: (kind: MediaKind, needsImage: boolean) => string | null;
-  defaultSettings: (kind: MediaKind) => Partial<GenSettings>;
-  asset: (id: string) => { kind: AssetKind; width?: number; height?: number } | undefined;
-  layer: (id: string) => { type: string } | undefined;
-  maxSteps?: number;
-  /**
-   * Whether the user picked the composer's model by hand (C2). When false, video steps without a model follow
-   * the purpose table; when true, or when not given, the composer's model is the default as before.
-   */
-  composerChosen?: (kind: MediaKind) => boolean;
-  /** Optional Agent-composer override for one exact video input route. */
-  routeModel?: (mode: RouteMode) => string | undefined;
-  /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
-  suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
-  /** Exact input route within the confirmed model line and provider; no fuzzy name search. */
-  variantModel?: (ref: string, route: VariantRoute) => string | undefined;
-  /** True when the user picked this kind's model by hand but it has no variant for these inputs and a stand-in is used. */
-  defaultIsFallback?: (kind: MediaKind, needsImage: boolean) => boolean;
-  /** What the user wrote (messages, answers): a model the plan names wins over the composer's pick only if it is named here. */
-  userText?: () => string;
-  /** Images attached to the current request: the start frame a model needs when the plan forgot it. */
-  requestImages?: () => string[];
-  /** Sources for known @Name references. */
-  librarySubjects?: () => Subject[];
-  /** Library names for callers that do not need source assets. */
-  subjectNames?: () => string[];
-  /** New proposals require recurring continuity coverage. */
-  strictContinuity?: boolean;
-  /** Settings the user confirmed (phase 2): model, resolution, duration and aspect for every step of that kind. */
-  confirmed?: (kind: MediaKind) => SettingsChoice | undefined;
-  /** Every confirmed part of that kind, in card order: several when the card compared models (A/B in one plan). */
-  confirmedParts?: (kind: MediaKind) => SettingsChoice[];
-  /** The request being handled: its message and its answers. What a fitted operation parameter is read from. */
-  requestText?: () => string;
-  switchedTo?: (kind: MediaKind) => SettingsChoice | undefined;
-  /** Angle values already made from this source image, so "a different angle" takes one that is not made yet. */
-  usedAngles?: (assetId: string) => string[];
-  /** Direct mode: no questions, so an ambiguity takes the operation's visible default instead of asking. */
-  direct?: () => boolean;
-  /** A question round is left in this request, and whether the user already answered one (fit.ts asks once). */
-  canAsk?: () => boolean;
-  answered?: () => boolean;
-  /** The image model an image-model operation runs on: the confirmed one (Auto, Guided) or the composer's (Direct). */
-  opModel?: () => string | undefined;
-}
-
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
 export function mentions(prompt: string | undefined, name: string): boolean {
   const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return Boolean(prompt) && new RegExp(`@${esc}(?![\\p{L}\\p{N}_-])`, 'iu').test(prompt!);
-}
-
-export interface ParsedRef {
-  type: 'step' | 'asset' | 'layer';
-  id: string;
-  index: number;
-}
-
-export function parseRef(ref: string): ParsedRef | null {
-  const r = ref.trim();
-  if (r.startsWith('asset:')) return { type: 'asset', id: r.slice(6), index: 0 };
-  if (r.startsWith('layer:')) return { type: 'layer', id: r.slice(6), index: 0 };
-  const m = /^([A-Za-z][\w-]*)(?:#(\d+))?$/.exec(r);
-  if (!m) return null;
-  return { type: 'step', id: m[1], index: m[2] ? Math.max(0, Number(m[2]) - 1) : 0 };
 }
 
 export function stepOutputKind(step: PlanStep): OutputKind {
@@ -207,78 +81,6 @@ export function topoOrder(steps: PlanStep[]): string[] {
   };
   for (const s of steps) visit(s.id, []);
   return order;
-}
-
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-
-function color(v: unknown, fallback: string | null): string | null {
-  if (v === null || v === 'none' || v === 'transparent') return null;
-  return typeof v === 'string' && HEX.test(v.trim()) ? v.trim() : fallback;
-}
-
-export function normalizeTextStyle(s: Record<string, unknown> | undefined): Partial<TextStyle> {
-  if (!s) return {};
-  const out: Partial<TextStyle> = {};
-  const g = (a: string, b: string) => s[a] ?? s[b];
-  if (g('font_family', 'fontFamily') != null) out.fontFamily = String(g('font_family', 'fontFamily'));
-  if (g('font_size', 'fontSize') != null) out.fontSize = Math.max(6, Math.min(800, num(g('font_size', 'fontSize'), 64)));
-  if (g('font_weight', 'fontWeight') != null) out.fontWeight = Math.max(100, Math.min(900, Math.round(num(g('font_weight', 'fontWeight'), 600) / 100) * 100));
-  const c = color(s.color, null);
-  if (c) out.color = c;
-  if (s.align === 'left' || s.align === 'center' || s.align === 'right') out.align = s.align;
-  if (g('line_height', 'lineHeight') != null) out.lineHeight = Math.max(0.7, Math.min(3, num(g('line_height', 'lineHeight'), 1.15)));
-  if (g('letter_spacing', 'letterSpacing') != null) out.letterSpacing = Math.max(-20, Math.min(80, num(g('letter_spacing', 'letterSpacing'), 0)));
-  return out;
-}
-
-export const MAX_AGENT_STROKES = 200;
-export const MAX_STROKE_POINTS = 2000;
-
-/** Freehand strokes from the agent: points in document px, optional pressure 0–1. Invalid points are dropped. */
-export function normalizeStrokes(raw: Array<Record<string, unknown>> | undefined, errors: string[] = [], where = 'layer'): StrokeSpec[] {
-  const list = raw ?? [];
-  if (list.length > MAX_AGENT_STROKES) errors.push(`${where}: at most ${MAX_AGENT_STROKES} strokes.`);
-  return list.slice(0, MAX_AGENT_STROKES).flatMap((s, i) => {
-    const pts = Array.isArray(s.points) ? s.points : [];
-    if (pts.length > MAX_STROKE_POINTS) errors.push(`${where}: stroke ${i + 1} has more than ${MAX_STROKE_POINTS} points.`);
-    const points = pts
-      .slice(0, MAX_STROKE_POINTS)
-      .filter((p): p is number[] => Array.isArray(p) && p.length >= 2 && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1])))
-      .map((p) => [Number(p[0]), Number(p[1]), p.length > 2 && Number.isFinite(Number(p[2])) ? Math.min(1, Math.max(0, Number(p[2]))) : 0.5] as [number, number, number]);
-    if (!points.length) {
-      errors.push(`${where}: stroke ${i + 1} needs "points" as [[x, y], …] or [[x, y, pressure], …].`);
-      return [];
-    }
-    const pressure = pts.some((p) => Array.isArray(p) && p.length > 2);
-    return [{ points, pressure, color: color(s.color, '#ffffff') ?? '#ffffff', size: Math.min(400, Math.max(0.5, num(s.size ?? s.width, 8))) }];
-  });
-}
-
-export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined, errors: string[] = [], where = 'layer'): ShapeSpec[] {
-  return (raw ?? []).slice(0, 40).flatMap((s, i): ShapeSpec[] => {
-    if (s.type === 'path') {
-      const d = typeof s.d === 'string' ? s.d.trim() : '';
-      const parsed = parsePath(d);
-      if ('error' in parsed) {
-        errors.push(`${where}: shape ${i + 1} path is invalid: ${parsed.error}.`);
-        return [];
-      }
-      const b = parsed.box;
-      return [{ type: 'path', d, box0: b, x: b.x, y: b.y, w: b.w, h: b.h, fill: color(s.fill, null), stroke: color(s.stroke, s.fill ? null : '#ffffff'), strokeWidth: Math.max(0, num(s.stroke_width ?? s.strokeWidth, s.fill ? 0 : 4)), radius: 0 }];
-    }
-    const type = s.type === 'ellipse' || s.type === 'line' ? s.type : 'rect';
-    return [{
-      type,
-      x: num(s.x, 0),
-      y: num(s.y, 0),
-      w: num(s.w ?? s.width, 100),
-      h: num(s.h ?? s.height, type === 'line' ? 0 : 100),
-      fill: type === 'line' ? null : color(s.fill, '#ffffff'),
-      stroke: color(s.stroke, type === 'line' ? '#ffffff' : null),
-      strokeWidth: Math.max(0, num(s.stroke_width ?? s.strokeWidth, type === 'line' ? 4 : 0)),
-      radius: Math.max(0, num(s.radius, 0)),
-    }];
-  });
 }
 
 /** Validate a raw agent plan and return a usable plan or repair errors. */
@@ -390,7 +192,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   for (const s of rawSteps) {
     rawStepInfo(s)?.repairFrames?.(s, isVideo, frameOf, adjustments);
   }
-  const env: StepEnv = { ctx, raw, rawSteps, errors, adjustments, steps, st, ids, share, total, stepRoles, fit, refKind, expectImage, inputAspect, frameOf, frames };
+  const env: StepEnv = { ctx, raw, rawSteps, errors, adjustments, steps, st, share, stepRoles, fit, refKind, expectImage, inputAspect, frameOf };
   for (const s of rawSteps) {
     const where = `Step ${s.id}`;
     const normalize = Object.hasOwn(NORMALIZE_STEP, s.kind ?? '') ? NORMALIZE_STEP[s.kind as PlanStep['kind']] : undefined;

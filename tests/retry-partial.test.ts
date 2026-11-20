@@ -2,11 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
-vi.mock('../src/engine/quotes', () => ({ atlasQuoteBody: () => ({}), fetchAtlasQuote: async () => null }));
 const ctl = vi.hoisted(() => ({ calls: [] as Array<{ count: number; seed?: number; prompt: string }>, failAt: 0 }));
 vi.mock('../src/engine/providers/registry', async (orig) => {
   const real = await orig<typeof import('../src/engine/providers/registry')>();
   return { ...real, ADAPTERS: { ...real.ADAPTERS, atlas: { ...real.ADAPTERS.atlas,
+    quote: async () => null,
     loadSchema: async (m: { ref: string }) => ({ ref: m.ref, params: [], slots: { prompt: 'prompt' }, source: 'openapi' }),
     generate: async (req: { count: number; settings: { seed?: number }; prompt: string }) => {
       ctl.calls.push({ count: req.count, seed: req.settings.seed, prompt: req.prompt });

@@ -121,7 +121,7 @@ export interface AppState {
   spentUsd: number;
   /** Itemized spending, newest last (capped at MAX_SPEND_LOG). */
   spendLog: SpendEntry[];
-  /** Exact Atlas prices by request (engine/quotes.ts); null = no quote. Not persisted: prices change. */
+  /** Exact provider prices by request (engine/quotes.ts); null = no quote. Not persisted: prices change. */
   quotes: Record<string, number | null>;
   sessions: Record<string, Session>;
   activeSessionId: string;
@@ -521,7 +521,6 @@ export function setCatalog(patch: Partial<CatalogState> | ((c: CatalogState) => 
   set((st) => ({ catalog: { ...st.catalog, ...(typeof patch === 'function' ? patch(st.catalog) : patch) } }));
 }
 
-export { addSpend, MAX_SPEND_LOG } from './spend';
 
 import { toast } from './toasts';
 export { toast, dismissToast } from './toasts';

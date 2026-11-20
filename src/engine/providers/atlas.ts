@@ -1,11 +1,10 @@
 import { extractErrorMessage, fetchJsonWithRelay, isAbort, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
-import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
+import type { GenSettings, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
 import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
-import { atlasQuoteBody, fetchAtlasQuote } from '../quotes';
 import { takesSourceAsReference } from '../modelRules';
 import { modelMime } from '../../lib/model3d';
 
@@ -78,12 +77,45 @@ export function atlasVideoCaps(id: string, cats: string[]): { text: boolean; ima
   return { text: cats.includes('TEXT-TO-VIDEO'), image: cats.includes('IMAGE-TO-VIDEO'), video: cats.includes('VIDEO-TO-VIDEO') };
 }
 
+// The calculation endpoint quotes the same wire parameters without a key, media or a model run.
+const ATLAS_QUOTE_URL = `${BASE}/api/v1/model/calculate`;
+const QUOTE_PROMPT = 'price quote';
+
+/** The body Atlas would receive for this request, minus media. */
+function atlasQuoteBody(modelId: string, schema: ModelSchema, settings: GenSettings, count = settings.count): Record<string, unknown> {
+  const body: Record<string, unknown> = { model: modelId, ...wireParams(schema, settings, Math.max(1, count)) };
+  if (schema.slots.prompt) body[schema.slots.prompt] = QUOTE_PROMPT;
+  return body;
+}
+
+/** `data.price` (or `price`), in USD; null when the answer has none. */
+function parseAtlasQuote(json: unknown): number | null {
+  const o = (json ?? {}) as { data?: { price?: unknown }; price?: unknown };
+  const raw = o.data?.price ?? o.price;
+  const n = typeof raw === 'string' ? Number.parseFloat(raw) : typeof raw === 'number' ? raw : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+const quote: NonNullable<ProviderAdapter['quote']> = async (model, schema, settings, count, timeoutMs = 3000) => {
+  try {
+    const res = await fetch(ATLAS_QUOTE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(atlasQuoteBody(model.id, schema, settings, count)),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok ? parseAtlasQuote(await res.json()) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const atlas: ProviderAdapter = {
   id: 'atlas',
   label: 'Atlas Cloud',
 
-  // Atlas prices a request without a key and at no cost (quotes.ts); a quote never blocks a send.
-  quote: (model, schema, settings, count) => fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, count), 3000),
+  shortLabel: 'Atlas',
+  quote,
   // Developer variants: one request at a time per model, in every canvas (T4).
   serialKey: (model) => (model.id.endsWith('-developer') ? `atlas:${model.id}` : null),
   // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts it later.
