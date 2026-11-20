@@ -15,7 +15,8 @@ import { useStore } from '../src/store/store';
 import { createGeneration, resumeInterrupted } from '../src/engine/jobs';
 import { runGeneration } from '../src/engine/jobs';
 import { ADAPTERS } from '../src/engine/providers/registry';
-import { isMuted, setMuted } from '../src/engine/notices';
+import { isMuted, NOTICES, setMuted } from '../src/engine/notices';
+import { setDrawingPreference } from '../src/engine/design/drawingChoice';
 import type { ModelSummary } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
 
@@ -82,11 +83,19 @@ describe('a send that may have been charged', () => {
     expect(toasts()).toHaveLength(0);
   });
 
-  it('the one register maps the over-limit notice too', () => {
-    expect(isMuted('budget')).toBe(false);
-    setMuted('budget', true);
-    expect(useStore.getState().settings.budgetNoAsk).toBe(true);
-    setMuted('budget', false);
-    expect(isMuted('budget')).toBe(false);
+  it('the register lists no preference that has its own control, and "silenced" never touches never/always', () => {
+    expect(NOTICES.map((n) => n.id)).toEqual(['send-uncertain', 'drawing-choice']);
+    useStore.setState((st) => ({ settings: { ...st.settings, autoSwitchProvider: 'never', budgetNoAsk: false } }));
+    setMuted('send-uncertain', true);
+    setMuted('send-uncertain', false);
+    expect(useStore.getState().settings.autoSwitchProvider).toBe('never');
+    expect(useStore.getState().settings.budgetNoAsk).toBe(false);
+  });
+
+  it('the drawing prompt is in the register: silenced by its saved answer, brought back from Settings', () => {
+    setDrawingPreference('flatten');
+    expect(isMuted('drawing-choice')).toBe(true);
+    setMuted('drawing-choice', false);
+    expect(isMuted('drawing-choice')).toBe(false);
   });
 });

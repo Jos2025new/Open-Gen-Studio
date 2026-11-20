@@ -61,7 +61,7 @@ export function BudgetTab() {
       {NOTICES.map((n) => (
         <SetRow key={n.id} label={n.label} tip={n.tip} className="set-row-3">
           <span>{isMuted(n.id) ? 'silenced' : 'shown'}</span>
-          {isMuted(n.id) ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, false)}>Show again</Button> : <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, true)}>Don’t show again</Button>}
+          {isMuted(n.id) ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, false)}>Show again</Button> : n.canSilence ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, true)}>Don’t show again</Button> : null}
         </SetRow>
       ))}
     </SetGroup>
