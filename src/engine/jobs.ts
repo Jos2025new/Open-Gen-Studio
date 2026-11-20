@@ -1,49 +1,46 @@
-import { reusedOpChoice, transcriberForRun } from './opRunModel';
-import { isRestart, statusChecker } from './checkStatus';
+import { isRestart } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
-import { notKept } from './keepResult';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
-import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
-import { LOCAL_WRITE } from '../lib/disk';
-import { disk, diskAvailable } from '../lib/disk';
-import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, jpegThumbnail, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
+import { getAssetBlob } from '../lib/idb';
 import { randomSeed } from '../lib/rng';
-import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
-import { apiKeyFor, creatorProvider, OP_PROVIDERS, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, sentModelRef, RECRAFT_STYLE_REF, resolveModel } from './catalog';
+import { apiKeyFor, modelSummary, isConnected, sentModelRef, RECRAFT_STYLE_REF } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
 import { withVariation } from './sentPrompt';
 import { deliveryNotes } from './delivery';
 import { isCreditError, onGenerationCredit } from './credit';
-import { InputError } from './errors';
-import { model3dProblem, sourceVideoRule } from './modelRules';
-import { modelMime, sniffModelMime } from '../lib/model3d';
-import { refsLimit } from './officialLimits';
-import { OPS, opCount, operationFactor, isVideoOpEngine, type VideoOpEngine } from './ops';
-import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
-import { mapSubjectPrompts } from './subjectPrompts';
+import { OPS, operationFactor, isVideoOpEngine } from './ops';
+import { maxCountPerRequest, paramByRole } from './params';
 import { ADAPTERS } from './providers/registry';
 import { resolveSendable, SchemaUnavailableError } from './schemaGuard';
 import { partialRetryCharge, retrySpec } from './retryPartial';
-import { cellRects, gridShape } from './sheet';
-import { checkJobsNow } from './providers/shared';
-import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput, type ProviderAdapter } from './providers/types';
+import { PROVIDER_LABELS, parseModelRef, type MediaInput, type ProviderAdapter } from './providers/types';
 import { opRealism, negFor } from './realism';
-import { opRolesLine } from './refRoles';
-import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
-import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
+import type { Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, ModelSummary, RemoteJob } from './types';
+import { addAssets, addSpend, patchGeneration, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { markSending, interruptedByReload } from './sendMark';
 import { consumeOnce, noteExcess } from './budget';
+import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
+import { followRemote } from './jobRecovery';
+import { videoOpSeconds } from './opSpec';
+import { runLocalOp } from './localOps';
+import { runCreateStyle, runCreateVoice, runTranscribe } from './specialSends';
+import { promptShape, slotInputs, structuredSlots, subjectInputs } from './sendInputs';
+
+// Moved out of this file (Opus #4); kept here so every caller and mock keeps its path.
+export { adoptRemoteAssets, storeModelOutputs } from './assetIO';
+export { canRecheck, checkStatusNow, recheckGeneration } from './jobRecovery';
+export { inputKindOf, opSpec, opSpecForModel, videoOpSeconds, videoOpSettings, type OpSpecInput } from './opSpec';
 
 const get = useStore.getState;
 export const controllers = new Map<string, AbortController>();
-const running = new Map<string, Promise<string[]>>();
+export const running = new Map<string, Promise<string[]>>();
 const retrying = new Map<string, Promise<string[]>>();
 
 export interface GenerationSpec {
@@ -86,7 +83,7 @@ export function estimateSpec(spec: GenerationSpec, memoryOnly = false): Estimate
   return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage, memoryOnly, spec.prompt.length);
 }
 
-function requestEstimate(spec: GenerationSpec): Estimate {
+export function requestEstimate(spec: GenerationSpec): Estimate {
   if (spec.op) {
     const engine = OPS[spec.op.id].engine;
     const source = get().assets[spec.op.sourceAssetId];
@@ -130,159 +127,6 @@ export function createGeneration(spec: GenerationSpec): Generation {
   };
   upsertGeneration(g);
   return g;
-}
-
-/** An asset's bytes; a result still only at the provider is downloaded and kept (links expire). */
-async function ensureAssetBlob(assetId: string): Promise<Blob> {
-  const asset = get().assets[assetId];
-  if (!asset) throw new Error('An input asset was deleted.');
-  const stored = await getAssetBlob(assetId);
-  if (stored) {
-    // Bytes saved by an earlier attempt whose flag never landed: show the local copy, not the remote link.
-    if (!asset.stored) patchAsset(assetId, { stored: true, remoteUrl: undefined });
-    return stored;
-  }
-  if (!asset.remoteUrl) throw new Error('An input asset is not available offline.');
-  const blob = await fetchBlob(asset.remoteUrl);
-  await putAssetBlob(assetId, blob);
-  patchAsset(assetId, { stored: true, remoteUrl: undefined });
-  return blob;
-}
-
-/** Keep results that are still only at the provider (e.g. after a download was blocked). Best effort. */
-export async function adoptRemoteAssets(): Promise<void> {
-  for (const a of Object.values(get().assets)) {
-    if (!a.stored && a.remoteUrl) await ensureAssetBlob(a.id).catch(notKept('keep a remote result'));
-  }
-}
-
-async function mediaInput(assetId: string): Promise<MediaInput> {
-  const asset = get().assets[assetId];
-  const blob = await ensureAssetBlob(assetId);
-  return { assetId, blob, mime: blob.type || asset.mime, width: asset.width, height: asset.height };
-}
-
-async function frameInput(assetId: string, which: 'first' | 'last' | number): Promise<MediaInput> {
-  // Read frames from local bytes: a remote video without CORS cannot be drawn to a canvas.
-  const url = URL.createObjectURL(await ensureAssetBlob(assetId));
-  try {
-    const f = await extractVideoFrame(url, which);
-    return { assetId, blob: f.blob, mime: 'image/png', width: f.width, height: f.height };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallback: MediaInfo, thumbnailUrl?: string): Promise<Asset> {
-  const id = uid('ast');
-  let blob = o.blob;
-  if (!blob && o.url) {
-    try {
-      blob = await fetchBlob(o.url);
-    } catch (err) {
-      notKept('download result')(err); // keep the remote URL
-    }
-  }
-  let info: MediaInfo = fallback;
-  if (blob) {
-    await putAssetBlob(id, blob);
-    // A 3D file is never decoded here: probing would load the mesh into an image/video element.
-    if (kind !== 'model3d') info = await probeMedia(blob).catch(() => fallback);
-  }
-  return {
-    id,
-    kind,
-    ...(thumbnailUrl ? { thumbnailUrl } : {}),
-    mime: blob?.type || o.mime || (kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : kind === 'model3d' ? 'model/gltf-binary' : 'video/mp4'),
-    width: info.width || fallback.width,
-    height: info.height || fallback.height,
-    duration: info.duration ?? fallback.duration,
-    sessionId: g.sessionId,
-    generationId: g.id,
-    origin: 'generated',
-    place: g.place,
-    mode: g.mode,
-    remoteUrl: blob ? undefined : o.url,
-    stored: Boolean(blob),
-    favorite: false,
-    createdAt: Date.now(),
-  };
-}
-
-/** A 3D result is model files plus often a render: each model is an asset, the render their thumbnail. */
-export async function storeModelOutputs(outputs: GenOutput[], g: Generation): Promise<Asset[]> {
-  const files = await Promise.all(
-    outputs.map(async (o) => {
-      let blob = o.blob;
-      if (!blob && o.url) blob = await fetchBlob(o.url).catch(notKept('download result'));
-      const mime = blob ? await sniffModelMime(blob, o.mime) : (o.mime ?? modelMime(o.url ?? '') ?? 'application/octet-stream');
-      return { o, blob: blob && blob.type !== mime ? new Blob([blob], { type: mime }) : blob, mime };
-    }),
-  );
-  const isImage = (f: { mime: string }) => f.mime.startsWith('image/');
-  // A turntable/preview clip is not the model either; it is dropped.
-  const models = files.filter((f) => !isImage(f) && !f.mime.startsWith('video/'));
-  if (!models.length) throw new JobFailedError('The provider finished without a 3D file (only a preview image).');
-  const thumb = files.find(isImage);
-  const thumbnailUrl = thumb?.blob ? await jpegThumbnail(thumb.blob).catch(() => undefined) : undefined;
-  return Promise.all(models.map((f) => storeOutput({ blob: f.blob, url: f.o.url, mime: f.mime }, g, 'model3d', { width: 0, height: 0 }, thumbnailUrl)));
-}
-
-function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
-  if (kind === 'audio' || kind === 'model3d') return { width: 0, height: 0 };
-  const ratio = ratioOf(s.aspect) ?? (kind === 'video' ? 16 / 9 : 1);
-  return { ...dimsFor(ratio, longEdgeFor(s.resolution ?? s.aspect)), duration: kind === 'video' && s.duration != null && s.duration > 0 ? s.duration : undefined };
-}
-
-/** Local operations (frames, grid split) run in the browser for free; they never reach a provider. */
-async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]> {
-  const { id, sourceAssetId, params } = g.op!;
-  if (id === 'join_clips') return joinClips(g, [sourceAssetId, ...String(params.clips ?? '').split(',').filter(Boolean)], signal, String(params.music ?? '') || undefined, params.loudness === 'social');
-  const images: Array<{ blob: Blob; width: number; height: number }> = [];
-  if (id === 'extract_frame') {
-    const seconds = parseFloat(String(params.seconds ?? '').replace(',', '.'));
-    const which = params.which === 'first' ? 'first' : params.which === 'time' && Number.isFinite(seconds) ? seconds : 'last';
-    images.push(await frameInput(sourceAssetId, which));
-  } else if (id === 'grid_split') {
-    // Cells come from sheet.ts: squares (2, 3), 2×3 (six views), or one row of 3 or 4 views (a turnaround sheet).
-    const src = await blobToCanvas((await mediaInput(sourceAssetId)).blob);
-    for (const cell of cellRects(gridShape(params.grid), src.width, src.height)) {
-      const c = createCanvas(cell.w, cell.h);
-      ctx2d(c).drawImage(src, cell.x, cell.y, cell.w, cell.h, 0, 0, cell.w, cell.h);
-      images.push({ blob: await canvasToBlob(c, 'image/png'), width: cell.w, height: cell.h });
-    }
-  } else if (id === 'fx') {
-    const out = fxOnCanvas(await blobToCanvas((await mediaInput(sourceAssetId)).blob), params);
-    images.push({ blob: await canvasToBlob(out, 'image/png'), width: out.width, height: out.height });
-  } else {
-    throw new Error(`${id} is not a local operation`);
-  }
-  if (signal.aborted) throw new AbortedError();
-  const assets = await Promise.all(images.map((f) => storeOutput({ blob: f.blob, mime: 'image/png' }, g, 'image', { width: f.width, height: f.height })));
-  assets.forEach((a) => (a.origin = 'frame'));
-  addAssets(assets);
-  return assets.map((a) => a.id);
-}
-
-/** join_clips: the local server joins the clips with ffmpeg; no server, no join. */
-async function joinClips(g: Generation, ids: string[], signal: AbortSignal, music?: string, loudnorm = false): Promise<string[]> {
-  if (ids.length < 2) throw new InputError('JOIN_CLIPS', 'Join clips needs at least two clips.');
-  if (!(await diskAvailable())) throw new InputError('JOIN_UNAVAILABLE', 'Joining clips needs the local app server (npm run dev or npm run preview).');
-  patchGeneration(g.id, { statusText: 'Joining clips' });
-  for (const id of ids) {
-    if (get().assets[id]?.kind !== 'video') throw new InputError('JOIN_CLIPS', 'Join clips only takes videos.');
-    await disk.setBlob(assetBlobKey(id), await ensureAssetBlob(id));
-  }
-  if (music) {
-    if (get().assets[music]?.kind !== 'audio') throw new InputError('JOIN_CLIPS', 'The music under the joined video must be audio.');
-    await disk.setBlob(assetBlobKey(music), await ensureAssetBlob(music));
-  }
-  const res = await fetch('/x/store/join', { method: 'POST', signal, body: JSON.stringify({ keys: ids.map(assetBlobKey), ...(music ? { music: assetBlobKey(music) } : {}), ...(loudnorm ? { loudnorm: true } : {}) }), headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
-  if (!res.ok) throw new InputError(res.status === 501 ? 'JOIN_UNAVAILABLE' : 'JOIN_FAILED', `Could not join the clips: ${(await res.text()).slice(0, 300)}`);
-  const first = get().assets[ids[0]];
-  const asset = await storeOutput({ blob: await res.blob(), mime: 'video/mp4' }, g, 'video', { width: first?.width ?? 0, height: first?.height ?? 0 });
-  addAssets([asset]);
-  return [asset.id];
 }
 
 /** One at a time per serialKey. */
@@ -389,174 +233,16 @@ async function execute(id: string): Promise<string[]> {
     const adapter = ADAPTERS[model.provider];
 
     // Inputs
-    let refs: MediaInput[] = [];
-    let refVideos: MediaInput[] = [];
-    let audios: MediaInput[] = [];
-    let firstFrame: MediaInput | undefined;
-    let lastFrame: MediaInput | undefined;
-    let video: MediaInput | undefined;
-    if (g.op) {
-      const def = OPS[g.op.id];
-      if (isVideoOpEngine(def.engine)) {
-        video = await mediaInput(g.op.sourceAssetId);
-        const rule = sourceVideoRule(model.id);
-        const range = def.engine === 'video_edit' ? rule?.seconds.edit : def.engine === 'video_extend' ? rule?.seconds.extend : undefined;
-        const seconds = get().assets[g.op.sourceAssetId]?.duration;
-        if (range && seconds != null && (seconds < range[0] || seconds > range[1])) {
-          throw new InputError('VIDEO_DURATION', `${model.name} takes clips of ${range[0]}–${range[1]} s for this; this one is ${seconds.toFixed(1)} s.`);
-        }
-        // No source-video field (Seedance 2.5 omni reference): the clip goes in as the one reference video.
-        if (!schema.slots.video && (schema.slots.refVideos || schema.slots.mixedRefs)) {
-          refVideos = [video];
-          video = undefined;
-        }
-      } else if (def.engine === 'video') {
-        firstFrame = g.op.id === 'continue' ? await frameInput(g.op.sourceAssetId, 'last') : await mediaInput(g.op.sourceAssetId);
-      } else {
-        refs.push(await mediaInput(g.op.sourceAssetId));
-        for (const id of String(g.op.params._refs ?? '').split(',').filter(Boolean)) refs.push(await mediaInput(id));
-      }
-    } else {
-      for (const r of g.inputs.refs) {
-        const kind = get().assets[r]?.kind;
-        (kind === 'video' ? refVideos : kind === 'audio' ? audios : refs).push(await mediaInput(r));
-      }
-      if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
-      if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
-    }
-    if (g.op && g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
-    // Mask operations (Edit region, Remove object): only models that declare a mask, in their convention.
-    let mask: MediaInput | undefined;
-    const engine = g.op ? OPS[g.op.id].engine : undefined;
-    if (g.op && (engine === 'inpaint' || engine === 'remove_object')) {
-      const def = OPS[g.op.id];
-      const maskId = String(g.op.params.mask ?? '');
-      const maskAsset = get().assets[maskId];
-      if (!maskAsset) throw new InputError('MASK_MISSING', `${def.label} needs a mask: paint the area in Sketch.`);
-      if (!schema.slots.mask) throw new InputError('MASK_UNSUPPORTED', `${model.name} cannot take a mask. Pick a model for ${def.label} in Settings → Operations.`);
-      const src = get().assets[g.op.sourceAssetId];
-      if (src && (maskAsset.width !== src.width || maskAsset.height !== src.height)) {
-        throw new InputError('MASK_SIZE', `The mask is ${maskAsset.width}×${maskAsset.height} but the image is ${src.width}×${src.height}.`);
-      }
-      const input = await mediaInput(maskId);
-      mask = schema.slots.mask.convention === 'alpha' ? { ...input, blob: await maskToAlpha(input.blob), mime: 'image/png' } : input;
-    }
-    if (g.kind === 'image' && (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0) > refs.length) {
-      throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
-    }
-    if (kind === 'model3d') {
-      if (refVideos.length || audios.length || firstFrame || lastFrame) throw new InputError('MODEL3D_MEDIA_INPUT', `${model.name} takes only images.`);
-      if (refs.length && !schema.slots.images) throw new InputError('MODEL3D_NO_IMAGE_INPUT', `${model.name} takes text only.`);
-      const problem = model3dProblem(model.id, model, g.prompt, refs.map((r) => ({ size: r.blob.size, width: r.width, height: r.height })));
-      if (problem) throw new InputError(problem.code, `${model.name} ${problem.message}`);
-    }
-    if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
-    if (g.kind === 'video' && !video && !(g.op && refVideos.length)) {
-      // A reference-to-video model has no start frame: an image given as one becomes a reference.
-      const routed = routeVideoInputs(schema.slots, refs, refVideos, firstFrame);
-      ({ firstFrame, images: refs, videos: refVideos } = routed);
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
-      if (problem) throw new Error(`${model.name} ${problem}`);
-    }
-    if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
-    if (g.kind === 'image' && refVideos.length && !schema.slots.clips) throw new InputError('VIDEO_REF_UNSUPPORTED', `${model.name} does not take video references.`);
-    if (g.kind === 'image' && refVideos.length < (schema.slots.clips?.min ?? 0)) throw new InputError('VIDEO_REF_REQUIRED', `${model.name} needs a reference video clip.`);
-    if (kind === 'image' || kind === 'audio') {
-      const problem = audioInputProblem(schema.slots, audios.length);
-      if (problem) throw new InputError('AUDIO_INPUT', `${model.name} ${problem}`);
-    }
-    if (kind === 'audio') {
-      if (refs.length || refVideos.length || firstFrame || lastFrame) throw new InputError('AUDIO_MEDIA_INPUT', `${model.name} takes no images or videos.`);
-      const song = songProblem(schema, g.prompt, g.settings);
-      if (song) throw new InputError(song.code, `${model.name}: ${song.message}`);
-    }
-    // Audio: the first track to a single-track field (lip-sync, soundtrack), the rest as references.
-    const { audio, refAudios } = routeAudio(schema.slots, audios);
+    const slots = await slotInputs(g, model, schema, kind);
+    const subjects = await subjectInputs(g, model, schema, slots);
+    const shaped = promptShape(g, model, schema, kind, slots, subjects);
+    const { firstFrame, lastFrame, video, mask, audio, refAudios } = slots;
+    const { elements } = subjects;
+    const { prompt } = shaped;
+    const { keyframes, clips, refs, refVideos, genSettings: shapedSettings } = structuredSlots(g, schema, subjects, slots, shaped.genSettings);
+    let genSettings = shapedSettings;
 
-    // Subjects: "@Name" mentions become the provider's elements (Kling); elsewhere just the name.
-    // A plan's own reference (not yet chosen for the library) wins over a library item with the same name.
-    const local = g.inputs.subjects ?? [];
-    const subjects = [...local, ...(g.inputs.nodeLibrary ?? get().library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
-    const elSlot = schema.slots.elements;
-    const mappedSubjects = mapSubjectPrompts(g.prompt, g.settings.shots, subjects, schema, model.id, refs.length);
-    const mentioned = { ids: mappedSubjects.ids };
-    let prompt = mappedSubjects.prompt;
-    let elements: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }> | undefined;
-    if (elSlot && mentioned.ids.length) {
-      if (mentioned.ids.length > elSlot.max) throw new InputError('SUBJECTS_MAX', `${model.name} takes up to ${elSlot.max} subjects; the prompt mentions ${mentioned.ids.length}.`);
-      elements = [];
-      for (const sid of mentioned.ids) {
-        const s = subjects.find((x) => x.id === sid)!;
-        const video = elSlot.video && s.videoAssetId ? await mediaInput(s.videoAssetId) : undefined;
-        if (!s.frontalAssetId && !video) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${s.name}" needs a frontal image${elSlot.video ? ' or a video' : ''}.`);
-        elements.push({
-          name: s.name,
-          description: s.description,
-          frontal: s.frontalAssetId ? await mediaInput(s.frontalAssetId) : undefined,
-          refs: await Promise.all(s.refAssetIds.slice(0, elSlot.refMax).map((r) => mediaInput(r))),
-          video,
-          voiceId: s.voiceId,
-        });
-      }
-    }
-    // Models without elements (R10): subject images join the references; the mention becomes the model's own
-    // syntax, numbered from the step's real references (frontal views first).
-    const subjectImages = mappedSubjects.subjectImages;
-    if (subjectImages) {
-      if (mentioned.ids.length) {
-        const chosen = mentioned.ids.map((id) => subjects.find((x) => x.id === id)!);
-        const incomplete = chosen.find((s) => !s.frontalAssetId);
-        if (incomplete) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${incomplete.name}" needs a frontal image to be used with ${model.name}.`);
-        const used = schema.slots.mixedRefs ? refs.length + refVideos.length + refAudios.length : refs.length;
-        const max = refsLimit(schema, g.settings.count);
-        const room = max - used;
-        if (chosen.length > room) throw new InputError('SUBJECTS_MAX', `${model.name} takes ${max} reference image${max === 1 ? '' : 's'}; the step already has ${used}, so ${chosen.length} subject${chosen.length === 1 ? '' : 's'} do not fit.`);
-        const frontals = await Promise.all(chosen.map((s) => mediaInput(s.frontalAssetId!)));
-        const views = chosen.flatMap((s) => s.refAssetIds).slice(0, room - chosen.length);
-        refs = [...refs, ...frontals, ...(await Promise.all(views.map((id) => mediaInput(id))))];
-      }
-    }
-    if (kind === 'video' && schema.slots.frameRules) {
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
-      if (problem) throw new Error(`${model.name} ${problem}`);
-    }
-    const promptMax = schema.slots.promptMax;
-    if (promptMax && prompt.length > promptMax) throw new InputError('PROMPT_TOO_LONG', `${model.name} takes prompts up to ${promptMax} characters (this one has ${prompt.length}).`);
-    // Multi-shot storyboard: shots must add up to the clip; some providers take shots instead of the prompt.
-    const shotProblem = schema.slots.shots ? shotsProblem(g.settings.shots, g.settings.duration) : null;
-    if (shotProblem) throw new InputError('SHOTS_DURATION', `${model.name}: ${shotProblem}`);
-    let genSettings = g.settings;
-    if (mappedSubjects.shots) genSettings = { ...g.settings, shots: mappedSubjects.shots };
-    if (schema.slots.shots?.exclusivePrompt && g.settings.shots?.length) prompt = '';
-
-    // Structured inputs: keyframe images at frame positions, reference videos as trimmed clips.
-    let keyframes: Array<{ input: MediaInput; frame: number }> | undefined;
-    let clips: Array<{ input: MediaInput; start: number; end: number }> | undefined;
-    if (schema.slots.keyframes && refs.length) {
-      // Positions need an explicit length (BFL): the chosen one, else the model's default, else its shortest.
-      const choices = durationChoices(schema).filter((d) => d > 0);
-      const def = Number(paramByRole(schema, 'duration')?.default);
-      const duration = genSettings.duration != null && genSettings.duration > 0 ? genSettings.duration : Number.isFinite(def) && def > 0 ? def : choices[0] ?? 5;
-      genSettings = { ...genSettings, duration };
-      const frames = placeKeyframes(refs.length, duration, schema.slots.keyframes.fps, refs.map((r) => g.inputs.times?.[r.assetId]));
-      keyframes = refs.map((input, i) => ({ input, frame: frames[i] }));
-      refs = [];
-    }
-    if (schema.slots.clips && refVideos.length) {
-      const slot = schema.slots.clips;
-      clips = refVideos.map((input) => {
-        const [start, end] = clipTrim(slot, get().assets[input.assetId]?.duration, g.inputs.trims?.[input.assetId]);
-        return { input, start, end };
-      });
-      refVideos = [];
-    }
-
-    // Candidates with their own variation: one request each (variantPrompt).
-    const variants = g.variants?.length ? g.variants : undefined;
-    const priorCount = g.assetIds.length;
-    const total = variants ? variants.length : Math.max(0, g.settings.count - priorCount);
-    const progressTotal = priorCount + total;
-    const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
+    const { variants, priorCount, total, progressTotal, perRequest } = batchPlan(g, schema);
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), operationFactor(g.op)) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
@@ -576,7 +262,7 @@ async function execute(id: string): Promise<string[]> {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // A quote is not a provider-reported charge in the agent notice.
-      const quote = adapter.quote ? await adapter.quote(model, schema, settings, n) : null;
+      const quote = await requestQuote(adapter, model, schema, settings, n);
       const send = async () => {
         await markSending(id);
         signal.throwIfAborted();
@@ -686,95 +372,32 @@ async function execute(id: string): Promise<string[]> {
   }
 }
 
+/** How many requests a generation takes: candidates with their own variation go one each (variantPrompt). */
+function batchPlan(g: Generation, schema: ModelSchema) {
+  const variants = g.variants?.length ? g.variants : undefined;
+  const priorCount = g.assetIds.length;
+  const total = variants ? variants.length : Math.max(0, g.settings.count - priorCount);
+  const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
+  return { variants, priorCount, total, progressTotal: priorCount + total, perRequest };
+}
+
+/** The provider's own quote for one request, when it gives one (null otherwise). */
+function requestQuote(adapter: ProviderAdapter, model: ModelSummary, schema: ModelSchema, settings: GenSettings, count: number): Promise<number | null> {
+  return adapter.quote ? adapter.quote(model, schema, settings, count) : Promise.resolve(null);
+}
+
 /** What a media input looked like, for the debug record. */
 function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
   return input ? [{ mime: input.mime, width: input.width, height: input.height }] : undefined;
 }
 
 /** A submitted job is kept for "Check again" after a local stop. */
-function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
+export function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
   return err instanceof JobFailedError ? undefined : job;
 }
 
-function checkSpecialSend(g: Generation, signal: AbortSignal): void {
-  signal.throwIfAborted();
-  if (g.planId) checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
-}
 
-/** Audio → text with the transcriber recorded on the generation. */
-async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> {
-  const model = get().catalog.transcribers?.[g.modelRef];
-  if (!model) throw new Error(`${g.modelName} is not available. Connect NanoGPT or pick another model in Settings → Operations.`);
-  const adapter = ADAPTERS[model.provider];
-  const apiKey = apiKeyFor(model.provider);
-  if (!adapter.transcribe || !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
-  const input = await mediaInput(g.op!.sourceAssetId);
-  if (input.blob.size > model.maxDirectBytes) {
-    const mb = (n: number) => (n / 1048576).toFixed(1);
-    throw new InputError('AUDIO_TOO_LARGE', `${model.name} takes files up to ${mb(model.maxDirectBytes)} MB from the app; this one is ${mb(input.blob.size)} MB. Use a shorter or compressed (MP3) clip.`);
-  }
-  await markSending(g.id);
-  checkSpecialSend(g, signal);
-  const result = await adapter.transcribe({
-    model,
-    input,
-    language: String(g.op!.params.language ?? 'auto'),
-    apiKey,
-    signal,
-    onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
-  });
-  finishText(g.id, result.text ?? '', result.costUsd);
-}
-
-/** Adapter (by parseModelRef) and key for the one-off creations. */
-function creatorOf(g: Generation, what: string): { adapter: ProviderAdapter; apiKey: string } {
-  const provider = parseModelRef(g.modelRef)?.provider;
-  const adapter = provider ? ADAPTERS[provider] : undefined;
-  const apiKey = provider ? apiKeyFor(provider) : undefined;
-  if (!provider || !adapter || !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[provider ?? 'local']} key in Settings to create ${what}.`);
-  return { adapter, apiKey };
-}
-
-/** Custom voice (Kling): 5–30 s of speech → voice_id. */
-async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void> {
-  const { adapter, apiKey } = creatorOf(g, 'Kling voices');
-  if (!adapter.createVoice) throw new Error(`${adapter.label} cannot create voices.`);
-  const seconds = get().assets[g.op!.sourceAssetId]?.duration;
-  if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
-  const input = await mediaInput(g.op!.sourceAssetId);
-  await markSending(g.id);
-  checkSpecialSend(g, signal);
-  const result = await adapter.createVoice({
-    input,
-    apiKey,
-    signal,
-    onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
-  });
-  finishText(g.id, result.text ?? '', result.costUsd);
-}
-
-/** Custom style (Recraft V4): the generation's reference images → style_id. */
-async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void> {
-  const { adapter, apiKey } = creatorOf(g, 'Recraft styles');
-  if (!adapter.createStyle) throw new Error(`${adapter.label} cannot create styles.`);
-  const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
-  if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
-  const inputs = await Promise.all(images.map((r) => mediaInput(r)));
-  await markSending(g.id);
-  checkSpecialSend(g, signal);
-  const result = await adapter.createStyle({
-    images: inputs,
-    apiKey,
-    signal,
-    onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
-  });
-  finishText(g.id, result.text ?? '', result.costUsd);
-}
-
-function finishText(id: string, text: string, actualUsd: number | undefined): void {
+export function finishText(id: string, text: string, actualUsd: number | undefined): void {
   const g = get().generations[id];
   if (!g) return;
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined });
@@ -783,14 +406,14 @@ function finishText(id: string, text: string, actualUsd: number | undefined): vo
 }
 
 /** O3: never fails a generation; a file that cannot be read gives no note. */
-async function checkDelivery(id: string, assets: Asset[]): Promise<string[] | undefined> {
+export async function checkDelivery(id: string, assets: Asset[]): Promise<string[] | undefined> {
   const g = get().generations[id];
   if (!g) return undefined;
   const notes = await deliveryNotes(g, assets, getAssetBlob).catch(() => []);
   return notes.length ? notes : undefined;
 }
 
-function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number): void {
+export function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number): void {
   const g = get().generations[id];
   if (!g) return;
   patchGeneration(id, {
@@ -882,293 +505,4 @@ export function retryGeneration(id: string, planItemId?: string): Promise<string
     held.release();
     return Promise.reject(err);
   }
-}
-
-/**
- * True when a stopped generation still has a submitted job whose result can be fetched, or when its job id was lost
- * but the provider can look it up among its recent runs (NanoGPT video and 3D: generate-video/recover).
- */
-export function canRecheck(g: Generation): boolean {
-  if (g.status === 'done') return false;
-  // In progress: only a job no loop follows any more (the app stalled or was reloaded mid-wait) is resumed here.
-  if (g.status === 'running' || g.status === 'queued') return Boolean(g.remoteJob && !running.has(g.id) && ADAPTERS[g.remoteJob.provider]?.resume);
-  if (g.remoteJob) return Boolean(ADAPTERS[g.remoteJob.provider]?.resume);
-  return canRecover(g);
-}
-
-function canRecover(g: Generation): boolean {
-  const parsed = parseModelRef(g.modelRef);
-  return Boolean(parsed && parsed.provider !== 'local' && ADAPTERS[parsed.provider]?.recover && (g.kind === 'video' || g.kind === 'model3d') && g.lostJob && g.startedAt && (g.settings.count ?? 1) <= 1 && !g.op?.id.startsWith('transcribe'));
-}
-
-/** Look the lost job up at the provider; adopt it (then it is followed like any job) or say it never arrived. */
-async function recoverJob(g: Generation): Promise<RemoteJob | null> {
-  const parsed = parseModelRef(g.modelRef)!;
-  const taken = new Set(Object.values(get().generations).flatMap((x) => [x.jobId, x.remoteJob?.id].filter((v): v is string => Boolean(v))));
-  return ADAPTERS[parsed.provider].recover!({ modelId: parsed.id, apiKey: apiKeyFor(parsed.provider), since: g.startedAt!, until: g.finishedAt ?? Date.now(), taken });
-}
-
-/** Check an existing remote job, interrupting a stalled local follower before resuming it. */
-export const checkStatusNow = statusChecker({
-  job: (id) => get().generations[id], pending: (id) => running.get(id),
-  controller: (id) => controllers.get(id), wake: checkJobsNow, resume: recheckGeneration,
-  restartable: (id) => { const g = get().generations[id]; return (g?.settings.count ?? 1) <= 1 && !g?.variants?.length; },
-});
-
-/** Ask the provider again about a job we stopped waiting for (connection problem, time limit, stop, reload). */
-export function recheckGeneration(id: string): Promise<string[]> {
-  const pending = running.get(id);
-  if (pending) return pending;
-  const g = get().generations[id];
-  if (!g || !canRecheck(g) || !mayStartWork()) return Promise.resolve([]);
-  if (!g.remoteJob) return recoverThenFollow(id);
-  const job = g.remoteJob;
-  if (!isConnected(job.provider)) {
-    patchGeneration(id, { status: 'error', error: `Connect ${PROVIDER_LABELS[job.provider]} in Settings to check this job.` });
-    return Promise.resolve([]);
-  }
-  patchGeneration(id, { status: 'running', error: undefined, statusText: 'Checking', progress: undefined, finishedAt: undefined });
-  return followRemote(id, job);
-}
-
-function recoverThenFollow(id: string): Promise<string[]> {
-  const g = get().generations[id];
-  const provider = parseModelRef(g.modelRef)!.provider;
-  if (!isConnected(provider)) {
-    patchGeneration(id, { status: 'error', error: `Connect ${PROVIDER_LABELS[provider]} in Settings to check this job.` });
-    return Promise.resolve([]);
-  }
-  patchGeneration(id, { status: 'running', error: undefined, statusText: 'Looking for the job', progress: undefined, finishedAt: undefined });
-  const p = (async () => {
-    let job: RemoteJob | null;
-    try {
-      job = await recoverJob(g);
-    } catch (err) {
-      running.delete(id);
-      patchGeneration(id, { status: 'error', error: `Could not ask ${PROVIDER_LABELS[provider]} for recent jobs: ${(err as Error).message}`, statusText: undefined, finishedAt: Date.now() });
-      return [];
-    }
-    running.delete(id);
-    if (!job) {
-      patchGeneration(id, { status: 'error', error: `${PROVIDER_LABELS[provider]} has no recent job for this request from that time: it most likely never arrived. Retry runs it again.`, statusText: undefined, finishedAt: Date.now() });
-      return [];
-    }
-    patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking' });
-    return followRemote(id, job);
-  })();
-  running.set(id, p);
-  return p;
-}
-
-function followRemote(id: string, job: RemoteJob): Promise<string[]> {
-  const controller = new AbortController();
-  controllers.set(id, controller);
-  const p = (async () => {
-    try {
-      const g = get().generations[id];
-      const result = await ADAPTERS[job.provider].resume!(job, {
-        kind: g.kind,
-        apiKey: apiKeyFor(job.provider),
-        signal: controller.signal,
-        onStatus: (text, progress) => patchGeneration(id, { statusText: text, progress }),
-      });
-      if (g.kind === 'text') {
-        finishText(id, result.text ?? '', result.costUsd);
-        return [];
-      }
-      const kind = g.kind;
-      const fallback = expectedDims(kind, g.settings);
-      const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
-      addAssets(assets);
-      finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets), result.costUsd);
-      return assets.map((a) => a.id);
-    } catch (err) {
-      if (isRestart(controller.signal.reason)) return [];
-      const remoteJob = keptJob(err, job);
-      if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
-      else {
-        patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
-        // A sent job that failed while followed (reload, Check status): same trail as a first-run failure (T5).
-        const cur = get().generations[id];
-        logEvent('provider-error', { generation: id, model: cur?.modelName, provider: job.provider, jobId: job.id, message: (err as Error).message, sent: cur?.sent, resumed: true });
-      }
-      return [];
-    } finally {
-      running.delete(id);
-      controllers.delete(id);
-      purgeDiscarded(id);
-    }
-  })();
-  running.set(id, p);
-  return p;
-}
-
-// ---------------------------------------------------------------------------
-// Operation specs
-
-export interface OpSpecInput {
-  sessionId: string;
-  sourceAssetId: string;
-  op: OpId;
-  params: Record<string, AdvancedValue>;
-  origin: GenerationOrigin;
-  place?: Generation['place'];
-  mode?: Generation['mode'];
-  parentId?: string;
-  planId?: string;
-  stepId?: string;
-  /** Dimensions of the source when it is not an asset yet (designer layers). */
-  sourceDims?: { width: number; height: number };
-  /** Model picked for this run (replay, edit / video / transcribe engines); by default the source's model or the engine's. */
-  modelRef?: string;
-  /** Model and composer settings reviewed by the Node Run confirmation. */
-  nodeChoice?: { ref: string; viaEdit: boolean; settings?: GenSettings };
-}
-
-/** Build the generation spec for an operation on an asset (model, instruction and settings). */
-/** Settings a video operation runs with: the source's framing and, for edits and upscales, its length. */
-export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | undefined, params: Record<string, AdvancedValue> = {}): GenSettings {
-  const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });
-  const extend = engine === 'video_extend';
-  // Keep the source's framing: the model's "auto"/"adaptive" option, else nothing.
-  const auto = paramByRole(schema, 'aspect')?.options?.find(isAutoOption);
-  settings.aspect = auto != null ? String(auto) : undefined;
-  if (!extend) {
-    // Edits follow the source's length: -1 where the model has it (Seedance 2.5 edit requires it), else nothing.
-    settings.duration = durationChoices(schema).includes(-1) ? -1 : undefined;
-    settings.audio = undefined;
-  }
-  // Multi-mode models (NanoGPT Seedance 2.5) need the operation named when a clip is given.
-  const mode = schema?.params.find((p) => p.key === 'mode' && p.options?.some((o) => String(o) === (extend ? 'video-extend' : 'video-edit')));
-  if (mode && engine !== 'video_upscale') settings.advanced[mode.key] = extend ? 'video-extend' : 'video-edit';
-  {
-    for (const p of schema?.params ?? []) {
-      const value = params[p.key];
-      if (value === undefined || ['count', 'duration', 'aspect', 'audio', 'negative'].includes(p.role)) continue;
-      if (p.role === 'other') settings.advanced[p.key] = value;
-      else if (p.role === 'resolution') settings.resolution = String(value);
-      else if (p.role === 'seed' && typeof value === 'number') settings.seed = value;
-    }
-  }
-  return settings;
-}
-
-/** Per-second prices: an edit or upscale is billed on the source clip, an extension on the new seconds. */
-export function videoOpSeconds(engine: VideoOpEngine, settings: GenSettings, clipSeconds: number | undefined): number | undefined {
-  return engine === 'video_extend' ? settings.duration : clipSeconds;
-}
-
-export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
-  const def = OPS[input.op];
-  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
-  const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
-  if (input.op === 'join_clips') {
-    const n = 1 + String(input.params.clips ?? '').split(',').filter(Boolean).length;
-    return { ...base, kind: 'video', prompt: `${def.label} (${n} clips)`, modelRef: 'local::join', settings: { count: 1, advanced: {} }, op, estimate: { usd: 0, approximate: false } };
-  }
-  if (def.engine === 'local') {
-    const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : input.op === 'fx' ? fxOpDetail(input.params) : (input.params.grid === 'row3' ? '1×3' : `${input.params.grid}×${input.params.grid}`);
-    return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
-  }
-  if (def.engine === 'voice') {
-    const host = creatorProvider(KLING_VOICE_REF);
-    if (!isConnected(host)) throw new Error(`Creating Kling voices needs ${PROVIDER_LABELS[host]}. Connect it in Settings.`);
-    return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: `${PROVIDER_LABELS[host]} bills the voice when it is created` } };
-  }
-  if (def.engine === 'transcribe') {
-    const t = transcriberForRun(input.modelRef);
-    if (!t) throw new Error('No connected provider offers Transcribe. Connect NanoGPT.');
-    const clip = get().assets[input.sourceAssetId];
-    const language = String(input.params.language ?? 'auto');
-    return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
-  }
-  const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
-  const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
-  if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error(def.engine === 'video_upscale' ? 'Choose a dedicated video upscaler, not a video generation/edit model.' : `Choose a connected model that can ${def.label.toLowerCase()}.`);
-  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? reusedOpChoice(input) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
-  if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect ${OP_PROVIDERS.map((p) => PROVIDER_LABELS[p]).join(', ').replace(/, ([^,]*)$/, ' or $1')}.`);
-  const resolved = await resolveModel(choice.ref);
-  const schema = resolved?.schema;
-  if (def.engine === 'video_upscale' && (!schema || schema.source === 'derived')) throw new Error('The video upscaler parameter schema is unavailable. Choose another model or reload its provider.');
-  return opSpecForModel(input, choice.ref, choice.viaEdit, schema);
-}
-
-/** Build the same operation parameters using an already chosen model and in-memory schema. No selection or I/O. */
-export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: boolean, schema: ModelSchema | undefined): GenerationSpec {
-  const def = OPS[input.op];
-  const source = get().assets[input.sourceAssetId] ?? input.sourceDims;
-  const prompt = def.instruction ? opRolesLine(input.params, input.sourceAssetId, modelRef, schema) + def.instruction(input.params) : def.label;
-  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
-  const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
-  const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';
-  if (isVideoOpEngine(def.engine)) {
-    const settings = videoOpSettings(def.engine, schema, input.params);
-    // No "auto": keep the source shape with the nearest ratio, or the model picks 16:9 and reframes.
-    const aspectOpts = paramByRole(schema, 'aspect')?.options;
-    if (settings.aspect == null && aspectOpts?.length && source?.width && source.height) settings.aspect = matchInputOption(aspectOpts) ?? nearestAspect(aspectOpts, source.width / source.height, undefined) ?? undefined;
-    const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: modelRef, settings, op };
-    const clip = get().assets[input.sourceAssetId];
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, modelRef) };
-  }
-  if (def.engine === 'video') {
-    const video = input.nodeChoice?.settings ?? get().composer.video.settings;
-    const { settings } = coerceSettings(schema, 'video', { ...video, count: 1, advanced: {} });
-    // Parameters the user set in the op form for the picked model (Continue shot).
-    if (picked) for (const p of schema?.params ?? []) {
-      const value = input.params[p.key];
-      if (value === undefined || ['count', 'aspect', 'negative'].includes(p.role)) continue;
-      if (p.role === 'resolution') settings.resolution = String(value);
-      else if (p.role === 'duration' && typeof value === 'number') settings.duration = value;
-      else if (p.role === 'seed' && typeof value === 'number') settings.seed = value;
-      else if (p.role === 'other') settings.advanced[p.key] = value;
-    }
-    if (source && paramByRole(schema, 'aspect')?.options) {
-      const opts = paramByRole(schema, 'aspect')!.options!;
-      // Keep the source's shape: an explicit "match input" option, else the nearest ratio ("auto" may pick another).
-      const auto = opts.find(isAutoOption);
-      settings.aspect = matchInputOption(opts) ?? nearestAspect(opts, source.width / source.height, settings.aspect) ?? (auto != null ? String(auto) : settings.aspect);
-    }
-    const spec: GenerationSpec = { ...base, kind: 'video', prompt, modelRef: modelRef, settings, op };
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, modelRef) };
-  }
-  const count = opCount(def, input.params);
-  const dedicated = !viaEdit && (def.engine === 'upscale' || def.engine === 'remove_bg');
-  const { settings } = coerceSettings(schema, 'image', { count, advanced: {} });
-  const aspectParam = paramByRole(schema, 'aspect');
-  if (aspectParam?.options?.length) {
-    // Reframe and a reference sheet take their own format; every other op keeps the source's shape.
-    const ownFormat = input.op === 'reframe' || input.op === 'reference_sheet';
-    const target = ownFormat ? String(input.params.aspect) : source ? source.width / source.height : undefined;
-    // Keep the source shape (Reframe: the chosen format). "auto" lets some models pick another (GPT Image turned a
-    // portrait into a landscape), so only an explicit "match input" option is used, else the nearest ratio.
-    const auto = aspectParam.options.find(isAutoOption);
-    const keep = !ownFormat ? matchInputOption(aspectParam.options) : undefined;
-    settings.aspect = keep ?? nearestAspect(aspectParam.options, target, settings.aspect) ?? (auto != null ? String(auto) : settings.aspect);
-  }
-  if (input.op === 'upscale') {
-    const res = paramByRole(schema, 'resolution');
-    if (res?.options?.length && viaEdit) settings.resolution = String(res.options[res.options.length - 1]);
-    const factorParam = schema?.params.find((p) => p.role === 'other' && /upscale_factor|^scale$|factor/i.test(p.key));
-    if (factorParam) {
-      const f = Number(input.params.factor) || 2;
-      settings.advanced[factorParam.key] = factorParam.type === 'enum' ? (factorParam.options?.find((o) => Number(o) === f) ?? f) : f;
-    }
-  }
-  let sheetNote: string | undefined;
-  if (input.op === 'reference_sheet') {
-    // 2K preferred (a reference is paid once and reused); the nearest size below when the model has no 2K.
-    const res = paramByRole(schema, 'resolution');
-    const pick = res?.options?.length ? preferredResolution(res.options, '2K') : undefined;
-    if (pick) {
-      settings.resolution = pick;
-      if (pick.toUpperCase() !== '2K') sheetNote = `sheet at ${pick}: the model has no 2K`;
-    }
-  }
-  const spec: GenerationSpec = { ...base, kind: 'image', prompt: dedicated ? '' : prompt, modelRef: modelRef, settings, op };
-  const estimate = estimateOp(input.op, input.params, source, settings, modelRef);
-  return { ...spec, estimate: sheetNote ? { ...estimate, note: [estimate.note, sheetNote].filter(Boolean).join('; ') } : estimate };
-}
-
-export function inputKindOf(assetId: string): AssetKind | undefined {
-  return get().assets[assetId]?.kind;
 }

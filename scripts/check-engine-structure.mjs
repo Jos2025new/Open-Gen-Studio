@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 // 1. jobs.ts is provider-neutral: a provider's quirks are optional capabilities of its ProviderAdapter.
 // 2. Providers reach the IndexedDB cache only through cachedJson / peekCached in providers/shared.ts.
 // 3. jobs.ts holds the send, not the operation specs (opSpec.ts) or the remote-job recovery (jobRecovery.ts).
-const RULES = { neutral: true, split: false };
+const RULES = { neutral: true, split: true };
 const NAMED_PROVIDER = /\b(atlas|fal)\b/i;
 const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|inputKindOf|recover\w*|resumeRemote\w*)\b/;
 
