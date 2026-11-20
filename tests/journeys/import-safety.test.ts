@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const persistence = vi.hoisted(() => ({ writes: 0 }));
 vi.mock('../../src/lib/idb', () => ({
   stateDb: { get: vi.fn(async () => undefined), set: async () => { persistence.writes += 1; }, del: async () => undefined },
-  cacheDb: { get: async () => undefined, set: async () => { persistence.writes += 1; } },
   blobDb: { get: async () => undefined, set: async () => { persistence.writes += 1; }, del: async () => undefined },
   getAssetBlob: async () => undefined, putAssetBlob: async () => undefined, peekAssetUrl: () => undefined, loadAssetUrl: async () => undefined,
+}));
+vi.mock('../../src/lib/cacheDb', () => ({
+  cacheDb: { get: async () => undefined, set: async () => { persistence.writes += 1; } },
+  clearCatalogCache: async () => undefined,
 }));
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
