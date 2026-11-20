@@ -15,7 +15,7 @@ import { focusNodes } from '../flow/selection';
 import { autoLayout, graphBounds, planToGraph, nodeOutputAsset } from '../flow/graph';
 import { activeDoc } from '../design/actions';
 import { LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, lineRoutes } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, lineRoutes, sentModelRef } from '../catalog';
 import type { AgentQuestion, AgentState, Estimate, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, PlanStep, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
 import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
 import { placeFor } from '../place';
@@ -238,18 +238,20 @@ function userWords(sessionId: string, owner: string): string {
   return [...said, draft?.request ?? '', ...Object.values(draft?.answers ?? {})].join('\n');
 }
 
+/** The variant a step's input route needs: with an image it is the catalog's one rule (sentModelRef), the same the send applies. */
+export function routeModel(ref: string, route: import('../variants').VariantRoute): string | undefined {
+  return route === 'edit' || route === 'image' || route === 'reference' ? sentModelRef(ref, route === 'edit' ? 'image' : 'video', true) : lineRoutes(ref)[route];
+}
+
 function planContext(sessionId: string, workspace: Workspace, strict: boolean, owner: string) {
   const doc = workspace === 'designer' ? activeDoc(sessionId) : null;
   return {
     workspace,
     getModel: watchModel(sessionId, owner, resolveModel),
-    variantModel: (ref: string, route: import('../variants').VariantRoute) => {
-      const routes = lineRoutes(ref);
-      return routes[route] ?? (route === 'edit' ? routes.reference : undefined);
-    },
+    variantModel: routeModel,
     defaultModel: (kind: MediaKind, needsImage: boolean) => {
       const ref = (kind === 'image' || kind === 'video') && agentOf(sessionId, owner).settings?.[kind]?.modelRef;
-      return ref ? (needsImage ? lineRoutes(ref)[kind === 'image' ? 'edit' : 'image'] ?? ref : lineRoutes(ref).text ?? ref) : defaultModelFor(kind, needsImage);
+      return ref ? (needsImage ? sentModelRef(ref, kind, true) : lineRoutes(ref).text ?? ref) : defaultModelFor(kind, needsImage);
     },
     defaultIsFallback: (kind: MediaKind, needsImage: boolean) => defaultModelChoice(kind, needsImage).source === 'fallback',
     defaultSettings: (kind: MediaKind) => get().composer[kind].settings,

@@ -36,3 +36,19 @@ describe('1. one reference limit', () => {
     expect(routeFits({ ...imgModel, acceptsText: true }, both, { mode: 'reference', refs: 5 })).toBe(true);
   });
 });
+
+describe('2. the agent picks the image variant with the send rule', () => {
+  it('a text-only video model gets its reference twin, the same the send resolves (not its own text model)', async () => {
+    const { routeModel } = await import('../src/engine/agent/runtimeShared');
+    const { sentModelRef } = await import('../src/engine/catalog');
+    const t = 'atlas::acme/vid-1/text-to-video';
+    const r = 'atlas::acme/vid-1/reference-to-video';
+    const mk = (ref: string, acceptsImage: boolean) => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref, kind: 'video', acceptsText: true, acceptsImage, tags: [] }) as ModelSummary;
+    const st = useStore.getState();
+    useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } }, catalog: { ...st.catalog, models: { ...st.catalog.models, [t]: mk(t, false), [r]: mk(r, true) } } });
+    expect(sentModelRef(t, 'video', true)).toBe(r);
+    expect(routeModel(t, 'image')).toBe(r);
+    expect(routeModel(t, 'reference')).toBe(r);
+    expect(routeModel(t, 'text')).toBe(t);
+  });
+});
