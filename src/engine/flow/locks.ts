@@ -1,4 +1,6 @@
-import type { Graph } from '../types';
+import type { Graph, GraphNode } from '../types';
+import { useStore } from '../../store/store';
+import { toast } from '../../store/toasts';
 
 /*
  * A node run holds the nodes it writes (the nodes it runs) and the nodes it reads (their inputs, up the graph).
@@ -40,4 +42,11 @@ export function lockAssets(ids: string[]): () => void {
 }
 export function assetsInUse(ids: string[]): boolean {
   return [...assetLocks].some(held => ids.some(id => held.has(id)));
+}
+
+/** Regenerate on a node: the node holding any attempt of `g`'s operation (the card may show an older one) is held while the new attempt runs, so a second click cannot pay again. Toasts and returns undefined when it is already running. */
+export function holdAttemptNode(g: { id: string; sessionId: string; operationId?: string }, nodes: GraphNode[]): { node?: GraphNode; release: () => void } | undefined {
+  const gens = useStore.getState().generations;
+  const node = nodes.find((n) => 'generationId' in n.data && n.data.generationId && (gens[n.data.generationId]?.operationId ?? n.data.generationId) === (g.operationId ?? g.id));
+  try { return { node, release: node ? lockNodes(g.sessionId, [node.id]) : () => {} }; } catch (e) { toast((e as Error).message, 'error'); }
 }

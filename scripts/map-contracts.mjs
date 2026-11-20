@@ -204,7 +204,7 @@ export default [
     what: 'Todo plan con coste mayor que cero o desconocido espera aprobación, también en Auto.',
     sides: [
       ['src/engine/pricing.ts', 'export function needsSpendCheck'],
-      ['src/engine/agent/runtimeShared.ts', "style === 'auto' && !needsSpendCheck(total)"],
+      ['src/engine/agent/runtimeShared.ts', "style === 'auto' && !needsSpendCheck(preparedTotal ?? planTotal)"],
     ],
     tests: ['tests/engine.test.ts'],
   },

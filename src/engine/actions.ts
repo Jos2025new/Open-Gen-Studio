@@ -17,7 +17,7 @@ import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec
 import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
-import { lockNodes } from './flow/locks';
+import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { ensureSpaceSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
@@ -452,14 +452,9 @@ export async function regenerate(generationId: string): Promise<void> {
   const spec = specFrom(g);
   const session = get().sessions[g.sessionId];
   // Node generations update their node; everything else appears in the conversation.
-  // The card may show an older attempt of the same operation (a click already made a newer one): the node is found by the operation.
-  const opOf = (id: string | undefined) => (id ? get().generations[id]?.operationId ?? id : undefined);
-  const node = session?.graph.nodes.find((n) => runsGeneration(n.data) && opOf(n.data.generationId) === (g.operationId ?? g.id));
-  // The node is held while its new attempt runs (like a Run): a second click on the same card cannot pay for another one.
-  let release = () => {};
-  if (node) {
-    try { release = lockNodes(g.sessionId, [node.id]); } catch (e) { toast((e as Error).message, 'error'); return; }
-  }
+  const held = holdAttemptNode(g, session?.graph.nodes ?? []);
+  if (!held) return;
+  const node = held.node;
   const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate });
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
@@ -469,7 +464,7 @@ export async function regenerate(generationId: string): Promise<void> {
   }
   runGeneration(next.id).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
-  }).finally(release);
+  }).finally(held.release);
 }
 
 /** Put lyrics into Audio on a music model and turn off "Write lyrics for me". */
