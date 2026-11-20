@@ -9,17 +9,18 @@ import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
 import { forgetBalances, isCreditError, onGenerationCredit } from '../src/engine/credit';
 import { useAlerts } from '../src/engine/alerts';
+import { isMuted, setMuted } from '../src/engine/notices';
 
 const m = (provider: 'nanogpt' | 'atlas', id: string, usd: number): ModelSummary =>
   ({ ref: `${provider}::${id}`, provider, id, name: id, kind: 'video', acceptsText: true, acceptsImage: true, tags: [], price: { skus: [{ unit: 'second', usd }] } }) as unknown as ModelSummary;
 
-const setup = (atlasUsd: number, atlasBalance: number) => {
+const setup = (atlasUsd: number, atlasBalance: number, autoSwitchProvider: 'ask' | 'always' | 'never' = 'always') => {
   const nano = m('nanogpt', 'bytedance-seedance-2-0-fast', 0.1);
   const atlas = m('atlas', 'bytedance/seedance-2.0-fast/image-to-video', atlasUsd);
   const other = m('atlas', 'bytedance/seedance-2.0/image-to-video', 0.3);
   const st = useStore.getState();
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
+    settings: { ...st.settings, autoSwitchProvider, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
     catalog: { ...st.catalog, models: { [nano.ref]: nano, [atlas.ref]: atlas, [other.ref]: other } },
     generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'video', modelRef: nano.ref, modelName: nano.name, status: 'error', inputs: { refs: [] }, settings: { count: 1 }, assetIds: [] } as never },
   });
@@ -45,6 +46,41 @@ describe('no credit at the provider', () => {
     expect(rerun).toHaveBeenCalledWith('g1');
     expect(useStore.getState().generations.g1.provider).toBe('atlas'); // the label follows the model it was switched to
     expect(useAlerts.getState().alerts[0].text).toMatch(/NanoGPT has no credit: .* switched to the same model at Atlas/);
+  });
+
+  it('by default it asks first, with the new provider and price, and switches only on "Yes, this time"', async () => {
+    setup(0.08, 5, 'ask');
+    const rerun = vi.fn(async () => []);
+    expect(await onGenerationCredit('g1', rerun)).toBe(false);
+    expect(rerun).not.toHaveBeenCalled();
+    expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::bytedance-seedance-2-0-fast');
+    const alert = useAlerts.getState().alerts[0];
+    expect(alert.text).toMatch(/Run it on Atlas Cloud instead \(.*\$0\.\d+.*same model, same price or less\)\?/);
+    expect(alert.actions?.map((a) => a.label)).toEqual(['Yes, this time', 'Don\u2019t ask again']);
+    alert.actions![0].run();
+    await vi.waitFor(() => expect(rerun).toHaveBeenCalledTimes(1));
+    expect(useStore.getState().generations.g1.modelRef).toBe('atlas::bytedance/seedance-2.0-fast/image-to-video');
+    expect(useStore.getState().settings.autoSwitchProvider).toBe('ask'); // "this time" does not change the setting
+  });
+
+  it('"Don\u2019t ask again" switches now and from then on switches by itself', async () => {
+    setup(0.08, 5, 'ask');
+    const rerun = vi.fn(async () => []);
+    await onGenerationCredit('g1', rerun);
+    useAlerts.getState().alerts[0].actions![1].run();
+    await vi.waitFor(() => expect(rerun).toHaveBeenCalledTimes(1));
+    expect(useStore.getState().settings.autoSwitchProvider).toBe('always');
+    expect(isMuted('credit-switch')).toBe(true);
+    setMuted('credit-switch', false); // Settings brings the question back
+    expect(useStore.getState().settings.autoSwitchProvider).toBe('ask');
+  });
+
+  it('"never" does not switch by itself: only the manual choices', async () => {
+    setup(0.08, 5, 'never');
+    const rerun = vi.fn(async () => []);
+    expect(await onGenerationCredit('g1', rerun)).toBe(false);
+    expect(rerun).not.toHaveBeenCalled();
+    expect(useAlerts.getState().alerts[0].text).toMatch(/Run it with another model that has credit/);
   });
 
   it('never switches by itself to a dearer model: it offers the choices above the prompt box', async () => {

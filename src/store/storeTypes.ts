@@ -18,6 +18,10 @@ export interface Settings {
   budgetAccepted?: number | null;
   /** Over-limit runs never ask. */
   budgetNoAsk?: boolean;
+  /** When a provider is out of credit and the same model (same price or less) is elsewhere: ask first (default), switch on its own, or never switch by itself. */
+  autoSwitchProvider?: 'ask' | 'always' | 'never';
+  /** Notices silenced with "Don't show again" (ids in engine/notices.ts); the user brings them back in Settings. */
+  mutedNotices?: string[];
   /** % over approval before a step waits (default 5). */
   priceMargin?: number | 'off';
   /** Browser notification when generations finish in a hidden tab (default off; permission is asked only when turned on). */

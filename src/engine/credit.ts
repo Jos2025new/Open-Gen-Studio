@@ -9,6 +9,7 @@ import { lineKey, modelFamily } from './variants';
 import { estimateMedia } from './costs';
 import type { GenSettings, Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, useStore } from '../store/store';
+import { autoSwitchMode, setMuted } from './notices';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -153,7 +154,20 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     return rerun(genId);
   };
   const auto = options.find((o) => o.same);
-  if (auto) {
+  const mode = autoSwitchMode();
+  if (auto && mode === 'ask') {
+    // First time (and until "Don't ask again"): the user decides, seeing the new provider and price. Same model, same price or less (ADR 0025 C).
+    const id = pushAlert({
+      level: 'warn',
+      text: `${empty} has no credit for ${cur.name}. Run it on ${PROVIDER_LABELS[auto.model.provider]} instead (${label(auto.model, undefined, auto.usd)}, same model, same price or less)?`,
+      actions: [
+        { label: 'Yes, this time', run: () => { dismissAlert(id); void switchTo(auto.model).catch(logged('switch provider after no credit')); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); setMuted('credit-switch', true); void switchTo(auto.model).catch(logged('switch provider after no credit')); } },
+      ],
+    });
+    return false;
+  }
+  if (auto && mode === 'always') {
     pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
     await switchTo(auto.model);
     return true;
