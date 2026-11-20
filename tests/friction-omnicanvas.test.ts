@@ -10,8 +10,7 @@ vi.mock('../src/lib/idb', () => ({
   getAssetBlob: async () => undefined,
   putAssetBlob: async () => undefined,
 }));
-import { PORT_MIN_ZOOM, portZoom, rejectedDrop } from '../src/components/node/connectionDrop';
-import { connectionError } from '../src/engine/flow/graph';
+import { PORT_MIN_ZOOM, portZoom, refusedDropReason, rejectedDrop, reportRefusedDrop } from '../src/components/node/connectionDrop';
 import { addNode } from '../src/engine/flow/actions';
 import { OMNI_ITEM } from '../src/components/shell/navModel';
 import { createSession, setGraph, useStore } from '../src/store/store';
@@ -25,25 +24,50 @@ beforeEach(() => {
 
 const state = (over: Record<string, unknown>) => ({ isValid: false, fromNode: { id: 'a' }, fromHandle: { type: 'source', id: 'out' }, toNode: { id: 'b' }, toHandle: { type: 'target', id: 'prompt' }, ...over }) as never;
 
+const graphWith = () => setGraph(sid, (g) => ({
+  edges: g.edges,
+  nodes: [
+    { id: 'p', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'P', text: '' } as never },
+    { id: 'i', position: { x: 300, y: 0 }, data: { kind: 'image', title: 'I', prompt: '', modelRef: 'm', settings: {}, outputIndex: 0 } as never },
+  ],
+}));
+const reason = (st: unknown) => refusedDropReason(st as never, useStore.getState().sessions[sid].graph, useStore.getState().assets);
+// text output 'p' dropped on the image node's 'ref' input, dragging from either end.
+const fwd = { fromNode: { id: 'p' }, fromHandle: { type: 'source', id: 'out' }, toNode: { id: 'i' }, toHandle: { type: 'target', id: 'ref' } };
+const rev = { fromNode: { id: 'i' }, fromHandle: { type: 'target', id: 'ref' }, toNode: { id: 'p' }, toHandle: { type: 'source', id: 'out' } };
+
 describe('a connection dropped on an incompatible port', () => {
-  it('is identified from the drop, with both ports, so the reason can be shown', () => {
-    expect(rejectedDrop(state({}))).toEqual({ source: 'a', target: 'b', sourceHandle: 'out', targetHandle: 'prompt' });
+  it('is identified from the drop, oriented source→target in either drag direction', () => {
+    const tried = { source: 'p', target: 'i', sourceHandle: 'out', targetHandle: 'ref' };
+    expect(rejectedDrop(state(fwd))).toEqual(tried);
+    expect(rejectedDrop(state(rev))).toEqual(tried);
   });
-  it('is not one when it lands on the background, is valid, or starts from an input', () => {
+  it('is not one when it lands on the background or is valid', () => {
     expect(rejectedDrop(state({ toNode: null, toHandle: null }))).toBeNull();
     expect(rejectedDrop(state({ isValid: true }))).toBeNull();
-    expect(rejectedDrop(state({ fromHandle: { type: 'target', id: 'x' } }))).toBeNull();
   });
-  it('has a reason naming both types, and creates no cable', () => {
-    setGraph(sid, (g) => ({
-      edges: g.edges,
-      nodes: [
-        { id: 'a', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'I', prompt: '', modelRef: 'm', settings: {}, outputIndex: 0 } as never },
-        { id: 'b', position: { x: 300, y: 0 }, data: { kind: 'image', title: 'J', prompt: '', modelRef: 'm', settings: {}, outputIndex: 0 } as never },
-      ],
-    }));
-    const why = connectionError(useStore.getState().sessions[sid].graph, useStore.getState().assets, { source: 'a', target: 'b', targetHandle: 'prompt', sourceHandle: 'out' });
-    expect(why).toMatch(/image/i);
+  it('names both port types in the reason, in both directions', () => {
+    graphWith();
+    for (const drop of [fwd, rev]) expect(reason(state(drop))).toMatch(/expects image.*text|text.*expects image/i);
+  });
+  it('refuses output→output and input→input with a reason', () => {
+    graphWith();
+    expect(reason(state({ ...fwd, toHandle: { type: 'source', id: 'out' } }))).toMatch(/output.*input/);
+    expect(reason(state({ ...rev, toHandle: { type: 'target', id: 'ref' } }))).toMatch(/output.*input/);
+  });
+  it('toasts the reason once from onConnectEnd and reports the drop as handled', () => {
+    graphWith();
+    const notify = vi.fn();
+    const st = useStore.getState();
+    expect(reportRefusedDrop(state(rev), st.sessions[sid].graph, st.assets, notify)).toBe(true);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0]).toMatch(/^Cannot connect: .*image/i);
+    expect(reportRefusedDrop(state({ isValid: true }), st.sessions[sid].graph, st.assets, notify)).toBe(false);
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+  it('says nothing for a valid drop and creates no cable when refused', () => {
+    graphWith();
+    expect(reason(state({ ...fwd, isValid: true }))).toBeNull();
     expect(useStore.getState().sessions[sid].graph.edges).toHaveLength(0);
   });
 });

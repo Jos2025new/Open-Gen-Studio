@@ -31,7 +31,7 @@ import { revealRect } from '../omni/revealNode';
 import { useOmniEntries } from '../omni/useOmniEntries';
 import { settleNewNodes } from '../../engine/flow/settle';
 import { ConnectionPreview } from './ConnectedNodeMenu';
-import { connectionDrop, refusedDropReason, usePortZoom } from './connectionDrop';
+import { connectionDrop, reportRefusedDrop, usePortZoom } from './connectionDrop';
 import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
@@ -453,8 +453,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         onConnectEnd={(e, state) => {
           if (embedded) return;
           const g = useStore.getState();
-          const why = refusedDropReason(state, g.sessions[sessionId].graph, g.assets);
-          if (why) return toast(`Cannot connect: ${why}`, 'error');
+          if (reportRefusedDrop(state, g.sessions[sessionId].graph, g.assets, toast)) return;
           const dropped = connectionDrop(e, state, canvasRef.current);
           if (dropped) setMenu(dropped);
         }}

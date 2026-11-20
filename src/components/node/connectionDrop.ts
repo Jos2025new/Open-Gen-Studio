@@ -3,16 +3,30 @@ import { useCallback, useEffect, type RefObject } from 'react';
 import { connectionError } from '../../engine/flow/graph';
 import type { Asset, Graph } from '../../engine/types';
 
-/** An output released on a port that cannot take it: the connection that was tried, to say why it is refused. */
-export function rejectedDrop(state: Parameters<OnConnectEnd>[1]): { source: string; target: string; sourceHandle: string | null; targetHandle: string | null } | null {
-  if (state.isValid || !state.toNode || !state.toHandle || state.fromHandle?.type !== 'source' || state.toHandle.type !== 'target' || !state.fromNode) return null;
-  return { source: state.fromNode.id, target: state.toNode.id, sourceHandle: state.fromHandle.id ?? null, targetHandle: state.toHandle.id ?? null };
+type Tried = { source: string; target: string; sourceHandle: string | null; targetHandle: string | null };
+
+/** A cable released on a port that cannot take it, in either direction (output→input or input→output): the connection tried,
+ * oriented source→target, or 'same' when both ends are outputs (or both inputs). */
+export function rejectedDrop(state: Parameters<OnConnectEnd>[1]): Tried | 'same' | null {
+  const { fromNode, fromHandle, toNode, toHandle } = state;
+  if (state.isValid || !fromNode || !toNode || !fromHandle || !toHandle) return null;
+  if (fromHandle.type === toHandle.type) return 'same';
+  const [out, outH, inn, inH] = fromHandle.type === 'source' ? [fromNode, fromHandle, toNode, toHandle] : [toNode, toHandle, fromNode, fromHandle];
+  return { source: out.id, target: inn.id, sourceHandle: outH.id ?? null, targetHandle: inH.id ?? null };
 }
 
 /** Why a drop on an incompatible port is refused (both port types named by connectionError), or null when it is not one. */
 export function refusedDropReason(state: Parameters<OnConnectEnd>[1], graph: Graph, assets: Record<string, Asset>): string | null {
   const refused = rejectedDrop(state);
+  if (refused === 'same') return 'an output connects to an input, not to another output (or input to input)';
   return refused ? connectionError(graph, assets, refused) : null;
+}
+
+/** Says once why a refused drop was refused; true when the drop was one (so no picker opens). */
+export function reportRefusedDrop(state: Parameters<OnConnectEnd>[1], graph: Graph, assets: Record<string, Asset>, notify: (text: string, kind: 'error') => void): boolean {
+  const why = refusedDropReason(state, graph, assets);
+  if (why) notify(`Cannot connect: ${why}`, 'error');
+  return Boolean(why);
 }
 
 /** Below this zoom ports stop growing: the enlarged hit area is capped at 12 px / 0.25 = 48 px (never larger than a card). */
