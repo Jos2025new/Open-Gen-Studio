@@ -1,6 +1,6 @@
 # 070 · Sesión maestra 2026-11-19/20: workers con revisión de Neon e integración
 
-Continúa la [069](069-2026-11-W47-master-cierre-fusion.md). Todo está en la rama `task/integracion` (`c2a0b682` o posterior), **sin fusionar a `main`**: esa fusión espera la aprobación del usuario. La app real no se tocó.
+Continúa la [069](069-2026-11-W47-master-cierre-fusion.md). Todo está en `main` (fast-forward desde `task/integracion`, `fcca386a`, con la aprobación del usuario el 2026-11-20; sin push). La app real no se tocó.
 
 ## Método
 
@@ -51,7 +51,7 @@ Continúa la [069](069-2026-11-W47-master-cierre-fusion.md). Todo está en la ra
 
 ## Pendiente, en orden
 
-1. **Aprobación del usuario para fusionar `task/integracion` en `main`** (sin push).
+1. **Push de `main`** cuando el usuario lo pida.
 2. **Una revisión de Neon que corra la suite de su área**, no solo los tests tocados: dos fallos de dinero solo aparecieron con `npm test` completo.
 3. **Arrastre a menos de 3 fps con 200 nodos** (crítico, ya existía): medir con la sonda y arreglar. Neon señaló cálculos O(n) en `CanvasNavigation` y `NodeSide`.
 4. **Check permanente** que impida cálculos pesados del lienzo en cada arrastre.
