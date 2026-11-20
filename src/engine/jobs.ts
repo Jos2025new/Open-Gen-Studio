@@ -867,7 +867,7 @@ export function retryGeneration(id: string, planItemId?: string): Promise<string
   if (held instanceof SchemaUnavailableError) return Promise.reject(held);
   if (!held) return Promise.resolve(g.assetIds);
   try {
-    // Create a new Generation as another attempt of the same operation.
+    // New Generation: another attempt of the same operation.
     const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
     // The failed attempt's card now shows this one, so the retry's result is seen.
