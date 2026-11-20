@@ -70,6 +70,6 @@ describe('omnicanvas entry and ports', () => {
   it('keeps a minimum port size on screen at any zoom, from the viewport zoom', () => {
     const css = readFileSync('src/styles/node-system.css', 'utf8');
     expect(css).toMatch(/\.node-canvas\.is-omni \.react-flow__node \.port \{[^}]*12px \/ var\(--rf-zoom/);
-    expect(readFileSync('src/components/node/NodeWorkspace.tsx', 'utf8')).toMatch(/setProperty\('--rf-zoom'/);
+    expect(readFileSync('src/components/node/connectionDrop.ts', 'utf8')).toMatch(/setProperty\('--rf-zoom'/);
   });
 });

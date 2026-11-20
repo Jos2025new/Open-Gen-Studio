@@ -1,9 +1,23 @@
-import type { OnConnectEnd } from '@xyflow/react';
+import { useOnViewportChange, type OnConnectEnd } from '@xyflow/react';
+import type { RefObject } from 'react';
+import { connectionError } from '../../engine/flow/graph';
+import type { Asset, Graph } from '../../engine/types';
 
 /** An output released on a port that cannot take it: the connection that was tried, to say why it is refused. */
 export function rejectedDrop(state: Parameters<OnConnectEnd>[1]): { source: string; target: string; sourceHandle: string | null; targetHandle: string | null } | null {
   if (state.isValid || !state.toNode || !state.toHandle || state.fromHandle?.type !== 'source' || state.toHandle.type !== 'target' || !state.fromNode) return null;
   return { source: state.fromNode.id, target: state.toNode.id, sourceHandle: state.fromHandle.id ?? null, targetHandle: state.toHandle.id ?? null };
+}
+
+/** Why a drop on an incompatible port is refused (both port types named by connectionError), or null when it is not one. */
+export function refusedDropReason(state: Parameters<OnConnectEnd>[1], graph: Graph, assets: Record<string, Asset>): string | null {
+  const refused = rejectedDrop(state);
+  return refused ? connectionError(graph, assets, refused) : null;
+}
+
+/** The omnicanvas can sit far below 100 %: ports keep a minimum on-screen size through --rf-zoom (no re-render per frame). */
+export function usePortZoom(omni: boolean, canvas: RefObject<HTMLElement | null>) {
+  useOnViewportChange({ onChange: (v) => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(v.zoom)); } });
 }
 
 /** Only an output released on this canvas's empty pane opens the connected-node picker. */
