@@ -2,9 +2,30 @@ import { z } from 'zod';
 import { defineCommand } from './commands/types';
 import { useStore } from '../store/store';
 import { estimateOp } from './costs';
-import { OP_IDS } from './ops';
-import type { OpId } from './types';
+import { opChoice, opSpecForModel } from './opSpec';
+import { OP_IDS, OPS } from './ops';
+import type { AdvancedValue, OpId } from './types';
 import * as A from './actions';
+
+function estimateStudioOp(
+  opId: OpId,
+  opParams: Record<string, AdvancedValue>,
+  opts: { sourceAssetId?: string; sourceDims?: { width: number; height: number }; modelRef?: string; origin: 'op' | 'designer'; sessionId?: string },
+) {
+  const st = useStore.getState();
+  const engine = OPS[opId].engine;
+  const src = opts.sourceAssetId ? st.assets[opts.sourceAssetId] : opts.sourceDims;
+  if (['local', 'transcribe', 'voice'].includes(engine)) return estimateOp(opId, opParams, src, st.composer.video.settings, opts.modelRef);
+  const choice = opChoice({ op: opId, params: opParams, sourceAssetId: opts.sourceAssetId ?? '', modelRef: opts.modelRef });
+  if (!choice.ref) return estimateOp(opId, opParams, src, st.composer.video.settings, opts.modelRef);
+  const spec = opSpecForModel(
+    { sessionId: opts.sessionId ?? '', origin: opts.origin, op: opId, params: opParams, sourceAssetId: opts.sourceAssetId ?? '', sourceDims: opts.sourceDims, modelRef: opts.modelRef },
+    choice.ref,
+    choice.viaEdit,
+    st.catalog.schemas[choice.ref],
+  );
+  return spec.estimate ?? estimateOp(opId, opParams, src, spec.settings, choice.ref);
+}
 
 const id = z.string().min(1);
 const kind = z.enum(['image', 'video', 'audio', 'model3d']);
@@ -232,9 +253,9 @@ export const commands = [
     effect: 'spend',
     needs: ['session'],
     available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
-    estimate: (_ctx, args) => { const st = useStore.getState(); return estimateOp(args.op, args.params, st.assets[args.assetId], st.composer.video.settings, args.modelRef); },
+    estimate: ({ on }, args) => estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }),
     debt: 'Reads the active session and screen; failures can be reported only as notices.',
-    run: async ({ on }, args) => { const st = useStore.getState(); const e = estimateOp(args.op, args.params, st.assets[args.assetId], st.composer.video.settings, args.modelRef); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
+    run: async ({ on }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
   }),
   defineCommand({
     id: 'studio.layer.run_op',
@@ -244,9 +265,9 @@ export const commands = [
     effect: 'spend',
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : layer(ctx, args),
-    estimate: ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); return estimateOp(args.op, args.params, l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, st.composer.video.settings); },
+    estimate: ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); return estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); },
     debt: 'The action catches failures and reports them only as notices.',
-    run: async ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateOp(args.op, args.params, l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, st.composer.video.settings); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params); },
+    run: async ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params); },
   }),
   defineCommand({
     id: 'studio.generation.delete',

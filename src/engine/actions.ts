@@ -16,6 +16,7 @@ import { estimateMedia, estimateRecraftStyle } from './costs';
 import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
+import { preferredProviderLabel } from './providers/registry';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
@@ -217,8 +218,8 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   const modelRef = directModelRef(kind, st.composer[kind].modelRef, imageAtt.length > 0);
   const schema = st.catalog.schemas[modelRef];
   const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0, false, text.length);
-  if (kind === 'audio' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud in Settings to generate music.', estimate };
-  if (kind === 'model3d' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud or NanoGPT in Settings to generate 3D models.', estimate };
+  if (kind === 'audio' && !modelRef) return { ok: false, reason: `Connect ${preferredProviderLabel('audio')} in Settings to generate music.`, estimate };
+  if (kind === 'model3d' && !modelRef) return { ok: false, reason: `Connect ${preferredProviderLabel('model3d')} in Settings to generate 3D models.`, estimate };
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
   if (st.ui.workspace === 'designer' && kind !== 'image') return { ok: false, reason: `Designer layers cannot hold ${kind}.`, estimate };
   if (schema.missing?.length) return { ok: false, reason: `This model needs ${schema.missing.join(', ')}, which the app cannot send yet.`, estimate };
@@ -473,7 +474,7 @@ export async function applyLyrics(text: string): Promise<void> {
   const preferred = preferredModel('audio');
   const ref = isMusic(current) ? current : isMusic(preferred) ? preferred : modelsOf('audio').find((m) => !m.textOutput)?.ref;
   if (!ref) {
-    toast('No music model is available. Connect Atlas Cloud in Settings.', 'error');
+    toast(`No music model is available. Connect ${preferredProviderLabel('audio')} in Settings.`, 'error');
     return;
   }
   if (ref !== current) await selectComposerModel('audio', ref);

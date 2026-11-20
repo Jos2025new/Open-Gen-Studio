@@ -11,12 +11,12 @@ import { parseSync } from 'rolldown/utils';
 // 3. jobs.ts holds the send, not the operation specs (opSpec.ts) or the remote-job recovery (jobRecovery.ts).
 const RULES = { neutral: true, split: true };
 const NAMED_PROVIDER = /\b(atlas|fal|nanogpt|openrouter)\b|\bOP_PROVIDERS\b/i;
-const NEUTRAL_FILES = new Set(['jobs.ts', 'quotes.ts', 'costs.ts', 'opSpec.ts', 'specialSends.ts', 'planSteps/audio.ts']
+const NEUTRAL_FILES = new Set(['jobs.ts', 'quotes.ts', 'costs.ts', 'opSpec.ts', 'specialSends.ts', 'planSteps/audio.ts', 'actions.ts', 'actions.commands.ts', 'executor.ts', 'plan.ts', 'improveShot.ts', 'budget.ts']
   .map((file) => `src/engine/${file}`));
 const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|inputKindOf|recover\w*|resumeRemote\w*)\b/;
 
 const OWN_CHOICE = /\b(opModelForAsset|opModelFromRef|reusedOpChoice)\(/;
-const CHOICE_CALLERS = ['src/engine/planSteps/exec/op.ts', 'src/engine/flow/actions.ts'];
+const CHOICE_CALLERS = ['src/engine/planSteps/exec/op.ts', 'src/engine/flow/actions.ts', 'src/engine/actions.commands.ts'];
 
 function isTypeOnlyDecl(node) {
   if (node.importKind === 'type' || node.exportKind === 'type') return true;

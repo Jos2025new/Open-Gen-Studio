@@ -108,7 +108,7 @@ export function operationProviderLabels(): string {
     .map((p) => PROVIDER_LABELS[p]).join(', ').replace(/, ([^,]*)$/, ' or $1');
 }
 
-export function preferredProviderLabel(kind: 'transcribe' | 'audio'): string {
+export function preferredProviderLabel(kind: 'transcribe' | 'audio' | 'model3d'): string {
   return REMOTE_PROVIDERS.filter((p) => PREFERRED[p][kind].length).reverse()
     .map((p) => PROVIDER_LABELS[p]).join(' or ');
 }

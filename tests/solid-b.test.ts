@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
 import { estimateSteps } from '../src/engine/executor';
+import { commands as studioCommands } from '../src/engine/actions.commands';
+import { checkDirect } from '../src/engine/actions';
 import { opChoice, opSpec } from '../src/engine/opSpec';
 import { costAuthorization } from '../src/engine/priceAuthorization';
 import { useStore } from '../src/store/store';
@@ -44,5 +46,18 @@ describe('Opus #2: one choice of the operation model', () => {
   });
   it('a step after a clip still to be made follows that step\'s model (no source asset yet)', () => {
     expect(opChoice({ op: 'continue', params: {}, sourceAssetId: '', upstreamModelRef: VID }).ref).toBe(VID);
+  });
+  it('studio.asset.run_op estimates through opChoice + opSpecForModel (same coerced price as opSpec)', async () => {
+    const cmd = studioCommands.find((c) => c.id === 'studio.asset.run_op')!;
+    const sid = useStore.getState().activeSessionId;
+    const est = await cmd.estimate!({ on: { session: sid } } as never, { assetId: 'clip', op: 'continue', params: { _modelRef: VID } } as never);
+    const spec = await opSpec({ sessionId: sid, sourceAssetId: 'clip', op: 'continue', params: { _modelRef: VID }, origin: 'op' });
+    expect(est.usd).toBeCloseTo(spec.estimate!.usd!);
+  });
+  it('missing-provider hints in checkDirect keep exact wording via preferredProviderLabel', () => {
+    const st = useStore.getState();
+    useStore.setState({ composer: { ...st.composer, audio: { ...st.composer.audio, modelRef: '' }, model3d: { ...st.composer.model3d, modelRef: '' } } });
+    expect(checkDirect('audio').reason).toBe('Connect Atlas Cloud in Settings to generate music.');
+    expect(checkDirect('model3d').reason).toBe('Connect Atlas Cloud or NanoGPT in Settings to generate 3D models.');
   });
 });
