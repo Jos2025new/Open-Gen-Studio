@@ -1,7 +1,7 @@
 import { ComposerAlerts } from './ComposerAlerts';
 import { useRecipientThread } from '../../engine/agent/useThread';
 import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
-import { isSpaceSession } from '../../store/spaceSession';
+import { sendSessionId, ensureSendSession, isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, Layers, Pencil, X, Zap } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
@@ -187,12 +187,14 @@ export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKin
   const schema = useStore((s) => s.catalog.schemas);
   const assets = useStore((s) => s.assets);
   const spent = useStore((s) => s.spentUsd);
-  const budget = useStore((s) => `${s.settings.budgetOn}|${s.settings.budgetUsd}|${s.settings.budgetAccepted}|${s.settings.budgetNoAsk}|${s.sessions[s.activeSessionId]?.noAskOverLimit}`);
+  const sid = useStore(sendSessionId);
+  const budget = useStore((s) => s.settings);
+  const noAsk = useStore((s) => s.sessions[sid]?.noAskOverLimit);
   const workspace = useStore((s) => s.ui.workspace);
   const models = useStore((s) => s.catalog.models);
   const quotes = useStore((s) => s.quotes);
   // Recompute whenever any input of the check changes (an Atlas quote arriving included).
-  const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, workspace, models, quotes]);
+  const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, sid, noAsk, workspace, models, quotes]);
   const pop = usePopover();
   const unknown = check.estimate.usd == null;
   const launch = () => { onLaunch?.(useStore.getState().composer.text); return generateDirect(kind); };
@@ -221,6 +223,8 @@ export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKin
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Confirm cost">
         <SpendConfirm
+          sessionId={sid}
+          resolveSessionId={ensureSendSession}
           title="Generate"
           estimate={check.estimate}
           confirmLabel="Generate"

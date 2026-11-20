@@ -88,7 +88,7 @@ describe('keyframes end to end (fal FLUX 3)', () => {
     useStore.setState({
       assets: { k1: img('k1'), k2: img('k2'), k3: img('k3') },
       catalog: { ...st.catalog, models: { [ref]: { ref, provider: 'fal', id: ref.slice(5), name: 'FLUX 3 keyframes', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] } as ModelSummary }, schemas: { [ref]: falSchema(ref.slice(5), 'video') } },
-      settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } },
+      settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, fal: 'k' } },
     });
   }
 

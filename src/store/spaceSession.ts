@@ -6,6 +6,17 @@ export const isSpaceSession = (s: Session | undefined): boolean => s?.hidden ===
 
 const marked = (sessions: Record<string, Session>): Session | undefined => Object.values(sessions).find(isSpaceSession);
 
+/** Preview a direct send's budget in its destination without creating a session. */
+export function sendSessionId(st: ReturnType<typeof useStore.getState>): string {
+  return st.ui.space ? marked(st.sessions)?.id ?? '__pending_space_session__' : st.activeSessionId;
+}
+
+/** Resolve the same destination when the user confirms or starts a send. */
+export function ensureSendSession(): string {
+  const st = useStore.getState();
+  return st.ui.space ? ensureSpaceSession() : st.activeSessionId;
+}
+
 /** Session lists, Home and the search: never the hidden container. */
 export function visibleSessions(sessions: Record<string, Session>): Session[] {
   return Object.values(sessions).filter((s) => !isSpaceSession(s));

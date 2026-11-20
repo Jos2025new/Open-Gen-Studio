@@ -7,7 +7,7 @@ const runAssetOp = vi.hoisted(() => vi.fn(async () => []));
 vi.mock('../src/engine/actions', async (orig) => ({ ...(await orig<typeof import('../src/engine/actions')>()), runAssetOp, opEstimate: async () => ({ estimate: { usd: 0.01 }, modelName: 'test' }) }));
 vi.mock('../src/engine/catalog', async (orig) => ({ ...(await orig<typeof import('../src/engine/catalog')>()), ensureSchema: async () => undefined }));
 vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('../src/engine/jobs')>()), runGeneration: vi.fn(async () => []) }));
-import { generateDirect } from '../src/engine/actions';
+import { SendDirect } from '../src/components/composer/Composer';
 import { ToolsPanel } from '../src/components/space/ToolsPanel';
 import { ReuseButton } from '../src/components/assets/ReuseButton';
 import { canReuse, reuseGeneration } from '../src/engine/reuse';
@@ -77,15 +77,36 @@ it('Create reuse from Designer keeps the start frame before references and the s
   const st = useStore.getState();
   useStore.setState({ assets: { start: { id: 'start', kind: 'image' } as Asset, reference: { id: 'reference', kind: 'image' } as Asset },
     ui: { ...st.ui, workspace: 'designer', home: true, space: undefined },
+    settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: null, budgetNoAsk: false },
+    sessions: { ...st.sessions, [st.activeSessionId]: { ...st.sessions[st.activeSessionId], noAskOverLimit: true } },
     catalog: { ...st.catalog, models: { replay: { ref: 'replay', provider: 'local', id: 'replay', name: 'Replay', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] } }, schemas: { replay: { ref: 'replay', source: 'builtin', params: [{ key: 'seed', label: 'Seed', role: 'seed', type: 'integer' }], slots: { firstFrame: { key: 'start', format: 'url' }, images: { key: 'refs', min: 0, max: 2, multiple: true, format: 'url' } } } } } });
   const video: Generation = { ...g, place: 'space-create', op: undefined, kind: 'video', modelRef: 'replay', prompt: 'move', inputs: { firstFrame: 'start', refs: ['reference'] }, settings: { count: 1, seed: 42, advanced: {} } };
   await reuseGeneration(video);
   expect(useStore.getState().ui).toMatchObject({ space: 'create', workspace: 'chat' });
   expect(useStore.getState().composer.attachments).toEqual(['start', 'reference']);
-  await generateDirect('video');
-  const launched = Object.values(useStore.getState().generations).find((result) => result.modelRef === 'replay');
-  expect(launched?.settings.seed).toBe(42);
-  expect(launched?.inputs).toMatchObject({ firstFrame: 'start', refs: ['reference'] });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  try {
+    act(() => root.render(createElement(SendDirect, { kind: 'video' })));
+    act(() => host.querySelector<HTMLButtonElement>('.send-btn')!.click());
+    const launched = () => Object.values(useStore.getState().generations).filter((result) => result.modelRef === 'replay');
+    expect(launched()).toHaveLength(0);
+    const confirm = [...document.querySelectorAll('button')].find((button) => button.textContent?.includes('Continue once'));
+    expect(confirm).toBeDefined();
+    await act(async () => { confirm!.click(); });
+    expect(launched()).toHaveLength(1);
+    const [result] = launched();
+    expect(useStore.getState().sessions[result.sessionId].hidden).toBe(true);
+    expect(result.settings.seed).toBe(42);
+    expect(result.inputs).toMatchObject({ firstFrame: 'start', refs: ['reference'] });
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+    useStore.setState({ settings: st.settings, sessions: st.sessions, generations: st.generations });
+  }
 });
 
 it('fixed Tools replay their original model without changing the Settings model', async () => {

@@ -53,7 +53,7 @@ function install(refs: string[], opsOverride: Record<string, string | null> = {}
   useStore.setState({
     assets: { photo: image('photo'), mask: image('mask', maskSize[0], maskSize[1], 'mask') },
     catalog: { ...st.catalog, models, schemas },
-    settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k', atlas: '', nanogpt: '' }, ops: { ...st.settings.ops, editRegion: null, removeObject: null, ...opsOverride } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, fal: 'k', atlas: '', nanogpt: '' }, ops: { ...st.settings.ops, editRegion: null, removeObject: null, ...opsOverride } },
   });
 }
 async function capture(run: () => Promise<unknown>): Promise<Record<string, unknown>> {

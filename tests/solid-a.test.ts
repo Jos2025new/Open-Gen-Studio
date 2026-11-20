@@ -95,6 +95,7 @@ describe('4. direct video resolves the model before routing the inputs', () => {
     const sch = (ref: string, first: boolean): ModelSchema => ({ ref, params: [], source: 'catalog', slots: { prompt: 'prompt', ...(first ? { firstFrame: { key: 'image', format: 'url' as const } } : {}) } });
     const st = useStore.getState();
     useStore.setState({ catalog: { ...st.catalog, models: { ...st.catalog.models, [t]: mk(t, false), [i]: mk(i, true) }, schemas: { ...st.catalog.schemas, [t]: sch(t, false), [i]: sch(i, true) } },
+      settings: { ...st.settings, budgetOn: false },
       composer: { ...st.composer, mode: 'video', text: 'move', attachments: ['a0'], video: { modelRef: t, settings: { count: 1, advanced: {} } } } });
     await generateDirect('video');
     const g = Object.values(useStore.getState().generations).find((x) => x.prompt === 'move');

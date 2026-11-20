@@ -38,7 +38,7 @@ function install(frameRules: NonNullable<ModelSchema['slots']['frameRules']>, so
     assets: { ref: asset('ref', 'image'), subject: asset('subject', 'image'), last: asset('last', 'image'), clip: asset('clip', 'video') },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], id: sid } },
     catalog: { ...st.catalog, models: { ...st.catalog.models, [modelRef]: model }, schemas: { ...st.catalog.schemas, [modelRef]: schema(frameRules, source) } },
-    settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'test-key' }, ops: { ...st.settings.ops, videoEdit: modelRef } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'test-key' }, ops: { ...st.settings.ops, videoEdit: modelRef } },
   });
 }
 

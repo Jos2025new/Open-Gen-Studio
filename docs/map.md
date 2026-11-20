@@ -48,7 +48,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src` | 2 | 0 |
 | `src/components/assets` | 17 | 9 |
 | `src/components/chat` | 23 | 24 |
-| `src/components/composer` | 15 | 17 |
+| `src/components/composer` | 15 | 18 |
 | `src/components/designer` | 133 | 57 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 26 | 22 |

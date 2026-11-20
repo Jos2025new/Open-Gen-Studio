@@ -101,7 +101,7 @@ describe('subjects and voices end to end (fal)', () => {
       sessions: { ...st.sessions, s: { ...(Object.values(st.sessions)[0] as Loose), id: 's' } },
       library: [{ id: 'm', name: 'Mia', frontalAssetId: 'mia', refAssetIds: ['mia2'], voiceId: '829877809978941442' }, { id: 'r', name: 'Rex', refAssetIds: [] }],
       catalog: { ...st.catalog, models: { [ref]: { ref, provider: 'fal', id: ref.slice(5), name: 'Kling O3', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] } as ModelSummary }, schemas: { [ref]: schema } },
-      settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } },
+      settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, fal: 'k' } },
     });
   }
 
@@ -197,7 +197,7 @@ describe('subjects and voices end to end (fal)', () => {
     blobs.set('speech', new Blob([new Uint8Array(4)], { type: 'audio/mpeg' }));
     blobs.set('short', new Blob([new Uint8Array(4)], { type: 'audio/mpeg' }));
     const st = useStore.getState();
-    useStore.setState({ assets: { speech: img('speech', 'audio', 12), short: img('short', 'audio', 2) }, settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } } });
+    useStore.setState({ assets: { speech: img('speech', 'audio', 12), short: img('short', 'audio', 2) }, settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, fal: 'k' } } });
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
       if (url.endsWith('/fal-ai/kling-video/create-voice')) {
         expect(JSON.parse(String(init?.body)).voice_url).toMatch(/^data:audio\/mpeg/);

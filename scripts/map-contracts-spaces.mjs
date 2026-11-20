@@ -16,16 +16,17 @@ export default [
   },
   {
     id: 'space-container',
-    what: 'Etapa 1 (ADR 0023): Create y Tools escriben en la sesión marcada hidden, que no cambia la activa ni aparece en listas, Home ni contadores.',
+    what: 'Etapa 1 (ADR 0023): Create y Tools escriben en la sesión marcada hidden, que no cambia la activa ni aparece en listas, Home ni contadores. La confirmación de Create concede el pase a esa sesión.',
     sides: [
       ['src/store/spaceSession.ts', 'export function ensureSpaceSession'],
-      ['src/engine/actions.ts', 'const sessionId = st.ui.space ? ensureSpaceSession()'],
+      ['src/engine/actions.ts', 'const sessionId = ensureSendSession()'],
+      ['src/components/composer/Composer.tsx', 'resolveSessionId={ensureSendSession}'],
       ['src/store/spaceSession.ts', 'export function visibleSessions'],
       ['src/components/shell/SessionSwitcher.tsx', 'visibleSessions(sessions)'],
       ['src/components/shell/SessionsPanel.tsx', 'visibleSessions(sessions)'],
       ['src/components/shell/HomeView.tsx', 'visibleSessions(sessions)'],
     ],
-    tests: ['tests/space-place.test.ts', 'tests/create-space.test.ts'],
+    tests: ['tests/space-place.test.ts', 'tests/create-space.test.ts', 'tests/space-reuse.test.ts'],
   },
   {
     id: 'space-text-results',

@@ -48,7 +48,7 @@ beforeEach(() => {
   ctl.loadFailures = 99; ctl.loads = 0; ctl.generated = 0; fetched = 0;
   vi.stubGlobal('fetch', async () => { fetched++; return new Response('{}', { status: 503 }); });
   const st = useStore.getState();
-  useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } }, catalog: { ...st.catalog, models: { [REF]: model }, schemas: {} } });
+  useStore.setState({ settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k' } }, catalog: { ...st.catalog, models: { [REF]: model }, schemas: {} } });
 });
 afterEach(() => vi.unstubAllGlobals());
 

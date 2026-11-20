@@ -19,7 +19,7 @@ import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
-import { ensureSpaceSession } from '../store/spaceSession';
+import { sendSessionId, ensureSendSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
 import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
@@ -267,7 +267,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (!text && !attachments.length && !settings.shots?.length) return { ok: false, reason: 'Write a prompt.', estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
   }
-  return { ok: true, estimate, overLimit: overLimit(estimate) };
+  return { ok: true, estimate, overLimit: overLimit(estimate, sendSessionId(st)) };
 }
 
 /** The entries of `map` for these ids, or undefined when there are none. */
@@ -284,7 +284,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
   }
   const st = get();
   const workspace = st.ui.workspace;
-  const sessionId = st.ui.space ? ensureSpaceSession() : st.activeSessionId;
+  const sessionId = ensureSendSession();
   const { settings } = st.composer[kind];
   const text = st.composer.text.trim();
   const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');

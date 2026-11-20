@@ -39,6 +39,7 @@ describe('video frame caller wiring', () => {
   it('generateDirect keeps storyboard and character as references for a model that forbids an implicit start frame', async () => {
     const st = useStore.getState();
     useStore.setState({ assets: { ...st.assets, subject: asset('subject') }, composer: { ...st.composer, mode: 'video', text: 'move', attachments: ['ref', 'subject'], video: { modelRef: videoRef, settings: { count: 1, resolution: '480p', advanced: {} } } },
+      settings: { ...st.settings, budgetOn: false },
       catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [videoRef]: schema({ refsWithFirst: false, refsWithLast: false }) } } });
     await generateDirect('video');
     const created = Object.values(useStore.getState().generations).find((g) => g.prompt === 'move');

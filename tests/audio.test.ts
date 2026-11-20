@@ -80,7 +80,7 @@ describe('audio end to end', () => {
     useStore.setState({
       assets: { face: asset('face', 'image', 'image/png'), voice: asset('voice', 'audio', 'audio/mpeg') },
       catalog: { ...st.catalog, models: { [ref]: { ref, provider: 'fal', id: LIPSYNC, name: 'Lip-sync', kind: 'video', acceptsText: false, acceptsImage: true, tags: [] } as ModelSummary }, schemas: { [ref]: falSchema(LIPSYNC, 'video') } },
-      settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } },
+      settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, fal: 'k' } },
     });
     let body: Record<string, unknown> = {};
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {

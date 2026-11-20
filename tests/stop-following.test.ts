@@ -21,7 +21,7 @@ import { patchGeneration, useStore } from '../src/store/store';
 const ref = 'atlas::google/nano-banana-2-lite/text-to-image';
 const make = () => {
   const st = useStore.getState();
-  useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } } });
+  useStore.setState({ settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k' } } });
   return createGeneration({ sessionId: st.activeSessionId, kind: 'image', prompt: 'x', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
 };
 

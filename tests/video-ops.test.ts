@@ -46,7 +46,7 @@ function install(ref: string, summary: Partial<ModelSummary>, schema: ModelSchem
   useStore.setState({
     assets: { clip },
     catalog: { ...st.catalog, models: { [ref]: { ref, provider, id, name: id, kind: 'video', acceptsText: true, acceptsImage: true, acceptsVideo: true, tags: [], ...summary } as ModelSummary }, schemas: { [ref]: schema } },
-    settings: { ...st.settings, keys: { ...st.settings.keys, [provider]: 'k' }, ops: { ...st.settings.ops, videoEdit: ref, videoExtend: ref } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, [provider]: 'k' }, ops: { ...st.settings.ops, videoEdit: ref, videoExtend: ref } },
   });
 }
 

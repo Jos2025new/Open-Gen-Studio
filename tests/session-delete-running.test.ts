@@ -54,7 +54,7 @@ import { newSession, useStore } from '../src/store/store';
 import type { ModelSummary } from '../src/engine/types';
 
 const REF = 'atlas::google/nano-banana-2-lite/text-to-image';
-const model = { id: REF, name: 'nb', provider: 'atlas', kind: 'image', acceptsImage: false, tags: [] } as unknown as ModelSummary;
+const model = { id: REF, name: 'nb', provider: 'atlas', kind: 'image', acceptsImage: false, tags: [], price: { skus: [{ unit: 'output', usd: 0.05 }] } } as unknown as ModelSummary;
 
 beforeEach(() => {
   gate.reset();

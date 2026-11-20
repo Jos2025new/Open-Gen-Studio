@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import falSnapshot from './fixtures/live/fal.json';
 import { coerceSettings, normalizeStructured, schemaFromJson, structuredWire, wireParams, type JsonProp } from '../src/engine/params';
 import { createGeneration, runGeneration } from '../src/engine/jobs';
+import { withOncePass } from '../src/engine/budget';
 import { RECRAFT_STYLE_REF } from '../src/engine/catalog';
 import { useStore } from '../src/store/store';
 import type { Asset, ModelSchema, ParamDef } from '../src/engine/types';
@@ -82,7 +83,8 @@ describe('Recraft style creation', () => {
       if (url.endsWith('/requests/q9')) return new Response(JSON.stringify({ style_id: '0f1e2d3c-aaaa-bbbb-cccc-111122223333' }));
       throw new Error(`unexpected ${url}`);
     });
-    const g = createGeneration({ sessionId: 's', kind: 'text', prompt: 'Create Recraft style', modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: ['a', 'b'] }, origin: 'composer', estimate: { usd: null, approximate: true } });
+    const sessionId = 's';
+    const g = withOncePass(sessionId, () => createGeneration({ sessionId, kind: 'text', prompt: 'Create Recraft style', modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: ['a', 'b'] }, origin: 'composer', estimate: { usd: null, approximate: true } }));
     await runGeneration(g.id);
     expect(useStore.getState().generations[g.id]).toMatchObject({ status: 'done', text: '0f1e2d3c-aaaa-bbbb-cccc-111122223333' });
   });

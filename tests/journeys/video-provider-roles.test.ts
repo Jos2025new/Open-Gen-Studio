@@ -68,7 +68,7 @@ function setup(kind: 'startEnd' | 'references' | 'keyframes') {
   useStore.setState({
     assets: Object.fromEntries(ids.map((assetId) => [assetId, image(assetId)])),
     catalog: { ...st.catalog, models: { [modelRef]: model }, schemas: { [modelRef]: schema }, status: { ...st.catalog.status, [provider]: 'ready' } },
-    settings: { ...st.settings, keys: { ...st.settings.keys, [provider]: 'test-only' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, [provider]: 'test-only' } },
   });
   vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
     const url = String(input);

@@ -34,9 +34,13 @@ describe('(a) a new entry that never asked is stopped at the send', () => {
     useStore.setState({ spentUsd: 0.99 });
     expect(() => createGeneration(spec({ estimate: { usd: 0.02, approximate: false } }))).toThrow(OverLimitError);
   });
-  it('an unpublished price stays with the entries (they ask about it); the net does not refuse every unpriced model', () => {
-    createGeneration(spec({ estimate: { usd: null, approximate: true } }));
+  it('an unpublished price needs approval when the limit is active', () => {
+    const unpriced = spec({ estimate: { usd: null, approximate: true } });
+    expect(() => createGeneration(unpriced)).toThrow(OverLimitError);
+    expect(count()).toBe(0);
+    withOncePass(sid, () => createGeneration(unpriced));
     expect(count()).toBe(1);
+    expect(() => createGeneration(unpriced)).toThrow(OverLimitError);
   });
   it('another session\'s pass does not cover it', () => {
     withOncePass('other', () => expect(() => createGeneration(spec())).toThrow(OverLimitError));

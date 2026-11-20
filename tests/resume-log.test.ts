@@ -20,7 +20,7 @@ import { patchGeneration, useStore } from '../src/store/store';
 describe('a followed job that fails leaves its trail (P5a)', () => {
   it('logs provider-error after a reload resumes a job that then fails', async () => {
     const st = useStore.getState();
-    useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } } });
+    useStore.setState({ settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k' } } });
     const ref = 'atlas::google/nano-banana-2-lite/text-to-image';
     const g = createGeneration({ sessionId: st.activeSessionId, kind: 'image', prompt: 'x', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
     patchGeneration(g.id, { status: 'running', remoteJob: { provider: 'atlas', id: 'job_1' } as never });

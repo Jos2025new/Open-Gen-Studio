@@ -153,7 +153,7 @@ describe('what a generation remembers of its request (T5)', () => {
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
     const st = useStore.getState();
     useStore.setState({
-      settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } },
+      settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k' } },
       catalog: {
         ...st.catalog,
         models: { [REF]: { id: REF, name: 'Nano Banana 2 Lite', provider: 'atlas', kind: 'image', acceptsImage: false, tags: [] } },
