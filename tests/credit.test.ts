@@ -143,6 +143,18 @@ describe('the equivalent model when a provider has no credit', () => {
     expect(notes.join(' ')).not.toMatch(/same price or less/);
   });
 
+  it('a manual pick of another model at the same price or less says so, not "price not comparable"', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/text-to-image', 0.1, false);
+    const lite = img('nanogpt', 'nano-banana-2-lite', 0.08, true);
+    const { switched } = await run([atlas, lite], atlas);
+    expect(switched).toBe(false);
+    useAlerts.getState().alerts[0].actions![0].run();
+    await vi.waitFor(() => expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2-lite'));
+    const text = (useStore.getState().generations.g1.notes ?? []).join(' ');
+    expect(text).toMatch(/model nano-banana-2-lite, same price or less/);
+    expect(text).not.toMatch(/not comparable/);
+  });
+
   it('when the only equivalent was dropped for its price, the alert says so instead of claiming there is none', async () => {
     const atlas = img('atlas', 'google/nano-banana-2/text-to-image', 0.1, false);
     const pro = img('nanogpt', 'nano-banana-pro', 0.25, true);
