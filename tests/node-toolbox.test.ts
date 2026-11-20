@@ -20,7 +20,7 @@ it('the top bar keeps only Run all; Add node, Auto layout and Fit view live in t
   expect(top).toContain('<RunAll');
   expect(top).not.toMatch(/AddNodeMenu|Auto layout|Fit view/);
   expect(ws).toMatch(/add=\{<AddNodeMenu onAdd=\{addAtCenter\} onImport=\{importAtCenter\} omni=\{omniEntries\} \/>\}/);
-  expect(parts).toMatch(/<IconButton ref=\{pop\.ref\} icon=\{Plus\} label="Add node"/);
+  expect(parts).toMatch(/<IconButton ref=\{pop\.ref\} icon=\{Plus\} label="Add node…"/);
 });
 
 it('Nodes zooms as far as the Designer, and the zoom popover uses the app’s one slider (log scale, typed percent), no Fit view', () => {

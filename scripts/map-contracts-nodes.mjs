@@ -55,4 +55,22 @@ export default [{
     ['src/components/omni/ChatNode.tsx', '<ChatRecipientSelect'],
   ],
   tests: ['tests/nodecore-strip2.test.ts'],
+}, {
+  id: 'omni-port-hit-area',
+  what: 'En Omnicanvas el box de `.port` no cambia con el zoom (React Flow ancla los cables desde su medida); un `::before` centrado dibuja la forma y recoge el arrastre con al menos 12 px en pantalla, con `--rf-zoom` acotado por `portZoom`.',
+  sides: [
+    ['src/styles/node-system.css', '.node-canvas.is-omni .react-flow__node .port::before'],
+    ['src/components/node/connectionDrop.ts', 'export const portZoom'],
+    ['src/components/node/NodeWorkspace.tsx', 'usePortZoom(omni, canvasRef)'],
+  ],
+  tests: ['tests/friction-omnicanvas.test.ts'],
+}, {
+  id: 'agent-names',
+  what: 'Cada agente nuevo es «Agent N» sin renumerar; el título se renombra en la cabecera por la capa del grafo; al cargar se normalizan los «Agent» repetidos (un «Agent» manual repetido se numera también: el esquema no distingue manual de defecto).',
+  sides: [
+    ['src/engine/nodes/agentNames.ts', 'export function normalizeAgentTitles'],
+    ['src/store/store.ts', 'normalizeAgentTitles(loadMigration'],
+    ['src/components/node/AgentNodeControls.tsx', 'export function AgentTitle'],
+  ],
+  tests: ['tests/agent-names.test.ts', 'tests/agent-title-ui.test.ts'],
 }];

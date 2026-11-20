@@ -11,6 +11,7 @@ const root = process.cwd();
 const OUT = 'docs/map.md';
 const CONTRACT_OUT = 'docs/map-contracts.md';
 const CONTRACT_OUT_2 = 'docs/map-contracts-2.md';
+const CONTRACT_OUT_3 = 'docs/map-contracts-3.md';
 const SOURCE = /\.(ts|tsx|js|mjs)$/;
 const EXTS = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js'];
 const IMPORT = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|vi\.mock\(\s*['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]/gm;
@@ -83,7 +84,7 @@ for (const f of src) {
   areas.set(area, a);
 }
 
-const contractPage = (rows, part) => `# Contratos del código (${part}/2)
+const contractPage = (rows, part) => `# Contratos del código (${part}/3)
 
 Generado por \`node scripts/map.mjs --write\`; [índice y cobertura](map.md). Se comprueban todos los archivos, anclas y tests de cada contrato.
 
@@ -91,12 +92,12 @@ Generado por \`node scripts/map.mjs --write\`; [índice y cobertura](map.md). Se
 | --- | --- | --- |
 ${rows.join('\n')}
 `;
-// Half the bytes, not half the rows: the rows differ a lot in length and each page must stay under the size limit.
+// A third of the bytes per page, not a third of the rows: the rows differ a lot in length and each page must stay under the size limit.
 const total = contractRows.reduce((n, row) => n + row.length + 1, 0);
-let acc = 0;
-const midpoint = contractRows.findIndex((row) => (acc += row.length + 1) >= total / 2) + 1;
-const contractMap = contractPage(contractRows.slice(0, midpoint), 1);
-const contractMap2 = contractPage(contractRows.slice(midpoint), 2);
+const cuts = [1, 2].map((k) => { let acc = 0; return contractRows.findIndex((row) => (acc += row.length + 1) >= (total * k) / 3) + 1; });
+const contractMap = contractPage(contractRows.slice(0, cuts[0]), 1);
+const contractMap2 = contractPage(contractRows.slice(cuts[0], cuts[1]), 2);
+const contractMap3 = contractPage(contractRows.slice(cuts[1]), 3);
 
 const map = `# Mapa del código
 
@@ -112,7 +113,7 @@ Generado por \`node scripts/map.mjs --write\` desde [map-contracts.mjs](../scrip
 
 ## Contratos que el compilador no ve
 
-Las tablas de contratos [1](map-contracts.md) y [2](map-contracts-2.md) incluyen todos sus archivos, anclas y tests. Se generan y comprueban junto a este índice.
+Las tablas de contratos [1](map-contracts.md), [2](map-contracts-2.md) y [3](map-contracts-3.md) incluyen todos sus archivos, anclas y tests. Se generan y comprueban junto a este índice.
 
 ## Módulos centrales
 
@@ -140,12 +141,15 @@ if (process.argv.includes('--write')) {
   writeFileSync(join(root, OUT), map);
   writeFileSync(join(root, CONTRACT_OUT), contractMap);
   writeFileSync(join(root, CONTRACT_OUT_2), contractMap2);
+  writeFileSync(join(root, CONTRACT_OUT_3), contractMap3);
   console.log(`map: written ${OUT} (${Buffer.byteLength(map)} bytes, ${contracts.length} contracts)`);
 } else {
   const current = existsSync(join(root, OUT)) ? readFileSync(join(root, OUT), 'utf8') : '';
   if (current !== map) errors.push(`${OUT} is out of date: run node scripts/map.mjs --write`);
   const currentContracts = existsSync(join(root, CONTRACT_OUT)) ? readFileSync(join(root, CONTRACT_OUT), 'utf8') : '';
   if (currentContracts !== contractMap) errors.push(`${CONTRACT_OUT} is out of date: run node scripts/map.mjs --write`);
+  const currentContracts3 = existsSync(join(root, CONTRACT_OUT_3)) ? readFileSync(join(root, CONTRACT_OUT_3), 'utf8') : '';
+  if (currentContracts3 !== contractMap3) errors.push(`${CONTRACT_OUT_3} is out of date: run node scripts/map.mjs --write`);
   const currentContracts2 = existsSync(join(root, CONTRACT_OUT_2)) ? readFileSync(join(root, CONTRACT_OUT_2), 'utf8') : '';
   if (currentContracts2 !== contractMap2) errors.push(`${CONTRACT_OUT_2} is out of date: run node scripts/map.mjs --write`);
   if (errors.length) { console.error(`map: FAIL\n${errors.join('\n')}`); process.exit(1); }

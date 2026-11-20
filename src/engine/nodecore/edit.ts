@@ -48,12 +48,12 @@ export interface EditRequest { session: string; op: EditOp; expect?: Record<stri
 
 export type EditResult =
   | { ok: true; edgeId?: string; rev: Record<string, string> }
-  | { ok: false; error: string; conflict?: { node: string; expected: string; actual: string }; draft: EditRequest };
+  | { ok: false; error: string; notified?: boolean; conflict?: { node: string; expected: string; actual: string }; draft: EditRequest };
 
 /** The nodes whose revision the edit depends on. */
 const touched = (op: EditOp): string[] => op.op === 'compound' || op.op === 'present' || op.op === 'travel' ? [] : op.op === 'connect' ? [op.source, op.target] : op.op === 'disconnect' ? [] : op.op === 'set' ? [op.node] : op.op === 'add' ? (op.connect ? [op.connect.source] : []) : op.nodes;
 const owners = (op: EditOp): string[] => op.op === 'compound' || op.op === 'present' || op.op === 'travel' ? [] : op.op === 'connect' ? [op.target] : op.op === 'set' ? [op.node] : op.op === 'delete' ? op.nodes : op.op === 'add' && op.connect ? [op.connect.source] : [];
-const refuse = (req: EditRequest, error: string, conflict?: { node: string; expected: string; actual: string }): EditResult => ({ ok: false, error, ...(conflict ? { conflict } : {}), draft: req });
+const refuse = (req: EditRequest, error: string, conflict?: { node: string; expected: string; actual: string }, notified?: true): EditResult => ({ ok: false, error, ...(notified ? { notified } : {}), ...(conflict ? { conflict } : {}), draft: req });
 
 /** The owner revisions of the nodes an edit touches, to hand back to the caller for its next precondition. */
 export const revisionsOf = (graph: Graph, ids: string[]): Record<string, string> => Object.fromEntries(ids.map((id) => [id, ownerRev(graph, id)]));
@@ -257,7 +257,7 @@ export function applyEdit(req: EditRequest): EditResult {
   }
   next = pruneBroken(stampNew(graph, next));
   const locked = graphEditProblem(req.session, graph, next);
-  if (locked) { toast(locked, 'error'); return refuse(req, locked); }
+  if (locked) { toast(locked, 'error'); return refuse(req, locked, undefined, true); }
   if ((op.op === 'compound' || op.op === 'present' || op.op === 'travel') && op.silent) {
     // The system keeps its own parts in step without an undo step (the same graph rules held above).
     useStore.setState((s0) => s0.sessions[req.session] ? { sessions: { ...s0.sessions, [req.session]: { ...s0.sessions[req.session], graph: next } } } : s0);

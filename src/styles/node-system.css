@@ -43,3 +43,12 @@
 .omni-connections { padding-top: 0.375rem; }
 .nc-sys-llm { display: flex; align-items: center; gap: 0.375rem; font-size: var(--fs-xs); color: var(--text-2); }
 .nc-sys-llm select { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--text-1); background: var(--surface-2); border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.125rem 0.25rem; }
+/* Omnicanvas zoom can drop far below 100 %: the .port box stays fixed (React Flow anchors cables from its measured size), and a centred ::before draws the shape and takes the drag at least 12 px on screen; --rf-zoom is clamped by portZoom. */
+.node-canvas.is-omni .react-flow__node .port::before { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, calc(12px / var(--rf-zoom, 1))); height: max(100%, calc(12px / var(--rf-zoom, 1))); transform: translate(-50%, -50%); box-sizing: border-box; border: 2px solid var(--surface); border-radius: inherit; background: var(--pf, var(--type-image)); pointer-events: all; }
+.node-canvas.is-omni .react-flow__node .port { background: transparent!important; border-color: transparent!important; clip-path: none!important; overflow: visible; --pf: var(--type-image); }
+.node-canvas.is-omni .react-flow__node .port.port-text { --pf: var(--type-text); }
+.node-canvas.is-omni .react-flow__node .port.port-video { --pf: var(--type-video); }
+.node-canvas.is-omni .react-flow__node .port.port-audio { --pf: var(--type-audio); }
+.node-canvas.is-omni .react-flow__node .port.port-link-ref::before { --pf: var(--surface); border: 3px solid var(--type-text); border-radius: 50%; }
+.node-canvas.is-omni .react-flow__node .port.port-link-control::before { --pf: var(--type-audio); border: 0; border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.node-canvas.is-omni .react-flow__node .port.port-link-data::before { border-radius: 50%; }

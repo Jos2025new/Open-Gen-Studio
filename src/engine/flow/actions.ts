@@ -1,3 +1,5 @@
+import { nextAgentTitle } from '../nodes/agentNames';
+import { systemRefDefault } from '../nodes/systemDefaults';
 import { videoOpSettings } from '../jobs';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
@@ -63,27 +65,16 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
     case 'ref': {
       const type = opts.type ?? 'chat';
       const session = st.sessions[st.activeSessionId];
-      const defaults: Record<SystemNodeType, string> = {
-        chat: st.activeSessionId,
-        agent: st.activeSessionId,
-        session: st.activeSessionId,
-        model: st.composer.image.modelRef,
-        provider: 'openrouter',
-        space: 'create',
-        'designer.doc': session?.activeDocId ?? session?.docs[0]?.id ?? 'active',
-        library: 'library',
-        toolset: 'toolset',
-        prompt: 'composer',
-        mediaSettings: 'image',
-      };
-      return { kind: 'ref', type, ref: opts.ref ?? defaults[type], title: SYSTEM_NODE_TYPES[type].title };
+      return { kind: 'ref', type, ref: opts.ref ?? systemRefDefault(type, st.activeSessionId, st.composer.image.modelRef, session), title: type === 'agent' ? nextAgentTitle(session?.graph) : SYSTEM_NODE_TYPES[type].title };
     }
   }
 }
 
 export function addNode(sessionId: string, data: GraphNodeData, position: { x: number; y: number }): string {
   const id = uid('nd');
-  applyEdit({ session: sessionId, op: { op: 'add', node: { id, position, data } } });
+  const done = applyEdit({ session: sessionId, op: { op: 'add', node: { id, position, data } } });
+  // A refused add says why instead of leaving the user clicking an entry that does nothing; no node, no id.
+  if (!done.ok) { if (!done.notified) toast(`Could not add the node: ${done.error}`, 'error'); return ''; }
   return id;
 }
 

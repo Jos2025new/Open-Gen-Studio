@@ -16,7 +16,7 @@ export function AddNodeMenu({ onAdd, onImport, omni }: { onAdd: (data: GraphNode
   const pop = usePopover();
   return (
     <>
-      <IconButton ref={pop.ref} icon={Plus} label="Add node" aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={pop.toggle} />
+      <IconButton ref={pop.ref} icon={Plus} label="Add node…" aria-haspopup="menu" aria-expanded={pop.open} active={pop.open} onClick={pop.toggle} />
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={340} label="Add node" className="node-lib-pop">
         <NodeLibrary
           // The omnicanvas entries add a node too: the same one click (or Enter) closes the menu.
