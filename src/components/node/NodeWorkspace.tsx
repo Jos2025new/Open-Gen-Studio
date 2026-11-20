@@ -5,6 +5,7 @@ import {
   SelectionMode,
   ReactFlow,
   ReactFlowProvider,
+  useOnViewportChange,
   useReactFlow,
   type Connection,
   type Edge,
@@ -31,7 +32,7 @@ import { revealRect } from '../omni/revealNode';
 import { useOmniEntries } from '../omni/useOmniEntries';
 import { settleNewNodes } from '../../engine/flow/settle';
 import { ConnectionPreview } from './ConnectedNodeMenu';
-import { connectionDrop } from './connectionDrop';
+import { connectionDrop, rejectedDrop } from './connectionDrop';
 import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
@@ -130,6 +131,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
   useOmniFraming(omni, sessionId, rf);
+  // The omnicanvas can sit far below 100 %: ports keep a minimum on-screen size through this variable (no re-render per frame).
+  useOnViewportChange({ onChange: (v) => { if (omni) canvasRef.current?.style.setProperty('--rf-zoom', String(v.zoom)); } });
   // Nodes the agent just added: frame them once they are measured.
   const focus = useNodeFocus();
   useEffect(() => {
@@ -286,6 +289,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const center = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 };
     const pos = freePos({ x: center.x - NODE_WIDTH / 2, y: center.y }, data);
     const id = addNode(sessionId, data, pos);
+    if (!id) return;
     selectNodes([id]);
     revealRect(rf, canvasRef.current, { ...pos, width: omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data), height: Math.min(estimatedHeight(data), 160) });
   };
@@ -408,7 +412,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   return (
     <div
       ref={canvasRef}
-      className={`node-canvas ${embedded ? 'is-embedded' : ''}${tool === 'cut' ? ' is-cut-tool' : ''}`}
+      className={`node-canvas ${omni ? 'is-omni' : ''} ${embedded ? 'is-embedded' : ''}${tool === 'cut' ? ' is-cut-tool' : ''}`}
       onPointerDownCapture={(e) => { cut.down(e); onBoxDown(e); }}
       onMouseDownCapture={(e) => { if (boxing.current || cut.cutting) e.stopPropagation(); }}
       onPointerMoveCapture={(e) => { cut.move(e); onBoxMove(e); }}
@@ -450,6 +454,12 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null, sourceHandle: c.sourceHandle })}
         onConnectEnd={(e, state) => {
           if (embedded) return;
+          const refused = rejectedDrop(state);
+          if (refused) {
+            const why = connectionError(useStore.getState().sessions[sessionId].graph, useStore.getState().assets, refused);
+            if (why) toast(`Cannot connect: ${why}`, 'error');
+            return;
+          }
           const dropped = connectionDrop(e, state, canvasRef.current);
           if (dropped) setMenu(dropped);
         }}

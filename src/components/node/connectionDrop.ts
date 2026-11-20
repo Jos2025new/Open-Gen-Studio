@@ -1,5 +1,11 @@
 import type { OnConnectEnd } from '@xyflow/react';
 
+/** An output released on a port that cannot take it: the connection that was tried, to say why it is refused. */
+export function rejectedDrop(state: Parameters<OnConnectEnd>[1]): { source: string; target: string; sourceHandle: string | null; targetHandle: string | null } | null {
+  if (state.isValid || !state.toNode || !state.toHandle || state.fromHandle?.type !== 'source' || state.toHandle.type !== 'target' || !state.fromNode) return null;
+  return { source: state.fromNode.id, target: state.toNode.id, sourceHandle: state.fromHandle.id ?? null, targetHandle: state.toHandle.id ?? null };
+}
+
 /** Only an output released on this canvas's empty pane opens the connected-node picker. */
 export function connectionDrop(event: MouseEvent | TouchEvent, state: Parameters<OnConnectEnd>[1], canvas: HTMLElement | null): { x: number; y: number; from: string; handle?: string | null } | null {
   if (!canvas || event.type === 'touchcancel' || state.isValid || state.toNode || state.fromHandle?.type !== 'source' || !state.fromNode) return null;
