@@ -57,6 +57,23 @@ describe('2. the agent picks the image variant with the send rule', () => {
   });
 });
 
+describe('2b. the reference route of a line that also has image-to-video', () => {
+  it('goes to reference-to-video, from the text model and from a confirmed model that already takes an image', async () => {
+    const { routeModel } = await import('../src/engine/agent/runtimeShared');
+    const t = 'atlas::acme/vid-2b/text-to-video';
+    const i = 'atlas::acme/vid-2b/image-to-video';
+    const r = 'atlas::acme/vid-2b/reference-to-video';
+    const mk = (ref: string, acceptsImage: boolean) => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref, kind: 'video', acceptsText: true, acceptsImage, tags: [] }) as ModelSummary;
+    const st = useStore.getState();
+    useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } }, catalog: { ...st.catalog, models: { ...st.catalog.models, [t]: mk(t, false), [i]: mk(i, true), [r]: mk(r, true) } } });
+    expect(routeModel(t, 'reference')).toBe(r);
+    expect(routeModel(i, 'reference')).toBe(r);
+    expect(routeModel(r, 'reference')).toBe(r);
+    expect(routeModel(t, 'image')).toBe(i);
+    expect(routeModel(i, 'image')).toBe(i);
+  });
+});
+
 describe('3. subjects counted from the list the send uses', () => {
   it('checkDirect reads the library, not the legacy session.subjects', () => {
     const vref = 'atlas::acme/vid-3/with-subjects';

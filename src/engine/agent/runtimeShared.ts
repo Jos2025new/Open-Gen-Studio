@@ -240,7 +240,7 @@ function userWords(sessionId: string, owner: string): string {
 
 /** The variant a step's input route needs: with an image it is the catalog's one rule (sentModelRef), the same the send applies. */
 export function routeModel(ref: string, route: import('../variants').VariantRoute): string | undefined {
-  return route === 'edit' || route === 'image' || route === 'reference' ? sentModelRef(ref, route === 'edit' ? 'image' : 'video', true) : lineRoutes(ref)[route];
+  return route === 'edit' || route === 'image' || route === 'reference' ? sentModelRef(ref, route === 'edit' ? 'image' : 'video', true, route === 'reference' ? 'reference' : undefined) : lineRoutes(ref)[route];
 }
 
 function planContext(sessionId: string, workspace: Workspace, strict: boolean, owner: string) {

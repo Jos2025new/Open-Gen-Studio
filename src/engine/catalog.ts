@@ -393,8 +393,13 @@ export function opModelFromRef(ref: string | undefined, kind: 'image' | 'video')
  * a text-only model with an image attached runs as its edit / image-to-video variant. null = none exists
  * (or the model already takes the image), so the caller keeps its current behavior.
  */
-export function inputVariant(ref: string | undefined, kind: 'image' | 'video'): { ref: string; route: VariantRoute } | null {
+export function inputVariant(ref: string | undefined, kind: 'image' | 'video', route?: 'reference'): { ref: string; route: VariantRoute } | null {
   const m = ref ? modelSummary(ref) : undefined;
+  // Video references (several images, not a start frame) need the line's reference-to-video endpoint, even from a model that takes an image.
+  if (ref && m && kind === 'video' && route === 'reference') {
+    const r = variantRoute(m) === 'reference' ? ref : lineRoutes(ref).reference;
+    if (r) return { ref: r, route: 'reference' };
+  }
   if (!ref || !m || m.acceptsImage) return null;
   const alt = opModelFromRef(ref, kind) ?? (kind === 'image' ? lineRoutes(ref).edit ?? lineRoutes(ref).reference : lineRoutes(ref).image ?? lineRoutes(ref).reference) ?? null;
   const v = alt && alt !== ref ? modelSummary(alt) : undefined;
@@ -402,8 +407,8 @@ export function inputVariant(ref: string | undefined, kind: 'image' | 'video'): 
 }
 
 /** The model a media request is sent to: with inputs, a text-only model runs as its image-input twin (jobs.ts); the plan prices the same one (B10). */
-export function sentModelRef(ref: string, kind: string, hasInputs: boolean): string {
-  return hasInputs && (kind === 'image' || kind === 'video') ? inputVariant(ref, kind)?.ref ?? ref : ref;
+export function sentModelRef(ref: string, kind: string, hasInputs: boolean, route?: 'reference'): string {
+  return hasInputs && (kind === 'image' || kind === 'video') ? inputVariant(ref, kind, route)?.ref ?? ref : ref;
 }
 
 /** One line for the agent's context: the family's image-input variant, or null when the model needs none. */
