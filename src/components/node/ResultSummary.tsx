@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, Copy, Layers } from '../ui/icons';
 import { aspectLabel, durationLabel } from '../../engine/params';
-import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { PROVIDER_LABELS, shownProvider } from '../../engine/providers/types';
 import { copyText } from '../../engine/actions';
 import type { Asset, Generation } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -26,7 +26,7 @@ export function ResultSummary({ generation: g, asset }: { generation?: Generatio
   ].filter((c): c is string => Boolean(c));
   return (
     <div className="result-summary">
-      {g ? <div className="rs-line"><Layers size={13} /> {g.modelName}{g.provider !== 'local' ? <span className="faint"> · {PROVIDER_LABELS[g.provider]}</span> : null}</div> : null}
+      {g ? <div className="rs-line"><Layers size={13} /> {g.modelName}{shownProvider(g) !== 'local' ? <span className="faint"> · {PROVIDER_LABELS[shownProvider(g)]}</span> : null}</div> : null}
       {text ? <p className="rs-prompt">{text}</p> : <p className="rs-prompt faint">{asset.origin === 'upload' ? 'Uploaded file' : 'No prompt'}</p>}
       {inputs.length ? (
         <div className="rs-inputs">

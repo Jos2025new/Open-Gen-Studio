@@ -8,6 +8,7 @@ import { useStore } from '../src/store/store';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
 import { forgetBalances, isCreditError, onGenerationCredit } from '../src/engine/credit';
+import { shownProvider } from '../src/engine/providers/types';
 import { useAlerts } from '../src/engine/alerts';
 
 const m = (provider: 'nanogpt' | 'atlas', id: string, usd: number): ModelSummary =>
@@ -75,7 +76,7 @@ describe('the equivalent model when a provider has no credit', () => {
     useStore.setState({
       settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
       catalog: { ...st.catalog, models: Object.fromEntries(models.map((x) => [x.ref, x])) },
-      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, status: 'error', inputs, settings: { count: 1 }, assetIds: [] } as never },
+      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, provider: failing.provider, status: 'error', inputs, settings: { count: 1 }, assetIds: [] } as never },
     });
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(0);
     vi.spyOn(ADAPTERS.nanogpt, 'balance').mockResolvedValue(5);
@@ -91,7 +92,12 @@ describe('the equivalent model when a provider has no credit', () => {
     const pro = img('nanogpt', 'nano-banana-pro', 0.14, true);
     const { switched, rerun } = await run([atlas, nano, pro], atlas);
     expect(switched).toBe(true);
-    expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2');
+    const saved = useStore.getState().generations.g1;
+    expect(saved.modelRef).toBe('nanogpt::nano-banana-2');
+    expect(saved.provider).toBe('nanogpt');
+    expect(saved.notes?.join(' ')).toMatch(/Atlas Cloud had no credit/);
+    expect(saved.notes?.join(' ')).toMatch(/NanoGPT/);
+    expect(shownProvider({ modelRef: saved.modelRef, provider: 'atlas' })).toBe('nanogpt');
     expect(rerun).toHaveBeenCalledWith('g1');
   });
 
@@ -127,6 +133,14 @@ describe('the equivalent model when a provider has no credit', () => {
     const labels = (useAlerts.getState().alerts[0].actions ?? []).map((a) => a.label);
     expect(labels).toHaveLength(1);
     expect(labels[0]).toMatch(/nano-banana-2-lite.*pricier/);
+    // The manual click must not claim "same price or less": the note names the real price ratio and reads fresh notes.
+    useStore.setState((s) => ({ generations: { ...s.generations, g1: { ...s.generations.g1, notes: ['earlier'] } } }));
+    useAlerts.getState().alerts[0].actions![0].run();
+    await vi.waitFor(() => expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2-lite'));
+    const notes = useStore.getState().generations.g1.notes ?? [];
+    expect(notes[0]).toBe('earlier');
+    expect(notes.join(' ')).toMatch(/about 1\.3× the price/);
+    expect(notes.join(' ')).not.toMatch(/same price or less/);
   });
 
   it('when the only equivalent was dropped for its price, the alert says so instead of claiming there is none', async () => {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
-import { PROVIDER_LABELS } from '../providers/types';
+import { PROVIDER_LABELS, shownProvider } from '../providers/types';
 import { checkJobsNow } from '../providers/shared';
 import { traceOf } from '../jobTrace';
 import { OPS } from '../ops';
@@ -39,7 +39,7 @@ export function describeRunning(g: Generation, now = Date.now()): string {
   const what = g.op ? OPS[g.op.id].label : `"${g.prompt.length > 80 ? `${g.prompt.slice(0, 79)}…` : g.prompt}"`;
   const head = [
     `generation:${g.id}`,
-    `${g.kind} · ${g.modelName}${g.provider !== 'local' ? ` (${PROVIDER_LABELS[g.provider]})` : ''}`,
+    `${g.kind} · ${g.modelName}${shownProvider(g) !== 'local' ? ` (${PROVIDER_LABELS[shownProvider(g)]})` : ''}`,
     what,
     `status ${g.status}${g.statusText ? ` — ${g.statusText}` : ''}`,
     g.progress != null ? `progress ${Math.round(g.progress * (g.progress <= 1 ? 100 : 1))}%` : '',

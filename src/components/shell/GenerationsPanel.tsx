@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CornerDownRight, Image as ImageIcon, Search, ListFilter, ArrowUpDown, Eye, EyeOff, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
-import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { PROVIDER_LABELS, shownProvider } from '../../engine/providers/types';
 import { generationTitle } from '../assets/GenerationInfo';
 import { formatDateTime, formatUsd } from '../../lib/format';
 import type { Generation } from '../../engine/types';
@@ -152,7 +152,7 @@ function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs
         <div className="gen-row-title" title={generationTitle(g)}>{generationTitle(g)}</div>
         <div className="gen-row-meta faint">
           <span className={`gen-row-status status-${statusOf(g)}`}>{STATUS_LABEL[g.status]}</span>
-          <span>{g.modelName} · {PROVIDER_LABELS[g.provider]}</span>
+          <span>{g.modelName} · {PROVIDER_LABELS[shownProvider(g)]}</span>
           <span className="num">{formatDateTime(g.createdAt)}</span>
           {space ? <span>{placeLabel(g)}</span> : place ? <span>{CANVAS[place.canvas]}{showSession ? ` · ${sessions[place.sessionId]?.title ?? ''}` : ''}</span> : null}
           {cost != null ? <span className="num">{g.actualUsd == null ? '≈' : ''}{formatUsd(cost)}</span> : null}

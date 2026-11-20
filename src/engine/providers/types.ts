@@ -136,3 +136,8 @@ export function parseModelRef(ref: string): { provider: ProviderId; id: string }
   if (!['local', 'openrouter', 'fal', 'nanogpt', 'atlas'].includes(provider)) return null;
   return { provider, id: ref.slice(i + 2) };
 }
+
+/** The provider a generation really ran on: the one named by `modelRef`, not a stale `provider` field. */
+export function shownProvider(g: { modelRef: string; provider: ProviderId }): ProviderId {
+  return parseModelRef(g.modelRef)?.provider ?? g.provider;
+}

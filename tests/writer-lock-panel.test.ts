@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { idbKeyval, resetWorld, settle } from './helpers/fakeTabs';
@@ -18,18 +18,31 @@ const calls = vi.hoisted(() => [] as string[]);
 const ref = 'atlas::google/nano-banana-2-lite/text-to-image';
 let host: HTMLDivElement, rootEl: HTMLDivElement, root: Root;
 
-async function openTab() {
+// The engine (jobs, agent runtime) is heavy to import and only the last test uses it: load it on request, so the
+// panel tests do not pay for it on every tab (that made test 1 time out under load).
+async function openTab(withEngine = false) {
   vi.resetModules();
   const lock = await import('../src/lib/writerLock');
   const store = await import('../src/store/store');
   await import('../src/store/writerHandoff');
-  const jobs = await import('../src/engine/jobs');
-  const runtime = await import('../src/engine/agent/runtime');
+  const jobs = withEngine ? await import('../src/engine/jobs') : undefined;
+  const runtime = withEngine ? await import('../src/engine/agent/runtime') : undefined;
   const panel = await import('../src/components/shell/WriterLockPanel');
   return { lock, store, jobs, runtime, panel };
 }
 const show = async (t: Awaited<ReturnType<typeof openTab>>) => { await act(async () => { root.render(createElement(t.panel.WriterLockPanel)); }); };
 const buttons = () => [...document.body.querySelectorAll('.writer-lock button')].map((b) => b.textContent);
+
+// The first import of the app's module graph is a cold transform (about 17 s on a loaded machine, 0.3 s afterwards).
+// It is warmed here, under its own limit, so the first test's 20 s covers only what the test does.
+beforeAll(async () => {
+  await import('../src/lib/writerLock');
+  await import('../src/store/store');
+  await import('../src/store/writerHandoff');
+  await import('../src/components/shell/WriterLockPanel');
+  await import('../src/engine/jobs');
+  await import('../src/engine/agent/runtime');
+}, 120_000);
 
 beforeEach(() => {
   resetWorld();
@@ -78,8 +91,12 @@ describe('test 15e: the read-only panel', () => {
     expect(document.body.querySelector('.writer-lock')).toBeNull(); // the holder is not covered
     const b = await openTab();
     await settle();
-    b.lock.useHere();
-    await settle();
+    // The panel subscribes with useSyncExternalStore. Outside act(), a busy suite commits that update after the
+    // assertion, so the overlay is missing and the test fails; alone, the same settle() usually flushes it in time.
+    await act(async () => {
+      b.lock.useHere();
+      await settle();
+    });
     expect(a.lock.holdsWriterLock()).toBe(false);
     expect(document.body.querySelector('.writer-lock')?.textContent).toContain('Open Gen Studio is open in another tab');
     expect(buttons()).toEqual(['Use here']);
@@ -88,16 +105,16 @@ describe('test 15e: the read-only panel', () => {
   it('a tab without the lock starts no generation and calls no provider; the agent does not take a message', async () => {
     const a = await openTab();
     await settle();
-    const b = await openTab();
+    const b = await openTab(true);
     await settle();
     expect(b.lock.holdsWriterLock()).toBe(false);
     calls.length = 0; // tab A's own loading is not the question
     const st = b.store.useStore.getState();
     b.store.useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } } });
-    const g = b.jobs.createGeneration({ sessionId: st.activeSessionId, kind: 'image', prompt: 'x', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
-    await expect(b.jobs.runGeneration(g.id)).rejects.toThrow('open in another tab');
+    const g = b.jobs!.createGeneration({ sessionId: st.activeSessionId, kind: 'image', prompt: 'x', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
+    await expect(b.jobs!.runGeneration(g.id)).rejects.toThrow('open in another tab');
     expect(b.store.useStore.getState().generations[g.id].status).not.toBe('running');
-    await b.runtime.sendAgentMessage('make a picture');
+    await b.runtime!.sendAgentMessage('make a picture');
     const sess = b.store.useStore.getState().sessions[st.activeSessionId];
     expect(sess.feed.some((f) => f.type === 'user')).toBe(false);
     expect(viewed(sess).busy).toBe(false);

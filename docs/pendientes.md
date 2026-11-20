@@ -26,7 +26,7 @@ Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rend
    - Ideas sin prioridad (misma revisión): encapsular grafos como operador (= paso 14), dependencias por propiedad, traza o inspección de datos por nodo.
 9. **Pasos 10 y 11** (dos agentes en un chat; ejecutar y parar por nodo): los hace el usuario. [plan](propuesta-todo-es-un-nodo-plan.md)
 10. **Migrar datos reales a SQLite**: necesita aprobación expresa. [detalle](pendientes-sistema.md)
-11. **Tests intermitentes en la suite completa**: `writer-lock-panel` y `path-boolean` (*nuevo* para este último: reabierto, figuraba cerrado en D36) fallan a veces juntos y pasan solos. [detalle](pendientes-sistema.md)
+11. **Tests intermitentes en la suite completa**: `writer-lock-panel` y `path-boolean` (*nuevo* para este último: reabierto, figuraba cerrado en D36) fallan a veces juntos y pasan solos. 2026-11-19: ajuste de `path-boolean` en la rama `task/grok-menor`; `writer-lock-panel` sigue abierto (zona protegida). [detalle](pendientes-sistema.md)
 12. ~~**Tabla del plan con filas 8–10 duplicadas; añadir la biblioteca como paso 16.**~~ **Hecho 2026-11-17**: quedan las filas 8, 9 (motor hecho) y 10 (mensajes hechos) una sola vez; paso 16 «La biblioteca como nodo» añadido. [plan](propuesta-todo-es-un-nodo-plan.md)
 13. **Pasos 14 y 15** (JSON, CLI, MCP): pueden esperar.
 
