@@ -377,9 +377,12 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
     }),
   );
   const prior = new Map<string, StepOutput>();
+  // A retry relinked the plan's step → generation mapping to the new attempt: read the card again, not the copy from before.
+  const relinked = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan') ?? item;
+  const genNow = (id: string) => get().generations[relinked.stepGenerations[id] ?? ''];
   for (const st of chosen) {
     if (item.stepStates[st.id] !== 'done' && !recovered.has(st.id)) continue;
-    const g = genOf(st.id);
+    const g = genNow(st.id);
     prior.set(st.id, g ? { assetIds: g.assetIds, text: g.text } : st.kind === 'text' ? { assetIds: [], text: st.text } : { assetIds: [], layerId: null });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
