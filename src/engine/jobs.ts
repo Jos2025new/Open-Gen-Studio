@@ -726,9 +726,10 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
   if (!apiKey || !ADAPTERS.fal.createVoice) throw new Error('Add your fal.ai key in Settings to create Kling voices.');
   const seconds = get().assets[g.op!.sourceAssetId]?.duration;
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
+  const input = await mediaInput(g.op!.sourceAssetId);
   await markSending(g.id);
   const result = await ADAPTERS.fal.createVoice({
-    input: await mediaInput(g.op!.sourceAssetId),
+    input,
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
@@ -743,9 +744,10 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
   if (!apiKey || !ADAPTERS.fal.createStyle) throw new Error('Add your fal.ai key in Settings to create Recraft styles.');
   const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
   if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
+  const inputs = await Promise.all(images.map((r) => mediaInput(r)));
   await markSending(g.id);
   const result = await ADAPTERS.fal.createStyle({
-    images: await Promise.all(images.map((r) => mediaInput(r))),
+    images: inputs,
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),

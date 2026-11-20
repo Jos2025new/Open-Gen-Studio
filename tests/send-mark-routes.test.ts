@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const disk = vi.hoisted(() => ({ raw: undefined as string | undefined }));
+const disk = vi.hoisted(() => ({ raw: undefined as string | undefined, onRead: undefined as (() => void) | undefined }));
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener() {} },
   document: { addEventListener() {}, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => disk.raw, set: async (_k: string, raw: string | { text(): string }) => { disk.raw = typeof raw === "string" ? raw : raw.text(); }, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
-  getAssetBlob: async () => new Blob(['test'], { type: 'image/png' }), putAssetBlob: async () => undefined,
+  getAssetBlob: async () => { disk.onRead?.(); return new Blob(['test'], { type: 'image/png' }); }, putAssetBlob: async () => undefined,
 }));
 vi.mock('../src/lib/media', async (original) => ({ ...await original<typeof import('../src/lib/media')>(),
   probeMedia: async () => ({ width: 1, height: 1 }) }));
@@ -28,7 +28,16 @@ beforeEach(() => {
     sessions: { ...st.sessions, [st.activeSessionId]: { ...st.sessions[st.activeSessionId], feed: [], agents: mainThread({ history: [], notes: [], questionRound: 0, busy: false }) } },
   });
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); disk.onRead = undefined; });
+const sendingOf = (id: string) => useStore.getState().generations[id]?.sending;
+const TR = 'nanogpt::transcriber';
+function audio() {
+  const st = useStore.getState();
+  useStore.setState({ assets: { ...st.assets, au: { id: 'au', kind: 'audio', mime: 'audio/mpeg', duration: 10, sessionId: st.activeSessionId, origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never },
+    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', fal: 'k' } },
+    catalog: { ...st.catalog, transcribers: { [TR]: { ref: TR, provider: 'nanogpt', name: 'Test transcriber', id: 'transcriber', usdPerMinute: 0.01, maxDirectBytes: 1000000, video: false, diarization: false } } } as never });
+}
+const opGen = (op: string, modelRef: string) => createGeneration({ sessionId: useStore.getState().activeSessionId, origin: 'op', kind: 'text', prompt: '', modelRef, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: op, sourceAssetId: 'au', params: { language: 'es' } } } as never);
 
 describe('sending marks on the other routes', () => {
   it('Recraft style: marked while the request is out, cleared when it answers', async () => {
@@ -54,5 +63,61 @@ describe('sending marks on the other routes', () => {
     await runGeneration(g.id).catch(() => undefined);
     expect(useStore.getState().generations[g.id].remoteJob).toBeUndefined();
     expect(during).toEqual(expect.any(Number));
+  });
+
+  it('Recraft style: the inputs are read before the mark (a reload while reading them is not a possible charge)', async () => {
+    const g = createGeneration({ sessionId: useStore.getState().activeSessionId, origin: 'composer', kind: 'text', prompt: 'style', modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: ['a1'] } });
+    const atRead: Array<number | undefined> = [];
+    disk.onRead = () => atRead.push(sendingOf(g.id));
+    vi.spyOn(ADAPTERS.fal, 'createStyle').mockResolvedValue({ text: 'sty_1', costUsd: 0.04 } as never);
+    await runGeneration(g.id);
+    expect(atRead.length).toBeGreaterThan(0);
+    expect(atRead.every((v) => v === undefined)).toBe(true);
+  });
+
+  it('Kling voice: the clip is read before the mark, marked while the request is out, cleared when it answers', async () => {
+    audio();
+    const g = opGen('create_voice', 'fal::kling-voice');
+    const atRead: Array<number | undefined> = [];
+    disk.onRead = () => atRead.push(sendingOf(g.id));
+    let during: number | undefined;
+    vi.spyOn(ADAPTERS.fal, 'createVoice').mockImplementation(async () => { during = sendingOf(g.id); return { text: 'voice_1', costUsd: 0.05 } as never; });
+    await runGeneration(g.id);
+    expect(atRead.length).toBeGreaterThan(0);
+    expect(atRead.every((v) => v === undefined)).toBe(true);
+    expect(during).toEqual(expect.any(Number));
+    expect(sendingOf(g.id)).toBeUndefined();
+    expect(useStore.getState().generations[g.id].status).toBe('done');
+  });
+
+  it('transcription answered at once: read before the mark, marked while out, cleared by finishText', async () => {
+    audio();
+    const g = opGen('transcribe', TR);
+    const atRead: Array<number | undefined> = [];
+    disk.onRead = () => atRead.push(sendingOf(g.id));
+    let during: number | undefined;
+    vi.spyOn(ADAPTERS.nanogpt, 'transcribe').mockImplementation(async () => { during = sendingOf(g.id); return { text: 'hola', costUsd: 0.01 } as never; });
+    await runGeneration(g.id);
+    expect(atRead.every((v) => v === undefined)).toBe(true);
+    expect(during).toEqual(expect.any(Number));
+    expect(sendingOf(g.id)).toBeUndefined();
+    expect(useStore.getState().generations[g.id]).toMatchObject({ status: 'done', text: 'hola' });
+  });
+
+  it('transcription answered with 202: the stored job replaces the mark (a reload follows the job, not "may have been charged")', async () => {
+    audio();
+    const g = opGen('transcribe', TR);
+    let afterJob: { sending?: number; remoteJob?: unknown } = {};
+    vi.spyOn(ADAPTERS.nanogpt, 'transcribe').mockImplementation(async (req) => {
+      expect(sendingOf(g.id)).toEqual(expect.any(Number));
+      req.onRemoteJob?.({ provider: 'nanogpt', id: 't1', meta: {} } as never);
+      const now = useStore.getState().generations[g.id];
+      afterJob = { sending: now.sending, remoteJob: now.remoteJob };
+      return { text: 'hola', costUsd: 0.01 } as never;
+    });
+    await runGeneration(g.id);
+    expect(afterJob.sending).toBeUndefined();
+    expect(afterJob.remoteJob).toMatchObject({ id: 't1' });
+    expect(useStore.getState().generations[g.id]).toMatchObject({ status: 'done', remoteJob: undefined, sending: undefined });
   });
 });
