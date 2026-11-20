@@ -30,6 +30,7 @@ import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 import { agentEngine, feedOfAgent, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
 import { agentOf } from './lanes';
+import { canonicalJson } from './canonicalJson';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
@@ -493,10 +494,3 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
 }
 
 /** Cost of one model call: what the provider reported, else tokens at the catalog's per-million prices. */
-
-/** The same JSON whatever the key order or spacing, to tell a repeated payload from a changed one. */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
-  return JSON.stringify(value) ?? 'null';
-}
