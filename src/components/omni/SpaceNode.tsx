@@ -8,6 +8,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Segmented } from '../ui/primitives';
 import { SPACES, openSpace } from '../shell/navModel';
 import { PortDot, useLive } from '../node/SystemNode';
+import { ProblemBadge } from '../node/CanvasNotices';
 import type { FlowNode } from '../node/nodes';
 
 /* A Studio, Nodes or Designer node (plan "todo es un nodo", step 12): one per session, two looks the user switches.
@@ -72,6 +73,7 @@ export function SpaceNode({ data, selected }: NodeProps<FlowNode>) {
         <div className="nc-label">
           <Icon size={12} />
           <span className="nc-title-text">{live?.title ?? d.title}</span>
+          {space === 'nodes' && live?.badge === 'Space' && <ProblemBadge count={data.spaceProblems ?? 0} />}
           {live?.badge ? <span className="nc-sys-badge">{live.badge}</span> : null}
         </div>
         <div className="omni-look nodrag">

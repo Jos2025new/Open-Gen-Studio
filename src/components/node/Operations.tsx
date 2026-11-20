@@ -8,6 +8,7 @@ import { alignNodes, copyNodes, cutNodes, groupNodes, renameGroup, setGroupColor
 import { deleteNodes } from '../../engine/flow/actions';
 import type { Graph, GraphGroup } from '../../engine/types';
 import { toast } from '../../store/store';
+import { ProblemBadge } from './CanvasNotices';
 
 const ALIGN: Array<{ id: AlignMode; label: string; icon: typeof AlignStartVertical }> = [
   { id: 'left', label: 'Left edges', icon: AlignStartVertical },
@@ -93,7 +94,7 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect }: { session
 
 const COLORS = [undefined, '#d8ff3a', '#5ec8ff', '#b892ff', '#ff7ab6', '#ffc25e', '#86e3a5'];
 
-export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string }, 'group'>;
+export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collapsed: boolean; problems: number; toggle(groupId: string): void }, 'group'>;
 
 /**
  * A group as a container on the canvas: a frame behind its nodes, sized from them (it follows them as they move).
@@ -101,12 +102,17 @@ export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string }, 'grou
  * optional background color (none by default).
  */
 export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<GroupFlowNode>) {
-  const { group, sessionId } = data;
+  const { group, sessionId, collapsed, problems, toggle } = data;
   const [editing, setEditing] = useState(false);
   const [palette, setPalette] = useState(false);
   return (
-    <div className={`group-frame ${selected ? 'is-selected' : ''}`} style={group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : undefined}>
+    <div className={`group-frame ${selected ? 'is-selected' : ''}${collapsed ? ' is-collapsed' : ''}`} style={group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : undefined}>
       <div className="group-head">
+        <button type="button" className="nt-btn nodrag" aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand group' : 'Collapse group'} data-tip={collapsed ? 'Expand group' : 'Collapse group'}
+          onClick={() => toggle(group.id)}>
+          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+        </button>
         {editing ? (
           <input
             autoFocus
@@ -124,6 +130,7 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
             {group.title}
           </span>
         )}
+        <ProblemBadge count={problems} />
         {'detachedOutputs' in group ? <button type="button" className="nt-btn nodrag" onClick={() => ungroup(sessionId, group.id)}>Reattach outputs</button> : null}
         <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
         {palette ? (

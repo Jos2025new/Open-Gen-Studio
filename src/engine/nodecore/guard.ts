@@ -5,8 +5,8 @@ import { resolveInputs, storeEnv, type ResolveEnv } from './resolver';
 
 /**
  * What stops an action before anything is spent (ADR 0031 points 2 and 4): a cycle through a node it runs, and an
- * invalid cable on an input the node's descriptor marks required. Optional inputs that are broken stay visible in the
- * inspector but do not block, so deleting a reference image never stops a prompt-only run.
+ * invalid cable on a required input. The planner handles type mismatches as absent inputs. A deletion tombstone
+ * only blocks while the required port it used is still empty.
  */
 export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): string[] {
   const problems: string[] = [];
@@ -16,8 +16,10 @@ export function runProblems(graph: Graph, runIds: string[], env: ResolveEnv): st
     const node = graph.nodes.find((n) => n.id === id);
     if (!node) continue;
     const required = descriptorOf(node.data.kind)?.required ?? [];
-    for (const input of resolveInputs(graph, node, env)) {
-      if (input.status !== 'invalid' || !required.includes(input.port)) continue;
+    const inputs = resolveInputs(graph, node, env);
+    for (const input of inputs) {
+      if (input.status !== 'invalid' || input.incompatible || !required.includes(input.port)) continue;
+      if (input.lost && inputs.some(i => i.port === input.port && i.status !== 'invalid')) continue;
       // A deleted source is not an invalid cable: the input is simply empty, and the run waits for it.
       problems.push(input.lost ? `“${node.data.title}”: the ${input.port} input is empty (its source was deleted).` : `“${node.data.title}”: the ${input.port} cable is invalid. ${input.reason ?? ''}`.trim());
     }

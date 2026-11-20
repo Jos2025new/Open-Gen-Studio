@@ -39,6 +39,7 @@ import './styles/save-guard.css';
 import './styles/writer-lock.css';
 import './styles/studio.css';
 import './styles/node-side.css';
+import './styles/node-notices.css';
 import { App } from './App';
 import { installDoneNotice } from './lib/doneNotice';
 import { installDoneSignal } from './lib/doneSignal';

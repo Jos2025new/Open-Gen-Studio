@@ -2,6 +2,7 @@ import { useStore } from '../../store/store';
 import { normalizeAssetRevisions } from '../assetRevisions';
 import type { Asset, Generation, Graph, GraphEdge, GraphNode } from '../types';
 import { digest, type RefMode, type RefStatus } from './address';
+import { cablePortProblem } from '../flow/graph';
 import { feedOwner } from '../agent/threads';
 
 /*
@@ -35,6 +36,8 @@ export interface ResolvedInput {
   kind?: import('../types').LinkKind;
   /** Set when the cable is invalid because its pin no longer matches. */
   pinMoved?: true;
+  incompatible?: true;
+  currentRevision?: string | null;
   /** The revision, only for a source whose content was revised: it joins the freshness signature. */
   rev?: string;
 }
@@ -92,17 +95,22 @@ export function sourceValue(src: GraphNode | undefined, edge: Pick<GraphEdge, 'o
   return { value, revision: revision ?? digest(value), ...(edited ? { edited } : {}) };
 }
 
+/** Resolve one live data cable against its current source and ports. */
+export function resolveCableInput(src: GraphNode | undefined, node: GraphNode, e: GraphEdge, env: ResolveEnv): ResolvedInput {
+  const base = { port: e.targetHandle, edgeId: e.id, from: src?.id ?? null, mode: (e.pin ? 'pinned' : 'moving') as RefMode };
+  if (!src) return { ...base, status: 'invalid', reason: 'The source node no longer exists.', value: null, revision: null };
+  const incompatible = cablePortProblem(src, node, env.assets, e);
+  if (incompatible) return { ...base, status: 'invalid', incompatible: true, reason: incompatible, value: null, revision: null };
+  if (e.outputIndex === GONE) return { ...base, status: 'invalid', reason: 'The image this link used was deleted.', value: null, revision: null };
+  const { value, revision, edited } = sourceValue(src, e, env);
+  if (e.pin && revision !== e.pin) return { ...base, status: 'invalid', pinMoved: true, currentRevision: revision, reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
+  return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: 'The source has no output yet.' } : {}), value, revision, ...(edited ? { rev: revision! } : {}) };
+}
+
 /** Every data input of a node, resolved: the value, its revision, and whether the link is usable. */
 export function resolveInputs(graph: Graph, node: GraphNode, env: ResolveEnv): ResolvedInput[] {
-  const live = graph.edges.filter((e) => (e.kind ?? 'data') === 'data' && e.target === node.id).map((e): ResolvedInput => {
-    const src = graph.nodes.find((n) => n.id === e.source);
-    const base = { port: e.targetHandle, edgeId: e.id, from: src?.id ?? null, mode: (e.pin ? 'pinned' : 'moving') as RefMode };
-    if (!src) return { ...base, status: 'invalid', reason: 'The source node no longer exists.', value: null, revision: null };
-    if (e.outputIndex === GONE) return { ...base, status: 'invalid', reason: 'The image this link used was deleted.', value: null, revision: null };
-    const { value, revision, edited } = sourceValue(src, e, env);
-    if (e.pin && revision !== e.pin) return { ...base, status: 'invalid', pinMoved: true, reason: "The pinned revision is no longer the source's.", value: null, revision: e.pin };
-    return { ...base, status: value == null ? 'empty' : 'ok', ...(value == null ? { reason: 'The source has no output yet.' } : {}), value, revision, ...(edited ? { rev: revision! } : {}) };
-  });
+  const live = graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === node.id)
+    .map(e => resolveCableInput(graph.nodes.find(n => n.id === e.source), node, e, env));
   const broken = (graph.broken ?? []).filter((b) => b.edge.target === node.id).map((b): ResolvedInput => ({
     kind: b.edge.kind ?? 'data', port: b.edge.targetHandle, edgeId: b.edge.id, from: b.missing === 'source' ? null : b.edge.source, mode: b.edge.pin ? 'pinned' : 'moving',
     status: 'invalid', reason: `The ${b.missing} node was deleted.`, value: null, revision: null, broken: true, ...((b.reason ?? 'deleted') === 'deleted' ? { lost: true as const } : {}),
@@ -110,5 +118,8 @@ export function resolveInputs(graph: Graph, node: GraphNode, env: ResolveEnv): R
   return [...live, ...broken];
 }
 
+/** Cables that cannot participate in a run. Deleted results still get their existing plan error. */
+export const ignoredRunCable = (input: ResolvedInput) => Boolean(input.incompatible || input.pinMoved);
+
 /** The inputs a node's request is built from, in the `{ port, value }` shape saved signatures already use. */
-export const incomingOf = (inputs: ResolvedInput[]) => inputs.filter((i) => !i.broken).map((i) => ({ port: i.port, value: i.value, ...(i.rev ? { rev: i.rev } : {}) }));
+export const incomingOf = (inputs: ResolvedInput[]) => inputs.filter((i) => !i.broken && !i.incompatible).map((i) => ({ port: i.port, value: i.value, ...(i.rev ? { rev: i.rev } : {}) }));

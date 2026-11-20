@@ -213,7 +213,6 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .node-canvas.is-cut-tool .react-flow__pane { cursor: crosshair; }
 .cut-trail { position: absolute; inset: 0; z-index: 6; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .cut-trail polyline { fill: none; stroke: var(--danger); stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; stroke-linejoin: round; }
-.react-flow__edge.is-cut-hit .react-flow__edge-path { stroke: var(--danger) !important; stroke-width: 3; }
 /* Selection panel: the selected node's result tools, by section, at the top right (same frame as the canvas toolbox). */
 .selection-panel { width: 15rem; max-height: calc(100% - 1.5rem); overflow-y: auto; scrollbar-width: none; padding: 0.25rem; border: 1px solid var(--bar-line); border-radius: var(--toolbar-radius); background: var(--bar-bg); box-shadow: var(--bar-shadow); }
 .selection-panel .sp-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.5625rem 0.5625rem 0.4375rem; color: var(--text); font-size: var(--fs-s); }

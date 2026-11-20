@@ -13,6 +13,21 @@ export default [{
   ],
   tests: ['tests/connected-node-menu.test.ts', 'tests/node-connection-drop.test.ts', 'tests/add-connected-node.test.ts'],
 }, {
+  id: 'canvas-notices',
+  what: 'El lienzo y la ejecución leen la compatibilidad de los cables existentes. Los avisos de puertos, cables y pines alimentan el resumen y el recuento de contenedores sin cambiar el formato guardado.',
+  sides: [
+    ['src/engine/flow/graph.ts', 'export function cablePortProblem'],
+    ['src/engine/flow/graph.ts', 'filter(ignoredRunCable)'],
+    ['src/engine/nodecore/resolver.ts', 'export function resolveCableInput'],
+    ['src/engine/flow/notices.ts', 'export function graphNotices'],
+    ['src/components/node/CanvasNotices.tsx', 'export function ProblemList'],
+    ['src/components/node/NodeWorkspace.tsx', 'onJump={jumpToNode}'],
+    ['src/components/node/nodes.tsx', 'node-port-missing'],
+    ['src/components/node/CanvasElements.ts', 'countNotices(notices, group.nodeIds)'],
+    ['src/components/omni/SpaceNode.tsx', 'count={data.spaceProblems ?? 0}'],
+  ],
+  tests: ['tests/node-notices.test.ts', 'tests/node-notices-ui.test.ts'],
+}, {
   id: 'system-nodes-and-link-classes',
   what: 'Chat, agente, modelos, docs y Spaces son nodos `ref` que apuntan a sus datos (sin copiar). Los enlaces tienen clase (data, ref, control) y `both` solo en ref y control; el orden de ejecución sale de los enlaces data. Cambiar un lado cambia los demás.',
   sides: [

@@ -2,7 +2,7 @@ import { mentionSubjects } from '../params';
 import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
 import { refNodeText } from './refText';
-import { resolveInputs, sessionChatText } from '../nodecore/resolver';
+import { ignoredRunCable, resolveInputs, sessionChatText } from '../nodecore/resolver';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
@@ -136,6 +136,41 @@ function usesSystemPorts(
   );
 }
 
+type ConnectionPorts = { sourceHandle?: string | null; targetHandle: string | null; kind?: LinkKind; both?: boolean };
+
+function systemPortsFor(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset>, c: ConnectionPorts) {
+  return usesSystemPorts(src, tgt, c) ? resolveSystemConnection(nodePorts(src.data, assets), nodePorts(tgt.data, assets), c) : undefined;
+}
+
+function portProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset>, c: ConnectionPorts,
+  resolved: ReturnType<typeof systemPortsFor>, existing = false): string | null {
+  // Callers without the asset inventory cannot infer an existing asset cable's type.
+  const unknownAsset = existing && src.data.kind === 'asset' && !!src.data.assetId && !assets[src.data.assetId];
+  if (resolved) {
+    if (resolved.classMismatch) return resolved.classMismatch;
+    if (!resolved.tgtPort) return 'This node has no such input.';
+    if (!resolved.srcPort) return unknownAsset ? null : 'The source has no output yet.';
+    const kind = resolved.kind ?? resolved.tgtPort.kind;
+    if (c.both && kind === 'data') return 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
+    if (resolved.srcPort.kind !== resolved.tgtPort.kind) return `Link class mismatch: cannot connect ${resolved.srcPort.kind} to ${resolved.tgtPort.kind}.`;
+    if (!portTypeCompatible(kind, resolved.srcPort.type, resolved.tgtPort.type)) {
+      return `${resolved.tgtPort.label ?? resolved.tgtPort.id} expects ${resolved.tgtPort.type}, got ${resolved.srcPort.type}.`;
+    }
+    return null;
+  }
+  const out = outputPort(src.data, assets);
+  const port = inputPorts(tgt.data).find((p) => p.id === c.targetHandle);
+  if (!port) return 'This node has no such input.';
+  if (!out) return unknownAsset ? null : 'The source has no output yet.';
+  if (!portFits(out, port.type)) return `${port.label} expects ${port.type}, got ${out}.`;
+  return null;
+}
+
+/** A cable can outlive a port's former type. Its original endpoints stay in the graph. */
+export function cablePortProblem(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset>, edge: GraphEdge): string | null {
+  return portProblem(src, tgt, assets, edge, systemPortsFor(src, tgt, assets, edge), true);
+}
+
 export function connectionError(
   graph: Graph,
   assets: Record<string, Asset>,
@@ -145,27 +180,11 @@ export function connectionError(
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
   if (!src || !tgt) return 'Unknown node.';
-  if (usesSystemPorts(src, tgt, c)) {
-    const resolved = resolveSystemConnection(nodePorts(src.data, assets), nodePorts(tgt.data, assets), c);
-    if (resolved.classMismatch) return resolved.classMismatch;
-    if (!resolved.tgtPort) return 'This node has no such input.';
-    if (!resolved.srcPort) return 'The source has no output yet.';
-    const kind = resolved.kind ?? resolved.tgtPort.kind;
-    if (c.both && kind === 'data') return 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
-    if (resolved.srcPort.kind !== resolved.tgtPort.kind) return `Link class mismatch: cannot connect ${resolved.srcPort.kind} to ${resolved.tgtPort.kind}.`;
-    if (!portTypeCompatible(kind, resolved.srcPort.type, resolved.tgtPort.type)) {
-      return `${resolved.tgtPort.label ?? resolved.tgtPort.id} expects ${resolved.tgtPort.type}, got ${resolved.srcPort.type}.`;
-    }
-    if (kind === 'data' && reaches(graph.edges, c.target, c.source)) return 'That connection would create a loop.';
-    return null;
-  }
-  const out = outputPort(src.data, assets);
-  const port = inputPorts(tgt.data).find((p) => p.id === c.targetHandle);
-  if (!port) return 'This node has no such input.';
-  if (!out) return 'The source has no output yet.';
-  if (!portFits(out, port.type)) return `${port.label} expects ${port.type}, got ${out}.`;
-  if (reaches(graph.edges, c.target, c.source)) return 'That connection would create a loop.';
-  return null;
+  const system = systemPortsFor(src, tgt, assets, c);
+  const problem = portProblem(src, tgt, assets, c, system);
+  if (problem) return problem;
+  const kind = system?.kind ?? system?.tgtPort?.kind ?? 'data';
+  return kind === 'data' && reaches(graph.edges, c.target, c.source) ? 'That connection would create a loop.' : null;
 }
 
 export { resultHandle, NO_RESULT, GONE_HANDLE } from './results';
@@ -370,7 +389,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const env = { generations, assets: options.assets ?? {}, chatText: sessionChatText };
   const badEdges = new Map<string, Set<string>>();
   const unusable = (id: string): Set<string> => {
-    if (!badEdges.has(id)) { const n = byId.get(id); badEdges.set(id, new Set(n ? resolveInputs(graph, n, env).filter(i => i.pinMoved).map(i => i.edgeId) : [])); }
+    if (!badEdges.has(id)) { const n = byId.get(id); badEdges.set(id, new Set(n ? resolveInputs(graph, n, env).filter(ignoredRunCable).map(i => i.edgeId) : [])); }
     return badEdges.get(id)!;
   };
   const visit = (id: string, forced: boolean): boolean => {
@@ -430,12 +449,14 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       const src = edge ? byId.get(edge.source) : undefined;
       if (!src) return undefined;
       if (src.data.kind === 'text') {
+        if (handle === 'prompt' && !src.data.text.trim()) return undefined;
         if (!textSteps.has(src.id)) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: src.data.text });
         return src.id;
       }
       if (src.data.kind === 'ref') {
         const said = refNodeText(src);
         if (said == null) { errors.push(`"${src.data.title}" has no text yet.`); return undefined; }
+        if (handle === 'prompt' && !said.trim()) return undefined;
         if (!textSteps.has(src.id)) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: said });
         return src.id;
       }
@@ -505,9 +526,14 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     }
 
     if ((s.kind === 'image' || s.kind === 'model3d' || s.kind === 'video') && !s.prompt.trim() && !s.promptFrom) {
-      const needsPrompt = s.kind === 'image' || s.kind === 'model3d' ? !s.refs.length : !s.firstFrame && !s.refs?.length;
+      const needsPrompt = !hasPromptAlternative(s.kind, s.refs?.length, s.kind === 'video' && !!s.firstFrame);
       if (needsPrompt) errors.push(`"${s.title}" needs a prompt.`);
     }
   }
   return { steps: [...textSteps.values(), ...steps], runIds: [...run], errors };
+}
+
+/** Image/reference-driven models can run without text when the plan has a visual input. */
+export function hasPromptAlternative(kind: 'image' | 'video' | 'model3d', referenceCount = 0, hasFirstFrame = false): boolean {
+  return referenceCount > 0 || (kind === 'video' && hasFirstFrame);
 }
