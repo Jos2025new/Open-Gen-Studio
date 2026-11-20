@@ -1,3 +1,4 @@
+import { nextAgentTitle } from './agentNames';
 import { uid } from '../../lib/id';
 import { firstAgentId } from '../agent/threads';
 import { threadOf } from '../agent/lanes';
@@ -87,7 +88,7 @@ function buildInitialSystemGraph(sessionId: string, graph: Graph): { nodes: Grap
       kind: 'ref',
       type: 'agent',
       ref: sessionId,
-      title: 'Agent',
+      title: nextAgentTitle({ nodes }),
     });
     ensureNode('sys_model_llm', at(0, 0), {
       kind: 'ref',
@@ -279,7 +280,9 @@ export function addSystemNode(
               : spec.type);
   const title =
     spec.title ??
-    (spec.type === 'model'
+    (spec.type === 'agent'
+      ? nextAgentTitle(session?.graph)
+      : spec.type === 'model'
       ? modelLabelForRef(defaultRef)
       : spec.type === 'designer.doc'
         ? session?.docs.find((d) => d.id === defaultRef)?.name ?? SYSTEM_NODE_TYPES[spec.type].title

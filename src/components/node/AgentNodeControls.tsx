@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { distinctTitles } from '../../engine/nodes/agentNames';
 import { patchNodeData } from '../../engine/flow/actions';
 import { setAgentLlm } from '../../engine/nodes/system';
 import { chatAgents } from '../../engine/agent/runtimeShared';
@@ -6,6 +7,35 @@ import { useStore } from '../../store/store';
 
 /* Two small controls the node core needs (ADR 0031, strip 2). They write the node's own data through the single
  * editing layer: which LLM an agent node uses, and which connected agent a chat node writes to. */
+
+/** The agent's name in its card header: double-click to rename, through the graph layer (so undo brings the old one back). */
+export function AgentTitle({ sessionId, nodeId, title }: { sessionId: string; nodeId: string; title: string }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    const next = draft?.trim();
+    setDraft(null);
+    if (next && next !== title) patchNodeData(sessionId, nodeId, { title: next });
+  };
+  if (draft != null)
+    return (
+      <input
+        autoFocus
+        className="nc-title nodrag"
+        value={draft}
+        aria-label="Agent name"
+        maxLength={60}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') setDraft(null);
+          e.stopPropagation();
+        }}
+      />
+    );
+  return <span className="nc-title-text" title="Double-click to rename" onDoubleClick={(e) => { e.stopPropagation(); setDraft(title); }}>{title}</span>;
+}
 
 /** The agent's own LLM; «Default» follows Settings → Agent. Hidden while the local planner is the only engine. */
 export function AgentLlmSelect({ sessionId, nodeId, llm }: { sessionId: string; nodeId: string; llm?: { provider: string; model: string } }) {
@@ -28,7 +58,7 @@ export function AgentLlmSelect({ sessionId, nodeId, llm }: { sessionId: string; 
 /** Which agent a chat node writes to. Shown only when several agents are connected to it. */
 export function ChatRecipientSelect({ sessionId, nodeId, recipient }: { sessionId: string; nodeId: string; recipient?: string }) {
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
-  const agents = useMemo(() => (graph ? chatAgents(sessionId, nodeId).flatMap((id) => { const n = graph.nodes.find((x) => x.id === id); return n ? [{ id, title: n.data.title }] : []; }) : []), [graph, sessionId, nodeId]);
+  const agents = useMemo(() => distinctTitles(graph ? chatAgents(sessionId, nodeId).flatMap((id) => { const n = graph.nodes.find((x) => x.id === id); return n ? [{ id, title: n.data.title }] : []; }) : []), [graph, sessionId, nodeId]);
   const stale = Boolean(recipient) && !agents.some((a) => a.id === recipient);
   if (agents.length < 2 && !stale) return null;
   return (
@@ -36,7 +66,7 @@ export function ChatRecipientSelect({ sessionId, nodeId, recipient }: { sessionI
       <span>To</span>
       <select aria-label="Send messages to" value={stale ? recipient : recipient ?? agents[0].id} onChange={(e) => patchNodeData(sessionId, nodeId, { recipient: e.target.value })}>
         {stale ? <option value={recipient}>Not connected — choose one</option> : null}
-        {agents.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+        {agents.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
       </select>
     </label>
   );

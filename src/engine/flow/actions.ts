@@ -1,3 +1,4 @@
+import { nextAgentTitle } from '../nodes/agentNames';
 import { videoOpSettings } from '../jobs';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
@@ -76,7 +77,7 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
         prompt: 'composer',
         mediaSettings: 'image',
       };
-      return { kind: 'ref', type, ref: opts.ref ?? defaults[type], title: SYSTEM_NODE_TYPES[type].title };
+      return { kind: 'ref', type, ref: opts.ref ?? defaults[type], title: type === 'agent' ? nextAgentTitle(session?.graph) : SYSTEM_NODE_TYPES[type].title };
     }
   }
 }
