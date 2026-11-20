@@ -152,8 +152,10 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   const switchTo = (o: CreditOption) => {
     const m = o.model;
     const to = parseModelRef(m.ref)?.provider ?? m.provider;
-    const detail = o.same ? 'same model, same price or less'
-      : `${lineKey(m) === lineKey(cur) ? 'same model' : `model ${m.name}`}, ${o.ratio !== undefined && o.ratio > 1 ? `about ${Math.round(o.ratio * 10) / 10}× the price` : 'price not comparable'}`;
+    const what = lineKey(m) === lineKey(cur) ? 'same model' : `model ${m.name}`;
+    // Three honest cases: no comparable price, the same price or less, and dearer by the measured ratio.
+    const price = o.ratio === undefined ? 'price not comparable' : o.ratio > 1 ? `about ${Math.round(o.ratio * 10) / 10}× the price` : 'same price or less';
+    const detail = o.same ? 'same model, same price or less' : `${what}, ${price}`;
     const note = `${empty} had no credit, so this ran on ${PROVIDER_LABELS[to]} (${detail}).`;
     // Read the notes now, not when the alert was built: the user may click long after.
     const notes = [...(get().generations[genId]?.notes ?? []), note];
