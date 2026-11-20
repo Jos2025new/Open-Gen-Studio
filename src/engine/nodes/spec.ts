@@ -455,7 +455,7 @@ export function resolveSystemNodeLive(sessionId: string, node: GraphNode): LiveS
       };
     },
     library: () => {
-      const subjects = [...st.library, ...(session?.subjects ?? [])];
+      const subjects = st.library;
       return {
         type: 'library',
         ref: d.ref || 'library',

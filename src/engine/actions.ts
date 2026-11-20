@@ -114,7 +114,7 @@ export function subjectFromAsset(assetId: string, name: string, kind: SubjectKin
 /** A reference sheet saved as separate views (Grid-split, local and free): the main view first, then the others. */
 export async function saveSheetViews(assetId: string, name: string, kind: SubjectKind, replace: boolean): Promise<Subject | null> {
   const sessionId = get().assets[assetId]?.sessionId ?? get().activeSessionId;
-  // The cut and its order come from sheet.ts: a turnaround is one row of 3 or 4 views, other sheets 2×2.
+  // Cut and order: sheet.ts.
   const { grid, order } = sheetCut(get().generations[get().assets[assetId]?.generationId ?? '']?.op);
   try {
     const g = createGeneration(await opSpec({ sessionId, sourceAssetId: assetId, op: 'grid_split', params: { grid }, origin: 'op' }));
@@ -128,7 +128,7 @@ export async function saveSheetViews(assetId: string, name: string, kind: Subjec
   }
 }
 
-/** A new subject from the composer attachments: the first image is the frontal view, up to 3 more are views; or a video. */
+/** A subject from the attachments: the first image is the frontal view, up to 3 more are views; or a video. */
 export function subjectFromAttachments(name: string): Subject | null {
   const st = get();
   const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
@@ -264,7 +264,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (shots) return { ok: false, reason: `Multi-shot: ${shots}`, estimate };
     const el = schema.slots.elements;
     if (el) {
-      const mentioned = mentionSubjects(text, st.sessions[st.activeSessionId]?.subjects ?? []).ids.length;
+      const mentioned = mentionSubjects(text, st.library).ids.length;
       if (mentioned > el.max) return { ok: false, reason: `This model takes up to ${el.max} subjects.`, estimate };
     }
     if (!text && !attachments.length && !settings.shots?.length) return { ok: false, reason: 'Write a prompt.', estimate };

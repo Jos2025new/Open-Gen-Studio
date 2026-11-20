@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async (id: string) => id }));
-import { checkDirect } from '../src/engine/actions';
+vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('../src/engine/jobs')>()), runGeneration: vi.fn(async () => []) }));
+import { checkDirect, generateDirect } from '../src/engine/actions';
 import { useStore } from '../src/store/store';
 import { routeFits } from '../src/engine/routing';
 import type { Asset, ModelSchema, ModelSummary } from '../src/engine/types';
@@ -52,3 +53,17 @@ describe('2. the agent picks the image variant with the send rule', () => {
     expect(routeModel(t, 'text')).toBe(t);
   });
 });
+
+describe('3. subjects counted from the list the send uses', () => {
+  it('checkDirect reads the library, not the legacy session.subjects', () => {
+    const vref = 'atlas::acme/vid-3/with-subjects';
+    const v = { ref: vref, provider: 'atlas', id: 'acme/vid-3/with-subjects', name: 'Subjects video', kind: 'video', acceptsText: true, acceptsImage: false, tags: [] } as ModelSummary;
+    const vs: ModelSchema = { ref: vref, params: [], source: 'catalog', slots: { prompt: 'prompt', elements: { key: 'elements', max: 1, video: false } as never } };
+    const st = useStore.getState();
+    const subject = (id: string) => ({ id, name: id, kind: 'character', frontalAssetId: 'a0', refAssetIds: [] }) as never;
+    useStore.setState({ library: [subject('Ana'), subject('Leo')], catalog: { ...st.catalog, models: { ...st.catalog.models, [vref]: v }, schemas: { ...st.catalog.schemas, [vref]: vs } },
+      composer: { ...st.composer, mode: 'video', text: '@Ana talks to @Leo', attachments: [], video: { modelRef: vref, settings: { count: 1, advanced: {} } } } });
+    expect(checkDirect('video')).toMatchObject({ ok: false, reason: expect.stringMatching(/up to 1 subjects/) });
+  });
+});
+
