@@ -12,7 +12,7 @@ import { probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
 import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, pickComposerModel, selectComposerModel } from './catalog';
-import { estimateMedia } from './costs';
+import { estimateMedia, estimateRecraftStyle } from './costs';
 import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
@@ -149,7 +149,7 @@ export async function createRecraftStyle(sessionId: string, name: string): Promi
     toast('Attach 1–10 reference images first.', 'error');
     return;
   }
-  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: { usd: null, approximate: true, note: 'fal bills the style when it is created' } });
+  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: estimateRecraftStyle() });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     await runGeneration(g.id);

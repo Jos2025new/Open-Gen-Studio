@@ -1,6 +1,6 @@
 import { isStepKind } from '../planSteps/inspect';
 import { useStore } from '../../store/store';
-import { parseRef } from '../plan';
+import { parseRef } from '../planRef';
 import type { LlmContentPart, PlanFeedItem } from '../types';
 import { attachmentParts } from './attachments';
 

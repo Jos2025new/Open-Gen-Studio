@@ -207,7 +207,7 @@ function partialRefs(value: unknown, at: number, results: unknown[], ran: boolea
 
 // --- The boundary ---------------------------------------------------------------------------------------------------
 
-export const MAX_STEPS = 40;
+const MAX_STEPS = 40;
 
 const targetShape = z.object({ session: z.string().optional(), doc: z.string().optional(), node: z.string().optional() }).strict();
 const callShape = z.object({ cmd: z.string().min(1), args: z.unknown().optional(), on: targetShape.optional() }).strict();

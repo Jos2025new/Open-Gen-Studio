@@ -2,7 +2,7 @@
  *  Existing ones are listed in dead-exports-baseline.json: that list may shrink, never grow. */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCOPE = /^src\/engine\/.*\.(ts|tsx)$/;
@@ -16,7 +16,7 @@ export function deadExports(files, baseline = {}) {
     const found = [];
     const { text } = file;
     for (const m of text.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm)) found.push([m[1], m.index]);
-    for (const m of text.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)) {
+    for (const m of text.matchAll(/^export\s*\{([^}]*)\}(\s*from\b)?/gm)) {
       for (const part of m[1].split(',')) {
         const spec = part.trim();
         if (!spec || spec.startsWith('type ')) continue;
@@ -25,30 +25,47 @@ export function deadExports(files, baseline = {}) {
     }
     return found;
   };
-  // A re-export (`export { x }` of an imported name) is only alive when some file imports it from this very module; the name alone also
+  // A re-export is only alive when another file consumes it from this module; the name alone also
   // appears where x is defined, so it cannot tell. A pure alias (`export const a = b;`) is a second name for one thing.
   const reexports = (file) => {
     const out = [];
-    for (const m of file.text.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)) {
+    for (const m of file.text.matchAll(/^export\s*\{([^}]*)\}(\s*from\b)?/gm)) {
       for (const part of m[1].split(',')) {
         const name = part.trim().split(/\s+as\s+/).pop().trim();
-        if (name && !part.trim().startsWith('type ') && new RegExp(`^import\\s[^;]*\\b${name}\\b[^;]*from`, 'm').test(file.text)) out.push([name, m.index]);
+        if (name && !part.trim().startsWith('type ') && (m[2] || new RegExp(`^import\\s[^;]*\\b${name}\\b[^;]*from`, 'm').test(file.text))) out.push([name, m.index]);
       }
     }
     return out;
   };
   const aliases = (file) => [...file.text.matchAll(/^export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$.]*;\s*$/gm)].map((m) => [m[1], m.index]);
   const readers = files.filter((f) => READERS.test(f.path));
+  const paths = new Set(readers.map((f) => f.path));
+  const importsByFile = new Map();
+  for (const reader of readers) {
+    const staticReaders = reader.text.matchAll(/^\s*(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?(\{[^}]*\}|\*(?:\s+as\s+\w+)?)\s+from\s*['"]([^'"]+)['"]/gm);
+    const dynamicReaders = reader.text.matchAll(/\b(?:const|let)\s+(\{[^}]*\})\s*=\s*await\s+import\(\s*['"]([^'"]+)['"]\s*\)/g);
+    for (const m of [...staticReaders, ...dynamicReaders]) {
+      if (!m[2].startsWith('.')) continue;
+      const base = posix.join(posix.dirname(reader.path), m[2]).replace(/\.[cm]?jsx?$/, '');
+      const target = [base, base + '.ts', base + '.tsx', base + '.mjs', base + '/index.ts', base + '/index.tsx']
+        .find((path) => paths.has(path));
+      if (!target || target === reader.path) continue;
+      const names = importsByFile.get(target) ?? new Set();
+      for (const spec of m[1].startsWith('*') ? ['*'] : m[1].slice(1, -1).split(',')) {
+        names.add(spec.trim().replace(/^type\s+/, '').split(/\s+as\s+|\s*:\s*/)[0]);
+      }
+      importsByFile.set(target, names);
+    }
+  }
   for (const file of files.filter((f) => SCOPE.test(f.path))) {
     const reexported = new Map(reexports(file));
     const aliased = new Map(aliases(file));
-    const base = file.path.replace(/\.tsx?$/, '').split('/').pop();
     for (const [name, at] of names(file)) {
       if (baseline[file.path]?.includes(name)) continue;
       const word = new RegExp(`(?<![\\w$])${name.replace(/\$/g, '\\$')}(?![\\w$])`);
       if (reexported.has(name)) {
-        const from = new RegExp(`import\\s*(?:type\\s*)?\\{[^}]*(?<![\\w$])${name.replace(/\$/g, '\\$')}(?![\\w$])[^}]*\\}\\s*from\\s*['"][^'"]*/${base}(?:\\.\\w+)?['"]`);
-        if (readers.some((r) => r.path !== file.path && from.test(r.text))) continue;
+        const imported = importsByFile.get(file.path);
+        if (imported?.has(name) || imported?.has('*')) continue;
         errors.push(`${file.path}:${lineOf(file.text, at)}: re-export \`${name}\` is imported from this file by nobody. Delete the re-export; callers import it from its own module.`);
         continue;
       }

@@ -1,4 +1,4 @@
-import type { PlanContext } from '../plan';
+import type { PlanContext } from './env';
 import type { AdvancedValue, MediaKind } from '../types';
 
 /**

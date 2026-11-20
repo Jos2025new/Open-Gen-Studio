@@ -1,6 +1,5 @@
 import type { TextStep } from '../types';
-import type { RawStep } from '../plan';
-import type { StepEnv } from './env';
+import type { RawStep, StepEnv } from './env';
 
 export async function normalizeText(s: RawStep, env: StepEnv): Promise<void> {
   const { errors, steps } = env;

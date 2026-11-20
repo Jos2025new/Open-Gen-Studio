@@ -6,7 +6,7 @@ import { estimatedHeight, findFreePosition, NODE_WIDTH, nodeRect, rectsOverlap, 
 import { COL, ROW, addSystemNode, ensureSystemNodes, linkSystemNodes, sysOrigin } from './system';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, type OmniSpace } from './omniSpaces';
 
-export { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, omniOnly, ordinaryGraph, type OmniSpace } from './omniSpaces';
+export { OMNI_SPACES, omniSpaceNodeId, ordinaryGraph, type OmniSpace } from './omniSpaces';
 
 /** The most assets the omnicanvas brings in at once; the user adds the rest from the library. */
 const ASSETS_AT_ONCE = 8;

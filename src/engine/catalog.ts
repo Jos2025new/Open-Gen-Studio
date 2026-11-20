@@ -353,8 +353,6 @@ export const KLING_VOICE_REF = 'fal::fal-ai/kling-video/create-voice';
 export const RECRAFT_STYLE_REF = 'fal::fal-ai/recraft/v4/create-style';
 /** The provider that hosts the voice-creation endpoint: read from its ref, never named by the engine. */
 export const KLING_VOICE_PROVIDER: ProviderId = parseModelRef(KLING_VOICE_REF)?.provider ?? 'local';
-/** Providers that run the operations the app offers (labels for «connect one of these» messages). */
-export const OP_PROVIDERS: ProviderId[] = ['atlas', 'nanogpt', 'fal'];
 
 /** Speech-to-text model for the Transcribe operation: the settings override, then the preferred list, then any. */
 export function transcriberFor(): TranscriberSummary | undefined {

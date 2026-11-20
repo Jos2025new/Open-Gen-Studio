@@ -13,9 +13,8 @@ import { withRealismSetting } from '../realism';
 import { placeRoles, stepRolesLine } from '../refRoles';
 import { RouteMode, VIDEO_PURPOSES, VideoPurpose, routeFits, routeMode, routeVideo } from '../routing';
 import type { ImageStep, Model3dStep, ModelSchema, VideoStep } from '../types';
-import type { RawStep } from '../plan';
 import { cleanParams, didYouMean, familyRef } from './shared';
-import type { StepEnv } from './env';
+import type { RawStep, StepEnv } from './env';
 
 export async function normalizeMedia(s: RawStep, env: StepEnv): Promise<void> {
   const { ctx, raw, rawSteps, errors, adjustments, steps, st, share, stepRoles, refKind, expectImage, inputAspect, frameOf } = env;

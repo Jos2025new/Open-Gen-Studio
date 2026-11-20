@@ -1,5 +1,5 @@
 import { WRITER_HANDOFF } from '../engine/checkStatus';
-import { controllers } from '../engine/jobs';
+import { controllers } from '../engine/jobState';
 import { stopSession } from '../engine/agent/runtime';
 import { allThreads } from '../engine/agent/threads';
 import { onWriterLockGranted, onWriterLockLost, setWriterHooks, type WorkReport } from '../lib/writerLock';

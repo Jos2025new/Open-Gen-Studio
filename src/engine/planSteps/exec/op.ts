@@ -2,7 +2,7 @@ import { estimateOp } from '../../costs';
 import { createGeneration, opSpec, opSpecForModel, videoOpSeconds } from '../../jobs';
 import { opChoice } from '../../opSpec';
 import { OPS, opCount, operationFactor, isVideoOpEngine } from '../../ops';
-import { parseRef } from '../../plan';
+import { parseRef } from '../../planRef';
 import { costAuthorization } from '../../priceAuthorization';
 import { useStore } from '../../../store/store';
 import type { GenSettings } from '../../types';

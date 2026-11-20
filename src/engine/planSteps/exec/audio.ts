@@ -2,7 +2,7 @@ import { estimateMedia } from '../../costs';
 import { ensureSchema } from '../../catalog';
 import { createGeneration } from '../../jobs';
 import { lyricsBody, lyricsParam } from '../../params';
-import { parseRef } from '../../plan';
+import { parseRef } from '../../planRef';
 import { costAuthorization } from '../../priceAuthorization';
 import { useStore } from '../../../store/store';
 import type { EstimateStep, RunStep } from './env';

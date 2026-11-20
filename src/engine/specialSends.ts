@@ -2,12 +2,12 @@
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
-import { ADAPTERS } from './providers/registry';
+import { ADAPTERS, preferredProviderLabel } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type ProviderAdapter } from './providers/types';
 import type { Generation } from './types';
 import { patchGeneration, useStore } from '../store/store';
 import { markSending } from './sendMark';
-import { finishText, requestEstimate } from './jobs';
+import { finishText, requestEstimate } from './jobState';
 import { mediaInput } from './assetIO';
 
 const get = useStore.getState;
@@ -20,7 +20,7 @@ function checkSpecialSend(g: Generation, signal: AbortSignal): void {
 /** Audio → text with the transcriber recorded on the generation. */
 export async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> {
   const model = get().catalog.transcribers?.[g.modelRef];
-  if (!model) throw new Error(`${g.modelName} is not available. Connect NanoGPT or pick another model in Settings → Operations.`);
+  if (!model) throw new Error(`${g.modelName} is not available. Connect ${preferredProviderLabel('transcribe')} or pick another model in Settings → Operations.`);
   const adapter = ADAPTERS[model.provider];
   const apiKey = apiKeyFor(model.provider);
   if (!adapter.transcribe || !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);

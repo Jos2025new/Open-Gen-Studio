@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
-import { addSpend, createSession, useStore } from '../src/store/store';
+import { createSession, useStore } from '../src/store/store';
+import { addSpend } from '../src/store/spend';
 
 /* The "you passed your limit" notice is silenced only by the lasting rules, and does not depend on budget.ts having loaded (Neon, SOLID A). */
 const passed = () => useStore.getState().ui.toasts.some((t) => /passed your spending limit/.test(t.text));

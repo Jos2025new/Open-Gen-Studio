@@ -62,7 +62,7 @@ export default [
       ['src/engine/checkStatus.ts', 'export const isRestart'],
       ['src/engine/jobs.ts', 'if (isRestart(signal.reason)) return [];'],
       ['src/engine/jobRecovery.ts', 'if (isRestart(controller.signal.reason)) return [];'],
-      ['src/engine/jobs.ts', 'export const controllers'],
+      ['src/engine/jobState.ts', 'export const controllers'],
       ['src/store/writerHandoff.ts', 'abort(WRITER_HANDOFF)'],
       ['src/lib/writerLock.ts', 'hooks.abortTransferable();'],
     ],

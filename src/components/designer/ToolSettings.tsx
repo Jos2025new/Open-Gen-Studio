@@ -3,7 +3,7 @@ import { getSelection, setSelection, useSelectionVersion } from '../../engine/de
 import { getDesignerTool } from './tools/registry';
 import type { ToolSettingsProps } from './tools/types';
 
-export { AutoSelectToggle, ContextField, EditModeOptions, EditModeToggle, EditOps, TextStyleFields, SELECT_MODES, WAND_DEFAULT } from './ToolSettingsFields';
+export { EditModeOptions, EditOps } from './ToolSettingsFields';
 
 /** With another tool active, a pixel selection still shows in the bar (it still clips Delete, copy and the gradient). */
 export function SelectionChip({ docId }: { docId: string }) {

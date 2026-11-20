@@ -92,6 +92,7 @@ async function falPrice(id: string, apiKey: string | undefined): Promise<PriceRu
 export const fal: ProviderAdapter = {
   id: 'fal',
   label: 'fal.ai',
+  shortLabel: 'fal',
 
   async listModels(apiKey) {
     const out: ModelSummary[] = [];

@@ -1,8 +1,8 @@
+import { preferredProviderLabel } from '../providers/registry';
 import { coerceSettings, lyricsParam, songProblem } from '../params';
 import type { AudioStep } from '../types';
-import type { RawStep } from '../plan';
 import { cleanParams, didYouMean, familyRef } from './shared';
-import type { StepEnv } from './env';
+import type { RawStep, StepEnv } from './env';
 
 export async function normalizeAudio(s: RawStep, env: StepEnv): Promise<void> {
   const { ctx, errors, adjustments, steps, refKind } = env;
@@ -10,7 +10,7 @@ export async function normalizeAudio(s: RawStep, env: StepEnv): Promise<void> {
   const title = (s.title ?? '').trim() || s.id!;
   const modelRef = familyRef(ctx, s.model, 'audio', false, s.id!, adjustments) || ctx.defaultModel('audio', false);
   if (!modelRef) {
-    errors.push(`${where}: no audio model is available. Ask the user to connect Atlas Cloud.`);
+    errors.push(`${where}: no audio model is available. Ask the user to connect ${preferredProviderLabel('audio')}.`);
     return;
   }
   const resolved = await ctx.getModel(modelRef);

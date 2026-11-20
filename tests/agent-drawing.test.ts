@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parsePath, pathTransform } from '../src/engine/design/path';
-import { normalizeShapes, normalizeStrokes } from '../src/engine/plan';
+import { normalizeShapes, normalizeStrokes } from '../src/engine/planSteps/layer';
 
 describe('agent drawing in the Designer', () => {
   it('reads the box of an absolute path and rejects what it cannot place', () => {

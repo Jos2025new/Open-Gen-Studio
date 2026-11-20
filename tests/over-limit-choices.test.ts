@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
-import { addSpend, createSession, setSettings, useStore } from '../src/store/store';
+import { createSession, setSettings, useStore } from '../src/store/store';
+import { addSpend } from '../src/store/spend';
 import { askAgain, consumeOnce, dontAskAgain, ignoreExcess, noteExcess, overLimit, overLimitText, withOncePass } from '../src/engine/budget';
 import type { Generation, NoticeFeedItem } from '../src/engine/types';
 

@@ -9,7 +9,7 @@ import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef } from './providers/types';
 import type { Generation, RemoteJob } from './types';
 import { addAssets, patchGeneration, useStore } from '../store/store';
-import { checkDelivery, controllers, finish, finishText, keptJob, purgeDiscarded, running } from './jobs';
+import { checkDelivery, controllers, finish, finishText, keptJob, purgeDiscarded, running } from './jobState';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 
 const get = useStore.getState;

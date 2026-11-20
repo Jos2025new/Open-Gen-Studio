@@ -5,7 +5,7 @@ import { refNodeText } from './refText';
 import { ignoredRunCable, resolveInputs, sessionChatText } from '../nodecore/resolver';
 import { descriptorOf } from '../nodecore/registry';
 import { OPS } from '../ops';
-import { parseRef } from '../plan';
+import { parseRef } from '../planRef';
 import { graphStepNeedsPrompt, graphStepNode, linkGraphStep } from '../planSteps/graph';
 import { stepInfo } from '../planSteps/inspect';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';

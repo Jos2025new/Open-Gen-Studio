@@ -84,7 +84,7 @@ function FollowStrokeRuler({ docId }: { docId: string }) {
   return <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={ruler.on} onChange={(on) => setRuler({ ...ruler, on })} />;
 }
 
-export function paintTool(erase: boolean) {
+function paintTool(erase: boolean) {
   return {
     down: (args: PointerPress) => beginPaint(erase, args),
     gestures,
@@ -100,3 +100,7 @@ export function paintTool(erase: boolean) {
       : (l) => l?.type === 'raster' && !l.locked && l.visible && !isProtectedImage(l) ? l.name : 'new layer',
   } satisfies ToolDescriptor;
 }
+
+export const brush = paintTool(false);
+
+export const eraser = paintTool(true);

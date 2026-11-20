@@ -94,6 +94,7 @@ export interface ResumeContext {
 export interface ProviderAdapter {
   id: ProviderId;
   label: string;
+  shortLabel?: string;
   /** Model catalog. Public catalogs may be listed without a key. */
   listModels(apiKey: string | undefined, signal?: AbortSignal): Promise<ModelSummary[]>;
   loadSchema(model: ModelSummary, apiKey: string | undefined): Promise<ModelSchema>;
@@ -117,7 +118,7 @@ export interface ProviderAdapter {
    * Exact price of one request before it is sent (USD), when the provider can quote it; null when it has no answer.
    * The engine adds it up as the cost of a request whose result reports none. It never blocks a send.
    */
-  quote?(model: ModelSummary, schema: ModelSchema, settings: GenSettings, count: number): Promise<number | null>;
+  quote?(model: Pick<ModelSummary, 'ref' | 'provider' | 'id'>, schema: ModelSchema, settings: GenSettings, count: number, timeoutMs?: number): Promise<number | null>;
   /** Requests with the same key run one at a time, in every canvas; null means no limit for that model. */
   serialKey?(model: ModelSummary): string | null;
   /**
