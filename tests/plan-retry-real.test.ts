@@ -33,7 +33,7 @@ beforeEach(() => {
     generations: {}, quotes: {}, assets: {}, spendLog: [], spentUsd: 0,
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test-only' }, budgetOn: false },
     catalog: { ...st.catalog, models: { [REF]: { ref: REF, provider: 'nanogpt', id: 'test-image', name: 'Test', kind: 'image', acceptsText: true, acceptsImage: true, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] } } as ModelSummary },
-      schemas: { [REF]: { ref: REF, params: [], slots: { prompt: 'prompt', promptRequired: true, images: 'image', maxImages: 4 }, source: 'catalog' } } },
+      schemas: { [REF]: { ref: REF, params: [], slots: { prompt: 'prompt', promptRequired: true, images: { key: 'image', min: 0, max: 4, multiple: true, format: 'url' } as never }, source: 'catalog' } } },
     sessions: { ...st.sessions, [st.activeSessionId]: { ...st.sessions[st.activeSessionId], feed: [], agentMetrics: [], agents: mainThread({ history: [], notes: [], questionRound: 0, busy: false }) } },
   });
   let n = 0;
