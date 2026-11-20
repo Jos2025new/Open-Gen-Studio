@@ -30,8 +30,13 @@ describe('(a) a new entry that never asked is stopped at the send', () => {
     expect(() => createGeneration(spec())).toThrow(OverLimitError);
     expect(count()).toBe(0);
   });
-  it('an unknown price cannot be checked against the limit, so it is refused too', () => {
-    expect(() => createGeneration(spec({ estimate: { usd: null, approximate: true } }))).toThrow(OverLimitError);
+  it('a known price over what is left is refused even by a model the catalog prices lower in the composer', () => {
+    useStore.setState({ spentUsd: 0.99 });
+    expect(() => createGeneration(spec({ estimate: { usd: 0.02, approximate: false } }))).toThrow(OverLimitError);
+  });
+  it('an unpublished price stays with the entries (they ask about it); the net does not refuse every unpriced model', () => {
+    createGeneration(spec({ estimate: { usd: null, approximate: true } }));
+    expect(count()).toBe(1);
   });
   it('another session\'s pass does not cover it', () => {
     withOncePass('other', () => expect(() => createGeneration(spec())).toThrow(OverLimitError));
