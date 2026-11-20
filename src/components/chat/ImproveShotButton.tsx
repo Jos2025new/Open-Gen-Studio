@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Sparkles } from '../ui/icons';
-import { improveEstimate, improvePlan, improveShot } from '../../engine/improveShot';
+import { improveEstimate, improvePlan, improveSessionId, improveShot } from '../../engine/improveShot';
 import type { Estimate, Generation } from '../../engine/types';
 import { Popover, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
@@ -29,7 +29,8 @@ export function ImproveShotButton({ g }: { g: Generation }) {
           confirmLabel="Mejorar"
           onConfirm={() => { pop.close(); return improveShot(g.id); }}
           onCancel={pop.close}
-          sessionId={g.sessionId}
+          sessionId={improveSessionId(g, plan)}
+          resolveSessionId={() => improveSessionId(g, plan, true)}
         />
       </Popover>
     </>

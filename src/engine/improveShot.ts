@@ -2,6 +2,7 @@ import { uid } from '../lib/id';
 import { isAbort } from '../lib/http';
 import { opModelFor } from './catalog';
 import { budgetProblem, opEstimate, runAssetOp } from './actions';
+import { opSessionId } from './opSession';
 import { estimateMedia } from './costs';
 import { createGeneration, runGeneration } from './jobs';
 import { paramByRole } from './params';
@@ -34,13 +35,17 @@ export async function improveEstimate(g: Generation, plan: ImprovePlan): Promise
   return estimateMedia(g.modelRef, g.kind as 'video', { ...g.settings, resolution: plan.resolution }, Boolean(g.inputs.refs.length || g.inputs.firstFrame), false, g.prompt.length);
 }
 
+export function improveSessionId(g: Generation, plan: ImprovePlan, create = false): string {
+  return plan.mode === 'upscale' ? opSessionId(g.assetIds[0], create) : g.sessionId;
+}
+
 /** Run the improvement. Call after the user confirmed the cost. */
 export async function improveShot(generationId: string): Promise<void> {
   const g = get().generations[generationId];
   const plan = g && improvePlan(g);
   if (!g || !plan) return;
   const estimate = await improveEstimate(g, plan);
-  const problem = budgetProblem(estimate, g.sessionId);
+  const problem = budgetProblem(estimate, improveSessionId(g, plan, true));
   if (problem) { toast(problem, 'error'); return; }
   if (plan.mode === 'upscale') { await runAssetOp(g.assetIds[0], 'video_upscale', {}, undefined, undefined, g.place, g.mode); return; }
   const next = createGeneration({
