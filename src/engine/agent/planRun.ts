@@ -11,11 +11,10 @@ import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
 import { patchGeneration } from '../../store/store';
 import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
-import { graphToSteps, runsGeneration } from '../flow/graph';
-import { lockNodes } from '../flow/locks';
+import { runsGeneration } from '../flow/graph';
 import { ensureDoc, getDoc, placeAsset } from '../design/actions';
 import type { ChatMessageMeta } from '../feedMeta';
-import type { GraphNodeData, PlanFeedItem, PlanStep, StepState } from '../types';
+import type { PlanFeedItem, PlanStep, StepState } from '../types';
 import { appendFeed, toast, updateFeedItem } from '../../store/store';
 import { applyEdit } from '../nodecore/edit';
 import { WRAPUP_RULE } from './context';
@@ -146,27 +145,19 @@ async function executePlanItem(
   const { plan } = item;
   const workspace = plan.workspace;
   let steps = chosen;
-  const nodeOf = (stepId: string) => `${plan.id}_${stepId}`;
-  if (workspace === 'node') {
-    // Run what is on the canvas now (the user may have edited the drafted nodes).
-    const graph = session(sessionId).graph;
-    const ids = graph.nodes.filter((n) => n.planId === plan.id && !off.has(n.id.replace(`${plan.id}_`, ''))).map((n) => n.id);
-    const run = graphToSteps(graph, ids, get().generations, { assets: get().assets });
-    if (run.errors.length) {
-      updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: run.errors.join(' ') });
-      return;
-    }
-    steps = run.steps;
+  if ((plan.workspace as string) === 'node') {
+    // The single door for Nodes spending is runAction (approved snapshot, one send per approval). This executor
+    // recompiled the live graph with every destination forced and no approval: it never runs a Nodes plan.
+    updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: 'A Nodes plan runs only from an approved node run, never from here.' });
+    return;
   }
   let docId: string | undefined;
   if (workspace === 'designer') docId = ensureDoc(sessionId, designerDims()).id;
 
   if (plan.continuity?.length) {
     const ids = new Set(steps.map(s => s.id));
-    const mapSource = (ref: string) => workspace === 'node' && parseRef(ref)?.type === 'step' ? nodeOf(ref) : ref;
-    const groups = plan.continuity.map(g => ({ ...g, source: mapSource(g.source), steps: g.steps.map(id => workspace === 'node' ? nodeOf(id) : id).filter(id => ids.has(id)) }));
-    const subjects = plan.subjects?.map(s => ({ ...s, from: mapSource(s.from) }));
-    const errors = continuityErrors(groups, steps, subjects, get().library, get().catalog.schemas);
+    const groups = plan.continuity.map(g => ({ ...g, steps: g.steps.filter(id => ids.has(id)) }));
+    const errors = continuityErrors(groups, steps, plan.subjects, get().library, get().catalog.schemas);
     // What each step keeps from which source is for debugging, not for the card: the reference use is checked, fidelity is not.
     logEvent('agent', { event: 'plan.continuity', sessionId, planId: plan.id, groups: groups.map((g) => ({ keep: g.preserve, from: g.source, steps: g.steps })), check: errors.length ? errors : 'references used' });
     if (errors.length) {
@@ -174,27 +165,17 @@ async function executePlanItem(
       return;
     }
   }
-  // A canvas plan sends under the same node lock as a Run: while it works the nodes cannot be run (and paid) a second time, and it does not start over nodes that already run.
-  let release = () => {};
-  if (workspace === 'node') {
-    try { release = lockNodes(sessionId, steps.map((st) => st.id)); } catch (e) {
-      updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: (e as Error).message });
-      return;
-    }
-  }
   const result = await executeSteps(steps, {
     ...(resume ? { prior: resume.prior, blocked: resume.blocked, waiting: resume.waiting, reuseGenerations: resume.reuseGenerations } : {}),
-    canceled: new Set((item.canceledSteps ?? []).map((id) => (workspace === 'node' ? nodeOf(id) : id))),
+    canceled: new Set(item.canceledSteps ?? []),
     sessionId,
     planId: plan.id,
     workspace,
     origin: 'agent',
     docId,
-    // Node runs use node ids as step ids.
-    subjects: workspace === 'node' ? plan.subjects?.map((x) => (parseRef(x.from)?.type === 'step' ? { ...x, from: nodeOf(x.from) } : x)) : plan.subjects,
+    subjects: plan.subjects,
     onState: (stepId, state, info) => {
-      // Node runs use node ids as step ids; map back to plan step ids for the card.
-      const planStepId = workspace === 'node' ? stepId.replace(`${plan.id}_`, '') : stepId;
+      const planStepId = stepId;
       updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
         ...it,
         stepStates: { ...it.stepStates, [planStepId]: state },
@@ -205,14 +186,10 @@ async function executePlanItem(
         // The Designer shows each generation's card in its conversation too (it also lands on the page).
         if (workspace === 'chat' || workspace === 'designer') {
           appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: info.generationId, ...(item.meta ? { meta: item.meta } : {}) }); // in the chat and of the agent that ran the plan
-        } else if (workspace === 'node') {
-          const nodeId = stepId.startsWith(`${plan.id}_`) ? stepId : nodeOf(stepId);
-          const bound = session(sessionId).graph.nodes.find((n) => n.id === nodeId);
-          if (bound && runsGeneration(bound.data)) applyEdit({ session: sessionId, op: { op: 'set', node: nodeId, patch: { generationId: info.generationId } as Partial<GraphNodeData> } });
         }
       }
     },
-  }).finally(release);
+  });
 
   // Designer: a final image the plan did not put on a layer goes on the page as a new layer (kept in Generations too).
   if (workspace === 'designer' && docId) {
@@ -236,7 +213,7 @@ async function executePlanItem(
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status, stepOutputs: Object.fromEntries(result.outputs), error: failed ? result.failed.map((f) => `${f.stepId}: ${f.error}`).join(' · ') : undefined });
   const summary = plan.steps
     .map((st) => {
-      const key = workspace === 'node' ? nodeOf(st.id) : st.id;
+      const key = st.id;
       const out = result.outputs.get(key);
       const fail = result.failed.find((f) => f.stepId === key);
       if (fail) return failedStepSummary(sessionId, itemId, st.id, fail.error);
@@ -277,6 +254,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const review = item?.stepCostReviews?.[stepId];
   const generationId = item?.stepGenerations[stepId];
   if (!item || !review || !generationId || !reviewOpen(item, stepId)) return;
+  if (item.plan.workspace === 'node') return; // Nodes spend only through runAction: nothing here may decide or send for them
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
@@ -345,8 +323,11 @@ export { planRecovery, planRecoveryProblem, type PlanRecoveryMode };
  * (no new charge for those); "retry" runs the failed steps again (charged again). Failed generations run again in
  * their own chat cards; steps done before are reused; the steps that waited for the failed ones run afterwards.
  * Returns a short summary for the agent.
+ * A retry may send again something the provider already received, so it is the user's decision: it runs only with
+ * `userConfirmed` (the "Retry failed" button, which shows the price). The agent never passes it.
  */
-export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode): Promise<string> {
+export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode, userConfirmed = false): Promise<string> {
+  if (mode === 'retry' && !userConfirmed) return RETRY_NEEDS_USER;
   claimLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
@@ -407,6 +388,8 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   const status = done?.type === 'plan' ? done.status : 'error';
   return `${mode === 'check' ? 'Checked' : 'Retried'} "${item.plan.title}": ${status === 'done' ? 'all steps done' : status === 'partial' ? `finished with errors (${done?.type === 'plan' ? done.error : ''})` : `still failing (${done?.type === 'plan' ? done.error : ''})`}.`;
 }
+
+export const RETRY_NEEDS_USER = 'Nothing was sent. A retry may charge again for a step the provider already received, so only the user can start it: tell them to press "Retry failed" on the plan card, which shows the price.';
 
 export function cancelPlan(sessionId: string, itemId: string): void {
   claimLaneOfItem(sessionId, itemId);

@@ -410,7 +410,7 @@ describe('price approval evidence (simulated prices, real adapter)', () => {
     expect(currentPlan(run.sessionId).status).toBe('error');
     run.sent.length = 0;
     useStore.setState(s => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [TEXT]: { ...s.catalog.models[TEXT], acceptsImage: false } } } }));
-    await resumePlan(run.sessionId, run.item!.id, 'retry');
+    await resumePlan(run.sessionId, run.item!.id, 'retry', true);
     expect(currentPlan(run.sessionId)).toMatchObject({ status: 'review', stepStates: { s1: 'review' } });
     expect(run.sent).toEqual([]);
     await resolveStepCostReview(run.sessionId, run.item!.id, 's1', 'continue');

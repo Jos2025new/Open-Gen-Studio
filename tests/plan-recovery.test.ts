@@ -110,7 +110,7 @@ describe('recovering a failed plan', () => {
     const s1Gen = planItem().stepGenerations.s1;
     const cards = useStore.getState().sessions[sid()].feed.filter((f) => f.type === 'generation').length;
 
-    const summary = await resumePlan(sid(), planItem().id, 'retry');
+    const summary = await resumePlan(sid(), planItem().id, 'retry', true);
     expect(planItem().status).toBe('done');
     expect(planItem().stepStates).toMatchObject({ s1: 'done', s2: 'done' });
     // The same generation (and card) ran again; only the clip got a new card.
@@ -123,7 +123,7 @@ describe('recovering a failed plan', () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     failNext = new Set(['s1']);
-    const summary = await resumePlan(sid(), planItem().id, 'retry');
+    const summary = await resumePlan(sid(), planItem().id, 'retry', true);
     expect(planItem().status).toBe('error');
     expect(planItem().stepStates).toMatchObject({ s1: 'error', s2: 'skipped' });
     expect(summary).toMatch(/still failing/);
@@ -149,16 +149,22 @@ describe('recovering a failed plan', () => {
     expect(runs).toEqual([`s1:${genId}`, `s1:${genId}`, expect.stringMatching(/^s2:/)]);
   });
 
-  it('the agent retries when the user asks ("reinténtalo")', async () => {
+  it('the agent asking for a retry sends nothing: only the user\'s button retries (double-send guard)', async () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     // The closing message of the first run is written by the model too: let it finish before queuing the next reply.
     await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
-    replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'Listo, lo reintento.'];
+    const before = runs.length;
+    replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'Pulsa Retry failed.'];
     await sendAgentMessage('reinténtalo');
-    await vi.waitFor(() => expect(planItem().status).toBe('done'));
+    await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
+    expect(runs).toHaveLength(before);
+    expect(planItem().status).toBe('error');
+    expect(await resumePlan(sid(), planItem().id, 'retry')).toMatch(/only the user can start it/);
+    expect(runs).toHaveLength(before);
+    // The user's button (confirmed, price shown) is what retries.
+    await resumePlan(sid(), planItem().id, 'retry', true);
+    expect(planItem().status).toBe('done');
     expect(runs.filter((r) => r.startsWith('s1:'))).toHaveLength(2);
-    const activity = useStore.getState().sessions[sid()].feed.filter((f) => f.type === 'activity').at(-1);
-    expect(JSON.stringify(activity)).toMatch(/Retried the failed steps/);
   });
 });

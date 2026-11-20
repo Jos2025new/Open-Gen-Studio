@@ -101,6 +101,15 @@ describe('price notices reach the model over the existing channel', () => {
     expect(JSON.stringify(bodies)).not.toContain('cache_control');
   });
 
+  it('a Nodes plan in review never spends through the plan executor: Continue decides and sends nothing (single door)', async () => {
+    const gid = reviewedStep();
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: s.sessions[sid()].feed.map((f) => (f.type === 'plan' ? { ...f, workspace: 'node' as const, plan: { ...f.plan, workspace: 'node' as const } } : f)) } } }));
+    await resolveStepCostReview(sid(), 'card', 's1', 'continue');
+    expect(mediaCalls).toBe(0);
+    expect(plan().stepCostReviews?.s1.decisions ?? []).toHaveLength(0);
+    expect(useStore.getState().generations[gid].status).toBe('review');
+  });
+
   it('Cancel remains blocked even after notes are consumed and Retry is requested', async () => {
     reviewedStep();
     await resolveStepCostReview(sid(), 'card', 's1', 'cancel');
@@ -108,7 +117,7 @@ describe('price notices reach the model over the existing channel', () => {
     expect(plan().stepCostReviews?.s1.decisions?.[0].decision).toBe('cancel');
     expect(plan().canceledSteps).toContain('s1');
     expect(modelCalls).toBe(1);
-    await resumePlan(sid(), 'card', 'retry');
+    await resumePlan(sid(), 'card', 'retry', true);
     expect(mediaCalls).toBe(0); expect(quoteCalls).toBe(0);
     expect(notices(bodies.at(-1)!, 'Decisión: Cancelar. No enviado. No reintentar.')).toHaveLength(1);
   });

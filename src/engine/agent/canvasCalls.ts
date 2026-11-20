@@ -30,7 +30,7 @@ import { nodeSelection } from '../flow/selection';
 import { continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, formatZodError } from './tools';
 import { agentChoice, agentOf, feedOfAgent, get, session } from './runtimeShared';
 import { flushToolResults, guideLabel } from './conversation';
-import { planRecoveryProblem, presentNodeRun, resumePlan } from './planRun';
+import { planRecoveryProblem, presentNodeRun, RETRY_NEEDS_USER, resumePlan } from './planRun';
 import { activityLog } from './activityLog';
 import { generationStatus, generationStatusSchema } from './jobStatus';
 
@@ -75,11 +75,13 @@ export async function runCanvasCall(c: CallCtx): Promise<{ handled: boolean; sto
   const mode = v.data.action === 'check_status' ? 'check' : 'retry';
   const target = [...feedOfAgent(sessionId, c.owner)].reverse().find((f): f is PlanFeedItem => f.type === 'plan' && (f.status === 'error' || f.status === 'partial'));
   const problem = target ? planRecoveryProblem(target, mode, sessionId) : 'There is no failed plan in this chat.';
+  // A retry may charge again for something the provider already received: only the user's button starts it, never the model.
+  if (target && !problem && mode === 'retry') { respond(RETRY_NEEDS_USER); return { handled: true, workspace: c.workspace }; }
   if (target && !problem) {
-    log.action({ icon: 'fix', label: mode === 'check' ? 'Checked the status of the failed steps' : 'Retried the failed steps', detail: target.plan.title });
+    log.action({ icon: 'fix', label: 'Checked the status of the failed steps', detail: target.plan.title });
     void resumePlan(sessionId, target.id, mode);
   }
-  respond(problem ?? `${mode === 'check' ? 'Checking the providers' : 'Running the failed steps again'} for "${target!.plan.title}"; the plan card shows the progress. Tell the user in one short sentence.`);
+  respond(problem ?? `Checking the providers for "${target!.plan.title}"; the plan card shows the progress. Tell the user in one short sentence.`);
   return { handled: true, workspace: c.workspace };
           }
           if (['edit_node', 'connect_nodes', 'disconnect_nodes', 'delete_nodes', 'restore_nodes'].includes(call.name)) {

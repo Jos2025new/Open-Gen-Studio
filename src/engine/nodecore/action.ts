@@ -8,9 +8,13 @@ import { resolveInputs, storeEnv } from './resolver';
 /*
  * Explicit actions (ADR 0031 point 6). `prepareAction` freezes what the user approves: destination (session and
  * nodes), the reviewed preview and the revision every input had. `runAction` consumes that snapshot under a run id.
- * Running the same id again reconciles with what is already known instead of sending again: the same id while it runs
- * gives the same run; after it finished gives its result; after a failure it re-runs only what is still stale, so
- * results already paid for are never regenerated. The result belongs to the session in the snapshot, not to the view.
+ * One approval pays for one send, whatever happened to it: the same id while it runs gives the same run; after it
+ * finished (done or failed) it gives that record and never sends again; another id with the same approval is refused.
+ * Trying again after a failure means preparing and approving again (a new price review). Looking up a job the
+ * provider already holds is a different operation (check status) and does not resend.
+ * The registry (snapshots and runs) lives in memory on purpose: after a reload an approval is simply unknown and
+ * `runAction` refuses it (stale) instead of sending, so a reload can never revive an approval or send twice. What
+ * was sent is kept by the generations themselves, which reload follows or marks interrupted.
  */
 export interface ActionSnapshot {
   /** The approval: one per prepare. */

@@ -117,4 +117,18 @@ describe('money boundaries through the reviewed Run path', () => {
     expect.soft((await launch('command-retry')).ok).toBe(false);
     expect(execute).toHaveBeenCalledTimes(1);
   });
+
+  it('a reload forgets the approvals: replaying the same approval and run id sends nothing (fail closed)', async () => {
+    const on = { session: HOME };
+    const options = { caller: 'cli' as const, approver: () => true };
+    const prepared = await run({ cmd: 'nodes.action.prepare', args: { targets: ['gen'] }, on }, options);
+    const { approval } = prepared.results[0] as { approval: string };
+    execute.mockResolvedValue(completed());
+    expect((await run({ cmd: 'nodes.action.run', args: { approval, runId: 'r1' }, on }, options)).ok).toBe(true);
+    expect(execute).toHaveBeenCalledTimes(1);
+    resetActions(); // what a reload does to the in-memory registry
+    expect((await run({ cmd: 'nodes.action.run', args: { approval, runId: 'r1' }, on }, options)).ok).toBe(false);
+    expect((await run({ cmd: 'nodes.action.run', args: { approval, runId: 'r2' }, on }, options)).ok).toBe(false);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
 });

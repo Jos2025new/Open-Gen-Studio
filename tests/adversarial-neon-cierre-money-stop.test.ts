@@ -298,8 +298,8 @@ describe('adversarial cierre: dinero, Stop y aprobaciones', () => {
     retryGeneration.mockImplementationOnce(() => new Promise<void>((resolve) => { releaseRetry = resolve; }));
     executeSteps.mockResolvedValue({ outputs: new Map(), failed: [], skipped: [], waiting: [] });
 
-    const r1 = resumePlan(HOME, plan.id, 'retry');
-    const r2 = resumePlan(HOME, plan.id, 'retry');
+    const r1 = resumePlan(HOME, plan.id, 'retry', true);
+    const r2 = resumePlan(HOME, plan.id, 'retry', true);
     expect(await r2).toContain('no failed steps');
     releaseRetry();
     await r1;
