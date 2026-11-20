@@ -35,9 +35,11 @@ import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
-import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
-import { addAssets, addSpend, patchAsset, patchGeneration, updateFeedItem, upsertGeneration, useStore } from '../store/store';
-import { applyEdit } from './nodecore/edit';import { consumeOnce, noteExcess } from './budget';
+import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
+import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
+import { relinkAttempt } from './relinkAttempt';
+import { markSending, interruptedByReload } from './sendMark';
+import { consumeOnce, noteExcess } from './budget';
 
 const get = useStore.getState;
 export const controllers = new Map<string, AbortController>();
@@ -581,8 +583,9 @@ async function execute(id: string): Promise<string[]> {
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // Preserve Atlas quote accounting; a quote is not a provider-reported charge in the agent notice.
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
-      const send = () => {
+      const send = async () => {
         if (proposed) checkStepAuthorization(g, proposed);
+        await markSending(id);
         return ADAPTERS[model.provider].generate({
         kind,
         model,
@@ -607,7 +610,7 @@ async function execute(id: string): Promise<string[]> {
         onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
         onRemoteJob: (job) => {
           const sent = get().generations[id]?.sent;
-          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
+          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sending: undefined, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined, sending: undefined });
         },
         // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
         onRequest: (info) => {
@@ -629,6 +632,7 @@ async function execute(id: string): Promise<string[]> {
       for (let retry = 0; ; retry++) {
         try {
           result = await once();
+          patchGeneration(id, { sending: undefined });
           break;
         } catch (err) {
           const wait = ATLAS_RETRY_WAITS[retry];
@@ -667,13 +671,13 @@ async function execute(id: string): Promise<string[]> {
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
+      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, sending: undefined });
       if (cur?.assetIds.length) chargePartial(cur);
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
     const lostJob = !remoteJob && err instanceof NetworkError;
-    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob });
+    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
     if (cur?.sent) logEvent('provider-error', { generation: id, model: cur?.modelName, provider: cur?.provider, jobId: remoteJob?.id, message: (err as Error).message, sent: cur.sent });
@@ -825,8 +829,7 @@ export async function resumeInterrupted(): Promise<void> {
   for (const g of gens) {
     const job = g.remoteJob;
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
-      const error = job ? `Interrupted by a page reload or tab change. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.` : 'Interrupted by a page reload or tab change. Regenerate to try again.';
-      patchGeneration(g.id, { status: 'error', error, statusText: undefined, finishedAt: Date.now() });
+      patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
       purgeDiscarded(g.id);
       continue;
     }
@@ -848,25 +851,6 @@ export function retryGeneration(id: string): Promise<string[]> {
   const retry = runGeneration(newG.id).finally(() => retrying.delete(id));
   retrying.set(id, retry);
   return retry;
-}
-
-function relinkAttempt(oldId: string, newId: string): void {
-  for (const [sessionId, session] of Object.entries(useStore.getState().sessions)) {
-    const nodes = session.graph?.nodes ?? [];
-    if (nodes.some((n) => 'generationId' in n.data && n.data.generationId === oldId)) {
-      for (const n of nodes) if ('generationId' in n.data && n.data.generationId === oldId) applyEdit({ session: sessionId, op: { op: 'set', node: n.id, patch: { generationId: newId } as Partial<GraphNode['data']> } });
-    }
-    for (const item of session.feed) {
-      if (item.type === 'generation' && item.generationId === oldId) {
-        updateFeedItem<GenerationFeedItem>(sessionId, item.id, { generationId: newId });
-      } else if (item.type === 'plan' && Object.values(item.stepGenerations).includes(oldId)) {
-        updateFeedItem<PlanFeedItem>(sessionId, item.id, (it) => ({
-          ...it,
-          stepGenerations: Object.fromEntries(Object.entries(it.stepGenerations).map(([step, gid]) => [step, gid === oldId ? newId : gid])),
-        }));
-      }
-    }
-  }
 }
 
 /**
