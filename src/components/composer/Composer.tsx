@@ -8,7 +8,7 @@ import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { recipientOf } from '../../engine/agent/recipient';
 import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';
-import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
+import { lineRoutes, modelSummary, pickComposerModel, sentModelRef } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
 import { clipTrim, paramByRole, placeKeyframes, routeVideoInputs } from '../../engine/params';
@@ -367,12 +367,9 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
       recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_retained', reason: 'attachment count changed within the same image/video route bucket', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: currentRef, imageCount, inputFunctions: roleSnapshot(currentRef, imageCount) } });
       return;
     }
-    const routes = lineRoutes(currentRef);
-    const want =
-      imageCount === 0 ? routes.text
-      : mode === 'image' ? (modelSummary(currentRef)?.acceptsImage ? undefined : routes.edit ?? routes.reference ?? opModelFromRef(currentRef, 'image') ?? undefined)
-      : imageCount > 1 ? routes.reference ?? routes.image
-      : routes.image ?? routes.reference;
+    const want = imageCount === 0
+      ? lineRoutes(currentRef).text
+      : sentModelRef(currentRef, mode, true, mode === 'video' && imageCount > 1 ? 'reference' : undefined);
     if (want && want !== currentRef) {
       recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_switched', reason: 'React attachment-count effect selected an available same-line route', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: want, imageCount, inputFunctions: roleSnapshot(want, imageCount) } });
       // The same line in the variant the attachments need: not a model choice, so the session keeps its own.
@@ -383,11 +380,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
     }
   }, [imageCount, mode, currentRef, sessionId]);
   // A text-only variant still takes images when its line has an image route: attaching switches to it (above).
-  const lineTwin = (() => {
-    if (acceptsImages || (mode !== 'image' && mode !== 'video') || !currentRef) return undefined;
-    const routes = lineRoutes(currentRef);
-    return mode === 'image' ? routes.edit ?? routes.reference ?? opModelFromRef(currentRef, 'image') ?? undefined : routes.image ?? routes.reference;
-  })();
+  const lineTwin = !acceptsImages && (mode === 'image' || mode === 'video') && currentRef ? sentModelRef(currentRef, mode, true) : undefined;
   const takesImages = acceptsImages || Boolean(lineTwin && lineTwin !== currentRef);
   const canSendAgent = !busy && (text.trim().length > 0 || liveAttachments.length > 0);
 

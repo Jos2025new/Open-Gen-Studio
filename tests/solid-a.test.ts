@@ -157,6 +157,7 @@ describe('4b. one rule, no copies', () => {
     walk('src');
     const rules: Array<[RegExp, string[], string]> = [
       [/(?<![.\w])inputVariant\(/, ['src/engine/catalog.ts'], 'ask catalog.sentModelRef(), the one variant rule'],
+      [/routes\.edit\s*\?\?\s*routes\.reference\s*\?\?\s*opModelFromRef/, ['src/engine/catalog.ts', 'src/components/space/actionGo.ts'], 'use catalog.sentModelRef() instead of duplicating variant selection'],
       [/budgetUsd - spent\b/, [], 'use budget.remainingBudget()'],
       [/!settings\.budgetNoAsk/, [], 'use budget.noAskEverywhere(settings)'],
       [/'video_upscale',\s*'video_edit',\s*'video_extend'/, ['src/engine/ops.ts'], 'use ops.VIDEO_OP_ENGINES / isVideoOpEngine'],
