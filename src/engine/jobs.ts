@@ -332,7 +332,7 @@ async function attempt(id: string): Promise<string[]> {
   } catch (err) {
     if (isCreditError(err)) {
       let rerun: Promise<string[]> | undefined;
-      await onGenerationCredit(id, (gid) => (rerun = execute(gid)));
+      await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration);
       if (rerun) return rerun;
       throw err;
     }
@@ -610,7 +610,7 @@ async function execute(id: string): Promise<string[]> {
         onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
         onRemoteJob: (job) => {
           const sent = get().generations[id]?.sent;
-          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sending: undefined, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined, sending: undefined });
+          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sending: undefined, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
         },
         // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
         onRequest: (info) => {
@@ -707,6 +707,7 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     const mb = (n: number) => (n / 1048576).toFixed(1);
     throw new InputError('AUDIO_TOO_LARGE', `${model.name} takes files up to ${mb(model.maxDirectBytes)} MB from the app; this one is ${mb(input.blob.size)} MB. Use a shorter or compressed (MP3) clip.`);
   }
+  await markSending(g.id);
   const result = await adapter.transcribe({
     model,
     input,
@@ -714,7 +715,7 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -725,12 +726,13 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
   if (!apiKey || !ADAPTERS.fal.createVoice) throw new Error('Add your fal.ai key in Settings to create Kling voices.');
   const seconds = get().assets[g.op!.sourceAssetId]?.duration;
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
+  await markSending(g.id);
   const result = await ADAPTERS.fal.createVoice({
     input: await mediaInput(g.op!.sourceAssetId),
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -741,12 +743,13 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
   if (!apiKey || !ADAPTERS.fal.createStyle) throw new Error('Add your fal.ai key in Settings to create Recraft styles.');
   const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
   if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
+  await markSending(g.id);
   const result = await ADAPTERS.fal.createStyle({
     images: await Promise.all(images.map((r) => mediaInput(r))),
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -754,7 +757,7 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
 function finishText(id: string, text: string, actualUsd: number | undefined): void {
   const g = get().generations[id];
   if (!g) return;
-  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined });
+  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
   noteExcess(id);
 }

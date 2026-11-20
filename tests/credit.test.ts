@@ -7,9 +7,8 @@ vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: a
 import { useStore } from '../src/store/store';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { HttpError } from '../src/lib/http';
-import { forgetBalances, isCreditError, onGenerationCredit } from '../src/engine/credit';
+import { forgetBalances, isCreditError, onAgentCredit, onGenerationCredit } from '../src/engine/credit';
 import { useAlerts } from '../src/engine/alerts';
-import { isMuted, setMuted } from '../src/engine/notices';
 
 const m = (provider: 'nanogpt' | 'atlas', id: string, usd: number): ModelSummary =>
   ({ ref: `${provider}::${id}`, provider, id, name: id, kind: 'video', acceptsText: true, acceptsImage: true, tags: [], price: { skus: [{ unit: 'second', usd }] } }) as unknown as ModelSummary;
@@ -70,9 +69,6 @@ describe('no credit at the provider', () => {
     useAlerts.getState().alerts[0].actions![1].run();
     await vi.waitFor(() => expect(rerun).toHaveBeenCalledTimes(1));
     expect(useStore.getState().settings.autoSwitchProvider).toBe('always');
-    expect(isMuted('credit-switch')).toBe(true);
-    setMuted('credit-switch', false); // Settings brings the question back
-    expect(useStore.getState().settings.autoSwitchProvider).toBe('ask');
   });
 
   it('"never" does not switch by itself: only the manual choices', async () => {
@@ -194,5 +190,40 @@ describe('B11: the credit switch compares what this job costs, not the first lis
     const rerun = vi.fn(async () => []);
     expect(await onGenerationCredit('g1', rerun)).toBe(true);
     expect(useStore.getState().generations.g1.modelRef).toBe(atlas.ref);
+  });
+});
+
+describe('the agent\u2019s own credit follows the same setting', () => {
+  const llm = (id: string, name: string, inputPrice?: number, outputPrice?: number) => ({ id, name, tools: true, vision: true, inputPrice, outputPrice }) as never;
+  const prep = (mode: 'ask' | 'always' | 'never', priced = true) => {
+    const st = useStore.getState();
+    useStore.setState({
+      settings: { ...st.settings, autoSwitchProvider: mode, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'a' }, keys: { ...st.settings.keys, nanogpt: 'k', openrouter: 'k' } },
+      catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [llm('a', 'Model A', priced ? 1 : undefined, priced ? 1 : undefined)], openrouter: [llm('b', 'Model A', priced ? 1 : undefined, priced ? 1 : undefined)] } },
+    });
+    useAlerts.setState({ alerts: [] });
+    forgetBalances();
+  };
+  it('ask: asks, and switches only on "Yes, this time"', async () => {
+    prep('ask');
+    expect(await onAgentCredit()).toBe(false);
+    expect(useStore.getState().settings.agent.provider).toBe('nanogpt');
+    useAlerts.getState().alerts[0].actions![0].run();
+    expect(useStore.getState().settings.agent.provider).toBe('openrouter');
+  });
+  it('never: does not switch by itself', async () => {
+    prep('never');
+    expect(await onAgentCredit()).toBe(false);
+    expect(useStore.getState().settings.agent.provider).toBe('nanogpt');
+  });
+  it('always: switches', async () => {
+    prep('always');
+    expect(await onAgentCredit()).toBe(true);
+    expect(useStore.getState().settings.agent.provider).toBe('openrouter');
+  });
+  it('unknown prices are not "same price or less"', async () => {
+    prep('always', false);
+    expect(await onAgentCredit()).toBe(false);
+    expect(useStore.getState().settings.agent.provider).toBe('nanogpt');
   });
 });

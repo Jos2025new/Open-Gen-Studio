@@ -8,8 +8,8 @@ import { PROVIDER_LABELS } from './providers/types';
 import { lineKey, modelFamily } from './variants';
 import { estimateMedia } from './costs';
 import type { GenSettings, Generation, ModelSummary, ProviderId } from './types';
-import { patchGeneration, useStore } from '../store/store';
-import { autoSwitchMode, setMuted } from './notices';
+import { patchGeneration, setSettings, useStore } from '../store/store';
+import { autoSwitchMode } from './notices';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -140,18 +140,19 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
 
 /**
  * A generation failed for lack of credit: switch it to the same model elsewhere (same or lower price, with credit)
- * and run it again, or show the choices above the prompt box. `rerun` runs the generation again.
+ * and run it again, or show the choices above the prompt box. `rerun` runs it again inside the attempt that just failed;
+ * `later` runs it from an alert the user answers afterwards (the attempt is over: it must go through the single door, runGeneration).
  */
-export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>): Promise<boolean> {
+export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun): Promise<boolean> {
   const g = get().generations[genId];
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
   markEmpty(cur.provider);
   const empty = PROVIDER_LABELS[cur.provider];
   const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g), g.settings);
-  const switchTo = (m: ModelSummary) => {
+  const switchTo = (m: ModelSummary, run = rerun) => {
     patchGeneration(genId, { modelRef: m.ref, modelName: m.name, provider: m.provider, error: undefined });
-    return rerun(genId);
+    return run(genId);
   };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
@@ -161,8 +162,8 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it on ${PROVIDER_LABELS[auto.model.provider]} instead (${label(auto.model, undefined, auto.usd)}, same model, same price or less)?`,
       actions: [
-        { label: 'Yes, this time', run: () => { dismissAlert(id); void switchTo(auto.model).catch(logged('switch provider after no credit')); } },
-        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); setMuted('credit-switch', true); void switchTo(auto.model).catch(logged('switch provider after no credit')); } },
+        { label: 'Yes, this time', run: () => { dismissAlert(id); void switchTo(auto.model, later).catch(logged('switch provider after no credit')); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); setSettings({ autoSwitchProvider: 'always' }); void switchTo(auto.model, later).catch(logged('switch provider after no credit')); } },
       ],
     });
     return false;
@@ -176,7 +177,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run, dearer ones marked), or recharge ${empty}:`,
-      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
+      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); void switchTo(o.model, later).catch(logged('switch model after no credit')); } })),
     });
     return false;
   }
@@ -217,7 +218,8 @@ export async function onAgentCredit(): Promise<boolean> {
     if (bal !== undefined && bal <= 0) continue;
     for (const m of get().catalog.llm[p] ?? []) {
       if (!m.tools || (cur?.vision && m.vision === false)) continue;
-      const same = Boolean(cur && sameName(m.name) === sameName(cur.name) && cost(m) <= cost(cur));
+      // Same only with both prices known: an unknown price is not "same or less".
+      const same = Boolean(cur && sameName(m.name) === sameName(cur.name) && Number.isFinite(cost(m)) && Number.isFinite(cost(cur)) && cost(m) <= cost(cur));
       choices.push({ p, m, same });
     }
   }
@@ -225,7 +227,19 @@ export async function onAgentCredit(): Promise<boolean> {
     useStore.setState((s) => ({ settings: { ...s.settings, agent: { ...s.settings.agent, provider: c.p, model: c.m.id, modelPinned: true } } }));
   };
   const auto = choices.find((c) => c.same);
-  if (auto) {
+  const mode = autoSwitchMode();
+  if (auto && mode === 'ask') {
+    const id = pushAlert({
+      level: 'warn',
+      text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Use the same model at ${PROVIDER_LABELS[auto.p]} instead (${auto.m.name}, same price or less) and press Retry?`,
+      actions: [
+        { label: 'Yes, this time', run: () => { use(auto); dismissAlert(id); } },
+        { label: 'Don\u2019t ask again', run: () => { setSettings({ autoSwitchProvider: 'always' }); use(auto); dismissAlert(id); } },
+      ],
+    });
+    return false;
+  }
+  if (auto && mode === 'always') {
     use(auto);
     pushAlert({ level: 'info', text: `${empty} has no credit: the agent switched to the same model at ${PROVIDER_LABELS[auto.p]} (${auto.m.name}, same price or less).` });
     return true;
