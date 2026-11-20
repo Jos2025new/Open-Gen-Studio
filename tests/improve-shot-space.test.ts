@@ -45,7 +45,7 @@ describe('ImproveShotButton in upscale mode from a Space', () => {
     const upModel: ModelSummary = { ref: upRef, provider: 'fal', id: 'fal-ai/bytedance-upscaler/upscale/video', name: 'Video Upscaler', kind: 'video', acceptsText: false, acceptsImage: false, acceptsVideo: true, needsVideo: true, tags: ['upscale'] };
     const draftSchema = { ref: draftRef, source: 'openapi', slots: { promptRequired: true }, params: [{ key: 'resolution', label: 'Resolution', role: 'resolution', type: 'enum', options: ['480p', '720p'], default: '480p' }] } as unknown as ModelSchema;
     const upSchema = { ref: upRef, source: 'openapi', slots: { video: { key: 'video_url' }, promptRequired: false }, params: [] } as unknown as ModelSchema;
-    const clip: Asset = { id: 'clip1', kind: 'video', mime: 'video/mp4', width: 854, height: 480, duration: 5, sessionId: activeSid, origin: 'generation', createdAt: 1, stored: true, favorite: false };
+    const clip: Asset = { id: 'clip1', kind: 'video', mime: 'video/mp4', width: 854, height: 480, duration: 5, sessionId: activeSid, origin: 'generated', createdAt: 1, stored: true, favorite: false };
     const g: Generation = {
       id: 'g_draft', sessionId: activeSid, kind: 'video', prompt: 'ocean wave', modelRef: draftRef, modelName: 'Draft', provider: 'fal',
       settings: { count: 1, resolution: '480p', seed: 7, advanced: {} }, inputs: { refs: [] }, origin: 'composer', status: 'done',

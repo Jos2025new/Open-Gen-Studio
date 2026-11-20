@@ -391,8 +391,8 @@ describe('AssetActions and SketchEditor library editing flow', () => {
 
   it('applies a mask operation from a Space once confirmed under an active limit (same opSessionId)', async () => {
     const modelRef = 'fal::fal-ai/ideogram/object-removal';
-    const model: ModelSummary = { ref: modelRef, provider: 'fal', id: 'fal-ai/ideogram/object-removal', name: 'Object Removal', kind: 'image', acceptsText: true, acceptsImage: true };
-    const schema: ModelSchema = { ref: modelRef, source: 'schema', slots: { images: { min: 1, max: 1 }, mask: { key: 'mask_url', kind: 'white' }, promptRequired: false }, params: [] };
+    const model: ModelSummary = { ref: modelRef, provider: 'fal', id: 'fal-ai/ideogram/object-removal', name: 'Object Removal', kind: 'image', acceptsText: true, acceptsImage: true, tags: [] };
+    const schema: ModelSchema = { ref: modelRef, source: 'openapi', slots: { images: { key: 'image_url', min: 1, max: 1, multiple: false, format: 'url' }, mask: { key: 'mask_url', required: true, convention: 'white', format: 'url' }, promptRequired: false }, params: [] };
     blobs.set('node-sketch-copy', new Blob(['mask-bytes'], { type: 'image/png' }));
     const activeSid = useStore.getState().activeSessionId;
     useStore.setState((st) => ({

@@ -96,8 +96,8 @@ describe('(b) what an entry already approved keeps going without a second questi
   });
   it('a multi-step Nodes run with an active limit and unknown price sends every step once confirmed (both direct runNodes and a nodeRun card)', async () => {
     const modelRef = 'fal::unpriced-img';
-    const model: ModelSummary = { ref: modelRef, provider: 'fal', id: 'unpriced-img', name: 'Unpriced Img', kind: 'image', acceptsText: true, acceptsImage: true };
-    const schema: ModelSchema = { ref: modelRef, source: 'schema', slots: { images: { min: 0, max: 4 }, promptRequired: true }, params: [] };
+    const model: ModelSummary = { ref: modelRef, provider: 'fal', id: 'unpriced-img', name: 'Unpriced Img', kind: 'image', acceptsText: true, acceptsImage: true, tags: [] };
+    const schema: ModelSchema = { ref: modelRef, source: 'openapi', slots: { images: { key: 'image_urls', min: 0, max: 4, multiple: true, format: 'url' }, promptRequired: true }, params: [] };
     const node = (id: string, title: string) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'image' as const, title, prompt: title, modelRef, settings: { count: 1, advanced: {} }, outputIndex: 0 } });
     const graph: Graph = { nodes: [node('a', 'Step A'), node('b', 'Step B')], edges: [{ id: 'e1', source: 'a', target: 'b', sourceHandle: 'out', targetHandle: 'ref' }] };
     const st = useStore.getState();

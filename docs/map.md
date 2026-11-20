@@ -37,7 +37,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 40 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 38 | 10 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
-| [actions.ts](../src/engine/actions.ts) | 37 | 33 |
+| [actions.ts](../src/engine/actions.ts) | 37 | 34 |
 | [render.ts](../src/engine/design/render.ts) | 35 | 10 |
 | [graph.ts](../src/engine/flow/graph.ts) | 32 | 22 |
 
