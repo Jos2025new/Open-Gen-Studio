@@ -41,9 +41,18 @@ it('each section groups its rows under titled cards, and rows lead with an icon'
   expect(rows.length).toBe(10);
   expect(rows.every((r) => r.querySelector('.set-label .set-row-icon'))).toBe(true);
   tab('Budget');
-  expect(groups()).toEqual(['Limit', 'Prices']);
+  expect(groups()).toEqual(['Limit', 'Provider and notices', 'Prices']);
+  const providerCard = host.querySelector('[aria-label="Provider and notices"]')!;
+  expect(providerCard.querySelector('.set-group-head svg')).not.toBeNull();
+  const providerRows = [...providerCard.querySelectorAll('.set-group-body > .set-row .set-label')];
+  expect(providerRows.map((label) => label.textContent)).toEqual([
+    'Auto-switch provider when out of credit',
+    'Warn after a reload during a send',
+    'Painting on layers with editable strokes',
+  ]);
+  expect(providerRows.every((label) => label.querySelector('.set-row-icon'))).toBe(true);
   tab('Data');
-  expect(groups()).toEqual(['Storage', 'Drawing', 'Reset']);
+  expect(groups()).toEqual(['Storage', 'Reset']);
 });
 
 it('Look shows each base as a small picture in its own colours; System shows dark and light halves', () => {

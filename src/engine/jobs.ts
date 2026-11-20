@@ -28,7 +28,7 @@ import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { mapSubjectPrompts } from './subjectPrompts';
 import { ADAPTERS } from './providers/registry';
-import { resolveSendable } from './schemaGuard';
+import { resolveSendable, SchemaUnavailableError } from './schemaGuard';
 import { partialRetryCharge, retrySpec } from './retryPartial';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
@@ -864,6 +864,7 @@ export function retryGeneration(id: string, planItemId?: string): Promise<string
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
   const held = holdRetry(g, planItemId);
+  if (held instanceof SchemaUnavailableError) return Promise.reject(held);
   if (!held) return Promise.resolve(g.assetIds);
   try {
     // Create a new Generation as another attempt of the same operation.

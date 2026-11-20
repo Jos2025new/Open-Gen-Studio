@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
+import { Bell, BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
 import { formatUsd } from '../../../lib/format';
 import { askAgain, subscribeUntilNextSession, untilNextSessionActive } from '../../../engine/budget';
 import { NOTICES, setMuted, useNotice, autoSwitchMode, type AutoSwitch } from '../../../engine/notices';
@@ -11,7 +11,7 @@ import { SetGroup, SetRow } from './SettingsRows';
 /** One row of the register of silenceable notices; it follows the store, so a change shows at once. */
 function NoticeRow({ notice: n }: { notice: (typeof NOTICES)[number] }) {
   const { muted, text } = useNotice(n.id);
-  return <SetRow label={n.label} tip={n.tip} className="set-row-3">
+  return <SetRow icon={Bell} label={n.label} tip={n.tip} className="set-row-3">
     <span className="faint">{text}</span>
     {muted ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, false)}>{n.bringBack}</Button> : n.canSilence ? <Button size="sm" variant="ghost" onClick={() => setMuted(n.id, true)}>Don’t show again</Button> : null}
   </SetRow>;
