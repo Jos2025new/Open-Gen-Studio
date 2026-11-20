@@ -42,6 +42,9 @@ describe('a connection dropped on an incompatible port', () => {
     expect(rejectedDrop(state(fwd))).toEqual(tried);
     expect(rejectedDrop(state(rev))).toEqual(tried);
   });
+  it('is not one when released on the very handle it started from', () => {
+    expect(rejectedDrop(state({ toNode: { id: 'a' }, toHandle: { type: 'source', id: 'out' } }))).toBeNull();
+  });
   it('is not one when it lands on the background or is valid', () => {
     expect(rejectedDrop(state({ toNode: null, toHandle: null }))).toBeNull();
     expect(rejectedDrop(state({ isValid: true }))).toBeNull();
@@ -103,6 +106,10 @@ describe('omnicanvas entry and ports', () => {
     expect(omni.length).toBeGreaterThan(0);
     for (const rule of omni.filter((l) => !l.includes('::before'))) expect(rule).not.toMatch(/(^|[^-])(width|height)\s*:/);
     expect(omni.find((l) => l.includes('::before'))).toMatch(/12px \/ var\(--rf-zoom[^}]*translate\(-50%, -50%\)[^}]*pointer-events: all/);
+  });
+  it('keeps hidden (.port-quiet) ports unclickable through the enlarged ::before', () => {
+    const css = readFileSync('src/styles/node-system.css', 'utf8');
+    expect(css).toMatch(/\.port\.port-quiet::before \{ pointer-events: none; \}/);
   });
   it('syncs --rf-zoom at mount and keeps one memoized listener', () => {
     const src = readFileSync('src/components/node/connectionDrop.ts', 'utf8');
