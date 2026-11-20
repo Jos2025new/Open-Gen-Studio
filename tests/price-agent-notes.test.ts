@@ -108,7 +108,7 @@ describe('price notices reach the model over the existing channel', () => {
     expect(plan().stepCostReviews?.s1.decisions?.[0].decision).toBe('cancel');
     expect(plan().canceledSteps).toContain('s1');
     expect(modelCalls).toBe(1);
-    await resumePlan(sid(), 'card', 'retry');
+    await resumePlan(sid(), 'card', 'retry', true);
     expect(mediaCalls).toBe(0); expect(quoteCalls).toBe(0);
     expect(notices(bodies.at(-1)!, 'Decisión: Cancelar. No enviado. No reintentar.')).toHaveLength(1);
   });

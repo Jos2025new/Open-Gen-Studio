@@ -48,7 +48,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'recover_plan',
       description:
-        'Resume the latest plan that failed or finished with errors, in the same card. check_status asks the providers again about the jobs they received (only steps with a job id; no new charge for them); retry runs the failed steps again (charged again). Steps that waited for them run afterwards. Only when the user asks to check or retry; never propose a new plan for a failed one.',
+        'Resume the latest plan that failed or finished with errors, in the same card. check_status asks the providers again about the jobs they received (only steps with a job id; no new charge for them); retry never runs by itself (it may charge again): it only tells you to ask the user to press "Retry failed" on the plan card. Steps that waited for them run afterwards. Only when the user asks to check or retry; never propose a new plan for a failed one.',
       parameters: {
         type: 'object',
         properties: { action: { type: 'string', enum: ['check_status', 'retry'] } },

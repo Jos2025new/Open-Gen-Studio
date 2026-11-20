@@ -27,7 +27,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
         toast(problem, 'info');
         return;
       }
-      return resumePlan(sessionId, item.id, mode);
+      return resumePlan(sessionId, item.id, mode, true);
     };
     void (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId) ? withOncePass(sessionId, go) : go());
   };

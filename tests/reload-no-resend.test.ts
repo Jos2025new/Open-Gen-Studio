@@ -67,7 +67,7 @@ describe('after a reload nothing already sent is sent again', () => {
     reload();
     settleInterruptedPlans();
     await approvePlan(sid, 'fd_n');
-    const said = await resumePlan(sid, 'fd_n', 'retry');
+    const said = await resumePlan(sid, 'fd_n', 'retry', true);
     expect(said).toMatch(/rerun from their nodes/);
     expect(execute).not.toHaveBeenCalled();
     expect(card('fd_n').status).not.toBe('awaiting'); // never offered for approval again

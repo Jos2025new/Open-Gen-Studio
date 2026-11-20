@@ -351,8 +351,11 @@ export { planRecovery, planRecoveryProblem, type PlanRecoveryMode };
  * (no new charge for those); "retry" runs the failed steps again (charged again). Failed generations run again in
  * their own chat cards; steps done before are reused; the steps that waited for the failed ones run afterwards.
  * Returns a short summary for the agent.
+ * A retry may send again something the provider already received, so it is the user's decision: it runs only with
+ * `userConfirmed` (the "Retry failed" button, which shows the price). The agent never passes it.
  */
-export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode): Promise<string> {
+export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode, userConfirmed = false): Promise<string> {
+  if (mode === 'retry' && !userConfirmed) return RETRY_NEEDS_USER;
   claimLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
@@ -413,6 +416,8 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   const status = done?.type === 'plan' ? done.status : 'error';
   return `${mode === 'check' ? 'Checked' : 'Retried'} "${item.plan.title}": ${status === 'done' ? 'all steps done' : status === 'partial' ? `finished with errors (${done?.type === 'plan' ? done.error : ''})` : `still failing (${done?.type === 'plan' ? done.error : ''})`}.`;
 }
+
+export const RETRY_NEEDS_USER = 'Nothing was sent. A retry may charge again for a step the provider already received, so only the user can start it: tell them to press "Retry failed" on the plan card, which shows the price.';
 
 export function cancelPlan(sessionId: string, itemId: string): void {
   claimLaneOfItem(sessionId, itemId);
