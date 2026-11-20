@@ -1,5 +1,5 @@
-import { useOnViewportChange, type OnConnectEnd } from '@xyflow/react';
-import type { RefObject } from 'react';
+import { useOnViewportChange, useReactFlow, type OnConnectEnd } from '@xyflow/react';
+import { useCallback, useEffect, type RefObject } from 'react';
 import { connectionError } from '../../engine/flow/graph';
 import type { Asset, Graph } from '../../engine/types';
 
@@ -15,9 +15,17 @@ export function refusedDropReason(state: Parameters<OnConnectEnd>[1], graph: Gra
   return refused ? connectionError(graph, assets, refused) : null;
 }
 
-/** The omnicanvas can sit far below 100 %: ports keep a minimum on-screen size through --rf-zoom (no re-render per frame). */
+/** Below this zoom ports stop growing: the enlarged hit area is capped at 12 px / 0.25 = 48 px (never larger than a card). */
+export const PORT_MIN_ZOOM = 0.25;
+export const portZoom = (zoom: number): number => Math.max(PORT_MIN_ZOOM, zoom);
+
+/** The omnicanvas can sit far below 100 %: ports keep a minimum on-screen size through --rf-zoom (no re-render per frame).
+ * Only the ::before of .port scales (node-system.css): the port box React Flow measures for cable anchors never changes. */
 export function usePortZoom(omni: boolean, canvas: RefObject<HTMLElement | null>) {
-  useOnViewportChange({ onChange: (v) => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(v.zoom)); } });
+  const rf = useReactFlow();
+  const onChange = useCallback((v: { zoom: number }) => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(portZoom(v.zoom))); }, [omni, canvas]);
+  useOnViewportChange({ onChange });
+  useEffect(() => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(portZoom(rf.getZoom()))); }, [omni, canvas, rf]);
 }
 
 /** Only an output released on this canvas's empty pane opens the connected-node picker. */

@@ -10,7 +10,7 @@ vi.mock('../src/lib/idb', () => ({
   getAssetBlob: async () => undefined,
   putAssetBlob: async () => undefined,
 }));
-import { rejectedDrop } from '../src/components/node/connectionDrop';
+import { PORT_MIN_ZOOM, portZoom, rejectedDrop } from '../src/components/node/connectionDrop';
 import { connectionError } from '../src/engine/flow/graph';
 import { addNode } from '../src/engine/flow/actions';
 import { OMNI_ITEM } from '../src/components/shell/navModel';
@@ -67,9 +67,22 @@ describe('omnicanvas entry and ports', () => {
     expect(OMNI_ITEM.label).toMatch(/Node canvas/);
     expect(OMNI_ITEM.icon).toBeDefined();
   });
-  it('keeps a minimum port size on screen at any zoom, from the viewport zoom', () => {
+  it('clamps the zoom that scales ports, so the hit area never outgrows a card', () => {
+    expect(portZoom(0.05)).toBe(PORT_MIN_ZOOM);
+    expect(portZoom(0.35)).toBe(0.35);
+    expect(portZoom(3)).toBe(3);
+    expect(12 / portZoom(0.05)).toBeLessThanOrEqual(48);
+  });
+  it('never resizes the port box (React Flow anchors cables from it), only a centred ::before', () => {
     const css = readFileSync('src/styles/node-system.css', 'utf8');
-    expect(css).toMatch(/\.node-canvas\.is-omni \.react-flow__node \.port \{[^}]*12px \/ var\(--rf-zoom/);
-    expect(readFileSync('src/components/node/connectionDrop.ts', 'utf8')).toMatch(/setProperty\('--rf-zoom'/);
+    const omni = css.split('\n').filter((l) => l.startsWith('.node-canvas.is-omni .react-flow__node .port'));
+    expect(omni.length).toBeGreaterThan(0);
+    for (const rule of omni.filter((l) => !l.includes('::before'))) expect(rule).not.toMatch(/(^|[^-])(width|height)\s*:/);
+    expect(omni.find((l) => l.includes('::before'))).toMatch(/12px \/ var\(--rf-zoom[^}]*translate\(-50%, -50%\)[^}]*pointer-events: all/);
+  });
+  it('syncs --rf-zoom at mount and keeps one memoized listener', () => {
+    const src = readFileSync('src/components/node/connectionDrop.ts', 'utf8');
+    expect(src).toMatch(/useCallback\(\(v/);
+    expect(src).toMatch(/rf\.getZoom\(\)/);
   });
 });
