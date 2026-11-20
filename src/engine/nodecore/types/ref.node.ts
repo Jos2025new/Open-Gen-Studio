@@ -1,4 +1,3 @@
-import { inputPorts, outputPort } from '../../flow/graph';
 import { defineNode } from '../descriptor';
 import { evaluateNode } from '../evaluate';
 
@@ -7,8 +6,13 @@ export default defineNode({
   kind: 'ref',
   version: 1,
   params: ['title', 'llm', 'recipient', 'promptText', 'attachMode', 'dockedTo', 'mergedModels', 'mediaKind', 'undocked', 'view'],
-  inputs: inputPorts,
-  output: outputPort,
+  inputs: () => [],
+  output: (data) => {
+    if (data.kind !== 'ref') return null;
+    if (data.type === 'chat' || data.type === 'agent' || data.type === 'prompt') return 'text';
+    if (data.type === 'designer.doc' || data.type === 'space' || data.type === 'library') return 'image';
+    return null;
+  },
   required: [],
   affects: {},
   evaluate: evaluateNode,

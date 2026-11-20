@@ -3,6 +3,7 @@ import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
 import { refNodeText } from './refText';
 import { resolveInputs, sessionChatText } from '../nodecore/resolver';
+import { descriptorOf } from '../nodecore/registry';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
 import { allNodePorts, portTypeCompatible, resolveSystemConnection } from '../nodes/system';
@@ -44,64 +45,11 @@ export function portFits(out: PortType | null, input: PortType | undefined): boo
 }
 
 export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): PortType | null {
-  switch (data.kind) {
-    case 'text':
-      return 'text';
-    case 'image':
-      return 'image';
-    case 'model3d':
-      return 'model3d';
-    case 'video':
-      return 'video';
-    case 'audio':
-      return data.textOutput ? 'text' : 'audio';
-    case 'tool':
-      return OPS[data.op].output;
-    case 'asset':
-      return data.assetId ? assets[data.assetId]?.kind ?? null : null;
-    case 'ref':
-      if (data.type === 'chat' || data.type === 'agent' || data.type === 'prompt') return 'text';
-      if (data.type === 'designer.doc' || data.type === 'space' || data.type === 'library') return 'image';
-      return null;
-  }
+  return descriptorOf(data.kind)?.output(data, assets) ?? null;
 }
 
 export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortType; label: string; multi: boolean }> {
-  switch (data.kind) {
-    case 'image':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        { id: 'ref', type: 'image', label: 'References', multi: true },
-        // Clip models (Nano Banana 2 reference-to-image): a trimmed reference video.
-        { id: 'clip', type: 'video', label: 'Video clip', multi: true },
-      ];
-    case 'model3d':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        { id: 'ref', type: 'image', label: 'Reference images', multi: true },
-      ];
-    case 'video':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        { id: 'first', type: 'image', label: 'First frame', multi: false },
-        { id: 'last', type: 'image', label: 'Last frame', multi: false },
-        // Reference-to-video models take these as references; keyframe models pin them in order.
-        { id: 'ref', type: 'image', label: 'References / keyframes', multi: true },
-        { id: 'refVideo', type: 'video', label: 'Reference videos', multi: true },
-        // Lip-sync speech, a soundtrack or reference audio, as the model takes it.
-        { id: 'audio', type: 'audio', label: 'Audio', multi: true },
-      ];
-    case 'audio':
-      return [
-        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
-        // Song lyrics: a text node, a lyrics node or a transcription.
-        { id: 'lyrics', type: 'text', label: 'Lyrics', multi: false },
-      ];
-    case 'tool':
-      return [{ id: 'input', type: OPS[data.op].input, label: 'Input', multi: false }];
-    default:
-      return [];
-  }
+  return descriptorOf(data.kind)?.inputs(data) ?? [];
 }
 
 export function nodePorts(data: GraphNodeData, assets: Record<string, Asset> = {}): PortSpec[] {

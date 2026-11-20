@@ -1,18 +1,21 @@
-import { inputPorts, outputPort } from '../flow/graph';
-import { defineNode, type NodeDescriptor } from './descriptor';
+import type { PortType } from '../types';
+import { defineNode, type NodeDescriptor, type PortInfo } from './descriptor';
 import { evaluateNode } from './evaluate';
 
-/** The shared descriptor of the four generation kinds: they differ in ports (graph.ts inputPorts), not in contract. */
-export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d'): NodeDescriptor {
+const PROMPT: PortInfo = { id: 'prompt', type: 'text', label: 'Prompt', multi: false };
+
+/** The shared descriptor of the four generation kinds: they differ in ports and output, not in contract. */
+export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d', ports: { inputs: PortInfo[]; output: PortType | ((textOutput?: boolean) => PortType) }): NodeDescriptor {
   return defineNode({
     kind,
     version: 1,
     params: ['title', 'prompt', 'modelRef', 'settings', 'outputIndex', 'subjects', 'textOutput'],
-    inputs: inputPorts,
-    output: outputPort,
+    inputs: () => ports.inputs.map((p) => ({ ...p })),
+    output: (data) => (typeof ports.output === 'function' ? ports.output('textOutput' in data ? data.textOutput : undefined) : ports.output),
     required: [],
     affects: { prompt: true, ref: true, clip: true, first: true, last: true, refVideo: true, audio: true, lyrics: true },
     evaluate: evaluateNode,
     actions: ['generate'],
   });
 }
+export { PROMPT };

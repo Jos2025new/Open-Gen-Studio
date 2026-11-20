@@ -20,7 +20,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 393 | 326 |
+| [types.ts](../src/engine/types.ts) | 394 | 327 |
 | [store.ts](../src/store/store.ts) | 265 | 320 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 147 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 105 | 0 |
@@ -30,8 +30,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 50 | 23 |
 | [id.ts](../src/lib/id.ts) | 50 | 0 |
 | [catalog.ts](../src/engine/catalog.ts) | 48 | 27 |
+| [ops.ts](../src/engine/ops.ts) | 48 | 20 |
 | [doc.ts](../src/engine/design/doc.ts) | 47 | 72 |
-| [ops.ts](../src/engine/ops.ts) | 47 | 19 |
 | [index.ts](../src/engine/params/index.ts) | 43 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 40 | 29 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
@@ -39,7 +39,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 36 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 32 | 10 |
 | [render.ts](../src/engine/design/render.ts) | 31 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 31 | 19 |
+| [pathNodes.ts](../src/engine/design/pathNodes.ts) | 27 | 15 |
 
 ## Por área
 
@@ -57,11 +57,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 17 |
-| `src/engine` | 69 | 390 |
+| `src/engine` | 69 | 391 |
 | `src/engine/agent` | 64 | 148 |
 | `src/engine/commands` | 7 | 21 |
 | `src/engine/design` | 163 | 205 |
-| `src/engine/flow` | 18 | 63 |
+| `src/engine/flow` | 18 | 64 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 22 | 31 |
