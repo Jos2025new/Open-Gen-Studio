@@ -26,6 +26,6 @@ export function deliverAsset(src: GraphNode, env: ResolveEnv): Delivery {
   const data = src.data;
   if (data.kind !== 'asset') return NOTHING;
   const value = data.sketchAssetId ?? data.assetId;
-  const rev = data.assetId ? normalizeAssetRevisions(env.assets[data.assetId]) : undefined;
+  const rev = data.assetId ? normalizeAssetRevisions(env.assets?.[data.assetId]) : undefined;
   return delivered(value, value ? `${value}@${rev ? `${rev.index}/${rev.versions.length}` : '0'}` : null, rev && rev.versions.length > 1 ? true : undefined);
 }

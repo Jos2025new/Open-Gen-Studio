@@ -1,0 +1,78 @@
+.node-canvas .node-notice-anchor { opacity: 0; pointer-events: none; }
+.node-canvas .port.node-port-missing {
+  background: var(--surface) !important;
+  border-color: var(--danger) !important;
+  color: var(--danger);
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+.node-port-missing > svg { position: relative; pointer-events: none; }
+.node-canvas.is-omni .react-flow__node .port.node-port-missing::before {
+  background: var(--surface);
+  border-color: var(--danger);
+}
+.node-canvas .react-flow__edge.is-incompatible .react-flow__edge-path {
+  stroke: var(--danger);
+  stroke-width: 2;
+}
+.node-canvas .react-flow__edge.is-cut-hit .react-flow__edge-path {
+  stroke: var(--accent) !important;
+  stroke-width: 3;
+  stroke-dasharray: 4 3;
+}
+.node-cable-label { position: absolute; pointer-events: auto; }
+.node-cable-notice, .node-problem-list { position: relative; }
+.node-cable-marker, .node-problem-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0.125rem var(--sp-1);
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+}
+.node-cable-marker.is-invalid, .node-problem-badge.is-error { color: var(--danger); }
+.node-notice-details {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(20rem, 55vw);
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0;
+  padding: var(--sp-1);
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-s);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  z-index: 2;
+}
+.node-problem-list:is(:hover, :has(:focus-visible)) > .node-notice-details { display: grid; }
+.node-cable-notice:is(:hover, :has(:focus-visible)) > .node-pin-actions { display: flex; align-items: center; }
+.node-notice-details button {
+  display: grid;
+  text-align: start;
+  gap: var(--sp-1);
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  color: inherit;
+  border-radius: var(--r-s);
+}
+.node-pin-actions button { width: auto; white-space: nowrap; }
+.node-pin-actions button:disabled { opacity: 0.55; pointer-events: none; }
+.node-notice-details button:is(:hover, :focus-visible) { background: var(--surface-2); }
+.group-frame.is-collapsed { border: 0; }
+.group-frame.is-collapsed > .group-head { bottom: auto; top: 0; left: 0; }
+.node-problem-list > .node-notice-details { top: auto; bottom: 100%; }
+.node-notice-heading { padding: var(--sp-1) var(--sp-2); color: var(--text-2); }

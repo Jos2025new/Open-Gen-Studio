@@ -5,6 +5,7 @@ import { threadOf } from '../agent/lanes';
 import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
 import { laneState, patchLane } from '../agent/lanes';
 import { applyEdit, editCompound } from '../nodecore/edit';
+import { nodePorts } from '../flow/graph';
 import { isOmniSpace } from './omniSpaces';
 import type {
   Graph,
@@ -499,25 +500,7 @@ export function linkSystemNodes(
   if (!src || !tgt) return { error: 'Unknown node.' };
   if (opts.source === opts.target) return { error: 'A node cannot connect to itself.' };
 
-  const srcPorts =
-    src.data.kind === 'ref'
-      ? systemNodePorts(src.data)
-      : [
-          { id: 'out', direction: 'out' as const, kind: 'data' as const, type: 'any' },
-          { id: 'out_ref', direction: 'out' as const, kind: 'ref' as const, type: 'any' },
-          { id: 'out_control', direction: 'out' as const, kind: 'control' as const, type: 'control' },
-        ];
-  const tgtPorts =
-    tgt.data.kind === 'ref'
-      ? systemNodePorts(tgt.data)
-      : [
-          { id: opts.targetHandle ?? 'in', direction: 'in' as const, kind: 'data' as const, type: 'any', multi: true },
-          { id: 'sys_ref', direction: 'in' as const, kind: 'ref' as const, type: 'any', multi: true },
-          { id: 'model', direction: 'in' as const, kind: 'control' as const, type: 'model', multi: false },
-          { id: 'control', direction: 'in' as const, kind: 'control' as const, type: 'control', multi: true },
-        ];
-
-  const resolved = resolveSystemConnection(srcPorts, tgtPorts, {
+  const resolved = resolveSystemConnection(nodePorts(src.data, st.assets), nodePorts(tgt.data, st.assets), {
     sourceHandle: opts.sourceHandle,
     targetHandle: opts.targetHandle,
     kind: opts.kind,

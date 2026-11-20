@@ -99,14 +99,18 @@ export function setGroupColor(sessionId: string, groupId: string, color: string 
 }
 
 /** The frame around a group's nodes (flow coordinates), from their real sizes: it follows them as they move. */
-export function groupBounds(graph: Graph, group: GraphGroup, sizes: Sizes, pad = 28): { x: number; y: number; width: number; height: number } | null {
-  const members = graph.nodes.filter((n) => group.nodeIds.includes(n.id));
+export function groupBounds(members: GraphNode[], sizes: Sizes, pad = 28): { x: number; y: number; width: number; height: number } | null {
   if (!members.length) return null;
-  const l = Math.min(...members.map((n) => n.position.x)) - pad;
-  const t = Math.min(...members.map((n) => n.position.y)) - pad - 18;
-  const r = Math.max(...members.map((n) => n.position.x + sizeOf(n, sizes).width)) + pad;
-  const b = Math.max(...members.map((n) => n.position.y + sizeOf(n, sizes).height)) + pad;
-  return { x: l, y: t, width: r - l, height: b - t };
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const node of members) {
+    const { x, y } = node.position;
+    const { width, height } = sizeOf(node, sizes);
+    left = Math.min(left, x);
+    top = Math.min(top, y);
+    right = Math.max(right, x + width);
+    bottom = Math.max(bottom, y + height);
+  }
+  return { x: left - pad, y: top - pad - 18, width: right - left + pad * 2, height: bottom - top + pad * 2 + 18 };
 }
 
 /** Move every node of a group by (dx, dy). */

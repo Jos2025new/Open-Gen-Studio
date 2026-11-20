@@ -13,6 +13,24 @@ export default [{
   ],
   tests: ['tests/connected-node-menu.test.ts', 'tests/node-connection-drop.test.ts', 'tests/add-connected-node.test.ts'],
 }, {
+  id: 'canvas-notices',
+  what: 'El lienzo, las dependencias y la ejecución comparten la compatibilidad de los cables existentes. La revisión de contenido estabiliza los avisos durante el arrastre. Los recuentos heredan la mayor gravedad.',
+  sides: [
+    ['src/engine/flow/graph.ts', 'export function cablePortProblem'],
+    ['src/engine/nodecore/deps.ts', 'compatibleDataEdges(graph, assets)'],
+    ['src/engine/flow/actions.ts', "i.port === 'input' && i.from && i.status !== 'invalid'"],
+    ['src/engine/flow/graph.ts', 'filter(ignoredRunCable)'],
+    ['src/engine/nodecore/resolver.ts', 'export function resolveCableInput'],
+    ['src/engine/flow/notices.ts', 'export function graphNotices'],
+    ['src/components/node/useCanvasNotices.ts', 'export function useCanvasGraphs'],
+    ['src/components/node/CanvasNotices.tsx', 'export function ProblemList'],
+    ['src/components/node/NodeWorkspace.tsx', 'onJump={jumpToNode}'],
+    ['src/components/node/nodes.tsx', 'node-port-missing'],
+    ['src/components/node/CanvasElements.ts', 'groupNotices(notices, group.nodeIds)'],
+    ['src/components/omni/SpaceNode.tsx', 'count={data.spaceProblems ?? 0}'],
+  ],
+  tests: ['tests/node-notices.test.ts', 'tests/node-notices-ui.test.ts', 'tests/node-notices-canvas.test.ts'],
+}, {
   id: 'system-nodes-and-link-classes',
   what: 'Chat, agente, modelos, docs y Spaces son nodos `ref` que apuntan a sus datos (sin copiar). Los enlaces tienen clase (data, ref, control) y `both` solo en ref y control; el orden de ejecución sale de los enlaces data. Cambiar un lado cambia los demás.',
   sides: [
@@ -20,6 +38,8 @@ export default [{
     ['src/engine/nodes/spec.ts', 'export const SYSTEM_NODE_TYPES'],
     ['src/engine/nodes/system.ts', 'export function ensureSystemNodes'],
     ['src/engine/nodes/commands.ts', 'nodes.system.link'],
+    ['src/engine/nodes/system.ts', 'resolveSystemConnection(nodePorts(src.data, st.assets)'],
+    ['src/engine/flow/graph.ts', 'export function nodePorts'],
     ['src/engine/flow/graph.ts', 'export function executionOrder'],
     ['src/components/node/SystemNode.tsx', 'export function linkClassProps'],
     ['src/styles/node-system.css', '.edge-link-control'],

@@ -13,18 +13,18 @@ import {
 } from '@xyflow/react';
 import { setUi, toast, useStore } from '../../store/store';
 import { editPresentation } from '../../engine/nodecore/edit';
-import { ensureOmniNodes, ordinaryGraph } from '../../engine/nodes/omni';
+import { ensureOmniNodes } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH, runsGeneration, } from '../../engine/flow/graph';
+import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
-import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
+import { focusNodes, setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover } from '../ui/Popover';
 import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems } from './AddNodeItems';
-import { AddNodeMenu, RunAll } from './NodeCanvasParts';
+import { AddNodeMenu, CanvasChatImport, RunAll } from './NodeCanvasParts';
 import { omniWidth } from '../omni/RefNode';
 import { useOmniFraming } from '../omni/useOmniFraming';
 import { revealRect } from '../omni/revealNode';
@@ -35,16 +35,17 @@ import { connectionDrop, reportRefusedDrop, usePortZoom } from './connectionDrop
 import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
-import { GroupNode, Operations, type GroupFlowNode } from './Operations';
-import { flowEdges, LinkBar, useDeleteRequest } from './LinkBar';
+import { GroupNode, Operations } from './Operations';
+import { LinkBar, useDeleteRequest } from './LinkBar';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
-import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
-import { ImportFromChat } from '../ui/ImportFromChat';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
-import { chatItem, loadNodeTool } from './nodeToolStorage';
+import { loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
+import { closedGroupNotices, useCanvasElements, useCanvasGroups } from './CanvasElements';
+import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
+import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
@@ -55,24 +56,16 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const sessionId = useStore((s) => s.activeSessionId);
   const fullGraph = useStore((s) => s.sessions[s.activeSessionId].graph);
   // The ordinary canvas draws what it always drew: the omnicanvas-only nodes (system parts, Spaces) stay out of it.
-  const graph = useMemo(() => (omni ? fullGraph : ordinaryGraph(fullGraph)), [fullGraph, omni]);
+  const { graph, revision, fullRevision, ordinaryRevision } = useCanvasGraphs(fullGraph, omni);
   // Opening the omnicanvas brings the session's parts in as nodes (idempotent; no undo step).
   useEffect(() => { if (omni) ensureOmniNodes(sessionId); }, [omni, sessionId]);
-  const assets = useStore((s) => s.assets);
-  const generations = useStore((s) => s.generations);
-  const feed = useStore((s) => s.sessions[s.activeSessionId].feed);
-  // Chat results not on this canvas yet: one click (or "continue here" to the agent) brings them as connected nodes.
-  const fromChat = useMemo(
-    () => chatWorkNotInNodes(sessionId).map(chatItem),
-    [sessionId, graph, generations, feed],
-  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
   const del = useDeleteRequest(sessionId, (removedNodes, removedEdges) => {
     if (removedNodes.length) setSelected((prev) => { const next = new Set(prev); removedNodes.forEach((id) => next.delete(id)); return next; });
     if (removedEdges.length) setSelectedEdges((prev) => { const next = new Set(prev); removedEdges.forEach((id) => next.delete(id)); return next; });
   });
-  const selectNodes = (ids: Iterable<string>) => { setSelected(new Set(ids)); setSelectedEdges(new Set()); };
+  const selectNodes = useCallback((ids: Iterable<string>) => { setSelected(new Set(ids)); setSelectedEdges(new Set()); }, []);
   // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
   // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
   // Cut (scissors, X) is a passing tool: it is not remembered, and X or Escape returns to the last one.
@@ -143,57 +136,32 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
 
-  // Groups are containers: a frame node behind their members, sized from them (it follows them as they move).
-  const groupFrames = useMemo(
-    () =>
-      (graph.groups ?? []).flatMap((g) => {
-        const b = groupBounds(graph, g, measured);
-        return b ? [{ group: g, b }] : [];
-      }),
-    [graph, measured],
-  );
-  // Frames go in the same list; React Flow takes them as nodes of type "group".
-  const nodes = useMemo((): FlowNode[] => {
-    // Count only live nodes: ids of deleted nodes must not keep the toolbar hidden.
-    const solo = graph.nodes.filter((n) => selected.has(n.id)).length === 1;
-    const frames: GroupFlowNode[] = groupFrames.map(({ group, b }) => ({
-      id: group.id,
-      type: 'group',
-      position: { x: b.x, y: b.y },
-      data: { group, sessionId },
-      width: b.width,
-      height: b.height,
-      measured: { width: b.width, height: b.height },
-      zIndex: -1,
-      draggable: true,
-      selectable: true,
-      connectable: false,
-      style: { width: b.width, height: b.height },
-    }));
-    return [...(frames as unknown as FlowNode[]), ...graph.nodes.map((n) => ({
-        id: n.id,
-        type: 'studio',
-        position: n.position,
-        data: { node: n, solo, panel: !embedded },
-        selected: selected.has(n.id),
-        width: omni ? omniWidth(n.data, NODE_WIDTH) : NODE_WIDTH,
-        measured: measured.get(n.id),
-      } as FlowNode))];
-  }, [graph.nodes, selected, measured, groupFrames, sessionId, embedded, omni]);
-
-  const running = useMemo(() => {
-    const set = new Set<string>();
-    for (const n of graph.nodes) {
-      const d = n.data;
-      if (runsGeneration(d) && d.generationId) {
-        const st = generations[d.generationId]?.status;
-        if (st === 'running' || st === 'queued') set.add(n.id);
-      }
+  const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const toggleGroup = useCallback((id: string) => {
+    setClosed(prev => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+    setSelected(new Set());
+    setSelectedEdges(new Set());
+  }, []);
+  const groupNotices = useMemo(() => closedGroupNotices(revision.groups, closed, notices), [revision.groups, closed, notices]);
+  const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup);
+  const jumpToNode = useCallback((id: string) => {
+    const groups = revision.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
+    if (groups.some(g => closed.has(g.id))) {
+      setClosed(prev => new Set([...prev].filter(gid => !groups.some(g => g.id === gid))));
     }
-    return set;
-  }, [graph.nodes, generations]);
+    selectNodes([id]);
+    focusNodes(sessionId, [id]);
+  }, [revision.groups, closed, selectNodes, sessionId]);
 
-  const edges: Edge[] = useMemo(() => flowEdges(graph, assets, running, selectedEdges), [graph.edges, graph.nodes, assets, running, selectedEdges]);
+  const { nodes, edges } = useCanvasElements({
+    graph, revision, selected, selectedEdges, measured, frames, hidden,
+    byPort, byCable, spaceProblems, sessionId, omni, embedded,
+  });
 
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
@@ -221,7 +189,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       // A dragged frame moves its nodes — unless they are selected too, then they already moved with it.
       for (const [g, p] of frameMoves) {
         if (g.nodeIds.some((id) => moves.has(id))) continue;
-        const b = groupBounds(useStore.getState().sessions[sessionId].graph, g, measuredRef.current);
+        const ids = new Set(g.nodeIds);
+        const members = useStore.getState().sessions[sessionId].graph.nodes.filter(n => ids.has(n.id));
+        const b = groupBounds(members, measuredRef.current);
         if (b) moveGroup(sessionId, g.id, p.x - b.x, p.y - b.y);
       }
       if (removed.length) deleteNodes(sessionId, removed);
@@ -382,12 +352,10 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     return () => window.removeEventListener('keydown', key);
   }, [sessionId, selected]);
 
-  const runIds = runnableIds(graph.nodes);
+  const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 
-  const liveSelected = useMemo(() => {
-    const ids = new Set(graph.nodes.map((n) => n.id));
-    return [...selected].filter((id) => ids.has(id));
-  }, [graph.nodes, selected]);
+  const selectedNodes = useMemo(() => selected.size ? revision.nodes.filter(n => selected.has(n.id)) : [], [revision.nodes, selected]);
+  const liveSelected = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
   const liveSelectedEdgeSet = useMemo(() => {
     const ids = new Set(graph.edges.map((e) => e.id));
     return new Set([...selectedEdges].filter((id) => ids.has(id)));
@@ -403,8 +371,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     setMenu({ x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0), nodeId });
   };
   useEffect(() => { setMenu(null); }, [sessionId]);
-  const menuSource = menu?.from ? graph.nodes.find((n) => n.id === menu.from) : undefined;
-  const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuSource && outputPort(menuSource.data, assets)));
+  const menuSource = menu?.from ? revision.nodes.find((n) => n.id === menu.from) : undefined;
+  const menuOutput = useStore(s => menuSource ? outputPort(menuSource.data, s.assets) : null);
+  const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuOutput));
   const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
 
   return (
@@ -441,6 +410,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       <ReactFlow<FlowNode, Edge>
         nodes={nodes}
         edges={edges}
+        edgeTypes={noticeEdgeTypes}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -478,8 +448,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {box ? <BoxSelectRect box={box} /> : null}
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
-        {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={graph.nodes.filter((n) => selected.has(n.id))} />}
-        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={selectNodes} />
+        {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={selectedNodes} />}
+        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} />
         <CanvasNavigation
           sessionId={sessionId}
           add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
@@ -487,13 +457,14 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
             layoutAll(sessionId);
             window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
           }}
-          onSelect={(id) => selectNodes([id])}
+          onSelect={id => hidden.has(id) ? jumpToNode(id) : selectNodes([id])}
           tool={tool}
           onTool={pickTool}
           selectedCount={liveSelected.length + liveSelectedEdgeSet.size}
           onDelete={() => del.request(liveSelected, [...liveSelectedEdgeSet])}
           omni={omni}
         /></>}
+        <CanvasProblems notices={notices} onJump={jumpToNode} />
         <LinkBar sessionId={sessionId} graph={graph} selected={liveSelectedEdgeSet} />
         {del.card}
       </ReactFlow>
@@ -507,7 +478,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
           <>
           <AddNodeItems
             searchable={Boolean(menu.from)}
-            accepts={menuSource ? outputPort(menuSource.data, assets) : undefined}
+            accepts={menuOutput ?? undefined}
             onImport={menu.from ? undefined : () => {
               const r = canvasRef.current?.getBoundingClientRect();
               importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
@@ -532,16 +503,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         </div>
       </Popover>
       {menuOpen && menu?.from ? <ConnectionPreview from={menu.from} menu={connectionMenu} /> : null}
-      {embedded || omni ? null : <ImportFromChat
-        sessionId={sessionId}
-        canvas="node"
-        items={fromChat}
-        noun="result"
-        onImport={(ids) => {
-          chatToNodes(sessionId, ids);
-          window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
-        }}
-      />}
+      {embedded || omni ? null : <CanvasChatImport sessionId={sessionId} content={fullRevision.nodes} />}
       {!graph.nodes.length && omni ? null : !graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
         <NodeEmptyState onAdd={(kind) => addAtCenter(newNodeData(kind))} />
       ) : null}

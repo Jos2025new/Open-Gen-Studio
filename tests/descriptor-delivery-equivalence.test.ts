@@ -16,7 +16,7 @@ function legacy(src: GraphNode | undefined, edge: Pick<GraphEdge, 'outputIndex'>
   else if (data.kind === 'ref') value = env.chatText(src!);
   else if (data.kind === 'asset') {
     value = data.sketchAssetId ?? data.assetId;
-    const rev = data.assetId ? normalizeAssetRevisions(env.assets[data.assetId]) : undefined;
+    const rev = data.assetId ? normalizeAssetRevisions(env.assets?.[data.assetId]) : undefined;
     if (value) revision = `${value}@${rev ? `${rev.index}/${rev.versions.length}` : '0'}`;
     if (rev && rev.versions.length > 1) edited = true;
   } else {
@@ -42,6 +42,12 @@ const env = {
 } as unknown as ResolveEnv;
 
 describe('what a node delivers equals the former sourceValue chain', () => {
+  it('delivers an asset and its base revision when the inventory is omitted', () => {
+    const src = n({ kind: 'asset', assetId: 'a1' });
+    const { generations, chatText } = env;
+    expect(sourceValue(src, {}, { generations, chatText })).toEqual({ value: 'a1', revision: 'a1@0/0' });
+  });
+
   const cases: [string, GraphNode | undefined][] = [
     ['no source', undefined],
     ['text', n({ kind: 'text', text: 'abc' })],

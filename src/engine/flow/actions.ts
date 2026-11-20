@@ -14,12 +14,12 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
-import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
+import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
-import { storeEnv } from '../nodecore/resolver';
+import { ignoredRunCable, resolveInputs, storeEnv } from '../nodecore/resolver';
 import { descriptorOf } from '../nodecore/registry';
 
 const get = useStore.getState;
@@ -66,21 +66,19 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   const drop = new Set(ids);
   const deleted = { nodes: structuredClone(graph.nodes.filter(n => drop.has(n.id))), edges: structuredClone(graph.edges.filter(e => drop.has(e.source) || drop.has(e.target))) };
   const error = editError(applyEdit({ session: sessionId, op: { op: 'delete', nodes: ids } }));
-  const galleryNodes = deleted.nodes.filter(n => n.data.kind !== 'ref');
-  if (!error && galleryNodes.length) {
-    const galleryIds = new Set(galleryNodes.map(n => n.id));
-    const galleryDeleted = galleryNodes.length === deleted.nodes.length ? deleted : { nodes: galleryNodes, edges: deleted.edges.filter(e => galleryIds.has(e.source) || galleryIds.has(e.target)) };
-    appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${galleryNodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: galleryDeleted, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, 'node') } });
+  const restorable = deleted.nodes.filter(n => n.data.kind !== 'ref' || (n.data.type === 'prompt' && n.data.ref !== 'composer'));
+  if (!error && restorable.length) {
+    const ids = new Set(restorable.map(n => n.id));
+    const undoNodes = { nodes: restorable, edges: deleted.edges.filter(e => ids.has(e.source) || ids.has(e.target)) };
+    const results = restorable.some(n => n.data.kind !== 'ref') ? ' Results remain in the gallery.' : '';
+    appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${restorable.map(n => n.data.title).join(', ')}.${results}`, undoNodes, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, 'node') } });
   }
   return error;
 }
 
 export { addConnected } from './addConnected';
 
-/**
- * Change a generation node's model. Audio nodes follow the model's output (lyrics models answer with text), and
- * connections the new output or inputs no longer fit are dropped.
- */
+/** Change the model and preserve its cables. */
 export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenNodeData, 'modelRef' | 'settings'>): string | null {
   const node = get().sessions[sessionId]?.graph.nodes.find(n => n.id === nodeId);
   if (!node || !('modelRef' in node.data)) return `No generation node: ${nodeId}.`;
@@ -88,16 +86,10 @@ export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenN
   if (!model && !patch.modelRef.startsWith('local::')) return `Unknown model: ${patch.modelRef}.`;
   if (model && model.kind !== node.data.kind) return `${model.name} produces ${model.kind}, not ${node.data.kind}.`;
   const textOutput = node.data.kind === 'audio' && model?.textOutput ? true : undefined;
-  return editCompound(sessionId, 'set-model', g => {
-    const nodes = g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...patch, textOutput } as GraphNodeData } : n);
-    const out = outputPort(nodes.find(n => n.id === nodeId)!.data, get().assets);
-    const keeps = (e: import('../types').GraphEdge) => {
-      if (e.source !== nodeId || (e.kind ?? 'data') !== 'data') return true;
-      const tgt = nodes.find(n => n.id === e.target);
-      return Boolean(tgt && portFits(out, inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type));
-    };
-    return { graph: { ...g, nodes, edges: g.edges.filter(keeps) }, dropped: g.edges.filter(e => !keeps(e)).map(e => e.id) };
-  });
+  return editCompound(sessionId, 'set-model', g => ({
+    ...g,
+    nodes: g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, ...patch, textOutput } as GraphNodeData } : n),
+  }));
 }
 
 /** Set (or clear, with `undefined`) a node's painted-over copy. The copy it replaces is deleted. */
@@ -177,15 +169,10 @@ export function disconnectEdges(sessionId: string, ids: string[]): string | null
 export function setNodeOp(sessionId: string, nodeId: string, op: OpId): string | null {
   const node = get().sessions[sessionId]?.graph.nodes.find(n => n.id === nodeId);
   if (node?.data.kind !== 'tool') return `No tool node: ${nodeId}.`;
-  return editCompound(sessionId, 'set-op', g => {
-    const nodes = g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, op, params: defaultOpParams(OPS[op]), title: OPS[op].label, generationId: undefined } as GraphNodeData } : n);
-    const keeps = (e: import('../types').GraphEdge) => {
-      if ((e.source !== nodeId && e.target !== nodeId) || (e.kind ?? 'data') !== 'data') return true;
-      const src = nodes.find(n => n.id === e.source), tgt = nodes.find(n => n.id === e.target);
-      return Boolean(src && tgt && portFits(outputPort(src.data, get().assets), inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type));
-    };
-    return { graph: { ...g, nodes, edges: g.edges.filter(keeps) }, dropped: g.edges.filter(e => !keeps(e)).map(e => e.id) };
-  });
+  return editCompound(sessionId, 'set-op', g => ({
+    ...g,
+    nodes: g.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, op, params: defaultOpParams(OPS[op]), title: OPS[op].label, generationId: undefined } as GraphNodeData } : n),
+  }));
 }
 
 export function layoutAll(sessionId: string): void {
@@ -200,12 +187,15 @@ export function runnableIds(nodes: GraphNode[]): string[] {
 
 function requestContext(sessionId: string) {
   const st = get(), graph = st.sessions[sessionId].graph;
+  const env = storeEnv();
   return { schemas: st.catalog.schemas, assets: st.assets, operation: (n: GraphNode) => {
     if (n.data.kind !== 'tool') return undefined;
     const engine = OPS[n.data.op].engine;
     if (['local', 'voice'].includes(engine)) return undefined;
-    const sourceNode = graph.nodes.find(src => src.id === graph.edges.find(e => e.target === n.id && e.targetHandle === 'input')?.source);
-    const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations) : null;
+    const input = resolveInputs(graph, n, env).find(i => i.port === 'input' && i.from && i.status !== 'invalid');
+    const edge = input && graph.edges.find(e => e.id === input.edgeId);
+    const sourceNode = input && graph.nodes.find(src => src.id === input.from);
+    const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations, edge?.outputIndex) : null;
     const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
     const fromModel = opFollowsSource(engine) ? opModelFromRef(sourceRef, engine === 'edit' ? 'image' : 'video') : null;
     // A step from a confirmed plan carries the model the user approved (and the estimate priced): it wins over the source's model.
@@ -230,14 +220,16 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   const graph = st.sessions[sessionId].graph;
   const context = requestContext(sessionId);
   const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context });
+  const env = storeEnv();
   const inputs = new Set(run.runIds);
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
     const subjects = n && 'subjects' in n.data ? (n.data.subjects ?? []).filter(s => !s.from.startsWith('asset:')).map(s => s.from.split('#')[0]) : [];
-    for (const source of [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id).map(e => e.source), ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
+    const linked = n ? resolveInputs(graph, n, env).flatMap(i => i.from && !i.broken && !ignoredRunCable(i) ? [i.from] : []) : [];
+    for (const source of [...linked, ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
   };
   run.runIds.forEach(visit);
-  const errors = [...run.errors, ...runProblems(graph, run.runIds, { ...storeEnv(), generations: st.generations, assets: st.assets })];
+  const errors = [...run.errors, ...runProblems(graph, run.runIds, env)];
   for (const id of inputs) {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
@@ -383,7 +375,7 @@ export function restoreNodes(sessionId: string, deleted: DeletedNodes): { error:
     if (occupied || problem) { skipped.push(`${edge.id}: ${occupied ? 'port changed since deletion' : problem}`); continue; }
     const candidate = { ...next, edges: [...next.edges, { ...edge }] };
     // Subjects can close a loop the cable-to-cable check does not see.
-    if (findCycle(candidate)) { skipped.push(`${edge.id}: would create a loop`); continue; }
+    if (findCycle(candidate, get().assets)) { skipped.push(`${edge.id}: would create a loop`); continue; }
     next = candidate;
   }
   return { error: editCompound(sessionId, 'restore', () => next), skipped };

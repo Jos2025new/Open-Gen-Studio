@@ -2,29 +2,48 @@ import { useMemo, useState } from 'react';
 import { Panel, type Edge } from '@xyflow/react';
 import { disconnectEdges, deleteNodes } from '../../engine/flow/actions';
 import { ungroup } from '../../engine/flow/arrange';
-import { GONE_HANDLE, NO_RESULT, outputPort, resultHandle } from '../../engine/flow/graph';
+import { GONE_HANDLE, NO_RESULT, nodePorts, outputPort, resultHandle } from '../../engine/flow/graph';
 import { openHistoryGroup } from '../../engine/flow/history';
 import { setLinkBoth } from '../../engine/nodes/system';
 import type { Asset, Graph } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
+import { NOTICE_IN, NOTICE_OUT, type NoticeEdge } from './CanvasNotices';
+import type { CableNotice } from '../../engine/flow/notices';
 import { linkClassProps } from './SystemNode';
 
 /* The canvas's links and the removal of system nodes: the edges React Flow draws, a bar for the selected link (Both,
  * Remove) and the contextual confirmation before a system node that holds model links is taken off the canvas. */
 
-export function flowEdges(graph: Graph, assets: Record<string, Asset>, running: Set<string>, selected: Set<string>): Edge[] {
-  return graph.edges.map((e) => {
-    const src = graph.nodes.find((n) => n.id === e.source);
+export function flowEdges(graph: Graph, assets: Record<string, Asset>, running: Set<string>, selected: Set<string>,
+  notices: ReadonlyMap<string, CableNotice> = new Map(), sessionId = '', hidden: ReadonlySet<string> = new Set()): Edge[] {
+  const nodes = new Map(graph.nodes.map(n => [n.id, n]));
+  return graph.edges.map((e): Edge | NoticeEdge => {
+    const src = nodes.get(e.source), tgt = nodes.get(e.target);
+    const output = src ? outputPort(src.data, assets) : null;
+    const notice = notices.get(e.id);
+    const classes = linkClassProps(e, output);
+    let sourceHandle = e.outputIndex == null ? e.sourceHandle : e.outputIndex === NO_RESULT ? GONE_HANDLE : resultHandle(e.outputIndex);
+    let targetHandle = e.targetHandle;
+    if (notice?.kind === 'cable' && src && tgt) {
+      const hasSource = src.data.kind !== 'ref' && e.outputIndex != null
+        ? Boolean(output)
+        : nodePorts(src.data, assets).some(p => p.direction === 'out' && p.id === (sourceHandle ?? 'out'));
+      const hasTarget = nodePorts(tgt.data, assets).some(p => p.direction === 'in' && p.id === targetHandle);
+      if (!hasSource) sourceHandle = NOTICE_OUT;
+      if (!hasTarget) targetHandle = NOTICE_IN;
+    }
     return {
       id: e.id,
       source: e.source,
       target: e.target,
-      sourceHandle: e.outputIndex == null ? e.sourceHandle : e.outputIndex === NO_RESULT ? GONE_HANDLE : resultHandle(e.outputIndex),
-      targetHandle: e.targetHandle,
-      ...linkClassProps(e, src ? outputPort(src.data, assets) : null),
-      animated: running.has(e.target),
+      sourceHandle,
+      targetHandle,
+      ...classes,
+      ...(notice ? { type: 'notice', data: { notice, sessionId }, className: `${classes.className}${notice.kind === 'cable' ? ' is-incompatible' : ''}` } : {}),
+      animated: !notice && running.has(e.target),
       selected: selected.has(e.id),
+      hidden: hidden.has(e.source) || hidden.has(e.target),
     };
   });
 }

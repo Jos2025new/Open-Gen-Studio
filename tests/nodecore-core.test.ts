@@ -19,7 +19,7 @@ import { ownerRev } from '../src/engine/nodecore/revision';
 import { runProblems } from '../src/engine/nodecore/guard';
 import { deleteNodes, patchNodeData, tryConnect } from '../src/engine/flow/actions';
 import { linkSystemNodes } from '../src/engine/nodes/system';
-import type { Graph } from '../src/engine/types';
+import type { Graph, GraphNode, RefNodeData } from '../src/engine/types';
 
 const settings = { count: 1, advanced: {} };
 const text = (id: string, t: string) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'text' as const, title: id, text: t } });
@@ -57,6 +57,24 @@ describe('node core: descriptors and identity (points 1-2)', () => {
 });
 
 describe('node core: dependencies and cycles (point 4)', () => {
+  it.each<Pick<RefNodeData, 'type' | 'ref'>>([
+    { type: 'space', ref: 'designer' },
+    { type: 'session', ref: 'studio' },
+  ])('refuses a ref patch that reactivates a cycle from $type/$ref', (initial) => {
+    const agent: GraphNode = { ...text('agent', ''), data: { kind: 'ref', title: 'Agent', type: 'agent', ref: sid } };
+    const space: GraphNode = { ...text('space', ''), data: { kind: 'ref', title: 'Space', ...initial } };
+    const before: Graph = { nodes: [agent, space], edges: [
+      { id: 'prompt', source: 'agent', sourceHandle: 'out', target: 'space', targetHandle: 'in' },
+      { id: 'result', source: 'space', sourceHandle: 'out', target: 'agent', targetHandle: 'in' },
+    ] };
+    useStore.setState(st => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph: before } } }));
+    expect(findCycle(before)).toBeNull();
+    const patch: Partial<RefNodeData> = initial.type === 'space' ? { ref: 'studio' } : { type: 'space' };
+    const result = applyEdit({ session: sid, op: { op: 'set', node: 'space', patch } });
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('loop') });
+    expect(g()).toBe(before);
+  });
+
   it('rejects a data cycle when editing, with the path', () => {
     const tool = (id: string) => ({ id, position: { x: 0, y: 0 }, data: { kind: 'tool' as const, title: id, op: 'grid_split' as const, params: {}, outputIndex: 0 } });
     useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph: { nodes: [tool('a'), tool('b')], edges: [{ id: 'e', source: 'a', target: 'b', sourceHandle: 'out', targetHandle: 'input' }] } } } }));
