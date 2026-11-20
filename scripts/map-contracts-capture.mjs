@@ -6,7 +6,7 @@ export default [
     sides: [
       ['src/engine/captureStyles.ts', 'export const CAPTURE_PRESETS'],
       ['src/engine/realism.ts', 'captureClause(ctx.capture'],
-      ['src/engine/plan.ts', 'withCaptureSetting('],
+      ['src/engine/planSteps/media.ts', 'withCaptureSetting('],
       ['src/engine/procedure.ts', 'export const CAPTURE_RULE'],
       ['src/engine/agent/captureContext.ts', 'export function captureLines'],
       ['src/engine/agent/context.ts', 'captureLines(subjects'],

@@ -9,7 +9,7 @@ export default [
       ['src/engine/params/inputs.ts', 'export function routeVideoInputs'],
       ['src/engine/jobs.ts', "kind === 'video' && schema.slots.frameRules"],
       ['src/engine/actions.ts', 'sourceVideo: false'],
-      ['src/engine/plan.ts', 'sourceVideo: false'],
+      ['src/engine/planSteps/media.ts', 'sourceVideo: false'],
       ['src/engine/planFix.ts', 'export function videoFix'],
       ['src/engine/flow/actions.ts', 'sourceVideo: false'],
       ['src/engine/agent/providerFit.ts', 'sourceVideo: false'],
