@@ -1,9 +1,8 @@
-import { cacheDb } from '../../lib/idb';
 import { HttpError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { roleForKey, humanizeKey, wireParams } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, peekCached } from './shared';
 import type { GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { commonImageParameters, imageProviderOptions } from './openrouterOptions';
@@ -68,19 +67,11 @@ export function orHeaders(key: string): Record<string, string> {
 }
 
 async function fetchImageModels(): Promise<OrImageModel[]> {
-  const cached = await cacheDb.get<OrImageModel[]>('or:images', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: OrImageModel[] }>(`${BASE}/images/models`);
-  await cacheDb.set('or:images', res.data);
-  return res.data;
+  return (await cachedJson('or:images', DAY / 2, async () => (await requestJson<{ data: OrImageModel[] }>(`${BASE}/images/models`)).data))!;
 }
 
 async function fetchVideoModels(): Promise<OrVideoModel[]> {
-  const cached = await cacheDb.get<OrVideoModel[]>('or:videos', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: OrVideoModel[] }>(`${BASE}/videos/models`);
-  await cacheDb.set('or:videos', res.data);
-  return res.data;
+  return (await cachedJson('or:videos', DAY / 2, async () => (await requestJson<{ data: OrVideoModel[] }>(`${BASE}/videos/models`)).data))!;
 }
 
 /** Parse OpenRouter video `pricing_skus` into normalized SKUs. */
@@ -142,8 +133,10 @@ const priceCacheKey = (id: string) => `or:price:v2:${id}`;
  */
 export async function imagePrice(id: string, endpoints?: import('./openrouterOptions').ImageEndpoint[]): Promise<PriceRule | undefined> {
   const cacheKey = priceCacheKey(id);
-  const cached = await cacheDb.get<PriceRule>(cacheKey, DAY);
-  if (cached) return cached;
+  return cachedJson<PriceRule>(cacheKey, DAY, () => loadImagePrice(id, endpoints));
+}
+
+async function loadImagePrice(id: string, endpoints?: import('./openrouterOptions').ImageEndpoint[]): Promise<PriceRule | undefined> {
   let res: { endpoints?: Array<{ pricing?: Array<{ billable: string; unit: string; cost_usd: number; resolution?: string }> }> };
   try {
     res = endpoints ? { endpoints } : await requestJson(`${BASE}/images/models/${id}/endpoints`);
@@ -166,7 +159,6 @@ export async function imagePrice(id: string, endpoints?: import('./openrouterOpt
   let rule: PriceRule = { skus: [], note: TOKEN_NOTE };
   if (skus.length) rule = varies ? { skus, lowerBound: true, note: 'Providers bill this model differently; the lowest is shown' } : { skus };
   else if (mp) rule = { skus: [{ unit: 'megapixel', usd: mp.cost_usd }], approximate: true };
-  await cacheDb.set(cacheKey, rule);
   return rule;
 }
 
@@ -193,7 +185,7 @@ export const openrouter: ProviderAdapter = {
     const [images, videos] = await Promise.all([fetchImageModels(), fetchVideoModels()]);
     const out: ModelSummary[] = [];
     // Image prices need one request per model, so the listing only carries those already fetched (cache, no network).
-    const priced = await Promise.all(images.map((m) => cacheDb.get<PriceRule>(priceCacheKey(m.id), DAY)));
+    const priced = await Promise.all(images.map((m) => peekCached<PriceRule>(priceCacheKey(m.id), DAY)));
     for (const [i, m] of images.entries()) {
       imageRaw.set(m.id, m);
       const inputs = m.architecture?.input_modalities ?? ['text'];

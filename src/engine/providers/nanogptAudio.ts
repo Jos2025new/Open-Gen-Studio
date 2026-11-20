@@ -1,9 +1,8 @@
-import { cacheDb } from '../../lib/idb';
 import { providerFetch } from '../../lib/providerFetch';
 import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http';
 import { extensionForMime } from '../../lib/media';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, RemoteJob, TranscriberSummary } from '../types';
-import { JSON_HEADERS, numberOrUndefined as num, POLL_TIMEOUT_MS, pollJob } from './shared';
+import { cachedJson, JSON_HEADERS, numberOrUndefined as num, POLL_TIMEOUT_MS, pollJob } from './shared';
 import type { GenRequest, GenResult, ResumeContext, TranscribeRequest } from './types';
 import { modelRef } from './types';
 
@@ -33,11 +32,7 @@ export interface NanoAudioModel {
 }
 
 export async function fetchAudioModels(): Promise<NanoAudioModel[]> {
-  const cached = await cacheDb.get<NanoAudioModel[]>('nano:v1:audio', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: NanoAudioModel[] }>(`${BASE}/v1/audio-models?detailed=true`);
-  await cacheDb.set('nano:v1:audio', res.data);
-  return res.data;
+  return (await cachedJson('nano:v1:audio', DAY / 2, async () => (await requestJson<{ data: NanoAudioModel[] }>(`${BASE}/v1/audio-models?detailed=true`)).data))!;
 }
 
 // ---------------------------------------------------------------------------

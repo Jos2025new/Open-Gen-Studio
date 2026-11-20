@@ -1,9 +1,8 @@
-import { cacheDb } from '../../lib/idb';
 import { extractErrorMessage, fetchJsonWithRelay, isAbort, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -28,12 +27,10 @@ const raws = new Map<string, AtlasModel>();
 
 async function fetchCatalog(): Promise<AtlasModel[]> {
   // v3: the chosen 3D models too (listed by Atlas as type Image).
-  const cached = await cacheDb.get<AtlasModel[]>('atlas:models:v3', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: AtlasModel[] }>(`${BASE}/api/v1/models`);
-  const media = res.data.filter((m) => m.type === 'Image' || m.type === 'Video' || (m.type === 'Audio' && AUDIO_FAMILIES.test(m.model)));
-  await cacheDb.set('atlas:models:v3', media);
-  return media;
+  return (await cachedJson<AtlasModel[]>('atlas:models:v3', DAY / 2, async () => {
+    const res = await requestJson<{ data: AtlasModel[] }>(`${BASE}/api/v1/models`);
+    return res.data.filter((m) => m.type === 'Image' || m.type === 'Video' || (m.type === 'Audio' && AUDIO_FAMILIES.test(m.model)));
+  }))!;
 }
 
 /** Audio families confirmed by the user (2026-09-25): MiniMax Music and MiniMax Lyrics. Others wait for a decision. */
@@ -158,31 +155,31 @@ export const atlas: ProviderAdapter = {
   async loadSchema(model) {
     // v3: reference slots, fixed/missing required fields, sizes as framing.
     const cacheKey = `atlas:schema:v4:${model.id}`;
-    const cached = await cacheDb.get<ModelSchema>(cacheKey, DAY);
-    if (cached) return { ...cached, price: model.price ?? cached.price };
-    if (!raws.has(model.id)) await atlas.listModels(undefined);
-    const raw = raws.get(model.id);
-    if (!raw?.schema) throw new Error(`Atlas Cloud has no schema for ${model.id}`);
-    const path = raw.schema.startsWith(STATIC) ? raw.schema.slice(STATIC.length) : new URL(raw.schema).pathname;
-    const doc = await fetchJsonWithRelay<{ components?: { schemas?: Record<string, JsonProp & { properties?: Record<string, JsonProp>; required?: string[] }> } }>(
-      raw.schema,
-      `/x/atlas-static${path}`,
-    );
-    const schemas = doc.components?.schemas ?? {};
-    const input = schemas.Input ?? Object.entries(schemas).find(([k]) => /input/i.test(k))?.[1];
-    if (!input?.properties) throw new Error(`Atlas Cloud schema for ${model.id} has no input definition`);
-    const schema = schemaFromJson({
-      ref: model.ref,
-      kind: model.kind,
-      properties: input.properties,
-      required: input.required ?? [],
-      resolve: (ref) => schemas[ref.split('/').pop() ?? ''],
-      imageFormat: 'url',
-      source: 'openapi',
-    });
-    schema.price = model.price;
-    await cacheDb.set(cacheKey, schema);
-    return schema;
+    const schema = (await cachedJson<ModelSchema>(cacheKey, DAY, async () => {
+      if (!raws.has(model.id)) await atlas.listModels(undefined);
+      const raw = raws.get(model.id);
+      if (!raw?.schema) throw new Error(`Atlas Cloud has no schema for ${model.id}`);
+      const path = raw.schema.startsWith(STATIC) ? raw.schema.slice(STATIC.length) : new URL(raw.schema).pathname;
+      const doc = await fetchJsonWithRelay<{ components?: { schemas?: Record<string, JsonProp & { properties?: Record<string, JsonProp>; required?: string[] }> } }>(
+        raw.schema,
+        `/x/atlas-static${path}`,
+      );
+      const schemas = doc.components?.schemas ?? {};
+      const input = schemas.Input ?? Object.entries(schemas).find(([k]) => /input/i.test(k))?.[1];
+      if (!input?.properties) throw new Error(`Atlas Cloud schema for ${model.id} has no input definition`);
+      const built = schemaFromJson({
+        ref: model.ref,
+        kind: model.kind,
+        properties: input.properties,
+        required: input.required ?? [],
+        resolve: (ref) => schemas[ref.split('/').pop() ?? ''],
+        imageFormat: 'url',
+        source: 'openapi',
+      });
+      built.price = model.price;
+      return built;
+    }))!;
+    return { ...schema, price: model.price ?? schema.price };
   },
 
   async generate(req: GenRequest): Promise<GenResult> {
