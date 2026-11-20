@@ -10,6 +10,7 @@ type Tried = { source: string; target: string; sourceHandle: string | null; targ
 export function rejectedDrop(state: Parameters<OnConnectEnd>[1]): Tried | 'same' | null {
   const { fromNode, fromHandle, toNode, toHandle } = state;
   if (state.isValid || !fromNode || !toNode || !fromHandle || !toHandle) return null;
+  if (fromNode.id === toNode.id && fromHandle.id === toHandle.id) return null; // released on the handle it started from
   if (fromHandle.type === toHandle.type) return 'same';
   const [out, outH, inn, inH] = fromHandle.type === 'source' ? [fromNode, fromHandle, toNode, toHandle] : [toNode, toHandle, fromNode, fromHandle];
   return { source: out.id, target: inn.id, sourceHandle: outH.id ?? null, targetHandle: inH.id ?? null };

@@ -52,3 +52,4 @@
 .node-canvas.is-omni .react-flow__node .port.port-link-ref::before { --pf: var(--surface); border: 3px solid var(--type-text); border-radius: 50%; }
 .node-canvas.is-omni .react-flow__node .port.port-link-control::before { --pf: var(--type-audio); border: 0; border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .node-canvas.is-omni .react-flow__node .port.port-link-data::before { border-radius: 50%; }
+.node-canvas.is-omni .react-flow__node .port.port-quiet::before { pointer-events: none; }
