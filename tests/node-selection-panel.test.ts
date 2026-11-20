@@ -5,6 +5,7 @@ import { OP_GROUPS, OP_GROUP_ORDER, opGroup } from '../src/components/assets/opG
 
 const panel = readFileSync('src/components/node/SelectionPanel.tsx', 'utf8');
 const ws = readFileSync('src/components/node/NodeWorkspace.tsx', 'utf8');
+const elements = readFileSync('src/components/node/CanvasElements.ts', 'utf8');
 const nodes = readFileSync('src/components/node/nodes.tsx', 'utf8');
 
 it('every op with one input has its own section, in Explore · Edit · Reuse · Finalize order', () => {
@@ -20,7 +21,8 @@ it('the full canvas shows the Selection panel at the top right for exactly one s
   expect(panel).toMatch(/<Panel position="top-right" className="selection-panel/);
   expect(ws).toMatch(/\{embedded \? null : <CanvasPanels sessionId=\{sessionId\}/);
   expect(panel).toMatch(/open && nodes\.length === 1 \? <SelectionPanel/);
-  expect(ws).toMatch(/data: \{ node: n, solo, panel: !embedded \}/);
+  expect(ws).toMatch(/useCanvasElements\(\{[^}]*\bembedded\b[^}]*\}\)/);
+  expect(elements).toMatch(/data: \{ node: n, solo, panel: !embedded[, }]/);
 });
 
 it('the panel keeps every tool the node bar had: all single-input ops for the result, Panorama, Sketch, Attach to prompt, Download', () => {

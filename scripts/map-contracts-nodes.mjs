@@ -38,6 +38,8 @@ export default [{
     ['src/engine/nodes/spec.ts', 'export const SYSTEM_NODE_TYPES'],
     ['src/engine/nodes/system.ts', 'export function ensureSystemNodes'],
     ['src/engine/nodes/commands.ts', 'nodes.system.link'],
+    ['src/engine/nodes/system.ts', 'resolveSystemConnection(nodePorts(src.data, st.assets)'],
+    ['src/engine/flow/graph.ts', 'export function nodePorts'],
     ['src/engine/flow/graph.ts', 'export function executionOrder'],
     ['src/components/node/SystemNode.tsx', 'export function linkClassProps'],
     ['src/styles/node-system.css', '.edge-link-control'],

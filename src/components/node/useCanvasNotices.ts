@@ -60,8 +60,20 @@ function noticeEnvironment(graph: Graph, sessionId: string) {
   let revision: unknown[] | undefined;
   let env: ResolveEnv;
   return (s: AppState): ResolveEnv => {
-    if (previous && s.assets === previous.assets && s.generations === previous.generations &&
-        (!refs.length || (s.sessions === previous.sessions && s.composer.text === previous.composer.text))) return env;
+    const before = previous;
+    previous = s;
+    if (before && s.assets === before.assets && s.generations === before.generations &&
+        ((s.sessions === before.sessions && s.composer.text === before.composer.text) || refs.every(({ data: d }) => {
+          if (d.kind !== 'ref') return true;
+          if (d.type === 'prompt') return s.composer.text === before.composer.text;
+          const session = s.sessions[d.ref];
+          const old = before.sessions[d.ref];
+          if (session?.feed !== old?.feed) return false;
+          const nodes = session?.graph.nodes;
+          const oldNodes = old?.graph.nodes;
+          return d.ref === sessionId || nodes === oldNodes ||
+            (nodes && firstOwner(nodes, d.type)) === (oldNodes && firstOwner(oldNodes, d.type));
+        }))) return env;
 
     const keys: unknown[] = [];
     const assets: Record<string, Asset> = {};
@@ -91,7 +103,6 @@ function noticeEnvironment(graph: Graph, sessionId: string) {
       texts.set(node.id, read.value);
       keys.push(read.value);
     }
-    previous = s;
     if (!revision || !shallow(revision, keys)) {
       revision = keys;
       env = { assets, generations, chatText: node => {

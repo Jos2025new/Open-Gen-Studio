@@ -210,7 +210,7 @@ export function applyEdit(req: EditRequest): EditResult {
       }
       next = { ...graph, nodes: graph.nodes.map((n) => n.id === op.node ? { ...n, data: { ...n.data, ...op.patch } as GraphNodeData } : n) };
       // Changing a port's type can reactivate a cable kept on the graph.
-      if ('subjects' in op.patch || 'textOutput' in op.patch || 'op' in op.patch) {
+      if ('subjects' in op.patch || 'textOutput' in op.patch || 'op' in op.patch || 'type' in op.patch || 'ref' in op.patch) {
         const loop = findCycle(next, st.assets);
         if (loop) return refuse(req, `That would create a loop (${loop.join(' → ')}).`);
       }

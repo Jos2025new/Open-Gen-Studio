@@ -24,7 +24,7 @@ import { TopbarActions } from '../shell/TopBar';
 import { Popover } from '../ui/Popover';
 import { StudioNode, type FlowNode } from './nodes';
 import { AddNodeItems } from './AddNodeItems';
-import { AddNodeMenu, RunAll } from './NodeCanvasParts';
+import { AddNodeMenu, CanvasChatImport, RunAll } from './NodeCanvasParts';
 import { omniWidth } from '../omni/RefNode';
 import { useOmniFraming } from '../omni/useOmniFraming';
 import { revealRect } from '../omni/revealNode';
@@ -38,14 +38,12 @@ import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
 import { LinkBar, useDeleteRequest } from './LinkBar';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
-import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
-import { ImportFromChat } from '../ui/ImportFromChat';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
-import { chatItem, loadNodeTool } from './nodeToolStorage';
+import { loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
-import { canvasGroups, closedGroupNotices, useCanvasElements } from './CanvasElements';
+import { closedGroupNotices, useCanvasElements, useCanvasGroups } from './CanvasElements';
 import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
 import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 
@@ -61,14 +59,6 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const { graph, revision, fullRevision, ordinaryRevision } = useCanvasGraphs(fullGraph, omni);
   // Opening the omnicanvas brings the session's parts in as nodes (idempotent; no undo step).
   useEffect(() => { if (omni) ensureOmniNodes(sessionId); }, [omni, sessionId]);
-  const assets = useStore((s) => s.assets);
-  const generations = useStore((s) => embedded || omni ? undefined : s.generations);
-  const feed = useStore((s) => embedded || omni ? undefined : s.sessions[s.activeSessionId].feed);
-  // Chat results not on this canvas yet: one click (or "continue here" to the agent) brings them as connected nodes.
-  const fromChat = useMemo(
-    () => embedded || omni ? [] : chatWorkNotInNodes(sessionId).map(chatItem),
-    [sessionId, revision, generations, feed, embedded, omni],
-  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
   const del = useDeleteRequest(sessionId, (removedNodes, removedEdges) => {
@@ -158,10 +148,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     setSelectedEdges(new Set());
   }, []);
   const groupNotices = useMemo(() => closedGroupNotices(revision.groups, closed, notices), [revision.groups, closed, notices]);
-  const { frames, hidden } = useMemo(
-    () => canvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup),
-    [graph, measured, sessionId, closed, groupNotices, toggleGroup],
-  );
+  const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup);
   const jumpToNode = useCallback((id: string) => {
     const groups = revision.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
     if (groups.some(g => closed.has(g.id))) {
@@ -172,7 +159,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   }, [revision.groups, closed, selectNodes, sessionId]);
 
   const { nodes, edges } = useCanvasElements({
-    graph, revision, assets, selected, selectedEdges, measured, frames, hidden,
+    graph, revision, selected, selectedEdges, measured, frames, hidden,
     byPort, byCable, spaceProblems, sessionId, omni, embedded,
   });
 
@@ -202,7 +189,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       // A dragged frame moves its nodes — unless they are selected too, then they already moved with it.
       for (const [g, p] of frameMoves) {
         if (g.nodeIds.some((id) => moves.has(id))) continue;
-        const b = groupBounds(useStore.getState().sessions[sessionId].graph, g, measuredRef.current);
+        const ids = new Set(g.nodeIds);
+        const members = useStore.getState().sessions[sessionId].graph.nodes.filter(n => ids.has(n.id));
+        const b = groupBounds(members, measuredRef.current);
         if (b) moveGroup(sessionId, g.id, p.x - b.x, p.y - b.y);
       }
       if (removed.length) deleteNodes(sessionId, removed);
@@ -365,10 +354,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
 
   const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 
-  const liveSelected = useMemo(() => {
-    const ids = new Set(graph.nodes.map((n) => n.id));
-    return [...selected].filter((id) => ids.has(id));
-  }, [graph.nodes, selected]);
+  const selectedNodes = useMemo(() => selected.size ? revision.nodes.filter(n => selected.has(n.id)) : [], [revision.nodes, selected]);
+  const liveSelected = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
   const liveSelectedEdgeSet = useMemo(() => {
     const ids = new Set(graph.edges.map((e) => e.id));
     return new Set([...selectedEdges].filter((id) => ids.has(id)));
@@ -384,8 +371,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     setMenu({ x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0), nodeId });
   };
   useEffect(() => { setMenu(null); }, [sessionId]);
-  const menuSource = menu?.from ? graph.nodes.find((n) => n.id === menu.from) : undefined;
-  const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuSource && outputPort(menuSource.data, assets)));
+  const menuSource = menu?.from ? revision.nodes.find((n) => n.id === menu.from) : undefined;
+  const menuOutput = useStore(s => menuSource ? outputPort(menuSource.data, s.assets) : null);
+  const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuOutput));
   const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
 
   return (
@@ -460,8 +448,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {box ? <BoxSelectRect box={box} /> : null}
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
-        {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={graph.nodes.filter((n) => selected.has(n.id))} />}
-        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={selectNodes} />
+        {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={selectedNodes} />}
+        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} />
         <CanvasNavigation
           sessionId={sessionId}
           add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
@@ -490,7 +478,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
           <>
           <AddNodeItems
             searchable={Boolean(menu.from)}
-            accepts={menuSource ? outputPort(menuSource.data, assets) : undefined}
+            accepts={menuOutput ?? undefined}
             onImport={menu.from ? undefined : () => {
               const r = canvasRef.current?.getBoundingClientRect();
               importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
@@ -515,16 +503,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         </div>
       </Popover>
       {menuOpen && menu?.from ? <ConnectionPreview from={menu.from} menu={connectionMenu} /> : null}
-      {embedded || omni ? null : <ImportFromChat
-        sessionId={sessionId}
-        canvas="node"
-        items={fromChat}
-        noun="result"
-        onImport={(ids) => {
-          chatToNodes(sessionId, ids);
-          window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
-        }}
-      />}
+      {embedded || omni ? null : <CanvasChatImport sessionId={sessionId} content={fullRevision.nodes} />}
       {!graph.nodes.length && omni ? null : !graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
         <NodeEmptyState onAdd={(kind) => addAtCenter(newNodeData(kind))} />
       ) : null}

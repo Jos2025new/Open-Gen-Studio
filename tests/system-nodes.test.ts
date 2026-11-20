@@ -17,6 +17,7 @@ import { graphHistory, travelGraph } from '../src/engine/flow/history';
 import { connectionError, executionOrder } from '../src/engine/flow/graph';
 import { ensureSystemNodes } from '../src/engine/nodes/system';
 import { deleteNodes } from '../src/engine/flow/actions';
+import { consumersOf } from '../src/engine/nodecore/deps';
 import { flowEdges } from '../src/components/node/LinkBar';
 import { createSession, setGraph, useStore } from '../src/store/store';
 import type { Graph, GraphNode } from '../src/engine/types';
@@ -78,6 +79,34 @@ describe('the session\'s parts as nodes', () => {
 describe('links with a class', () => {
   beforeEach(() => { ensureSystemNodes(sid); });
   const link = (args: Record<string, unknown>) => run({ cmd: 'nodes.system.link', args, on: on() }, { caller: 'agent' });
+
+  it('infers a compatible creative input and rejects the reverse data link', async () => {
+    const image = (id: string): GraphNode => ({
+      id, position: { x: 0, y: 0 },
+      data: { kind: 'image', title: id, prompt: '', modelRef: 'local::image', settings: { count: 1, advanced: {} }, outputIndex: 0 },
+    });
+    setGraph(sid, g => ({ ...g, nodes: [...g.nodes, image('first'), image('second')] }));
+    expect((await link({ source: 'first', target: 'second', kind: 'data' })).ok).toBe(true);
+    expect(graph().edges.find(e => e.source === 'first')).toMatchObject({ sourceHandle: 'out', targetHandle: 'ref' });
+    expect(consumersOf(graph(), ['first'])).toContain('second');
+    const order = await run({ cmd: 'nodes.system.execution_order', args: { targets: ['second'] }, on: on() }, { caller: 'agent' });
+    expect(order).toMatchObject({ ok: true, results: [{ order: ['first', 'second'] }] });
+    const before = graph();
+    expect(await link({ source: 'second', target: 'first', kind: 'data' })).toMatchObject({
+      ok: false, error: { message: expect.stringContaining('loop') },
+    });
+    expect(graph()).toBe(before);
+  });
+
+  it('refuses invented handles and incompatible real inputs without adding a cable', async () => {
+    const node: GraphNode = { id: 'image', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Image', prompt: '', modelRef: '', settings: { count: 1, advanced: {} }, outputIndex: 0 } };
+    setGraph(sid, g => ({ ...g, nodes: [...g.nodes, node] }));
+    const before = graph();
+    for (const target_handle of ['in', 'ref']) {
+      expect(await link({ source: 'sys_chat', target: 'image', kind: 'data', target_handle })).toMatchObject({ ok: false });
+      expect(graph()).toBe(before);
+    }
+  });
 
   it('links with each class, one undo step each, and unlinks with one', async () => {
     const before = graph().edges.length;

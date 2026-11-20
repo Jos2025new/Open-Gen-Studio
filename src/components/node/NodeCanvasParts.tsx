@@ -1,15 +1,49 @@
-import { useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
+import { useReactFlow } from '@xyflow/react';
+import { useShallow } from 'zustand/react/shallow';
 import { Play, Plus } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
 import { usePreviewDeps } from './usePreviewDeps';
 import { prepareNodeRun, previewRun } from '../../engine/flow/actions';
 import { runApproved } from '../../engine/nodecore/action';
 import { uid } from '../../lib/id';
-import type { GraphNodeData } from '../../engine/types';
+import type { Generation, Graph, GraphNodeData } from '../../engine/types';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { NodeLibrary, type OmniEntries } from './AddNodeItems';
+import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
+import { ImportFromChat } from '../ui/ImportFromChat';
+import { chatItem } from './nodeToolStorage';
+
+/** Running jobs only enter the import menu when they finish. */
+export const CanvasChatImport = memo(function CanvasChatImport({ sessionId, content }: { sessionId: string; content: Graph['nodes'] }) {
+  const rf = useReactFlow();
+  const feed = useStore(s => s.sessions[sessionId].feed);
+  const selectFinished = useMemo(() => {
+    let inventory: Record<string, Generation> | undefined;
+    let finished: Generation[] = [];
+    return ({ generations }: { generations: Record<string, Generation> }) => {
+      if (inventory !== generations) {
+        inventory = generations;
+        finished = Object.values(generations).filter(g => g.sessionId === sessionId && g.status === 'done');
+      }
+      return finished;
+    };
+  }, [sessionId]);
+  const finished = useStore(useShallow(selectFinished));
+  const items = useMemo(() => chatWorkNotInNodes(sessionId).map(chatItem), [sessionId, content, feed, finished]);
+  return <ImportFromChat
+    sessionId={sessionId}
+    canvas="node"
+    items={items}
+    noun="result"
+    onImport={ids => {
+      chatToNodes(sessionId, ids);
+      window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
+    }}
+  />;
+});
 
 /** Add node: the first tool of the canvas toolbox; its list opens to the right. */
 export function AddNodeMenu({ onAdd, onImport, omni }: { onAdd: (data: GraphNodeData) => void; onImport: () => void; omni?: OmniEntries }) {

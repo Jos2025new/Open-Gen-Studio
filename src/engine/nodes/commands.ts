@@ -131,7 +131,7 @@ export const commands = [
   nodeCommand({
     id: 'nodes.system.link',
     title: 'Link nodes with class',
-    description: 'Links two nodes with a typed link class (data, ref, control) and optional bidirectional flag (both, allowed only on ref and control). One undo step.',
+    description: 'Links two nodes through compatible ports of the given class (data, ref, control). Omitted handles are inferred from those ports. The optional both flag is allowed on ref and control. One undo step.',
     args: z
       .object({
         source: nodeRef,

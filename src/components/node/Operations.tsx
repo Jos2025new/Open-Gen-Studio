@@ -132,7 +132,7 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
         )}
         <ProblemBadge count={problems} hasErrors={hasErrors} />
         {'detachedOutputs' in group ? <button type="button" className="nt-btn nodrag" onClick={() => ungroup(sessionId, group.id)}>Reattach outputs</button> : null}
-        <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={!collapsed && group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
+        <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
         {palette ? (
           <span className="group-palette nodrag">
             {COLORS.map((c) => (
