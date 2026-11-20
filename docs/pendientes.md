@@ -26,14 +26,15 @@ Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rend
    - Ideas sin prioridad (misma revisión): encapsular grafos como operador (= paso 14), dependencias por propiedad, traza o inspección de datos por nodo.
 9. **Pasos 10 y 11** (dos agentes en un chat; ejecutar y parar por nodo): los hace el usuario. [plan](propuesta-todo-es-un-nodo-plan.md)
 10. **Migrar datos reales a SQLite**: necesita aprobación expresa. [detalle](pendientes-sistema.md)
-11. ~~**Tests intermitentes `writer-lock-panel` y `path-boolean`.**~~ **Hecho 2026-11-19**: el panel leía el DOM fuera de `act` (el aviso de React salía en la pasada) y `path-boolean` exigía menos de 40 ms de reloj (solo, ~22 ms). [detalle](pendientes-sistema.md) El resto de C8 sigue abierto.
+11. **Tests intermitentes en la suite completa**: `writer-lock-panel` y `path-boolean` (*nuevo* para este último: reabierto, figuraba cerrado en D36) fallan a veces juntos y pasan solos. 2026-11-19: ajuste de `path-boolean` en la rama `task/grok-menor`; `writer-lock-panel` sigue abierto (zona protegida). [detalle](pendientes-sistema.md)
 12. ~~**Tabla del plan con filas 8–10 duplicadas; añadir la biblioteca como paso 16.**~~ **Hecho 2026-11-17**: quedan las filas 8, 9 (motor hecho) y 10 (mensajes hechos) una sola vez; paso 16 «La biblioteca como nodo» añadido. [plan](propuesta-todo-es-un-nodo-plan.md)
 13. **Pasos 14 y 15** (JSON, CLI, MCP): pueden esperar.
 
 ## Lo más crítico ahora
 
 1. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
-2. **Probar en el sandbox lo hecho el 2026-10-23** (sin prueba visual ni LLM real): ajuste «Price margin», Nodes frenado por límite, puertos por resultado en Nodes, Designer D19–D28, «como antes · Cambiar» en la tarjeta del plan y A1 con un LLM real. Lista en [050](history/050-2026-10-W43.md#pendiente).
+2. **A2 · Etiqueta de proveedor falsa** (2026-10-21): el faro pasó de Atlas a NanoGPT, se guardó como Atlas y el agente no avisó. Alerta que dice algo falso. [detalle](pendientes-agente.md)
+3. **Probar en el sandbox lo hecho el 2026-10-23** (sin prueba visual ni LLM real): ajuste «Price margin», Nodes frenado por límite, puertos por resultado en Nodes, Designer D19–D28, «como antes · Cambiar» en la tarjeta del plan y A1 con un LLM real. Lista en [050](history/050-2026-10-W43.md#pendiente).
    Del mismo día, auditoría del Designer ([051](history/051-2026-10-W43.md#pendiente)):
    - Keep Opacity en capa de borde suave, normal y Multiply: los bordes no se aclaran.
    - Preset con textura muestra la textura.
@@ -45,9 +46,10 @@ Orden acordado con el usuario por lo que más nota en diseño, usabilidad y rend
    - D30: icono de aviso en Layers con tooltip, al pulsar reintenta; pintar en ella avisa y no guarda nada.
    - Opcional: borrar el «Design 1» de prueba del sandbox.
 4. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
-5. **A6 · El agente se saltó las tomas en imagen que pediste** (2026-10-21): entregable equivocado. [detalle](pendientes-agente.md)
-6. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
-7. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
+5. **A5 · DeepSeek V4.1 Flash repite un plan roto sin `prompt`** (2026-10-21): la app debería cortar y decirlo, sin cambiar de modelo sola. [detalle](pendientes-agente.md)
+6. **A6 · El agente se saltó las tomas en imagen que pediste** (2026-10-21): entregable equivocado. [detalle](pendientes-agente.md)
+7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
+8. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
 
 Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
 
@@ -67,8 +69,10 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | ID | Asunto | Prio | Origen |
 | --- | --- | --- | --- |
 | A1 | `confirm_settings` repetida: hecho en código, falta probar con LLM real | medio | 2026-10-22 |
+| A2 | Etiqueta de proveedor falsa tras Atlas → NanoGPT | crítico | 2026-10-21 |
 | A3 | Keep/Change no nombra los dos proveedores (falla del informe) | crítico | 2026-10-21 |
 | A4 | Repetir la prueba visual del sandbox (1 falla, 4 dudosas, 9 sin ver) | crítico | 2026-10-21 |
+| A5 | DeepSeek en bucle sin `prompt`: la app debe cortar y decirlo | crítico | 2026-10-21 |
 | A6 | Tomas en imagen saltadas antes del vídeo | crítico | 2026-10-21 |
 | A7 | «1 problem to fix» / «could not produce a valid plan» tras Continue | alto | 2026-10-21 |
 | A8 | Decisión: tarjeta extra al nombrar un modelo | medio | 2026-10-21 |

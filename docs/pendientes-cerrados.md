@@ -4,13 +4,6 @@ Lo que salió de las listas abiertas ([índice](pendientes.md)). Una línea por 
 
 Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se movieron tal cual estaban marcados `[x]`.
 
-## Cerrado el 2026-11-19 (rama `task/grok-menor`)
-
-- **`writer-lock-panel` y `path-boolean` intermitentes juntos.** El panel de la pestaña que entrega el candado se actualiza por `useSyncExternalStore`; el test leía el texto fuera de `act`, y con la suite cargada ese commit llega después de la aserción (el aviso de React salió al correr los dos archivos). `path-boolean` medía el reloj: solo, `eraseArea` tarda ~22 ms y el tope era 40. Ahora el panel espera dentro de `act` y el coste se compara con un borrado pequeño en la misma pasada. Evidencia: `tests/writer-lock-panel.test.ts`, `tests/path-boolean.test.ts`. La lista más vieja de C8 (otros archivos) sigue abierta; el fallo original de la suite completa no quedó guardado.
-
-- **A5 · DeepSeek repite un plan sin `prompt`.** El mismo `propose_plan` inválido, la segunda vez, corta el turno y lo dice; el modelo del agente no cambia (`src/engine/agent/llmTurn.ts`). Evidencia: `tests/broken-plan-repeat.test.ts` (commit `007b8af7`). Prueba visual: no hecha.
-- **A2 · Etiqueta de proveedor tras caer de Atlas a NanoGPT.** La generación guarda el proveedor del `modelRef` nuevo y una nota en el resultado; las etiquetas leen ese `modelRef`, no un campo `provider` viejo (`src/engine/credit.ts`, `shownProvider`). La regla C (mismo modelo, mismo precio o menos) no cambia. Evidencia: `tests/credit.test.ts` (commit `075b08d0`). Prueba visual: no hecha.
-
 ## Cerrado el 2026-11-01 (rama `task/gui-compact`)
 
 - **Tecla en el tooltip de la caja, franja con selección y Properties al elegir** (commit `ce97e87c`): los tooltips de variantes leen la tecla de `DESIGN_TOOL_KEYS` («Brush  B»); con Edit y selección real la tira aparece sin tarjeta; con Edit, una selección real nueva (objetos o varias capas) abre Properties y Layers se queda; cortar o borrar sin efecto no deja paso de deshacer (`6e054662`). Evidencia: código `ToolDock.tsx`, `usePropsOnPick.ts`; tests `tests/tool-dock-strip-and-keys.test.ts`, `tests/designer-props-on-pick.test.ts`. Prueba visual: no hecha. Detalle en [toolbox-dock](designer-controles/toolbox-dock.md) y [capas](designer-controles/capas.md).
