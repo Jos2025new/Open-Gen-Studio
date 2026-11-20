@@ -17,7 +17,6 @@ import { useObjectSelection } from '../../engine/design/objectSelection';
 import { useLayerSelection, layerSelection } from '../../engine/design/selection';
 import { useStore } from '../../store/store';
 import { boardKey } from './boardKey';
-import { ShapeBuilder } from './ShapeBuilder';
 
 /*
  * Shape edit mode (docs/plan-edicion-formas.md): after a double-click or «Edit shape», the edited shape shows its own
@@ -30,12 +29,7 @@ type Knot = 'rx' | 'ry' | 'top' | 'right';
 const NUDGE = 10; // screen px: a zero radius knot sits beside the corner, so Rx and Ry never share one spot
 const BLUR_GAP = 20; // screen px from the edge, so the blur knots stay apart from the corner knots
 
-/** The Edit tool's knots, or the Shape Builder's regions while that tool is active (mounted here so the Stage stays as it is). */
-export function ShapeKnots(props: { view: View; sessionId: string; doc: DesignDoc }) {
-  return useStore((st) => st.ui.tool) === 'shapeBuilder' ? <ShapeBuilder {...props} /> : <EditKnots {...props} />;
-}
-
-function EditKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
+export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
   const picked = usePickedShape(doc);
   const edit = useShapeEdit((st) => st.byDoc[doc.id]);
   const objectPick = useObjectSelection((st) => st.byDoc[doc.id]);

@@ -176,7 +176,10 @@ describe('app CSS and canvas drawing follow the theme', () => {
     for (const m of read('accents.css').matchAll(/--accent:\s*([^;]+);/g)) expect(m[1].trim()).toMatch(/^#[0-9a-f]{6}$/i);
   });
   it('Designer selection and handles read --accent; only the new-shape stroke default keeps the lime', () => {
-    const src = readFileSync('src/components/designer/Stage.tsx', 'utf8');
+    const stage = (file: string) => readFileSync(`src/components/designer/${file}`, 'utf8');
+    const shapePreview = stage('tools/shape.tsx').split('export function drawShapePreview')[1];
+    expect(shapePreview).toBeDefined();
+    const src = [stage('stageTheme.ts'), stage('stageCanvas.ts'), shapePreview].join('\n');
     expect(src).toMatch(/const accentA = .*tok\('--accent'/);
     expect(src.match(/'#d4f25a'|212,\s*242,\s*90/g) ?? []).toEqual(["'#d4f25a'", '212,242,90']);
   });

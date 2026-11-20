@@ -1,153 +1,16 @@
-import { ShapeLookFields } from './ShapeLookFields';
-import { record } from '../../engine/design/history';
-import type { ReactNode } from 'react';
-import { AlignCenterVertical, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, RefreshCw, RotateCcw, RotateCw } from '../ui/icons';
-import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
-import { layerSelection, useLayerSelection } from '../../engine/design/selection';
-import { MenuItem, Segmented } from '../ui/primitives';
-import { useObjectSelection } from '../../engine/design/objectSelection';
-import { layerObjects } from '../../engine/design/objectOps';
-import { alignPicks, distributePicks, pickGroups, turnPicks } from '../../engine/design/multiObjectOps';
-import { setUi, useStore } from '../../store/store';
-import { FONT_NAMES } from '../../engine/design/doc';
-import { Popover, usePopover } from '../ui/Popover';
-import { StrokeStyleFields } from './StrokeStyleFields';
-import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
-import { getDoc, mutateDoc } from '../../engine/design/actions';
-import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion, type SelectCombine } from '../../engine/design/pixelSelection';
-import { ColorPair } from './ColorPair';
-import { FillSettings } from './FillSettings';
-import { SamplerSettings } from './SamplerSettings';
-import { SelectionActions } from './SelectionActions';
-import { GRADIENT_DEFAULT } from '../../engine/design/gradient';
-import { toast } from '../../store/store';
-import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
-import { BrushSettings } from './BrushSettings';
-import { PaintModeToggle } from './PaintModeToggle';
-import { RulerSettings } from './StrokeRulerOverlay';
-import { SnapControl } from './SnapControl';
-import { AlignControls } from './AlignControls';
-import { CornerToolFields, EllipseToolFields, LineToolFields } from './ShapeKindFields';
+import { useStore } from '../../store/store';
+import { getSelection, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { getDesignerTool } from './tools/registry';
+import type { ToolSettingsProps } from './tools/types';
 
-export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  const pop = usePopover();
-  return <>
-    <button type="button" ref={pop.ref} className="tool-setting" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>{label}<ChevronDown size={12} /></button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={230} label={typeof label === 'string' ? label : 'Tool setting'}>
-      <div className="tool-setting-content"><div className="field"><span className="field-label">{label}</span>{children}{hint && <span className="field-hint">{hint}</span>}</div></div>
-    </Popover>
-  </>;
-}
-
-// Icons by their drawing, not by lucide's old alias names: in this lucide version "FlipHorizontal2" is the triangles
-// split by a horizontal line (a top↔bottom mirror), so the names alone pointed at the wrong icon.
-const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof TrianglesCenterlineDashedVertical }> = [
-  { id: 'flip-h', label: 'Mirror left ↔ right', icon: TrianglesCenterlineDashedVertical },
-  { id: 'flip-v', label: 'Mirror top ↕ bottom', icon: TrianglesCenterlineDashedHorizontal },
-  { id: 'rotate-cw', label: 'Rotate 90° right', icon: RotateCw },
-  { id: 'rotate-ccw', label: 'Rotate 90° left', icon: RotateCcw },
-  { id: 'rotate-180', label: 'Rotate 180°', icon: RefreshCw },
-];
-
-
-/** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
-/** Edit acts on the objects inside a layer (default) or on whole layers. Also in the layer's Properties. */
-/**
- * Object and Layer are always shown. A raster layer without editable strokes is one whole object.
- */
-export function EditModeToggle({ objects = true }: { objects?: boolean }) {
-  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
-  return <EditModeOptions mode={mode} objects={objects} />;
-}
-
-/** The view of the Edit mode choice, with the mode passed in (the store is read by EditModeToggle). */
-export function EditModeOptions({ mode, objects = true }: { mode: 'objects' | 'layers'; objects?: boolean }) {
-  return <span className="opt edit-mode"><span className="opt-label">Edit</span><Segmented size="sm" value={mode} onChange={(v) => setUi({ selectMode: v })} options={[
-    { value: 'objects' as const, label: 'Object', disabled: !objects, tip: objects ? 'Move, align and transform picked objects; images, text and flattened paint count as whole objects' : 'No objects are available. Choose Layer to work with the whole layer.' },
-    { value: 'layers' as const, label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
-  ]} /></span>;
-}
-
-/** Click acts on the topmost layer under the pointer (Auto-select, as Photoshop); off: the selected layer only. */
-export function AutoSelectToggle() {
-  const on = useStore((st) => st.ui.autoSelect ?? false);
-  return <InlineToggle label="Auto-select" checked={on} tip="Click acts on the topmost layer under the pointer. Off: only the selected layer, and a click elsewhere keeps the selection" onChange={(v) => setUi({ autoSelect: v })} />;
-}
-
-/** Edit tool: align, distribute (3+), fit/fill one image, or transform picked objects/layers. */
-export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false, panelOnly = false, alignPanel }: {
-  sessionId: string; doc: DesignDoc; alignOnly?: boolean; turnOnly?: boolean; panelOnly?: boolean;
-  alignPanel?: { relativeTo: RelativeTo | null; setRelativeTo: (value: RelativeTo) => void; alignAsGroup: boolean; setAlignAsGroup: (value: boolean) => void };
-}) {
-  const turn = usePopover();
-  const activeTool = useStore((st) => st.ui.tool);
-  useLayerSelection((st) => st.byDoc[doc.id]);
-  const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
-  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
-  const layerIds = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
-  // A cross-layer group picked on the canvas in Objects mode remains the effective target set.
-  const layerGroup = mode === 'layers' || (!objPickNow?.length && layerIds.length > 1);
-  const active = doc.layers.find((l) => l.id === doc.activeLayerId);
-  // Objects mode: the objects picked inside the active layer. A layer with no parts (an image, a text) is its own
-  // object, so it acts on that layer; a layer with parts and none picked acts on nothing (it says so).
-  // The pick may span layers: each object is edited in its own layer, in one undo step.
-  const objGroups = pickGroups(doc, objPickNow ?? []);
-  const objIds = objGroups.flatMap((g) => g.ids);
-  const objLayer = objGroups[0]?.layer;
-  const onObjects = mode === 'objects' && objIds.length > 0;
-  const noParts = !layerGroup && !onObjects && active && !layerObjects(active).length && active.type !== 'vector';
-  const ids = layerGroup ? layerIds : noParts ? [active!.id] : [];
-  const layers = ids.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
-  // Nothing to act on: the buttons stay (disabled, with the reason) so the bar never changes width or shifts.
-  const emptyPick = !onObjects && !layers.length;
-  const count = onObjects ? objIds.length : layers.length;
-  const many = count > 1;
-  const relativeTo = alignPanel?.relativeTo ?? (many ? 'selection' : 'page');
-  const alignAsGroup = alignPanel?.alignAsGroup ?? false;
-  const groupReason = count < 2 ? 'Select at least two objects or layers to move them as a group.'
-    : relativeTo === 'selection' ? 'Choose Page or an anchor; aligning a group to its own selection would not move it.' : undefined;
-  const alignReason = alignAsGroup && relativeTo === 'selection' ? groupReason : undefined;
-  const anchorEdgeNeedsPair = count < 2 && ['first', 'last', 'biggest', 'smallest'].includes(relativeTo);
-  const one = layers[0];
-  const locked = onObjects ? objGroups.some((g) => g.layer.locked) : layers.some((l) => l.locked);
-  const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
-  // What the menus act on, said at the top of each menu (not on the buttons).
-  const target = `On ${count} ${noun}${onObjects ? (objGroups.length > 1 ? ` in ${objGroups.length} layers` : ` of ${objLayer!.name}`) : ''}`;
-  const why = !emptyPick ? undefined : !layerGroup ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
-  const doAlign = (to: AlignTo) => (onObjects ? alignPicks(sessionId, doc.id, doc, objPickNow!, to, relativeTo, alignAsGroup) : alignLayers(sessionId, doc.id, ids, to, relativeTo, alignAsGroup));
-  const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePicks(sessionId, doc.id, doc, objPickNow!, axis) : distributeLayers(sessionId, doc.id, ids, axis));
-  const doTurn = (t: Turn) => (onObjects ? turnPicks(sessionId, doc.id, doc, objPickNow!, t) : turnLayers(sessionId, doc.id, ids, t));
-  if (panelOnly) {
-    if (!alignPanel) return null;
-    return <AlignControls target={target} count={count} relativeTo={relativeTo} setRelativeTo={alignPanel.setRelativeTo} alignAsGroup={alignAsGroup}
-      setAlignAsGroup={alignPanel.setAlignAsGroup} groupReason={groupReason} alignReason={alignReason} disabledReason={why ?? (locked ? 'Unlock selected layers before aligning or distributing them.' : undefined)} anchorEdgeNeedsPair={anchorEdgeNeedsPair}
-      onAlign={doAlign} onDistribute={doDistribute}
-      onFit={!onObjects && !many && one?.type === 'raster' ? () => fitLayer(sessionId, doc.id, one.id, 'contain') : undefined}
-      onFill={!onObjects && !many && one?.type === 'raster' ? () => fitLayer(sessionId, doc.id, one.id, 'cover') : undefined} />;
-  }
-  const openAlign = () => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: 'tool' }));
-  const alignUnavailable = alignOnly && activeTool !== 'move';
-  return <>
-    {!turnOnly && <button type="button" className="tool-setting" aria-controls="designer-align-panel" onClick={openAlign} disabled={locked || emptyPick || alignUnavailable} data-tip={alignUnavailable ? 'Switch to Edit to align the selection.' : why ?? 'Align settings in the Tool panel'} aria-label="Align"><AlignCenterVertical size={14} /></button>}
-    {!alignOnly && <>
-    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
-    <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
-      <div className="menu">
-        <div className="menu-target">{target}</div>
-        {TURN_ITEMS.map((t) => { const no = onObjects ? null : layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(no)} tip={no ?? undefined} onClick={() => doTurn(t.id)} />; })}
-      </div>
-    </Popover>
-    </>}
-  </>;
-}
+export { AutoSelectToggle, ContextField, EditModeOptions, EditModeToggle, EditOps, TextStyleFields, SELECT_MODES, WAND_DEFAULT } from './ToolSettingsFields';
 
 /** With another tool active, a pixel selection still shows in the bar (it still clips Delete, copy and the gradient). */
 export function SelectionChip({ docId }: { docId: string }) {
   useSelectionVersion();
-  useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
   const sel = getSelection(docId);
-  if (!sel || tool === 'select') return null;
+  if (!sel || getDesignerTool(tool).hideSelectionChip) return null;
   return <span className="opt selection-chip" data-tip="Delete, copy, cut and the gradient act inside it">
     <span className="opt-label">{sel.inverted ? 'Selection · inverted' : 'Selection'}</span>
     <button type="button" className="sb-link" onClick={() => setSelection(docId, null)}>Deselect</button>
@@ -155,121 +18,13 @@ export function SelectionChip({ docId }: { docId: string }) {
 }
 
 /** How a new selection combines with the one there; the same four in the card and in the quick row. */
-export const SELECT_MODES = [{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }, { value: 'intersect' as const, label: 'Intersect' }];
-export const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as SelectCombine, sample: 'all' as 'layer' | 'all' };
 
-/** Pixel selection: its shape, and what to do with what is selected. */
-function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc: DesignDoc; compact?: boolean }) {
-  useSelectionVersion();
-  const shape = useStore((s) => s.ui.selectShape ?? 'rect');
-  const wand = useStore((s) => s.ui.wand) ?? WAND_DEFAULT;
-  const setWand = (patch: Partial<typeof WAND_DEFAULT>) => setUi({ wand: { ...wand, ...patch } });
-  const sel = getSelection(doc.id);
-  const workspace = useStore((s) => s.ui.workspace);
-  const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
-  const cur = () => getDoc(sessionId, doc.id)!;
-  const wandOn = shape === 'wand';
-  const shapeField = <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'ellipse' as const, label: 'Ellipse' }, { value: 'lasso' as const, label: 'Lasso' }, { value: 'polygon' as const, label: 'Polygon' }, { value: 'wand' as const, label: 'Magic wand' }]} onChange={(v) => setUi({ selectShape: v })} />;
-  if (compact) return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
-    {shapeField}
-    {/* What finishes a selection stays at hand, also in the quick strip. */}
-    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
-    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
-  </div>;
-  return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
-    <div className="brush-row select-row">{shapeField}<InlineSelect label="Mode" value={wand.mode} options={SELECT_MODES} onChange={(v) => setWand({ mode: v })} /></div>
-    {wandOn ? <>
-      <div className="brush-row select-row">
-        <InlineSlider label="Tolerance" tip="How different a color can be and still be picked: low = only that color, high = a wider range" min={0} max={255} value={wand.threshold} onChange={(v) => setWand({ threshold: v })} />
-        <InlineSelect label="Sample" value={wand.sample} options={[{ value: 'layer' as const, label: 'Active layer' }, { value: 'all' as const, label: 'All layers' }]} onChange={(v) => setWand({ sample: v })} />
-      </div>
-      <div className="brush-row select-row">
-        <InlineSlider label="Grow / shrink" unit="px" tip="Widens each pick, or narrows it when negative" min={-50} max={50} value={wand.expand} onChange={(v) => setWand({ expand: v })} />
-        <InlineSlider label="Smooth" unit="px" tip="Softens the jagged edge of each pick" min={0} max={4} step={0.5} value={wand.smooth} onChange={(v) => setWand({ smooth: v })} />
-      </div>
-    </> : null}
-    <div className="brush-row select-row select-actions">
-      <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Selects the whole page · Ctrl+A">All</button>
-      <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Selects everything else · Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
-    </div>
-    {/* In the Designer these float in the selection bar; Studio's board has no such bar. */}
-    {workspace !== 'designer' && sel ? <div className="brush-row select-row select-actions"><SelectionActions sessionId={sessionId} doc={doc} /></div> : null}
-  </div>;
-}
-
-/**
- * Text style fields, the same for the next text (ui.text) and for a selected text layer (its own properties): the
- * caller decides what they change. Compact keeps the essentials (font, size, weight, colour, alignment).
- */
-export function TextStyleFields({ value, onChange, compact = false }: { value: TextStyle; onChange: (patch: Partial<TextStyle>) => void; compact?: boolean }) {
-  return <>
-    <InlineSelect label="Font" value={value.fontFamily} options={FONT_NAMES} onChange={(v) => onChange({ fontFamily: v })} />
-    <InlineSlider label="Size" unit="px" min={1} max={500} value={value.fontSize} onChange={(v) => onChange({ fontSize: v })} />
-    <InlineSelect label="Weight" value={value.fontWeight} options={[100, 200, 300, 400, 500, 600, 700, 800, 900]} onChange={(v) => onChange({ fontWeight: v })} />
-    <InlineColor label="Color" value={value.color} onChange={(v) => onChange({ color: v })} />
-    <InlineSelect label="Align" value={value.align} options={['left', 'center', 'right'] as const as unknown as Array<TextStyle['align']>} onChange={(v) => onChange({ align: v })} />
-    {!compact && <>
-      <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={value.lineHeight} onChange={(v) => onChange({ lineHeight: v })} />
-      <InlineSlider label="Spacing" unit="px" min={-10} max={40} step={0.5} value={value.letterSpacing} onChange={(v) => onChange({ letterSpacing: v })} />
-      <InlineSelect label="Case" value={value.textCase ?? 'none'} options={[{ value: 'none', label: 'As typed' }, { value: 'upper', label: 'UPPER' }, { value: 'lower', label: 'lower' }, { value: 'title', label: 'Title Case' }]} onChange={(v) => onChange({ textCase: v === 'none' ? undefined : v as TextStyle['textCase'] })} />
-      <InlineToggle label="Underline" checked={!!value.underline} onChange={(on) => onChange({ underline: on || undefined })} />
-      <InlineToggle label="Strikethrough" checked={!!value.strike} onChange={(on) => onChange({ strike: on || undefined })} />
-    </>}
-  </>;
-}
-
-export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, modeToggle = true, card = false }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null; compact?: boolean; modeToggle?: boolean; card?: boolean }) {
+export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, modeToggle = true, card = false }: Omit<ToolSettingsProps, 'compact' | 'modeToggle' | 'card'> & Partial<Pick<ToolSettingsProps, 'compact' | 'modeToggle' | 'card'>>) {
   useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
-  const lineart = useStore((s) => s.ui.lineart);
-  const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
-  const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
-  const shape = useStore((s) => s.ui.shape);
-  const text = useStore((s) => s.ui.text);
-  const gradient = useStore((s) => s.ui.gradient);
-  const paint = tool === 'brush' || tool === 'eraser';
-  const layer = doc.layers.find((l) => l.id === selectedCurve?.layerId && l.id === doc.activeLayerId);
-  const curve = layer?.type === 'vector' && layer.visible && !layer.locked ? layer.strokes?.find((s) => s.id === selectedCurve?.strokeId) : undefined;
-  const applyCurveStyle = (patch: Partial<StrokeStyle>) => {
-    if (!selectedCurve) return;
-    const current = getDoc(sessionId, doc.id);
-    const target = current?.layers.find((l) => l.id === selectedCurve.layerId && l.id === current.activeLayerId);
-    if (target?.type !== 'vector' || target.locked || !target.visible || !target.strokes?.some((s) => s.id === selectedCurve.strokeId)) return;
-    mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
-  };
-  if (tool === 'hand') return null;
-  if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} compact={compact} />;
-  if (tool === 'eyedropper') return <SamplerSettings compact={compact} />;
-  if (tool === 'gradient') {
-    const g = gradient ?? GRADIENT_DEFAULT;
-    const set = (patch: Partial<typeof g>) => setUi({ gradient: { ...g, ...patch } });
-    return <div className="tool-settings" role="toolbar" aria-label="Gradient settings">
-      <InlineSelect label="Shape" value={g.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => set({ shape: v })} />
-      <ColorPair dimSecondary={g.mode !== 'two'} />
-      <InlineSelect label="To" value={g.mode} options={[{ value: 'two' as const, label: 'Second color' }, { value: 'fade' as const, label: 'Transparent' }]} onChange={(v) => set({ mode: v })} />
-      {!compact && <InlineToggle label="Reverse" checked={!!g.reverse} onChange={(v) => set({ reverse: v })} />}
-      <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
-    </div>;
-  }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle /><AutoSelectToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
-  return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
-        {tool === 'text' ? <>
-          {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}
-          <TextStyleFields value={text} compact={compact} onChange={(p) => setUi({ text: { ...text, ...p } })} />
-        </> : tool === 'ruler' ? <RulerSettings docId={doc.id} /> : tool === 'fill' ? <FillSettings compact={compact} />
-        : tool === 'lineart' ? <>
-          <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
-          {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
-        </> : paint ? card ? <BrushSettings erase={tool === 'eraser'} card head={modeToggle ? <PaintModeToggle sessionId={sessionId} doc={doc} /> : null} /> : <>{modeToggle ? <PaintModeToggle sessionId={sessionId} doc={doc} /> : null}<BrushSettings erase={tool === 'eraser'} compact={compact} /></> : <>
-          {tool !== 'line' && tool !== 'curve' && tool !== 'arrow' && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
-          <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
-          <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
-          {(tool === 'ellipse' || tool === 'sector' || tool === 'arc' || tool === 'chord') && <EllipseToolFields tool={tool} />}
-          {(tool === 'polygon' || tool === 'star') && <CornerToolFields tool={tool} />}
-          {(tool === 'line' || tool === 'arrow') && <LineToolFields tool={tool} />}
-          {tool === 'curve' && <span data-tip="How far the curve bows from the straight line; negative bows to the other side"><InlineSlider label="Bend" unit="%" min={-100} max={100} value={shape.bend ?? 30} onChange={(v) => setUi({ shape: { ...shape, bend: v } })} /></span>}
-          <ShapeLookFields value={shape} corners={tool === 'rect'} compact={compact} onChange={(p) => setUi({ shape: { ...shape, ...p } })} />
-        </>}
-
-  </div>;
+  const { settings: Settings, bareSettings } = getDesignerTool(tool);
+  if (!Settings) return null;
+  const controls = <Settings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} compact={compact} modeToggle={modeToggle} card={card} />;
+  if (bareSettings) return controls;
+  return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>{controls}</div>;
 }

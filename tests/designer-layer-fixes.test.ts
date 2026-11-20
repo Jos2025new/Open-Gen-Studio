@@ -65,7 +65,7 @@ describe('D22: drawing a shape into an empty vector layer keeps its place', () =
     const doc = { ...createDoc('z', 8, 8), layers: [empty, top] };
     expect(updateLayer(doc, empty.id, { shapes: [{ id: 's' } as never] }).layers.map((l) => l.name)).toEqual(['Empty', 'Top']);
     // The stage fills it through updateLayer (no filter-and-append).
-    expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).not.toMatch(/layers\.filter\(\(l\) => l\.id !== act\.id\), \{ \.\.\.act, shapes/);
+    expect(readFileSync('src/components/designer/tools/move.tsx', 'utf8')).not.toMatch(/layers\.filter\(\(l\) => l\.id !== act\.id\), \{ \.\.\.act, shapes/);
   });
 });
 

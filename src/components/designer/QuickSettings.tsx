@@ -8,7 +8,7 @@ import { getSelection, invertSelection, selectAll, useSelectionVersion } from '.
 import { setRuler } from '../../engine/design/strokeRuler';
 import { setUi, useStore } from '../../store/store';
 import { SelectionQuick } from './SelectionActions';
-import { AutoSelectToggle, EditModeToggle, SELECT_MODES, WAND_DEFAULT } from './ToolSettings';
+import { AutoSelectToggle, EditModeToggle, SELECT_MODES, WAND_DEFAULT } from './ToolSettingsFields';
 import { Layers } from '../ui/icons';
 import { FlowMenu, BlendMenu, LockAlphaButton } from './BrushQuick';
 import { ColorPair } from './ColorPair';
@@ -16,17 +16,14 @@ import { FillGapField, FillSourceField } from './FillSettings';
 import { SampleRadiusField, SampleSourceField } from './SamplerSettings';
 import { BrushSizeField } from './BrushSizeField';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
+import { designerTools, getDesignerTool } from './tools/registry';
 
 /** What each control of the subtoolbox's quick settings edits. All of them exist in the tool's card already. */
 export type QuickKind = 'gradientShape' | 'gradientColors' | 'selectMode' | 'wandTolerance' | 'wandExpand' | 'selectOps' | 'selectActions' | 'gradientReverse' | 'editMode' | 'autoSelect' | 'size' | 'opacity' | 'color' | 'threshold' | 'gradientOpacity' | 'lineartSize' | 'lineartOpacity' | 'lineartColor' | 'strokeWidth' | 'stroke' | 'fill' | 'fontSize' | 'textColor' | 'rulerSnap' | 'rulerClear' | 'flow' | 'blend' | 'lockAlpha' | 'colorPair' | 'fillGap' | 'fillSource' | 'sampleRadius' | 'sampleSource';
-const SHAPES: QuickKind[] = ['strokeWidth', 'stroke', 'fill'], LINES: QuickKind[] = ['strokeWidth', 'stroke'];
-/** Per tool: at most 2 long sliders first, then 1–2 small controls. A tool absent here has no quick settings (its card may still exist). */
-export const QUICK: Partial<Record<DesignTool, QuickKind[]>> = {
-  brush: ['size', 'opacity', 'flow', 'colorPair'], eraser: ['size', 'opacity'], fill: ['threshold', 'fillGap', 'fillSource', 'colorPair'], gradient: ['gradientShape', 'gradientOpacity', 'gradientColors', 'gradientReverse'], eyedropper: ['sampleRadius', 'sampleSource', 'colorPair'],
-  lineart: ['lineartSize', 'lineartOpacity', 'lineartColor'], rect: SHAPES, ellipse: SHAPES, sector: SHAPES, arc: SHAPES, chord: SHAPES, polygon: SHAPES, star: SHAPES,
-  line: LINES, arrow: LINES, curve: LINES, text: ['fontSize', 'textColor'], ruler: ['rulerSnap', 'rulerClear'],
-  select: ['selectMode', 'wandTolerance', 'wandExpand', 'selectOps', 'selectActions'], move: ['editMode', 'autoSelect'],
-};
+// Compatibility for the dock's quick-mode availability check.
+export const QUICK: Partial<Record<DesignTool, readonly QuickKind[]>> = Object.fromEntries(
+  Object.entries(designerTools).flatMap(([tool, descriptor]) => descriptor.quick ? [[tool, descriptor.quick]] : []),
+);
 const WAND_ONLY = new Set<QuickKind>(['wandTolerance', 'wandExpand']);
 /** Controls that come before the long sliders. */
 const LEADING = new Set<QuickKind>(['selectMode', 'gradientShape']);
@@ -93,7 +90,7 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
 /** The quick settings of `tool`: long sliders share the row, small controls follow. */
 export function QuickControls({ tool, sessionId, doc }: { tool: DesignTool; sessionId: string; doc: DesignDoc }): ReactNode {
   const wandShape = useStore((s) => s.ui.selectShape) === 'wand';
-  const kinds = QUICK[tool]?.filter((k) => (k === 'selectOps' ? !wandShape : !WAND_ONLY.has(k) || wandShape));
+  const kinds = getDesignerTool(tool).quick?.filter((k) => (k === 'selectOps' ? !wandShape : !WAND_ONLY.has(k) || wandShape));
   if (!kinds) return null;
   const long = kinds.filter((k) => LONG.has(k));
   return <>

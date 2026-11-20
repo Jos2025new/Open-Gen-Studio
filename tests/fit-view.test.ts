@@ -36,5 +36,5 @@ it('the prompt box is centered on that same line, narrowing to clear the panel',
   expect(css).toContain('.composer-dock .composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; margin-inline: auto; }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toContain('.composer-dock { width: min(50rem, calc(100% - 3rem)); }');
   expect(readFileSync('src/styles/prompt-box.css', 'utf8')).toMatch(/\.composer-dock:is\(\.dock-chat, \.dock-node\), [^{]*\{ width: min\(50rem, calc\(100% - 12rem\)\); \}/);
-  expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).toContain('fitView(size, doc, board)');
+  expect(readFileSync('src/components/designer/stageState.ts', 'utf8')).toContain('fitView(size, doc, board)');
 });
