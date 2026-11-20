@@ -8,7 +8,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 ## Núcleo de nodos, tras la fusión (2026-11-19)
 
-El núcleo de nodos (ADR 0031) y el hilo por agente están en `main`. Su lista vigente, en orden, está en [069](history/069-2026-11-W47-master-cierre-fusion.md#pendiente-en-orden): controles y nombres de los agentes, la crítica de diseño de Grok (descriptores y subnet), Neon sobre las propuestas, el boceto de avisos, los agentes de suscripción por su CLI oficial, la prueba con clave real y el paso de la app real a `main` (migra sus datos: necesita aprobación), la rama menor de Grok y la fricción vista por Haiku. También quedan las piezas de [067](history/067-2026-11-W47-master-estabilizacion.md) líneas 66-69.
+El núcleo de nodos (ADR 0031) y el hilo por agente están en `main`. La sesión 2026-11-19/20 dejó en `task/integracion` (sin fusionar, espera aprobación) la rama menor de Grok, la fricción y los nombres de agentes, el gasto por una sola puerta (ronda 1), el descriptor y los avisos. Su lista vigente, en orden, está en [070](history/070-2026-11-W47-master-workers-integracion.md#pendiente-en-orden).
 
 ## Por impacto visible (2026-11-16)
 
