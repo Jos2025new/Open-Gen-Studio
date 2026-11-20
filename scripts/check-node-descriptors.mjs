@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const NEEDED = ['version', 'params', 'inputs', 'output', 'required', 'affects', 'evaluate', 'actions'];
+const NEEDED = ['version', 'params', 'inputs', 'output', 'required', 'affects', 'evaluate'];
 const lineOf = (text, at) => text.slice(0, at).split('\n').length;
 
 /** Problems of the tree under `root` (the repo by default), as `file:line: message` strings. */

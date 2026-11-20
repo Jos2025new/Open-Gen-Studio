@@ -11,5 +11,4 @@ export default defineNode({
   affects: {},
   evaluate: (n) => delivered(n.data.kind === 'text' ? n.data.text : null),
   defaults: () => ({ kind: 'text', title: 'Prompt', text: '' }),
-  actions: [],
 });

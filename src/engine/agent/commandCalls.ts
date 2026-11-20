@@ -1,7 +1,7 @@
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
 import { appendFeed, updateFeedItem, useStore } from '../../store/store';
-import { allowForSession, beginOncePass, dontAskUntilNextSession, overLimit } from '../budget';
+import { dontAskAgain, beginOncePass, dontAskUntilNextSession, overLimit } from '../budget';
 import { allCommands, command, findCommands, getApprover, run, type ApprovalRequest, type Approver } from '../commands';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
@@ -92,7 +92,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
   const hasSpend = entry.request.steps.some((s) => s.effect === 'spend');
   const heldAtLimit = hasSpend && overLimit(entry.request.estimate, sessionId);
   if (heldAtLimit && decision === 'approve') return false;
-  if (decision === 'session') allowForSession(sessionId);
+  if (decision === 'session') dontAskAgain(sessionId);
   else if (decision === 'until-next-session') dontAskUntilNextSession();
   else if (decision === 'once') entry.setReleasePass(beginOncePass(sessionId));
   pending.delete(itemId);

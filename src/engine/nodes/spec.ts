@@ -33,7 +33,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'context', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Context' },
       { id: 'out', direction: 'out', kind: 'data', type: 'text', multi: true, label: 'Prompt' },
     ],
-    commands: ['nodes.system.ensure', 'nodes.system.link', 'nodes.system.unlink', 'nodes.system.attach_model'],
   },
   agent: {
     type: 'agent',
@@ -48,7 +47,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'target', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Targets' },
       { id: 'out', direction: 'out', kind: 'data', type: 'text', multi: true, label: 'Plan / Prompt' },
     ],
-    commands: ['nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.link', 'nodes.system.unlink'],
   },
   model: {
     type: 'model',
@@ -61,7 +59,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'schema', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Schema' },
       { id: 'out', direction: 'out', kind: 'data', type: 'any', multi: true, label: 'Output' },
     ],
-    commands: ['nodes.system.attach_model', 'nodes.system.detach_model', 'nodes.system.link', 'nodes.system.unlink'],
   },
   provider: {
     type: 'provider',
@@ -71,7 +68,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'provider', direction: 'out', kind: 'control', type: 'provider', multi: true, label: 'Models' },
       { id: 'ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Catalog' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink'],
   },
   session: {
     type: 'session',
@@ -82,7 +78,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'session', direction: 'out', kind: 'control', type: 'session', multi: true, label: 'Session' },
       { id: 'context', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Context' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink'],
   },
   space: {
     type: 'space',
@@ -95,7 +90,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'space', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Space' },
       { id: 'out', direction: 'out', kind: 'data', type: 'image', multi: true, label: 'Selected asset' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink'],
   },
   'designer.doc': {
     type: 'designer.doc',
@@ -108,7 +102,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'doc', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Document' },
       { id: 'out', direction: 'out', kind: 'data', type: 'image', multi: true, label: 'Render' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink', 'designer.doc.create'],
   },
   library: {
     type: 'library',
@@ -120,7 +113,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Subjects' },
       { id: 'out', direction: 'out', kind: 'data', type: 'image', multi: true, label: 'Subject image' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink', 'library.subject.save'],
   },
   prompt: {
     type: 'prompt',
@@ -128,7 +120,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
     ports: [
       { id: 'out', direction: 'out', kind: 'data', type: 'text', multi: true, label: 'Text' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink'],
   },
   mediaSettings: {
     type: 'mediaSettings',
@@ -136,7 +127,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
     ports: [
       { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Settings' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink'],
   },
   toolset: {
     type: 'toolset',
@@ -146,7 +136,6 @@ export const SYSTEM_NODE_TYPES: Record<SystemNodeType, NodeTypeSpec> = {
       { id: 'tools', direction: 'out', kind: 'control', type: 'toolset', multi: true, label: 'Tools' },
       { id: 'ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Catalog' },
     ],
-    commands: ['nodes.system.link', 'nodes.system.unlink'],
   },
 };
 

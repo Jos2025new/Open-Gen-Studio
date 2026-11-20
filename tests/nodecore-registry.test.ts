@@ -20,7 +20,6 @@ export default defineNode({
   required: [],
   affects: {},
   evaluate: () => ({ text: null, assets: [], issues: [] }) as never,
-  actions: [],
   migrate: { 1: (d) => ({ ...d, label: (d as { title: string }).title }) as never },
 });
 `;

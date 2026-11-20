@@ -148,16 +148,11 @@ export function beginOncePass(sessionId: string): () => void {
   return () => removePass(sequencePasses, sessionId, token);
 }
 
-export function allowThisTime<T>(sessionId: string, action: () => T): T {
-  return runWithPass(beginOncePass(sessionId), action);
-}
-
 /** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
 export function dontAskAgain(sessionId: string = get().activeSessionId): void {
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: true }));
 }
 
-export const allowForSession = dontAskAgain;
 
 /** "Don't ask again until next session": see `untilNextSessionStillHolds` for how long it lasts. */
 export function dontAskUntilNextSession(): void {

@@ -5,13 +5,10 @@ import type { ResolveEnv } from './resolver';
 
 /*
  * One descriptor per node type (ADR 0031 point 1). A file in `types/` declares what a type owns (parameters), its
- * typed ports, what its inputs affect, its pure `evaluate`, its explicit actions and its version with migrations.
+ * typed ports, what its inputs affect, its pure `evaluate` and its version with migrations.
  * `registry.ts` collects them; `scripts/check-node-descriptors.mjs` fails `npm test` when a type has none.
  */
 export type NodeKindId = GraphNodeData['kind'];
-/** An explicit action: the only things that spend or send. Connecting and editing are never actions. */
-export type NodeActionId = 'generate' | 'run-tool' | 'send';
-
 /** What a node delivers on an edge now: the value and the revision label of that value (`edited` when a source asset was revised). */
 export interface Delivery { value: string | null; revision: string | null; edited?: true }
 
@@ -53,7 +50,6 @@ export interface NodeDescriptor {
   plan?(data: GraphNodeData, ctx: StepContext): PlanStep;
   /** The data of a node the user adds: its title, defaults and what the composer last chose. */
   defaults?(opts: NewNodeOptions, st: StoreState): GraphNodeData;
-  actions: readonly NodeActionId[];
   migrate?: Readonly<Record<number, (data: GraphNodeData) => GraphNodeData>>;
 }
 

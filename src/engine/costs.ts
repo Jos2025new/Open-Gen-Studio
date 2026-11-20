@@ -1,5 +1,5 @@
 import { knownAtlasQuote } from './quotes';
-import { estimate, sumEstimates, FREE, UNKNOWN } from './pricing';
+import { estimate, FREE, UNKNOWN } from './pricing';
 import { durationChoices, longEdgeFor, ratioOf } from './params';
 import { OPS, opCount, isVideoOpEngine } from './ops';
 import { opModelFor } from './catalog';
@@ -87,5 +87,3 @@ export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, so
   if (opId === 'upscale') mp *= Number(params.factor) === 4 ? 16 : 4;
   return estimate(price, { count, megapixels: mp, mode: 'image' });
 }
-
-export { sumEstimates };

@@ -56,7 +56,6 @@ export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d', po
       const textOutput = kind === 'audio' && st.catalog.models[c.modelRef]?.textOutput;
       return { kind, title: TITLES[kind], prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0, ...(textOutput ? { textOutput: true } : {}) };
     },
-    actions: ['generate'],
   });
 }
 export { PROMPT };

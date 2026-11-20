@@ -1,0 +1,369 @@
+{
+ "src/engine/actions.ts": [
+  "AUDIO_MIME"
+ ],
+ "src/engine/agent/assetSearch.ts": [
+  "extensionOf"
+ ],
+ "src/engine/agent/attachments.ts": [
+  "VISION_MAX_SIDE",
+  "trimmedResult"
+ ],
+ "src/engine/agent/canvasView.ts": [
+  "CANVAS_VIEW_SIDE"
+ ],
+ "src/engine/agent/context.ts": [
+  "defaultImageGuideId",
+  "defaultVideoGuideId"
+ ],
+ "src/engine/agent/draftActions.ts": [
+  "lockSections"
+ ],
+ "src/engine/agent/draftFirst.ts": [
+  "asksDraftChange"
+ ],
+ "src/engine/agent/fit.ts": [
+  "ANGLE_ORDER",
+  "DIRECT_ANGLES",
+  "FIT_KEYS",
+  "fitSheet",
+  "fitSubject"
+ ],
+ "src/engine/agent/lanes.ts": [
+  "freshAgent",
+  "shownThread"
+ ],
+ "src/engine/agent/llmTurn.ts": [
+  "agentSystem"
+ ],
+ "src/engine/agent/metrics.ts": [
+  "openMetrics",
+  "sumAgentMetrics"
+ ],
+ "src/engine/agent/modelLimits.ts": [
+  "OWED_QUESTION"
+ ],
+ "src/engine/agent/offline.ts": [
+  "isConversational"
+ ],
+ "src/engine/agent/providerFit.ts": [
+  "askedResolution"
+ ],
+ "src/engine/agent/runtimeShared.ts": [
+  "get"
+ ],
+ "src/engine/agent/settingsParts.ts": [
+  "partsOfSteps"
+ ],
+ "src/engine/agent/triggers.ts": [
+  "OP_VETO"
+ ],
+ "src/engine/agent/userChoice.ts": [
+  "inferUserRequested"
+ ],
+ "src/engine/assetRevisions.ts": [
+  "collectAssetBlobIds"
+ ],
+ "src/engine/budget.ts": [
+  "noAskActive"
+ ],
+ "src/engine/captureStyles.ts": [
+  "legacyById"
+ ],
+ "src/engine/commands/registry.ts": [
+  "sourceOf"
+ ],
+ "src/engine/contrast.ts": [
+  "MAX_CONTRAST"
+ ],
+ "src/engine/credit.ts": [
+  "CREDIT_PRICE_LIMIT",
+  "creditOptions",
+  "jobNeedsImage",
+  "markEmpty",
+  "providerBalance",
+  "takesInputsOf"
+ ],
+ "src/engine/design/belowFxCache.ts": [
+  "BELOW_CACHE_PX"
+ ],
+ "src/engine/design/brushTextures.ts": [
+  "stampDef"
+ ],
+ "src/engine/design/brushTipShape.ts": [
+  "ROUNDNESS_MIN"
+ ],
+ "src/engine/design/doc.ts": [
+  "FONT_STACKS"
+ ],
+ "src/engine/design/export.ts": [
+  "minifySvg",
+  "roundSvgNumbers"
+ ],
+ "src/engine/design/exportLimits.ts": [
+  "MAX_EXPORT_PIXELS",
+  "MAX_EXPORT_SIDE"
+ ],
+ "src/engine/design/exportPrint.ts": [
+  "PRINT_PPI"
+ ],
+ "src/engine/design/exportSettings.ts": [
+  "MARK_SLUG_MM",
+  "paperLayout"
+ ],
+ "src/engine/design/history.ts": [
+  "HISTORY_BYTES_DEFAULT",
+  "setHistoryByteLimit"
+ ],
+ "src/engine/design/hitAlpha.ts": [
+  "ALPHA_BUDGET_BYTES"
+ ],
+ "src/engine/design/marquee.ts": [
+  "marqueeContains",
+  "marqueeTouches"
+ ],
+ "src/engine/design/marqueePick.ts": [
+  "rasterEnclosed",
+  "rasterPaintedIn"
+ ],
+ "src/engine/design/objectGroupTree.ts": [
+  "shapeIs"
+ ],
+ "src/engine/design/objectGroups.ts": [
+  "groupPicked"
+ ],
+ "src/engine/design/objectOps.ts": [
+  "alignPickedObjects",
+  "commitObjects",
+  "distributeObjectDeltas",
+  "distributePickedObjects",
+  "turnPickedObjects"
+ ],
+ "src/engine/design/objectSelection.ts": [
+  "pickedCount"
+ ],
+ "src/engine/design/paintMode.ts": [
+  "hasPaintedPixels"
+ ],
+ "src/engine/design/pathBoolean.ts": [
+  "MAX_FACE_AREAS"
+ ],
+ "src/engine/design/pathNodes.ts": [
+  "subpathStart"
+ ],
+ "src/engine/design/primKnots.ts": [
+  "boxFrame"
+ ],
+ "src/engine/design/raster.ts": [
+  "snapshotBuffers"
+ ],
+ "src/engine/design/rasterCompose.ts": [
+  "strokeBufferBox"
+ ],
+ "src/engine/design/rasterHistoryTiles.ts": [
+  "tileKey"
+ ],
+ "src/engine/design/rasterLimit.ts": [
+  "DEFAULT_RASTER_PAINT_LIMITS",
+  "rasterPaintGateVersion",
+  "rasterPaintNearLimit"
+ ],
+ "src/engine/design/rasterSurface.ts": [
+  "BOX_ALIGN"
+ ],
+ "src/engine/design/render.ts": [
+  "composeFrame",
+  "rasterLayerBlob",
+  "retainedStats"
+ ],
+ "src/engine/design/retainedPage.ts": [
+  "MAX_REGION_SHARE"
+ ],
+ "src/engine/design/rules.ts": [
+  "TOOL_LAYER"
+ ],
+ "src/engine/design/segmentDrag.ts": [
+  "nearestOnSegment"
+ ],
+ "src/engine/design/selectMode.ts": [
+  "edgeDistance"
+ ],
+ "src/engine/design/shapeKinds.ts": [
+  "CORNER_TOOLS",
+  "DEFAULT_ARC",
+  "ELLIPSE_TOOLS",
+  "LINE_TOOLS"
+ ],
+ "src/engine/design/shapeSameLook.ts": [
+  "strokeLook"
+ ],
+ "src/engine/design/snap.ts": [
+  "SNAP_WEIGHT"
+ ],
+ "src/engine/design/snapNodes.ts": [
+  "MAX_NODE_TARGETS"
+ ],
+ "src/engine/design/snapSession.ts": [
+  "snapSessionFor",
+  "visibleDocRect"
+ ],
+ "src/engine/design/strokeCut.ts": [
+  "strokePiece"
+ ],
+ "src/engine/design/strokeEdit.ts": [
+  "pickedStrokes"
+ ],
+ "src/engine/design/strokeRuler.ts": [
+  "perspectiveDirections"
+ ],
+ "src/engine/design/strokes.ts": [
+  "MIN_STROKE_SIZE"
+ ],
+ "src/engine/design/svgImport/index.ts": [
+  "MAX_USE_ELEMENTS"
+ ],
+ "src/engine/design/svgImport/rasterize.ts": [
+  "loadResvg"
+ ],
+ "src/engine/design/svgImport/sanitize.ts": [
+  "MAX_SVG_BYTES",
+  "MAX_SVG_ELEMENTS",
+  "cleanCss"
+ ],
+ "src/engine/design/svgImport/structure.ts": [
+  "itemBox"
+ ],
+ "src/engine/design/transform.ts": [
+  "alignLayer",
+  "referenceBox"
+ ],
+ "src/engine/design/valueNotice.ts": [
+  "getValueNotice"
+ ],
+ "src/engine/design/vectorErase.ts": [
+  "insideRanges"
+ ],
+ "src/engine/eta.ts": [
+  "ETA_MIN_SAMPLES",
+  "ETA_SAMPLES"
+ ],
+ "src/engine/feedMeta.ts": [
+  "formatMessageUsage",
+  "formatMessageUsageDetail",
+  "providerLabel",
+  "shortModelName",
+  "spaceLabelOf",
+  "spaceOfFeedItem"
+ ],
+ "src/engine/flow/freshness.ts": [
+  "comparableSettings"
+ ],
+ "src/engine/fx/canvas.ts": [
+  "flareCanvas"
+ ],
+ "src/engine/fx/lut.ts": [
+  "LUT_SIZE"
+ ],
+ "src/engine/jobs.ts": [
+  "ATLAS_RETRY_MS",
+  "inputKindOf"
+ ],
+ "src/engine/modelNamed.ts": [
+  "providerNamed"
+ ],
+ "src/engine/modelRules.ts": [
+  "MODEL3D_RULES",
+  "MODEL_FITS",
+  "SOURCE_VIDEO_RULES"
+ ],
+ "src/engine/nodecore/deps.ts": [
+  "changedNodes",
+  "evaluableDeps",
+  "invalidationDeps",
+  "subjectSources"
+ ],
+ "src/engine/nodecore/edit.ts": [
+  "revisionsOf"
+ ],
+ "src/engine/nodecore/migrate.ts": [
+  "migrateData"
+ ],
+ "src/engine/nodecore/revision.ts": [
+  "stableJson"
+ ],
+ "src/engine/nodes/commands.ts": [
+  "SYSTEM_NODE_ACTIONS"
+ ],
+ "src/engine/nodes/omni.ts": [
+  "OMNI_SPACE_Y",
+  "SPACE_SYSTEM_PARTS"
+ ],
+ "src/engine/nodes/omniSpaces.ts": [
+  "hiddenInOrdinary"
+ ],
+ "src/engine/nodes/system.ts": [
+  "modelLabelForRef",
+  "systemNodePorts"
+ ],
+ "src/engine/notices.ts": [
+  "noticeState"
+ ],
+ "src/engine/officialLimits.ts": [
+  "officialSheet"
+ ],
+ "src/engine/plan.ts": [
+  "MAX_AGENT_STROKES",
+  "MAX_STROKE_POINTS",
+  "normalizeTextStyle",
+  "ownDeps"
+ ],
+ "src/engine/planSent.ts": [
+  "pickClipLengths",
+  "styleSuffix"
+ ],
+ "src/engine/pricing.ts": [
+  "normRes"
+ ],
+ "src/engine/procedure.ts": [
+  "settingsAskReason"
+ ],
+ "src/engine/providers/atlas.ts": [
+  "MODEL3D_FAMILIES"
+ ],
+ "src/engine/providers/demo/art.ts": [
+  "sceneFor"
+ ],
+ "src/engine/providers/demo/motion.ts": [
+  "recordingSupported"
+ ],
+ "src/engine/providers/llm.ts": [
+  "STALL_MS",
+  "isAnthropicModel"
+ ],
+ "src/engine/providers/nanogpt.ts": [
+  "NANO_3D_MODELS",
+  "model3dSchema",
+  "parseNano3dPrice",
+  "parseNanoImagePrice",
+  "parseNanoVideoPrice"
+ ],
+ "src/engine/providers/nanogptAudio.ts": [
+  "SFX_MODEL",
+  "fetchAudioModels"
+ ],
+ "src/engine/providers/shared.ts": [
+  "authBearer"
+ ],
+ "src/engine/refRoles.ts": [
+  "REF_ROLES",
+  "opRefList",
+  "refId",
+  "userRefsFirst"
+ ],
+ "src/engine/retryPartial.ts": [
+  "retryEstimate"
+ ],
+ "src/engine/skills/guides.ts": [
+  "STAGED_GUIDE"
+ ]
+}

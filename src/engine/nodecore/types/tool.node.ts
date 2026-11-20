@@ -24,5 +24,4 @@ export default defineNode({
     const op = opts.op ?? 'relight';
     return { kind: 'tool', title: OPS[op].label, op, params: defaultOpParams(OPS[op]), outputIndex: 0 };
   },
-  actions: ['run-tool'],
 });
