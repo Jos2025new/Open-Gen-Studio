@@ -6,7 +6,7 @@ import { ADAPTERS, PREFERRED, REMOTE_PROVIDERS, editCounterpart, i2vCounterpart 
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from './providers/demo';
 import { listLlmModels, pickDefaultLlm } from './providers/llm';
 import { parseModelRef } from './providers/types';
-import type { OpEngine } from './ops';
+import { isVideoOpEngine, type OpEngine } from './ops';
 import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId, TranscriberSummary } from './types';
 import { rememberSessionModel } from './agent/sessionModel';
 import { setCatalog, setComposer, setComposerMedia, setSettings, useStore } from '../store/store';
@@ -493,7 +493,7 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
     if (valid(ops.video)) return { ref: ops.video!, viaEdit: false };
     return { ref: defaultModelFor('video', true), viaEdit: false };
   }
-  if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
+  if (isVideoOpEngine(engine)) {
     // Video-to-video: settings override, then each provider's preferred list, then any tagged model that takes video.
     const key = engine === 'video_upscale' ? 'videoUpscale' : engine === 'video_edit' ? 'videoEdit' : 'videoExtend';
     const fits = (ref: string) => engine !== 'video_upscale' || Boolean(modelSummary(ref) && isVideoUpscaler(modelSummary(ref)!));

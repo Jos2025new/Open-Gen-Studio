@@ -117,3 +117,20 @@ describe('6. the approved price of an operation is the sent one', () => {
     expect(got.authorizations.s1.modelRef).toBe(dear);
   });
 });
+
+describe('7. video-to-video engines', () => {
+  it('one predicate lists them', async () => {
+    const { isVideoOpEngine } = await import('../src/engine/ops');
+    expect(['video_upscale', 'video_edit', 'video_extend'].every(isVideoOpEngine)).toBe(true);
+    expect(['video', 'edit', 'upscale', 'local'].some(isVideoOpEngine)).toBe(false);
+  });
+  it('a model that cannot edit a clip is refused by name, not as a «video upscaler»', async () => {
+    const ref = 'atlas::acme/plain-video';
+    const st = useStore.getState();
+    useStore.setState({ assets: { ...st.assets, clip: { ...asset('clip'), kind: 'video', duration: 5 } as Asset }, catalog: { ...st.catalog, models: { ...st.catalog.models, [ref]: { ref, provider: 'atlas', id: 'acme/plain-video', name: 'Plain', kind: 'video', acceptsText: true, acceptsImage: false, acceptsVideo: false, tags: [] } as ModelSummary } } });
+    const { opSpec } = await import('../src/engine/jobs');
+    const failure = opSpec({ sessionId: 's', sourceAssetId: 'clip', op: 'video_edit', params: { _modelRef: ref, instruction: 'x' }, origin: 'op' });
+    await expect(failure).rejects.toThrow(/Choose a connected model that can/);
+    await expect(failure).rejects.not.toThrow(/upscaler/);
+  });
+});

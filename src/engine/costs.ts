@@ -1,7 +1,7 @@
 import { knownAtlasQuote } from './quotes';
 import { estimate, sumEstimates, FREE, UNKNOWN } from './pricing';
 import { durationChoices, longEdgeFor, ratioOf } from './params';
-import { OPS, opCount } from './ops';
+import { OPS, opCount, isVideoOpEngine } from './ops';
 import { opModelFor } from './catalog';
 import type { AdvancedValue, Asset, Estimate, GenSettings, MediaKind, OpId, PriceRule } from './types';
 import { useStore } from '../store/store';
@@ -78,7 +78,7 @@ export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, so
   if (ref.startsWith('local::')) return FREE;
   const price = priceOf(ref);
   if (!price) return UNKNOWN;
-  if (def.engine === 'video' || def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
+  if (def.engine === 'video' || isVideoOpEngine(def.engine)) {
     // For video-to-video, `duration` is the source clip's length (per-second prices scale with it).
     return estimate(price, { count: 1, duration: videoSettings.duration, maxDuration: maxDuration(ref), resolution: videoSettings.resolution, audio: videoSettings.audio, mode: 'image' });
   }

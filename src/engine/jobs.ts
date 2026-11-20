@@ -25,7 +25,7 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { refsLimit } from './officialLimits';
-import { OPS, opCount, operationFactor, type VideoOpEngine } from './ops';
+import { OPS, opCount, operationFactor, isVideoOpEngine, type VideoOpEngine } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { mapSubjectPrompts } from './subjectPrompts';
 import { ADAPTERS } from './providers/registry';
@@ -92,7 +92,7 @@ function requestEstimate(spec: GenerationSpec): Estimate {
     const engine = OPS[spec.op.id].engine;
     const source = get().assets[spec.op.sourceAssetId];
     if (engine === 'transcribe') return estimateTranscribe(get().catalog.transcribers?.[spec.modelRef]?.usdPerMinute, source?.duration);
-    if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
+    if (isVideoOpEngine(engine)) {
       return estimateOp(spec.op.id, spec.op.params, source, { ...spec.settings, duration: videoOpSeconds(engine, spec.settings, source?.duration) }, spec.modelRef);
     }
   }
@@ -405,7 +405,7 @@ async function execute(id: string): Promise<string[]> {
     let video: MediaInput | undefined;
     if (g.op) {
       const def = OPS[g.op.id];
-      if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
+      if (isVideoOpEngine(def.engine)) {
         video = await mediaInput(g.op.sourceAssetId);
         const rule = sourceVideoRule(model.id);
         const range = def.engine === 'video_edit' ? rule?.seconds.edit : def.engine === 'video_extend' ? rule?.seconds.extend : undefined;
@@ -1081,7 +1081,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   }
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
   const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
-  if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
+  if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error(def.engine === 'video_upscale' ? 'Choose a dedicated video upscaler, not a video generation/edit model.' : `Choose a connected model that can ${def.label.toLowerCase()}.`);
   const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? reusedOpChoice(input) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
@@ -1098,7 +1098,7 @@ export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: bo
   const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';
-  if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
+  if (isVideoOpEngine(def.engine)) {
     const settings = videoOpSettings(def.engine, schema, input.params);
     // No "auto": keep the source shape with the nearest ratio, or the model picks 16:9 and reframes.
     const aspectOpts = paramByRole(schema, 'aspect')?.options;

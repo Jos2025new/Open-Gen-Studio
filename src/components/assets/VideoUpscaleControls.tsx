@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown } from '../ui/icons';
+import { isVideoOpEngine } from '../../engine/ops';
 import { ensureSchema, opModelFor, videoOpFits } from '../../engine/catalog';
 import type { AdvancedValue } from '../../engine/types';
 import { useStore } from '../../store/store';
@@ -30,4 +31,10 @@ export function VideoUpscaleControls({ params, onChange, engine = 'video_upscale
     {fields.map(p => ['string', 'text'].includes(p.type) ? <label key={p.key} className="op-field"><span className="field-label" data-tip={p.description}>{p.label}</span><input className="input" value={String(params[p.key] ?? p.default ?? '')} onChange={e => onChange({ ...params, _modelRef: ref, [p.key]: e.target.value })} /></label> : <AdvancedField key={p.key} p={p} value={params[p.key]} onChange={value => { const next: Record<string, AdvancedValue> = { ...params, _modelRef: ref }; if (value === undefined) delete next[p.key]; else next[p.key] = value; onChange(next); }} />)}
     {schema && !fields.length ? <p className="faint">{schema.source === 'derived' ? 'Provider parameter schema unavailable.' : 'This model exposes no adjustable parameters.'}</p> : null}
   </div>;
+}
+
+/** The model and parameters of a video operation in an operation form (Continue shot is the `video` engine); nothing for other ops. */
+export function OpVideoControls({ op, params, onChange }: { op: string; params: Record<string, AdvancedValue>; onChange: (params: Record<string, AdvancedValue>) => void }) {
+  if (op === 'continue') return <VideoUpscaleControls engine="video" params={params} onChange={onChange} />;
+  return isVideoOpEngine(op) ? <VideoUpscaleControls engine={op} params={params} onChange={onChange} /> : null;
 }

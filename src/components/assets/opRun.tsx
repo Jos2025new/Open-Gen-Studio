@@ -10,7 +10,7 @@ import { useStore } from '../../store/store';
 import { ModelList } from '../composer/ModelList';
 import { Popover, usePopover } from '../ui/Popover';
 import { Segmented } from '../ui/primitives';
-import { VideoUpscaleControls } from './VideoUpscaleControls';
+import { OpVideoControls } from './VideoUpscaleControls';
 
 export type OpTarget = { kind: 'asset'; assetId: string; parentId?: string } | { kind: 'layer'; sessionId: string; docId: string; layerId: string };
 
@@ -87,7 +87,7 @@ export function OpFields({ op, state, className }: { op: OpId; state: OpRun; cla
   const def = OPS[op];
   const { params, setParams } = state;
   return <>
-    {op === 'video_upscale' || op === 'video_edit' || op === 'video_extend' || op === 'continue' ? <VideoUpscaleControls engine={op === 'continue' ? 'video' : op} params={params} onChange={setParams} /> : null}
+    <OpVideoControls op={op} params={params} onChange={setParams} />
     {def.fields.map((f) =>
       f.type === 'choice' ? (
         <div key={f.key} className={`op-field ${className ?? ''}`}>

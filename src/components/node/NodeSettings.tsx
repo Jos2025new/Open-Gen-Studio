@@ -12,7 +12,7 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip, MenuItem, Segmented, Toggle } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
 import { AspectGlyph } from '../composer/MediaControls';
-import { VideoUpscaleControls } from '../assets/VideoUpscaleControls';
+import { OpVideoControls } from '../assets/VideoUpscaleControls';
 import { OP_ICONS } from '../assets/AssetActions';
 import { RunButton } from './NodeRunButton';
 
@@ -356,7 +356,7 @@ export function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData 
           ))}
         </div>
       </Popover>
-      {d.op === 'video_upscale' || d.op === 'video_edit' || d.op === 'video_extend' || d.op === 'continue' ? <VideoUpscaleControls engine={d.op === 'continue' ? 'video' : d.op} params={d.params} onChange={params => patchNodeData(sessionId, node.id, { params })} /> : null}
+      <OpVideoControls op={d.op} params={d.params} onChange={params => patchNodeData(sessionId, node.id, { params })} />
       {def.fields.map((f) =>
         f.type === 'choice' ? (
           <div key={f.key} className="node-field nodrag">

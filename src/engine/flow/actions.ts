@@ -11,7 +11,7 @@ import { placeFor } from '../place';
 import { uid } from '../../lib/id';
 import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
-import { defaultOpParams, OPS } from '../ops';
+import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
@@ -201,7 +201,7 @@ function requestContext(sessionId: string) {
     // A step from a confirmed plan carries the model the user approved (and the estimate priced): it wins over the source's model.
     const chosen = (PICKABLE_VIDEO_OPS.includes(engine) || opFollowsSource(engine)) && typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : undefined;
     const choice = chosen ? { ref: chosen, viaEdit: false } : source && st.assets[source] ? opModelForAsset(engine, source) : fromModel ? { ref: fromModel, viaEdit: false } : opModelFor(engine);
-    return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : ['video_edit', 'video_upscale', 'video_extend'].includes(engine) ? { settings: videoOpSettings(engine as 'video_edit' | 'video_upscale' | 'video_extend', st.catalog.schemas[choice.ref], n.data.params) } : {}) };
+    return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : isVideoOpEngine(engine) ? { settings: videoOpSettings(engine, st.catalog.schemas[choice.ref], n.data.params) } : {}) };
   } };
 }
 
