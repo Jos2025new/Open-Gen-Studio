@@ -1,6 +1,7 @@
-import type { AudioStep, ImageStep, Model3dStep, PortType, VideoStep } from '../types';
+import type { AudioStep, ImageStep, MediaKind, Model3dStep, PortType, VideoStep } from '../types';
 import { defineNode, type NodeDescriptor, type PortInfo, type StepContext } from './descriptor';
 import { deliverGenerated } from './deliver';
+const TITLES = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D model' } as const;
 
 const PROMPT: PortInfo = { id: 'prompt', type: 'text', label: 'Prompt', multi: false };
 
@@ -50,6 +51,11 @@ export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d', po
     affects: { prompt: true, ref: true, clip: true, first: true, last: true, refVideo: true, audio: true, lyrics: true },
     evaluate: deliverGenerated,
     plan,
+    defaults: (_opts, st) => {
+      const c = st.composer[kind as MediaKind];
+      const textOutput = kind === 'audio' && st.catalog.models[c.modelRef]?.textOutput;
+      return { kind, title: TITLES[kind], prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0, ...(textOutput ? { textOutput: true } : {}) };
+    },
     actions: ['generate'],
   });
 }

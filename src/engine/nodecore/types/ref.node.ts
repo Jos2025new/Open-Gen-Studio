@@ -1,3 +1,6 @@
+import { nextAgentTitle } from '../../nodes/agentNames';
+import { systemRefDefault } from '../../nodes/systemDefaults';
+import { SYSTEM_NODE_TYPES } from '../../nodes/system';
 import { defineNode } from '../descriptor';
 import { delivered } from '../deliver';
 
@@ -17,5 +20,10 @@ export default defineNode({
   affects: {},
   // The live text of a chat/agent/prompt node: what the resolver delivers (the former `evaluate` said null; nothing read it).
   evaluate: (n, _e, env) => delivered(env.chatText(n)),
+  defaults: (opts, st) => {
+    const type = opts.type ?? 'chat';
+    const session = st.sessions[st.activeSessionId];
+    return { kind: 'ref', type, ref: opts.ref ?? systemRefDefault(type, st.activeSessionId, st.composer.image.modelRef, session), title: type === 'agent' ? nextAgentTitle(session?.graph) : SYSTEM_NODE_TYPES[type].title };
+  },
   actions: ['send'],
 });

@@ -1,5 +1,3 @@
-import { nextAgentTitle } from '../nodes/agentNames';
-import { systemRefDefault } from '../nodes/systemDefaults';
 import { videoOpSettings } from '../jobs';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
@@ -14,8 +12,7 @@ import { uid } from '../../lib/id';
 import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
-import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, MediaKind, OpId, SystemNodeType } from '../types';
-import { SYSTEM_NODE_TYPES } from '../nodes/system';
+import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
@@ -23,6 +20,7 @@ import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
 import { storeEnv } from '../nodecore/resolver';
+import { descriptorOf } from '../nodecore/registry';
 
 const get = useStore.getState;
 
@@ -43,31 +41,9 @@ export function addAssetAsNode(sessionId: string, assetId: string, position: { x
 }
 
 export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; assetId?: string; type?: SystemNodeType; ref?: string } = {}): GraphNodeData {
-  const st = get();
-  switch (kind) {
-    case 'text':
-      return { kind: 'text', title: 'Prompt', text: '' };
-    case 'image':
-    case 'video':
-    case 'audio':
-    case 'model3d': {
-      const c = st.composer[kind as MediaKind];
-      const title = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Audio' : '3D model';
-      const textOutput = kind === 'audio' && st.catalog.models[c.modelRef]?.textOutput;
-      return { kind, title, prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0, ...(textOutput ? { textOutput: true } : {}) };
-    }
-    case 'tool': {
-      const op = opts.op ?? 'relight';
-      return { kind: 'tool', title: OPS[op].label, op, params: defaultOpParams(OPS[op]), outputIndex: 0 };
-    }
-    case 'asset':
-      return { kind: 'asset', title: 'Asset', assetId: opts.assetId ?? null };
-    case 'ref': {
-      const type = opts.type ?? 'chat';
-      const session = st.sessions[st.activeSessionId];
-      return { kind: 'ref', type, ref: opts.ref ?? systemRefDefault(type, st.activeSessionId, st.composer.image.modelRef, session), title: type === 'agent' ? nextAgentTitle(session?.graph) : SYSTEM_NODE_TYPES[type].title };
-    }
-  }
+  const defaults = descriptorOf(kind)?.defaults;
+  if (!defaults) throw new Error(`Node type "${kind}" declares no defaults.`);
+  return defaults(opts, get());
 }
 
 export function addNode(sessionId: string, data: GraphNodeData, position: { x: number; y: number }): string {

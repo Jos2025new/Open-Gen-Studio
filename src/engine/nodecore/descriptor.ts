@@ -1,5 +1,6 @@
 import type { Asset, GraphNodeData, PortType } from '../types';
-import type { GraphEdge, GraphNode, PlanStep } from '../types';
+import type { GraphEdge, GraphNode, OpId, PlanStep, SystemNodeType } from '../types';
+import type { useStore } from '../../store/store';
 import type { ResolveEnv } from './resolver';
 
 /*
@@ -28,6 +29,10 @@ export interface StepContext {
   promptFrom: string | undefined;
 }
 
+/** What a new node of a type may be born with (a picked op, a dropped asset, a system type). */
+export interface NewNodeOptions { op?: OpId; assetId?: string; type?: SystemNodeType; ref?: string }
+export type StoreState = ReturnType<typeof useStore.getState>;
+
 export interface PortInfo { id: string; type: PortType; label: string; multi: boolean }
 
 export interface NodeDescriptor {
@@ -46,6 +51,8 @@ export interface NodeDescriptor {
   evaluate(node: GraphNode, edge: Pick<GraphEdge, 'outputIndex'>, env: ResolveEnv): Delivery;
   /** The run step of a node that runs: absent for text, asset and system nodes. */
   plan?(data: GraphNodeData, ctx: StepContext): PlanStep;
+  /** The data of a node the user adds: its title, defaults and what the composer last chose. */
+  defaults?(opts: NewNodeOptions, st: StoreState): GraphNodeData;
   actions: readonly NodeActionId[];
   migrate?: Readonly<Record<number, (data: GraphNodeData) => GraphNodeData>>;
 }

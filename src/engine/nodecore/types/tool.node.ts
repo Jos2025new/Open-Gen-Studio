@@ -1,3 +1,4 @@
+import { defaultOpParams } from '../../ops';
 import { OPS } from '../../ops';
 import type { OpStep } from '../../types';
 import { defineNode } from '../descriptor';
@@ -18,6 +19,10 @@ export default defineNode({
     const ref = input ? ctx.refFor(input) : null;
     if (!ref) ctx.errors.push(`"${d.title}" needs an ${OPS[d.op].input} input.`);
     return { id: ctx.id, kind: 'op', title: d.title, op: d.op, input: ref ?? '', params: d.params } satisfies OpStep;
+  },
+  defaults: (opts) => {
+    const op = opts.op ?? 'relight';
+    return { kind: 'tool', title: OPS[op].label, op, params: defaultOpParams(OPS[op]), outputIndex: 0 };
   },
   actions: ['run-tool'],
 });
