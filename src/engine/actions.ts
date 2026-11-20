@@ -17,6 +17,7 @@ import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec
 import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
+import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { ensureSpaceSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
@@ -383,9 +384,10 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
     data: { kind: 'asset', title: 'Reference', assetId },
     handle,
   }));
-  const g = createGeneration(spec);
+  const nodeId = uid('nd');
+  const g = createGeneration({ ...spec, stepId: nodeId });
   const genNode: GraphNode = {
-    id: uid('nd'),
+    id: nodeId,
     position: origin,
     data: {
       kind,
@@ -424,10 +426,8 @@ function specFrom(g: Generation): GenerationSpec {
     op: g.op,
     origin: g.origin,
     parentId: g.id,
-    // Preserve operation id: regenerate is another attempt of the same operation.
     operationId: g.operationId ?? g.id,
-    planId: g.planId,
-    stepId: g.stepId,
+    stepId: g.planId ? undefined : g.stepId,
   };
 }
 
@@ -449,10 +449,12 @@ export async function regenerate(generationId: string): Promise<void> {
     return;
   }
   const spec = specFrom(g);
-  const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate });
   const session = get().sessions[g.sessionId];
   // Node generations update their node; everything else appears in the conversation.
-  const node = session?.graph.nodes.find((n) => runsGeneration(n.data) && n.data.generationId === g.id);
+  const held = holdAttemptNode(g, session?.graph.nodes ?? []);
+  if (!held) return;
+  const node = held.node;
+  const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate });
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
     applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { generationId: next.id, sketchAssetId: undefined } as Partial<GraphNode['data']> } });
@@ -461,7 +463,7 @@ export async function regenerate(generationId: string): Promise<void> {
   }
   runGeneration(next.id).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
-  });
+  }).finally(held.release);
 }
 
 /** Put lyrics into Audio on a music model and turn off "Write lyrics for me". */

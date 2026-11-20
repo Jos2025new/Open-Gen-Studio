@@ -68,7 +68,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
         size="sm"
         variant="secondary"
         icon={RotateCw}
-        data-tip={over ? overLimitText(g.estimate) : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
+        data-tip={over ? overLimitText(estimate) : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
         onClick={() => {
           void (over ? withOncePass(g.sessionId, () => retryGeneration(g.id)) : retryGeneration(g.id));
         }}

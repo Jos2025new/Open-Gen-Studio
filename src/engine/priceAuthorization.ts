@@ -36,7 +36,8 @@ export function checkStepAuthorization(g: Generation, proposed: StepAuthorizatio
   const item = useStore.getState().sessions[g.sessionId]?.feed.find((f): f is PlanFeedItem => f.type === 'plan' && f.plan.id === g.planId);
   const stepId = item?.plan.workspace === 'node' ? g.stepId.replace(`${g.planId}_`, '') : g.stepId;
   const approved = item?.stepAuthorizations?.[stepId];
-  if (!item) return;
+  // A plan generation whose card left the feed (a message edited, a card reopened) has no approval to check against: it is not sent.
+  if (!item) throw new Error(`The plan of this step (${g.planId}) is no longer in the chat, so its price approval is gone; propose and approve it again.`);
   // A step of a plan that nobody authorized (a node the live graph added after the approval) is not sent: it needs its own approval with its price.
   if (!approved && !item.nodeRun) throw new Error(`The step ${stepId} has no approved price; approve the plan again to run it.`);
   if (!approved) return;

@@ -358,6 +358,8 @@ export interface Generation {
   notes?: string[];
   /** The last provider request (endpoint, params, try, job id). Never a key or media. */
   sent?: SentRequest;
+  /** When the request left for the provider and no answer (job id or result) had come back: still set after a reload, the send may have been charged. */
+  sending?: number;
 }
 
 // ---------------------------------------------------------------------------

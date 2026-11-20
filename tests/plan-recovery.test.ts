@@ -149,6 +149,21 @@ describe('recovering a failed plan', () => {
     expect(runs).toEqual([`s1:${genId}`, `s1:${genId}`, expect.stringMatching(/^s2:/)]);
   });
 
+  it('over the budget the model still hears that only the user can retry (not the budget text)', async () => {
+    await sendWithSettings('Quiero un anuncio UGC de este vestido');
+    await vi.waitFor(() => expect(planItem().status).toBe('error'));
+    await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
+    useStore.setState((st) => ({ spentUsd: 5, settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: undefined, budgetNoAsk: false } }));
+    const before = runs.length;
+    replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'ok'];
+    await sendAgentMessage('reinténtalo');
+    await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
+    const tools = viewed(useStore.getState().sessions[sid()]).history.filter((m) => m.role === 'tool').map((m) => String(m.content));
+    useStore.setState((st) => ({ spentUsd: 0, settings: { ...st.settings, budgetOn: false } }));
+    expect(tools.at(-1)).toMatch(/only the user can start it/);
+    expect(runs).toHaveLength(before);
+  });
+
   it('the agent asking for a retry sends nothing: only the user\'s button retries (double-send guard)', async () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));

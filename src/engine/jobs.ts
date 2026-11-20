@@ -35,9 +35,11 @@ import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
-import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
-import { addAssets, addSpend, patchAsset, patchGeneration, updateFeedItem, upsertGeneration, useStore } from '../store/store';
-import { applyEdit } from './nodecore/edit';import { consumeOnce, noteExcess } from './budget';
+import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
+import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
+import { holdRetry, relinkAttempt } from './relinkAttempt';
+import { markSending, interruptedByReload } from './sendMark';
+import { consumeOnce, noteExcess } from './budget';
 
 const get = useStore.getState;
 export const controllers = new Map<string, AbortController>();
@@ -330,7 +332,7 @@ async function attempt(id: string): Promise<string[]> {
   } catch (err) {
     if (isCreditError(err)) {
       let rerun: Promise<string[]> | undefined;
-      await onGenerationCredit(id, (gid) => (rerun = execute(gid)));
+      await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration, requestEstimate);
       if (rerun) return rerun;
       throw err;
     }
@@ -346,6 +348,7 @@ async function execute(id: string): Promise<string[]> {
   const signal = controller.signal;
   patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
   let g = get().generations[id];
+  let submitted = false;
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
       const assetIds = await runLocalOp(g, signal);
@@ -581,7 +584,9 @@ async function execute(id: string): Promise<string[]> {
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // Preserve Atlas quote accounting; a quote is not a provider-reported charge in the agent notice.
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
-      const send = () => {
+      const send = async () => {
+        await markSending(id);
+        signal.throwIfAborted();
         if (proposed) checkStepAuthorization(g, proposed);
         return ADAPTERS[model.provider].generate({
         kind,
@@ -606,8 +611,9 @@ async function execute(id: string): Promise<string[]> {
         signal,
         onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
         onRemoteJob: (job) => {
+          submitted = true;
           const sent = get().generations[id]?.sent;
-          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
+          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sending: undefined, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
         },
         // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
         onRequest: (info) => {
@@ -629,10 +635,12 @@ async function execute(id: string): Promise<string[]> {
       for (let retry = 0; ; retry++) {
         try {
           result = await once();
+          submitted = false;
+          patchGeneration(id, { sending: undefined });
           break;
         } catch (err) {
           const wait = ATLAS_RETRY_WAITS[retry];
-          if (wait == null || signal.aborted || !ACCESS_DENIED.test((err as Error).message)) throw err;
+          if (wait == null || submitted || signal.aborted || !ACCESS_DENIED.test((err as Error).message)) throw err;
           const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
           patchGeneration(id, {
             statusText: `Atlas refused access${which}; trying again in ${wait / 1000} s`,
@@ -662,18 +670,21 @@ async function execute(id: string): Promise<string[]> {
     finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined);
     return assetIds;
   } catch (err) {
-    if (err instanceof PriceReviewRequired) throw err;
+    if (err instanceof PriceReviewRequired) {
+      patchGeneration(id, { sending: undefined });
+      throw err;
+    }
     const cur = get().generations[id];
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
+      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, sending: undefined });
       if (cur?.assetIds.length) chargePartial(cur);
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
-    const lostJob = !remoteJob && err instanceof NetworkError;
-    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob });
+    const lostJob = !remoteJob && (err instanceof NetworkError || (submitted && isCreditError(err)));
+    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
     if (cur?.sent) logEvent('provider-error', { generation: id, model: cur?.modelName, provider: cur?.provider, jobId: remoteJob?.id, message: (err as Error).message, sent: cur.sent });
@@ -691,6 +702,11 @@ function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefine
   return err instanceof JobFailedError ? undefined : job;
 }
 
+function checkSpecialSend(g: Generation, signal: AbortSignal): void {
+  signal.throwIfAborted();
+  if (g.planId) checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
+}
+
 /** Audio → text with the transcriber recorded on the generation. */
 async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> {
   const model = get().catalog.transcribers?.[g.modelRef];
@@ -703,6 +719,8 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     const mb = (n: number) => (n / 1048576).toFixed(1);
     throw new InputError('AUDIO_TOO_LARGE', `${model.name} takes files up to ${mb(model.maxDirectBytes)} MB from the app; this one is ${mb(input.blob.size)} MB. Use a shorter or compressed (MP3) clip.`);
   }
+  await markSending(g.id);
+  checkSpecialSend(g, signal);
   const result = await adapter.transcribe({
     model,
     input,
@@ -710,7 +728,7 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -721,12 +739,15 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
   if (!apiKey || !ADAPTERS.fal.createVoice) throw new Error('Add your fal.ai key in Settings to create Kling voices.');
   const seconds = get().assets[g.op!.sourceAssetId]?.duration;
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
+  const input = await mediaInput(g.op!.sourceAssetId);
+  await markSending(g.id);
+  checkSpecialSend(g, signal);
   const result = await ADAPTERS.fal.createVoice({
-    input: await mediaInput(g.op!.sourceAssetId),
+    input,
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -737,12 +758,15 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
   if (!apiKey || !ADAPTERS.fal.createStyle) throw new Error('Add your fal.ai key in Settings to create Recraft styles.');
   const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
   if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
+  const inputs = await Promise.all(images.map((r) => mediaInput(r)));
+  await markSending(g.id);
+  checkSpecialSend(g, signal);
   const result = await ADAPTERS.fal.createStyle({
-    images: await Promise.all(images.map((r) => mediaInput(r))),
+    images: inputs,
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id, sending: undefined }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -750,7 +774,7 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
 function finishText(id: string, text: string, actualUsd: number | undefined): void {
   const g = get().generations[id];
   if (!g) return;
-  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined });
+  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
   noteExcess(id);
 }
@@ -825,8 +849,7 @@ export async function resumeInterrupted(): Promise<void> {
   for (const g of gens) {
     const job = g.remoteJob;
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
-      const error = job ? `Interrupted by a page reload or tab change. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.` : 'Interrupted by a page reload or tab change. Regenerate to try again.';
-      patchGeneration(g.id, { status: 'error', error, statusText: undefined, finishedAt: Date.now() });
+      patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
       purgeDiscarded(g.id);
       continue;
     }
@@ -835,37 +858,25 @@ export async function resumeInterrupted(): Promise<void> {
   }
 }
 
-export function retryGeneration(id: string): Promise<string[]> {
+export function retryGeneration(id: string, planItemId?: string): Promise<string[]> {
   const ongoing = retrying.get(id);
   if (ongoing) return ongoing;
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
-  // Create a new Generation as another attempt of the same operation.
-  const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
-  patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
-  // The failed attempt's card now shows this one, so the retry's result is seen.
-  relinkAttempt(g.id, newG.id);
-  const retry = runGeneration(newG.id).finally(() => retrying.delete(id));
-  retrying.set(id, retry);
-  return retry;
-}
-
-function relinkAttempt(oldId: string, newId: string): void {
-  for (const [sessionId, session] of Object.entries(useStore.getState().sessions)) {
-    const nodes = session.graph?.nodes ?? [];
-    if (nodes.some((n) => 'generationId' in n.data && n.data.generationId === oldId)) {
-      for (const n of nodes) if ('generationId' in n.data && n.data.generationId === oldId) applyEdit({ session: sessionId, op: { op: 'set', node: n.id, patch: { generationId: newId } as Partial<GraphNode['data']> } });
-    }
-    for (const item of session.feed) {
-      if (item.type === 'generation' && item.generationId === oldId) {
-        updateFeedItem<GenerationFeedItem>(sessionId, item.id, { generationId: newId });
-      } else if (item.type === 'plan' && Object.values(item.stepGenerations).includes(oldId)) {
-        updateFeedItem<PlanFeedItem>(sessionId, item.id, (it) => ({
-          ...it,
-          stepGenerations: Object.fromEntries(Object.entries(it.stepGenerations).map(([step, gid]) => [step, gid === oldId ? newId : gid])),
-        }));
-      }
-    }
+  const held = holdRetry(g, planItemId);
+  if (!held) return Promise.resolve(g.assetIds);
+  try {
+    // Create a new Generation as another attempt of the same operation.
+    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
+    patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
+    // The failed attempt's card now shows this one, so the retry's result is seen.
+    relinkAttempt(g.id, newG.id);
+    const retry = runGeneration(newG.id).finally(() => { retrying.delete(id); held.release(); });
+    retrying.set(id, retry);
+    return retry;
+  } catch (err) {
+    held.release();
+    return Promise.reject(err);
   }
 }
 

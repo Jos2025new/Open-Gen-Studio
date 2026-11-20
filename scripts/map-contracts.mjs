@@ -62,9 +62,10 @@ export default [
       ['src/components/designer/Stage.tsx', 'if (drawingChoiceFirst(sessionId, doc.id, current, erase, { x: e.clientX, y: e.clientY })) return;'],
       ['src/components/designer/DrawingChoice.tsx', "Don&apos;t show again"],
       ['src/engine/design/drawingChoice.ts', 'export function promptAnchor'],
-      ['src/components/shell/settings/DataTab.tsx', 'Ask every time'],
+      ['src/engine/notices.ts', "bringBack: 'Ask every time'"],
+      ['src/components/shell/settings/BudgetTab.tsx', 'const { muted, text } = useNotice(n.id);'],
     ],
-    tests: ['tests/drawing-choice.test.ts', 'tests/drawing-choice-position.test.ts'],
+    tests: ['tests/drawing-choice.test.ts', 'tests/drawing-choice-position.test.ts', 'tests/notices-register.test.ts'],
   },
   {
     id: 'eps-import',
@@ -204,9 +205,19 @@ export default [
     what: 'Todo plan con coste mayor que cero o desconocido espera aprobación, también en Auto.',
     sides: [
       ['src/engine/pricing.ts', 'export function needsSpendCheck'],
-      ['src/engine/agent/runtimeShared.ts', "style === 'auto' && !needsSpendCheck(total)"],
+      ['src/engine/agent/runtimeShared.ts', "style === 'auto' && !needsSpendCheck(preparedTotal ?? planTotal)"],
     ],
     tests: ['tests/engine.test.ts'],
+  },
+  {
+    id: 'credit-recovery',
+    what: 'El sustituto 402 elegido mientras corre el plan se envía por Retry. Regenerate tiene aprobación propia. En Nodos se comparte su bloqueo.',
+    sides: [
+      ['src/engine/credit.ts', 'const held = holdAttemptNode(g, nodes())'],
+      ['src/engine/flow/locks.ts', 'export function holdAttemptNode'],
+      ['src/engine/retryPartial.ts', 'export function planRetryEstimate'],
+    ],
+    tests: ['tests/credit-substitute.test.ts', 'tests/regenerate-node-lock.test.ts'],
   },
   {
     id: 'upscale-note',

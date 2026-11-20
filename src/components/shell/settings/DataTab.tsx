@@ -1,30 +1,18 @@
 import { useRef, useState } from 'react';
-import { Brush, HardDrive, Keyboard, Paintbrush, Trash, TriangleAlert } from '../../ui/icons';
-import { setDrawingPreference } from '../../../engine/design/drawingChoice';
+import { HardDrive, Keyboard, Trash, TriangleAlert } from '../../ui/icons';
 import { shortcutGroups } from '../../../engine/shortcuts';
-import { useStore, wipeAllData } from '../../../store/store';
+import { wipeAllData } from '../../../store/store';
 import { Popover } from '../../ui/Popover';
 import { Button } from '../../ui/primitives';
 import { DataSummary } from '../DataSummary';
 import { SetGroup, SetRow } from './SettingsRows';
 
-/** Painting in Drawing on a layer with editable strokes: the saved choice, and the way back to asking (ADR 0016). */
-function DrawingChoiceSetting() {
-  const pref = useStore((s) => s.ui.drawingChoice ?? 'ask');
-  const labels = { ask: 'Ask every time', flatten: 'Flatten and paint', design: 'Paint in Design', newLayer: 'New layer' } as const;
-  return <SetRow icon={Paintbrush} label="Painting on layers with editable strokes" className="set-row-3">
-    <span className="faint">{labels[pref]}</span>
-    <Button size="sm" variant="ghost" disabled={pref === 'ask'} onClick={() => setDrawingPreference('ask')}>Ask every time</Button>
-  </SetRow>;
-}
-
-/** Settings → Data: what is saved and where, the remembered Drawing choice, and clearing everything (with its own confirmation). */
+/** Settings → Data: what is saved and where, and clearing everything (with its own confirmation). The remembered Drawing choice is in the register of notices (Settings → Budget). */
 export function DataTab() {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   return <>
     <SetGroup icon={HardDrive} title="Storage"><DataSummary /></SetGroup>
-    <SetGroup icon={Brush} title="Drawing"><DrawingChoiceSetting /></SetGroup>
     <SetGroup icon={TriangleAlert} title="Reset">
       <SetRow icon={Trash} label="Local data">
         <Button ref={confirmRef} size="sm" variant="danger" icon={Trash} onClick={() => setConfirmOpen(true)}>

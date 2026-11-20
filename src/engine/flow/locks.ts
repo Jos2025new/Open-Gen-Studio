@@ -1,4 +1,6 @@
-import type { Graph } from '../types';
+import type { Generation, Graph, GraphNode } from '../types';
+import { useStore } from '../../store/store';
+import { toast } from '../../store/toasts';
 
 /*
  * A node run holds the nodes it writes (the nodes it runs) and the nodes it reads (their inputs, up the graph).
@@ -40,4 +42,19 @@ export function lockAssets(ids: string[]): () => void {
 }
 export function assetsInUse(ids: string[]): boolean {
   return [...assetLocks].some(held => ids.some(id => held.has(id)));
+}
+
+type NodeAttempt = Pick<Generation, 'id' | 'sessionId' | 'operationId' | 'origin' | 'stepId'>;
+
+export function attemptNode(g: NodeAttempt, nodes: GraphNode[]): GraphNode | undefined {
+  // Run may fail before linking its result. Its step id is the node id.
+  if (g.origin === 'node' && g.stepId) return nodes.find((n) => n.id === g.stepId);
+  const gens = useStore.getState().generations;
+  return nodes.find((n) => 'generationId' in n.data && n.data.generationId && (gens[n.data.generationId]?.operationId ?? n.data.generationId) === (g.operationId ?? g.id));
+}
+
+/** Regenerate, Retry and a late 402 answer hold the same node for the duration of their attempt. */
+export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[]): { node?: GraphNode; release: () => void } | undefined {
+  const node = attemptNode(g, nodes);
+  try { return { node, release: node ? lockNodes(g.sessionId, [node.id]) : () => {} }; } catch (e) { toast((e as Error).message, 'error'); }
 }

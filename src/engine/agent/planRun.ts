@@ -255,6 +255,8 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const generationId = item?.stepGenerations[stepId];
   if (!item || !review || !generationId || !reviewOpen(item, stepId)) return;
   if (item.plan.workspace === 'node') return; // Nodes spend only through runAction: nothing here may decide or send for them
+  // «Continuar» raises what this step spends above what was approved: over an active limit it needs the same pass as any other spend (PlanCard gives it with «Continue once»).
+  if (decision === 'continue' && overLimit(review.proposed.estimate, sessionId)) { toast(overLimitText(review.proposed.estimate), 'error'); return; }
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
@@ -274,17 +276,14 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const blocked = new Map<string, string>();
   const waiting = new Set<string>();
   const reuseGenerations: Record<string, string> = {};
-  // The executor knows a Nodes plan's steps by node id (`<plan>_<step>`): what it reuses or holds back is keyed the same way.
-  const exec = (id: string) => (latest.plan.workspace === 'node' ? `${latest.plan.id}_${id}` : id);
-  for (const [k, v] of [...prior]) { prior.delete(k); prior.set(exec(k), v); }
   for (const st of chosen) {
     const gid = latest.stepGenerations[st.id];
     const gen = gid ? get().generations[gid] : undefined;
-    if (gen?.status === 'done') prior.set(exec(st.id), { assetIds: gen.assetIds, text: gen.text });
-    else if (gen?.status === 'review') waiting.add(exec(st.id));
-    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[exec(st.id)] = gen.id;
-    else if (gen?.status === 'running') blocked.set(exec(st.id), 'Interrupted by reload; check the existing generation before retrying.');
-    else if (latest.stepStates[st.id] === 'error') blocked.set(exec(st.id), gen?.error ?? 'Failed');
+    if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
+    else if (gen?.status === 'review') waiting.add(st.id);
+    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[st.id] = gen.id;
+    else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
+    else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({ ...it, status: 'running', stepStates: { ...it.stepStates, ...Object.fromEntries([...blocked.keys()].map(id => [id, 'error' as StepState])) } }));
   await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked, waiting, reuseGenerations });
@@ -360,7 +359,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         return;
       }
       // A step that fails again rejects here; its card shows the error, the plan must still settle.
-      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
+      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id, itemId)).catch(() => undefined);
       // A retry creates a new attempt and relinks the plan's step → generation mapping itself (jobs.ts relinkAttempt).
       // The latest attempt of the same operation is the one whose status counts.
       const opId = g.operationId ?? g.id;
@@ -374,9 +373,12 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
     }),
   );
   const prior = new Map<string, StepOutput>();
+  // A retry relinked the plan's step → generation mapping to the new attempt: read the card again, not the copy from before.
+  const relinked = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan') ?? item;
+  const genNow = (id: string) => get().generations[relinked.stepGenerations[id] ?? ''];
   for (const st of chosen) {
     if (item.stepStates[st.id] !== 'done' && !recovered.has(st.id)) continue;
-    const g = genOf(st.id);
+    const g = genNow(st.id);
     prior.set(st.id, g ? { assetIds: g.assetIds, text: g.text } : st.kind === 'text' ? { assetIds: [], text: st.text } : { assetIds: [], layerId: null });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
