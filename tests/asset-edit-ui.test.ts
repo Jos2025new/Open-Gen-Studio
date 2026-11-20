@@ -42,9 +42,10 @@ import { AssetActions } from '../src/components/assets/AssetActions';
 import { SketchEditor } from '../src/components/assets/SketchEditor';
 import { Toasts } from '../src/components/ui/Toasts';
 import { subjectFromAsset } from '../src/engine/actions';
+import { ADAPTERS } from '../src/engine/providers/registry';
 import { canvasToAsset } from '../src/engine/design/actions';
 import { setSketch } from '../src/engine/flow/actions';
-import type { Asset } from '../src/engine/types';
+import type { Asset, ModelSchema, ModelSummary } from '../src/engine/types';
 import { setUi, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -386,5 +387,65 @@ describe('AssetActions and SketchEditor library editing flow', () => {
     expect(boundedLeft + boundedW).toBeLessThanOrEqual(vw - 8);
 
     cleanup();
+  });
+
+  it('applies a mask operation from a Space once confirmed under an active limit (same opSessionId)', async () => {
+    const modelRef = 'fal::fal-ai/ideogram/object-removal';
+    const model: ModelSummary = { ref: modelRef, provider: 'fal', id: 'fal-ai/ideogram/object-removal', name: 'Object Removal', kind: 'image', acceptsText: true, acceptsImage: true };
+    const schema: ModelSchema = { ref: modelRef, source: 'schema', slots: { images: { min: 1, max: 1 }, mask: { key: 'mask_url', kind: 'white' }, promptRequired: false }, params: [] };
+    blobs.set('node-sketch-copy', new Blob(['mask-bytes'], { type: 'image/png' }));
+    const activeSid = useStore.getState().activeSessionId;
+    useStore.setState((st) => ({
+      generations: {},
+      spentUsd: 0.9,
+      assets: {
+        ...st.assets,
+        'node-sketch-copy': { id: 'node-sketch-copy', kind: 'image', mime: 'image/png', width: 120, height: 80, sessionId: activeSid, origin: 'upload', createdAt: 11, stored: true, favorite: false },
+      },
+      catalog: { ...st.catalog, models: { ...st.catalog.models, [modelRef]: model }, schemas: { ...st.catalog.schemas, [modelRef]: schema } },
+      settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'test-key' }, budgetOn: true, budgetUsd: 1, budgetAccepted: null, budgetNoAsk: false },
+      ui: { ...st.ui, space: 'create', sketch: { assetId: 'hero', mode: 'mask' }, toasts: [] },
+    }));
+    const gen = vi.spyOn(ADAPTERS.fal, 'generate').mockResolvedValue({
+      outputs: [{ blob: new Blob(['edited-bytes'], { type: 'image/png' }), mime: 'image/png' }],
+    });
+    try {
+      act(() => {
+        root.render(createElement(SketchEditor));
+      });
+      await paintStroke();
+
+      const applyBtn = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"][aria-label="Editor de imagen"] .sketch-bar > button')]
+        .find((b) => b.textContent?.includes('Quitar objeto'))!;
+      expect(applyBtn).toBeTruthy();
+      applyBtn.getBoundingClientRect = () => ({ left: 200, top: 20, right: 300, bottom: 50, width: 100, height: 30, x: 200, y: 20, toJSON() {} });
+      await act(async () => {
+        applyBtn.click();
+        await flush();
+      });
+
+      const confirmPop = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Aplicar máscara"]')!;
+      expect(confirmPop).toBeTruthy();
+      const continueBtn = [...confirmPop.querySelectorAll<HTMLButtonElement>('.spend-actions button')]
+        .find((b) => b.textContent?.includes('Continue once'))!;
+      expect(continueBtn).toBeTruthy();
+
+      await act(async () => {
+        continueBtn.click();
+        await flush();
+        await flush();
+      });
+
+      expect(useStore.getState().ui.toasts.filter((t) => t.level === 'error')).toEqual([]);
+      expect(gen).toHaveBeenCalledTimes(1);
+      const created = Object.values(useStore.getState().generations);
+      expect(created).toHaveLength(1);
+      expect(created[0].sessionId).not.toBe(activeSid);
+      expect(useStore.getState().sessions[created[0].sessionId]?.hidden).toBe(true);
+    } finally {
+      gen.mockRestore();
+      useStore.setState((st) => ({ ui: { ...st.ui, space: undefined } }));
+      cleanup();
+    }
   });
 });

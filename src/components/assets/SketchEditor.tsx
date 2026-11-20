@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Brush, Eraser, Redo2, Undo2, WandSparkles, X } from '../ui/icons';
 import { opEstimate, runAssetOp } from '../../engine/actions';
+import { opSessionId } from '../../engine/opSession';
 import { saveAssetEdit } from '../../engine/assetRevisions';
 import { opModelFor } from '../../engine/catalog';
 import { assetCanvas, canvasToAsset } from '../../engine/design/actions';
@@ -175,8 +176,8 @@ export function SketchEditor() {
     if (!target) return;
     setSaving(true);
     try {
-      const mask = await canvasToAsset(sessionId, maskCanvas(), 'mask');
       const source = target.assetId;
+      const mask = await canvasToAsset(opSessionId(source, true), maskCanvas(), 'mask');
       close();
       await runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() });
     } catch (err) {
@@ -294,6 +295,8 @@ export function SketchEditor() {
                   lines={[quote.modelName, change.trim() || 'Rellenar con el fondo alrededor']}
                   estimate={quote.estimate}
                   confirmLabel={change.trim() ? 'Editar región' : 'Quitar objeto'}
+                  sessionId={opSessionId(target.assetId)}
+                  resolveSessionId={() => opSessionId(target.assetId, true)}
                   onConfirm={() => (apply.close(), runMask())}
                   onCancel={apply.close}
                 />
