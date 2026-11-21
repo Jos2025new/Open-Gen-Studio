@@ -9,7 +9,7 @@ import { graphHistory, travelGraph } from '../src/engine/flow/history';
 import * as edit from '../src/engine/nodecore/edit';
 import type { Graph, GraphNode } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
-import { rfDrag } from './rf-drag-events';
+import { arrowKey, pointerEvent, rfDrag, touch } from './rf-drag-events';
 
 const flow = vi.hoisted(() => ({
   props: null as null | {
@@ -138,7 +138,11 @@ function watchWrites(sid: string) {
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 // The release of the pointer as the window sees it (the fallback when React Flow sends no end), then its timer.
-const release = async () => { act(() => { window.dispatchEvent(new Event('pointerup')); }); await settle(); };
+const release = async (type: 'mouse' | 'touch' = 'mouse', isPrimary = true) => {
+  act(() => { window.dispatchEvent(pointerEvent('pointerup', type, isPrimary)); });
+  await settle();
+};
+const arrow = (cs: NodeChange[]) => arrowKey(() => flow.props!.onNodesChange(cs));
 
 describe('Gesture bounds from React Flow events', () => {
   type Ev = (e: unknown, ...rest: unknown[]) => void;
@@ -166,9 +170,11 @@ describe('Gesture bounds from React Flow events', () => {
 
   it('closes a flight whose touch target unmounted (no end from React Flow) at the window pointerup', async () => {
     const { sid } = mountCanvas(makeGraph(3));
-    drag.start('n0');
+    rfDrag(() => flow.props, touch(1)).start('n0');
     onCh([pCh('n0', true, pt(40, 25))]);
-    await release();
+    await release('mouse');
+    expect(sPos(sid, 'n0')).toEqual(pt(0, 0));
+    await release('touch');
     expect(sPos(sid, 'n0')).toEqual(pt(40, 25));
     expect(graphHistory(sid, 'undo')).toHaveLength(1);
   });
@@ -188,7 +194,7 @@ describe('Gesture bounds from React Flow events', () => {
     expect(sPos(sid, 'n0')).toEqual(pt(0, 0));
     expect(graphHistory(sid, 'redo')).toHaveLength(1);
     // After that end, arrow keys write again.
-    onCh([pCh('n0', false, pt(5, 0))]);
+    arrow([pCh('n0', false, pt(5, 0))]);
     expect(sPos(sid, 'n0')).toEqual(pt(5, 0));
   });
 
@@ -198,7 +204,7 @@ describe('Gesture bounds from React Flow events', () => {
     onCh([pCh('n0', true, pt(20, 0))]);
     onCh([pCh('n0', false, pt(20, 0))]);
     drag.stop(['n0']);
-    for (const x of [25, 30, 35]) onCh([pCh('n0', false, pt(x, 0))]);
+    for (const x of [25, 30, 35]) arrow([pCh('n0', false, pt(x, 0))]);
     expect(sPos(sid, 'n0')).toEqual(pt(35, 0));
     expect(graphHistory(sid, 'undo')).toHaveLength(2);
     act(() => { expect(tr(sid, 'undo')).toBe(true); });
@@ -210,7 +216,7 @@ describe('Gesture bounds from React Flow events', () => {
     const writes = watchWrites(sid);
     drag.start('n0');
     onCh([pCh('n0', true, pt(50, 20))]);
-    onCh([pCh('n0', false, pt(55, 20))]);
+    arrow([pCh('n0', false, pt(55, 20))]);
     await settle();
     expect(writes()).toBe(0);
     expect(rPos('n0')).toEqual(pt(55, 20));
@@ -219,6 +225,71 @@ describe('Gesture bounds from React Flow events', () => {
     drag.stop(['n0']);
     expect(writes()).toBe(1);
     expect(sPos(sid, 'n0')).toEqual(pt(60, 20));
+  });
+
+  it('keeps a mouse drag open when another finger lifts, and writes its end once (G3 point 1)', async () => {
+    const { sid } = mountCanvas(makeGraph(3));
+    const writes = watchWrites(sid);
+    drag.start('n0');
+    onCh([pCh('n0', true, pt(30, 10))]);
+    await release('touch');
+    onCh([pCh('n0', true, pt(60, 20))]);
+    expect(rPos('n0')).toEqual(pt(60, 20));
+    onCh([pCh('n0', false, pt(60, 20))]);
+    drag.stop(['n0']);
+    await settle();
+    expect(writes()).toBe(1);
+    expect(sPos(sid, 'n0')).toEqual(pt(60, 20));
+  });
+
+  it('ignores a second simultaneous touch gesture until the first ends, with one write (G3 point 2)', async () => {
+    const { sid } = mountCanvas(makeGraph(3));
+    const writes = watchWrites(sid);
+    const a = rfDrag(() => flow.props, touch(1)), b = rfDrag(() => flow.props, touch(2, [1, 2]));
+    a.start('n0');
+    b.start('n2');
+    onCh([pCh('n0', true, pt(30, 10))]);
+    onCh([pCh('n2', true, pt(560, 40))]);
+    expect(rPos('n2')).toEqual(pt(520, 0));
+    onCh([pCh('n0', false, pt(30, 10))]);
+    a.stop(['n0']);
+    onCh([pCh('n2', false, pt(560, 40))]);
+    b.stop(['n2'], { n2: pt(560, 40) });
+    await settle();
+    expect(writes()).toBe(1);
+    expect([sPos(sid, 'n0'), sPos(sid, 'n2')]).toEqual([pt(30, 10), pt(520, 0)]);
+  });
+
+  it('after an early close, ignores that gesture\'s autopan and late batches by identity and still writes later arrows (G3 points 3, 4)', async () => {
+    const { sid } = mountCanvas(makeGraph(3));
+    const writes = watchWrites(sid);
+    drag.start('n0');
+    onCh([pCh('n0', true, pt(40, 0))]);
+    act(() => { window.dispatchEvent(new Event('blur')); });
+    expect(writes()).toBe(1);
+    onCh([pCh('n0', true, pt(80, 0))]);
+    onCh([pCh('n0', false, pt(80, 0))]);
+    // A new gesture on n1: the old autopan still ticks n0 and must not enter it.
+    drag.start('n1');
+    onCh([pCh('n1', true, pt(300, 30)), pCh('n0', true, pt(90, 0))]);
+    expect(rPos('n0')).toEqual(pt(40, 0));
+    onCh([pCh('n1', false, pt(300, 30))]);
+    drag.stop(['n1']);
+    expect(writes()).toBe(2);
+    expect(sPos(sid, 'n0')).toEqual(pt(40, 0));
+    arrow([pCh('n0', false, pt(45, 0))]);
+    expect(sPos(sid, 'n0')).toEqual(pt(45, 0));
+  });
+
+  it('does not fuse an arrow nudge into one brought back by Redo (G3 point 6)', () => {
+    const { sid } = mountCanvas(makeGraph(3));
+    arrow([pCh('n0', false, pt(5, 0))]);
+    act(() => { expect(tr(sid, 'undo')).toBe(true); });
+    act(() => { expect(tr(sid, 'redo')).toBe(true); });
+    arrow([pCh('n0', false, pt(10, 0))]);
+    expect(graphHistory(sid, 'undo')).toHaveLength(2);
+    act(() => { expect(tr(sid, 'undo')).toBe(true); });
+    expect(sPos(sid, 'n0')).toEqual(pt(5, 0));
   });
 
   it('treats onNodeDragStart + onSelectionDragStart of one selection drag as one gesture and one write', () => {

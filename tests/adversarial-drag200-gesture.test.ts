@@ -16,7 +16,7 @@ import * as edit from '../src/engine/nodecore/edit';
 import type { Graph, GraphNode } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
 import { check as checkNodeDrag } from '../scripts/check-node-drag.mjs';
-import { rfDrag } from './rf-drag-events';
+import { arrowKey, rfDrag } from './rf-drag-events';
 
 const flow = vi.hoisted(() => ({
   props: null as null | {
@@ -222,19 +222,24 @@ describe('Gesture attack 1: lifecycle, split drops, autopan, rapid gestures', ()
     const { sid } = mountCanvas(makeGraph(3));
     const writes = watchWrites(sid);
 
-    // @xyflow/react useMoveSelectedNodes emits { type: 'position', position, dragging: false } without dragging: true.
-    onCh([pCh('n0', false, pt(5, 0))]);
+    // @xyflow/react useMoveSelectedNodes emits { type: 'position', position, dragging: false } from its keydown handler.
+    arrowKey(() => flow.props!.onNodesChange([pCh('n0', false, pt(5, 0))]));
     expect(writes()).toBe(1);
     expect(sPos(sid, 'n0')).toEqual(pt(5, 0));
     expect(graphHistory(sid, 'undo')).toHaveLength(1);
   });
 
-  it('does not lose gesture 1 drop when gesture 2 starts in the same onNodesChange batch', () => {
+  it('does not lose gesture 1 drop when gesture 2 starts right after it', async () => {
     const { sid } = mountCanvas(makeGraph(3));
     drag.start('n0');
     onCh([pCh('n0', true, pt(120, 60))]);
-    // Batched transition: n0 drops while n1 starts a new drag in the same changes array.
-    onCh([pCh('n0', false, pt(120, 60)), pCh('n1', true, pt(380, 60))]);
+    // Gesture 1 ends without a stop (an abort); its pointer goes up before gesture 2 can start. A batch carrying n1 before
+    // gesture 2's start is not gesture 1's: items are fixed at each start (XYDrag's dragItems).
+    onCh([pCh('n0', false, pt(120, 60)), pCh('n1', true, pt(999, 999))]);
+    act(() => { window.dispatchEvent(Object.assign(new Event('pointerup'), { pointerType: 'mouse', isPrimary: true })); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    drag.start('n1');
+    onCh([pCh('n1', true, pt(380, 60))]);
     onCh([pCh('n1', false, pt(380, 60))]);
     drag.stop(['n1']);
 
@@ -342,7 +347,8 @@ describe('Gesture attack 2: discard and reconciliation (delete, undo/redo, load,
     expect(rPos('n1')).toEqual(sPos(sid, 'n1'));
     expect(rPos('n1')).toEqual(pt(260, 0));
 
-    onCh([pCh('n0', false, pt(110, 55))]);
+    // React Flow's final batch and stop still carry n1 from its drag items: it stays out of this gesture.
+    onCh([pCh('n0', false, pt(110, 55)), pCh('n1', false, pt(370, 55))]);
     drag.stop(['n0', 'n1'], { n1: pt(370, 55) });
     expect(rPos('n0')).toEqual(sPos(sid, 'n0'));
     expect([sPos(sid, 'n0'), sPos(sid, 'n1')]).toEqual([pt(110, 55), pt(260, 0)]);
