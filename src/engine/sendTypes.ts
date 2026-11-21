@@ -15,4 +15,10 @@ export interface SendRecord {
   index: number;
   status: SendStatus;
   remoteJob?: RemoteJob;
+  /** What this request cost once it delivered: reported, quoted, or its share of the estimate. */
+  costUsd?: number;
+  /** `costUsd` is an estimate (no reported cost and no quote). */
+  estimated?: boolean;
+  /** Already booked to Spending: a record is booked once (sendLedger). */
+  bookedUsd?: number;
 }

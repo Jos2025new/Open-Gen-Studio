@@ -22,7 +22,8 @@ import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, saveNow, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
-import { flushSendSave, interruptedByReload, isFreeSend, markSending, markSendsDone, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { deliverSend, shareOfEstimate } from './sendLedger';
+import { flushSendSave, interruptedByReload, isFreeSend, markSending, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -300,8 +301,8 @@ async function execute(id: string): Promise<string[]> {
           await sleep(wait, signal);
         }
       }
-      if (result.costUsd != null) cost += result.costUsd;
-      else if (quote != null) cost += quote;
+      const reqCost = result.costUsd ?? quote;
+      if (reqCost != null) cost += reqCost;
       else costKnown = false;
       if (result.costUsd != null) providerReportedCost += result.costUsd;
       else providerReportedCostKnown = false;
@@ -314,18 +315,19 @@ async function execute(id: string): Promise<string[]> {
       addAssets(assets);
       delivered.push(...assets);
       assetIds.push(...assets.map((a) => a.id));
-      done += Math.max(1, Math.min(n, result.outputs.length));
-      const sends = markSendsDone(get().generations[id]?.sends, activeReqId);
+      const items = Math.max(1, Math.min(n, result.outputs.length));
+      done += items;
+      // This request delivered: its record carries its cost and is booked now, once (sendLedger).
+      const before = get().generations[id];
+      if (before && (activeReqId || before.sends)) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
       const batchDone = done >= total || !result.outputs.length;
       patchGeneration(id, {
         assetIds: [...assetIds],
         ...(variants ? { variants: variants.slice(done) } : {}),
         sending: undefined,
         remoteJob: undefined,
-        ...(costKnown && !batchDone ? { costSoFar: cost } : {}),
         ...(batchDone && costKnown ? { actualUsd: cost } : {}),
         ...(batchDone && providerReportedCostKnown ? { providerReportedUsd: providerReportedCost } : {}),
-        ...(sends ? { sends } : {}),
       });
       await flushSendSave();
       if (!result.outputs.length) break;
@@ -353,7 +355,6 @@ async function execute(id: string): Promise<string[]> {
     if (err instanceof SendNotCommittedError) {
       const keepLost = Boolean(cur && !isFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
       patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: keepLost, sending: undefined });
-      if (cur?.assetIds.length) chargePartial(cur);
       toast(err.message, 'error', 9000, cur?.planId || keepLost ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
       throw err;
     }
@@ -368,8 +369,6 @@ async function execute(id: string): Promise<string[]> {
     const free = freeSend || (cur ? isFreeSend(cur) : false);
     const lostJob = !free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)));
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
-    // What earlier requests of the batch already delivered was really sent: book it once.
-    if (cur?.assetIds.length && !remoteJob) chargePartial(cur);
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
     if (cur?.sent) logEvent('provider-error', { generation: id, model: cur?.modelName, provider: cur?.provider, jobId: remoteJob?.id, message: (err as Error).message, sent: cur.sent });
@@ -417,7 +416,6 @@ export async function resumeInterrupted(): Promise<void> {
         continue;
       }
       patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
-      if (g.assetIds.length && !job) chargePartial(g);
       purgeDiscarded(g.id);
       continue;
     }

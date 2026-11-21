@@ -56,6 +56,11 @@ const patchG = (id: string, patch: Partial<Generation>) => useStore.setState((s)
 const rj = (id: string) => ({ provider: 'nanogpt' as const, id, meta: {} });
 const reload = async () => { running.clear(); controllers.clear(); await useStore.persist.rehydrate(); await resumeInterrupted(); };
 const spent = () => useStore.getState().spentUsd;
+/** Reload from the saved copy only: memory is wiped first, so what counts is what reached the disk. */
+const reloadFromDisk = async () => { useStore.setState({ generations: {}, spentUsd: -1, spendLog: [] }); await reload(); };
+/** A request delivered and booked before the reload (the ledger the app saves). */
+const bookedSend = (id: string, index: number, job?: string) => ({ id, index, status: 'done' as const, costUsd: 0.1, bookedUsd: 0.1, ...(job ? { remoteJob: rj(job) } : {}) });
+const seedSpent = () => useStore.setState({ spentUsd: 0.1, spendLog: [{ at: 1, usd: 0.1, category: 'image', provider: 'nanogpt', model: NANO, estimated: false }] as never });
 const mkAsset = (id: string, g: string) => ({ id, kind: 'image', mime: 'image/png', width: 512, height: 512, sessionId: sid(), origin: 'generated', generationId: g, stored: true, favorite: false, createdAt: 1 }) as never;
 
 beforeEach(() => {
@@ -91,17 +96,19 @@ describe('Gasto de lotes a medias: lo anotado es lo realmente entregado, una sol
     await expect(runGeneration(g.id)).rejects.toThrow();
     expect(genOf(g.id).assetIds).toHaveLength(1);
     expect(spent()).toBeCloseTo(0.1);
-    await reload(); await reload();
+    await reloadFromDisk(); await reloadFromDisk();
     expect(spent()).toBeCloseTo(0.1);
     expect(useStore.getState().spendLog).toHaveLength(1);
+    expect(genOf(g.id).sends?.filter((s) => s.bookedUsd != null)).toHaveLength(1);
   });
 
   it('N2: recarga a mitad de lote síncrono: se anota lo entregado, una vez tras dos recargas', async () => {
     const g = make(2);
     useStore.setState((s) => ({ assets: { ...s.assets, p0: mkAsset('p0', g.id) } }));
-    patchG(g.id, { status: 'running', assetIds: ['p0'], costSoFar: 0.1 });
+    patchG(g.id, { status: 'running', assetIds: ['p0'], sends: [bookedSend('r0', 0)] });
+    seedSpent();
     await saveNow();
-    await reload(); await reload();
+    await reloadFromDisk(); await reloadFromDisk();
     expect(genOf(g.id).status).toBe('error');
     expect(spent()).toBeCloseTo(0.1);
     expect(useStore.getState().spendLog).toHaveLength(1);
@@ -110,27 +117,80 @@ describe('Gasto de lotes a medias: lo anotado es lo realmente entregado, una sol
   it('N1: recarga a mitad de lote remoto: se cobra lo anterior más el último, una vez', async () => {
     const g = make(2);
     useStore.setState((s) => ({ assets: { ...s.assets, p0: mkAsset('p0', g.id) } }));
-    patchG(g.id, { status: 'running', assetIds: ['p0'], costSoFar: 0.1, remoteJob: rj('j2'), sends: [{ id: 'r0', index: 0, status: 'done', remoteJob: rj('j1') }, { id: 'r1', index: 1, status: 'sent', remoteJob: rj('j2') }] });
+    patchG(g.id, { status: 'running', assetIds: ['p0'], remoteJob: rj('j2'), sends: [bookedSend('r0', 0, 'j1'), { id: 'r1', index: 1, status: 'sent', remoteJob: rj('j2') }] });
+    seedSpent();
     await saveNow();
     vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValue(imgOut('two', 0.1));
-    await resumeInterrupted(); await running.get(g.id);
-    await reload(); await reload();
+    await reloadFromDisk(); await running.get(g.id);
+    await reloadFromDisk(); await reloadFromDisk();
+    expect(genOf(g.id).status).toBe('done');
     expect(genOf(g.id).assetIds).toHaveLength(2);
     expect(spent()).toBeCloseTo(0.2);
-    expect(useStore.getState().spendLog).toHaveLength(1);
+    expect(useStore.getState().spendLog).toHaveLength(2);
+    expect(genOf(g.id).actualUsd).toBeCloseTo(0.2);
   });
 
   it('N1 parcial: lote remoto que queda a medias suma lo anterior y lo recibido', async () => {
     const g = make(3);
     useStore.setState((s) => ({ assets: { ...s.assets, p0: mkAsset('p0', g.id) } }));
-    patchG(g.id, { status: 'running', assetIds: ['p0'], costSoFar: 0.1, remoteJob: rj('j2'), sends: [{ id: 'r0', index: 0, status: 'done', remoteJob: rj('j1') }, { id: 'r1', index: 1, status: 'sent', remoteJob: rj('j2') }] });
+    patchG(g.id, { status: 'running', assetIds: ['p0'], remoteJob: rj('j2'), sends: [bookedSend('r0', 0, 'j1'), { id: 'r1', index: 1, status: 'sent', remoteJob: rj('j2') }] });
+    seedSpent();
     await saveNow();
     vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValue(imgOut('two', 0.1));
-    await resumeInterrupted(); await running.get(g.id);
+    await reloadFromDisk(); await running.get(g.id);
     expect(genOf(g.id).status).toBe('error');
     expect(spent()).toBeCloseTo(0.2);
-    await reload();
+    await reloadFromDisk(); await reloadFromDisk();
     expect(spent()).toBeCloseTo(0.2);
+    expect(useStore.getState().spendLog).toHaveLength(2);
+    expect(genOf(g.id).sends?.filter((s) => s.status === 'done').map((s) => s.bookedUsd)).toEqual([0.1, 0.1]);
+  });
+
+  it('GPT N2: una entrega sin precio y otra posterior con importe: se anota el importe aunque falle la 3.ª', async () => {
+    useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [NANO]: { ...s.catalog.models[NANO], price: undefined } } } as never }));
+    let n = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => { n += 1; if (n === 3) throw new HttpError(500, 'boom', {}); return { ...imgOut(`a${n}`), costUsd: n === 2 ? 0.3 : undefined }; });
+    const g = make(3);
+    patchG(g.id, { estimate: { usd: null, approximate: true } });
+    await expect(runGeneration(g.id)).rejects.toThrow();
+    expect(genOf(g.id).assetIds).toHaveLength(2);
+    expect(spent()).toBeCloseTo(0.3);
+    await reloadFromDisk(); await reloadFromDisk();
+    expect(spent()).toBeCloseTo(0.3);
+  });
+
+  it('GPT: abortar tras recargar mientras se sigue el 2.º trabajo deja anotado el 1.º', async () => {
+    let n = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async (opts) => {
+      if (++n === 1) return imgOut('a1');
+      opts.onRemoteJob?.(rj('j2'));
+      return new Promise(() => undefined);
+    });
+    const g = make(2);
+    void runGeneration(g.id).catch(() => undefined);
+    await vi.waitFor(() => expect(disk.raw ?? '').toContain('"j2"'));
+    vi.spyOn(ADAPTERS.nanogpt, 'resume').mockRejectedValue(new DOMException('stopped', 'AbortError'));
+    await reloadFromDisk(); await running.get(g.id);
+    expect(genOf(g.id).status).toBe('canceled');
+    expect(spent()).toBeCloseTo(0.1);
+    await reloadFromDisk(); await reloadFromDisk();
+    expect(spent()).toBeCloseTo(0.1);
+    expect(useStore.getState().spendLog).toHaveLength(1);
+  });
+
+  it('GPT: cambio de proveedor que reutiliza la generación y falla antes de entregar no vuelve a anotar el 1.º', async () => {
+    let n = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => { if (++n >= 2) throw new HttpError(500, 'boom', {}); return imgOut('a1'); });
+    const g = make(2);
+    await expect(runGeneration(g.id)).rejects.toThrow();
+    expect(spent()).toBeCloseTo(0.1);
+    // The substitute is dearer: a new proportional share of the first item would be $0.15.
+    patchG(g.id, { status: 'queued', estimate: { usd: 0.3, approximate: true }, retryBaseEstimate: { usd: 0.3, approximate: true } });
+    await expect(runGeneration(g.id)).rejects.toThrow();
+    expect(spent()).toBeCloseTo(0.1);
+    await reloadFromDisk();
+    expect(spent()).toBeCloseTo(0.1);
+    expect(useStore.getState().spendLog).toHaveLength(1);
   });
 
   it('bajo: un envío gratis que falla por red no queda incierto', async () => {

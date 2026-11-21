@@ -332,8 +332,6 @@ export interface Generation {
   estimate: Estimate;
   retryBaseEstimate?: Estimate;
   retryTotal?: number;
-  costSoFar?: number;
-  chargedUsd?: number;
   actualUsd?: number;
   /** Reported cost. */
   providerReportedUsd?: number;
