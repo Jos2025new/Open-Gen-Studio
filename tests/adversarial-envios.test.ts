@@ -430,21 +430,29 @@ describe('4. Reenvío de un incierto', () => {
     expect(confirmSpy).not.toHaveBeenCalled(); expect(genSpy).toHaveBeenCalledTimes(1);
   });
 
-  it.fails('GenerationRecovery (over=true): Continue once NO salta confirmación (RecoveryActions.tsx:73-89)', async () => {
-    setupCatalog({ budgetOn: true, budgetLimit: 0.05 });
+  it('GenerationRecovery (over=true): Continue once NO salta confirmación (RecoveryActions.tsx:73-89)', async () => {
+    const g = uGen({ estimate: { usd: 0.5, approximate: false } });
+    useStore.setState((s) => ({ settings: { ...s.settings, budgetOn: true, budgetUsd: 0.05 } }));
     const genSpy = spyN().mockResolvedValue(imgOut('bypass'));
-    const host = mount(createElement(GenerationRecovery, { g: uGen({ estimate: { usd: 0.5, approximate: false } }) }));
+    const host = mount(createElement(GenerationRecovery, { g }));
     await act(async () => { btn(host, /Continue once/).click(); await tick(); });
     expect(genSpy).not.toHaveBeenCalled(); expect(host.textContent).toMatch(/May have been charged/i);
+    await act(async () => { btn(host, /Cancel/).click(); await tick(); });
+    expect(genSpy).not.toHaveBeenCalled();
+    await act(async () => { btn(host, /Don’t ask again/).click(); await tick(); });
+    expect(genSpy).not.toHaveBeenCalled(); expect(host.textContent).toMatch(/May have been charged/i);
+    expect(useStore.getState().sessions[sid()].noAskOverLimit).toBeFalsy();
   });
 
-  it.fails('PlanRecoveryChips: paso incierto exige confirmación (RecoveryActions.tsx:19-50)', async () => {
+  it('PlanRecoveryChips: paso incierto exige confirmación (RecoveryActions.tsx:19-50)', async () => {
     const genSpy = spyN().mockResolvedValue(imgOut('bypass'));
     const g = uGen({ planId: 'plan_u', stepId: 's1' });
     const item = putPlan('it_pu', 'plan_u', 'error', [mkStep('s1')], { s1: 'error' }, { s1: g.id });
     const host = mount(createElement(PlanRecoveryChips, { sessionId: sid(), item }));
     await act(async () => { btn(host, /Retry failed/).click(); await tick(); });
     expect(genSpy).not.toHaveBeenCalled(); expect(host.textContent).toMatch(/May have been charged/i);
+    await act(async () => { btn(host, /Cancel/).click(); await tick(); });
+    expect(genSpy).not.toHaveBeenCalled();
   });
 });
 
