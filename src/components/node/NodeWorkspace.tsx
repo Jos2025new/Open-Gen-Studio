@@ -12,14 +12,13 @@ import {
   type EdgeChange,
 } from '@xyflow/react';
 import { setUi, toast, useStore } from '../../store/store';
-import { editPresentation } from '../../engine/nodecore/edit';
 import { ensureOmniNodes } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { focusNodes, setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
-import type { GraphGroup, GraphNode, GraphNodeData } from '../../engine/types';
+import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover } from '../ui/Popover';
 import { StudioNode, type FlowNode } from './nodes';
@@ -37,7 +36,8 @@ import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from '.
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
 import { LinkBar, useDeleteRequest } from './LinkBar';
-import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { copyNodes, cutNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { liveGroupsMap, useNodeDrag } from './useNodeDrag';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
 import { loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
@@ -48,7 +48,6 @@ import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
 import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
-const EMPTY_DRAG_POS = new Map<string, { x: number; y: number }>();
 
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
 function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?: boolean }) {
@@ -136,11 +135,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
-  // In-flight drag positions stay local to the canvas so moving cards never writes the store or history.
-  const [dragPos, setDragPos] = useState<Map<string, { x: number; y: number }>>(EMPTY_DRAG_POS);
-  const dragPosRef = useRef(dragPos);
-  dragPosRef.current = dragPos;
-  useEffect(() => { dragPosRef.current = EMPTY_DRAG_POS; setDragPos(EMPTY_DRAG_POS); }, [sessionId]);
+  const { dragPos, applyDragChanges } = useNodeDrag(sessionId, measuredRef);
 
   const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -171,99 +166,23 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
 
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
-      const previewMoves = new Map<string, { x: number; y: number }>();
-      const commitMoves = new Map<string, { x: number; y: number }>();
-      const droppedIds = new Set<string>();
       const removed: string[] = [];
       const picks: Array<[string, boolean]> = [];
       const sizes: Array<[string, { width: number; height: number }]> = [];
-      const previewFrames: Array<[GraphGroup, { x: number; y: number }]> = [];
-      const commitFrames: Array<[GraphGroup, { x: number; y: number } | undefined]> = [];
-      const liveGraph = useStore.getState().sessions[sessionId]?.graph;
-      const groupById = new Map((liveGraph?.groups ?? []).map((g) => [g.id, g]));
+      const { liveGraph, groupById } = liveGroupsMap(sessionId);
       for (const c of changes) {
-        // A group frame: dragging it moves its nodes; selecting it selects them; deleting it ungroups.
+        // A group frame: selecting it selects its nodes; deleting it ungroups; position is handled in applyDragChanges.
         if ('id' in c && groupById.has(c.id)) {
           const g = groupById.get(c.id)!;
-          if (c.type === 'position') {
-            if (c.dragging === true) { if (c.position) previewFrames.push([g, c.position]); }
-            else commitFrames.push([g, c.position]);
-          }
-          else if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
+          if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
           else if (c.type === 'remove') ungroup(sessionId, g.id);
           continue;
         }
         if (c.type === 'dimensions' && c.dimensions) sizes.push([c.id, c.dimensions]);
-        else if (c.type === 'position') {
-          if (c.dragging === true) {
-            if (c.position) previewMoves.set(c.id, c.position);
-          } else {
-            const pos = c.position ?? dragPosRef.current.get(c.id);
-            if (pos) commitMoves.set(c.id, pos);
-            droppedIds.add(c.id);
-          }
-        }
         else if (c.type === 'remove') removed.push(c.id);
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
-      const currentDrag = dragPosRef.current;
-      const liveNodesById = (previewFrames.length || commitFrames.length) && liveGraph
-        ? new Map(liveGraph.nodes.map((n) => [n.id, n]))
-        : null;
-      const previewPosOf = (n: GraphNode) => commitMoves.get(n.id) ?? previewMoves.get(n.id) ?? currentDrag.get(n.id) ?? n.position;
-      // A dragged frame moves its nodes — unless they are selected too, then they already moved with it.
-      for (const [g, p] of previewFrames) {
-        if (g.nodeIds.some((id) => previewMoves.has(id) || commitMoves.has(id))) continue;
-        const members: GraphNode[] = [];
-        for (const id of g.nodeIds) {
-          const n = liveNodesById?.get(id);
-          if (n) members.push({ ...n, position: previewPosOf(n) });
-        }
-        const b = groupBounds(members, measuredRef.current);
-        if (b) {
-          const dx = p.x - b.x, dy = p.y - b.y;
-          for (const m of members) previewMoves.set(m.id, { x: m.position.x + dx, y: m.position.y + dy });
-        }
-      }
-      for (const [g, p] of commitFrames) {
-        if (g.nodeIds.some((id) => previewMoves.has(id) || commitMoves.has(id))) continue;
-        const members: GraphNode[] = [];
-        for (const id of g.nodeIds) {
-          const n = liveNodesById?.get(id);
-          if (n) members.push({ ...n, position: previewPosOf(n) });
-        }
-        const b = groupBounds(members, measuredRef.current);
-        const dx = p && b ? p.x - b.x : 0;
-        const dy = p && b ? p.y - b.y : 0;
-        for (const m of members) {
-          commitMoves.set(m.id, { x: m.position.x + dx, y: m.position.y + dy });
-          droppedIds.add(m.id);
-        }
-      }
-      if (previewMoves.size || droppedIds.size || removed.length) {
-        const next = new Map(currentDrag);
-        for (const id of droppedIds) next.delete(id);
-        for (const id of removed) next.delete(id);
-        for (const [id, pos] of previewMoves) next.set(id, pos);
-        const resolved = next.size ? next : EMPTY_DRAG_POS;
-        dragPosRef.current = resolved;
-        setDragPos(resolved);
-      }
-      if (commitMoves.size && liveGraph) {
-        const moved = liveGraph.nodes.some((n) => {
-          const p = commitMoves.get(n.id);
-          return p !== undefined && (p.x !== n.position.x || p.y !== n.position.y);
-        });
-        if (moved) {
-          editPresentation(sessionId, (g) => ({
-            ...g,
-            nodes: g.nodes.map((n) => {
-              const p = commitMoves.get(n.id);
-              return p && (p.x !== n.position.x || p.y !== n.position.y) ? { ...n, position: p } : n;
-            }),
-          }));
-        }
-      }
+      applyDragChanges(changes, liveGraph, groupById, removed);
       if (removed.length) deleteNodes(sessionId, removed);
       // Functional updates: several reports can arrive before a re-render; none may be lost.
       if (picks.length || removed.length) {
@@ -279,7 +198,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id)).map(([id]) => id));
       if (fresh.size) settleNewNodes(sessionId, fresh, new Map([...measuredRef.current, ...sizes]));
     },
-    [sessionId],
+    [sessionId, applyDragChanges],
   );
 
   const onEdgesChange = useCallback(
