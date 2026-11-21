@@ -6,7 +6,7 @@ export default [
     sides: [
       ['scripts/check-commands.mjs', 'function inspect('],
       ['scripts/check-all.mjs', "['commands', 'node', ['scripts/check-commands.mjs']]"],
-      ['package.json', 'node scripts/check-commands.mjs'],
+      ['package.json', '"test": "node scripts/check-all.mjs && vitest run"'],
       ['src/engine/design/commands.ts', 'check-commands: reads-active'],
       ['src/store/commands.ts', 'check-commands: reads-active'],
     ],

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,8 +12,12 @@ function fixture(file: string, code: string) {
 }
 
 describe('check-node-drag AST guard', () => {
-  it('passes on the real src/ tree', () => {
+  it('passes on the real src/ tree and is wired into npm test via check-all', () => {
     expect(check('.')).toEqual([]);
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
+    const checkAll = readFileSync('scripts/check-all.mjs', 'utf8');
+    expect(pkg.scripts.test).toContain('node scripts/check-all.mjs');
+    expect(checkAll).toContain('scripts/check-node-drag.mjs');
   });
 
   it('rejects editPresentation or helper calls inside dragging: true branch of onNodesChange', () => {

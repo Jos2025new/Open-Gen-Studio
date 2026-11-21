@@ -61,7 +61,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/agent` | 64 | 153 |
 | `src/engine/commands` | 7 | 21 |
 | `src/engine/design` | 163 | 207 |
-| `src/engine/flow` | 19 | 74 |
+| `src/engine/flow` | 19 | 75 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 23 | 38 |
