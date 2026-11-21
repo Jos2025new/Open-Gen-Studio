@@ -111,7 +111,7 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
   const key = `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
   const time = Date.now();
   const last = s.past.at(-1);
-  if (!group && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
+  if (!group && !moved && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
     last.after = structuredClone(after); last.time = time;
   } else {
     s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time });

@@ -33,14 +33,6 @@ function calleeName(callee) {
   return '';
 }
 
-function isForbiddenCall(node) {
-  if (node.type !== 'CallExpression') return null;
-  const full = calleeName(node.callee);
-  const short = full.includes('.') ? full.split('.').pop() : full;
-  if (FORBIDDEN_CALLS.has(short) || full === 'JSON.stringify') return full;
-  return null;
-}
-
 function walkSubtree(node, fn) {
   if (!node || typeof node.type !== 'string') return;
   if (fn(node) === false) return;
@@ -51,26 +43,53 @@ function walkSubtree(node, fn) {
   }
 }
 
+function isDraggingMember(node) {
+  return node?.type === 'MemberExpression' && node.property?.name === 'dragging';
+}
+
 function isDraggingTrueTest(test) {
-  let found = false;
-  walkSubtree(test, (n) => {
-    if (n.type === 'BinaryExpression' && n.left?.type === 'MemberExpression' && n.left.property?.name === 'dragging') {
-      if ((n.operator === '===' || n.operator === '==') && n.right?.type === 'Literal' && n.right.value === true) found = true;
-      if ((n.operator === '!==' || n.operator === '!=') && n.right?.type === 'Literal' && n.right.value === false) found = true;
-    }
-    if (n.type === 'MemberExpression' && n.property?.name === 'dragging') {
-      // Positive truthiness check like `if (c.dragging)` when not negated.
-      found = true;
-    }
-    if (n.type === 'UnaryExpression' && n.operator === '!' && n.argument?.type === 'MemberExpression' && n.argument.property?.name === 'dragging') {
-      return false;
-    }
-    if (n.type === 'BinaryExpression' && n.left?.type === 'MemberExpression' && n.left.property?.name === 'dragging' &&
-        (n.operator === '===' || n.operator === '==') && n.right?.type === 'Literal' && n.right.value === false) {
-      return false;
-    }
-  });
-  return found;
+  if (!test) return false;
+  if (test.type === 'LogicalExpression' && test.operator === '&&') {
+    return isDraggingTrueTest(test.left) || isDraggingTrueTest(test.right);
+  }
+  if (isDraggingMember(test)) return true;
+  if (test.type === 'BinaryExpression') {
+    const { left, right, operator } = test;
+    if ((operator === '===' || operator === '==') &&
+        ((isDraggingMember(left) && right?.type === 'Literal' && right.value === true) ||
+         (isDraggingMember(right) && left?.type === 'Literal' && left.value === true))) return true;
+    if ((operator === '!==' || operator === '!=') &&
+        ((isDraggingMember(left) && right?.type === 'Literal' && right.value === false) ||
+         (isDraggingMember(right) && left?.type === 'Literal' && left.value === false))) return true;
+  }
+  return false;
+}
+
+function isDraggingFalseTest(test) {
+  if (!test) return false;
+  if (test.type === 'LogicalExpression' && test.operator === '&&') {
+    return isDraggingFalseTest(test.left) || isDraggingFalseTest(test.right);
+  }
+  if (test.type === 'UnaryExpression' && test.operator === '!') {
+    return isDraggingMember(test.argument) || isDraggingTrueTest(test.argument);
+  }
+  if (test.type === 'BinaryExpression') {
+    const { left, right, operator } = test;
+    if ((operator === '===' || operator === '==') &&
+        ((isDraggingMember(left) && right?.type === 'Literal' && right.value === false) ||
+         (isDraggingMember(right) && left?.type === 'Literal' && left.value === false))) return true;
+    if ((operator === '!==' || operator === '!=') &&
+        ((isDraggingMember(left) && right?.type === 'Literal' && right.value === true) ||
+         (isDraggingMember(right) && left?.type === 'Literal' && left.value === true))) return true;
+  }
+  return false;
+}
+
+function alwaysExits(stmt) {
+  if (!stmt) return false;
+  if (stmt.type === 'ReturnStatement' || stmt.type === 'ContinueStatement' || stmt.type === 'ThrowStatement' || stmt.type === 'BreakStatement') return true;
+  if (stmt.type === 'BlockStatement' && stmt.body.length) return alwaysExits(stmt.body.at(-1));
+  return false;
 }
 
 function checksDraggingAnywhere(fnNode) {
@@ -103,7 +122,42 @@ export function check(root = '.') {
     allowed: new Set(),
     what: 'node drag performance guards',
     rules: ({ rel, program }) => {
-      // Collect top-level / local helper functions that reach forbidden calls.
+      // Collect imported and local aliases to forbidden calls + top-level/local helper functions.
+      const importAliases = new Map();
+      const resolveAlias = (name) => importAliases.get(name) ?? name;
+      for (const stmt of program.body) {
+        if (stmt.type === 'ImportDeclaration') {
+          for (const spec of stmt.specifiers ?? []) {
+            if (spec.type === 'ImportSpecifier') {
+              const imported = spec.imported?.type === 'Identifier' ? spec.imported.name : spec.imported?.value;
+              if (FORBIDDEN_CALLS.has(imported)) importAliases.set(spec.local.name, imported);
+            }
+          }
+        }
+      }
+      walkSubtree(program, (n) => {
+        if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier' && n.init) {
+          if (n.init.type === 'Identifier') {
+            const resolved = resolveAlias(n.init.name);
+            if (FORBIDDEN_CALLS.has(resolved)) importAliases.set(n.id.name, resolved);
+          } else if (n.init.type === 'MemberExpression') {
+            const prop = n.init.property?.type === 'Identifier' ? n.init.property.name : n.init.property?.value;
+            if (prop && FORBIDDEN_CALLS.has(prop)) importAliases.set(n.id.name, prop);
+          }
+        }
+      });
+
+      const isForbidden = (node) => {
+        if (node.type !== 'CallExpression') return null;
+        const full = calleeName(node.callee);
+        const short = full.includes('.') ? full.split('.').pop() : full;
+        const resolved = resolveAlias(short);
+        if (FORBIDDEN_CALLS.has(resolved) || full === 'JSON.stringify') {
+          return resolved !== short ? `${full} -> ${resolved}` : full;
+        }
+        return null;
+      };
+
       const localBodies = new Map();
       for (const stmt of program.body) {
         if (stmt.type === 'FunctionDeclaration' && stmt.id) localBodies.set(stmt.id.name, stmt.body);
@@ -116,13 +170,14 @@ export function check(root = '.') {
         }
       }
       const reachesForbidden = (fnName, seen = new Set()) => {
-        if (FORBIDDEN_CALLS.has(fnName)) return fnName;
+        const resolved = resolveAlias(fnName);
+        if (FORBIDDEN_CALLS.has(resolved)) return resolved !== fnName ? `${fnName} -> ${resolved}` : fnName;
         if (seen.has(fnName) || !localBodies.has(fnName)) return null;
         seen.add(fnName);
         let hit = null;
         walkSubtree(localBodies.get(fnName), (n) => {
           if (hit) return false;
-          const direct = isForbiddenCall(n);
+          const direct = isForbidden(n);
           if (direct) { hit = direct; return false; }
           if (n.type === 'CallExpression' && n.callee?.type === 'Identifier') {
             const sub = reachesForbidden(n.callee.name, seen);
@@ -134,7 +189,7 @@ export function check(root = '.') {
 
       const flagCallsInSubtree = (rootNode, report) => {
         walkSubtree(rootNode, (n) => {
-          const direct = isForbiddenCall(n);
+          const direct = isForbidden(n);
           if (direct) { report(n, `Escritura/serialización durante el arrastre (${direct}). ${DRAG_HINT}`); return; }
           if (n.type === 'CallExpression' && n.callee?.type === 'Identifier') {
             const via = reachesForbidden(n.callee.name);
@@ -148,13 +203,59 @@ export function check(root = '.') {
           flagCallsInSubtree(fnNode.body, report);
           return;
         }
-        // `onNodesChange`: flag any forbidden call inside a `dragging === true` branch, OR an unguarded position commit.
-        walkSubtree(fnNode.body, (n) => {
-          if (n.type === 'IfStatement' && isDraggingTrueTest(n.test)) {
-            flagCallsInSubtree(n.consequent, report);
-            return false;
+        // `onNodesChange` / `applyDragChanges`: flag any forbidden call in any dragging-true path, OR an unguarded position commit.
+        const walkDraggingPaths = (node) => {
+          if (!node || typeof node.type !== 'string') return;
+          if (node.type === 'BlockStatement' && Array.isArray(node.body)) {
+            for (let i = 0; i < node.body.length; i++) {
+              const stmt = node.body[i];
+              if (stmt.type === 'IfStatement') {
+                if (isDraggingTrueTest(stmt.test)) {
+                  flagCallsInSubtree(stmt.consequent, report);
+                  if (stmt.alternate) walkDraggingPaths(stmt.alternate);
+                  continue;
+                }
+                if (isDraggingFalseTest(stmt.test)) {
+                  walkDraggingPaths(stmt.consequent);
+                  if (stmt.alternate) flagCallsInSubtree(stmt.alternate, report);
+                  if (alwaysExits(stmt.consequent)) {
+                    for (const rest of node.body.slice(i + 1)) flagCallsInSubtree(rest, report);
+                    break;
+                  }
+                  continue;
+                }
+              }
+              walkDraggingPaths(stmt);
+            }
+            return;
           }
-        });
+          if (node.type === 'IfStatement') {
+            if (isDraggingTrueTest(node.test)) {
+              flagCallsInSubtree(node.consequent, report);
+              if (node.alternate) walkDraggingPaths(node.alternate);
+              return;
+            }
+            if (isDraggingFalseTest(node.test)) {
+              walkDraggingPaths(node.consequent);
+              if (node.alternate) flagCallsInSubtree(node.alternate, report);
+              return;
+            }
+          }
+          if (node.type === 'ConditionalExpression') {
+            if (isDraggingTrueTest(node.test)) { flagCallsInSubtree(node.consequent, report); return; }
+            if (isDraggingFalseTest(node.test)) { flagCallsInSubtree(node.alternate, report); return; }
+          }
+          if (node.type === 'LogicalExpression') {
+            if (node.operator === '&&' && isDraggingTrueTest(node.left)) { flagCallsInSubtree(node.right, report); return; }
+            if (node.operator === '||' && isDraggingFalseTest(node.left)) { flagCallsInSubtree(node.right, report); return; }
+          }
+          for (const k of Object.keys(node)) {
+            const child = node[k];
+            if (Array.isArray(child)) child.forEach(walkDraggingPaths);
+            else if (child && typeof child === 'object') walkDraggingPaths(child);
+          }
+        };
+        walkDraggingPaths(fnNode.body);
         if (!checksDraggingAnywhere(fnNode.body)) {
           // If `onNodesChange` touches `position` changes AND commits without checking `dragging`, flag the commit.
           let mentionsPosition = false;
@@ -163,9 +264,14 @@ export function check(root = '.') {
           });
           if (mentionsPosition) {
             walkSubtree(fnNode.body, (n) => {
-              const direct = isForbiddenCall(n);
+              const direct = isForbidden(n);
               if (direct && direct !== 'ungroup' && direct !== 'deleteNodes') {
                 report(n, `Commit de posición en onNodesChange sin distinguir \`dragging: false\` (${direct}). ${DRAG_HINT}`);
+                return;
+              }
+              if (n.type === 'CallExpression' && n.callee?.type === 'Identifier') {
+                const via = reachesForbidden(n.callee.name);
+                if (via) report(n, `Commit de posición en onNodesChange sin distinguir \`dragging: false\` (${via}). ${DRAG_HINT}`);
               }
             });
           }

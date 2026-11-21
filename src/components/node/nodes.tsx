@@ -129,14 +129,17 @@ function HistoryOutput({ node, generation: g, assetId, index, number, onOpen }: 
   </div>;
 }
 
-const historyByNodeCache = new WeakMap<Record<string, Generation>, Map<string, Generation[]>>();
+const historyByNodeCache = new WeakMap<Record<string, Generation>, { byNode: Map<string, Generation[]>; order: Map<string, number> }>();
 const EMPTY_GENERATIONS: Generation[] = [];
 
-function nodeGenerationHistory(generations: Record<string, Generation>, sessionId: string, nodeId: string, current?: string): Generation[] {
-  let byNode = historyByNodeCache.get(generations);
-  if (!byNode) {
-    byNode = new Map();
+export function nodeGenerationHistory(generations: Record<string, Generation>, sessionId: string, nodeId: string, current?: string): Generation[] {
+  let cached = historyByNodeCache.get(generations);
+  if (!cached) {
+    const byNode = new Map<string, Generation[]>();
+    const order = new Map<string, number>();
+    let i = 0;
     for (const g of Object.values(generations)) {
+      order.set(g.id, i++);
       if (g.status === 'done' && !g.assetIds.length && g.text == null) continue;
       const k = `${g.sessionId}\0${g.stepId}`;
       const list = byNode.get(k);
@@ -144,14 +147,15 @@ function nodeGenerationHistory(generations: Record<string, Generation>, sessionI
       else byNode.set(k, [g]);
     }
     for (const list of byNode.values()) if (list.length > 1) list.sort((a, b) => a.createdAt - b.createdAt);
-    historyByNodeCache.set(generations, byNode);
+    cached = { byNode, order };
+    historyByNodeCache.set(generations, cached);
   }
-  const bucket = byNode.get(`${sessionId}\0${nodeId}`) ?? EMPTY_GENERATIONS;
+  const bucket = cached.byNode.get(`${sessionId}\0${nodeId}`) ?? EMPTY_GENERATIONS;
   const cur = current ? generations[current] : undefined;
   if (!cur || (cur.status === 'done' && !cur.assetIds.length && cur.text == null) || bucket.some((g) => g.id === cur.id)) {
     return bucket;
   }
-  return [...bucket, cur].sort((a, b) => a.createdAt - b.createdAt);
+  return [...bucket, cur].sort((a, b) => (a.createdAt - b.createdAt) || ((cached!.order.get(a.id) ?? 0) - (cached!.order.get(b.id) ?? 0)));
 }
 
 const detachedGroupCache = new WeakMap<GraphGroup[], Map<string, GraphGroup>>();

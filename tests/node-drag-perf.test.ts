@@ -4,10 +4,12 @@ import { createRoot } from 'react-dom/client';
 import type { Edge, EdgeChange, Node, NodeChange, NodeTypes } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NodeWorkspace } from '../src/components/node/NodeWorkspace';
+import { nodeGenerationHistory } from '../src/components/node/nodes';
 import * as edit from '../src/engine/nodecore/edit';
+import { ungroup } from '../src/engine/flow/arrange';
 import { graphHistory, travelGraph } from '../src/engine/flow/history';
 import { storeHooks } from '../src/engine/storeBindings';
-import type { Graph, GraphNode } from '../src/engine/types';
+import type { Generation, Graph, GraphNode } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
 
 const flow = vi.hoisted(() => ({
@@ -190,5 +192,60 @@ describe('node drag publication counts', () => {
     expect(graphPublications).toBe(0);
     expect(editSpy).not.toHaveBeenCalled();
     expect(graphHistory(sessionId, 'undo')).toHaveLength(0);
+  });
+
+  it('keeps two rapid drags of the same nodes (<700ms) as separate undo steps', () => {
+    const { sessionId } = mountWorkspace(5);
+
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: true }]);
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: false }]);
+    });
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: true }]);
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: false }]);
+    });
+
+    expect(graphHistory(sessionId, 'undo')).toHaveLength(2);
+    let after = useStore.getState().sessions[sessionId].graph;
+    expect(travelGraph(sessionId, after, 'undo', 1, (g) => { after = g; return true; })).toBe(true);
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
+    expect(travelGraph(sessionId, after, 'undo', 1, (g) => { after = g; return true; })).toBe(true);
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('clears member drag previews if the group frame disappears mid-drag', () => {
+    const { sessionId } = mountWorkspace(5);
+
+    // Frame g0 wraps n0 (x:0,y:0) and n1 (x:260,y:0). With default NODE_WIDTH=240/220 and pad=28, frame starts at x=-28, y=-46.
+    const initialFramePos = flow.props!.nodes.find((n) => n.id === 'g0' && n.type === 'group')!.position;
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'g0', type: 'position', position: { x: initialFramePos.x + 80, y: initialFramePos.y + 40 }, dragging: true },
+      ]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 80, y: 40 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 340, y: 40 });
+
+    // Group is ungrouped mid-drag, then the drag gesture ends/cancels on g0.
+    act(() => {
+      ungroup(sessionId, 'g0');
+      flow.props!.onNodesChange([
+        { id: 'g0', type: 'position', position: { x: initialFramePos.x + 80, y: initialFramePos.y + 40 }, dragging: false },
+      ]);
+    });
+
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
+  });
+
+  it('preserves main generation history tie-breaking order when current is outside the node bucket', () => {
+    const base = { kind: 'image' as const, status: 'done' as const, prompt: 'p', modelRef: 'm', modelName: 'Model', provider: 'atlas' as const, origin: 'node' as const, estimate: {} as Generation['estimate'], settings: { count: 1, advanced: {} }, inputs: { refs: [] }, assetIds: ['a1'] };
+    const generations: Record<string, Generation> = {
+      gCur: { ...base, id: 'gCur', sessionId: 'other', stepId: 'otherNode', createdAt: 1000 },
+      gOwn: { ...base, id: 'gOwn', sessionId: 's1', stepId: 'n1', createdAt: 1000 },
+    };
+    const history = nodeGenerationHistory(generations, 's1', 'n1', 'gCur');
+    expect(history.map((g) => g.id)).toEqual(['gCur', 'gOwn']);
   });
 });

@@ -31,6 +31,46 @@ describe('check-node-drag AST guard', () => {
     expect(errors[0]).toMatch(/NodeWorkspace\.tsx:\d+ — /);
   });
 
+  it('rejects imported aliases and calls in else / early-return dragging branches', () => {
+    const aliased = fixture('NodeWorkspace.tsx', `
+      import { editPresentation as commit } from './edit';
+      const onNodesChange = (changes: any[]) => {
+        for (const c of changes) {
+          if (c.type === 'position' && c.dragging) {
+            commit('s1', (g) => g);
+          }
+        }
+      };
+    `);
+    expect(aliased).toHaveLength(1);
+
+    const elseBranch = fixture('NodeWorkspace.tsx', `
+      import { editPresentation as commit } from './edit';
+      const onNodesChange = (changes: any[]) => {
+        for (const c of changes) {
+          if (c.type !== 'position') continue;
+          if (!c.dragging) {
+            // drop
+          } else {
+            commit('s1', (g) => g);
+          }
+        }
+      };
+    `);
+    expect(elseBranch).toHaveLength(1);
+
+    const afterEarlyReturn = fixture('NodeWorkspace.tsx', `
+      import { editPresentation as commit } from './edit';
+      const onNodesChange = (changes: any[]) => {
+        for (const c of changes) {
+          if (!c.dragging) continue;
+          commit('s1', (g) => g);
+        }
+      };
+    `);
+    expect(afterEarlyReturn).toHaveLength(1);
+  });
+
   it('rejects unconditional position commit in onNodesChange without checking dragging', () => {
     const errors = fixture('NodeWorkspace.tsx', `
       const onNodesChange = (changes: any[]) => {
