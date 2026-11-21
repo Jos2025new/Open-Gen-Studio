@@ -138,6 +138,7 @@ async function execute(id: string): Promise<string[]> {
   patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
   let g = get().generations[id];
   let submitted = false;
+  let freeSend = false;
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
       const assetIds = await runLocalOp(g, signal);
@@ -222,7 +223,8 @@ async function execute(id: string): Promise<string[]> {
       const reqIndex = batchIndex++;
       activeReqId = undefined;
       const send = async () => {
-        if (isFreeSend(g, quote)) {
+        freeSend = isFreeSend(g, quote);
+        if (freeSend) {
           activeReqId = undefined;
           void saveNow().catch(() => undefined);
         } else {
@@ -320,6 +322,7 @@ async function execute(id: string): Promise<string[]> {
         ...(variants ? { variants: variants.slice(done) } : {}),
         sending: undefined,
         remoteJob: undefined,
+        ...(costKnown && !batchDone ? { costSoFar: cost } : {}),
         ...(batchDone && costKnown ? { actualUsd: cost } : {}),
         ...(batchDone && providerReportedCostKnown ? { providerReportedUsd: providerReportedCost } : {}),
         ...(sends ? { sends } : {}),
@@ -333,7 +336,7 @@ async function execute(id: string): Promise<string[]> {
     } catch (innerErr) {
       const cur = get().generations[id];
       const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
-      const free = cur ? isFreeSend(cur) : false;
+      const free = freeSend || (cur ? isFreeSend(cur) : false);
       const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
       if (activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
         const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
@@ -350,6 +353,7 @@ async function execute(id: string): Promise<string[]> {
     if (err instanceof SendNotCommittedError) {
       const keepLost = Boolean(cur && !isFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
       patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: keepLost, sending: undefined });
+      if (cur?.assetIds.length) chargePartial(cur);
       toast(err.message, 'error', 9000, cur?.planId || keepLost ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
       throw err;
     }
@@ -361,9 +365,11 @@ async function execute(id: string): Promise<string[]> {
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
-    const free = cur ? isFreeSend(cur) : false;
+    const free = freeSend || (cur ? isFreeSend(cur) : false);
     const lostJob = !free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)));
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
+    // What earlier requests of the batch already delivered was really sent: book it once.
+    if (cur?.assetIds.length && !remoteJob) chargePartial(cur);
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
     if (cur?.sent) logEvent('provider-error', { generation: id, model: cur?.modelName, provider: cur?.provider, jobId: remoteJob?.id, message: (err as Error).message, sent: cur.sent });
@@ -411,6 +417,7 @@ export async function resumeInterrupted(): Promise<void> {
         continue;
       }
       patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
+      if (g.assetIds.length && !job) chargePartial(g);
       purgeDiscarded(g.id);
       continue;
     }

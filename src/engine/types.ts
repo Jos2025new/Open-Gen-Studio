@@ -332,6 +332,10 @@ export interface Generation {
   estimate: Estimate;
   retryBaseEstimate?: Estimate;
   retryTotal?: number;
+  /** Cost of the batches already delivered and not yet booked to Spending; booked once when the generation ends or is cut. */
+  costSoFar?: number;
+  /** Already booked to Spending by a cut-short run (so a later finish does not book it twice). */
+  chargedUsd?: number;
   actualUsd?: number;
   /** Reported cost. */
   providerReportedUsd?: number;

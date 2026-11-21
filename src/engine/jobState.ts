@@ -103,16 +103,22 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
     providerReportedUsd,
     remoteJob: undefined,
     sending: undefined,
+    costSoFar: undefined,
     ...(sends ? { sends } : {}),
   });
-  addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  addSpend(actualUsd ?? Math.max(0, (g.estimate.usd ?? 0) - (g.chargedUsd ?? 0)), spendEntry(g, actualUsd == null));
   noteExcess(id);
   void saveNow().catch(() => undefined);
 }
 
+/** Book what a cut-short run really delivered, once: batch costs recorded so far, else the proportional estimate. */
 export function chargePartial(g: Generation): void {
-  const cost = partialRetryCharge(g, g.parentId ? get().generations[g.parentId] : undefined);
-  if (cost) addSpend(cost, spendEntry(g, true));
+  const cur = get().generations[g.id] ?? g;
+  const cost = cur.costSoFar ?? Math.max(0, partialRetryCharge(cur, cur.parentId ? get().generations[cur.parentId] : undefined) - (cur.chargedUsd ?? 0));
+  if (cost > 0) {
+    addSpend(cost, spendEntry(cur, cur.costSoFar == null));
+    if (get().generations[g.id]) patchGeneration(g.id, { chargedUsd: (cur.chargedUsd ?? 0) + cost, costSoFar: undefined });
+  }
 }
 
 /** How a generation shows in the Spending panel. */

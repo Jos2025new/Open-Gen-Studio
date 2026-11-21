@@ -1,4 +1,5 @@
 /* Remote job recovery: Check status, recover a lost job id, follow a submitted job (moved out of jobs.ts, Opus #4). */
+import { chargePartial } from './jobState';
 import { isRestart, statusChecker } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { isAbort, JobFailedError } from '../lib/http';
@@ -142,13 +143,15 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       if (batchIncomplete) {
         const sends = markSendsDone(latest.sends, matching?.id);
         const baseUsd = (latest.retryBaseEstimate ?? latest.estimate).usd;
-        const partialUsd = result.costUsd ?? (baseUsd != null && expectedTotal > 0 ? baseUsd * assets.length / expectedTotal : 0);
+        const partialUsd = (latest.costSoFar ?? 0) + (result.costUsd ?? (baseUsd != null && expectedTotal > 0 ? baseUsd * assets.length / expectedTotal : 0));
         if (partialUsd > 0) {
           addSpend(partialUsd, { category: latest.kind, provider: latest.modelRef.split('::')[0], model: latest.modelRef, sessionId: latest.sessionId, estimated: result.costUsd == null });
         }
         const remaining = remainingVariants ? remainingVariants.length : Math.max(1, expectedTotal - uniqueIds.length);
         patchGeneration(id, {
           status: 'error',
+          costSoFar: undefined,
+          chargedUsd: (latest.chargedUsd ?? 0) + partialUsd,
           error: `Interrupted after delivering ${uniqueIds.length} of ${expectedTotal}. Retry to generate the remaining ${remaining}.`,
           assetIds: uniqueIds,
           ...(remainingVariants ? { variants: remainingVariants } : {}),
@@ -163,7 +166,8 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
         await flushSendSave();
         return assets.map((a) => a.id);
       }
-      finish(id, uniqueIds, result.costUsd, await checkDelivery(id, assets), result.costUsd, matching?.id);
+      const prior = cur.costSoFar ?? 0;
+      finish(id, uniqueIds, result.costUsd != null ? result.costUsd + prior : undefined, await checkDelivery(id, assets), result.costUsd != null ? result.costUsd + prior : undefined, matching?.id);
       await flushSendSave();
       return assets.map((a) => a.id);
     } catch (err) {
@@ -179,7 +183,12 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
         const after = get().generations[id];
         logEvent('provider-error', { generation: id, model: after?.modelName, provider: job.provider, jobId: job.id, message: (err as Error).message, sent: after?.sent, resumed: true });
       }
-      if (err instanceof JobFailedError) await flushSendSave();
+      if (err instanceof JobFailedError) {
+        // The dead job was never delivered; the batches before it were: book them once.
+        const after = get().generations[id];
+        if (after?.costSoFar) chargePartial(after);
+        await flushSendSave();
+      }
       return [];
     } finally {
       running.delete(id);
