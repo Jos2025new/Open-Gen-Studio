@@ -73,6 +73,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [070: sesión maestra, workers con revisión de Neon e integración (rama `task/integracion`, 2026-11-19/20)](070-2026-11-W47-master-workers-integracion.md).
 - [071: revisión SOLID, KISS y YAGNI, 14 hallazgos de Opus reparados (rama `task/solid-int`, 2026-11-20)](071-2026-11-W47-master-solid.md).
 - [072: arrastre con 200 nodos y registro durable de envíos (ramas `task/drag200` y `task/envios-durables`, 2026-11-21)](072-2026-11-W47-master-arrastre-envios.md).
+- [073: posición al recargar, vista por espacio y diseño del subnet (ramas `task/posicion-recarga` y `task/vista-espacio`, 2026-11-21)](073-2026-11-W47-master-posicion-vista-subnet.md).
 - [066: visor, historial de versiones y fusión (2026-11-16)](066-2026-11-W47-visor-historial-fusion.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
