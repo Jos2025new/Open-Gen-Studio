@@ -9,6 +9,9 @@ import type { DraftMode } from './agent/draftFirst';
 import type { FxLayer } from './fx/types';
 import type { ChatMessageMeta } from './feedMeta';
 
+import type { RemoteJob, SendRecord } from './sendTypes';
+export type { RemoteJob, SendRecord, SendStatus } from './sendTypes';
+
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 /** auto (card if missing), guided (asks), direct (no card). */
@@ -285,13 +288,6 @@ export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | '
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled' | 'review';
 
-export interface RemoteJob {
-  provider: RemoteProviderId;
-  id: string;
-  /** Provider specific polling data (status/response URLs, endpoint id). */
-  meta: Record<string, string>;
-}
-
 export interface Generation {
   /** Its session was deleted while running: it finishes (charged to Spending once), then is removed. */
   discard?: boolean;
@@ -360,6 +356,8 @@ export interface Generation {
   sent?: SentRequest;
   /** When the request left for the provider and no answer (job id or result) had come back: still set after a reload, the send may have been charged. */
   sending?: number;
+  /** Per-request send ledger (optional for backward compatibility with saved generations). */
+  sends?: SendRecord[];
 }
 
 // ---------------------------------------------------------------------------
