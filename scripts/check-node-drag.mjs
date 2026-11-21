@@ -20,6 +20,7 @@ const FORBIDDEN_CALLS = new Set([
 ]);
 
 const DRAG_HINT = 'No escribas el grafo, historial ni serialices durante el arrastre en curso; usa estado local y aplica editPresentation al soltar (dragging: false).';
+const CUT_HINT = 'No recorras todo el trazo de la tijera en cada pointermove; prueba solo el segmento [anterior, actual] y acumula los cortes.';
 const TOOLBAR_HINT = 'NodeToolbar montado incondicionalmente; móntalo solo cuando la tarjeta esté seleccionada.';
 
 function calleeName(callee) {
@@ -278,15 +279,60 @@ export function check(root = '.') {
         }
       };
 
+      const cutMoveRescansTrail = (fnNode, report) => {
+        const TRAIL_NAMES = new Set(['trail', 'curTrail', 'next', 'trailRef']);
+        const ITER_METHODS = new Set(['forEach', 'map', 'filter', 'some', 'every', 'reduce', 'find']);
+        const referencesTrail = (node) => {
+          let hit = false;
+          walkSubtree(node, (n) => {
+            if (n.type === 'Identifier' && TRAIL_NAMES.has(n.name)) { hit = true; return false; }
+          });
+          return hit;
+        };
+        const hasTrailScan = (node, seen = new Set()) => {
+          let hit = null;
+          walkSubtree(node, (n) => {
+            if (hit) return false;
+            if (n.type === 'CallExpression' && n.callee?.type === 'Identifier') {
+              const name = n.callee.name;
+              if (name === 'trailCuts') { hit = n; return false; }
+              if (!seen.has(name) && localBodies.has(name)) {
+                seen.add(name);
+                const sub = hasTrailScan(localBodies.get(name), seen);
+                if (sub) { hit = n; return false; }
+              }
+            }
+            if ((n.type === 'ForStatement' || n.type === 'ForOfStatement' || n.type === 'WhileStatement' || n.type === 'DoWhileStatement') &&
+                referencesTrail(n.test ?? n.right ?? n.init)) {
+              hit = n; return false;
+            }
+            if (n.type === 'CallExpression' && n.callee?.type === 'MemberExpression' &&
+                ITER_METHODS.has(n.callee.property?.name) && referencesTrail(n.callee.object)) {
+              hit = n; return false;
+            }
+          });
+          return hit;
+        };
+        const bad = hasTrailScan(fnNode.body);
+        if (bad) report(bad, `La tijera recorre todo el trazo en pointermove. ${CUT_HINT}`);
+      };
+
       const fnStack = [];
       const condStack = [];
+      let cutToolDepth = 0;
       return {
         enter: (node, report) => {
           if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
             fnStack.push(node);
+            if (node.type === 'FunctionDeclaration' && node.id?.name === 'useCutTool') cutToolDepth++;
           }
           if (node.type === 'ConditionalExpression' || node.type === 'LogicalExpression') {
             condStack.push(node);
+          }
+          if (cutToolDepth > 0 && node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' &&
+              (node.id.name === 'move' || node.id.name === 'onPointerMove') && node.init &&
+              (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')) {
+            cutMoveRescansTrail(node.init, report);
           }
           // Rule 1: Drag handlers (`onNodesChange`, `onNodeDrag`, `onSelectionDrag`, `applyDragChanges`).
           if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' &&
@@ -317,6 +363,7 @@ export function check(root = '.') {
         leave: (node) => {
           if (node.type === 'ConditionalExpression' || node.type === 'LogicalExpression') condStack.pop();
           if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+            if (node.type === 'FunctionDeclaration' && node.id?.name === 'useCutTool') cutToolDepth--;
             fnStack.pop();
           }
         },

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { act, createElement, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { segmentsCross, trailCuts, useCutTool } from '../src/components/node/CutTool';
+import { segmentCuts, segmentsCross, trailCuts, useCutTool, type Pt } from '../src/components/node/CutTool';
 import { shortcutGroups } from '../src/engine/shortcuts';
 
 const nav = readFileSync('src/components/node/CanvasNavigation.tsx', 'utf8');
@@ -126,5 +126,36 @@ describe('useCutTool incremental per-move cutting', () => {
 
     act(() => api.up(evt(50, 100)));
     expect(onCut).toHaveBeenCalledWith(['e1', 'e2']);
+  });
+
+  it('segmentCuts matches trailCuts on a 200-point trail with O(edges) work per move', () => {
+    const lines = Array.from({ length: 12 }, (_, k) => ({
+      id: `e${k}`,
+      points: [{ x: 0, y: k * 25 + 10 }, { x: 200, y: k * 25 + 10 }],
+    }));
+    const trail: Pt[] = Array.from({ length: 200 }, (_, i) => ({ x: 10 + (i % 7) * 20, y: i * 1.5 }));
+    const accumulated = new Set<string>();
+    for (let i = 1; i < trail.length; i++) {
+      for (const id of segmentCuts(trail[i - 1], trail[i], lines, accumulated)) {
+        accumulated.add(id);
+      }
+    }
+    expect([...accumulated].sort()).toEqual(trailCuts(trail, lines).sort());
+
+    // Work per segmentCuts call is bounded by lines and does not scale with prior trail length.
+    let reads = 0;
+    const countedLines = lines.map((l) => ({
+      id: l.id,
+      points: l.points.map((p) => ({
+        get x() { reads++; return p.x; },
+        get y() { return p.y; },
+      })),
+    }));
+    segmentCuts({ x: 10, y: 0 }, { x: 10, y: 3 }, countedLines);
+    const workStep1 = reads;
+    reads = 0;
+    segmentCuts({ x: 10, y: 500 }, { x: 10, y: 503 }, countedLines);
+    const workStep200 = reads;
+    expect(workStep200).toBe(workStep1);
   });
 });

@@ -101,4 +101,29 @@ describe('check-node-drag AST guard', () => {
     `);
     expect(errors).toEqual([]);
   });
+
+  it('rejects CutTool move handlers that rescan the whole trail per pointermove', () => {
+    const callsTrailCuts = fixture('CutTool.tsx', `
+      function useCutTool() {
+        const move = (e: any) => {
+          const next = [...trail, e];
+          mark(trailCuts(next, lines.current));
+        };
+        return { move };
+      }
+    `);
+    expect(callsTrailCuts).toHaveLength(1);
+
+    const loopsTrail = fixture('CutTool.tsx', `
+      function useCutTool() {
+        const move = (e: any) => {
+          for (let i = 1; i < trail.length; i++) {
+            segmentsCross(trail[i - 1], trail[i], e, e);
+          }
+        };
+        return { move };
+      }
+    `);
+    expect(loopsTrail).toHaveLength(1);
+  });
 });

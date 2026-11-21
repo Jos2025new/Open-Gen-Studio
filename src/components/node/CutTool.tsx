@@ -11,6 +11,21 @@ export function segmentsCross(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
     && Math.max(a.y, b.y) >= Math.min(c.y, d.y) && Math.max(c.y, d.y) >= Math.min(a.y, b.y);
 }
 
+/** Connections crossed by a single segment `[a, b]` (skipping any IDs already in `skip`). */
+export function segmentCuts(a: Pt, b: Pt, lines: Array<{ id: string; points: Pt[] }>, skip?: ReadonlySet<string>): string[] {
+  const hit: string[] = [];
+  for (const { id, points } of lines) {
+    if (skip?.has(id)) continue;
+    for (let j = 1; j < points.length; j++) {
+      if (segmentsCross(a, b, points[j - 1], points[j])) {
+        hit.push(id);
+        break;
+      }
+    }
+  }
+  return hit;
+}
+
 /** The connections a cut trail crosses: each connection is a polyline sampled along its curve. */
 export function trailCuts(trail: Pt[], lines: Array<{ id: string; points: Pt[] }>): string[] {
   return lines.filter(({ points }) => {
@@ -41,13 +56,11 @@ function sampleEdges(canvas: HTMLElement): Array<{ id: string; points: Pt[] }> {
  *  cut on release (one undo step). Middle or right drag still pans. */
 export function useCutTool({ active, canvasRef, onCut }: { active: boolean; canvasRef: RefObject<HTMLDivElement | null>; onCut: (ids: string[]) => void }) {
   const [trail, setTrail] = useState<Pt[] | null>(null);
+  const trailRef = useRef<Pt[] | null>(null);
   const lines = useRef<Array<{ id: string; points: Pt[] }>>([]);
-  const hits = useRef<string[]>([]);
-  const mark = (ids: string[]) => {
-    const canvas = canvasRef.current;
-    canvas?.querySelectorAll('.react-flow__edge.is-cut-hit').forEach((el) => el.classList.remove('is-cut-hit'));
-    for (const id of ids) canvas?.querySelector(`.react-flow__edge[data-id="${CSS.escape(id)}"]`)?.classList.add('is-cut-hit');
-    hits.current = ids;
+  const hits = useRef<Set<string>>(new Set());
+  const clearMarks = () => {
+    canvasRef.current?.querySelectorAll('.react-flow__edge.is-cut-hit').forEach((el) => el.classList.remove('is-cut-hit'));
   };
   const at = (e: ReactPointerEvent<HTMLDivElement>): Pt => { const r = e.currentTarget.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const down = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -57,21 +70,38 @@ export function useCutTool({ active, canvasRef, onCut }: { active: boolean; canv
     e.stopPropagation();
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    clearMarks();
+    hits.current.clear();
     lines.current = canvasRef.current ? sampleEdges(canvasRef.current) : [];
-    setTrail([at(e)]);
+    const start = [at(e)];
+    trailRef.current = start;
+    setTrail(start);
   };
   const move = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!trail) return;
+    const curTrail = trailRef.current;
+    if (!curTrail) return;
     e.stopPropagation();
-    const next = [...trail, at(e)];
+    const prev = curTrail[curTrail.length - 1];
+    const curr = at(e);
+    const next = [...curTrail, curr];
+    trailRef.current = next;
     setTrail(next);
-    mark(trailCuts(next, lines.current));
+    const added = segmentCuts(prev, curr, lines.current, hits.current);
+    if (added.length) {
+      const canvas = canvasRef.current;
+      for (const id of added) {
+        hits.current.add(id);
+        canvas?.querySelector(`.react-flow__edge[data-id="${CSS.escape(id)}"]`)?.classList.add('is-cut-hit');
+      }
+    }
   };
   const up = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!trail) return;
+    if (!trailRef.current) return;
     e.stopPropagation();
-    const ids = hits.current;
-    mark([]);
+    const ids = [...hits.current];
+    hits.current.clear();
+    clearMarks();
+    trailRef.current = null;
     setTrail(null);
     if (ids.length) onCut(ids);
   };
