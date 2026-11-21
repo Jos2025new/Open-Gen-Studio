@@ -2,12 +2,18 @@ import type { Graph } from '../types';
 import { storeHooks } from '../storeBindings';
 import { GONE_HANDLE, NO_RESULT, resultHandle } from './results';
 
-interface Entry { before: Graph; after: Graph; label: string; key: string; time: number }
+interface Entry { before: Graph; after: Graph; label: string; key: string; time: number; nudge?: boolean }
 interface Stack { past: Entry[]; future: Entry[]; latest: Map<string, Graph['nodes'][number]> }
 const stacks = new Map<string, Stack>();
 const listeners = new Set<() => void>();
 let revision = 0;
 let replay = false;
+let nudging: string | null = null;
+/** Records `fn`'s edits of `id` as an arrow-key nudge: nudges of the same nodes within 700 ms share one step (drags never do). */
+export function asNudge<T>(id: string, fn: () => T): T {
+  nudging = id;
+  try { return fn(); } finally { nudging = null; }
+}
 const stack = (id: string) => {
   if (!stacks.has(id)) stacks.set(id, { past: [], future: [], latest: new Map() });
   return stacks.get(id)!;
@@ -114,10 +120,11 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
   const key = groupsChanged && !changed.length ? 'groups' : `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
   const time = Date.now();
   const last = s.past.at(-1);
-  if (!group && !moved && !groupsChanged && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
+  const nudge = nudging === id;
+  if (!group && (!moved || (nudge && last?.nudge)) && !groupsChanged && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
     last.after = structuredClone(after); last.time = time;
   } else {
-    s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time });
+    s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time, ...(nudge ? { nudge } : {}) });
     if (s.past.length > 40) s.past.shift();
     if (group) group.first = s.past[s.past.length - 1];
   }

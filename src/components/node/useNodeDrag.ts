@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import type { NodeChange } from '@xyflow/react';
 import { editPresentation } from '../../engine/nodecore/edit';
 import { groupBounds } from '../../engine/flow/arrange';
+import { asNudge } from '../../engine/flow/history';
 import type { Graph } from '../../engine/types';
 import { useStore } from '../../store/store';
 import type { FlowNode } from './nodes';
@@ -131,8 +132,8 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
     }
     const direct = newFlight();
     track(direct, changes);
-    commit(direct);
-  }, [live, track, publish, commit, endDrag]);
+    asNudge(sessionId, () => commit(direct));
+  }, [sessionId, live, track, publish, commit, endDrag]);
 
   const startSelection = useCallback((event: unknown, nodes: DragNodes) => startDrag(event, undefined, nodes), [startDrag]);
   const endSelection = useCallback((event: unknown, nodes: DragNodes) => endDrag(event, undefined, nodes), [endDrag]);
