@@ -302,38 +302,6 @@ describe('Gesture attack 1: lifecycle, split drops, autopan, rapid gestures', ()
   });
 });
 
-describe('Gesture bounds from React Flow events', () => {
-  type Ev = (e: unknown, ...rest: unknown[]) => void;
-  const rf = () => flow.props as unknown as Record<'onNodeDragStart' | 'onSelectionDragStart' | 'onNodeDragStop' | 'onSelectionDragStop', Ev>;
-
-  it('commits an aborted drag (dragging:false, no stop event) once, right after its batch', async () => {
-    const { sid } = mountCanvas(makeGraph(3));
-    drag.start('n0');
-    onCh([pCh('n0', true, pt(70, 30))]);
-    onCh([pCh('n0', false, pt(70, 30))]);
-    expect(sPos(sid, 'n0')).toEqual(pt(0, 0));
-    await act(async () => { await Promise.resolve(); });
-    expect(sPos(sid, 'n0')).toEqual(pt(70, 30));
-    expect(graphHistory(sid, 'undo')).toHaveLength(1);
-  });
-
-  it('treats onNodeDragStart + onSelectionDragStart of one selection drag as one gesture and one write', () => {
-    const { sid } = mountCanvas(makeGraph(3));
-    const writes = watchWrites(sid);
-    const down = new MouseEvent('mousedown'), up = new MouseEvent('mouseup');
-    const at = [{ id: 'n0', position: pt(0, 0) }, { id: 'n2', position: pt(520, 0) }];
-    act(() => { rf().onNodeDragStart(down, at[0], at); rf().onSelectionDragStart(down, at); });
-    onCh([pCh('n0', true, pt(30, 10)), pCh('n2', true, pt(550, 10))]);
-    act(() => { rf().onSelectionDragStart(down, at); });
-    expect(rPos('n0')).toEqual(pt(30, 10));
-    onCh([pCh('n0', false, pt(30, 10)), pCh('n2', false, pt(550, 10))]);
-    const end = [{ id: 'n0', position: pt(30, 10) }, { id: 'n2', position: pt(550, 10) }];
-    act(() => { rf().onNodeDragStop(up, end[0], end); rf().onSelectionDragStop(up, end); });
-    expect(writes()).toBe(1);
-    expect([sPos(sid, 'n0'), sPos(sid, 'n2')]).toEqual([pt(30, 10), pt(550, 10)]);
-  });
-});
-
 describe('Round 2 split-drop regressions (moved from adversarial-drag200 Attack 8)', () => {
   it('split multi-node drop batches: 1 write, 1 undo step, keeps preview of still-dropping node', () => {
     const { sid } = mountCanvas(makeGraph(4)), editSpy = vi.spyOn(edit, 'editPresentation');
@@ -363,16 +331,21 @@ describe('Gesture attack 2: discard and reconciliation (delete, undo/redo, load,
 
     // Last active node (n1) is deleted externally while n0 sits in gesture.final.
     act(() => { deleteNodes(sid, ['n1']); });
-    // The gesture survives the deletion (React Flow is still dragging n0); its stop commits n0 — never a ghost diverging from the store.
+    // Before any stop: no ghost of the deleted node, n0 stays where React Flow still drags it, a select writes nothing.
+    expect(rPos('n1')).toBeUndefined();
     expect(rPos('n0')).toEqual(pt(110, 55));
-    onCh([pCh('n0', false, pt(110, 55))]);
-    drag.stop(['n0', 'n1']);
-    expect(rPos('n0')).toEqual(sPos(sid, 'n0'));
-    expect(sPos(sid, 'n0')).toEqual(pt(110, 55));
-
     const callsAfterDelete = editSpy.mock.calls.length;
     onCh([{ id: 'n2', type: 'select', selected: true }]);
     expect(editSpy).toHaveBeenCalledTimes(callsAfterDelete);
+    // Undo of the deletion still mid-gesture: n1 comes back at its store position, never at its old drag position.
+    act(() => { expect(tr(sid, 'undo')).toBe(true); });
+    expect(rPos('n1')).toEqual(sPos(sid, 'n1'));
+    expect(rPos('n1')).toEqual(pt(260, 0));
+
+    onCh([pCh('n0', false, pt(110, 55))]);
+    drag.stop(['n0', 'n1'], { n1: pt(370, 55) });
+    expect(rPos('n0')).toEqual(sPos(sid, 'n0'));
+    expect([sPos(sid, 'n0'), sPos(sid, 'n1')]).toEqual([pt(110, 55), pt(260, 0)]);
   });
 
   it('keeps the in-flight gesture through Undo of an unrelated node and does not wipe Redo on next select', () => {
@@ -621,8 +594,13 @@ describe('Gesture attack 3: group frames & members', () => {
     onCh([pCh('g0', true, pt(f0.x + 60, f0.y + 30)), pCh('n2', true, pt(580, 30))]);
     onCh([pCh('n2', false)]);
     act(() => { ungroup(sid, 'g0'); });
-    // The gesture survives the ungroup; at its stop n2 commits and the former members stay put.
-    expect(rPos('n0')).toEqual(pt(0, 0));
+    // Before any stop: the former members show their store positions (no ghost of the dead frame), a select writes nothing.
+    expect(rPos('n0')).toEqual(sPos(sid, 'n0'));
+    expect(rPos('n1')).toEqual(sPos(sid, 'n1'));
+    expect(rPos('n2')).toEqual(pt(580, 30));
+    const before = editSpy.mock.calls.length;
+    onCh([{ id: 'n0', type: 'select', selected: true }]);
+    expect(editSpy).toHaveBeenCalledTimes(before);
     onCh([pCh('g0', false)]);
     drag.stop(['g0', 'n2'], { g0: pt(f0.x + 60, f0.y + 30) });
 

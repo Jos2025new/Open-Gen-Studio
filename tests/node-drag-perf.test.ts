@@ -333,30 +333,51 @@ describe('node drag publication counts', () => {
     expect(after.nodes.find((n) => n.id === 'n2')?.position).toEqual({ x: 600, y: 90 });
   });
 
-  it('keeps an in-flight gesture through Undo or a graph load and commits it onto the graph in force at drop', () => {
+  it('keeps an in-flight gesture through Redo, Undo or a graph load, commits onto the graph in force, and ignores a late drop', () => {
     const { sessionId } = mountWorkspace(4);
     type P = { x: number; y: number };
     const rPos = (id: string) => flow.props!.nodes.find((n) => n.id === id)?.position;
     const sPos = (id: string) => useStore.getState().sessions[sessionId].graph.nodes.find((n) => n.id === id)?.position;
     const move = (id: string, p: P, dragging: boolean) => act(() => flow.props!.onNodesChange([{ id, type: 'position', position: p, dragging }]));
     const full = (id: string, p: P) => { drag.start(id); move(id, p, true); move(id, p, false); drag.stop([id]); };
+    const travel = (dir: 'undo' | 'redo') => act(() => {
+      const cur = useStore.getState().sessions[sessionId].graph;
+      expect(travelGraph(sessionId, cur, dir, 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
+    });
     full('n0', { x: 100, y: 50 });
     full('n1', { x: 300, y: 40 });
+    travel('undo');
 
-    // Undo (of n1) while n0 is in flight: the gesture and its preview stay; the drop lands on the undone graph.
+    // Redo (of n1) while n0 is in flight: the preview stays; the drop lands on the redone graph.
     drag.start('n0');
     move('n0', { x: 220, y: 90 }, true);
-    act(() => {
-      const cur = useStore.getState().sessions[sessionId].graph;
-      expect(travelGraph(sessionId, cur, 'undo', 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
-    });
+    travel('redo');
     expect(rPos('n0')).toEqual({ x: 220, y: 90 });
-    expect(rPos('n1')).toEqual({ x: 260, y: 0 });
+    expect(rPos('n1')).toEqual({ x: 300, y: 40 });
     move('n0', { x: 220, y: 90 }, false);
     drag.stop(['n0']);
-    expect(sPos('n0')).toEqual({ x: 220, y: 90 });
-    expect(sPos('n1')).toEqual({ x: 260, y: 0 });
-    expect(graphHistory(sessionId, 'undo')).toHaveLength(2);
+    expect([sPos('n0'), sPos('n1')]).toEqual([{ x: 220, y: 90 }, { x: 300, y: 40 }]);
+
+    // Undo of the dragged node itself while in flight: the preview stays; the drop lands on the undone graph.
+    drag.start('n0');
+    move('n0', { x: 330, y: 95 }, true);
+    travel('undo');
+    expect(rPos('n0')).toEqual({ x: 330, y: 95 });
+    move('n0', { x: 330, y: 95 }, false);
+    drag.stop(['n0']);
+    expect(sPos('n0')).toEqual({ x: 330, y: 95 });
+    expect(graphHistory(sessionId, 'undo')).toHaveLength(3);
+
+    // A gesture closed early (window blur, lost mouseup), then Undo of its node: React Flow's late drop is ignored.
+    drag.start('n0');
+    move('n0', { x: 360, y: 100 }, true);
+    act(() => { window.dispatchEvent(new Event('blur')); });
+    travel('undo');
+    expect(rPos('n0')).toEqual({ x: 330, y: 95 });
+    move('n0', { x: 360, y: 100 }, false);
+    drag.stop(['n0'], { n0: { x: 360, y: 100 } });
+    expect(sPos('n0')).toEqual({ x: 330, y: 95 });
+    expect(graphHistory(sessionId, 'redo')).toHaveLength(1);
 
     // A graph load mid-gesture: the preview stays; the drop moves only n0 on the loaded graph.
     drag.start('n0');
