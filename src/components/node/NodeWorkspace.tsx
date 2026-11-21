@@ -35,7 +35,7 @@ import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
-import { LinkBar, useDeleteRequest } from './LinkBar';
+import { DeleteRequestContext, LinkBar, useDeleteRequest } from './LinkBar';
 import { copyNodes, cutNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { liveGroupsMap, useNodeDrag } from './useNodeDrag';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
@@ -396,6 +396,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       {embedded ? null : <TopbarActions>
         <RunAll sessionId={sessionId} ids={runIds} />
       </TopbarActions>}
+      <DeleteRequestContext.Provider value={del.request}>
       <ReactFlow<FlowNode, Edge>
         nodes={nodes}
         edges={edges}
@@ -438,7 +439,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={selectedNodes} />}
-        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} />
+        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} onDelete={del.request} />
         <CanvasNavigation
           sessionId={sessionId}
           add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
@@ -457,6 +458,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         <LinkBar sessionId={sessionId} graph={graph} selected={liveSelectedEdgeSet} />
         {del.card}
       </ReactFlow>
+      </DeleteRequestContext.Provider>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={menuOpen} placement={menu?.from ? 'right-start' : 'top-start'} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
         <div ref={connectionMenu}>

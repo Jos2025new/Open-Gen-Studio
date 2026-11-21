@@ -6,6 +6,7 @@ import {
 } from '../ui/icons';
 import { alignNodes, copyNodes, cutNodes, groupNodes, renameGroup, setGroupColor, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
 import { deleteNodes } from '../../engine/flow/actions';
+import { useDeleteRequestContext } from './LinkBar';
 import type { Graph, GraphGroup } from '../../engine/types';
 import { toast } from '../../store/store';
 import { ProblemBadge } from './CanvasNotices';
@@ -25,12 +26,14 @@ const ALIGN: Array<{ id: AlignMode; label: string; icon: typeof AlignStartVertic
  * Several nodes selected: "Operations ▾" over them, in the same bar as a node's tools; it opens only on click into
  * Group (or Ungroup) · Align › (its options show on hover, with what to align to) · copy · cut · delete.
  */
-export function Operations({ sessionId, graph, ids, sizes, onSelect }: { sessionId: string; graph: Graph; ids: string[]; sizes: Sizes; onSelect: (ids: string[]) => void }) {
+export function Operations({ sessionId, graph, ids, sizes, onSelect, onDelete }: { sessionId: string; graph: Graph; ids: string[]; sizes: Sizes; onSelect: (ids: string[]) => void; onDelete?: (ids: string[]) => void }) {
   const [open, setOpen] = useState(false);
   const [align, setAlign] = useState(false);
   const [to, setTo] = useState<AlignTo>('selection');
+  const contextDelete = useDeleteRequestContext();
   if (ids.length < 2) return null;
   const group = wholeGroup(graph, ids);
+  const requestDelete = onDelete ?? contextDelete;
   return (
     <NodeToolbar nodeId={ids} isVisible position={Position.Top} offset={14}>
       <div className="nt-bar ops-bar nodrag">
@@ -78,7 +81,7 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect }: { session
             <button type="button" className="nt-btn nt-icon" aria-label="Cut" data-tip="Cut (Ctrl+X)" onClick={() => { cutNodes(sessionId, ids); onSelect([]); }}>
               <Scissors size={14} />
             </button>
-            <button type="button" className="nt-btn nt-icon nt-danger" aria-label="Delete" data-tip="Delete" onClick={() => { deleteNodes(sessionId, ids); onSelect([]); }}>
+            <button type="button" className="nt-btn nt-icon nt-danger" aria-label="Delete" data-tip="Delete" onClick={() => { if (requestDelete) requestDelete(ids); else { deleteNodes(sessionId, ids); onSelect([]); } }}>
               <Trash size={14} />
             </button>
             <span className="nt-sep" />

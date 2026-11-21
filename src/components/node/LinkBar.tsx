@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { Panel, type Edge } from '@xyflow/react';
 import { disconnectEdges, deleteNodes } from '../../engine/flow/actions';
 import { ungroup } from '../../engine/flow/arrange';
@@ -65,6 +65,9 @@ export function LinkBar({ sessionId, graph, selected }: { sessionId: string; gra
     </Panel>
   );
 }
+
+export const DeleteRequestContext = createContext<((nodeIds: string[], edgeIds?: string[]) => void) | null>(null);
+export const useDeleteRequestContext = () => useContext(DeleteRequestContext);
 
 /** A system node is a pointer: removing it only takes it off the canvas. When it holds model links, ask first. */
 export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[], edges: string[]) => void) {

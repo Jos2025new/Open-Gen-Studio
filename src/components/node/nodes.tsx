@@ -24,6 +24,7 @@ import { LinkHandles, RefNode as SystemNode } from '../omni/RefNode';
 import { GenNodeBody, ToolNodeBody } from './NodeSettings';
 import { RunButton } from './NodeRunButton';
 import { NoticeAnchors } from './CanvasNotices';
+import { useDeleteRequestContext } from './LinkBar';
 import type { PortNotice } from '../../engine/flow/notices';
 export { RunButton } from './NodeRunButton';
 
@@ -56,6 +57,7 @@ function useSessionId() {
 function DeleteButton({ node }: { node: GraphNode }) {
   const sessionId = useSessionId();
   const pop = usePopover();
+  const requestDelete = useDeleteRequestContext();
   return (
     <>
       <button ref={pop.ref} type="button" className="nt-btn nt-icon nodrag" aria-label="Delete node" data-tip="Delete (Del)" onClick={pop.toggle}>
@@ -72,7 +74,8 @@ function DeleteButton({ node }: { node: GraphNode }) {
               variant="danger"
               onClick={() => {
                 pop.close();
-                deleteNodes(sessionId, [node.id]);
+                if (requestDelete) requestDelete([node.id]);
+                else deleteNodes(sessionId, [node.id]);
               }}
             >
               Delete
