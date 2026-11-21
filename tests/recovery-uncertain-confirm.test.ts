@@ -76,4 +76,50 @@ describe('uncertain send recovery requires explicit resend confirmation', () => 
     expect(retryMock).toHaveBeenCalledTimes(1);
     expect(retryMock).toHaveBeenCalledWith('g_uncertain');
   });
+
+  it('over-limit Don’t ask again on an uncertain generation still requires explicit confirmation before mutating session or resending', () => {
+    const st = useStore.getState();
+    const sid = st.activeSessionId;
+    useStore.setState({ settings: { ...st.settings, budgetOn: true, budgetUsd: 0.05 } });
+    const g = {
+      id: 'g_uncertain_over',
+      sessionId: sid,
+      kind: 'image',
+      prompt: 'a',
+      modelRef: 'nanogpt::seed',
+      modelName: 'Seed',
+      provider: 'nanogpt',
+      settings: { count: 1, advanced: {} },
+      inputs: { refs: [] },
+      origin: 'composer',
+      status: 'error',
+      error: 'Interrupted',
+      lostJob: true,
+      sends: [{ id: 'r0', index: 0, status: 'uncertain' }],
+      assetIds: [],
+      estimate: { usd: 0.5, approximate: false },
+      createdAt: 1,
+    } as Generation;
+
+    const host = document.createElement('div');
+    document.body.replaceChildren(host);
+    const root = createRoot(host);
+    act(() => root.render(createElement(GenerationRecovery, { g })));
+
+    const buttons = () => [...host.querySelectorAll('button')];
+    act(() => buttons().find((b) => /Don’t ask again/.test(b.textContent ?? ''))!.click());
+    expect(retryMock).not.toHaveBeenCalled();
+    expect(host.textContent).toMatch(/May have been charged/);
+    expect(useStore.getState().sessions[sid].noAskOverLimit).toBeFalsy();
+
+    act(() => buttons().find((b) => /Cancel/.test(b.textContent ?? ''))!.click());
+    expect(retryMock).not.toHaveBeenCalled();
+    expect(useStore.getState().sessions[sid].noAskOverLimit).toBeFalsy();
+
+    act(() => buttons().find((b) => /Don’t ask again/.test(b.textContent ?? ''))!.click());
+    act(() => buttons().find((b) => /Resend anyway/.test(b.textContent ?? ''))!.click());
+    expect(useStore.getState().sessions[sid].noAskOverLimit).toBe(true);
+    expect(retryMock).toHaveBeenCalledTimes(1);
+    expect(retryMock).toHaveBeenCalledWith('g_uncertain_over');
+  });
 });

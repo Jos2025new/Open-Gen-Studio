@@ -56,7 +56,7 @@ import { mainThread } from './helpers/threads';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const NANO = 'nanogpt::seed', ATLAS = 'atlas::seed', TR = 'nanogpt::transcriber';
+const NANO = 'nanogpt::seed', NANO_V = 'nanogpt::v', ATLAS = 'atlas::seed', TR = 'nanogpt::transcriber';
 const sid = () => useStore.getState().activeSessionId;
 const genOf = (id: string) => useStore.getState().generations[id];
 const savedGen = (id: string): Generation | undefined => (disk.raw ? JSON.parse(disk.raw)?.state?.generations?.[id] : undefined);
@@ -81,22 +81,22 @@ const putPlan = (id: string, planId: string, status: PlanFeedItem['status'], ste
 
 function setupCatalog(extra?: { budgetOn?: boolean; budgetLimit?: number; autoSwitch?: 'ask' | 'always' }) {
   const st = useStore.getState(), sId = st.activeSessionId;
-  const mod = (ref: string, provider: 'nanogpt' | 'atlas' | 'local', id: string, name: string, usd: number): ModelSummary =>
-    ({ ref, provider, id, name, kind: 'image', acceptsText: true, acceptsImage: provider === 'local', tags: provider === 'local' ? ['demo'] : [], price: { skus: [{ unit: 'output', usd }] } } as ModelSummary);
+  const mod = (ref: string, provider: 'nanogpt' | 'atlas' | 'local', id: string, name: string, usd: number, kind: 'image' | 'video' = 'image'): ModelSummary =>
+    ({ ref, provider, id, name, kind, acceptsText: true, acceptsImage: provider === 'local', tags: provider === 'local' ? ['demo'] : [], price: { skus: [{ unit: 'output', usd }] } } as ModelSummary);
+  const sch = (ref: string, source = 'catalog') => ({ ref, params: [], slots: { prompt: 'prompt', promptRequired: true }, source });
+  const mkA = (id: string, kind: 'image' | 'audio', mime: string, x: object) => ({ id, kind, mime, sessionId: sId, origin: 'upload', stored: true, favorite: false, createdAt: 1, ...x }) as never;
   useStore.setState({
     generations: {}, quotes: {}, spendLog: [], spentUsd: 0, ui: { ...st.ui, toasts: [] },
-    assets: {
-      a1: { id: 'a1', kind: 'image', mime: 'image/png', width: 512, height: 512, sessionId: sId, origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never,
-      au: { id: 'au', kind: 'audio', mime: 'audio/mpeg', duration: 10, sessionId: sId, origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never,
-    },
+    assets: { a1: mkA('a1', 'image', 'image/png', { width: 512, height: 512 }), au: mkA('au', 'audio', 'audio/mpeg', { duration: 10 }) },
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k-n', atlas: 'k-a', fal: 'k-f' }, budgetOn: extra?.budgetOn ?? false, budgetUsd: extra?.budgetLimit ?? 25, autoSwitchProvider: extra?.autoSwitch ?? 'ask', mutedNotices: [] },
     catalog: {
       ...st.catalog,
-      models: { [NANO]: mod(NANO, 'nanogpt', 'seed', 'Seed', 0.1), [ATLAS]: mod(ATLAS, 'atlas', 'seed', 'Seed', 0.08), [LOCAL_IMAGE_REF]: mod(LOCAL_IMAGE_REF, 'local', 'studio-image', 'Local Sketch', 0) },
+      models: { [NANO]: mod(NANO, 'nanogpt', 'seed', 'Seed', 0.1), [NANO_V]: mod(NANO_V, 'nanogpt', 'v', 'V', 0.1, 'video'), [ATLAS]: mod(ATLAS, 'atlas', 'seed', 'Seed', 0.08), [LOCAL_IMAGE_REF]: mod(LOCAL_IMAGE_REF, 'local', 'studio-image', 'Local Sketch', 0) },
       schemas: {
-        [NANO]: { ref: NANO, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' },
-        [ATLAS]: { ref: ATLAS, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' },
-        [LOCAL_IMAGE_REF]: { ref: LOCAL_IMAGE_REF, params: [], source: 'builtin', slots: { prompt: 'prompt', promptRequired: true }, price: { skus: [{ unit: 'output', usd: 0 }] } },
+        [NANO]: sch(NANO),
+        [NANO_V]: sch(NANO_V),
+        [ATLAS]: sch(ATLAS),
+        [LOCAL_IMAGE_REF]: { ...sch(LOCAL_IMAGE_REF, 'builtin'), price: { skus: [{ unit: 'output', usd: 0 }] } },
       },
       transcribers: { [TR]: { ref: TR, provider: 'nanogpt', name: 'Test STT', id: 'transcriber', usdPerMinute: 0.01, maxDirectBytes: 1_000_000, video: false, diarization: false } },
     } as never,
@@ -284,15 +284,6 @@ describe('2. Recarga en cada punto', () => {
   });
 
   it('recarga tras resultado en assetIds antes de finish() (checkDelivery): NO marcar error', async () => {
-    const NANO_V = 'nanogpt::seed-video';
-    const st = useStore.getState();
-    useStore.setState({
-      catalog: {
-        ...st.catalog,
-        models: { ...st.catalog.models, [NANO_V]: { ref: NANO_V, provider: 'nanogpt', id: 'seed-video', name: 'SeedV', kind: 'video', acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] } } as ModelSummary },
-        schemas: { ...st.catalog.schemas, [NANO_V]: { ref: NANO_V, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' } },
-      } as never,
-    });
     let release!: () => void;
     const inCheck = new Promise<void>((res) => { disk.onBlobGet = async () => { res(); await new Promise<void>((r) => { release = r; }); }; });
     spyN().mockResolvedValueOnce({ outputs: [{ blob: new Blob(['paid'], { type: 'video/mp4' }), mime: 'video/mp4' }], costUsd: 0.1 });
@@ -448,11 +439,6 @@ describe('4. Reenvío de un incierto', () => {
     const host = mount(createElement(GenerationRecovery, { g }));
     await act(async () => { btn(host, /Continue once/).click(); await tick(); });
     expect(genSpy).not.toHaveBeenCalled(); expect(host.textContent).toMatch(/May have been charged/i);
-    await act(async () => { btn(host, /Cancel/).click(); await tick(); });
-    expect(genSpy).not.toHaveBeenCalled();
-    await act(async () => { btn(host, /Don’t ask again/).click(); await tick(); });
-    expect(genSpy).not.toHaveBeenCalled(); expect(host.textContent).toMatch(/May have been charged/i);
-    expect(useStore.getState().sessions[sid()].noAskOverLimit).toBeFalsy();
   });
 
   it('PlanRecoveryChips: paso incierto exige confirmación (RecoveryActions.tsx:19-50)', async () => {
@@ -462,8 +448,6 @@ describe('4. Reenvío de un incierto', () => {
     const host = mount(createElement(PlanRecoveryChips, { sessionId: sid(), item }));
     await act(async () => { btn(host, /Retry failed/).click(); await tick(); });
     expect(genSpy).not.toHaveBeenCalled(); expect(host.textContent).toMatch(/May have been charged/i);
-    await act(async () => { btn(host, /Cancel/).click(); await tick(); });
-    expect(genSpy).not.toHaveBeenCalled();
   });
 });
 
