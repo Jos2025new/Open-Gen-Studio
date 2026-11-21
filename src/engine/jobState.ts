@@ -72,7 +72,6 @@ export function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | u
 export function finishText(id: string, text: string, actualUsd: number | undefined, reqId?: string): void {
   const g = get().generations[id];
   if (!g || g.status === 'done') return;
-  if (reqId && g.sends?.find((s) => s.id === reqId)?.status === 'done') return;
   const sends = markSendsDone(g.sends, reqId);
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
@@ -91,7 +90,6 @@ export async function checkDelivery(id: string, assets: Asset[]): Promise<string
 export function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number, reqId?: string): void {
   const g = get().generations[id];
   if (!g || g.status === 'done') return;
-  if (reqId && g.sends?.find((s) => s.id === reqId)?.status === 'done') return;
   const sends = markSendsDone(g.sends, reqId);
   const uniqueAssetIds = [...new Set(assetIds)];
   patchGeneration(id, {

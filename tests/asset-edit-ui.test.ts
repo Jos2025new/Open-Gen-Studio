@@ -32,6 +32,7 @@ vi.mock('../src/engine/design/actions', () => ({
 
 vi.mock('../src/engine/design/raster', () => ({
   strokeSegment: vi.fn(),
+  flushRaster: async () => undefined,
 }));
 
 vi.mock('../src/engine/flow/actions', () => ({
