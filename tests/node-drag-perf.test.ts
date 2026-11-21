@@ -11,6 +11,7 @@ import { graphHistory, travelGraph } from '../src/engine/flow/history';
 import { storeHooks } from '../src/engine/storeBindings';
 import type { Generation, Graph, GraphNode } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
+import { rfDrag } from './rf-drag-events';
 
 const flow = vi.hoisted(() => ({
   props: null as null | {
@@ -88,6 +89,7 @@ function makeGraph(count: number): Graph {
   };
 }
 
+const drag = rfDrag(() => flow.props);
 const cleanups: Array<() => void> = [];
 afterEach(() => {
   while (cleanups.length) cleanups.pop()!();
@@ -135,6 +137,7 @@ describe('node drag publication counts', () => {
     const recordSpy = vi.spyOn(storeHooks, 'recordGraph');
 
     // Simulate 15 drag frames across two selected nodes.
+    drag.start('n0', 'n2');
     for (let step = 1; step <= 15; step++) {
       act(() => {
         flow.props!.onNodesChange([
@@ -160,6 +163,7 @@ describe('node drag publication counts', () => {
         { id: 'n2', type: 'position', position: { x: 595, y: 45 }, dragging: false },
       ]);
     });
+    drag.stop(['n0', 'n2']);
 
     expect(graphPublications).toBe(1);
     expect(sessionPublications).toBe(1);
@@ -186,12 +190,14 @@ describe('node drag publication counts', () => {
     cleanups.push(unsub);
     const editSpy = vi.spyOn(edit, 'editPresentation');
 
+    drag.start('n0');
     act(() => {
       flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 40, y: 20 }, dragging: true }]);
     });
     act(() => {
       flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 0, y: 0 }, dragging: false }]);
     });
+    drag.stop(['n0']);
 
     expect(graphPublications).toBe(0);
     expect(editSpy).not.toHaveBeenCalled();
@@ -201,14 +207,14 @@ describe('node drag publication counts', () => {
   it('keeps two rapid drags of the same nodes (<700ms) as separate undo steps', () => {
     const { sessionId } = mountWorkspace(5);
 
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: true }]);
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: false }]);
-    });
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: true }]);
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: false }]);
-    });
+    for (const p of [{ x: 100, y: 50 }, { x: 220, y: 90 }]) {
+      drag.start('n0');
+      act(() => {
+        flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: p, dragging: true }]);
+        flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: p, dragging: false }]);
+      });
+      drag.stop(['n0']);
+    }
 
     expect(graphHistory(sessionId, 'undo')).toHaveLength(2);
     let after = useStore.getState().sessions[sessionId].graph;
@@ -223,6 +229,7 @@ describe('node drag publication counts', () => {
 
     // Frame g0 wraps n0 (x:0,y:0) and n1 (x:260,y:0). With default NODE_WIDTH=240/220 and pad=28, frame starts at x=-28, y=-46.
     const initialFramePos = flow.props!.nodes.find((n) => n.id === 'g0' && n.type === 'group')!.position;
+    drag.start('g0');
     act(() => {
       flow.props!.onNodesChange([
         { id: 'g0', type: 'position', position: { x: initialFramePos.x + 80, y: initialFramePos.y + 40 }, dragging: true },
@@ -241,6 +248,11 @@ describe('node drag publication counts', () => {
 
     expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
     expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
+    // React Flow then stops the gesture on g0: the frame no longer exists, so nothing moves.
+    drag.stop(['g0'], { g0: { x: initialFramePos.x + 80, y: initialFramePos.y + 40 } });
+    const after = useStore.getState().sessions[sessionId].graph;
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
   });
 
   it('commits once and records 1 undo step when a multi-node drop arrives split across 2 batches', () => {
@@ -251,6 +263,7 @@ describe('node drag publication counts', () => {
     }));
     const editSpy = vi.spyOn(edit, 'editPresentation');
 
+    drag.start('n0', 'n1');
     act(() => {
       flow.props!.onNodesChange([
         { id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: true },
@@ -268,10 +281,12 @@ describe('node drag publication counts', () => {
     expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
     expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 360, y: 50 });
 
-    // Second drop batch: n1 drops, completing the gesture.
+    // Second drop batch: n1 drops; React Flow's stop event completes the gesture.
     act(() => {
       flow.props!.onNodesChange([{ id: 'n1', type: 'position', dragging: false }]);
     });
+    expect(editSpy).not.toHaveBeenCalled();
+    drag.stop(['n0', 'n1']);
     expect(graphPublications).toBe(1);
     expect(editSpy).toHaveBeenCalledTimes(1);
     expect(graphHistory(sessionId, 'undo')).toHaveLength(1);
@@ -287,7 +302,8 @@ describe('node drag publication counts', () => {
   it('discards hanging preview from an unfinished gesture when a new gesture starts', () => {
     const { sessionId } = mountWorkspace(5);
 
-    // Gesture 1 on n0 (and partial drop on n1) loses its final dragging: false event.
+    // Gesture 1 on n0 (and partial drop on n1) loses its stop event.
+    drag.start('n0', 'n1');
     act(() => {
       flow.props!.onNodesChange([
         { id: 'n0', type: 'position', position: { x: 150, y: 80 }, dragging: true },
@@ -299,6 +315,7 @@ describe('node drag publication counts', () => {
     expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 360, y: 80 });
 
     // Gesture 2 starts on n2: hanging previews of n0 and n1 from the unfinished gesture are discarded.
+    drag.start('n2');
     act(() => {
       flow.props!.onNodesChange([{ id: 'n2', type: 'position', position: { x: 600, y: 90 }, dragging: true }]);
     });
@@ -309,66 +326,52 @@ describe('node drag publication counts', () => {
     act(() => {
       flow.props!.onNodesChange([{ id: 'n2', type: 'position', dragging: false }]);
     });
+    drag.stop(['n2']);
     const after = useStore.getState().sessions[sessionId].graph;
     expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
     expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
     expect(after.nodes.find((n) => n.id === 'n2')?.position).toEqual({ x: 600, y: 90 });
   });
 
-  it('discards hanging preview when undo/redo or graph load updates a previewed node ID', () => {
+  it('keeps an in-flight gesture through Undo or a graph load and commits it onto the graph in force at drop', () => {
     const { sessionId } = mountWorkspace(4);
+    type P = { x: number; y: number };
+    const rPos = (id: string) => flow.props!.nodes.find((n) => n.id === id)?.position;
+    const sPos = (id: string) => useStore.getState().sessions[sessionId].graph.nodes.find((n) => n.id === id)?.position;
+    const move = (id: string, p: P, dragging: boolean) => act(() => flow.props!.onNodesChange([{ id, type: 'position', position: p, dragging }]));
+    const full = (id: string, p: P) => { drag.start(id); move(id, p, true); move(id, p, false); drag.stop([id]); };
+    full('n0', { x: 100, y: 50 });
+    full('n1', { x: 300, y: 40 });
 
-    // Commit a real move on n0: (0,0) -> (100,50).
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: true }]);
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', dragging: false }]);
-    });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
-
-    // Start a second drag on n0 to (220,90) whose final event is lost.
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: true }]);
-    });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 220, y: 90 });
-
-    // Undo restores n0 to (0,0) in the store and must discard the hanging preview on n0 (and ignore any late drop).
+    // Undo (of n1) while n0 is in flight: the gesture and its preview stay; the drop lands on the undone graph.
+    drag.start('n0');
+    move('n0', { x: 220, y: 90 }, true);
     act(() => {
       const cur = useStore.getState().sessions[sessionId].graph;
       expect(travelGraph(sessionId, cur, 'undo', 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
     });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: false }]);
-    });
-    expect(useStore.getState().sessions[sessionId].graph.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(rPos('n0')).toEqual({ x: 220, y: 90 });
+    expect(rPos('n1')).toEqual({ x: 260, y: 0 });
+    move('n0', { x: 220, y: 90 }, false);
+    drag.stop(['n0']);
+    expect(sPos('n0')).toEqual({ x: 220, y: 90 });
+    expect(sPos('n1')).toEqual({ x: 260, y: 0 });
+    expect(graphHistory(sessionId, 'undo')).toHaveLength(2);
 
-    // Another hanging preview on n0 at (300,120) is discarded by Redo -> (100,50).
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 300, y: 120 }, dragging: true }]);
-    });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 300, y: 120 });
+    // A graph load mid-gesture: the preview stays; the drop moves only n0 on the loaded graph.
+    drag.start('n0');
+    move('n0', { x: 400, y: 160 }, true);
     act(() => {
       const cur = useStore.getState().sessions[sessionId].graph;
-      expect(travelGraph(sessionId, cur, 'redo', 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
+      const loaded: Graph = { ...cur, nodes: cur.nodes.map((n) => (n.id === 'n0' ? { ...n, position: { x: 40, y: 60 } } : n.id === 'n2' ? { ...n, position: { x: 999, y: 0 } } : { ...n })) };
+      useStore.setState((s) => ({ sessions: { ...s.sessions, [sessionId]: { ...s.sessions[sessionId], graph: loaded } } }));
     });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
-
-    // Hanging preview on n0 at (400,160) is discarded when a graph is loaded/hydrated into the session.
-    act(() => {
-      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 400, y: 160 }, dragging: true }]);
-    });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 400, y: 160 });
-    act(() => {
-      const cur = useStore.getState().sessions[sessionId].graph;
-      const loaded: Graph = {
-        ...cur,
-        nodes: cur.nodes.map((n) => (n.id === 'n0' ? { ...n, position: { x: 40, y: 60 } } : { ...n })),
-      };
-      useStore.setState((s) => ({
-        sessions: { ...s.sessions, [sessionId]: { ...s.sessions[sessionId], graph: loaded } },
-      }));
-    });
-    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 40, y: 60 });
+    expect(rPos('n0')).toEqual({ x: 400, y: 160 });
+    expect(rPos('n2')).toEqual({ x: 999, y: 0 });
+    move('n0', { x: 400, y: 160 }, false);
+    drag.stop(['n0']);
+    expect(sPos('n0')).toEqual({ x: 400, y: 160 });
+    expect(sPos('n2')).toEqual({ x: 999, y: 0 });
   });
 
   it('commits both A and B in 1 write when A drops first and B moves again before dropping', () => {
@@ -379,6 +382,7 @@ describe('node drag publication counts', () => {
     }));
     const editSpy = vi.spyOn(edit, 'editPresentation');
 
+    drag.start('n0', 'n1');
     act(() => {
       flow.props!.onNodesChange([
         { id: 'n0', type: 'position', position: { x: 110, y: 55 }, dragging: true },
@@ -404,10 +408,11 @@ describe('node drag publication counts', () => {
     expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 110, y: 55 });
     expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 420, y: 95 });
 
-    // Node B drops: the gesture ends and commits both A and B in a single editPresentation.
+    // Node B drops and React Flow stops the gesture: both A and B commit in a single editPresentation.
     act(() => {
       flow.props!.onNodesChange([{ id: 'n1', type: 'position', dragging: false }]);
     });
+    drag.stop(['n0', 'n1']);
     expect(graphPublications).toBe(1);
     expect(editSpy).toHaveBeenCalledTimes(1);
     expect(graphHistory(sessionId, 'undo')).toHaveLength(1);
@@ -428,6 +433,7 @@ describe('node drag publication counts', () => {
     }));
     const editSpy = vi.spyOn(edit, 'editPresentation');
 
+    drag.start('n0', 'n1');
     act(() => {
       flow.props!.onNodesChange([
         { id: 'n0', type: 'position', position: { x: 130, y: 65 }, dragging: true },
@@ -436,11 +442,13 @@ describe('node drag publication counts', () => {
       flow.props!.onNodesChange([{ id: 'n0', type: 'position', dragging: false }]);
     });
     const staleOnNodesChange = flow.props!.onNodesChange;
+    const staleProps = flow.props;
 
     unmount();
     act(() => {
       staleOnNodesChange([{ id: 'n1', type: 'position', position: { x: 390, y: 65 }, dragging: false }]);
     });
+    rfDrag(() => staleProps).stop(['n0', 'n1'], { n0: { x: 130, y: 65 }, n1: { x: 390, y: 65 } });
 
     expect(graphPublications).toBe(0);
     expect(editSpy).not.toHaveBeenCalled();

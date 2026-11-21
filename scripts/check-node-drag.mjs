@@ -1,6 +1,7 @@
 /**
  * Permanent drag-perf guard (single-scan AST check with lexical scope stack):
- * 1. In-progress drag paths (`onNodeDrag`, `onSelectionDrag`, `onNodesChange`, `applyDragChanges`) must not reach
+ * 1. In-progress drag paths (`onNodeDrag`, `onSelectionDrag`, their `*Start`, and the drag branches of `onNodesChange` /
+ *    `applyDragChanges`: `dragging` true or an open `flightRef.current`) must not reach
  *    `editPresentation`, `setGraph`, `patchSession`, `applyEdit`, `moveGroup`, `recordGraph`, `travelGraph`, `persistState`, `JSON.stringify`.
  * 2. Card components must not mount `<NodeToolbar` unconditionally.
  * 3. `useCutTool` pointermove handlers must not rescan the full trail (`trailCuts` or loop over `trail`).
@@ -13,13 +14,16 @@ import { scan } from './ast-scan.mjs';
 
 const FORBIDDEN = new Set(['editPresentation', 'setGraph', 'patchSession', 'applyEdit', 'moveGroup', 'recordGraph', 'travelGraph', 'persistState', 'JSON.stringify']);
 const TRACKED = new Set([...FORBIDDEN, 'trailCuts', 'NodeToolbar']);
-const HANDLERS = new Set(['onNodesChange', 'onNodeDrag', 'onSelectionDrag', 'applyDragChanges']);
-const JSX_DRAG_ATTRS = new Set(['onNodesChange', 'onNodeDrag', 'onSelectionDrag']);
+const STRICT = new Set(['onNodeDrag', 'onSelectionDrag', 'onNodeDragStart', 'onSelectionDragStart']);
+const HANDLERS = new Set([...STRICT, 'onNodesChange', 'applyDragChanges']);
+const JSX_DRAG_ATTRS = new Set([...STRICT, 'onNodesChange']);
+// The open drag flight in useNodeDrag: while it is set, a gesture is in progress.
+const FLIGHT = 'flightRef.current';
 const RELEVANT_RE = /onNodesChange|onNodeDrag|onSelectionDrag|applyDragChanges|useCutTool|NodeToolbar/;
 const TRAIL_NAMES = new Set(['trail', 'curTrail', 'next', 'trailRef']);
 const ITER_METHODS = new Set(['forEach', 'map', 'filter', 'some', 'every', 'reduce', 'find']);
 
-const DRAG_HINT = 'No escribas el grafo, historial ni serialices durante el arrastre en curso; usa estado local y aplica editPresentation al soltar (dragging: false).';
+const DRAG_HINT = 'No escribas el grafo, historial ni serialices durante el arrastre en curso; usa estado local y aplica editPresentation al soltar (onNodeDragStop; sin gesto, dragging: false directo).';
 const CUT_HINT = 'No recorras todo el trazo de la tijera en cada pointermove; prueba solo el segmento [anterior, actual] y acumula los cortes.';
 const TOOLBAR_HINT = 'NodeToolbar montado incondicionalmente; móntalo solo cuando la tarjeta esté seleccionada.';
 
@@ -48,7 +52,7 @@ function walkSubtree(node, fn) {
   }
 }
 function isDragMem(node, trueVars) {
-  return Boolean(node && ((node.type === 'MemberExpression' && node.property?.name === 'dragging') || (node.type === 'Identifier' && trueVars.has(node.name))));
+  return Boolean(node && ((node.type === 'MemberExpression' && (node.property?.name === 'dragging' || memberName(node) === FLIGHT)) || (node.type === 'Identifier' && trueVars.has(node.name))));
 }
 function isDragTest(test, wantTrue, trueVars, falseVars) {
   if (!test) return false;
@@ -61,10 +65,8 @@ function isDragTest(test, wantTrue, trueVars, falseVars) {
   if (test.type === 'UnaryExpression' && test.operator === '!') return isDragTest(test.argument, !wantTrue, trueVars, falseVars);
   if (test.type === 'BinaryExpression') {
     const { left, right, operator } = test;
-    if (operator === '>' && right?.value === 0 && /^(?:draggingIdsRef|framePreviewsRef)\b/.test(memberName(left))) return wantTrue;
     const eq = operator === '===' || operator === '==', neq = operator === '!==' || operator === '!=';
     if (eq || neq) {
-      if (right?.value === 0 && /^(?:draggingIdsRef|framePreviewsRef)\b/.test(memberName(left))) return eq ? !wantTrue : wantTrue;
       const target = eq ? wantTrue : !wantTrue;
       return (isDragMem(left, trueVars) && right?.value === target) || (isDragMem(right, trueVars) && left?.value === target);
     }
@@ -267,7 +269,7 @@ export function check(root = '.') {
             report(n, `Escritura/serialización durante el arrastre${hit.includes(' -> ') ? ` vía ${hit}` : ` (${hit})`}. ${DRAG_HINT}`);
           }
         };
-        if (name === 'onNodeDrag' || name === 'onSelectionDrag') {
+        if (STRICT.has(name)) {
           walkScopes(fnNode.body, fnScopes, (n, sc) => { if (isFnDef(n)) return false; if (n.type === 'CallExpression') flagCall(n, sc); });
           return;
         }

@@ -1,273 +1,135 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { NodeChange } from '@xyflow/react';
 import { editPresentation } from '../../engine/nodecore/edit';
 import { groupBounds } from '../../engine/flow/arrange';
-import type { Graph, GraphGroup, GraphNode } from '../../engine/types';
+import type { Graph } from '../../engine/types';
 import { useStore } from '../../store/store';
 import type { FlowNode } from './nodes';
 
-const EMPTY_DRAG_POS = new Map<string, { x: number; y: number }>();
-
 type Pt = { x: number; y: number };
+type Sizes = Map<string, { width: number; height: number }>;
+type DragNodes = ReadonlyArray<{ id: string; position: Pt }>;
+/** Positions React Flow reports while a gesture is in flight (nodes and frames), and each frame's position at gesture start. */
+interface Flight { pos: Map<string, Pt>; start: Map<string, Pt>; event?: unknown }
 
-interface DragGesture {
-  ids: Set<string>;
-  frames: Map<string, Set<string>>;
-  base: Map<string, { node: GraphNode; x: number; y: number }>;
-  preview: Map<string, Pt>;
-  final: Map<string, Pt>;
-  active: Set<string>;
-  dragging: boolean;
+const EMPTY = new Map<string, Pt>();
+const graphOf = (sessionId: string) => useStore.getState().sessions[sessionId]?.graph;
+const newFlight = (event?: unknown): Flight => ({ pos: new Map(), start: new Map(), event });
+
+/** Positions a flight gives to the live graph: dragged nodes as reported; a dragged frame shifts its live members by its own offset. */
+function project(f: Flight | null, graph: Graph | undefined): Map<string, Pt> {
+  if (!f || !graph) return EMPTY;
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const out = new Map<string, Pt>();
+  for (const [id, p] of f.pos) if (byId.has(id)) out.set(id, p);
+  for (const g of graph.groups ?? []) {
+    const p = f.pos.get(g.id), s = f.start.get(g.id);
+    if (!p || !s) continue;
+    for (const id of g.nodeIds) {
+      const n = byId.get(id);
+      if (n && !out.has(id)) out.set(id, { x: n.position.x + p.x - s.x, y: n.position.y + p.y - s.y });
+    }
+  }
+  return out;
 }
 
 /**
- * Explicit drag-gesture lifecycle («one gesture = one write»):
- * - Starts on the first `dragging: true` when no gesture is active, recording gesture IDs, base positions, previews, and dropped finals.
- * - During the gesture, `dragging: true` updates only that ID's preview without clearing any other ID's dropped final position.
- * - Ends once all gesture IDs release (`dragging: false`), committing one `editPresentation` for surviving nodes with net movement.
- * - Discards without writing on canvas unmount, session change, or if a new `dragging: true` arrives with IDs outside the unfinished gesture.
+ * Drag cycle («one gesture = one write»): React Flow's `onNodeDragStart` opens a flight; position changes only update it
+ * (cards are projected from graph + flight); `onNodeDragStop` writes one `editPresentation` with React Flow's final positions
+ * onto the live graph and empties the flight. Graph changes mid-gesture never cancel it. Position changes with no flight
+ * (arrow keys) are written directly, as in main. Unmount or a session change empties the flight without writing.
  */
-export function useNodeDrag(
-  sessionId: string,
-  measuredRef: RefObject<Map<string, { width: number; height: number }>>,
-) {
-  const [dragPos, setDragPos] = useState<Map<string, { x: number; y: number }>>(EMPTY_DRAG_POS);
-  const dragPosRef = useRef(dragPos);
-  dragPosRef.current = dragPos;
-  const gestureRef = useRef<DragGesture | null>(null);
-  const mountedRef = useRef(true);
-
-  const syncDragPos = useCallback(() => {
-    const g = gestureRef.current;
-    const next = g && g.preview.size ? g.preview : EMPTY_DRAG_POS;
-    const prev = dragPosRef.current;
-    if (next === EMPTY_DRAG_POS && prev === EMPTY_DRAG_POS) return;
-    if (next.size === prev.size && [...next].every(([id, p]) => { const q = prev.get(id); return q !== undefined && q.x === p.x && q.y === p.y; })) return;
-    const published = next === EMPTY_DRAG_POS ? EMPTY_DRAG_POS : new Map(next);
-    dragPosRef.current = published;
-    if (mountedRef.current) setDragPos(published);
-  }, []);
-
-  const reconcileWithGraph = useCallback(
-    (g: Graph | undefined, removed?: ReadonlySet<string>) => {
-      const gesture = gestureRef.current;
-      if (!gesture) return;
-      const liveNodes = new Map<string, GraphNode>();
-      for (const n of g?.nodes ?? []) if (!removed?.has(n.id)) liveNodes.set(n.id, n);
-      const liveGroups = new Map((g?.groups ?? []).map((gr) => [gr.id, new Set(gr.nodeIds)]));
-      const isNodeAlive = (id: string) => {
-        const live = liveNodes.get(id);
-        if (!live) return false;
-        const base = gesture.base.get(id);
-        if (!base) return true;
-        if (live.position.x !== base.x || live.position.y !== base.y) return false;
-        return gesture.final.has(id) || live === base.node;
-      };
-      const dead = new Set<string>();
-      for (const [gid, memberIds] of gesture.frames) {
-        const liveMembers = liveGroups.get(gid);
-        if (!liveMembers) {
-          for (const id of memberIds) if (!gesture.active.has(id)) dead.add(id);
-          gesture.frames.delete(gid);
-          gesture.ids.delete(gid);
-          gesture.active.delete(gid);
-        } else {
-          for (const id of memberIds) {
-            if (!liveMembers.has(id) || !isNodeAlive(id)) {
-              memberIds.delete(id);
-              if (!gesture.active.has(id)) dead.add(id);
-            }
-          }
-          if (!memberIds.size) {
-            gesture.frames.delete(gid);
-            gesture.ids.delete(gid);
-            gesture.active.delete(gid);
-          }
-        }
-      }
-      for (const id of gesture.ids) if (!gesture.frames.has(id) && !isNodeAlive(id)) dead.add(id);
-      for (const id of dead) {
-        gesture.ids.delete(id);
-        gesture.active.delete(id);
-        gesture.preview.delete(id);
-        gesture.final.delete(id);
-        gesture.base.delete(id);
-      }
-      if (!gesture.ids.size) gestureRef.current = null;
-      else gesture.dragging = gesture.active.size > 0;
-      syncDragPos();
-    },
-    [syncDragPos],
-  );
+export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
+  const [flight, setFlight] = useState<Flight | null>(null);
+  const flightRef = useRef<Flight | null>(null);
+  const sessionRef = useRef<string | null>(null);
+  const graph = useStore((s) => s.sessions[sessionId]?.graph);
+  const dragPos = useMemo(() => project(flight, graph), [flight, graph]);
 
   useEffect(() => {
-    mountedRef.current = true;
-    gestureRef.current = null;
-    dragPosRef.current = EMPTY_DRAG_POS;
-    setDragPos(EMPTY_DRAG_POS);
-    const unsub = useStore.subscribe((state, prev) => {
-      const nextGraph = state.sessions[sessionId]?.graph;
-      if (nextGraph !== prev.sessions[sessionId]?.graph) reconcileWithGraph(nextGraph);
-    });
+    sessionRef.current = sessionId;
+    flightRef.current = null;
+    setFlight(null);
     return () => {
-      mountedRef.current = false;
-      unsub();
-      gestureRef.current = null;
-      dragPosRef.current = EMPTY_DRAG_POS;
+      sessionRef.current = null;
+      flightRef.current = null;
     };
-  }, [sessionId, reconcileWithGraph]);
+  }, [sessionId]);
 
-  const applyDragChanges = useCallback(
-    (
-      changes: NodeChange<FlowNode>[],
-      liveGraph: Graph | undefined,
-      groupById: Map<string, GraphGroup>,
-      removed: string[],
-    ) => {
-      if (!mountedRef.current) return;
-      const removedSet = new Set(removed);
-      reconcileWithGraph(liveGraph, removedSet);
-      const liveNodes = new Map<string, GraphNode>();
-      for (const n of liveGraph?.nodes ?? []) if (!removedSet.has(n.id)) liveNodes.set(n.id, n);
+  const live = useCallback(() => sessionRef.current === sessionId, [sessionId]);
+  const publish = useCallback((f: Flight | null) => {
+    flightRef.current = f;
+    setFlight(f && { ...f });
+  }, []);
 
-      const dragStarts: Array<{ id: string; group?: GraphGroup }> = [];
+  /** Records reported positions; a frame without a start position starts at its current bounds. */
+  const track = useCallback((f: Flight, changes: NodeChange<FlowNode>[]) => {
+    const g = graphOf(sessionId);
+    for (const c of changes) {
+      if (c.type !== 'position' || !c.position) continue;
+      f.pos.set(c.id, c.position);
+      const group = g?.groups?.find((gr) => gr.id === c.id);
+      if (!group || f.start.has(c.id)) continue;
+      const ids = new Set(group.nodeIds);
+      const b = groupBounds(g!.nodes.filter((n) => ids.has(n.id)), measuredRef.current);
+      if (b) f.start.set(c.id, { x: b.x, y: b.y });
+    }
+  }, [sessionId, measuredRef]);
+
+  /** Writes a flight onto the live graph as one step, only for live IDs with net movement. */
+  const commit = useCallback((f: Flight) => {
+    const moves = project(f, graphOf(sessionId));
+    const moved = (n: { id: string; position: Pt }) => {
+      const p = moves.get(n.id);
+      return p !== undefined && (p.x !== n.position.x || p.y !== n.position.y);
+    };
+    if (!graphOf(sessionId)?.nodes.some(moved)) return;
+    editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moved(n) ? { ...n, position: moves.get(n.id)! } : n)) }));
+  }, [sessionId]);
+
+  const endDrag = useCallback((_event?: unknown, _node?: unknown, nodes?: DragNodes) => {
+    const f = flightRef.current;
+    if (!f || !live()) return;
+    for (const n of nodes ?? []) f.pos.set(n.id, n.position);
+    publish(null);
+    commit(f);
+  }, [live, publish, commit]);
+
+  const startDrag = useCallback((event?: unknown, _node?: unknown, nodes?: DragNodes) => {
+    if (!live()) return;
+    // React Flow 12 calls onNodeDragStart and onSelectionDragStart with the same event for one selection drag.
+    if (event !== undefined && flightRef.current?.event === event) return;
+    // A flight still open here lost its end (React Flow always stops or aborts first): it is discarded.
+    const f = newFlight(event);
+    for (const n of nodes ?? []) f.start.set(n.id, n.position);
+    publish(f);
+  }, [live, publish]);
+
+  const applyDragChanges = useCallback((changes: NodeChange<FlowNode>[]) => {
+    if (!live() || !changes.some((c) => c.type === 'position' && c.position)) return;
+    let gesture = flightRef.current;
+    if (!gesture && changes.some((c) => c.type === 'position' && c.dragging === true)) gesture = newFlight();
+    if (gesture) {
+      const f = gesture;
+      track(f, changes);
+      publish(f);
+      // An aborted drag (second finger, grabbed node deleted) ends with `dragging: false` and no stop event: commit it then.
       for (const c of changes) {
-        if (c.type !== 'position' || c.dragging !== true || !c.position) continue;
-        if (groupById.has(c.id)) {
-          const group = groupById.get(c.id)!;
-          if (group.nodeIds.some((id) => liveNodes.has(id))) dragStarts.push({ id: c.id, group });
-        } else if (liveNodes.has(c.id)) {
-          dragStarts.push({ id: c.id });
-        }
+        if (c.type === 'position' && c.dragging === false) { queueMicrotask(() => { if (flightRef.current === f) endDrag(); }); break; }
       }
+      return;
+    }
+    const direct = newFlight();
+    track(direct, changes);
+    commit(direct);
+  }, [live, track, publish, commit, endDrag]);
 
-      // Discard any unfinished gesture without writing if a new gesture starts with IDs outside the active gesture.
-      let gesture = gestureRef.current;
-      if (dragStarts.length > 0) {
-        const continues =
-          gesture !== null &&
-          dragStarts.every(
-            ({ id }) => gesture!.ids.has(id) && !gesture!.final.has(id) && (!groupById.has(id) || gesture!.active.has(id)),
-          );
-        if (!continues) {
-          gesture = {
-            ids: new Set(),
-            frames: new Map(),
-            base: new Map(),
-            preview: new Map(),
-            final: new Map(),
-            active: new Set(),
-            dragging: true,
-          };
-          for (const { id, group } of dragStarts) {
-            gesture.ids.add(id);
-            gesture.active.add(id);
-            if (group) {
-              const members = new Set(group.nodeIds.filter((mid) => liveNodes.has(mid)));
-              gesture.frames.set(id, members);
-              for (const mid of members) {
-                const n = liveNodes.get(mid)!;
-                gesture.ids.add(mid);
-                gesture.base.set(mid, { node: n, x: n.position.x, y: n.position.y });
-              }
-            } else {
-              const n = liveNodes.get(id)!;
-              gesture.base.set(id, { node: n, x: n.position.x, y: n.position.y });
-            }
-          }
-          gestureRef.current = gesture;
-        }
-      }
-
-      if (!gesture) return;
-
-      const preBatch = new Map(gesture.preview);
-      const directInBatch = new Set<string>();
-      const frameChanges: Array<{ group: GraphGroup; pos?: Pt; dragging: boolean }> = [];
-
-      for (const c of changes) {
-        if (c.type !== 'position' || !gesture.ids.has(c.id)) continue;
-        if (groupById.has(c.id)) {
-          const group = groupById.get(c.id)!;
-          if (c.dragging === true) {
-            gesture.active.add(c.id);
-            if (c.position) frameChanges.push({ group, pos: c.position, dragging: true });
-          } else {
-            gesture.active.delete(c.id);
-            frameChanges.push({ group, pos: c.position, dragging: false });
-          }
-          continue;
-        }
-        if (!liveNodes.has(c.id)) continue;
-        directInBatch.add(c.id);
-        if (c.dragging === true) {
-          gesture.active.add(c.id);
-          if (c.position) gesture.preview.set(c.id, c.position);
-        } else {
-          gesture.active.delete(c.id);
-          const pos = c.position ?? gesture.preview.get(c.id);
-          if (pos) {
-            gesture.preview.set(c.id, pos);
-            gesture.final.set(c.id, pos);
-          }
-        }
-      }
-
-      for (const { group, pos, dragging } of frameChanges) {
-        const memberIds = gesture.frames.get(group.id);
-        if (!memberIds) continue;
-        const members: GraphNode[] = [];
-        for (const id of memberIds) {
-          const n = liveNodes.get(id);
-          if (n) members.push({ ...n, position: preBatch.get(id) ?? n.position });
-        }
-        const b = groupBounds(members, measuredRef.current);
-        if (dragging && !b) continue;
-        const dx = pos && b ? pos.x - b.x : 0;
-        const dy = pos && b ? pos.y - b.y : 0;
-        for (const m of members) {
-          if (directInBatch.has(m.id)) continue;
-          const nextPos = { x: m.position.x + dx, y: m.position.y + dy };
-          if (dragging) {
-            if (!gesture.final.has(m.id)) gesture.preview.set(m.id, nextPos);
-          } else if (!gesture.active.has(m.id) && !gesture.final.has(m.id)) {
-            gesture.preview.set(m.id, nextPos);
-            gesture.final.set(m.id, nextPos);
-          }
-        }
-      }
-
-      gesture.dragging = gesture.active.size > 0;
-      if (!gesture.dragging) {
-        const finalMoves = gesture.final;
-        gestureRef.current = null;
-        syncDragPos();
-        if (liveGraph && finalMoves.size) {
-          const moved = liveGraph.nodes.some((n) => {
-            const p = finalMoves.get(n.id);
-            return p !== undefined && (p.x !== n.position.x || p.y !== n.position.y);
-          });
-          if (moved) {
-            editPresentation(sessionId, (g) => ({
-              ...g,
-              nodes: g.nodes.map((n) => {
-                const p = finalMoves.get(n.id);
-                return p && (p.x !== n.position.x || p.y !== n.position.y) ? { ...n, position: p } : n;
-              }),
-            }));
-          }
-        }
-      } else {
-        syncDragPos();
-      }
-    },
-    [sessionId, measuredRef, reconcileWithGraph, syncDragPos],
-  );
-
-  return { dragPos, applyDragChanges };
+  const startSelection = useCallback((event: unknown, nodes: DragNodes) => startDrag(event, undefined, nodes), [startDrag]);
+  const endSelection = useCallback((event: unknown, nodes: DragNodes) => endDrag(event, undefined, nodes), [endDrag]);
+  return { dragPos, applyDragChanges, startDrag, endDrag, startSelection, endSelection };
 }
 
 export function liveGroupsMap(sessionId: string) {
-  const liveGraph = useStore.getState().sessions[sessionId]?.graph;
+  const liveGraph = graphOf(sessionId);
   return { liveGraph, groupById: new Map((liveGraph?.groups ?? []).map((g) => [g.id, g])) };
 }

@@ -144,7 +144,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
-  const { dragPos, applyDragChanges } = useNodeDrag(sessionId, measuredRef);
+  const { dragPos, applyDragChanges, startDrag, endDrag, startSelection, endSelection } = useNodeDrag(sessionId, measuredRef);
 
   const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -178,9 +178,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       const removed: string[] = [];
       const picks: Array<[string, boolean]> = [];
       const sizes: Array<[string, { width: number; height: number }]> = [];
-      const { liveGraph, groupById } = liveGroupsMap(sessionId);
+      const { groupById } = liveGroupsMap(sessionId);
       for (const c of changes) {
-        // A group frame: selecting it selects its nodes; deleting it ungroups; position is handled in applyDragChanges.
+        // A group frame: selecting it selects its nodes; deleting it ungroups; positions go to useNodeDrag.
         if ('id' in c && groupById.has(c.id)) {
           const g = groupById.get(c.id)!;
           if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
@@ -191,7 +191,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         else if (c.type === 'remove') removed.push(c.id);
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
-      applyDragChanges(changes, liveGraph, groupById, removed);
+      applyDragChanges(changes);
       if (removed.length) deleteNodes(sessionId, removed);
       // Functional updates: several reports can arrive before a re-render; none may be lost.
       if (picks.length || removed.length) {
@@ -412,6 +412,10 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         edgeTypes={noticeEdgeTypes}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onNodeDragStart={startDrag}
+        onSelectionDragStart={startSelection}
+        onNodeDragStop={endDrag}
+        onSelectionDragStop={endSelection}
         onEdgesChange={onEdgesChange}
         onPaneContextMenu={embedded ? undefined : (e) => openMenu(e)}
         onNodeContextMenu={embedded ? undefined : (e, n) => {
