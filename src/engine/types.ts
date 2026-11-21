@@ -9,6 +9,9 @@ import type { DraftMode } from './agent/draftFirst';
 import type { FxLayer } from './fx/types';
 import type { ChatMessageMeta } from './feedMeta';
 
+import type { RemoteJob, SendRecord } from './sendTypes';
+export type { RemoteJob, SendRecord, SendStatus } from './sendTypes';
+
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 /** auto (card if missing), guided (asks), direct (no card). */
@@ -285,13 +288,6 @@ export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | '
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled' | 'review';
 
-export interface RemoteJob {
-  provider: RemoteProviderId;
-  id: string;
-  /** Provider specific polling data (status/response URLs, endpoint id). */
-  meta: Record<string, string>;
-}
-
 export interface Generation {
   /** Its session was deleted while running: it finishes (charged to Spending once), then is removed. */
   discard?: boolean;
@@ -358,8 +354,10 @@ export interface Generation {
   notes?: string[];
   /** The last provider request (endpoint, params, try, job id). Never a key or media. */
   sent?: SentRequest;
-  /** When the request left for the provider and no answer (job id or result) had come back: still set after a reload, the send may have been charged. */
+  /** The request left and no answer came back: still set after a reload, it may have been charged. */
   sending?: number;
+  /** Per-request send ledger (optional for backward compatibility with saved generations). */
+  sends?: SendRecord[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1009,7 +1007,7 @@ export interface Session {
   activeDocId: string | null;
   /** Every agent's thread by agent node id (see agent/threads.ts). */
   agents: Record<string, AgentState>;
-  /** Threads of deleted agent nodes (the last few), so undoing the deletion by any path gives the agent its memory back (agent/threads.ts). */
+  /** Threads of deleted agent nodes (the last few), so undoing the deletion gives the agent its memory back (agent/threads.ts). */
   retired?: Record<string, AgentState>;
   /** Which thread the UI shows (display only; nothing is written through it). Absent: the session's main thread. */
   agentLane?: string;

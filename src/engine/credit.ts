@@ -161,7 +161,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
   markEmpty(cur.provider);
-  if (g.remoteJob || g.lostJob) return false;
+  if (g.remoteJob || g.lostJob || g.sends?.some((s) => s.status === 'uncertain' || s.status === 'intent' || Boolean(s.remoteJob))) return false;
   const empty = PROVIDER_LABELS[cur.provider];
   const nodes = () => get().sessions[g.sessionId]?.graph.nodes ?? [];
   const nodeId = attemptNode(g, nodes())?.id;
