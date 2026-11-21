@@ -388,20 +388,26 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
-  const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
+  const hasPanel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' || d.kind === 'tool';
   const showTools = Boolean(selected) && solo;
   // The title floats above the card and scales with the zoom, the toolbar does not: clear the title, then a small fixed gap.
   // Only the selected node with a toolbar reads the zoom: the others do not re-render on every zoom tick.
   const toolbarOffset = useFlowStore((st) => (showTools ? Math.round(7 + TITLE_RISE * st.transform[2]) : 0));
   return (
     <>
-      <NodeToolbar isVisible={showTools} position={Position.Top} offset={toolbarOffset}>
-        <NodeActions node={node} out={out} panel={inPanel} />
-      </NodeToolbar>
-      {panel ? (
-        <NodeToolbar isVisible={showTools} position={Position.Bottom} offset={12}>
-          <div className="nt-panel">{panel}</div>
-        </NodeToolbar>
+      {showTools ? (
+        <>
+          <NodeToolbar isVisible position={Position.Top} offset={toolbarOffset}>
+            <NodeActions node={node} out={out} panel={inPanel} />
+          </NodeToolbar>
+          {hasPanel ? (
+            <NodeToolbar isVisible position={Position.Bottom} offset={12}>
+              <div className="nt-panel">
+                {d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : <GenNodeBody node={node as GraphNode & { data: GenNodeData }} />}
+              </div>
+            </NodeToolbar>
+          ) : null}
+        </>
       ) : null}
       {inputs.filter((p) => p.id !== 'clip' || wired.has('clip') || clipModel).map((p, i, shown) => (
         // The prompt box already holds the prompt: its port shows only when connected or while connecting.
