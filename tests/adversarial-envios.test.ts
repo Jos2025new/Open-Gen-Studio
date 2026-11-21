@@ -17,7 +17,8 @@ vi.mock('../src/lib/idb', async () => {
     stateDb: {
       get: async () => disk.raw,
       set: async (_k: string, raw: string | { text(): string }) => {
-        if (disk.onSet) await disk.onSet();
+        const pending = disk.onSet?.();
+        if (pending) await pending;
         if (guard.discarding) return 'fail';
         if (!lock.held) return 'browser-only';
         if (disk.hangSet) await new Promise<void>((r) => { disk.unblock = r; });
@@ -175,7 +176,7 @@ describe('1. Puerta de 8 s y rutas de envío', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it.fails('reintento interno Atlas: ni sending durante sleep ni intent colgado si discarding bloquea retry #2', async () => {
+  it('reintento interno Atlas: ni sending durante sleep ni intent colgado si discarding bloquea retry #2', async () => {
     vi.useFakeTimers(); vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0.08);
     const spy = spyA().mockRejectedValue(new HttpError(500, 'Upstream access denied', {}));
     const g = makeMedia({ modelRef: ATLAS });
@@ -219,7 +220,7 @@ describe('1. Puerta de 8 s y rutas de envío', () => {
     expect(genOf(g.id).status).toBe('done');
   });
 
-  it.fails('carrera guard.discarding (idb.ts:284 fail + revertToDisk limpia): 0 POST sin IDB', async () => {
+  it('carrera guard.discarding (idb.ts:284 fail + revertToDisk limpia): 0 POST sin IDB', async () => {
     disk.onSet = () => { guard.discarding = true; queueMicrotask(() => { guard.discarding = false; }); };
     const spy = spyN().mockResolvedValue(imgOut('leak'));
     const g = makeMedia();
@@ -327,7 +328,7 @@ describe('2. Recarga en cada punto', () => {
     release(); await p;
   });
 
-  it.fails('specialSends: cancelar tras enviar sin remoteJob NO deja sends[0] en intent', async () => {
+  it('specialSends: cancelar tras enviar sin remoteJob NO deja sends[0] en intent', async () => {
     const started = new Promise<void>((res) => {
       vi.spyOn(ADAPTERS.nanogpt, 'transcribe').mockImplementationOnce(async (req) => {
         res(); await new Promise<void>((_ok, rej) => { req.signal.addEventListener('abort', () => rej(new DOMException('Aborted', 'AbortError'))); });
@@ -401,14 +402,14 @@ describe('3. Idempotencia: rehidratar 2–3 veces, crédito y assetIds previos',
     expect(atlasSpy).not.toHaveBeenCalled();
   });
 
-  it.fails('execute() tras reentrada con fallo no-red: NO debe borrar lostJob previo (jobs.ts:346-347)', async () => {
+  it('execute() tras reentrada con fallo no-red: NO debe borrar lostJob previo (jobs.ts:346-347)', async () => {
     const g = makeMedia(); patchG(g.id, { lostJob: true });
     spyN().mockRejectedValueOnce(new Error('bad input'));
     await runGeneration(g.id).catch(() => undefined);
     expect(genOf(g.id).lostJob).toBe(true);
   });
 
-  it.fails('onGenerationCredit: NO debe auto-reenviar con status=intent sin liquidar (credit.ts:164)', async () => {
+  it('onGenerationCredit: NO debe auto-reenviar con status=intent sin liquidar (credit.ts:164)', async () => {
     setupCatalog({ autoSwitch: 'always' }); vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(10);
     const g = makeMedia(); patchG(g.id, { status: 'error', sends: [{ id: 'req_open', index: 0, status: 'intent' }] });
     const rerun = vi.fn(async () => undefined);

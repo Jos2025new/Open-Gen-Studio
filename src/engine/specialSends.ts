@@ -1,5 +1,5 @@
 /* Sends that are not a media generation: transcribe, create a voice, create a style (moved out of jobs.ts, Opus #4). */
-import { isAbort, JobFailedError, NetworkError } from '../lib/http';
+import { JobFailedError, NetworkError } from '../lib/http';
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
@@ -41,7 +41,7 @@ async function runSpecialSend(
     if (reqId && cur?.sends && !(err instanceof SendNotCommittedError)) {
       if (err instanceof JobFailedError) {
         patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, false, true) });
-      } else if (!cur.remoteJob && !isAbort(err)) {
+      } else if (!cur.remoteJob) {
         patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, !isFreeSend(cur) && err instanceof NetworkError) });
       }
     }

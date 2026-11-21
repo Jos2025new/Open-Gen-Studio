@@ -1,6 +1,7 @@
 import { uid } from '../lib/id';
 import { guard } from '../lib/saveGuard';
 import { holdsWriterLock } from '../lib/writerLock';
+import { saveStatus } from '../store/saveStatus';
 import { patchGeneration, saveNow, toast, useStore } from '../store/store';
 import { isMuted, setMuted } from './notices';
 import { PROVIDER_LABELS } from './providers/types';
@@ -73,16 +74,20 @@ async function saveWithinCap(timeoutMs: number, message: string): Promise<void> 
 export async function markSending(id: string, index = 0, reqId = uid('req')): Promise<string> {
   const g = useStore.getState().generations[id];
   const errMsg = notSentMessage(g, reqId);
-  if (!holdsWriterLock() || guard.discarding) throw new SendNotCommittedError(errMsg);
+  if (!holdsWriterLock() || guard.discarding) {
+    if (g?.sends?.some((s) => s.id === reqId && s.status === 'intent')) dropIntent(id, reqId);
+    throw new SendNotCommittedError(errMsg);
+  }
   const sends = upsertIntent(g?.sends, reqId, index);
   patchGeneration(id, { sending: Date.now(), sends });
+  const targetVersion = saveStatus.getState().version;
   try {
     await saveWithinCap(SEND_SAVE_TIMEOUT_MS, errMsg);
   } catch {
     dropIntent(id, reqId);
     throw new SendNotCommittedError(errMsg);
   }
-  if (!holdsWriterLock() || guard.discarding) {
+  if (!holdsWriterLock() || guard.discarding || saveStatus.getState().confirmed < targetVersion) {
     dropIntent(id, reqId);
     throw new SendNotCommittedError(errMsg);
   }

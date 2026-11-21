@@ -293,6 +293,8 @@ async function execute(id: string): Promise<string[]> {
             notes: [...(get().generations[id]?.notes ?? []).filter((x) => !x.startsWith(refused)), `${refused} ("${policy.reason}")${which}; it was tried again on its own.`],
           });
           logEvent('retry', { generation: id, model: g.modelName, reason: policy.reason.toLowerCase(), waitMs: wait, attempt: retry + 2, image: done + 1 });
+          rollbackSendIntent(id, activeReqId);
+          activeReqId = undefined;
           await sleep(wait, signal);
         }
       }
@@ -346,8 +348,9 @@ async function execute(id: string): Promise<string[]> {
     }
     const cur = get().generations[id];
     if (err instanceof SendNotCommittedError) {
-      patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: false, sending: undefined });
-      toast(err.message, 'error', 9000, cur?.planId ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
+      const keepLost = Boolean(cur && !isFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
+      patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: keepLost, sending: undefined });
+      toast(err.message, 'error', 9000, cur?.planId || keepLost ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
       throw err;
     }
     if (isRestart(signal.reason)) return [];
@@ -359,7 +362,7 @@ async function execute(id: string): Promise<string[]> {
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
     const free = cur ? isFreeSend(cur) : false;
-    const lostJob = !free && !remoteJob && (err instanceof NetworkError || (submitted && isCreditError(err)));
+    const lostJob = !free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)));
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
