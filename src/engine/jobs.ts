@@ -20,9 +20,9 @@ import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
 import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
-import { addAssets, patchGeneration, upsertGeneration, useStore } from '../store/store';
+import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
-import { markSending, interruptedByReload } from './sendMark';
+import { markSending, interruptedByReload, SendNotCommittedError } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { followRemote } from './jobRecovery';
@@ -308,6 +308,11 @@ async function execute(id: string): Promise<string[]> {
       throw err;
     }
     const cur = get().generations[id];
+    if (err instanceof SendNotCommittedError) {
+      patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: false, sending: undefined });
+      toast(err.message, 'error', 9000, cur?.planId ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
+      throw err;
+    }
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
