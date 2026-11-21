@@ -43,7 +43,7 @@ import { loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
-import { closedGroupNotices, useCanvasElements, useCanvasGroups } from './CanvasElements';
+import { closedGroupNotices, isNodeSelectable, useCanvasElements, useCanvasGroups } from './CanvasElements';
 import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
 import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 
@@ -111,8 +111,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const b = rf.screenToFlowPosition({ x: r.left + Math.max(box.x0, box.x1), y: r.top + Math.max(box.y0, box.y1) });
     setBox(null);
     if (b.x - a.x < 2 && b.y - a.y < 2) return;
-    // Partial overlap counts, as with the Select tool.
+    // Partial overlap counts, as with the Select tool, sharing the same selectability rule.
     const hit = graph.nodes.filter((n) => {
+      if (!isNodeSelectable(n.id, hidden)) return false;
       const m = measuredRef.current.get(n.id) ?? { width: NODE_WIDTH, height: 120 };
       return n.position.x < b.x && n.position.x + m.width > a.x && n.position.y < b.y && n.position.y + m.height > a.y;
     }).map((n) => n.id);

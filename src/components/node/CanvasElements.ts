@@ -106,6 +106,11 @@ interface CanvasElements {
 
 const NO_IDS = new Set<string>();
 
+/** Single rule for box selection (both Select and Pan) and visible node selection: hidden collapsed-group members are not selectable. */
+export function isNodeSelectable(nodeId: string, hidden: ReadonlySet<string>): boolean {
+  return !hidden.has(nodeId);
+}
+
 export function useCanvasElements({ graph, revision, dragPos, selected, selectedEdges, measured, frames, hidden,
   byPort, byCable, spaceProblems, sessionId, omni, embedded }: CanvasElements) {
   const stableHidden = useShallow((ids: Set<string>) => ids)(hidden);
@@ -175,7 +180,7 @@ export function useCanvasElements({ graph, revision, dragPos, selected, selected
   const noticeOut = useShallow((ids: Set<string>) => ids)(anchors.outputs);
   const soloId = useMemo(() => {
     let only: string | undefined;
-    for (const n of revision.nodes) if (selected.has(n.id) && !stableHidden.has(n.id)) {
+    for (const n of revision.nodes) if (selected.has(n.id) && isNodeSelectable(n.id, stableHidden)) {
       if (only) return undefined;
       only = n.id;
     }
@@ -185,8 +190,9 @@ export function useCanvasElements({ graph, revision, dragPos, selected, selected
   const nodes = useMemo(() => {
     const cards = graph.nodes.map(n => {
       const space = n.data.kind === 'ref' && n.data.type === 'space';
-      const hidden = stableHidden.has(n.id);
-      const selectedHere = selected.has(n.id) && !hidden;
+      const selectable = isNodeSelectable(n.id, stableHidden);
+      const hidden = !selectable;
+      const selectedHere = selected.has(n.id) && selectable;
       const solo = soloId === n.id;
       const missing = byPort.get(n.id);
       const input = noticeIn.has(n.id), output = noticeOut.has(n.id);
@@ -210,6 +216,7 @@ export function useCanvasElements({ graph, revision, dragPos, selected, selected
           spaceProblems: count, spaceHasErrors: hasErrors },
         selected: selectedHere,
         hidden,
+        selectable,
         width,
         measured: size,
       };
