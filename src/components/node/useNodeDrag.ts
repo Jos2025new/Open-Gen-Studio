@@ -32,7 +32,7 @@ function project(f: Flight | null, graph: Graph | undefined): Map<string, Pt> {
       if (n && !out.has(id)) out.set(id, { x: n.position.x + p.x - s.x, y: n.position.y + p.y - s.y });
     }
   }
-  return out;
+  return out.size ? out : EMPTY;
 }
 
 /**
@@ -45,6 +45,8 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
   const [flight, setFlight] = useState<Flight | null>(null);
   const flightRef = useRef<Flight | null>(null);
   const sessionRef = useRef<string | null>(null);
+  // IDs of a flight closed on window blur: React Flow may still end that gesture late, and that end is not a new move.
+  const orphanRef = useRef<Set<string> | null>(null);
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
   const dragPos = useMemo(() => project(flight, graph), [flight, graph]);
 
@@ -55,13 +57,14 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
 
   useEffect(() => {
     sessionRef.current = sessionId;
+    orphanRef.current = null;
     publish(null);
     // An ID deleted mid-gesture leaves the flight (React Flow aborts its drag too), so an Undo cannot bring it back as a ghost.
     const unsub = useStore.subscribe((st, prev) => {
       const f = flightRef.current, g = st.sessions[sessionId]?.graph;
       if (!f || g === prev.sessions[sessionId]?.graph) return;
-      const ids = liveIds(g), gone = [...f.pos.keys()].filter((id) => !ids.has(id));
-      for (const id of gone) f.pos.delete(id);
+      const ids = liveIds(g), gone = [...new Set([...f.pos.keys(), ...f.start.keys()])].filter((id) => !ids.has(id));
+      for (const id of gone) { f.pos.delete(id); f.start.delete(id); }
       if (gone.length) publish(f);
     });
     return () => {
@@ -99,15 +102,19 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
   }, [sessionId]);
 
   const endDrag = useCallback((_event?: unknown, _node?: unknown, nodes?: DragNodes) => {
+    if (!live()) return;
+    orphanRef.current = null;
     const f = flightRef.current;
-    if (!f || !live()) return;
-    for (const n of nodes ?? []) f.pos.set(n.id, n.position);
+    if (!f) return;
+    // Only IDs still in this flight: one deleted mid-gesture stays out even if an Undo brought it back.
+    for (const n of nodes ?? []) if (f.start.has(n.id) || f.pos.has(n.id)) f.pos.set(n.id, n.position);
     publish(null);
     commit(f);
   }, [live, publish, commit]);
 
   const startDrag = useCallback((event?: unknown, _node?: unknown, nodes?: DragNodes) => {
     if (!live()) return;
+    orphanRef.current = null;
     // React Flow 12 calls onNodeDragStart and onSelectionDragStart with the same event for one selection drag.
     if (event !== undefined && flightRef.current?.event === event) return;
     // A flight still open here lost its end (React Flow always stops or aborts first): it is discarded.
@@ -118,22 +125,39 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
 
   const applyDragChanges = useCallback((changes: NodeChange<FlowNode>[]) => {
     if (!live() || !changes.some((c) => c.type === 'position' && c.position)) return;
-    let gesture = flightRef.current;
-    if (!gesture && changes.some((c) => c.type === 'position' && c.dragging === true)) gesture = newFlight();
+    const gesture = flightRef.current;
     if (gesture) {
-      const f = gesture;
-      track(f, changes);
-      publish(f);
-      // An aborted drag (second finger, grabbed node deleted) ends with `dragging: false` and no stop event: commit it then.
-      for (const c of changes) {
-        if (c.type === 'position' && c.dragging === false) { queueMicrotask(() => { if (flightRef.current === f) endDrag(); }); break; }
-      }
+      track(gesture, changes);
+      publish(gesture);
       return;
     }
-    const direct = newFlight();
-    track(direct, changes);
+    // Only a start opens a flight: drag ticks without one (autopan after an abort, a gesture closed early) are dropped.
+    if (changes.some((c) => c.type === 'position' && c.dragging === true)) return;
+    const orphan = orphanRef.current, direct = newFlight();
+    track(direct, changes.filter((c) => !(c.type === 'position' && orphan?.has(c.id))));
     asNudge(sessionId, () => commit(direct));
-  }, [sessionId, live, track, publish, commit, endDrag]);
+  }, [sessionId, live, track, publish, commit]);
+
+  // Fallback ends when React Flow sends none: an abort (second finger, grabbed node deleted) or an unmounted touch target
+  // closes at the window pointerup, after React Flow's own end had its turn; a lost mouseup (window blur) closes at once.
+  useEffect(() => {
+    const up = () => {
+      const f = flightRef.current;
+      if (f) window.setTimeout(() => { if (flightRef.current === f) endDrag(); }, 0);
+    };
+    const blur = () => {
+      const f = flightRef.current;
+      if (!f) return;
+      endDrag();
+      orphanRef.current = new Set(f.pos.keys());
+    };
+    window.addEventListener('pointerup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, [endDrag]);
 
   const startSelection = useCallback((event: unknown, nodes: DragNodes) => startDrag(event, undefined, nodes), [startDrag]);
   const endSelection = useCallback((event: unknown, nodes: DragNodes) => endDrag(event, undefined, nodes), [endDrag]);

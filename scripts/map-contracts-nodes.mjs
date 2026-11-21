@@ -105,5 +105,5 @@ export default [{
     ['src/engine/flow/history.ts', 'const beforeById = new Map'],
     ['scripts/check-node-drag.mjs', 'export function check('],
   ],
-  tests: ['tests/node-drag-perf.test.ts', 'tests/check-node-drag.test.ts', 'tests/adversarial-drag200-gesture.test.ts'],
+  tests: ['tests/node-drag-perf.test.ts', 'tests/check-node-drag.test.ts', 'tests/adversarial-drag200-gesture.test.ts', 'tests/adversarial-drag200-bounds.test.ts'],
 }];

@@ -118,7 +118,7 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
   });
   it('trailing dragging:true after delete does not pollute Undo', () => {
     const { sid } = mountCanvas(makeGraph(4));
-    act(() => { deleteNodes(sid, ['n0']); }); onCh([pCh('n0', true, pt(222, 111))]); act(() => { expect(tr(sid, 'undo')).toBe(true); }); expect(rPos('n0')).toEqual(pt(0, 0));
+    drag.start('n0'); act(() => { deleteNodes(sid, ['n0']); }); onCh([pCh('n0', true, pt(222, 111))]); act(() => { expect(tr(sid, 'undo')).toBe(true); }); expect(rPos('n0')).toEqual(pt(0, 0));
   });
   it('frame + member drop in same batch commits other member too', () => {
     const { sid } = mountCanvas(makeGraph(4)), st = rPos('g0')!;
@@ -127,13 +127,13 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
   });
   it('ungrouping frame mid-drag clears member previews', () => {
     const { sid } = mountCanvas(makeGraph(4)), st = rPos('g0')!;
-    onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]); expect(rPos('n0')).toEqual(pt(80, 40));
+    drag.start('g0'); onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]); expect(rPos('n0')).toEqual(pt(80, 40));
     act(() => { ungroup(sid, 'g0'); }); expect(rPos('n0')).toEqual(pt(0, 0)); expect(rPos('n1')).toEqual(pt(260, 0));
   });
   it('session switch mid-drag drops preview with 0 writes', () => {
     const { sid: s1 } = mountCanvas(makeGraph(3)), s2 = createSession(`adv-s2-${Math.random()}`);
     useStore.setState((st) => ({ sessions: { ...st.sessions, [s2.id]: { ...s2, graph: { nodes: [tNode('n0', 10, 20, 'S2', 'x')], edges: [] }, feed: [] } } }));
-    onCh([pCh('n0', true, pt(400, 300))]); act(() => { useStore.setState({ activeSessionId: s2.id }); });
+    drag.start('n0'); onCh([pCh('n0', true, pt(400, 300))]); expect(rPos('n0')).toEqual(pt(400, 300)); act(() => { useStore.setState({ activeSessionId: s2.id }); });
     expect(sPos(s1, 'n0')).toEqual(pt(0, 0)); expect(sPos(s2.id, 'n0')).toEqual(pt(10, 20)); expect(rPos('n0')).toEqual(pt(10, 20));
     expect(graphHistory(s1, 'undo')).toHaveLength(0); expect(graphHistory(s2.id, 'undo')).toHaveLength(0);
   });
