@@ -39,16 +39,18 @@ Fuente: bus `20261121-neon-critica-direccion-5.md`; observaciones en [metodo-tra
 3. Como máximo, dos procesos pesados a la vez. Los workers no corren `test:related` (de 13 a 24 minutos): Hydrogen se agotó esperándolo dos veces sin hacer commit.
 4. Hay que mantener el foco en los frentes que pidió el usuario.
 
-## Pendiente, en orden (sustituye a la lista de 072)
-1. **App real a `main` y prueba con una clave real.** La app real sigue en `task/agent-forcing`, sin los arreglos de dinero ni los de hoy. Necesita aprobación.
-2. **Huecos de dinero en los envíos:**
+## Pendiente, en orden (sustituye a la lista de 072; prioridades del usuario, 2026-11-21)
+1. **Núcleo del dinero en los envíos**, con GPT y Neon revisando con KISS y SOLID:
    - proveedor síncrono sin id;
    - aprobaciones solo en memoria;
    - `purgeDiscarded`;
    - LLM fuera de `jobs.ts`;
    - gasto estimado de un lote recargado sin precio.
-3. **Probar en el sandbox la vista por espacio** y «Ajustar».
-4. **Subnet**, aplazado por el usuario: paso 1 de [diseno-subnet](../nucleo-nodos/diseno-subnet.md), luego `task/descriptor-2` según ese documento.
-5. **Agentes de suscripción** (baja prioridad).
+2. **Reglas para añadir sin rediseñar:** una guía corta de cómo se conecta cada cosa nueva. Las reglas están repartidas entre el [ADR 0030](../decisions/0030-nucleo-de-comandos.md), el [ADR 0031](../decisions/0031-nucleo-de-nodos.md), AGENTS.md y el mapa. Hay que reunirlas antes de cambiar la interfaz.
+3. **Refrescar las 14 dudas de interfaz y arrastre** del bus `20261120-master-para-usuario.md` contra `main`: qué sigue vigente.
+4. **Probar en el sandbox la vista por espacio** y «Ajustar».
+5. **Revisar el plan «Todo es un nodo»** buscando antes lo ya discutido. Va más o menos por la mitad; la tabla es del 2026-11-14 y está desactualizada. Nada bloquea aplazarlo una semana.
+6. **Subnet**, aplazado por el usuario: paso 1 de [diseno-subnet](../nucleo-nodos/diseno-subnet.md), luego `task/descriptor-2` según ese documento.
+7. **Agentes de suscripción** (baja prioridad).
 
-Plan «Todo es un nodo»: va más o menos por la mitad, según una estimación de esta sesión sin verificar paso a paso. La tabla de su plan es del 2026-11-14 y está desactualizada. Nada bloquea aplazarlo una semana. Siguen abiertas las 14 dudas de interfaz y de arrastre del bus `20261120-master-para-usuario.md`.
+Fuera de la lista: la app real se construye sobre la marcha. La rama antigua `task/agent-forcing` no es prioridad; el usuario cree que puede quitarla sin perder nada. Borrarla es decisión suya.
