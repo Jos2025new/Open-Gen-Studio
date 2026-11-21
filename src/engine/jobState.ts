@@ -8,6 +8,7 @@ import { deliveryNotes } from './delivery';
 import { isVideoOpEngine, OPS } from './ops';
 import { videoOpSeconds } from './opSpec';
 import { partialRetryCharge } from './retryPartial';
+import { markSendsDone } from './sendMark';
 import type { Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, RemoteJob } from './types';
 
 const get = useStore.getState;
@@ -68,10 +69,11 @@ export function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | u
 }
 
 
-export function finishText(id: string, text: string, actualUsd: number | undefined): void {
+export function finishText(id: string, text: string, actualUsd: number | undefined, reqId?: string): void {
   const g = get().generations[id];
   if (!g) return;
-  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined });
+  const sends = markSendsDone(g.sends, reqId);
+  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
   noteExcess(id);
 }
@@ -84,9 +86,10 @@ export async function checkDelivery(id: string, assets: Asset[]): Promise<string
   return notes.length ? notes : undefined;
 }
 
-export function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number): void {
+export function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number, reqId?: string): void {
   const g = get().generations[id];
   if (!g) return;
+  const sends = markSendsDone(g.sends, reqId);
   patchGeneration(id, {
     status: 'done',
     assetIds,
@@ -97,6 +100,8 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
     actualUsd,
     providerReportedUsd,
     remoteJob: undefined,
+    sending: undefined,
+    ...(sends ? { sends } : {}),
   });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
   noteExcess(id);

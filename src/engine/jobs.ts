@@ -22,7 +22,7 @@ import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
-import { markSending, interruptedByReload, SendNotCommittedError } from './sendMark';
+import { flushSendSave, interruptedByReload, markSending, markSendsDone, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { followRemote } from './jobRecovery';
@@ -209,17 +209,27 @@ async function execute(id: string): Promise<string[]> {
     let providerReportedCost = 0;
     let providerReportedCostKnown = true;
     let done = 0;
+    let batchIndex = 0;
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
+    let activeReqId: string | undefined;
+    try {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // A quote is not a provider-reported charge in the agent notice.
       const quote = await requestQuote(g.modelRef, schema, settings, n);
+      const reqIndex = batchIndex++;
+      activeReqId = undefined;
       const send = async () => {
-        await markSending(id);
-        signal.throwIfAborted();
-        if (proposed) checkStepAuthorization(g, proposed);
+        activeReqId = await markSending(id, reqIndex, activeReqId);
+        try {
+          signal.throwIfAborted();
+          if (proposed) checkStepAuthorization(g, proposed);
+        } catch (err) {
+          rollbackSendIntent(id, activeReqId);
+          throw err;
+        }
         return adapter.generate({
         kind,
         model,
@@ -244,8 +254,7 @@ async function execute(id: string): Promise<string[]> {
         onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
         onRemoteJob: (job) => {
           submitted = true;
-          const sent = get().generations[id]?.sent;
-          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sending: undefined, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
+          recordRemoteJob(id, activeReqId, job);
         },
         // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
         onRequest: (info) => {
@@ -267,12 +276,11 @@ async function execute(id: string): Promise<string[]> {
         try {
           result = await once();
           submitted = false;
-          patchGeneration(id, { sending: undefined });
           break;
         } catch (err) {
           const policy = adapter.retry;
           const wait = policy?.waits[retry];
-          if (!policy || wait == null || submitted || signal.aborted || !policy.matches((err as Error).message)) throw err;
+          if (!policy || wait == null || submitted || signal.aborted || err instanceof NetworkError || !policy.matches((err as Error).message)) throw err;
           const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
           const refused = `${policy.label} refused access`;
           patchGeneration(id, {
@@ -289,7 +297,8 @@ async function execute(id: string): Promise<string[]> {
       if (result.costUsd != null) providerReportedCost += result.costUsd;
       else providerReportedCostKnown = false;
       if (g.kind === 'text') {
-        finishText(id, result.text ?? '', result.costUsd);
+        finishText(id, result.text ?? '', result.costUsd, activeReqId);
+        await flushSendSave();
         return [];
       }
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
@@ -297,11 +306,24 @@ async function execute(id: string): Promise<string[]> {
       delivered.push(...assets);
       assetIds.push(...assets.map((a) => a.id));
       done += Math.max(1, Math.min(n, result.outputs.length));
-      patchGeneration(id, { assetIds: [...assetIds], ...(variants ? { variants: variants.slice(done) } : {}) });
+      const sends = markSendsDone(get().generations[id]?.sends, activeReqId);
+      patchGeneration(id, { assetIds: [...assetIds], ...(variants ? { variants: variants.slice(done) } : {}), sending: undefined, remoteJob: undefined, ...(sends ? { sends } : {}) });
+      await flushSendSave();
       if (!result.outputs.length) break;
     }
-    finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined);
+    finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined, activeReqId);
+    await flushSendSave();
     return assetIds;
+    } catch (innerErr) {
+      const cur = get().generations[id];
+      const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
+      const uncertain = !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
+      if (activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
+        const sends = settleFailedSend(cur?.sends, activeReqId, uncertain);
+        if (cur?.sends) patchGeneration(id, { sends });
+      }
+      throw innerErr;
+    }
   } catch (err) {
     if (err instanceof PriceReviewRequired) {
       patchGeneration(id, { sending: undefined });

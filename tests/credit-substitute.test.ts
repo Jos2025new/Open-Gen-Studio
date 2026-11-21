@@ -374,7 +374,7 @@ describe('402 recovery at the spending gate', () => {
     expect(useStore.getState().generations[g.id].remoteJob?.id).toBe('submitted');
   });
 
-  it('does not resend a submitted batch request after 402 even without a resumable job', async () => {
+  it('does not resend a submitted batch request after 402 and keeps its remote job', async () => {
     setup(0.08, { on: false, usd: 5 }, 'always');
     vi.mocked(ADAPTERS.nanogpt.generate).mockImplementationOnce(async ({ onRemoteJob }) => {
       onRemoteJob?.({ id: 'submitted', provider: 'nanogpt', meta: {} });
@@ -383,7 +383,8 @@ describe('402 recovery at the spending gate', () => {
     const g = gen();
     patchGeneration(g.id, { settings: { ...g.settings, count: 2 } });
     await runGeneration(g.id).catch(() => undefined);
-    expect(useStore.getState().generations[g.id].lostJob).toBe(true);
+    expect(useStore.getState().generations[g.id].remoteJob?.id).toBe('submitted');
+    expect(useStore.getState().generations[g.id].sends?.[0]).toMatchObject({ status: 'sent', remoteJob: { id: 'submitted' } });
     expect(atlasSends).toBe(0);
   });
 

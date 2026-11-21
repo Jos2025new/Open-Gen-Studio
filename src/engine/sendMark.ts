@@ -70,6 +70,46 @@ export async function markSending(id: string, index = 0, reqId = uid('req')): Pr
   return reqId;
 }
 
+/** Drop an uncommitted or pre-flight-aborted intent so it is not mistaken for a sent request. */
+export function rollbackSendIntent(id: string, reqId: string | undefined): void {
+  if (reqId) dropIntent(id, reqId);
+  else patchGeneration(id, { sending: undefined });
+}
+
+/** Persist a provider job id on both the generation and its per-request ledger, flushing immediately. */
+export function recordRemoteJob(id: string, reqId: string | undefined, job: RemoteJob): void {
+  const cur = useStore.getState().generations[id];
+  if (!cur) return;
+  const sends = cur.sends?.map((s) => (reqId ? s.id === reqId : s.status === 'intent') ? { ...s, status: 'sent' as const, remoteJob: job } : s);
+  patchGeneration(id, {
+    remoteJob: job,
+    jobId: job.id,
+    sending: undefined,
+    sent: cur.sent ? { ...cur.sent, jobId: job.id } : undefined,
+    ...(sends ? { sends } : {}),
+  });
+  void saveNow().catch(() => undefined);
+}
+
+/** Return updated `sends` with the matching request (or active intent/sent entries) marked done. */
+export function markSendsDone(sends: SendRecord[] | undefined, reqId?: string): SendRecord[] | undefined {
+  if (!sends?.length) return sends;
+  return sends.map((s) => ((reqId ? s.id === reqId : s.status === 'intent' || s.status === 'sent') ? { ...s, status: 'done' as const } : s));
+}
+
+/** Return updated `sends` with an unanswered intent marked uncertain (or dropped if never sent). */
+export function settleFailedSend(sends: SendRecord[] | undefined, reqId: string | undefined, uncertain: boolean): SendRecord[] | undefined {
+  if (!sends?.length || !reqId) return sends;
+  if (uncertain) return sends.map((s) => (s.id === reqId && !s.remoteJob ? { ...s, status: 'uncertain' as const } : s));
+  const rest = sends.filter((s) => !(s.id === reqId && !s.remoteJob && s.status === 'intent'));
+  return rest.length ? rest : undefined;
+}
+
+/** Best-effort immediate flush to IndexedDB after storing job results or progress. */
+export async function flushSendSave(): Promise<void> {
+  await saveNow().catch(() => undefined);
+}
+
 /** What a reload leaves on a generation that was running: the error, no mark, and (when a send was in flight) a toast unless silenced. */
 export function interruptedByReload(g: Generation, job: RemoteJob | undefined): Partial<Generation> {
   const hasUncertainRecord = Boolean(g.sends?.some((s) => !s.remoteJob && (s.status === 'intent' || s.status === 'uncertain')));

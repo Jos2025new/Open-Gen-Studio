@@ -85,20 +85,27 @@ describe('sending marks on the other routes', () => {
     expect(useStore.getState().generations[g.id].status).toBe('done');
   });
 
-  it('a batch keeps the mark when no remote job is stored for it (a reload then says it may have been charged)', async () => {
+  it('a batch stores the remote job for each request and clears the mark once stored', async () => {
     const REF = 'nanogpt::seed';
     const st = useStore.getState();
     useStore.setState({ catalog: { ...st.catalog, models: { [REF]: { ref: REF, provider: 'nanogpt', id: 'seed', name: 'seed', kind: 'image', acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] } } as never }, schemas: { [REF]: { ref: REF, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' } } as never }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' } } });
     const g = createGeneration({ sessionId: st.activeSessionId, origin: 'composer', kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 2, advanced: {} }, inputs: { refs: [] } });
-    let during: number | undefined;
+    const seenDuring: Array<{ sending?: number; jobId?: string }> = [];
+    let n = 0;
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async (req) => {
-      req.onRemoteJob?.({ provider: 'nanogpt', id: 'j1', meta: {} });
-      during = useStore.getState().generations[g.id].sending;
+      req.onRemoteJob?.({ provider: 'nanogpt', id: `j${++n}`, meta: {} });
+      const cur = useStore.getState().generations[g.id];
+      seenDuring.push({ sending: cur.sending, jobId: cur.remoteJob?.id });
       return { outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.1 } as never;
     });
-    await runGeneration(g.id).catch(() => undefined);
-    expect(useStore.getState().generations[g.id].remoteJob).toBeUndefined();
-    expect(during).toEqual(expect.any(Number));
+    await runGeneration(g.id);
+    expect(seenDuring).toEqual([{ sending: undefined, jobId: 'j1' }, { sending: undefined, jobId: 'j2' }]);
+    const done = useStore.getState().generations[g.id];
+    expect(done.remoteJob).toBeUndefined();
+    expect(done.sends?.map((s) => ({ index: s.index, status: s.status, id: s.remoteJob?.id }))).toEqual([
+      { index: 0, status: 'done', id: 'j1' },
+      { index: 1, status: 'done', id: 'j2' },
+    ]);
   });
 
   it('Recraft style: the inputs are read before the mark (a reload while reading them is not a possible charge)', async () => {
