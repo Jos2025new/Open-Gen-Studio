@@ -329,13 +329,13 @@ describe('Attack 7: check-node-drag evasions', () => {
 });
 
 describe('Attack 8: round 2 regressions & gaps after tanda C', () => {
-  it.fails('split multi-node drop batches keep preview of still-dropping node', () => {
+  it('split multi-node drop batches keep preview of still-dropping node', () => {
     const { sid } = mountCanvas(makeGraph(4));
     onCh([pCh('n0', true, pt(100, 50)), pCh('n1', true, pt(360, 50))]);
     onCh([pCh('n0', false)]); expect(rPos('n1')).toEqual(pt(360, 50));
     onCh([pCh('n1', false)]); expect(sPos(sid, 'n0')).toEqual(pt(100, 50)); expect(sPos(sid, 'n1')).toEqual(pt(360, 50));
   });
-  it.fails('trailing event for deleted node keeps another active drag', () => {
+  it('trailing event for deleted node keeps another active drag', () => {
     const { sid } = mountCanvas(makeGraph(4)); act(() => { deleteNodes(sid, ['n3']); });
     onCh([pCh('n0', true, pt(140, 70))]);
     onCh([pCh('n3', true, pt(999, 999))]); expect(rPos('n0')).toEqual(pt(140, 70));
