@@ -7,7 +7,7 @@ export interface RemoteJob {
   meta: Record<string, string>;
 }
 
-export type SendStatus = 'intent' | 'sent' | 'done' | 'uncertain';
+export type SendStatus = 'intent' | 'sent' | 'done' | 'uncertain' | 'failed';
 
 /** Durable per-request send record stored inside `Generation.sends`. */
 export interface SendRecord {

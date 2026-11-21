@@ -2,7 +2,7 @@ import { isRestart } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired, stepApproved } from './priceAuthorization';
 import { uid } from '../lib/id';
-import { AbortedError, isAbort, NetworkError, sleep } from '../lib/http';
+import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
 import { estimateMedia } from './costs';
 import { randomSeed } from '../lib/rng';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
@@ -20,9 +20,9 @@ import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
 import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
-import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
+import { addAssets, patchGeneration, saveNow, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
-import { flushSendSave, interruptedByReload, markSending, markSendsDone, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { flushSendSave, interruptedByReload, isFreeSend, markSending, markSendsDone, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -222,7 +222,12 @@ async function execute(id: string): Promise<string[]> {
       const reqIndex = batchIndex++;
       activeReqId = undefined;
       const send = async () => {
-        activeReqId = await markSending(id, reqIndex, activeReqId);
+        if (isFreeSend(g, quote)) {
+          activeReqId = undefined;
+          void saveNow().catch(() => undefined);
+        } else {
+          activeReqId = await markSending(id, reqIndex, activeReqId);
+        }
         try {
           signal.throwIfAborted();
           if (proposed) checkStepAuthorization(g, proposed);
@@ -307,7 +312,16 @@ async function execute(id: string): Promise<string[]> {
       assetIds.push(...assets.map((a) => a.id));
       done += Math.max(1, Math.min(n, result.outputs.length));
       const sends = markSendsDone(get().generations[id]?.sends, activeReqId);
-      patchGeneration(id, { assetIds: [...assetIds], ...(variants ? { variants: variants.slice(done) } : {}), sending: undefined, remoteJob: undefined, ...(sends ? { sends } : {}) });
+      const batchDone = done >= total || !result.outputs.length;
+      patchGeneration(id, {
+        assetIds: [...assetIds],
+        ...(variants ? { variants: variants.slice(done) } : {}),
+        sending: undefined,
+        remoteJob: undefined,
+        ...(batchDone && costKnown ? { actualUsd: cost } : {}),
+        ...(batchDone && providerReportedCostKnown ? { providerReportedUsd: providerReportedCost } : {}),
+        ...(sends ? { sends } : {}),
+      });
       await flushSendSave();
       if (!result.outputs.length) break;
     }
@@ -317,9 +331,10 @@ async function execute(id: string): Promise<string[]> {
     } catch (innerErr) {
       const cur = get().generations[id];
       const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
-      const uncertain = !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
+      const free = cur ? isFreeSend(cur) : false;
+      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
       if (activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
-        const sends = settleFailedSend(cur?.sends, activeReqId, uncertain);
+        const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
         if (cur?.sends) patchGeneration(id, { sends });
       }
       throw innerErr;
@@ -343,7 +358,8 @@ async function execute(id: string): Promise<string[]> {
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
-    const lostJob = !remoteJob && (err instanceof NetworkError || (submitted && isCreditError(err)));
+    const free = cur ? isFreeSend(cur) : false;
+    const lostJob = !free && !remoteJob && (err instanceof NetworkError || (submitted && isCreditError(err)));
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
@@ -383,6 +399,14 @@ export async function resumeInterrupted(): Promise<void> {
     if (running.has(g.id)) continue;
     const job = activeRemoteJob(g);
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
+      const hasOpenSend = Boolean(g.sending != null || g.sends?.some((s) => s.status === 'intent' || s.status === 'uncertain'));
+      const expectedTotal = g.variants ? g.assetIds.length + g.variants.length : (g.retryTotal ?? g.settings.count);
+      const allDelivered = g.status === 'running' && g.kind !== 'text' && !job && !hasOpenSend && g.assetIds.length > 0 && (g.variants ? g.variants.length === 0 : g.assetIds.length >= expectedTotal);
+      if (allDelivered) {
+        finish(g.id, g.assetIds, g.actualUsd, undefined, g.providerReportedUsd);
+        purgeDiscarded(g.id);
+        continue;
+      }
       patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
       purgeDiscarded(g.id);
       continue;

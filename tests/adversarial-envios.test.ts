@@ -210,7 +210,7 @@ describe('1. Puerta de 8 s y rutas de envío', () => {
     expect(atlasSpy).not.toHaveBeenCalled();
   });
 
-  it.fails('local gratis: NO debe bloquearse por fallo de guardado', async () => {
+  it('local gratis: NO debe bloquearse por fallo de guardado', async () => {
     const localSpy = vi.spyOn(ADAPTERS.local, 'generate').mockResolvedValue(imgOut('l', 0));
     disk.failSet = true;
     const g = makeMedia({ modelRef: LOCAL_IMAGE_REF });
@@ -270,7 +270,7 @@ describe('2. Recarga en cada punto', () => {
     release(); await p;
   });
 
-  it.fails('JobFailedError tras onRemoteJob: NO resucitar trabajo muerto desde sends', async () => {
+  it('JobFailedError tras onRemoteJob: NO resucitar trabajo muerto desde sends', async () => {
     spyN().mockImplementationOnce(async (req) => { req.onRemoteJob(rj('dead_1')); throw new JobFailedError('failed'); });
     const resumeSpy = spyR().mockResolvedValue(imgOut('zombie'));
     const g = makeMedia();
@@ -282,11 +282,21 @@ describe('2. Recarga en cada punto', () => {
     expect(resumeSpy).not.toHaveBeenCalled();
   });
 
-  it.fails('recarga tras resultado en assetIds antes de finish() (checkDelivery): NO marcar error', async () => {
+  it('recarga tras resultado en assetIds antes de finish() (checkDelivery): NO marcar error', async () => {
+    const NANO_V = 'nanogpt::seed-video';
+    const st = useStore.getState();
+    useStore.setState({
+      catalog: {
+        ...st.catalog,
+        models: { ...st.catalog.models, [NANO_V]: { ref: NANO_V, provider: 'nanogpt', id: 'seed-video', name: 'SeedV', kind: 'video', acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] } } as ModelSummary },
+        schemas: { ...st.catalog.schemas, [NANO_V]: { ref: NANO_V, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' } },
+      } as never,
+    });
     let release!: () => void;
     const inCheck = new Promise<void>((res) => { disk.onBlobGet = async () => { res(); await new Promise<void>((r) => { release = r; }); }; });
-    spyN().mockResolvedValueOnce(imgOut('paid'));
-    const g = makeMedia(); const p = runGeneration(g.id).catch(() => undefined);
+    spyN().mockResolvedValueOnce({ outputs: [{ blob: new Blob(['paid'], { type: 'video/mp4' }), mime: 'video/mp4' }], costUsd: 0.1 });
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'video', prompt: 'adv', modelRef: NANO_V, settings: { count: 1, audio: true, advanced: {} }, inputs: { refs: [] } });
+    const p = runGeneration(g.id).catch(() => undefined);
     await inCheck;
     expect(savedGen(g.id)?.assetIds).toHaveLength(1);
     await reloadAndResume();
@@ -295,7 +305,7 @@ describe('2. Recarga en cada punto', () => {
     release(); await p;
   });
 
-  it.fails('recarga a mitad de lote (3 items, id del 1.º): NO cerrar done con 1 de 3 y cobrar los 3', async () => {
+  it('recarga a mitad de lote (3 items, id del 1.º): NO cerrar done con 1 de 3 y cobrar los 3', async () => {
     const g = makeMedia({ count: 3 });
     patchG(g.id, { status: 'running', estimate: { usd: 0.3, approximate: false }, remoteJob: rj('bj0'), sends: [{ id: 'r0', index: 0, status: 'sent', remoteJob: rj('bj0') }] });
     await saveNow();
@@ -306,7 +316,7 @@ describe('2. Recarga en cada punto', () => {
     expect(useStore.getState().spentUsd).toBeLessThan(0.25);
   });
 
-  it.fails('local gratis: recarga en vuelo NO marca lostJob/uncertain ni toast de cobro', async () => {
+  it('local gratis: recarga en vuelo NO marca lostJob/uncertain ni toast de cobro', async () => {
     let release!: () => void;
     const rendering = new Promise<void>((res) => { vi.spyOn(ADAPTERS.local, 'generate').mockImplementationOnce(async () => { res(); await new Promise<void>((r) => { release = r; }); return imgOut('l', 0); }); });
     const g = makeMedia({ modelRef: LOCAL_IMAGE_REF }); const p = runGeneration(g.id).catch(() => undefined);
@@ -478,7 +488,7 @@ describe('6. Mensajes al usuario', () => {
     expect(toasts().some((t) => /Nothing was charged/.test(t.text))).toBe(true);
   });
 
-  it.fails('lote: tras cobrar 1.º, si 2.º cae en 8 s NO afirmar «Nothing was charged» (jobs.ts:334-335)', async () => {
+  it('lote: tras cobrar 1.º, si 2.º cae en 8 s NO afirmar «Nothing was charged» (jobs.ts:334-335)', async () => {
     let n = 0; spyN().mockImplementation(async () => { if (++n === 1) disk.failSet = true; return imgOut('p1'); });
     const g = makeMedia({ count: 2 }); await runGeneration(g.id).catch(() => undefined);
     expect(genOf(g.id).assetIds).toHaveLength(1);

@@ -1,5 +1,5 @@
 /* Sends that are not a media generation: transcribe, create a voice, create a style (moved out of jobs.ts, Opus #4). */
-import { isAbort, NetworkError } from '../lib/http';
+import { isAbort, JobFailedError, NetworkError } from '../lib/http';
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
@@ -7,7 +7,7 @@ import { ADAPTERS, preferredProviderLabel } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenResult, type ProviderAdapter } from './providers/types';
 import type { Generation, RemoteJob } from './types';
 import { patchGeneration, useStore } from '../store/store';
-import { flushSendSave, markSending, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { flushSendSave, isFreeSend, markSending, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { finishText, requestEstimate } from './jobState';
 import { mediaInput } from './assetIO';
 
@@ -24,7 +24,7 @@ async function runSpecialSend(
   send: (hooks: { onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }) => Promise<GenResult>,
 ): Promise<void> {
   checkSpecialSend(g, signal);
-  const reqId = await markSending(g.id, 0);
+  const reqId = isFreeSend(g) ? undefined : await markSending(g.id, 0);
   if (signal.aborted) {
     rollbackSendIntent(g.id, reqId);
     signal.throwIfAborted();
@@ -38,9 +38,12 @@ async function runSpecialSend(
     await flushSendSave();
   } catch (err) {
     const cur = get().generations[g.id];
-    if (cur?.sends && !cur.remoteJob && !isAbort(err) && !(err instanceof SendNotCommittedError)) {
-      const sends = settleFailedSend(cur.sends, reqId, err instanceof NetworkError);
-      patchGeneration(g.id, { sends });
+    if (reqId && cur?.sends && !(err instanceof SendNotCommittedError)) {
+      if (err instanceof JobFailedError) {
+        patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, false, true) });
+      } else if (!cur.remoteJob && !isAbort(err)) {
+        patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, !isFreeSend(cur) && err instanceof NetworkError) });
+      }
     }
     throw err;
   }

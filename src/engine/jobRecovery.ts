@@ -1,7 +1,7 @@
 /* Remote job recovery: Check status, recover a lost job id, follow a submitted job (moved out of jobs.ts, Opus #4). */
 import { isRestart, statusChecker } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
-import { isAbort } from '../lib/http';
+import { isAbort, JobFailedError } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { apiKeyFor, isConnected } from './catalog';
 import { ADAPTERS } from './providers/registry';
@@ -9,8 +9,9 @@ import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef } from './providers/types';
 import type { Generation, RemoteJob } from './types';
 import { addAssets, patchGeneration, useStore } from '../store/store';
+import { addSpend } from '../store/spend';
 import { checkDelivery, controllers, finish, finishText, keptJob, purgeDiscarded, running } from './jobState';
-import { flushSendSave } from './sendMark';
+import { flushSendSave, markRemoteJobFailed, markSendsDone } from './sendMark';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 
 const get = useStore.getState;
@@ -130,21 +131,55 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const fallback = expectedDims(kind, cur.settings);
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, cur) : await Promise.all(result.outputs.map((o) => storeOutput(o, cur, kind, fallback)));
       addAssets(assets);
-      const mergedIds = [...cur.assetIds];
+      const latest = get().generations[id];
+      if (!latest || latest.status === 'done') return latest?.assetIds ?? [];
+      const mergedIds = [...latest.assetIds];
       for (const a of assets) if (!mergedIds.includes(a.id)) mergedIds.push(a.id);
-      finish(id, mergedIds, result.costUsd, await checkDelivery(id, assets), result.costUsd, matching?.id);
+      const uniqueIds = [...new Set(mergedIds)];
+      const remainingVariants = latest.variants ? latest.variants.slice(assets.length) : undefined;
+      const expectedTotal = latest.variants ? latest.assetIds.length + latest.variants.length : (latest.retryTotal ?? latest.settings.count);
+      const batchIncomplete = remainingVariants ? remainingVariants.length > 0 : uniqueIds.length < expectedTotal;
+      if (batchIncomplete) {
+        const sends = markSendsDone(latest.sends, matching?.id);
+        const baseUsd = (latest.retryBaseEstimate ?? latest.estimate).usd;
+        const partialUsd = result.costUsd ?? (baseUsd != null && expectedTotal > 0 ? baseUsd * assets.length / expectedTotal : 0);
+        if (partialUsd > 0) {
+          addSpend(partialUsd, { category: latest.kind, provider: latest.modelRef.split('::')[0], model: latest.modelRef, sessionId: latest.sessionId, estimated: result.costUsd == null });
+        }
+        const remaining = remainingVariants ? remainingVariants.length : Math.max(1, expectedTotal - uniqueIds.length);
+        patchGeneration(id, {
+          status: 'error',
+          error: `Interrupted after delivering ${uniqueIds.length} of ${expectedTotal}. Retry to generate the remaining ${remaining}.`,
+          assetIds: uniqueIds,
+          ...(remainingVariants ? { variants: remainingVariants } : {}),
+          statusText: undefined,
+          progress: undefined,
+          finishedAt: Date.now(),
+          remoteJob: undefined,
+          sending: undefined,
+          lostJob: Boolean(latest.sends?.some((s) => s.status === 'uncertain')),
+          ...(sends ? { sends } : {}),
+        });
+        await flushSendSave();
+        return assets.map((a) => a.id);
+      }
+      finish(id, uniqueIds, result.costUsd, await checkDelivery(id, assets), result.costUsd, matching?.id);
       await flushSendSave();
       return assets.map((a) => a.id);
     } catch (err) {
       if (isRestart(controller.signal.reason)) return [];
       const remoteJob = keptJob(err, job);
-      if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
+      const cur = get().generations[id];
+      const sends = err instanceof JobFailedError ? markRemoteJobFailed(cur?.sends, job) : cur?.sends;
+      const sendsPatch = err instanceof JobFailedError && sends ? { sends } : {};
+      if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, ...sendsPatch });
       else {
-        patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
+        patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, ...sendsPatch });
         // A sent job that failed while followed (reload, Check status): same trail as a first-run failure (T5).
-        const cur = get().generations[id];
-        logEvent('provider-error', { generation: id, model: cur?.modelName, provider: job.provider, jobId: job.id, message: (err as Error).message, sent: cur?.sent, resumed: true });
+        const after = get().generations[id];
+        logEvent('provider-error', { generation: id, model: after?.modelName, provider: job.provider, jobId: job.id, message: (err as Error).message, sent: after?.sent, resumed: true });
       }
+      if (err instanceof JobFailedError) await flushSendSave();
       return [];
     } finally {
       running.delete(id);

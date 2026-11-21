@@ -8,6 +8,24 @@ import type { Generation, RemoteJob, SendRecord } from './types';
 
 const SEND_SAVE_TIMEOUT_MS = 8000;
 const NOT_SENT_MESSAGE = 'Not sent: could not save before sending. Nothing was charged; retry to try again.';
+const PARTIAL_NOT_SENT_MESSAGE = 'Next request not sent: could not save before sending. Earlier items in this batch were already sent; retry to continue with the rest.';
+const PRIOR_UNCERTAIN_NOT_SENT_MESSAGE = 'Not sent: could not save before sending. A previous request for this generation may have been charged; check before retrying.';
+
+/** True when the send has zero cost (local models or $0 price) and never needs the paid-send gate. */
+export function isFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, quote?: number | null): boolean {
+  return g.provider === 'local' || g.modelRef.startsWith('local::') || (quote != null ? quote === 0 : g.estimate?.usd === 0);
+}
+
+function notSentMessage(g: Generation | undefined, reqId?: string): string {
+  const priorBatch = Boolean(
+    g && (g.sends?.some((s) => s.id !== reqId && (s.status === 'done' || s.status === 'sent' || s.status === 'failed')) || (g.assetIds.length > 0 && !g.parentId)),
+  );
+  if (priorBatch) return PARTIAL_NOT_SENT_MESSAGE;
+  const priorUncertain = Boolean(
+    g && (g.lostJob || g.remoteJob || g.sends?.some((s) => s.id !== reqId && (s.status === 'uncertain' || Boolean(s.remoteJob)))),
+  );
+  return priorUncertain ? PRIOR_UNCERTAIN_NOT_SENT_MESSAGE : NOT_SENT_MESSAGE;
+}
 
 /** Thrown when pre-send persistence or lock/discard guards fail before calling a provider. */
 export class SendNotCommittedError extends Error {
@@ -34,13 +52,13 @@ function dropIntent(id: string, reqId: string): void {
   });
 }
 
-async function saveWithinCap(timeoutMs: number): Promise<void> {
+async function saveWithinCap(timeoutMs: number, message: string): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
       saveNow(),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new SendNotCommittedError()), timeoutMs);
+        timer = setTimeout(() => reject(new SendNotCommittedError(message)), timeoutMs);
       }),
     ]);
   } finally {
@@ -53,19 +71,20 @@ async function saveWithinCap(timeoutMs: number): Promise<void> {
  * IndexedDB confirmation while still holding the writer lock and not discarding. Throws before any send if guarded.
  */
 export async function markSending(id: string, index = 0, reqId = uid('req')): Promise<string> {
-  if (!holdsWriterLock() || guard.discarding) throw new SendNotCommittedError();
   const g = useStore.getState().generations[id];
+  const errMsg = notSentMessage(g, reqId);
+  if (!holdsWriterLock() || guard.discarding) throw new SendNotCommittedError(errMsg);
   const sends = upsertIntent(g?.sends, reqId, index);
   patchGeneration(id, { sending: Date.now(), sends });
   try {
-    await saveWithinCap(SEND_SAVE_TIMEOUT_MS);
+    await saveWithinCap(SEND_SAVE_TIMEOUT_MS, errMsg);
   } catch {
     dropIntent(id, reqId);
-    throw new SendNotCommittedError();
+    throw new SendNotCommittedError(errMsg);
   }
   if (!holdsWriterLock() || guard.discarding) {
     dropIntent(id, reqId);
-    throw new SendNotCommittedError();
+    throw new SendNotCommittedError(errMsg);
   }
   return reqId;
 }
@@ -97,12 +116,19 @@ export function markSendsDone(sends: SendRecord[] | undefined, reqId?: string): 
   return sends.map((s) => ((reqId ? s.id === reqId : s.status === 'intent' || s.status === 'sent') ? { ...s, status: 'done' as const } : s));
 }
 
-/** Return updated `sends` with an unanswered intent marked uncertain (or dropped if never sent). */
-export function settleFailedSend(sends: SendRecord[] | undefined, reqId: string | undefined, uncertain: boolean): SendRecord[] | undefined {
+/** Return updated `sends` with an unanswered intent marked uncertain, a failed remote job marked failed, or never-sent intent dropped. */
+export function settleFailedSend(sends: SendRecord[] | undefined, reqId: string | undefined, uncertain: boolean, failed = false): SendRecord[] | undefined {
   if (!sends?.length || !reqId) return sends;
+  if (failed) return sends.map((s) => (s.id === reqId ? { ...s, status: 'failed' as const } : s));
   if (uncertain) return sends.map((s) => (s.id === reqId && !s.remoteJob ? { ...s, status: 'uncertain' as const } : s));
   const rest = sends.filter((s) => !(s.id === reqId && !s.remoteJob && s.status === 'intent'));
   return rest.length ? rest : undefined;
+}
+
+/** Mark the send matching a dead remote job as failed so `activeRemoteJob()` never resurrects it. */
+export function markRemoteJobFailed(sends: SendRecord[] | undefined, job: RemoteJob): SendRecord[] | undefined {
+  if (!sends?.length) return sends;
+  return sends.map((s) => (s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider ? { ...s, status: 'failed' as const } : s));
 }
 
 /** Best-effort immediate flush to IndexedDB after storing job results or progress. */
@@ -112,16 +138,20 @@ export async function flushSendSave(): Promise<void> {
 
 /** What a reload leaves on a generation that was running: the error, no mark, and (when a send was in flight) a toast unless silenced. */
 export function interruptedByReload(g: Generation, job: RemoteJob | undefined): Partial<Generation> {
+  const free = isFreeSend(g);
   const hasUncertainRecord = Boolean(g.sends?.some((s) => !s.remoteJob && (s.status === 'intent' || s.status === 'uncertain')));
-  const maybeCharged = !job && (g.sending != null || hasUncertainRecord);
+  const maybeCharged = !free && !job && (g.sending != null || hasUncertainRecord);
   if (maybeCharged && !isMuted('send-uncertain')) {
     toast(`${g.modelName}: this may have been sent and charged; check the provider before regenerating.`, 'error', 12000, { label: 'Don\u2019t show again', run: () => setMuted('send-uncertain', true) });
   }
   const error = job ? `Interrupted by a page reload or tab change. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.`
     : maybeCharged ? 'Interrupted by a page reload or tab change while the request was being sent. It may have been sent and charged: check the provider before regenerating.'
     : 'Interrupted by a page reload or tab change. Regenerate to try again.';
-  const sends = g.sends?.length
-    ? g.sends.map((s) => (!job && !s.remoteJob && s.status === 'intent' ? { ...s, status: 'uncertain' as const } : s))
-    : undefined;
+  const cleanedFree = free ? g.sends?.filter((s) => s.status !== 'intent' && s.status !== 'uncertain') : undefined;
+  const sends = free
+    ? (cleanedFree?.length ? cleanedFree : undefined)
+    : g.sends?.length
+      ? g.sends.map((s) => (!job && !s.remoteJob && s.status === 'intent' ? { ...s, status: 'uncertain' as const } : s))
+      : undefined;
   return { error, sending: undefined, ...(maybeCharged ? { lostJob: true } : {}), ...(sends ? { sends } : {}) };
 }
