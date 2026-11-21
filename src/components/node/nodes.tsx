@@ -1,14 +1,15 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Handle, NodeToolbar, Position, useConnection, useUpdateNodeInternals, useStore as useFlowStore, type Node, type NodeProps } from '@xyflow/react';
 import { X, Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Trash, Type, Wand, FileImage, Check, Paperclip, Layers } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { ratioOf } from '../../engine/params';
 import { addConnected, deleteNodes, duplicateNode, newNodeData, patchNodeData, restoreNodeGeneration, renameNode, setSketch } from '../../engine/flow/actions';
 import { nodeAttempt, inputPorts, nodeOutputAsset, outputPort, runsGeneration } from '../../engine/flow/graph';
-import { detachOutputs, detachedOutputGroup, reattachOutputs } from '../../engine/flow/arrange';
+import { detachOutputs, reattachOutputs } from '../../engine/flow/arrange';
 import { extensionForMime } from '../../lib/media';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
-import type { Generation, GenNodeData, GraphNode, OpId, PortType, ToolNodeData } from '../../engine/types';
+import type { Asset, Generation, GenNodeData, GraphEdge, GraphGroup, GraphNode, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationProgress } from './GenerationProgress';
@@ -23,6 +24,7 @@ import { LinkHandles, RefNode as SystemNode } from '../omni/RefNode';
 import { GenNodeBody, ToolNodeBody } from './NodeSettings';
 import { RunButton } from './NodeRunButton';
 import { NoticeAnchors } from './CanvasNotices';
+import { useDeleteRequestContext } from './LinkBar';
 import type { PortNotice } from '../../engine/flow/notices';
 export { RunButton } from './NodeRunButton';
 
@@ -55,6 +57,7 @@ function useSessionId() {
 function DeleteButton({ node }: { node: GraphNode }) {
   const sessionId = useSessionId();
   const pop = usePopover();
+  const requestDelete = useDeleteRequestContext();
   return (
     <>
       <button ref={pop.ref} type="button" className="nt-btn nt-icon nodrag" aria-label="Delete node" data-tip="Delete (Del)" onClick={pop.toggle}>
@@ -71,7 +74,8 @@ function DeleteButton({ node }: { node: GraphNode }) {
               variant="danger"
               onClick={() => {
                 pop.close();
-                deleteNodes(sessionId, [node.id]);
+                if (requestDelete) requestDelete([node.id]);
+                else deleteNodes(sessionId, [node.id]);
               }}
             >
               Delete
@@ -128,12 +132,73 @@ function HistoryOutput({ node, generation: g, assetId, index, number, onOpen }: 
   </div>;
 }
 
+const historyByNodeCache = new WeakMap<Record<string, Generation>, { byNode: Map<string, Generation[]>; order: Map<string, number> }>();
+const EMPTY_GENERATIONS: Generation[] = [];
+
+export function nodeGenerationHistory(generations: Record<string, Generation>, sessionId: string, nodeId: string, current?: string): Generation[] {
+  let cached = historyByNodeCache.get(generations);
+  if (!cached) {
+    const byNode = new Map<string, Generation[]>();
+    const order = new Map<string, number>();
+    let i = 0;
+    for (const g of Object.values(generations)) {
+      order.set(g.id, i++);
+      if (g.status === 'done' && !g.assetIds.length && g.text == null) continue;
+      const k = `${g.sessionId}\0${g.stepId}`;
+      const list = byNode.get(k);
+      if (list) list.push(g);
+      else byNode.set(k, [g]);
+    }
+    for (const list of byNode.values()) if (list.length > 1) list.sort((a, b) => a.createdAt - b.createdAt);
+    cached = { byNode, order };
+    historyByNodeCache.set(generations, cached);
+  }
+  const bucket = cached.byNode.get(`${sessionId}\0${nodeId}`) ?? EMPTY_GENERATIONS;
+  const cur = current ? generations[current] : undefined;
+  if (!cur || (cur.status === 'done' && !cur.assetIds.length && cur.text == null) || bucket.some((g) => g.id === cur.id)) {
+    return bucket;
+  }
+  return [...bucket, cur].sort((a, b) => (a.createdAt - b.createdAt) || ((cached!.order.get(a.id) ?? 0) - (cached!.order.get(b.id) ?? 0)));
+}
+
+const detachedGroupCache = new WeakMap<GraphGroup[], Map<string, GraphGroup>>();
+
+function detachedOutputGroupFor(groups: GraphGroup[] | undefined, nodeId: string): GraphGroup | undefined {
+  if (!groups?.length) return undefined;
+  let byNode = detachedGroupCache.get(groups);
+  if (!byNode) {
+    byNode = new Map();
+    for (const g of groups) if ('detachedOutputs' in g) for (const id of g.nodeIds) byNode.set(id, g);
+    detachedGroupCache.set(groups, byNode);
+  }
+  return byNode.get(nodeId);
+}
+
+const targetHandlesCache = new WeakMap<GraphEdge[], Map<string, string>>();
+
+function wiredTargetHandles(edges: GraphEdge[] | undefined, nodeId: string): string {
+  if (!edges?.length) return '';
+  let byTarget = targetHandlesCache.get(edges);
+  if (!byTarget) {
+    const lists = new Map<string, string[]>();
+    for (const e of edges) {
+      const list = lists.get(e.target);
+      const handle = e.targetHandle ?? '';
+      if (list) list.push(handle);
+      else lists.set(e.target, [handle]);
+    }
+    byTarget = new Map();
+    for (const [id, list] of lists) byTarget.set(id, list.join('|'));
+    targetHandlesCache.set(edges, byTarget);
+  }
+  return byTarget.get(nodeId) ?? '';
+}
+
 function NodeHistory({ node }: { node: GraphNode }) {
   const sessionId = useSessionId();
-  const generations = useStore(s => s.generations);
   const pop = usePopover();
   const current = runsGeneration(node.data) ? node.data.generationId : undefined;
-  const history = Object.values(generations).filter(g => (g.id === current || (g.sessionId === sessionId && g.stepId === node.id)) && (g.status !== 'done' || g.assetIds.length || g.text != null)).sort((a, b) => a.createdAt - b.createdAt);
+  const history = useStore(useShallow((s) => nodeGenerationHistory(s.generations, sessionId, node.id, current)));
   if (history.length < 2) return null;
   const index = history.findIndex(g => g.id === current);
   return <>
@@ -168,7 +233,7 @@ export function useNodeOutput(node: GraphNode) {
   const d = node.data;
   const genId = runsGeneration(d) ? d.generationId : undefined;
   const g = useStore((s) => (genId ? s.generations[genId] : undefined));
-  const detached = useStore(s => Boolean(detachedOutputGroup(s.sessions[s.activeSessionId]?.graph, node.id)));
+  const detached = useStore((s) => Boolean(detachedOutputGroupFor(s.sessions[s.activeSessionId]?.graph.groups, node.id)));
   const output = nodeOutput(node, g && genId ? { [genId]: g } : {});
   return detached ? { ...output, all: output.assetId ? [output.assetId] : [] } : output;
 }
@@ -267,7 +332,7 @@ function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | nu
   const sessionId = useSessionId();
   const { assetId, all, sketch } = useNodeOutput(node);
   const runnable = runsGeneration(node.data);
-  const detached = useStore(s => detachedOutputGroup(s.sessions[sessionId]?.graph, node.id));
+  const detached = useStore((s) => detachedOutputGroupFor(s.sessions[sessionId]?.graph.groups, node.id));
   const quick = assetId && out && !panel ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
   return (
     <div className="nt-bar">
@@ -320,8 +385,7 @@ function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | nu
 }
 
 /** Aspect of the card preview: the result's, else the requested aspect, clamped to sensible bounds. */
-function previewRatio(node: GraphNode, assetId: string | undefined, assets: ReturnType<typeof useStore.getState>['assets']): number {
-  const a = assetId ? assets[assetId] : undefined;
+function previewRatio(node: GraphNode, a: Asset | undefined): number {
   const d = node.data;
   const r = a?.width && a.height ? a.width / a.height : d.kind === 'audio' ? 2 : d.kind === 'image' || d.kind === 'video' ? ratioOf(d.settings.aspect) ?? 4 / 3 : 4 / 3;
   return Math.min(2, Math.max(0.6, r));
@@ -375,33 +439,40 @@ const TITLE_RISE = 21;
 
 function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const { node, solo, panel: inPanel } = data;
-  const assets = useStore((s) => s.assets);
   const sessionId = useSessionId();
   const inputs = inputPorts(node.data);
-  const out = outputPort(node.data, assets);
+  const out = useStore((s) => outputPort(node.data, s.assets));
   // Inputs already in use, and whether the model takes reference clips (only then the Video clip input exists).
-  const wired = new Set(useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.filter((e) => e.target === node.id).map((e) => e.targetHandle ?? '').join('|') ?? '').split('|'));
+  const wiredKey = useStore((s) => wiredTargetHandles(s.sessions[s.activeSessionId]?.graph.edges, node.id));
+  const wired = useMemo(() => new Set(wiredKey ? wiredKey.split('|') : []), [wiredKey]);
   // While a connection is dragged every input shows, with its name.
   const connecting = useConnection((c) => c.inProgress);
   const clipModel = useStore((s) => ('modelRef' in node.data ? Boolean(s.catalog.schemas[node.data.modelRef]?.slots.clips) : false));
   const { assetId } = useNodeOutput(node);
+  const previewAsset = useStore((s) => (assetId ? s.assets[assetId] : undefined));
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
-  const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
+  const hasPanel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' || d.kind === 'tool';
   const showTools = Boolean(selected) && solo;
   // The title floats above the card and scales with the zoom, the toolbar does not: clear the title, then a small fixed gap.
   // Only the selected node with a toolbar reads the zoom: the others do not re-render on every zoom tick.
   const toolbarOffset = useFlowStore((st) => (showTools ? Math.round(7 + TITLE_RISE * st.transform[2]) : 0));
   return (
     <>
-      <NodeToolbar isVisible={showTools} position={Position.Top} offset={toolbarOffset}>
-        <NodeActions node={node} out={out} panel={inPanel} />
-      </NodeToolbar>
-      {panel ? (
-        <NodeToolbar isVisible={showTools} position={Position.Bottom} offset={12}>
-          <div className="nt-panel">{panel}</div>
-        </NodeToolbar>
+      {showTools ? (
+        <>
+          <NodeToolbar isVisible position={Position.Top} offset={toolbarOffset}>
+            <NodeActions node={node} out={out} panel={inPanel} />
+          </NodeToolbar>
+          {hasPanel ? (
+            <NodeToolbar isVisible position={Position.Bottom} offset={12}>
+              <div className="nt-panel">
+                {d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : <GenNodeBody node={node as GraphNode & { data: GenNodeData }} />}
+              </div>
+            </NodeToolbar>
+          ) : null}
+        </>
       ) : null}
       {inputs.filter((p) => p.id !== 'clip' || wired.has('clip') || clipModel).map((p, i, shown) => (
         // The prompt box already holds the prompt: its port shows only when connected or while connecting.
@@ -426,7 +497,7 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
         ) : (
           <div
             className="nc-body"
-            style={{ aspectRatio: previewRatio(node, assetId, assets) }}
+            style={{ aspectRatio: previewRatio(node, previewAsset) }}
             onDoubleClick={() => assetId && setUi({ lightbox: { assetIds: [assetId], index: 0 } })}
           >
             <Preview node={node} />

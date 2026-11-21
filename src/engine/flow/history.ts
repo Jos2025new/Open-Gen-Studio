@@ -2,12 +2,18 @@ import type { Graph } from '../types';
 import { storeHooks } from '../storeBindings';
 import { GONE_HANDLE, NO_RESULT, resultHandle } from './results';
 
-interface Entry { before: Graph; after: Graph; label: string; key: string; time: number }
+interface Entry { before: Graph; after: Graph; label: string; key: string; time: number; nudge?: boolean }
 interface Stack { past: Entry[]; future: Entry[]; latest: Map<string, Graph['nodes'][number]> }
 const stacks = new Map<string, Stack>();
 const listeners = new Set<() => void>();
 let revision = 0;
 let replay = false;
+let nudging: string | null = null;
+/** Records `fn`'s edits of `id` as an arrow-key nudge: nudges of the same nodes within 700 ms share one step (drags never do). */
+export function asNudge<T>(id: string, fn: () => T): T {
+  nudging = id;
+  try { return fn(); } finally { nudging = null; }
+}
 const stack = (id: string) => {
   if (!stacks.has(id)) stacks.set(id, { past: [], future: [], latest: new Map() });
   return stacks.get(id)!;
@@ -17,7 +23,7 @@ export const historyRevision = () => revision;
 export function subscribeGraphHistory(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
 export function graphHistory(id: string, direction: 'undo' | 'redo') { return [...(direction === 'undo' ? stack(id).past : stack(id).future)].reverse(); }
 function logical(g: Graph) {
-  return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges, broken: g.broken ?? [] });
+  return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges, groups: g.groups ?? [], broken: g.broken ?? [] });
 }
 /** Open groups by session: the first `recordGraph` inside one is its undo step, the later ones add nothing (ADR 0030). */
 const groups = new Map<string, { first: Entry | null }>();
@@ -90,27 +96,35 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
     notify();
     return;
   }
+  const beforeById = new Map<string, Graph['nodes'][number]>();
+  for (const p of before.nodes) if (!beforeById.has(p.id)) beforeById.set(p.id, p);
+  const afterById = new Map<string, Graph['nodes'][number]>();
+  for (const n of after.nodes) if (!afterById.has(n.id)) afterById.set(n.id, n);
   const edits = { ...after, nodes: after.nodes.map(n => {
-    const prev = before.nodes.find(p => p.id === n.id);
+    const prev = beforeById.get(n.id);
     if (prev && 'outputIndex' in prev.data && 'outputIndex' in n.data && prev.data.generationId !== n.data.generationId) {
       return { ...n, data: { ...n.data, outputIndex: prev.data.outputIndex, sketchAssetId: prev.data.sketchAssetId } };
     }
     return n;
   }) };
   if (replay || logical(before) === logical(edits)) return;
-  const added = after.nodes.filter(n => !before.nodes.some(p => p.id === n.id));
-  const removed = before.nodes.filter(n => !after.nodes.some(p => p.id === n.id));
-  const changed = after.nodes.filter(n => { const prev = before.nodes.find(p => p.id === n.id); return prev && logical({ nodes: [prev], edges: [] }) !== logical({ nodes: [n], edges: [] }); });
+  const added = after.nodes.filter(n => !beforeById.has(n.id));
+  const removed = before.nodes.filter(n => !afterById.has(n.id));
+  const changed = after.nodes.filter(n => { const prev = beforeById.get(n.id); return prev && logical({ nodes: [prev], edges: [] }) !== logical({ nodes: [n], edges: [] }); });
   const edges = JSON.stringify([before.edges, before.broken ?? []]) !== JSON.stringify([after.edges, after.broken ?? []]);
-  const moved = changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(before.nodes.find(p => p.id === n.id)!.data));
-  const label = added.length ? `Add ${added.map(n => n.data.title).join(', ')}` : removed.length ? `Delete ${removed.map(n => n.data.title).join(', ')}` : edges ? 'Change connections' : `${moved ? 'Move' : 'Edit'} ${changed.map(n => n.data.title).join(', ')}`;
-  const key = `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
+  const groupsChanged = JSON.stringify(before.groups ?? []) !== JSON.stringify(after.groups ?? []);
+  const moved = !groupsChanged && changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(beforeById.get(n.id)!.data));
+  const beforeG = before.groups ?? [], afterG = after.groups ?? [];
+  const groupLabel = afterG.length > beforeG.length ? `Group ${afterG.at(-1)?.title ?? 'nodes'}` : afterG.length < beforeG.length ? 'Ungroup' : 'Edit group';
+  const label = added.length ? `Add ${added.map(n => n.data.title).join(', ')}` : removed.length ? `Delete ${removed.map(n => n.data.title).join(', ')}` : edges ? 'Change connections' : changed.length ? `${moved ? 'Move' : 'Edit'} ${changed.map(n => n.data.title).join(', ')}` : groupLabel;
+  const key = groupsChanged && !changed.length ? 'groups' : `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
   const time = Date.now();
   const last = s.past.at(-1);
-  if (!group && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
+  const nudge = nudging === id;
+  if (!group && (!moved || (nudge && last?.nudge)) && !groupsChanged && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
     last.after = structuredClone(after); last.time = time;
   } else {
-    s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time });
+    s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time, ...(nudge ? { nudge } : {}) });
     if (s.past.length > 40) s.past.shift();
     if (group) group.first = s.past[s.past.length - 1];
   }
@@ -124,8 +138,10 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
   if (!Number.isInteger(count) || count < 1 || count > from.length) return false;
   const target = from[from.length - count];
   const saved = direction === 'undo' ? target.before : target.after;
+  const currentById = new Map<string, Graph['nodes'][number]>();
+  for (const p of current.nodes) if (!currentById.has(p.id)) currentById.set(p.id, p);
   const graph = { ...structuredClone(saved), viewport: current.viewport, nodes: saved.nodes.map(n => {
-    const live = current.nodes.find(p => p.id === n.id) ?? s.latest.get(n.id);
+    const live = currentById.get(n.id) ?? s.latest.get(n.id);
     if (live && live.data.kind === n.data.kind && 'outputIndex' in n.data && 'outputIndex' in live.data) {
       const newerOutput = n.data.generationId !== live.data.generationId;
       return { ...n, data: { ...n.data, generationId: live.data.generationId, ...(newerOutput ? { outputIndex: live.data.outputIndex, sketchAssetId: live.data.sketchAssetId } : {}) } };
@@ -134,7 +150,8 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
   }) };
   replay = true;
   try { if (!apply(reconciled(graph, target.time))) return false; } finally { replay = false; }
-  for (let i = 0; i < count; i++) to.push(from.pop()!);
+  // A travelled step is closed: a later nudge never fuses into it.
+  for (let i = 0; i < count; i++) { const e = from.pop()!; delete e.nudge; to.push(e); }
   notify();
   return true;
 }

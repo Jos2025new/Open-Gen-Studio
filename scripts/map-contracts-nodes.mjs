@@ -93,4 +93,17 @@ export default [{
     ['src/components/node/AgentNodeControls.tsx', 'export function AgentTitle'],
   ],
   tests: ['tests/agent-names.test.ts', 'tests/agent-title-ui.test.ts'],
+}, {
+  id: 'node-drag-preview',
+  what: 'Durante el arrastre las posiciones viven en el vuelo local del lienzo (`dragPos` proyectado del grafo) y `editPresentation` se llama una sola vez en `onNodeDragStop` de React Flow sobre el grafo vigente (sin gesto, p. ej. flechas, se escribe directo); `NodeToolbar` solo se monta al seleccionar.',
+  sides: [
+    ['src/components/node/useNodeDrag.ts', 'const dragPos = useMemo(() => project(flight, graph)'],
+    ['src/components/node/NodeWorkspace.tsx', 'useNodeDrag(sessionId, measuredRef)'],
+    ['src/components/node/NodeWorkspace.tsx', 'onNodeDragStop={endDrag}'],
+    ['src/components/node/CanvasElements.ts', 'const pos = dragPos?.get(n.id) ?? n.position;'],
+    ['src/components/node/nodes.tsx', '{showTools ? ('],
+    ['src/engine/flow/history.ts', 'const beforeById = new Map'],
+    ['scripts/check-node-drag.mjs', 'export function check('],
+  ],
+  tests: ['tests/node-drag-perf.test.ts', 'tests/check-node-drag.test.ts', 'tests/adversarial-drag200-gesture.test.ts', 'tests/adversarial-drag200-bounds.test.ts'],
 }];

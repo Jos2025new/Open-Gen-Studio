@@ -40,4 +40,43 @@ describe('node graph history', () => {
     expect((restored.nodes[0].data as { generationId: string }).generationId).toBe('new');
     expect(restored.viewport).toEqual(c.viewport);
   });
+
+  it('records group-only changes (create, rename, color, ungroup) and does not merge them with moves', () => {
+    const a: Graph = {
+      nodes: [
+        { id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'A', text: '' } },
+        { id: 'n2', position: { x: 200, y: 0 }, data: { kind: 'text', title: 'B', text: '' } },
+      ],
+      edges: [],
+    };
+    const moved: Graph = {
+      ...a,
+      nodes: [{ ...a.nodes[0], position: { x: 50, y: 0 } }, a.nodes[1]],
+    };
+    const grouped: Graph = { ...moved, groups: [{ id: 'g1', title: 'Group 1', nodeIds: ['n1', 'n2'] }] };
+    const renamed: Graph = { ...grouped, groups: [{ id: 'g1', title: 'Scene', nodeIds: ['n1', 'n2'] }] };
+    const colored: Graph = { ...renamed, groups: [{ id: 'g1', title: 'Scene', nodeIds: ['n1', 'n2'], color: '#5ec8ff' }] };
+    const ungrouped: Graph = { ...colored, groups: [] };
+
+    recordGraph('groups-test', a, moved);
+    recordGraph('groups-test', moved, grouped);
+    recordGraph('groups-test', grouped, renamed);
+    recordGraph('groups-test', renamed, colored);
+    recordGraph('groups-test', colored, ungrouped);
+
+    expect(graphHistory('groups-test', 'undo')).toHaveLength(5);
+
+    let current = ungrouped;
+    expect(travelGraph('groups-test', current, 'undo', 1, (g) => { current = g; return true; })).toBe(true);
+    expect(current.groups).toEqual(colored.groups);
+    expect(travelGraph('groups-test', current, 'undo', 1, (g) => { current = g; return true; })).toBe(true);
+    expect(current.groups).toEqual(renamed.groups);
+    expect(travelGraph('groups-test', current, 'undo', 1, (g) => { current = g; return true; })).toBe(true);
+    expect(current.groups).toEqual(grouped.groups);
+    expect(travelGraph('groups-test', current, 'undo', 1, (g) => { current = g; return true; })).toBe(true);
+    expect(current.groups).toBeUndefined();
+
+    expect(travelGraph('groups-test', current, 'redo', 4, (g) => { current = g; return true; })).toBe(true);
+    expect(current.groups).toEqual([]);
+  });
 });

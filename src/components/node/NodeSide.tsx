@@ -35,12 +35,13 @@ function useSpaceFeed(sessionId: string, space: Space) {
 }
 
 /** The one node selected on the canvas, when it has a result to describe. */
-function useSelectedResult(sessionId: string) {
-  const ids = useNodeSelection((s) => s.bySession[sessionId]);
-  const node = useStore((s) => (ids?.length === 1 ? s.sessions[sessionId]?.graph.nodes.find((n) => n.id === ids[0]) : undefined));
-  const generation = useStore((s) => (node ? nodeAttempt(node, s.generations) : undefined));
-  const asset = useStore((s) => (node ? s.assets[nodeOutputAsset(node, s.generations) ?? ''] : undefined));
-  return node && asset ? { node, generation: generation?.status === 'done' ? generation : undefined, asset } : null;
+function useSelectedResult(sessionId: string, active: boolean) {
+  const ids = useNodeSelection((s) => (active ? s.bySession[sessionId] : undefined));
+  const selectedId = active && ids?.length === 1 ? ids[0] : undefined;
+  const node = useStore((s) => (selectedId ? s.sessions[sessionId]?.graph.nodes.find((n) => n.id === selectedId) : undefined));
+  const generation = useStore((s) => (active && node ? nodeAttempt(node, s.generations) : undefined));
+  const asset = useStore((s) => (active && node ? s.assets[nodeOutputAsset(node, s.generations) ?? ''] : undefined));
+  return active && node && asset ? { node, generation: generation?.status === 'done' ? generation : undefined, asset } : null;
 }
 
 /** Create and Conversation in the canvas toolbox (Nodes, beside Add node; the Designer's side toolbox, under Designs). */
@@ -112,10 +113,10 @@ type Frame = (p: { result: boolean; label: string; children: ReactNode }) => Rea
 function SideContent({ sessionId, space, frame: FrameBox }: { sessionId: string; space: Space; frame: Frame }) {
   const { view, open } = useCorner();
   const { items, talked } = useSpaceFeed(sessionId, space);
-  const allFeed = useStore((s) => s.sessions[sessionId]?.feed);
+  const allFeed = useStore((s) => (open ? s.sessions[sessionId]?.feed : undefined));
   const hasConversation = Boolean(allFeed?.some((f) => f.type === 'user' || f.type === 'assistant'));
   const pending = useAnyThread(sessionId, (a) => Boolean(a.pending) || a.busy);
-  const selected = useSelectedResult(sessionId);
+  const selected = useSelectedResult(sessionId, space === 'node' && open);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const notices = items.filter((f) => f.type === 'notice');
   const lastKey = allFeed?.length ? `${allFeed[allFeed.length - 1].id}:${allFeed.length}` : '';

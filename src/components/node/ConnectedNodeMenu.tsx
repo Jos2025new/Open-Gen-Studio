@@ -4,7 +4,7 @@ import { getBezierPath, Handle, Position, useInternalNode, useReactFlow, useView
 import { Plus } from '../ui/icons';
 import { addConnected } from '../../engine/flow/actions';
 import { GONE_HANDLE, NO_RESULT, resultHandle, runsGeneration } from '../../engine/flow/graph';
-import type { GraphNode, PortType } from '../../engine/types';
+import type { GraphEdge, GraphNode, PortType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { AddNodeItems } from './AddNodeItems';
@@ -37,6 +37,26 @@ export function AddNext({ node, out }: { node: GraphNode; out: PortType }) {
   </>;
 }
 
+const sourceIndicesCache = new WeakMap<GraphEdge[], Map<string, string>>();
+
+function sourceOutputIndices(edges: GraphEdge[] | undefined, nodeId: string): string {
+  if (!edges?.length) return '';
+  let bySource = sourceIndicesCache.get(edges);
+  if (!bySource) {
+    const lists = new Map<string, number[]>();
+    for (const e of edges) {
+      if (e.outputIndex == null) continue;
+      const list = lists.get(e.source);
+      if (list) list.push(e.outputIndex);
+      else lists.set(e.source, [e.outputIndex]);
+    }
+    bySource = new Map();
+    for (const [id, list] of lists) bySource.set(id, list.join(','));
+    sourceIndicesCache.set(edges, bySource);
+  }
+  return bySource.get(nodeId) ?? '';
+}
+
 /**
  * A node with several results gets one numbered output per result (Houdini/Nuke convention): a link from «2» always
  * uses the second result; a link from + follows the result chosen on the node. Shown on hover, or while linked.
@@ -44,7 +64,7 @@ export function AddNext({ node, out }: { node: GraphNode; out: PortType }) {
 export function ResultPorts({ node, out }: { node: GraphNode; out: PortType }) {
   const d = node.data;
   const made = useStore((s) => (runsGeneration(d) && d.generationId ? s.generations[d.generationId]?.assetIds.length ?? 0 : 0));
-  const used = useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.filter((e) => e.source === node.id && e.outputIndex != null).map((e) => e.outputIndex!).join(',') ?? '');
+  const used = useStore((s) => sourceOutputIndices(s.sessions[s.activeSessionId]?.graph.edges, node.id));
   const linked = new Set(used ? used.split(',').map(Number) : []);
   const count = Math.max('settings' in d ? d.settings.count ?? 1 : 1, made, ...[...linked].map((i) => i + 1));
   const gone = linked.has(NO_RESULT);

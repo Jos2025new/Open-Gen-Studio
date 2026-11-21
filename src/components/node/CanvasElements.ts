@@ -25,22 +25,27 @@ interface GroupLayout {
 
 export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
   summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void,
-  cache = new WeakMap<GraphGroup, GroupLayout>()) {
+  cache = new WeakMap<GraphGroup, GroupLayout>(), dragPos?: ReadonlyMap<string, { x: number; y: number }>) {
   const frames: GroupFlowNode[] = [];
   const hidden = new Set<string>();
   if (!groups?.length) return { frames, hidden };
   const byId = new Map<string, GraphNode>();
   for (const node of nodes) byId.set(node.id, node);
+  const posOf = (node: GraphNode | undefined) => (node ? (dragPos?.get(node.id) ?? node.position) : undefined);
   for (const group of groups) {
     const previous = cache.get(group);
     let layout = previous;
-    if (!previous || group.nodeIds.some((id, i) =>
-      byId.get(id)?.position !== previous.positions[i] || measured.get(id) !== previous.sizes[i])) {
+    if (!previous || group.nodeIds.some((id, i) => {
+      const pos = posOf(byId.get(id));
+      const prev = previous.positions[i];
+      return pos?.x !== prev?.x || pos?.y !== prev?.y || measured.get(id) !== previous.sizes[i];
+    })) {
       const members: GraphNode[] = [];
       const positions = group.nodeIds.map(id => {
         const node = byId.get(id);
-        if (node) members.push(node);
-        return node?.position;
+        const pos = posOf(node);
+        if (node && pos) members.push(pos === node.position ? node : { ...node, position: pos });
+        return pos;
       });
       layout = { positions, sizes: group.nodeIds.map(id => measured.get(id)),
         bounds: groupBounds(members, measured), frame: previous?.frame };
@@ -75,15 +80,17 @@ export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionI
 }
 
 export function useCanvasGroups(graph: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
-  summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void) {
+  summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void,
+  dragPos?: ReadonlyMap<string, { x: number; y: number }>) {
   const cache = useMemo(() => new WeakMap<GraphGroup, GroupLayout>(), []);
-  return useMemo(() => canvasGroups(graph, measured, sessionId, closed, summaries, toggle, cache),
-    [graph, measured, sessionId, closed, summaries, toggle, cache]);
+  return useMemo(() => canvasGroups(graph, measured, sessionId, closed, summaries, toggle, cache, dragPos),
+    [graph, measured, sessionId, closed, summaries, toggle, cache, dragPos]);
 }
 
 interface CanvasElements {
   graph: Graph;
   revision: Graph;
+  dragPos?: ReadonlyMap<string, { x: number; y: number }>;
   selected: Set<string>;
   selectedEdges: Set<string>;
   measured: Map<string, { width: number; height: number }>;
@@ -99,7 +106,12 @@ interface CanvasElements {
 
 const NO_IDS = new Set<string>();
 
-export function useCanvasElements({ graph, revision, selected, selectedEdges, measured, frames, hidden,
+/** Single rule for box selection (both Select and Pan) and visible node selection: hidden collapsed-group members are not selectable. */
+export function isNodeSelectable(nodeId: string, hidden: ReadonlySet<string>): boolean {
+  return !hidden.has(nodeId);
+}
+
+export function useCanvasElements({ graph, revision, dragPos, selected, selectedEdges, measured, frames, hidden,
   byPort, byCable, spaceProblems, sessionId, omni, embedded }: CanvasElements) {
   const stableHidden = useShallow((ids: Set<string>) => ids)(hidden);
   const selectEdgeAssets = useMemo(() => {
@@ -168,7 +180,7 @@ export function useCanvasElements({ graph, revision, selected, selectedEdges, me
   const noticeOut = useShallow((ids: Set<string>) => ids)(anchors.outputs);
   const soloId = useMemo(() => {
     let only: string | undefined;
-    for (const n of revision.nodes) if (selected.has(n.id) && !stableHidden.has(n.id)) {
+    for (const n of revision.nodes) if (selected.has(n.id) && isNodeSelectable(n.id, stableHidden)) {
       if (only) return undefined;
       only = n.id;
     }
@@ -178,8 +190,9 @@ export function useCanvasElements({ graph, revision, selected, selectedEdges, me
   const nodes = useMemo(() => {
     const cards = graph.nodes.map(n => {
       const space = n.data.kind === 'ref' && n.data.type === 'space';
-      const hidden = stableHidden.has(n.id);
-      const selectedHere = selected.has(n.id) && !hidden;
+      const selectable = isNodeSelectable(n.id, stableHidden);
+      const hidden = !selectable;
+      const selectedHere = selected.has(n.id) && selectable;
       const solo = soloId === n.id;
       const missing = byPort.get(n.id);
       const input = noticeIn.has(n.id), output = noticeOut.has(n.id);
@@ -187,8 +200,10 @@ export function useCanvasElements({ graph, revision, selected, selectedEdges, me
       const hasErrors = space ? spaceProblems.hasErrors : undefined;
       const size = measured.get(n.id);
       const width = omni ? omniWidth(n.data, NODE_WIDTH) : NODE_WIDTH;
+      const pos = dragPos?.get(n.id) ?? n.position;
       const old = cardCache.get(n);
-      if (old && old.selected === selectedHere && old.hidden === hidden && old.measured === size &&
+      if (old && old.position.x === pos.x && old.position.y === pos.y &&
+          old.selected === selectedHere && old.hidden === hidden && old.measured === size &&
           old.data.solo === solo && old.data.panel === !embedded && old.data.missing === missing &&
           old.data.noticeIn === input && old.data.noticeOut === output &&
           old.data.spaceProblems === count && old.data.spaceHasErrors === hasErrors &&
@@ -196,11 +211,12 @@ export function useCanvasElements({ graph, revision, selected, selectedEdges, me
       const card: FlowNode = {
         id: n.id,
         type: 'studio',
-        position: n.position,
+        position: pos,
         data: { node: n, solo, panel: !embedded, missing, noticeIn: input, noticeOut: output,
           spaceProblems: count, spaceHasErrors: hasErrors },
         selected: selectedHere,
         hidden,
+        selectable,
         width,
         measured: size,
       };
@@ -208,6 +224,6 @@ export function useCanvasElements({ graph, revision, selected, selectedEdges, me
       return card;
     });
     return [...(frames as unknown as FlowNode[]), ...cards];
-  }, [graph.nodes, frames, stableHidden, noticeIn, noticeOut, selected, soloId, measured, byPort, spaceProblems, omni, embedded, cardCache]);
+  }, [graph.nodes, dragPos, frames, stableHidden, noticeIn, noticeOut, selected, soloId, measured, byPort, spaceProblems, omni, embedded, cardCache]);
   return { nodes, edges };
 }

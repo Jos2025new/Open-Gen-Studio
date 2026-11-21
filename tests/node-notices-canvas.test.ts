@@ -16,6 +16,7 @@ import * as notices from '../src/engine/flow/notices';
 import * as resolver from '../src/engine/nodecore/resolver';
 import type { Asset, Generation, Graph, GraphNode } from '../src/engine/types';
 import { useStore } from '../src/store/store';
+import { rfDrag } from './rf-drag-events';
 const noticeCss = readFileSync('src/styles/node-notices.css', 'utf8');
 
 const flow = vi.hoisted(() => ({
@@ -94,6 +95,7 @@ it('reuses notices during a drag and reads external text again only when its fee
   const initialReads = readText.mock.calls.length;
   const stationary = flow.props!.nodes.find(n => n.id === 'text');
   vi.mocked(equality.shallow).mockClear();
+  rfDrag(() => flow.props).start('image');
   for (let x = 1; x <= 6; x++) act(() => flow.props!.onNodesChange([{ id: 'image', type: 'position', position: { x, y: 0 }, dragging: true }]));
   expect(flow.props!.nodes.find(n => n.id === 'image')?.position.x).toBe(6);
   expect.soft(calculate).toHaveBeenCalledTimes(1);
@@ -165,6 +167,7 @@ it('does only the affected work during drags and store ticks in NodeWorkspace', 
   expect.soft(flow.renders).toBe(renderCount);
   expect.soft(importable).toHaveBeenCalledTimes(1);
   expect.soft(flow.props!.edges).toBe(firstEdges);
+  rfDrag(() => flow.props).start('outside', 'image');
   for (const x of [801, 802, 803]) {
     act(() => flow.props!.onNodesChange([{ id: 'outside', type: 'position', position: { x, y: 0 }, dragging: true }]));
     expect.soft(frame()).toBe(firstFrame);

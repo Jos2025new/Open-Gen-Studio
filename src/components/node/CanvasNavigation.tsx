@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
 import { Hand, LayoutDashboard, Scissors, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from '../ui/icons';
 import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
@@ -40,13 +40,36 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
+function CanvasSearchResults({ sessionId, submitted, onSelect }: { sessionId: string; submitted: string; onSelect: (id: string) => void }) {
+  const nodes = useStore(s => s.sessions[sessionId].graph.nodes);
+  const generations = useStore(s => s.generations);
+  const assets = useStore(s => s.assets);
+  const rf = useReactFlow();
+  const results = useMemo(() => {
+    if (!submitted) return [];
+    return nodes.flatMap(n => {
+      const d = n.data;
+      const asset = nodeOutputAsset(n, generations);
+      const g = asset && assets[asset]?.generationId ? generations[assets[asset].generationId!] : undefined;
+      const fields = [...new Set([d.title, d.kind === 'text' ? d.text : 'prompt' in d ? d.prompt : '', g ? generationTitle(g) : '', ...(d.kind === 'tool' ? Object.entries(d.params).filter(([k, v]) => /prompt|instruction|text/i.test(k) && typeof v === 'string').map(([, v]) => String(v)) : [])])];
+      return fields.filter(text => text.toLowerCase().includes(submitted.toLowerCase())).map(text => ({ id: n.id, title: d.title, text }));
+    });
+  }, [nodes, generations, assets, submitted]);
+  return (
+    <div className="canvas-search-results">
+      {results.map((r, i) => <button key={`${r.id}-${i}`} className="canvas-search-result" type="button" onClick={() => { onSelect(r.id); void rf.fitView({ nodes: [{ id: r.id }], padding: 0.4, maxZoom: 1, duration: 200 }); }}><span className="faint">{r.title}</span><span><Highlight text={r.text} query={submitted} /></span></button>)}
+      {submitted && !results.length ? <div className="empty-block">No matches in this canvas.</div> : null}
+    </div>
+  );
+}
+
 /** The canvas toolbox (2026-10-31): one vertical bar on the left, in the Designer's toolbar style, with every canvas
  *  tool: Add node (`add`), Select, Pan, Cut and Auto layout, Fit view and Map, Undo, Redo and Delete, zoom, Search. Its
  *  popovers open to the right. `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
 export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, onDelete, omni = false }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: NodeTool; onTool: (t: NodeTool) => void; selectedCount: number; onDelete: () => void; /** The omnicanvas keeps only the tools that move around the canvas (see the omni notes in docs). */ omni?: boolean }) {
-  const graph = useStore(s => s.sessions[sessionId].graph);
-  const generations = useStore(s => s.generations);
-  const assets = useStore(s => s.assets);
+  const hasNodes = useStore(s => Boolean(s.sessions[sessionId]?.graph.nodes.length));
+  const hasEdges = useStore(s => Boolean(s.sessions[sessionId]?.graph.edges.length));
+  const hasRunning = useStore(s => s.sessions[sessionId]?.graph.nodes.some(n => 'generationId' in n.data && Boolean(n.data.generationId) && ['running', 'queued'].includes(s.generations[n.data.generationId!]?.status)) ?? false);
   useSyncExternalStore(subscribeGraphHistory, historyRevision);
   const rf = useReactFlow();
   const { zoom } = useViewport();
@@ -61,11 +84,15 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
   const [submitted, setSubmitted] = useState('');
   const past = graphHistory(sessionId, 'undo');
   const future = graphHistory(sessionId, 'redo');
-  const blocked = lockedNodes(sessionId).size > 0 || graph.nodes.some(n => 'generationId' in n.data && n.data.generationId && ['running', 'queued'].includes(generations[n.data.generationId]?.status));
+  const blocked = lockedNodes(sessionId).size > 0 || hasRunning;
   const travel = (dir: 'undo' | 'redo', count = 1) => {
-    if (blocked) return;
-    travelGraph(sessionId, graph, dir, count, next => {
-      const problem = graphEditProblem(sessionId, graph, next);
+    const st = useStore.getState();
+    const current = st.sessions[sessionId]?.graph;
+    if (!current) return;
+    const busy = lockedNodes(sessionId).size > 0 || current.nodes.some(n => 'generationId' in n.data && Boolean(n.data.generationId) && ['running', 'queued'].includes(st.generations[n.data.generationId!]?.status));
+    if (busy) return;
+    travelGraph(sessionId, current, dir, count, next => {
+      const problem = graphEditProblem(sessionId, current, next);
       if (problem) { toast(problem, 'error'); return false; }
       applyEdit({ session: sessionId, op: { op: 'travel', graph: next } });
       reconcileDeletionNotices(sessionId);
@@ -73,26 +100,18 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
     });
     history.close();
   };
+  const travelRef = useRef(travel);
+  travelRef.current = travel;
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
       if (!(e.ctrlKey || e.metaKey) || !['z', 'y'].includes(e.key.toLowerCase())) return;
       e.preventDefault();
-      travel(e.key.toLowerCase() === 'y' || e.shiftKey ? 'redo' : 'undo');
+      travelRef.current(e.key.toLowerCase() === 'y' || e.shiftKey ? 'redo' : 'undo');
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  });
-  const results = useMemo(() => {
-    if (!submitted) return [];
-    return graph.nodes.flatMap(n => {
-      const d = n.data;
-      const asset = nodeOutputAsset(n, generations);
-      const g = asset && assets[asset]?.generationId ? generations[assets[asset].generationId!] : undefined;
-      const fields = [...new Set([d.title, d.kind === 'text' ? d.text : 'prompt' in d ? d.prompt : '', g ? generationTitle(g) : '', ...(d.kind === 'tool' ? Object.entries(d.params).filter(([k, v]) => /prompt|instruction|text/i.test(k) && typeof v === 'string').map(([, v]) => String(v)) : [])])];
-      return fields.filter(text => text.toLowerCase().includes(submitted.toLowerCase())).map(text => ({ id: n.id, title: d.title, text }));
-    });
-  }, [graph, generations, assets, submitted]);
+  }, []);
   const showHistory = (e: React.MouseEvent, dir: 'undo' | 'redo') => { e.preventDefault(); e.stopPropagation(); setDirection(dir); history.setOpen(true); };
   return (
     <>
@@ -103,10 +122,10 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
         <span className="canvas-nav-sep" />
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
-        <IconButton icon={Scissors} label="Cut connections (X): drag across links to cut them" active={tool === 'cut'} disabled={!graph.edges.length && tool !== 'cut'} onClick={() => onTool('cut')} />
-        {onAutoLayout && !omni ? <IconButton icon={LayoutDashboard} label="Auto layout" disabled={!graph.nodes.length} onClick={onAutoLayout} /> : null}
+        <IconButton icon={Scissors} label="Cut connections (X): drag across links to cut them" active={tool === 'cut'} disabled={!hasEdges && tool !== 'cut'} onClick={() => onTool('cut')} />
+        {onAutoLayout && !omni ? <IconButton icon={LayoutDashboard} label="Auto layout" disabled={!hasNodes} onClick={onAutoLayout} /> : null}
         <span className="canvas-nav-sep" />
-        <IconButton icon={Maximize} label="Fit view" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
+        <IconButton icon={Maximize} label="Fit view" disabled={!hasNodes} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
         <span className="canvas-nav-sep" />
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />
@@ -134,10 +153,7 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search prompts and names" aria-label="Search canvas text" />
           <IconButton icon={Search} label="Find matches" size="sm" type="submit" />
         </form>
-        <div className="canvas-search-results">
-          {results.map((r, i) => <button key={`${r.id}-${i}`} className="canvas-search-result" type="button" onClick={() => { onSelect(r.id); void rf.fitView({ nodes: [{ id: r.id }], padding: 0.4, maxZoom: 1, duration: 200 }); }}><span className="faint">{r.title}</span><span><Highlight text={r.text} query={submitted} /></span></button>)}
-          {submitted && !results.length ? <div className="empty-block">No matches in this canvas.</div> : null}
-        </div>
+        {searchPop.open && submitted ? <CanvasSearchResults sessionId={sessionId} submitted={submitted} onSelect={onSelect} /> : null}
       </Popover>}
     </>
   );

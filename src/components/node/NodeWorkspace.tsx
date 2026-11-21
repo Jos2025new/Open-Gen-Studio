@@ -12,7 +12,6 @@ import {
   type EdgeChange,
 } from '@xyflow/react';
 import { setUi, toast, useStore } from '../../store/store';
-import { editPresentation } from '../../engine/nodecore/edit';
 import { ensureOmniNodes } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
@@ -36,14 +35,15 @@ import { CanvasPanels } from './SelectionPanel';
 import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from './CanvasNavigation';
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
-import { LinkBar, useDeleteRequest } from './LinkBar';
-import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { DeleteRequestContext, LinkBar, useDeleteRequest } from './LinkBar';
+import { copyNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { liveGroupsMap, useNodeDrag } from './useNodeDrag';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
 import { loadNodeTool } from './nodeToolStorage';
 import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
-import { closedGroupNotices, useCanvasElements, useCanvasGroups } from './CanvasElements';
+import { closedGroupNotices, isNodeSelectable, useCanvasElements, useCanvasGroups } from './CanvasElements';
 import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
 import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 
@@ -72,6 +72,14 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const [tool, setTool] = useState<NodeTool>(loadNodeTool);
   const lastTool = useRef<'select' | 'pan'>(tool === 'select' ? 'select' : 'pan');
   const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  const pickToolRef = useRef(pickTool);
+  pickToolRef.current = pickTool;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const requestDeleteRef = useRef(del.request);
+  requestDeleteRef.current = del.request;
   const cut = useCutTool({ active: tool === 'cut', canvasRef, onCut: (ids) => void disconnectEdges(sessionId, ids) });
   // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
   const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -111,8 +119,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const b = rf.screenToFlowPosition({ x: r.left + Math.max(box.x0, box.x1), y: r.top + Math.max(box.y0, box.y1) });
     setBox(null);
     if (b.x - a.x < 2 && b.y - a.y < 2) return;
-    // Partial overlap counts, as with the Select tool.
+    // Partial overlap counts, as with the Select tool, sharing the same selectability rule.
     const hit = graph.nodes.filter((n) => {
+      if (!isNodeSelectable(n.id, hidden)) return false;
       const m = measuredRef.current.get(n.id) ?? { width: NODE_WIDTH, height: 120 };
       return n.position.x < b.x && n.position.x + m.width > a.x && n.position.y < b.y && n.position.y + m.height > a.y;
     }).map((n) => n.id);
@@ -135,6 +144,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
+  const { dragPos, applyDragChanges, startDrag, endDrag, startSelection, endSelection } = useNodeDrag(sessionId, measuredRef);
 
   const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -148,7 +158,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     setSelectedEdges(new Set());
   }, []);
   const groupNotices = useMemo(() => closedGroupNotices(revision.groups, closed, notices), [revision.groups, closed, notices]);
-  const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup);
+  const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup, dragPos);
   const jumpToNode = useCallback((id: string) => {
     const groups = revision.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
     if (groups.some(g => closed.has(g.id))) {
@@ -159,41 +169,29 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   }, [revision.groups, closed, selectNodes, sessionId]);
 
   const { nodes, edges } = useCanvasElements({
-    graph, revision, selected, selectedEdges, measured, frames, hidden,
+    graph, revision, dragPos, selected, selectedEdges, measured, frames, hidden,
     byPort, byCable, spaceProblems, sessionId, omni, embedded,
   });
 
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
-      const moves = new Map<string, { x: number; y: number }>();
       const removed: string[] = [];
       const picks: Array<[string, boolean]> = [];
       const sizes: Array<[string, { width: number; height: number }]> = [];
-      const frameMoves: Array<[import('../../engine/types').GraphGroup, { x: number; y: number }]> = [];
-      const frames = new Map((useStore.getState().sessions[sessionId]?.graph.groups ?? []).map((g) => [g.id, g]));
+      const { groupById } = liveGroupsMap(sessionId);
       for (const c of changes) {
-        // A group frame: dragging it moves its nodes; selecting it selects them; deleting it ungroups.
-        if ('id' in c && frames.has(c.id)) {
-          const g = frames.get(c.id)!;
-          if (c.type === 'position' && c.position) frameMoves.push([g, c.position]);
-          else if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
+        // A group frame: selecting it selects its nodes; deleting it ungroups; positions go to useNodeDrag.
+        if ('id' in c && groupById.has(c.id)) {
+          const g = groupById.get(c.id)!;
+          if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
           else if (c.type === 'remove') ungroup(sessionId, g.id);
           continue;
         }
         if (c.type === 'dimensions' && c.dimensions) sizes.push([c.id, c.dimensions]);
-        else if (c.type === 'position' && c.position) moves.set(c.id, c.position);
         else if (c.type === 'remove') removed.push(c.id);
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
-      if (moves.size) editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)) }));
-      // A dragged frame moves its nodes — unless they are selected too, then they already moved with it.
-      for (const [g, p] of frameMoves) {
-        if (g.nodeIds.some((id) => moves.has(id))) continue;
-        const ids = new Set(g.nodeIds);
-        const members = useStore.getState().sessions[sessionId].graph.nodes.filter(n => ids.has(n.id));
-        const b = groupBounds(members, measuredRef.current);
-        if (b) moveGroup(sessionId, g.id, p.x - b.x, p.y - b.y);
-      }
+      applyDragChanges(changes);
       if (removed.length) deleteNodes(sessionId, removed);
       // Functional updates: several reports can arrive before a re-render; none may be lost.
       if (picks.length || removed.length) {
@@ -209,7 +207,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id)).map(([id]) => id));
       if (fresh.size) settleNewNodes(sessionId, fresh, new Map([...measuredRef.current, ...sizes]));
     },
-    [sessionId],
+    [sessionId, applyDragChanges],
   );
 
   const onEdgesChange = useCallback(
@@ -327,22 +325,22 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const key = (e: KeyboardEvent) => {
       if (!insideRef.current || e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
       const k = e.key.toLowerCase();
-      if (k === 'x') { e.preventDefault(); pickTool(tool === 'cut' ? lastTool.current : 'cut'); }
-      else if (k === 'escape' && tool === 'cut') pickTool(lastTool.current);
+      if (k === 'x') { e.preventDefault(); pickToolRef.current(toolRef.current === 'cut' ? lastTool.current : 'cut'); }
+      else if (k === 'escape' && toolRef.current === 'cut') pickToolRef.current(lastTool.current);
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  });
+  }, [embedded]);
 
   // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (!insideRef.current || !(e.ctrlKey || e.metaKey) || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
-      const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id) ?? [];
+      const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selectedRef.current.has(n.id)).map((n) => n.id) ?? [];
       const k = e.key.toLowerCase();
       if (!ids.length || window.getSelection()?.toString()) return;
       if (k === 'c') { copyNodes(sessionId, ids); toast(`Copied ${ids.length} node${ids.length === 1 ? '' : 's'}`, 'success'); }
-      else if (k === 'x') { cutNodes(sessionId, ids); setSelected(new Set()); }
+      else if (k === 'x') { requestDeleteRef.current(ids, [], () => { copyNodes(sessionId, ids); }); }
       else if (k === 'g' && e.shiftKey) { const g = wholeGroup(useStore.getState().sessions[sessionId].graph, ids); if (g) ungroup(sessionId, g.id); }
       else if (k === 'g' && ids.length > 1) groupNodes(sessionId, ids);
       else return;
@@ -350,7 +348,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [sessionId, selected]);
+  }, [sessionId]);
 
   const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 
@@ -407,12 +405,17 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       {embedded ? null : <TopbarActions>
         <RunAll sessionId={sessionId} ids={runIds} />
       </TopbarActions>}
+      <DeleteRequestContext.Provider value={del.request}>
       <ReactFlow<FlowNode, Edge>
         nodes={nodes}
         edges={edges}
         edgeTypes={noticeEdgeTypes}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onNodeDragStart={startDrag}
+        onSelectionDragStart={startSelection}
+        onNodeDragStop={endDrag}
+        onSelectionDragStop={endSelection}
         onEdgesChange={onEdgesChange}
         onPaneContextMenu={embedded ? undefined : (e) => openMenu(e)}
         onNodeContextMenu={embedded ? undefined : (e, n) => {
@@ -449,7 +452,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {cut.overlay}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         {embedded ? null : <CanvasPanels sessionId={sessionId} nodes={selectedNodes} />}
-        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} />
+        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} onDelete={del.request} />
         <CanvasNavigation
           sessionId={sessionId}
           add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
@@ -468,6 +471,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         <LinkBar sessionId={sessionId} graph={graph} selected={liveSelectedEdgeSet} />
         {del.card}
       </ReactFlow>
+      </DeleteRequestContext.Provider>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={menuOpen} placement={menu?.from ? 'right-start' : 'top-start'} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
         <div ref={connectionMenu}>

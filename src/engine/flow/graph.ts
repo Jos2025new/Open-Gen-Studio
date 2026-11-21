@@ -267,12 +267,28 @@ export interface GraphRunPlan {
   errors: string[];
 }
 
+const attemptByStep = new WeakMap<Record<string, Generation>, Map<string, Generation>>();
+
+function latestAttemptByStep(generations: Record<string, Generation>): Map<string, Generation> {
+  let index = attemptByStep.get(generations);
+  if (index) return index;
+  index = new Map();
+  for (const g of Object.values(generations)) {
+    if (!g.stepId) continue;
+    const prev = index.get(g.stepId);
+    if (!prev || g.createdAt > (prev.createdAt ?? 0)) index.set(g.stepId, g);
+  }
+  attemptByStep.set(generations, index);
+  return index;
+}
+
 /** Last attempt may be running/failed while the last usable result stays attached. */
 export function nodeAttempt(node: GraphNode, generations: Record<string, Generation>): Generation | undefined {
   const d = node.data;
-  let latest = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
-  for (const g of Object.values(generations)) if (g.stepId === node.id && (!latest || g.createdAt > (latest.createdAt ?? 0))) latest = g;
-  return latest;
+  const direct = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
+  const byStep = latestAttemptByStep(generations).get(node.id);
+  if (!byStep) return direct;
+  return !direct || byStep.createdAt > (direct.createdAt ?? 0) ? byStep : direct;
 }
 
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
