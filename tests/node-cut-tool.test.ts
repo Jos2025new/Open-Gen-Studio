@@ -28,7 +28,7 @@ describe('Nodes Cut tool (scissors)', () => {
     expect(panel.indexOf('icon={Scissors}')).toBeGreaterThan(panel.indexOf('icon={Hand}'));
     expect(panel.indexOf('icon={Scissors}')).toBeLessThan(panel.indexOf('icon={LayoutDashboard}'));
     expect(panel).toMatch(/label="Cut connections \(X\)/);
-    expect(ws).toMatch(/if \(k === 'x'\) \{ e\.preventDefault\(\); pickTool\(tool === 'cut' \? lastTool\.current : 'cut'\); \}/);
+    expect(ws).toMatch(/if \(k === 'x'\) \{ e\.preventDefault\(\); pickToolRef\.current\(toolRef\.current === 'cut' \? lastTool\.current : 'cut'\); \}/);
     expect(ws).toMatch(/if \(t === 'cut'\) return; lastTool\.current = t; try \{ localStorage/);
     expect(ws).toMatch(/useCutTool\(\{ active: tool === 'cut', canvasRef, onCut: \(ids\) => void disconnectEdges\(sessionId, ids\) \}\)/);
     expect(ws).toMatch(/panOnDrag=\{tool === 'pan' \? true : \[1, 2\]\}/);
