@@ -8,7 +8,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 ## Núcleo de nodos, tras la fusión (2026-11-19)
 
-El núcleo de nodos (ADR 0031) y el hilo por agente están en `main`. La sesión 2026-11-19/20 fusionó en `main` la rama menor de Grok, la fricción y los nombres de agentes, el gasto por una sola puerta, el descriptor y los avisos. La revisión SOLID de Opus (14 hallazgos) está en `main` (2026-11-20). La lista vigente, en orden, está en [071](history/071-2026-11-W47-master-solid.md).
+El núcleo de nodos (ADR 0031) y el hilo por agente están en `main`. La sesión 2026-11-19/20 fusionó en `main` la rama menor de Grok, la fricción y los nombres de agentes, el gasto por una sola puerta, el descriptor y los avisos. La revisión SOLID de Opus (14 hallazgos) está en `main` (2026-11-20). La sesión maestra 4 (2026-11-21) fusionó el arrastre con 200 nodos y el registro durable de envíos. La lista vigente, en orden, está en [072](history/072-2026-11-W47-master-arrastre-envios.md).
 
 ## Por impacto visible (2026-11-16)
 
