@@ -239,6 +239,47 @@ describe('node drag publication counts', () => {
     expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
   });
 
+  it('commits once and records 1 undo step when a multi-node drop arrives split across 2 batches', () => {
+    const { sessionId } = mountWorkspace(5);
+    let graphPublications = 0;
+    cleanups.push(useStore.subscribe((next, prev) => {
+      if (next.sessions[sessionId]?.graph !== prev.sessions[sessionId]?.graph) graphPublications++;
+    }));
+    const editSpy = vi.spyOn(edit, 'editPresentation');
+
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: true },
+        { id: 'n1', type: 'position', position: { x: 360, y: 50 }, dragging: true },
+      ]);
+    });
+    expect(graphPublications).toBe(0);
+
+    // First drop batch: n0 drops while n1 is still dragging.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', dragging: false }]);
+    });
+    expect(graphPublications).toBe(0);
+    expect(editSpy).not.toHaveBeenCalled();
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 360, y: 50 });
+
+    // Second drop batch: n1 drops, completing the gesture.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n1', type: 'position', dragging: false }]);
+    });
+    expect(graphPublications).toBe(1);
+    expect(editSpy).toHaveBeenCalledTimes(1);
+    expect(graphHistory(sessionId, 'undo')).toHaveLength(1);
+    let after = useStore.getState().sessions[sessionId].graph;
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
+    expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 360, y: 50 });
+
+    expect(travelGraph(sessionId, after, 'undo', 1, (g) => { after = g; return true; })).toBe(true);
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
+  });
+
   it('preserves main generation history tie-breaking order when current is outside the node bucket', () => {
     const base = { kind: 'image' as const, status: 'done' as const, prompt: 'p', modelRef: 'm', modelName: 'Model', provider: 'atlas' as const, origin: 'node' as const, estimate: {} as Generation['estimate'], settings: { count: 1, advanced: {} }, inputs: { refs: [] }, assetIds: ['a1'] };
     const generations: Record<string, Generation> = {

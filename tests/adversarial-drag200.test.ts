@@ -23,11 +23,7 @@ vi.mock('@xyflow/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@xyflow/react')>()),
   ReactFlow(p: NonNullable<typeof flow.props> & { nodeTypes: NodeTypes }) {
     flow.props = p;
-    return createElement('div', { className: 'react-flow__pane' }, p.children,
-      ...p.nodes.filter((n) => !n.hidden).map((n) => createElement(p.nodeTypes[n.type!], {
-        ...n, key: n.id, type: n.type!, selected: Boolean(n.selected), dragging: false, draggable: n.draggable ?? true,
-        selectable: n.selectable ?? true, deletable: n.deletable ?? true, isConnectable: n.connectable ?? true, zIndex: n.zIndex ?? 0, positionAbsoluteX: n.position.x, positionAbsoluteY: n.position.y,
-      })));
+    return createElement('div', { className: 'react-flow__pane' }, p.children, ...p.nodes.filter((n) => !n.hidden).map((n) => createElement(p.nodeTypes[n.type!], { ...n, key: n.id, type: n.type!, selected: Boolean(n.selected), dragging: false, draggable: n.draggable ?? true, selectable: n.selectable ?? true, deletable: n.deletable ?? true, isConnectable: n.connectable ?? true, zIndex: n.zIndex ?? 0, positionAbsoluteX: n.position.x, positionAbsoluteY: n.position.y })));
   },
   useReactFlow: () => ({ fitView: vi.fn(), screenToFlowPosition: (p: Pt) => p, zoomIn: vi.fn(), zoomOut: vi.fn(), zoomTo: vi.fn(), getZoom: () => 1, getNodes: () => [] }),
   useOnViewportChange: () => {}, useViewport: () => ({ x: 0, y: 0, zoom: 1 }), useConnection: () => false, useUpdateNodeInternals: () => () => {},
@@ -36,14 +32,12 @@ vi.mock('@xyflow/react', async (importOriginal) => ({
   Panel: ({ children, ...r }: { children?: ReactNode } & Record<string, unknown>) => createElement('div', r, children),
   NodeToolbar: ({ isVisible = true, children }: { isVisible?: boolean; children?: ReactNode }) => isVisible ? createElement('div', null, children) : null,
 }));
-
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, peekAssetUrl: () => undefined, loadAssetUrl: async () => undefined }));
 if (typeof globalThis.ResizeObserver === 'undefined') (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 
 const cleanups: Array<() => void> = [];
 const unmountAll = () => { while (cleanups.length) cleanups.pop()!(); };
 afterEach(() => { unmountAll(); vi.restoreAllMocks(); });
-
 const pt = (x: number, y: number): Pt => ({ x, y });
 const tNode = (id: string, x: number, y: number, title = id, text = id): GraphNode => ({ id, position: pt(x, y), data: { kind: 'text', title, text } });
 const makeGraph = (n: number, grp = true): Graph => ({
@@ -52,19 +46,13 @@ const makeGraph = (n: number, grp = true): Graph => ({
   groups: grp && n >= 2 ? [{ id: 'g0', title: 'G0', nodeIds: ['n0', 'n1'] }] : undefined,
 });
 const mGraph = (): Graph => ({
-  nodes: [
-    { id: 'm1', position: pt(0, 0), data: { kind: 'ref', type: 'model', ref: 'atlas::nb', title: 'Model' } },
-    { id: 'a1', position: pt(300, 0), data: { kind: 'ref', type: 'agent', ref: 'agent', title: 'Agent' } },
-    tNode('t1', 600, 0, 'P1', 'hi'), tNode('t2', 900, 0, 'P2', 'yo'), tNode('t3', 1200, 0, 'Keep', 'k'),
-  ],
+  nodes: [{ id: 'm1', position: pt(0, 0), data: { kind: 'ref', type: 'model', ref: 'atlas::nb', title: 'Model' } }, { id: 'a1', position: pt(300, 0), data: { kind: 'ref', type: 'agent', ref: 'agent', title: 'Agent' } }, tNode('t1', 600, 0, 'P1', 'hi'), tNode('t2', 900, 0, 'P2', 'yo'), tNode('t3', 1200, 0, 'Keep', 'k')],
   edges: [{ id: 'e_ctrl', source: 'm1', sourceHandle: 'out_control', target: 'a1', targetHandle: 'model', kind: 'control' }],
 });
-
 function mountCanvas(graph: Graph, mode: 'node' | 'omni' | 'embedded' = 'node') {
   const s = createSession(`adv-${Math.random()}`);
   useStore.setState((st) => ({ activeSessionId: s.id, generations: {}, assets: {}, sessions: { ...st.sessions, [s.id]: { ...s, graph, feed: [] } } }));
-  const el = document.createElement('div'); document.body.append(el);
-  const root = createRoot(el);
+  const el = document.createElement('div'); document.body.append(el); const root = createRoot(el);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   cleanups.push(() => { act(() => root.unmount()); el.remove(); });
   act(() => root.render(createElement(mode === 'omni' ? OmniCanvas : mode === 'embedded' ? EmbeddedNodeCanvas : NodeWorkspace)));
@@ -73,23 +61,17 @@ function mountCanvas(graph: Graph, mode: 'node' | 'omni' | 'embedded' = 'node') 
 
 const sGraph = (sid: string) => useStore.getState().sessions[sid].graph;
 const tr = (sid: string, dir: 'undo' | 'redo') => travelGraph(sid, sGraph(sid), dir, 1, (next) => edit.applyEdit({ session: sid, op: { op: 'travel', graph: next } }).ok);
-const sPos = (sid: string, id: string) => sGraph(sid).nodes.find((n) => n.id === id)?.position;
-const has = (sid: string, id: string) => sGraph(sid).nodes.some((n) => n.id === id);
-const rNode = (id: string) => flow.props!.nodes.find((n) => n.id === id);
-const rPos = (id: string) => rNode(id)?.position;
+const sPos = (sid: string, id: string) => sGraph(sid).nodes.find((n) => n.id === id)?.position, has = (sid: string, id: string) => sGraph(sid).nodes.some((n) => n.id === id);
+const rNode = (id: string) => flow.props!.nodes.find((n) => n.id === id), rPos = (id: string) => rNode(id)?.position;
 const pCh = (id: string, dragging: boolean, position?: Pt): NodeChange => ({ id, type: 'position', dragging, ...(position ? { position } : {}) });
 const sCh = (...ids: string[]): NodeChange[] => ids.map((id) => ({ id, type: 'select' as const, selected: true }));
-const btn = (root: ParentNode, sel: string) => root.querySelector<HTMLButtonElement>(sel)!;
-const dlg = (c: HTMLElement) => c.querySelector('[role="alertdialog"][aria-label="Remove from canvas"]');
+const btn = (root: ParentNode, sel: string) => root.querySelector<HTMLButtonElement>(sel)!, dlg = (c: HTMLElement) => c.querySelector('[role="alertdialog"][aria-label="Remove from canvas"]');
 const clickTxt = (r: ParentNode, sel: string, txt: string) => act(() => [...r.querySelectorAll<HTMLButtonElement>(sel)].find((b) => b.textContent?.includes(txt))!.click());
 const onCh = (cs: NodeChange[]) => act(() => flow.props!.onNodesChange(cs));
-const WS = 'src/components/node/NodeWorkspace.tsx';
-const EP = `import { editPresentation } from './e';`;
+const WS = 'src/components/node/NodeWorkspace.tsx', EP = `import { editPresentation } from './e';`, ifD = `if (c.type === 'position' && c.dragging === true)`;
 const h = (body: string) => `const onNodesChange = (cs: any[]) => { for (const c of cs) ${body}; };`;
-const ifD = `if (c.type === 'position' && c.dragging === true)`;
 const runFix = (files: Record<string, string>) => {
-  const root = mkdtempSync(join(tmpdir(), 'ogs-adv-'));
-  cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+  const root = mkdtempSync(join(tmpdir(), 'ogs-adv-')); cleanups.push(() => rmSync(root, { recursive: true, force: true }));
   for (const [rel, code] of Object.entries(files)) { const f = join(root, rel); mkdirSync(join(f, '..'), { recursive: true }); writeFileSync(f, code); }
   return checkNodeDrag(root) as string[];
 };
@@ -99,8 +81,7 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
   it('200-node multiselect: 0 move writes, stable edges, 1 drop write, 2 rapid drags = 2 undo', () => {
     const { sid } = mountCanvas(makeGraph(200));
     let w = 0; cleanups.push(useStore.subscribe((n, p) => { if (n.sessions[sid]?.graph !== p.sessions[sid]?.graph) w++; }));
-    const editSpy = vi.spyOn(edit, 'editPresentation'), recSpy = vi.spyOn(storeHooks, 'recordGraph');
-    const eRef = flow.props!.edges, ids = ['n0', 'n2', 'n5', 'n50', 'n199'];
+    const editSpy = vi.spyOn(edit, 'editPresentation'), recSpy = vi.spyOn(storeHooks, 'recordGraph'), eRef = flow.props!.edges, ids = ['n0', 'n2', 'n5', 'n50', 'n199'];
     for (let k = 1; k <= 20; k++) onCh(ids.map((id, i) => pCh(id, true, pt(i * 100 + k * 4, k * 3))));
     expect(w).toBe(0); expect(editSpy).not.toHaveBeenCalled(); expect(recSpy).not.toHaveBeenCalled();
     expect(flow.props!.edges).toBe(eRef); expect(flow.props!.edges.map((e) => e.id)).toEqual(['e0', 'e1']);
@@ -124,8 +105,7 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
   it('delete mid-drag then drop does not resurrect node', () => {
     const { sid } = mountCanvas(makeGraph(4));
     onCh([pCh('n0', true, pt(150, 80)), pCh('n2', true, pt(650, 80))]); act(() => { deleteNodes(sid, ['n0']); });
-    onCh([pCh('n0', false, pt(150, 80)), pCh('n2', false, pt(650, 80))]);
-    expect(has(sid, 'n0')).toBe(false); expect(sPos(sid, 'n2')).toEqual(pt(650, 80));
+    onCh([pCh('n0', false, pt(150, 80)), pCh('n2', false, pt(650, 80))]); expect(has(sid, 'n0')).toBe(false); expect(sPos(sid, 'n2')).toEqual(pt(650, 80));
   });
   it('delete mid-drag + Undo renders store pos (no ghost)', () => {
     const { sid } = mountCanvas(makeGraph(4));
@@ -134,22 +114,20 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
   });
   it('trailing dragging:true after delete does not pollute Undo', () => {
     const { sid } = mountCanvas(makeGraph(4));
-    act(() => { deleteNodes(sid, ['n0']); }); onCh([pCh('n0', true, pt(222, 111))]);
-    act(() => { expect(tr(sid, 'undo')).toBe(true); }); expect(rPos('n0')).toEqual(pt(0, 0));
+    act(() => { deleteNodes(sid, ['n0']); }); onCh([pCh('n0', true, pt(222, 111))]); act(() => { expect(tr(sid, 'undo')).toBe(true); }); expect(rPos('n0')).toEqual(pt(0, 0));
   });
   it('frame + member drop in same batch commits other member too', () => {
-    const { sid } = mountCanvas(makeGraph(4)); const st = rPos('g0')!;
-    onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]);
-    onCh([pCh('n0', false, pt(80, 40)), pCh('g0', false, pt(st.x + 80, st.y + 40))]);
+    const { sid } = mountCanvas(makeGraph(4)), st = rPos('g0')!;
+    onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]); onCh([pCh('n0', false, pt(80, 40)), pCh('g0', false, pt(st.x + 80, st.y + 40))]);
     expect(sPos(sid, 'n0')).toEqual(pt(80, 40)); expect(sPos(sid, 'n1')).toEqual(pt(340, 40));
   });
   it('ungrouping frame mid-drag clears member previews', () => {
-    const { sid } = mountCanvas(makeGraph(4)); const st = rPos('g0')!;
+    const { sid } = mountCanvas(makeGraph(4)), st = rPos('g0')!;
     onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]); expect(rPos('n0')).toEqual(pt(80, 40));
     act(() => { ungroup(sid, 'g0'); }); expect(rPos('n0')).toEqual(pt(0, 0)); expect(rPos('n1')).toEqual(pt(260, 0));
   });
   it('session switch mid-drag drops preview with 0 writes', () => {
-    const { sid: s1 } = mountCanvas(makeGraph(3)); const s2 = createSession(`adv-s2-${Math.random()}`);
+    const { sid: s1 } = mountCanvas(makeGraph(3)), s2 = createSession(`adv-s2-${Math.random()}`);
     useStore.setState((st) => ({ sessions: { ...st.sessions, [s2.id]: { ...s2, graph: { nodes: [tNode('n0', 10, 20, 'S2', 'x')], edges: [] }, feed: [] } } }));
     onCh([pCh('n0', true, pt(400, 300))]); act(() => { useStore.setState({ activeSessionId: s2.id }); });
     expect(sPos(s1, 'n0')).toEqual(pt(0, 0)); expect(sPos(s2.id, 'n0')).toEqual(pt(10, 20)); expect(rPos('n0')).toEqual(pt(10, 20));
@@ -162,35 +140,29 @@ describe('Attack 2: CutTool parity & single undo', () => {
     if (typeof globalThis.DOMPoint === 'undefined') (globalThis as unknown as { DOMPoint: unknown }).DOMPoint = class { constructor(public x = 0, public y = 0) {} matrixTransform() { return this; } };
     if (!globalThis.CSS?.escape) (globalThis as unknown as { CSS: { escape: (s: string) => string } }).CSS = { escape: (s: string) => s };
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    const cv = document.createElement('div'), pane = document.createElement('div');
+    const cv = document.createElement('div'), pane = document.createElement('div'), NS = 'http://www.w3.org/2000/svg', lines: Array<{ id: string; points: Pt[] }> = [];
     cv.getBoundingClientRect = () => ({ left: 0, top: 0, right: 400, bottom: 400, width: 400, height: 400, x: 0, y: 0, toJSON: () => ({}) });
     pane.className = 'react-flow__pane'; cv.append(pane);
-    const NS = 'http://www.w3.org/2000/svg', lines: Array<{ id: string; points: Pt[] }> = [];
     for (let k = 0; k < 10; k++) {
       const id = `e${k}`, y = 30 + k * 35, g = document.createElementNS(NS, 'g'), p = document.createElementNS(NS, 'path');
       g.setAttribute('class', 'react-flow__edge'); g.setAttribute('data-id', id); p.setAttribute('class', 'react-flow__edge-path');
       Object.assign(p, { getScreenCTM: () => ({}), getTotalLength: () => 200, getPointAtLength: (l: number) => pt(50 + l, y) });
       g.append(p); cv.append(g); lines.push({ id, points: [pt(50, y), pt(250, y)] });
     }
-    document.body.append(cv);
-    let api!: ReturnType<typeof useCutTool>;
+    document.body.append(cv); let api!: ReturnType<typeof useCutTool>;
     const batches: string[][] = [], host = document.createElement('div'); document.body.append(host);
     function H() { const ref = useRef<HTMLDivElement | null>(cv); api = useCutTool({ active: true, canvasRef: ref, onCut: (ids) => batches.push(ids) }); return createElement('div', null, api.overlay); }
-    const root = createRoot(host); cleanups.push(() => { act(() => root.unmount()); host.remove(); cv.remove(); });
-    act(() => root.render(createElement(H)));
+    const root = createRoot(host); cleanups.push(() => { act(() => root.unmount()); host.remove(); cv.remove(); }); act(() => root.render(createElement(H)));
     const trail: Pt[] = [pt(100, 10)];
     for (let i = 1; i < 200; i++) trail.push(pt(80 + (i % 9) * 15, 10 + i * 1.05));
     for (let i = 0; i < 150; i++) trail.push(pt(90 + (i % 5) * 20, 220 - (i % 40) * 3));
     for (let i = 0; i < 150; i++) trail.push(pt(100, Math.max(5, 200 - i * 1.5)));
     const ev = (p: Pt) => ({ button: 0, clientX: p.x, clientY: p.y, pointerId: 1, target: pane, currentTarget: cv, stopPropagation: vi.fn(), preventDefault: vi.fn() } as unknown as React.PointerEvent<HTMLDivElement>);
-    act(() => api.down(ev(trail[0])));
-    for (let i = 1; i < trail.length; i++) act(() => api.move(ev(trail[i])));
+    act(() => api.down(ev(trail[0]))); for (let i = 1; i < trail.length; i++) act(() => api.move(ev(trail[i])));
     const hits = () => cv.querySelectorAll('.react-flow__edge.is-cut-hit').length;
     expect(hits()).toBe(6); act(() => api.up(ev(trail[trail.length - 1])));
-    const exp = trailCuts(trail, lines);
-    expect(batches).toHaveLength(1); expect(new Set(batches[0]).size).toBe(batches[0].length); expect([...batches[0]].sort()).toEqual([...exp].sort());
-    expect(hits()).toBe(0);
-    const acc = new Set<string>();
+    const exp = trailCuts(trail, lines), acc = new Set<string>();
+    expect(batches).toHaveLength(1); expect(new Set(batches[0]).size).toBe(batches[0].length); expect([...batches[0]].sort()).toEqual([...exp].sort()); expect(hits()).toBe(0);
     for (let i = 1; i < trail.length; i++) for (const id of segmentCuts(trail[i - 1], trail[i], lines, acc)) acc.add(id);
     expect([...acc].sort()).toEqual([...exp].sort());
   });
@@ -212,31 +184,28 @@ describe('Attack 3: group frames in history', () => {
     const { sid } = mountCanvas(makeGraph(3, false));
     const drag = (id: string, p: Pt) => act(() => { flow.props!.onNodesChange([pCh(id, true, p)]); flow.props!.onNodesChange([pCh(id, false, p)]); });
     drag('n0', pt(50, 10)); const gid = groupNodes(sid, ['n0', 'n1'])!; drag('n0', pt(90, 20));
-    renameGroup(sid, gid, 'Hero'); setGroupColor(sid, gid, '#5ec8ff'); setGroupColor(sid, gid, undefined);
-    drag('n1', pt(300, 40)); ungroup(sid, gid);
+    renameGroup(sid, gid, 'Hero'); setGroupColor(sid, gid, '#5ec8ff'); setGroupColor(sid, gid, undefined); drag('n1', pt(300, 40)); ungroup(sid, gid);
     expect(graphHistory(sid, 'undo')).toHaveLength(8);
-    const undo = () => expect(tr(sid, 'undo')).toBe(true);
-    undo(); expect(sGraph(sid).groups).toEqual([{ id: gid, title: 'Hero', nodeIds: ['n0', 'n1'], color: undefined }]);
-    undo(); expect(sPos(sid, 'n1')).toEqual(pt(260, 0));
-    undo(); expect(sGraph(sid).groups?.[0].color).toBe('#5ec8ff'); undo(); expect(sGraph(sid).groups?.[0].color).toBeUndefined();
-    undo(); expect(sGraph(sid).groups?.[0].title).toBe('Group 1'); undo(); expect(sPos(sid, 'n0')).toEqual(pt(50, 10));
-    undo(); expect(sGraph(sid).groups).toBeUndefined(); undo(); expect(sPos(sid, 'n0')).toEqual(pt(0, 0));
+    const u = () => expect(tr(sid, 'undo')).toBe(true);
+    u(); expect(sGraph(sid).groups).toEqual([{ id: gid, title: 'Hero', nodeIds: ['n0', 'n1'], color: undefined }]);
+    u(); expect(sPos(sid, 'n1')).toEqual(pt(260, 0)); u(); expect(sGraph(sid).groups?.[0].color).toBe('#5ec8ff');
+    u(); expect(sGraph(sid).groups?.[0].color).toBeUndefined(); u(); expect(sGraph(sid).groups?.[0].title).toBe('Group 1');
+    u(); expect(sPos(sid, 'n0')).toEqual(pt(50, 10)); u(); expect(sGraph(sid).groups).toBeUndefined(); u(); expect(sPos(sid, 'n0')).toEqual(pt(0, 0));
     for (let i = 0; i < 8; i++) expect(tr(sid, 'redo')).toBe(true);
     expect(sGraph(sid).groups).toEqual([]); expect(sPos(sid, 'n0')).toEqual(pt(90, 20)); expect(sPos(sid, 'n1')).toEqual(pt(300, 40));
   });
 });
-
 describe('Attack 4: delete confirmation across entry points', () => {
   it('Del, Operations Delete & ContextMenu confirm on model-linked ref', async () => {
-    const checkConfirm = async (trigger: (el: HTMLElement) => void | Promise<void>, action: 'Cancel' | 'Remove' | null) => {
+    const chk = async (trigger: (el: HTMLElement) => void | Promise<void>, action: 'Cancel' | 'Remove' | null) => {
       const { sid, el } = mountCanvas(mGraph(), 'omni'); await trigger(el);
       expect(has(sid, 'a1')).toBe(true); const d = dlg(el); expect(d).not.toBeNull();
       if (action) { clickTxt(d!, 'button', action); expect(has(sid, 'a1')).toBe(action === 'Cancel'); }
       unmountAll();
     };
-    await checkConfirm(async () => { await act(async () => { await flow.props!.onBeforeDelete!({ nodes: [{ id: 'a1' }], edges: [] }); }); }, 'Cancel');
-    await checkConfirm((el) => { onCh(sCh('a1', 't1')); clickTxt(el, 'button', 'Operations'); act(() => btn(el, '.ops-bar button[aria-label="Delete"]').click()); }, 'Remove');
-    await checkConfirm(() => {
+    await chk(async () => { await act(async () => { await flow.props!.onBeforeDelete!({ nodes: [{ id: 'a1' }], edges: [] }); }); }, 'Cancel');
+    await chk((el) => { onCh(sCh('a1', 't1')); clickTxt(el, 'button', 'Operations'); act(() => btn(el, '.ops-bar button[aria-label="Delete"]').click()); }, 'Remove');
+    await chk(() => {
       act(() => flow.props!.onNodeContextMenu!({ preventDefault: vi.fn(), clientX: 50, clientY: 50 } as unknown as React.MouseEvent, rNode('a1')!));
       const m = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Delete') && b.closest('[role="dialog"], .popover'));
       expect(m).toBeDefined(); act(() => m!.click());
@@ -279,7 +248,6 @@ describe('Attack 5: Pan & Select share selectability', () => {
     box(false); expect(btn(el, 'button[aria-label^="Delete "]').getAttribute('aria-label')).toBe('Delete 3 selected (Del)');
   });
 });
-
 describe('Attack 6: keyboard listeners parity with main', () => {
   it('supports Ctrl+C/X/Z/Shift+Z/Y and X/Esc, ignoring text inputs and embedded X', () => {
     const { sid, el } = mountCanvas(makeGraph(3, false));
@@ -297,43 +265,44 @@ describe('Attack 6: keyboard listeners parity with main', () => {
     const { el: emb } = mountCanvas(makeGraph(2, false), 'embedded'); key(window, { key: 'x' }); expect(isCut(emb)).toBe(false);
   });
 });
-
 describe('Attack 7: check-node-drag evasions', () => {
   it('reports file:line + hint on direct violation', () => {
     const e = runFix({ [WS]: `${EP} ${h(`${ifD} editPresentation('s', (g: any) => g)`)}` });
     expect(e).toHaveLength(1); expect(e[0]).toMatch(/^src\/components\/node\/NodeWorkspace\.tsx:\d+ — .*dragging: false/);
   });
-  it('catches cross-file re-export alias', () => { hit({ 'src/components/node/re.ts': `export { editPresentation as savePos } from './e';`, [WS]: `import { savePos } from './re'; ${h(`${ifD} savePos('s', (g: any) => g)`)}` }); });
-  it('catches cross-file helper', () => { hit({ 'src/components/node/h.ts': `${EP} export function flush(s: string) { editPresentation(s, (g: any) => g); }`, [WS]: `import { flush } from './h'; ${h(`${ifD} flush('s')`)}` }); });
+  it('catches cross-file re-export alias & helper', () => {
+    hit({ 'src/components/node/re.ts': `export { editPresentation as savePos } from './e';`, [WS]: `import { savePos } from './re'; ${h(`${ifD} savePos('s', (g: any) => g)`)}` });
+    hit({ 'src/components/node/h.ts': `${EP} export function flush(s: string) { editPresentation(s, (g: any) => g); }`, [WS]: `import { flush } from './h'; ${h(`${ifD} flush('s')`)}` });
+  });
   it('catches indirect calls + runtime counter catches dynamic writes', () => {
     hit({ [WS]: `${EP} ${h(`${ifD} editPresentation.call(null, 's', (g: any) => g)`)}` });
     hit({ [WS]: `${EP} const o = { w: editPresentation }; ${h(`${ifD} o.w('s', (g: any) => g)`)}` });
     hit({ [WS]: `import * as ed from './e'; const { editPresentation: w } = ed; ${h(`${ifD} w('s', (g: any) => g)`)}` });
     hit({ [WS]: `const ser = JSON.stringify; ${h(`${ifD} ser(c)`)}` });
-    const { sid } = mountCanvas(makeGraph(4));
-    let w = 0; cleanups.push(useStore.subscribe((n, p) => { if (n.sessions[sid]?.graph !== p.sessions[sid]?.graph) w++; }));
+    const { sid } = mountCanvas(makeGraph(4)); let w = 0;
+    cleanups.push(useStore.subscribe((n, p) => { if (n.sessions[sid]?.graph !== p.sessions[sid]?.graph) w++; }));
     onCh([pCh('n0', true, pt(120, 40))]); expect(w).toBe(0);
     const dynObj: Record<string, typeof edit.editPresentation> = { ['w']: edit.editPresentation };
     act(() => { dynObj['w'].call(null, sid, (g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === 'n0' ? { ...n, position: pt(120, 40) } : n)) })); });
     expect(w).toBe(1);
   });
-  it('catches nested closure in component/hook', () => { hit({ [WS]: `${EP} function C() { const save = () => editPresentation('s', (g: any) => g); const onNodesChange = useCallback((cs: any[]) => { for (const c of cs) ${ifD} save(); }, []); return onNodesChange; }` }); });
-  it('catches aliased c.dragging + inline JSX handler', () => {
+  it('catches nested closure, aliased c.dragging, inline JSX, trailCuts & NodeToolbar', () => {
+    hit({ [WS]: `${EP} function C() { const save = () => editPresentation('s', (g: any) => g); const onNodesChange = useCallback((cs: any[]) => { for (const c of cs) ${ifD} save(); }, []); return onNodesChange; }` });
     hit({ [WS]: `${EP} ${h(`{ const d = c.dragging; if (c.type === 'position' && d) editPresentation('s', (g: any) => g); }`)}` });
     hit({ [WS]: `${EP} function C() { return <ReactFlow onNodesChange={(cs: any[]) => { for (const c of cs) if (c.type === 'position' && c.dragging) editPresentation('s', (g: any) => g); }} />; }` });
-  });
-  it('catches aliased trailCuts + NodeToolbar', () => {
     hit({ 'src/components/node/CutTool.tsx': `import { trailCuts as scan } from './g'; function useCutTool() { const move = (e: any) => { scan([e], []); }; return { move }; }` });
     hit({ 'src/components/node/nodes.tsx': `import { NodeToolbar as Toolbar } from '@xyflow/react'; function Card({ selected }: { selected: boolean }) { return <><Toolbar isVisible={selected}><div /></Toolbar></>; }` });
   });
 });
 
 describe('Attack 8: round 2 regressions & gaps after tanda C', () => {
-  it('split multi-node drop batches keep preview of still-dropping node', () => {
-    const { sid } = mountCanvas(makeGraph(4));
+  it('split multi-node drop batches: 1 write, 1 undo step, keeps preview of still-dropping node', () => {
+    const { sid } = mountCanvas(makeGraph(4)), editSpy = vi.spyOn(edit, 'editPresentation');
     onCh([pCh('n0', true, pt(100, 50)), pCh('n1', true, pt(360, 50))]);
-    onCh([pCh('n0', false)]); expect(rPos('n1')).toEqual(pt(360, 50));
-    onCh([pCh('n1', false)]); expect(sPos(sid, 'n0')).toEqual(pt(100, 50)); expect(sPos(sid, 'n1')).toEqual(pt(360, 50));
+    onCh([pCh('n0', false)]); expect(editSpy).not.toHaveBeenCalled(); expect(rPos('n0')).toEqual(pt(100, 50)); expect(rPos('n1')).toEqual(pt(360, 50));
+    onCh([pCh('n1', false)]); expect(editSpy).toHaveBeenCalledTimes(1); expect(graphHistory(sid, 'undo')).toHaveLength(1);
+    expect(sPos(sid, 'n0')).toEqual(pt(100, 50)); expect(sPos(sid, 'n1')).toEqual(pt(360, 50));
+    act(() => { expect(tr(sid, 'undo')).toBe(true); }); expect(sPos(sid, 'n0')).toEqual(pt(0, 0)); expect(sPos(sid, 'n1')).toEqual(pt(260, 0));
   });
   it('trailing event for deleted node keeps another active drag', () => {
     const { sid } = mountCanvas(makeGraph(4)); act(() => { deleteNodes(sid, ['n3']); });
