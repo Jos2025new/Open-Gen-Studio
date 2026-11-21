@@ -332,9 +332,7 @@ export interface Generation {
   estimate: Estimate;
   retryBaseEstimate?: Estimate;
   retryTotal?: number;
-  /** Cost of the batches already delivered and not yet booked to Spending; booked once when the generation ends or is cut. */
   costSoFar?: number;
-  /** Already booked to Spending by a cut-short run (so a later finish does not book it twice). */
   chargedUsd?: number;
   actualUsd?: number;
   /** Reported cost. */
@@ -358,7 +356,7 @@ export interface Generation {
   notes?: string[];
   /** The last provider request (endpoint, params, try, job id). Never a key or media. */
   sent?: SentRequest;
-  /** When the request left for the provider and no answer (job id or result) had come back: still set after a reload, the send may have been charged. */
+  /** The request left and no answer came back: still set after a reload, it may have been charged. */
   sending?: number;
   /** Per-request send ledger (optional for backward compatibility with saved generations). */
   sends?: SendRecord[];
@@ -1011,7 +1009,7 @@ export interface Session {
   activeDocId: string | null;
   /** Every agent's thread by agent node id (see agent/threads.ts). */
   agents: Record<string, AgentState>;
-  /** Threads of deleted agent nodes (the last few), so undoing the deletion by any path gives the agent its memory back (agent/threads.ts). */
+  /** Threads of deleted agent nodes (the last few), so undoing the deletion gives the agent its memory back (agent/threads.ts). */
   retired?: Record<string, AgentState>;
   /** Which thread the UI shows (display only; nothing is written through it). Absent: the session's main thread. */
   agentLane?: string;
