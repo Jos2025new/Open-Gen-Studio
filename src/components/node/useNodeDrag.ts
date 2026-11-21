@@ -15,6 +15,7 @@ interface Flight { pos: Map<string, Pt>; start: Map<string, Pt>; event?: unknown
 const EMPTY = new Map<string, Pt>();
 const graphOf = (sessionId: string) => useStore.getState().sessions[sessionId]?.graph;
 const newFlight = (event?: unknown): Flight => ({ pos: new Map(), start: new Map(), event });
+const liveIds = (g: Graph | undefined) => new Set([...(g?.nodes ?? []), ...(g?.groups ?? [])].map((x) => x.id));
 
 /** Positions a flight gives to the live graph: dragged nodes as reported; a dragged frame shifts its live members by its own offset. */
 function project(f: Flight | null, graph: Graph | undefined): Map<string, Pt> {
@@ -46,32 +47,41 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
   const dragPos = useMemo(() => project(flight, graph), [flight, graph]);
 
-  useEffect(() => {
-    sessionRef.current = sessionId;
-    flightRef.current = null;
-    setFlight(null);
-    return () => {
-      sessionRef.current = null;
-      flightRef.current = null;
-    };
-  }, [sessionId]);
-
-  const live = useCallback(() => sessionRef.current === sessionId, [sessionId]);
   const publish = useCallback((f: Flight | null) => {
     flightRef.current = f;
     setFlight(f && { ...f });
   }, []);
 
+  useEffect(() => {
+    sessionRef.current = sessionId;
+    publish(null);
+    // An ID deleted mid-gesture leaves the flight (React Flow aborts its drag too), so an Undo cannot bring it back as a ghost.
+    const unsub = useStore.subscribe((st, prev) => {
+      const f = flightRef.current, g = st.sessions[sessionId]?.graph;
+      if (!f || g === prev.sessions[sessionId]?.graph) return;
+      const ids = liveIds(g), gone = [...f.pos.keys()].filter((id) => !ids.has(id));
+      for (const id of gone) f.pos.delete(id);
+      if (gone.length) publish(f);
+    });
+    return () => {
+      unsub();
+      sessionRef.current = null;
+      flightRef.current = null;
+    };
+  }, [sessionId, publish]);
+
+  const live = useCallback(() => sessionRef.current === sessionId, [sessionId]);
+
   /** Records reported positions; a frame without a start position starts at its current bounds. */
   const track = useCallback((f: Flight, changes: NodeChange<FlowNode>[]) => {
-    const g = graphOf(sessionId);
+    const g = graphOf(sessionId), ids = liveIds(g);
     for (const c of changes) {
-      if (c.type !== 'position' || !c.position) continue;
+      if (c.type !== 'position' || !c.position || !ids.has(c.id)) continue;
       f.pos.set(c.id, c.position);
       const group = g?.groups?.find((gr) => gr.id === c.id);
       if (!group || f.start.has(c.id)) continue;
-      const ids = new Set(group.nodeIds);
-      const b = groupBounds(g!.nodes.filter((n) => ids.has(n.id)), measuredRef.current);
+      const members = new Set(group.nodeIds);
+      const b = groupBounds(g!.nodes.filter((n) => members.has(n.id)), measuredRef.current);
       if (b) f.start.set(c.id, { x: b.x, y: b.y });
     }
   }, [sessionId, measuredRef]);

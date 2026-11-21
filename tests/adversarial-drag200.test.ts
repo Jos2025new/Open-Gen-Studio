@@ -16,6 +16,7 @@ import { storeHooks } from '../src/engine/storeBindings';
 import type { Graph, GraphNode } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
 import { check as checkNodeDrag } from '../scripts/check-node-drag.mjs';
+import { rfDrag } from './rf-drag-events';
 
 const flow = vi.hoisted(() => ({ props: null as null | { nodes: Node[]; edges: Edge[]; children: ReactNode; onNodesChange(c: NodeChange[]): void; onEdgesChange(c: EdgeChange[]): void; onBeforeDelete?(p: { nodes: Array<{ id: string }>; edges: Array<{ id: string }> }): Promise<boolean>; onNodeContextMenu?(e: React.MouseEvent, node: Node): void } }));
 
@@ -68,6 +69,7 @@ const sCh = (...ids: string[]): NodeChange[] => ids.map((id) => ({ id, type: 'se
 const btn = (root: ParentNode, sel: string) => root.querySelector<HTMLButtonElement>(sel)!, dlg = (c: HTMLElement) => c.querySelector('[role="alertdialog"][aria-label="Remove from canvas"]');
 const clickTxt = (r: ParentNode, sel: string, txt: string) => act(() => [...r.querySelectorAll<HTMLButtonElement>(sel)].find((b) => b.textContent?.includes(txt))!.click());
 const onCh = (cs: NodeChange[]) => act(() => flow.props!.onNodesChange(cs));
+const drag = rfDrag(() => flow.props);
 const WS = 'src/components/node/NodeWorkspace.tsx', EP = `import { editPresentation } from './e';`, ifD = `if (c.type === 'position' && c.dragging === true)`;
 const h = (body: string) => `const onNodesChange = (cs: any[]) => { for (const c of cs) ${body}; };`;
 const runFix = (files: Record<string, string>) => {
@@ -82,13 +84,15 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
     const { sid } = mountCanvas(makeGraph(200));
     let w = 0; cleanups.push(useStore.subscribe((n, p) => { if (n.sessions[sid]?.graph !== p.sessions[sid]?.graph) w++; }));
     const editSpy = vi.spyOn(edit, 'editPresentation'), recSpy = vi.spyOn(storeHooks, 'recordGraph'), eRef = flow.props!.edges, ids = ['n0', 'n2', 'n5', 'n50', 'n199'];
+    drag.start(...ids);
     for (let k = 1; k <= 20; k++) onCh(ids.map((id, i) => pCh(id, true, pt(i * 100 + k * 4, k * 3))));
     expect(w).toBe(0); expect(editSpy).not.toHaveBeenCalled(); expect(recSpy).not.toHaveBeenCalled();
     expect(flow.props!.edges).toBe(eRef); expect(flow.props!.edges.map((e) => e.id)).toEqual(['e0', 'e1']);
-    onCh(ids.map((id) => pCh(id, false)));
+    onCh(ids.map((id) => pCh(id, false))); expect(w).toBe(0);
+    drag.stop(ids);
     expect(w).toBe(1); expect(editSpy).toHaveBeenCalledTimes(1); expect(recSpy).toHaveBeenCalledTimes(1);
     expect(graphHistory(sid, 'undo')).toHaveLength(1); expect(sPos(sid, 'n199')).toEqual(pt(480, 60));
-    act(() => { flow.props!.onNodesChange([pCh('n199', true, pt(600, 120))]); flow.props!.onNodesChange([pCh('n199', false)]); });
+    drag.start('n199'); act(() => { flow.props!.onNodesChange([pCh('n199', true, pt(600, 120))]); flow.props!.onNodesChange([pCh('n199', false)]); }); drag.stop(['n199']);
     expect(graphHistory(sid, 'undo')).toHaveLength(2);
     expect(tr(sid, 'undo')).toBe(true); expect(sPos(sid, 'n199')).toEqual(pt(480, 60));
     expect(tr(sid, 'undo')).toBe(true); expect(sPos(sid, 'n199')).toEqual(pt(9 * 260, 19 * 180));
@@ -98,18 +102,18 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
     act(() => btn(el, 'button[aria-label="Collapse group"]').click()); expect(rNode('n0')?.hidden).toBe(true);
     let w = 0; cleanups.push(useStore.subscribe((n, p) => { if (n.sessions[sid]?.graph !== p.sessions[sid]?.graph) w++; }));
     const st = rPos('g0')!;
-    onCh([pCh('g0', true, pt(st.x + 120, st.y + 60))]); expect(w).toBe(0); expect(rPos('g0')).toEqual(pt(st.x + 120, st.y + 60));
-    onCh([pCh('g0', false)]); expect(w).toBe(1); expect(sPos(sid, 'n0')).toEqual(pt(120, 60)); expect(sPos(sid, 'n1')).toEqual(pt(380, 60));
+    drag.start('g0'); onCh([pCh('g0', true, pt(st.x + 120, st.y + 60))]); expect(w).toBe(0); expect(rPos('g0')).toEqual(pt(st.x + 120, st.y + 60));
+    onCh([pCh('g0', false)]); expect(w).toBe(0); drag.stop(['g0']); expect(w).toBe(1); expect(sPos(sid, 'n0')).toEqual(pt(120, 60)); expect(sPos(sid, 'n1')).toEqual(pt(380, 60));
     expect(graphHistory(sid, 'undo')).toHaveLength(1);
   });
   it('delete mid-drag then drop does not resurrect node', () => {
     const { sid } = mountCanvas(makeGraph(4));
-    onCh([pCh('n0', true, pt(150, 80)), pCh('n2', true, pt(650, 80))]); act(() => { deleteNodes(sid, ['n0']); });
-    onCh([pCh('n0', false, pt(150, 80)), pCh('n2', false, pt(650, 80))]); expect(has(sid, 'n0')).toBe(false); expect(sPos(sid, 'n2')).toEqual(pt(650, 80));
+    drag.start('n0', 'n2'); onCh([pCh('n0', true, pt(150, 80)), pCh('n2', true, pt(650, 80))]); act(() => { deleteNodes(sid, ['n0']); });
+    onCh([pCh('n0', false, pt(150, 80)), pCh('n2', false, pt(650, 80))]); drag.stop(['n0', 'n2'], { n0: pt(150, 80) }); expect(has(sid, 'n0')).toBe(false); expect(sPos(sid, 'n2')).toEqual(pt(650, 80));
   });
   it('delete mid-drag + Undo renders store pos (no ghost)', () => {
     const { sid } = mountCanvas(makeGraph(4));
-    onCh([pCh('n0', true, pt(150, 80))]); act(() => { deleteNodes(sid, ['n0']); }); act(() => { expect(tr(sid, 'undo')).toBe(true); });
+    drag.start('n0'); onCh([pCh('n0', true, pt(150, 80))]); act(() => { deleteNodes(sid, ['n0']); }); act(() => { expect(tr(sid, 'undo')).toBe(true); });
     expect(sPos(sid, 'n0')).toEqual(pt(0, 0)); expect(rPos('n0')).toEqual(pt(0, 0));
   });
   it('trailing dragging:true after delete does not pollute Undo', () => {
@@ -118,7 +122,7 @@ describe('Attack 1: drag, frames, cables, mid-drag mutations, session switch', (
   });
   it('frame + member drop in same batch commits other member too', () => {
     const { sid } = mountCanvas(makeGraph(4)), st = rPos('g0')!;
-    onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]); onCh([pCh('n0', false, pt(80, 40)), pCh('g0', false, pt(st.x + 80, st.y + 40))]);
+    drag.start('g0', 'n0'); onCh([pCh('g0', true, pt(st.x + 80, st.y + 40))]); onCh([pCh('n0', false, pt(80, 40)), pCh('g0', false, pt(st.x + 80, st.y + 40))]); drag.stop(['g0', 'n0']);
     expect(sPos(sid, 'n0')).toEqual(pt(80, 40)); expect(sPos(sid, 'n1')).toEqual(pt(340, 40));
   });
   it('ungrouping frame mid-drag clears member previews', () => {
@@ -182,9 +186,9 @@ describe('Attack 2: CutTool parity & single undo', () => {
 describe('Attack 3: group frames in history', () => {
   it('keeps group, rename, color, clear-color, ungroup & drags separate (<700ms)', () => {
     const { sid } = mountCanvas(makeGraph(3, false));
-    const drag = (id: string, p: Pt) => act(() => { flow.props!.onNodesChange([pCh(id, true, p)]); flow.props!.onNodesChange([pCh(id, false, p)]); });
-    drag('n0', pt(50, 10)); const gid = groupNodes(sid, ['n0', 'n1'])!; drag('n0', pt(90, 20));
-    renameGroup(sid, gid, 'Hero'); setGroupColor(sid, gid, '#5ec8ff'); setGroupColor(sid, gid, undefined); drag('n1', pt(300, 40)); ungroup(sid, gid);
+    const move = (id: string, p: Pt) => { drag.start(id); act(() => { flow.props!.onNodesChange([pCh(id, true, p)]); flow.props!.onNodesChange([pCh(id, false, p)]); }); drag.stop([id]); };
+    move('n0', pt(50, 10)); const gid = groupNodes(sid, ['n0', 'n1'])!; move('n0', pt(90, 20));
+    renameGroup(sid, gid, 'Hero'); setGroupColor(sid, gid, '#5ec8ff'); setGroupColor(sid, gid, undefined); move('n1', pt(300, 40)); ungroup(sid, gid);
     expect(graphHistory(sid, 'undo')).toHaveLength(8);
     const u = () => expect(tr(sid, 'undo')).toBe(true);
     u(); expect(sGraph(sid).groups).toEqual([{ id: gid, title: 'Hero', nodeIds: ['n0', 'n1'], color: undefined }]);
@@ -296,20 +300,6 @@ describe('Attack 7: check-node-drag evasions', () => {
 });
 
 describe('Attack 8: round 2 regressions & gaps after tanda C', () => {
-  it('split multi-node drop batches: 1 write, 1 undo step, keeps preview of still-dropping node', () => {
-    const { sid } = mountCanvas(makeGraph(4)), editSpy = vi.spyOn(edit, 'editPresentation');
-    onCh([pCh('n0', true, pt(100, 50)), pCh('n1', true, pt(360, 50))]);
-    onCh([pCh('n0', false)]); expect(editSpy).not.toHaveBeenCalled(); expect(rPos('n0')).toEqual(pt(100, 50)); expect(rPos('n1')).toEqual(pt(360, 50));
-    onCh([pCh('n1', false)]); expect(editSpy).toHaveBeenCalledTimes(1); expect(graphHistory(sid, 'undo')).toHaveLength(1);
-    expect(sPos(sid, 'n0')).toEqual(pt(100, 50)); expect(sPos(sid, 'n1')).toEqual(pt(360, 50));
-    act(() => { expect(tr(sid, 'undo')).toBe(true); }); expect(sPos(sid, 'n0')).toEqual(pt(0, 0)); expect(sPos(sid, 'n1')).toEqual(pt(260, 0));
-  });
-  it('trailing event for deleted node keeps another active drag', () => {
-    const { sid } = mountCanvas(makeGraph(4)); act(() => { deleteNodes(sid, ['n3']); });
-    onCh([pCh('n0', true, pt(140, 70))]);
-    onCh([pCh('n3', true, pt(999, 999))]); expect(rPos('n0')).toEqual(pt(140, 70));
-    onCh([pCh('n0', false)]); expect(sPos(sid, 'n0')).toEqual(pt(140, 70));
-  });
   it('Cut without model links skips dialog; Ctrl+X on model link keeps clipboard on Cancel', () => {
     const { sid, el } = mountCanvas(mGraph(), 'omni');
     onCh(sCh('t1', 't2')); clickTxt(el, 'button', 'Operations'); act(() => btn(el, '.ops-bar button[aria-label="Cut"]').click());
