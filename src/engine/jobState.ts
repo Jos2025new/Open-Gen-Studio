@@ -1,6 +1,6 @@
 import { JobFailedError } from '../lib/http';
 import { getAssetBlob } from '../lib/idb';
-import { patchGeneration, useStore } from '../store/store';
+import { patchGeneration, saveNow, useStore } from '../store/store';
 import { addSpend } from '../store/spend';
 import { noteExcess } from './budget';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
@@ -71,11 +71,13 @@ export function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | u
 
 export function finishText(id: string, text: string, actualUsd: number | undefined, reqId?: string): void {
   const g = get().generations[id];
-  if (!g) return;
+  if (!g || g.status === 'done') return;
+  if (reqId && g.sends?.find((s) => s.id === reqId)?.status === 'done') return;
   const sends = markSendsDone(g.sends, reqId);
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
   noteExcess(id);
+  void saveNow().catch(() => undefined);
 }
 
 /** O3: never fails a generation; a file that cannot be read gives no note. */
@@ -88,11 +90,13 @@ export async function checkDelivery(id: string, assets: Asset[]): Promise<string
 
 export function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number, reqId?: string): void {
   const g = get().generations[id];
-  if (!g) return;
+  if (!g || g.status === 'done') return;
+  if (reqId && g.sends?.find((s) => s.id === reqId)?.status === 'done') return;
   const sends = markSendsDone(g.sends, reqId);
+  const uniqueAssetIds = [...new Set(assetIds)];
   patchGeneration(id, {
     status: 'done',
-    assetIds,
+    assetIds: uniqueAssetIds,
     delivery,
     statusText: undefined,
     progress: undefined,
@@ -105,6 +109,7 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
   });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
   noteExcess(id);
+  void saveNow().catch(() => undefined);
 }
 
 export function chargePartial(g: Generation): void {

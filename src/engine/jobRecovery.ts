@@ -10,9 +10,15 @@ import { PROVIDER_LABELS, parseModelRef } from './providers/types';
 import type { Generation, RemoteJob } from './types';
 import { addAssets, patchGeneration, useStore } from '../store/store';
 import { checkDelivery, controllers, finish, finishText, keptJob, purgeDiscarded, running } from './jobState';
+import { flushSendSave } from './sendMark';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 
 const get = useStore.getState;
+
+/** Active remote job from top-level field or per-request ledger. */
+export function activeRemoteJob(g: Generation): RemoteJob | undefined {
+  return g.remoteJob ?? g.sends?.find((s) => s.status === 'sent' && s.remoteJob)?.remoteJob;
+}
 
 /**
  * True when a stopped generation still has a submitted job whose result can be fetched, or when its job id was lost
@@ -20,21 +26,23 @@ const get = useStore.getState;
  */
 export function canRecheck(g: Generation): boolean {
   if (g.status === 'done') return false;
+  const job = activeRemoteJob(g);
   // In progress: only a job no loop follows any more (the app stalled or was reloaded mid-wait) is resumed here.
-  if (g.status === 'running' || g.status === 'queued') return Boolean(g.remoteJob && !running.has(g.id) && ADAPTERS[g.remoteJob.provider]?.resume);
-  if (g.remoteJob) return Boolean(ADAPTERS[g.remoteJob.provider]?.resume);
+  if (g.status === 'running' || g.status === 'queued') return Boolean(job && !running.has(g.id) && ADAPTERS[job.provider]?.resume);
+  if (job) return Boolean(ADAPTERS[job.provider]?.resume);
   return canRecover(g);
 }
 
 function canRecover(g: Generation): boolean {
   const parsed = parseModelRef(g.modelRef);
-  return Boolean(parsed && parsed.provider !== 'local' && ADAPTERS[parsed.provider]?.recover && (g.kind === 'video' || g.kind === 'model3d') && g.lostJob && g.startedAt && (g.settings.count ?? 1) <= 1 && !g.op?.id.startsWith('transcribe'));
+  const uncertain = Boolean(g.lostJob || g.sends?.some((s) => s.status === 'uncertain'));
+  return Boolean(parsed && parsed.provider !== 'local' && ADAPTERS[parsed.provider]?.recover && (g.kind === 'video' || g.kind === 'model3d') && uncertain && g.startedAt && (g.settings.count ?? 1) <= 1 && !g.op?.id.startsWith('transcribe'));
 }
 
 /** Look the lost job up at the provider; adopt it (then it is followed like any job) or say it never arrived. */
 async function recoverJob(g: Generation): Promise<RemoteJob | null> {
   const parsed = parseModelRef(g.modelRef)!;
-  const taken = new Set(Object.values(get().generations).flatMap((x) => [x.jobId, x.remoteJob?.id].filter((v): v is string => Boolean(v))));
+  const taken = new Set(Object.values(get().generations).flatMap((x) => [x.jobId, x.remoteJob?.id, ...(x.sends?.map((s) => s.remoteJob?.id) ?? [])].filter((v): v is string => Boolean(v))));
   return ADAPTERS[parsed.provider].recover!({ modelId: parsed.id, apiKey: apiKeyFor(parsed.provider), since: g.startedAt!, until: g.finishedAt ?? Date.now(), taken });
 }
 
@@ -51,13 +59,13 @@ export function recheckGeneration(id: string): Promise<string[]> {
   if (pending) return pending;
   const g = get().generations[id];
   if (!g || !canRecheck(g) || !mayStartWork()) return Promise.resolve([]);
-  if (!g.remoteJob) return recoverThenFollow(id);
-  const job = g.remoteJob;
+  const job = activeRemoteJob(g);
+  if (!job) return recoverThenFollow(id);
   if (!isConnected(job.provider)) {
     patchGeneration(id, { status: 'error', error: `Connect ${PROVIDER_LABELS[job.provider]} in Settings to check this job.` });
     return Promise.resolve([]);
   }
-  patchGeneration(id, { status: 'running', error: undefined, statusText: 'Checking', progress: undefined, finishedAt: undefined });
+  patchGeneration(id, { status: 'running', error: undefined, statusText: 'Checking', progress: undefined, finishedAt: undefined, remoteJob: job });
   return followRemote(id, job);
 }
 
@@ -91,6 +99,13 @@ function recoverThenFollow(id: string): Promise<string[]> {
 }
 
 export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
+  const pending = running.get(id);
+  if (pending) return pending;
+  const g0 = get().generations[id];
+  if (!g0 || g0.status === 'done') return Promise.resolve(g0?.assetIds ?? []);
+  const send0 = g0.sends?.find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
+  if (send0?.status === 'done') return Promise.resolve(g0.assetIds);
+
   const controller = new AbortController();
   controllers.set(id, controller);
   const p = (async () => {
@@ -102,15 +117,23 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
         signal: controller.signal,
         onStatus: (text, progress) => patchGeneration(id, { statusText: text, progress }),
       });
-      if (g.kind === 'text') {
-        finishText(id, result.text ?? '', result.costUsd);
+      const cur = get().generations[id];
+      if (!cur || cur.status === 'done') return cur?.assetIds ?? [];
+      const matching = cur.sends?.find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
+      if (matching?.status === 'done') return cur.assetIds;
+      if (cur.kind === 'text') {
+        finishText(id, result.text ?? '', result.costUsd, matching?.id);
+        await flushSendSave();
         return [];
       }
-      const kind = g.kind;
-      const fallback = expectedDims(kind, g.settings);
-      const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
+      const kind = cur.kind;
+      const fallback = expectedDims(kind, cur.settings);
+      const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, cur) : await Promise.all(result.outputs.map((o) => storeOutput(o, cur, kind, fallback)));
       addAssets(assets);
-      finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets), result.costUsd);
+      const mergedIds = [...cur.assetIds];
+      for (const a of assets) if (!mergedIds.includes(a.id)) mergedIds.push(a.id);
+      finish(id, mergedIds, result.costUsd, await checkDelivery(id, assets), result.costUsd, matching?.id);
+      await flushSendSave();
       return assets.map((a) => a.id);
     } catch (err) {
       if (isRestart(controller.signal.reason)) return [];

@@ -27,6 +27,8 @@ vi.mock('../src/lib/media', async (original) => ({
 
 import { saveNow, useStore } from '../src/store/store';
 import { canRecheck, createGeneration, recheckGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
+import { running } from '../src/engine/jobState';
+import { onGenerationCredit } from '../src/engine/credit';
 import { RECRAFT_STYLE_REF } from '../src/engine/catalog';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import type { ModelSummary } from '../src/engine/types';
@@ -125,8 +127,9 @@ describe('durable send ledger across reloads in jobs.ts', () => {
     expect(sendingDuringStore).toEqual(expect.any(Number));
     expect(useStore.getState().generations[g.id].assetIds).toEqual([]);
 
-    // Simulate reload while storeOutput is still saving the blob: resumeInterrupted sees sending / intent -> uncertain.
+    // Simulate a real reload while storeOutput is still saving the blob: in-memory running map is gone.
     const snapshot = JSON.parse(JSON.stringify(useStore.getState().generations[g.id]));
+    running.delete(g.id);
     useStore.setState((s) => ({ generations: { ...s.generations, [g.id]: { ...snapshot, status: 'running' } } }));
     await resumeInterrupted();
     const afterReload = useStore.getState().generations[g.id];
@@ -320,5 +323,38 @@ describe('per-request recovery, reentry preservation, and idempotent rehydration
     expect(st.spentUsd).toBeCloseTo(0.1);
     expect(st.generations[g.id].assetIds).toHaveLength(1);
     expect(Object.keys(st.assets)).toHaveLength(1);
+  });
+
+  it('never auto-resends an uncertain send on credit fallback even when autoSwitchProvider is always', async () => {
+    const ATLAS = 'atlas::seed';
+    const st = useStore.getState();
+    useStore.setState({
+      settings: { ...st.settings, autoSwitchProvider: 'always', keys: { ...st.settings.keys, atlas: 'k' } },
+      catalog: {
+        ...st.catalog,
+        models: {
+          ...st.catalog.models,
+          [ATLAS]: { ref: ATLAS, provider: 'atlas', id: 'seed', name: 'Seed', kind: 'image', acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'output', usd: 0.08 }] } } as ModelSummary,
+        },
+        schemas: {
+          ...st.catalog.schemas,
+          [ATLAS]: { ref: ATLAS, params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' },
+        },
+      },
+    });
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    const atlasSpy = vi.spyOn(ADAPTERS.atlas, 'generate');
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 1, advanced: {} }, inputs: { refs: [] } });
+    useStore.setState((s) => ({
+      generations: {
+        ...s.generations,
+        [g.id]: { ...s.generations[g.id], status: 'error', sends: [{ id: 'req_u', index: 0, status: 'uncertain' }] },
+      },
+    }));
+    const rerun = vi.fn(async () => undefined);
+    const switched = await onGenerationCredit(g.id, rerun);
+    expect(switched).toBe(false);
+    expect(rerun).not.toHaveBeenCalled();
+    expect(atlasSpy).not.toHaveBeenCalled();
   });
 });

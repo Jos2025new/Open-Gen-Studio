@@ -25,7 +25,7 @@ import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { flushSendSave, interruptedByReload, markSending, markSendsDone, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
-import { followRemote } from './jobRecovery';
+import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
 import { chargePartial, checkDelivery, controllers, estimateSpec, finish, finishText, keptJob, purgeDiscarded, requestEstimate, running, type GenerationSpec } from './jobState';
 import { runLocalOp } from './localOps';
@@ -135,7 +135,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
   let g = get().generations[id];
   let submitted = false;
   try {
@@ -380,13 +380,14 @@ export function isRunning(id: string): boolean {
 export async function resumeInterrupted(): Promise<void> {
   const gens = Object.values(get().generations).filter((g) => g.status === 'running' || g.status === 'queued');
   for (const g of gens) {
-    const job = g.remoteJob;
+    if (running.has(g.id)) continue;
+    const job = activeRemoteJob(g);
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
       patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
       purgeDiscarded(g.id);
       continue;
     }
-    patchGeneration(g.id, { statusText: 'Resuming' });
+    patchGeneration(g.id, { statusText: 'Resuming', remoteJob: job });
     followRemote(g.id, job);
   }
 }
