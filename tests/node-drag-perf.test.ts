@@ -107,12 +107,16 @@ function mountWorkspace(count: number) {
   document.body.append(container);
   const root = createRoot(container);
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  cleanups.push(() => {
+  let mounted = true;
+  const unmount = () => {
+    if (!mounted) return;
+    mounted = false;
     act(() => root.unmount());
     container.remove();
-  });
+  };
+  cleanups.push(unmount);
   act(() => root.render(createElement(NodeWorkspace)));
-  return { sessionId: session.id, initialGraph };
+  return { sessionId: session.id, initialGraph, unmount };
 }
 
 describe('node drag publication counts', () => {
@@ -327,12 +331,16 @@ describe('node drag publication counts', () => {
     });
     expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 220, y: 90 });
 
-    // Undo restores n0 to (0,0) in the store and must discard the hanging preview on n0.
+    // Undo restores n0 to (0,0) in the store and must discard the hanging preview on n0 (and ignore any late drop).
     act(() => {
       const cur = useStore.getState().sessions[sessionId].graph;
       expect(travelGraph(sessionId, cur, 'undo', 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
     });
     expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: false }]);
+    });
+    expect(useStore.getState().sessions[sessionId].graph.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
 
     // Another hanging preview on n0 at (300,120) is discarded by Redo -> (100,50).
     act(() => {
@@ -361,6 +369,85 @@ describe('node drag publication counts', () => {
       }));
     });
     expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 40, y: 60 });
+  });
+
+  it('commits both A and B in 1 write when A drops first and B moves again before dropping', () => {
+    const { sessionId } = mountWorkspace(5);
+    let graphPublications = 0;
+    cleanups.push(useStore.subscribe((next, prev) => {
+      if (next.sessions[sessionId]?.graph !== prev.sessions[sessionId]?.graph) graphPublications++;
+    }));
+    const editSpy = vi.spyOn(edit, 'editPresentation');
+
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'n0', type: 'position', position: { x: 110, y: 55 }, dragging: true },
+        { id: 'n1', type: 'position', position: { x: 350, y: 40 }, dragging: true },
+      ]);
+    });
+    expect(graphPublications).toBe(0);
+
+    // Node A (n0) drops while node B (n1) remains in the gesture.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', dragging: false }]);
+    });
+    expect(graphPublications).toBe(0);
+    expect(editSpy).not.toHaveBeenCalled();
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 110, y: 55 });
+
+    // Node B moves again before dropping; A's pending final position must stay intact.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n1', type: 'position', position: { x: 420, y: 95 }, dragging: true }]);
+    });
+    expect(graphPublications).toBe(0);
+    expect(editSpy).not.toHaveBeenCalled();
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 110, y: 55 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 420, y: 95 });
+
+    // Node B drops: the gesture ends and commits both A and B in a single editPresentation.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n1', type: 'position', dragging: false }]);
+    });
+    expect(graphPublications).toBe(1);
+    expect(editSpy).toHaveBeenCalledTimes(1);
+    expect(graphHistory(sessionId, 'undo')).toHaveLength(1);
+    let after = useStore.getState().sessions[sessionId].graph;
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 110, y: 55 });
+    expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 420, y: 95 });
+
+    expect(travelGraph(sessionId, after, 'undo', 1, (g) => { after = g; return true; })).toBe(true);
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
+  });
+
+  it('discards an active gesture without writing when the canvas unmounts', () => {
+    const { sessionId, unmount } = mountWorkspace(4);
+    let graphPublications = 0;
+    cleanups.push(useStore.subscribe((next, prev) => {
+      if (next.sessions[sessionId]?.graph !== prev.sessions[sessionId]?.graph) graphPublications++;
+    }));
+    const editSpy = vi.spyOn(edit, 'editPresentation');
+
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'n0', type: 'position', position: { x: 130, y: 65 }, dragging: true },
+        { id: 'n1', type: 'position', position: { x: 390, y: 65 }, dragging: true },
+      ]);
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', dragging: false }]);
+    });
+    const staleOnNodesChange = flow.props!.onNodesChange;
+
+    unmount();
+    act(() => {
+      staleOnNodesChange([{ id: 'n1', type: 'position', position: { x: 390, y: 65 }, dragging: false }]);
+    });
+
+    expect(graphPublications).toBe(0);
+    expect(editSpy).not.toHaveBeenCalled();
+    expect(graphHistory(sessionId, 'undo')).toHaveLength(0);
+    const graphAfterUnmount = useStore.getState().sessions[sessionId].graph;
+    expect(graphAfterUnmount.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(graphAfterUnmount.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
   });
 
   it('preserves main generation history tie-breaking order when current is outside the node bucket', () => {
