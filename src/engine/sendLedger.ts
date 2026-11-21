@@ -61,7 +61,13 @@ export function bookDelivered(id: string): void {
 }
 
 /** What the generation cost by its records: the sum, and whether every amount was reported or quoted. */
-export function ledgerCost(g: Pick<Generation, 'sends'>): { usd: number; known: boolean } {
+export function ledgerCost(g: Pick<Generation, 'sends'>): { usd: number; known: boolean; estimatedUsd: number } {
   const done = (g.sends ?? []).filter((s) => s.status === 'done' && s.costUsd != null);
-  return { usd: Math.round(done.reduce((n, s) => n + s.costUsd!, 0) * 10000) / 10000, known: done.every((s) => !s.estimated) };
+  const round = (n: number) => Math.round(n * 10000) / 10000;
+  return {
+    usd: round(done.reduce((n, s) => n + s.costUsd!, 0)),
+    known: done.every((s) => !s.estimated),
+    // An unpriced request estimated at $0 adds nothing: the reported part is then the whole known cost (noteExcess).
+    estimatedUsd: round(done.filter((s) => s.estimated).reduce((n, s) => n + s.costUsd!, 0)),
+  };
 }

@@ -114,7 +114,7 @@ afterEach(() => {
 });
 
 describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
-  it.fails('CRÍTICO: recoverThenFollow + recarga en checkDelivery cobra DOBLE ($1.00 en vez de $0.50) y duplica assets', async () => {
+  it('CRÍTICO: recoverThenFollow + recarga en checkDelivery cobra DOBLE ($1.00 en vez de $0.50) y duplica assets', async () => {
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValueOnce(new NetworkError('drop'));
     const g = make(1, NANO_V, 'video', { audio: true });
     await expect(runGeneration(g.id)).rejects.toThrow(NetworkError);
@@ -147,7 +147,7 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
     expect(genOf(g.id).sends?.some((s) => s.status === 'uncertain')).toBe(false);
   });
 
-  it.fails('CRÍTICO: quote=$0 en 1.er ítem con costUsd real ($0.10) + 2.º ítem falla → pierde el cobro ($0)', async () => {
+  it('CRÍTICO: quote=$0 en 1.er ítem con costUsd real ($0.10) + 2.º ítem falla → pierde el cobro ($0)', async () => {
     vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0);
     let n = 0;
     vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
@@ -161,7 +161,7 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
     expect(logLen()).toBe(1);
   });
 
-  it.fails('CRÍTICO: lote mixto (1.º quote=$0 con costUsd=$0.10, 2.º quote=$0.10 con costUsd=$0.10) → finish() pierde $0.10', async () => {
+  it('CRÍTICO: lote mixto (1.º quote=$0 con costUsd=$0.10, 2.º quote=$0.10 con costUsd=$0.10) → finish() pierde $0.10', async () => {
     useStore.setState((s) => ({ catalog: { ...s.catalog, schemas: { ...s.catalog.schemas, [ATLAS]: { ...s.catalog.schemas[ATLAS], params: [{ key: 'seed', role: 'seed', type: 'integer' }] } } } as never }));
     const g = make(2, ATLAS);
     vi.spyOn(ADAPTERS.atlas, 'quote').mockImplementation(async (_m, _sc, st) => (st.seed === g.settings.seed ? 0 : 0.1));
@@ -173,7 +173,7 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
     expect(genOf(g.id).actualUsd).toBeCloseTo(0.2);
   });
 
-  it.fails('ALTO: followRemote normal + recarga en checkDelivery deja generación cobrada ($0.10) zombi en running sin assets', async () => {
+  it('ALTO: followRemote normal + recarga en checkDelivery deja generación cobrada ($0.10) zombi en running sin assets', async () => {
     const g = make(1, NANO_V, 'video', { audio: true });
     patchG(g.id, { status: 'running', remoteJob: rj('j_v1'), sends: [{ id: 'r0', index: 0, status: 'sent', remoteJob: rj('j_v1') }] });
     await saveNow();
@@ -200,7 +200,7 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
     expect(genOf(g.id).assetIds).toHaveLength(1);
   });
 
-  it.fails('ALTO: estimate=$0 pero quote=$0.10 (pagado) + NetworkError borra intent pagado y omite lostJob', async () => {
+  it('ALTO: estimate=$0 pero quote=$0.10 (pagado) + NetworkError borra intent pagado y omite lostJob', async () => {
     vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0.1);
     vi.spyOn(ADAPTERS.atlas, 'generate').mockRejectedValueOnce(new NetworkError('lost'));
     const g = make(1, ATLAS);
@@ -210,7 +210,7 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
     expect(genOf(g.id).sends?.[0]?.status).toBe('uncertain');
   });
 
-  it.fails('ALTO: estimate=$0 pero quote=$0.10 (pagado) + recarga en vuelo borra intent pagado y oculta aviso de cobro', async () => {
+  it('ALTO: estimate=$0 pero quote=$0.10 (pagado) + recarga en vuelo borra intent pagado y oculta aviso de cobro', async () => {
     vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0.1);
     let release!: () => void;
     const inFlight = new Promise<void>((res) => {
@@ -221,12 +221,16 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
     const p = runGeneration(g.id).catch(() => undefined);
     await inFlight;
     await reloadFromDisk();
-    release(); await p;
+    // What the reload leaves (a real reload ends the old run): the paid request is uncertain and flagged.
     expect(genOf(g.id).lostJob).toBe(true);
     expect(genOf(g.id).sends?.[0]?.status).toBe('uncertain');
+    // The test's old run still lives in memory: if it delivers after all, that request is booked once.
+    release(); await p;
+    expect(spent()).toBeCloseTo(0.1);
+    expect(logLen()).toBe(1);
   });
 
-  it.fails('MEDIO: lote sin precio (estimate null), ítem 1 sin coste + ítem 2 $0.30 > límite $0.20 → noteExcess no avisa', async () => {
+  it('MEDIO: lote sin precio (estimate null), ítem 1 sin coste + ítem 2 $0.30 > límite $0.20 → noteExcess no avisa', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.2 });
     useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [NANO]: { ...s.catalog.models[NANO], price: undefined } } } as never }));
     let n = 0;

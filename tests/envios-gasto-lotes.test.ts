@@ -39,7 +39,7 @@ vi.mock('../src/engine/design/raster', () => ({ flushRaster: async () => undefin
 
 import { guard } from '../src/lib/saveGuard';
 import { HttpError } from '../src/lib/http';
-import { saveNow, useStore } from '../src/store/store';
+import { useStore } from '../src/store/store';
 import { forgetBalances } from '../src/engine/credit';
 import { createGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
 import { controllers, running } from '../src/engine/jobState';
@@ -58,10 +58,6 @@ const reload = async () => { running.clear(); controllers.clear(); await useStor
 const spent = () => useStore.getState().spentUsd;
 /** Reload from the saved copy only: memory is wiped first, so what counts is what reached the disk. */
 const reloadFromDisk = async () => { useStore.setState({ generations: {}, spentUsd: -1, spendLog: [] }); await reload(); };
-/** A request delivered and booked before the reload (the ledger the app saves). */
-const bookedSend = (id: string, index: number, job?: string) => ({ id, index, status: 'done' as const, costUsd: 0.1, bookedUsd: 0.1, ...(job ? { remoteJob: rj(job) } : {}) });
-const seedSpent = () => useStore.setState({ spentUsd: 0.1, spendLog: [{ at: 1, usd: 0.1, category: 'image', provider: 'nanogpt', model: NANO, estimated: false }] as never });
-const mkAsset = (id: string, g: string) => ({ id, kind: 'image', mime: 'image/png', width: 512, height: 512, sessionId: sid(), origin: 'generated', generationId: g, stored: true, favorite: false, createdAt: 1 }) as never;
 
 beforeEach(() => {
   Object.assign(disk, { raw: undefined, failSet: false, hangSet: false, unblock: undefined, onSet: undefined, onBlobGet: undefined, onBlobPut: undefined });
@@ -103,23 +99,29 @@ describe('Gasto de lotes a medias: lo anotado es lo realmente entregado, una sol
   });
 
   it('N2: recarga a mitad de lote síncrono: se anota lo entregado, una vez tras dos recargas', async () => {
+    let n = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => (++n === 1 ? imgOut('a1') : new Promise(() => undefined)));
     const g = make(2);
-    useStore.setState((s) => ({ assets: { ...s.assets, p0: mkAsset('p0', g.id) } }));
-    patchG(g.id, { status: 'running', assetIds: ['p0'], sends: [bookedSend('r0', 0)] });
-    seedSpent();
-    await saveNow();
+    void runGeneration(g.id).catch(() => undefined);
+    // The first item was booked before the reload: the saved copy already says so.
+    await vi.waitFor(() => expect(disk.raw ?? '').toContain('"bookedUsd":0.1'));
     await reloadFromDisk(); await reloadFromDisk();
     expect(genOf(g.id).status).toBe('error');
+    expect(genOf(g.id).assetIds).toHaveLength(1);
     expect(spent()).toBeCloseTo(0.1);
     expect(useStore.getState().spendLog).toHaveLength(1);
   });
 
   it('N1: recarga a mitad de lote remoto: se cobra lo anterior más el último, una vez', async () => {
     const g = make(2);
-    useStore.setState((s) => ({ assets: { ...s.assets, p0: mkAsset('p0', g.id) } }));
-    patchG(g.id, { status: 'running', assetIds: ['p0'], remoteJob: rj('j2'), sends: [bookedSend('r0', 0, 'j1'), { id: 'r1', index: 1, status: 'sent', remoteJob: rj('j2') }] });
-    seedSpent();
-    await saveNow();
+    let n = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async (opts) => {
+      if (++n === 1) return imgOut('a1');
+      opts.onRemoteJob?.(rj('j2'));
+      return new Promise(() => undefined);
+    });
+    void runGeneration(g.id).catch(() => undefined);
+    await vi.waitFor(() => expect(disk.raw ?? '').toContain('"j2"'));
     vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValue(imgOut('two', 0.1));
     await reloadFromDisk(); await running.get(g.id);
     await reloadFromDisk(); await reloadFromDisk();
@@ -132,10 +134,14 @@ describe('Gasto de lotes a medias: lo anotado es lo realmente entregado, una sol
 
   it('N1 parcial: lote remoto que queda a medias suma lo anterior y lo recibido', async () => {
     const g = make(3);
-    useStore.setState((s) => ({ assets: { ...s.assets, p0: mkAsset('p0', g.id) } }));
-    patchG(g.id, { status: 'running', assetIds: ['p0'], remoteJob: rj('j2'), sends: [bookedSend('r0', 0, 'j1'), { id: 'r1', index: 1, status: 'sent', remoteJob: rj('j2') }] });
-    seedSpent();
-    await saveNow();
+    let n = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async (opts) => {
+      if (++n === 1) return imgOut('a1');
+      opts.onRemoteJob?.(rj('j2'));
+      return new Promise(() => undefined);
+    });
+    void runGeneration(g.id).catch(() => undefined);
+    await vi.waitFor(() => expect(disk.raw ?? '').toContain('"j2"'));
     vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValue(imgOut('two', 0.1));
     await reloadFromDisk(); await running.get(g.id);
     expect(genOf(g.id).status).toBe('error');
@@ -193,9 +199,16 @@ describe('Gasto de lotes a medias: lo anotado es lo realmente entregado, una sol
     expect(useStore.getState().spendLog).toHaveLength(1);
   });
 
-  it('bajo: un envío gratis que falla por red no queda incierto', async () => {
-    vi.spyOn(ADAPTERS.local, 'generate').mockRejectedValue(new (await import('../src/lib/http')).NetworkError('down'));
-    const g = make(1, LOCAL_IMAGE_REF);
+  it('bajo: un envío remoto gratis (cotización y estimado $0) que falla por red no queda incierto', async () => {
+    const ATLAS = 'atlas::free';
+    useStore.setState((st) => ({
+      settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k-a' } },
+      catalog: { ...st.catalog, models: { ...st.catalog.models, [ATLAS]: { ...st.catalog.models[NANO], ref: ATLAS, provider: 'atlas', id: 'free', price: { skus: [{ unit: 'output', usd: 0 }] } } }, schemas: { ...st.catalog.schemas, [ATLAS]: { ...st.catalog.schemas[NANO], ref: ATLAS } } } as never,
+    }));
+    vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0);
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockRejectedValue(new (await import('../src/lib/http')).NetworkError('down'));
+    const g = make(1, ATLAS);
+    patchG(g.id, { estimate: { usd: 0, approximate: true } });
     await expect(runGeneration(g.id)).rejects.toThrow();
     expect(genOf(g.id).lostJob).toBeFalsy();
     expect(genOf(g.id).sends?.some((s) => s.status === 'uncertain') ?? false).toBe(false);

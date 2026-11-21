@@ -93,7 +93,12 @@ function recoverThenFollow(id: string): Promise<string[]> {
       patchGeneration(id, { status: 'error', error: `${PROVIDER_LABELS[provider]} has no recent job for this request from that time: it most likely never arrived. Retry runs it again.`, statusText: undefined, finishedAt: Date.now() });
       return [];
     }
-    patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking' });
+    // The adopted job is the uncertain request's answer: tie it to that record, so the ledger books it once.
+    const cur = get().generations[id];
+    const open = cur?.sends?.findIndex((s) => !s.remoteJob && (s.status === 'uncertain' || s.status === 'intent')) ?? -1;
+    const sends = open >= 0 ? cur!.sends!.map((s, i) => (i === open ? { ...s, status: 'sent' as const, remoteJob: job! } : s)) : undefined;
+    patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking', ...(sends ? { sends } : {}) });
+    await flushSendSave();
     return followRemote(id, job);
   })();
   running.set(id, p);
@@ -132,8 +137,12 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const fallback = expectedDims(kind, cur.settings);
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, cur) : await Promise.all(result.outputs.map((o) => storeOutput(o, cur, kind, fallback)));
       addAssets(assets);
+      // Read the files back first: the request is booked and marked done only once nothing is left to wait for,
+      // so a reload in between follows the job again instead of leaving it booked and stuck.
+      const delivery = await checkDelivery(id, assets);
       const latest = get().generations[id];
       if (!latest || latest.status === 'done') return latest?.assetIds ?? [];
+      if (latest.sends?.some((s) => s.status === 'done' && s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider)) return latest.assetIds;
       const mergedIds = [...latest.assetIds];
       for (const a of assets) if (!mergedIds.includes(a.id)) mergedIds.push(a.id);
       const uniqueIds = [...new Set(mergedIds)];
@@ -166,7 +175,7 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
         await flushSendSave();
         return assets.map((a) => a.id);
       }
-      finish(id, uniqueIds, result.costUsd, await checkDelivery(id, assets), result.costUsd, matching?.id);
+      finish(id, uniqueIds, result.costUsd, delivery, result.costUsd, matching?.id);
       await flushSendSave();
       return assets.map((a) => a.id);
     } catch (err) {

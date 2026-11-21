@@ -105,7 +105,7 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
     statusText: undefined,
     progress: undefined,
     finishedAt: Date.now(),
-    actualUsd: booked ? (booked.known ? booked.usd : undefined) : actualUsd,
+    actualUsd: booked ? (booked.known || booked.estimatedUsd === 0 ? booked.usd : undefined) : actualUsd,
     providerReportedUsd,
     remoteJob: undefined,
     sending: undefined,

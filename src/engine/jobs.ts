@@ -23,7 +23,7 @@ import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, saveNow, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { deliverSend, shareOfEstimate } from './sendLedger';
-import { flushSendSave, interruptedByReload, isFreeSend, markSending, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { flushSendSave, interruptedByReload, isFreeSend, markSending, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -338,7 +338,7 @@ async function execute(id: string): Promise<string[]> {
     } catch (innerErr) {
       const cur = get().generations[id];
       const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
-      const free = freeSend || (cur ? isFreeSend(cur) : false);
+      const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
       const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
       if (activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
         const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
@@ -353,7 +353,7 @@ async function execute(id: string): Promise<string[]> {
     }
     const cur = get().generations[id];
     if (err instanceof SendNotCommittedError) {
-      const keepLost = Boolean(cur && !isFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
+      const keepLost = Boolean(cur && !wasFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
       patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: keepLost, sending: undefined });
       toast(err.message, 'error', 9000, cur?.planId || keepLost ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
       throw err;
@@ -366,7 +366,7 @@ async function execute(id: string): Promise<string[]> {
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
-    const free = freeSend || (cur ? isFreeSend(cur) : false);
+    const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
     const lostJob = !free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)));
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app

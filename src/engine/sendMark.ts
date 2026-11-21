@@ -14,7 +14,14 @@ const PRIOR_UNCERTAIN_NOT_SENT_MESSAGE = 'Not sent: could not save before sendin
 
 /** True when the send has zero cost (local models or $0 price) and never needs the paid-send gate. */
 export function isFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, quote?: number | null): boolean {
-  return g.provider === 'local' || g.modelRef.startsWith('local::') || (quote != null ? quote === 0 : g.estimate?.usd === 0);
+  // A remote send is free only when both the estimate and the quote (if any) say $0: either one above $0 bills.
+  return g.provider === 'local' || g.modelRef.startsWith('local::') || (g.estimate?.usd === 0 && (quote == null || quote === 0));
+}
+
+/** Free as far as a later step can tell: an open send record means it was judged paid (with its quote) when it left. */
+export function wasFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate' | 'sends'>, freeAtSend = false): boolean {
+  if (g.sends?.some((s) => s.status === 'intent' || s.status === 'uncertain')) return false;
+  return freeAtSend || isFreeSend(g);
 }
 
 function notSentMessage(g: Generation | undefined, reqId?: string): string {
@@ -143,7 +150,7 @@ export async function flushSendSave(): Promise<void> {
 
 /** What a reload leaves on a generation that was running: the error, no mark, and (when a send was in flight) a toast unless silenced. */
 export function interruptedByReload(g: Generation, job: RemoteJob | undefined): Partial<Generation> {
-  const free = isFreeSend(g);
+  const free = wasFreeSend(g);
   const hasUncertainRecord = Boolean(g.sends?.some((s) => !s.remoteJob && (s.status === 'intent' || s.status === 'uncertain')));
   const maybeCharged = !free && !job && (g.sending != null || hasUncertainRecord);
   if (maybeCharged && !isMuted('send-uncertain')) {
