@@ -351,14 +351,14 @@ describe('Attack 8: round 2 regressions & gaps after tanda C', () => {
     expect(dlg(el)).not.toBeNull(); expect(has(sid, 'a1')).toBe(true); clickTxt(dlg(el)!, 'button', 'Cancel'); expect(has(sid, 'a1')).toBe(true);
     const p2 = pasteNodes(sid); expect(sGraph(sid).nodes.filter((n) => p2.includes(n.id)).map((n) => n.data.title)).toEqual(['Keep']);
   });
-  it.fails('check-node-drag catches unconditional write after harmless c.dragging', () => {
+  it('check-node-drag catches unconditional write after harmless c.dragging', () => {
     hit({ [WS]: `${EP} ${h(`{ if (c.type !== 'position') continue; if (c.dragging) {} editPresentation('s', (g: any) => g); }`)}` });
   });
-  it.fails('check-node-drag respects lexical scope (shadowing & same-name FP)', () => {
+  it('check-node-drag respects lexical scope (shadowing & same-name FP)', () => {
     hit({ [WS]: `${EP} function A() { const w = editPresentation; ${h(`${ifD} w('s', (g: any) => g)`)} return onNodesChange; } function B(noop: any) { const w = noop; return w; }` });
     expect(runFix({ [WS]: `${EP} function Drag() { const apply = (p: any) => p; ${h(`${ifD} apply(c.position)`)} return onNodesChange; } function Other() { const apply = () => editPresentation('s', (g: any) => g); return apply; }` })).toEqual([]);
   });
-  it.fails('check-node-drag catches NodeToolbar after null-return & arrow useCutTool', () => {
+  it('check-node-drag catches NodeToolbar after null-return & arrow useCutTool', () => {
     hit({ 'src/components/node/nodes.tsx': `import { NodeToolbar } from '@xyflow/react'; function Card({ node, selected }: any) { if (!node) return null; return <><NodeToolbar isVisible={selected}><div /></NodeToolbar></>; }` });
     hit({ 'src/components/node/CutTool.tsx': `import { trailCuts } from './g'; const useCutTool = () => { const move = (e: any) => { trailCuts([e], []); }; return { move }; };` });
   });
