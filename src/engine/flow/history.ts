@@ -17,7 +17,7 @@ export const historyRevision = () => revision;
 export function subscribeGraphHistory(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
 export function graphHistory(id: string, direction: 'undo' | 'redo') { return [...(direction === 'undo' ? stack(id).past : stack(id).future)].reverse(); }
 function logical(g: Graph) {
-  return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges, broken: g.broken ?? [] });
+  return JSON.stringify({ nodes: g.nodes.map(n => { const data = { ...n.data }; if ('generationId' in data) delete data.generationId; return { ...n, data }; }), edges: g.edges, groups: g.groups ?? [], broken: g.broken ?? [] });
 }
 /** Open groups by session: the first `recordGraph` inside one is its undo step, the later ones add nothing (ADR 0030). */
 const groups = new Map<string, { first: Entry | null }>();
@@ -106,12 +106,15 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
   const removed = before.nodes.filter(n => !afterById.has(n.id));
   const changed = after.nodes.filter(n => { const prev = beforeById.get(n.id); return prev && logical({ nodes: [prev], edges: [] }) !== logical({ nodes: [n], edges: [] }); });
   const edges = JSON.stringify([before.edges, before.broken ?? []]) !== JSON.stringify([after.edges, after.broken ?? []]);
-  const moved = changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(beforeById.get(n.id)!.data));
-  const label = added.length ? `Add ${added.map(n => n.data.title).join(', ')}` : removed.length ? `Delete ${removed.map(n => n.data.title).join(', ')}` : edges ? 'Change connections' : `${moved ? 'Move' : 'Edit'} ${changed.map(n => n.data.title).join(', ')}`;
-  const key = `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
+  const groupsChanged = JSON.stringify(before.groups ?? []) !== JSON.stringify(after.groups ?? []);
+  const moved = !groupsChanged && changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(beforeById.get(n.id)!.data));
+  const beforeG = before.groups ?? [], afterG = after.groups ?? [];
+  const groupLabel = afterG.length > beforeG.length ? `Group ${afterG.at(-1)?.title ?? 'nodes'}` : afterG.length < beforeG.length ? 'Ungroup' : 'Edit group';
+  const label = added.length ? `Add ${added.map(n => n.data.title).join(', ')}` : removed.length ? `Delete ${removed.map(n => n.data.title).join(', ')}` : edges ? 'Change connections' : changed.length ? `${moved ? 'Move' : 'Edit'} ${changed.map(n => n.data.title).join(', ')}` : groupLabel;
+  const key = groupsChanged && !changed.length ? 'groups' : `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
   const time = Date.now();
   const last = s.past.at(-1);
-  if (!group && !moved && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
+  if (!group && !moved && !groupsChanged && !added.length && !removed.length && !edges && last?.key === key && time - last.time < 700 && !s.future.length) {
     last.after = structuredClone(after); last.time = time;
   } else {
     s.past.push({ before: structuredClone(before), after: structuredClone(after), label, key, time });
