@@ -578,7 +578,7 @@ export function useAsReference(assetId: string): void {
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 
-/** Kinds the agent-context checkbox can name. */
+/** Attachment policy for the agent's context, independent of the media generation kinds. */
 export const AGENT_ATTACHABLE: readonly string[] = ['image', 'video', 'audio', 'model3d'];
 
 /** Toggle an existing asset in the agent's attachment list. No asset is created or copied. */

@@ -11,10 +11,12 @@ vi.mock('../src/lib/idb', () => ({
 
 import { argsSchema, command, run } from '../src/engine/commands';
 import { findAssetsSchema, findModelsSchema, TOOLS } from '../src/engine/agent/tools';
+import { BASE_NODE_KINDS, LINK_KINDS, MODEL_ATTACH_MODES } from '../src/engine/graphTypes';
 import { createSession, useStore } from '../src/store/store';
 
 const systemTypes = ['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset'];
 const nodeTypes = [...systemTypes, 'prompt', 'mediaSettings'];
+const mediaKinds = ['image', 'video', 'audio', 'model3d'];
 
 describe.each([
   {
@@ -74,13 +76,48 @@ describe.each([
 });
 
 it('publishes the same ordered media kinds that find_models and find_assets validate', () => {
-  const kinds = ['image', 'video', 'audio', 'model3d'];
   const tools = TOOLS.map((tool) => tool.function);
-  const models = { properties: { kind: { enum: kinds } } };
-  const assets = { properties: { kind: { items: { enum: kinds } } } };
+  const models = { properties: { kind: { enum: mediaKinds } } };
+  const assets = { properties: { kind: { items: { enum: mediaKinds } } } };
 
   expect(tools.find((tool) => tool.name === 'find_models')?.parameters).toMatchObject(models);
   expect(z.toJSONSchema(findModelsSchema)).toMatchObject(models);
   expect(tools.find((tool) => tool.name === 'find_assets')?.parameters).toMatchObject(assets);
   expect(z.toJSONSchema(findAssetsSchema)).toMatchObject(assets);
+});
+
+it.each([
+  'studio.direct.check',
+  'studio.images.accepts',
+  'studio.param.has',
+  'studio.generate.start',
+  'models.kind.list',
+  'models.composer.pick',
+  'models.composer.reset',
+])('%s publishes media kinds in order', (cmd) => {
+  expect(argsSchema(command(cmd)!)).toHaveProperty('properties.kind.enum', mediaKinds);
+});
+
+it.each([
+  ['nodes.node.add', 'properties.data.oneOf'],
+  ['nodes.node.add_connected', 'properties.data.oneOf'],
+  ['nodes.node.restore', 'properties.deleted.properties.nodes.items.properties.data.oneOf'],
+])('%s publishes generation node kinds in order', (cmd, path) => {
+  expect(argsSchema(command(cmd)!)).toHaveProperty(path, expect.arrayContaining([
+    expect.objectContaining({
+      properties: expect.objectContaining({ kind: expect.objectContaining({ enum: mediaKinds }) }),
+    }),
+  ]));
+});
+
+it('keeps the base node kinds, link kinds and model attachment modes in order', () => {
+  const baseKinds = ['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset', 'ref'];
+  const linkKinds = ['data', 'ref', 'control'];
+  const attachModes = ['wired', 'docked', 'grouped', 'merged'];
+  expect(BASE_NODE_KINDS).toEqual(baseKinds);
+  expect(LINK_KINDS).toEqual(linkKinds);
+  expect(MODEL_ATTACH_MODES).toEqual(attachModes);
+  expect(argsSchema(command('nodes.node.new_data')!)).toHaveProperty('properties.kind.enum', baseKinds);
+  expect(argsSchema(command('nodes.edge.connect')!)).toHaveProperty('properties.kind.enum', linkKinds);
+  expect(argsSchema(command('nodes.node.edit')!)).toHaveProperty('properties.patch.properties.attachMode.enum', attachModes);
 });

@@ -93,13 +93,14 @@ export default [
   },
   {
     id: 'media-kind-validations',
-    what: 'Los validadores del dominio completo de medios comparten MEDIA_KINDS. find_models y find_assets publican los mismos valores en el mismo orden.',
+    what: 'Los validadores del dominio completo de medios y los esquemas JSON publicados por find_models y find_assets usan MEDIA_KINDS con los mismos valores en el mismo orden.',
     sides: [
       ['src/engine/types.ts', 'export const MEDIA_KINDS'],
       ['src/engine/actions.commands.ts', 'z.enum(MEDIA_KINDS)'],
       ['src/engine/catalog.commands.ts', 'z.enum(MEDIA_KINDS)'],
       ['src/engine/flow/commands.ts', 'z.enum(MEDIA_KINDS)'],
       ['src/engine/agent/tools.ts', 'z.enum(MEDIA_KINDS)'],
+      ['src/engine/agent/tools.ts', 'enum: [...MEDIA_KINDS]'],
     ],
     tests: ['tests/listas-cerradas.test.ts'],
   },

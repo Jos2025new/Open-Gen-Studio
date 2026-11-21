@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { threadOf } from '../src/engine/agent/lanes';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Graph } from '../src/engine/types';
@@ -109,5 +109,29 @@ describe('review finding 8: affects, inspector and the descriptor check', () => 
     expect(check(root).errors).toEqual([]);
     writeFileSync(join(root, 'src/engine/nodecore/types/text.node.ts'), file('1'));
     expect(check(root).errors).toEqual([]);
+  });
+  it('the check requires BaseNodeKind to derive exactly from BASE_NODE_KINDS', () => {
+    const root = mkdtempSync(join(tmpdir(), 'nd-base-kinds-'));
+    try {
+      const dir = join(root, 'src/engine/nodecore/types');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'text.node.ts'), "export default defineNode({ kind: 'text', version: 1, params: [], inputs, output, required: [], affects: {}, evaluate, });");
+      const types = join(root, 'src/engine/graphTypes.ts');
+      const tuple = "export const BASE_NODE_KINDS = ['text'] as const;\n";
+      const alias = 'export type BaseNodeKind = typeof BASE_NODE_KINDS[number]';
+      writeFileSync(types, `${tuple}${alias};\n`);
+      expect(check(root)).toEqual({ errors: [], kinds: ['text'] });
+      writeFileSync(types, `${tuple}${alias} | 'foo';\n`);
+      expect(check(root)).toEqual({
+        errors: [expect.stringContaining('src/engine/graphTypes.ts:2: declare `export type BaseNodeKind = typeof BASE_NODE_KINDS[number];`')],
+        kinds: ['text'],
+      });
+      writeFileSync(types, tuple);
+      expect(check(root).errors).toEqual([expect.stringContaining('src/engine/graphTypes.ts:1: declare `export type BaseNodeKind = typeof BASE_NODE_KINDS[number];`')]);
+      writeFileSync(types, `const extra = ['foo'] as const;\n${tuple.replace("['text']", "['text', ...extra]")}${alias};\n`);
+      expect(check(root).errors).toEqual([expect.stringContaining('src/engine/graphTypes.ts:2: declare the base node kinds directly as string literals in `BASE_NODE_KINDS`')]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

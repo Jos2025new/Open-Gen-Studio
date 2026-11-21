@@ -1,3 +1,4 @@
+import type { MediaKind } from '../engine/types';
 import { AbortedError, isAbort } from './http';
 import { providerFetch } from './providerFetch';
 import { HOST_NOT_ALLOWED, MAX_HOPS, TOO_MANY_REDIRECTS } from './mediaHosts';
@@ -340,7 +341,7 @@ export function extensionForMime(mime: string): string {
   return 'bin';
 }
 
-export function guessMimeFromUrl(url: string, kind: 'image' | 'video' | 'audio' | 'model3d'): string {
+export function guessMimeFromUrl(url: string, kind: MediaKind): string {
   const path = url.split('?')[0].toLowerCase();
   if (path.endsWith('.png')) return 'image/png';
   if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';

@@ -3,7 +3,7 @@ import { Bot, Box, ChevronRight, Cpu, Database, FileImage, FileText, Film, Image
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
-import type { GraphNodeData, OpId, PortType, SystemNodeType } from '../../engine/types';
+import type { GraphNodeData, MediaKind, OpId, PortType, SystemNodeType } from '../../engine/types';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, type OmniSpace } from '../../engine/nodes/omniSpaces';
 import { SYSTEM_NODE_TYPES } from '../../engine/nodes/spec';
 import { OP_ICONS } from '../assets/AssetActions';
@@ -104,7 +104,7 @@ export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = 
   const [tools, setTools] = useState(false);
   const [query, setQuery] = useState('');
   const matches = (text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
-  const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => portFits(accepts, p.type));
+  const takes = (kind: MediaKind) => !accepts || inputPorts(newNodeData(kind)).some((p) => portFits(accepts, p.type));
   const toolIds = OP_IDS.filter((id) => !OPS[id].multiInput && (!accepts || portFits(accepts, OPS[id].input)));
   if (tools && !query.trim()) {
     return (

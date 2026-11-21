@@ -9,14 +9,26 @@ const lineOf = (text, at) => text.slice(0, at).split('\n').length;
 /** Problems of the tree under `root` (the repo by default), as `file:line: message` strings. */
 export function check(root = '.') {
   const at = (p) => join(root, p);
-  const types = readFileSync(at('src/engine/graphTypes.ts'), 'utf8');
+  const typesFile = 'src/engine/graphTypes.ts';
+  const types = readFileSync(at(typesFile), 'utf8');
   const union = /export type NodeKind = ([^;]+);/.exec(types);
   const errors = [];
-  const base = /export const BASE_NODE_KINDS\s*=\s*\[([^\]]*)\]\s*as const\b/.exec(types)
-    ?? /export type BaseNodeKind = ([^;]+);/.exec(types) ?? union;
+  const tupleDeclaration = /\bconst\s+BASE_NODE_KINDS\b/.exec(types);
+  const baseType = /\bexport\s+type\s+BaseNodeKind\b/.exec(types);
+  const baseAlias = /\bexport\s+type\s+BaseNodeKind\s*=\s*([^;]+);/.exec(types);
+  if (tupleDeclaration && !/^typeof\s+BASE_NODE_KINDS\s*\[\s*number\s*\]$/.test(baseAlias?.[1].trim() ?? '')) {
+    const line = lineOf(types, baseType?.index ?? tupleDeclaration.index);
+    errors.push(`${typesFile}:${line}: declare \`export type BaseNodeKind = typeof BASE_NODE_KINDS[number];\`.`);
+  }
+  const base = tupleDeclaration
+    ? /const\s+BASE_NODE_KINDS\s*=\s*\[([^\]]*)\]\s*as const\b/.exec(types)
+    : baseAlias ?? union;
   const dir = 'src/engine/nodecore/types';
   const kinds = base ? [...base[1].matchAll(/'([a-z0-9]+)'/g)].map((m) => m[1]) : [];
-  if (!kinds.length) errors.push('src/engine/graphTypes.ts:1: cannot read the base node kinds; declare them as string literals in `BASE_NODE_KINDS`.');
+  if (!kinds.length || (tupleDeclaration && base?.[1].includes('...'))) {
+    const line = lineOf(types, tupleDeclaration?.index ?? 0);
+    errors.push(`${typesFile}:${line}: declare the base node kinds directly as string literals in \`BASE_NODE_KINDS\`.`);
+  }
   // Open registry: a descriptor file outside the base kinds is a type of its own when it declares its data by merging `ExtraNodeKinds`.
   const extra = existsSync(at(dir)) ? readdirSync(at(dir)).filter((f) => f.endsWith('.node.ts')).map((f) => f.replace('.node.ts', '')).filter((k) => !kinds.includes(k) && new RegExp(`interface ExtraNodeKinds\\s*\\{[^}]*\\b${k}\\b`).test(readFileSync(at(`${dir}/${k}.node.ts`), 'utf8'))) : [];
   kinds.push(...extra);

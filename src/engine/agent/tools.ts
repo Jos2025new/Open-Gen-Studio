@@ -38,7 +38,7 @@ export const TOOLS: ToolSpec[] = [
         type: 'object',
         properties: {
           query: { type: 'string', description: 'The model name as the user said it, e.g. "seedance 2.0 fast".' },
-          kind: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'], description: 'Optional: only models that make this.' },
+          kind: { type: 'string', enum: [...MEDIA_KINDS], description: 'Optional: only models that make this.' },
         },
         required: ['query'],
       },
@@ -66,7 +66,7 @@ export const TOOLS: ToolSpec[] = [
       parameters: {
         type: 'object',
         properties: {
-          kind: { type: 'array', items: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'] } },
+          kind: { type: 'array', items: { type: 'string', enum: [...MEDIA_KINDS] } },
           query: { type: 'string' },
           canvas: { type: 'string', enum: ['this', 'all'], description: 'this (default): the current canvas; all: every canvas of this session.' },
           since: { type: 'string' },

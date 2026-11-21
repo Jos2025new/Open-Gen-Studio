@@ -48,7 +48,7 @@ export interface TextNodeData {
 export interface GenNodeData {
   /** Plan-local identities retain their source node IDs when materialized. */
   subjects?: PlanSubject[];
-  kind: 'image' | 'video' | 'audio' | 'model3d';
+  kind: MediaKind;
   title: string;
   prompt: string;
   modelRef: string;
