@@ -24,8 +24,8 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     ReactFlow(props: NonNullable<typeof flow.props> & { nodeTypes: NodeTypes }) {
       flow.props = props;
       return createElement(
-        Fragment,
-        null,
+        'div',
+        { className: 'react-flow__pane' },
         props.children,
         ...props.nodes
           .filter((n) => !n.hidden)
@@ -141,5 +141,50 @@ describe('NodeWorkspace delete confirmation', () => {
     act(() => confirmBtn!.click());
     expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 'a1')).toBe(false);
     expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 't1')).toBe(false);
+  });
+});
+
+describe('Pan box selection with collapsed groups', () => {
+  it('does not select hidden members of a collapsed group when boxing in Pan mode', () => {
+    const graph: Graph = {
+      nodes: [
+        { id: 't1', position: { x: 100, y: 100 }, data: { kind: 'text', title: 'T1', text: 'a' } },
+        { id: 't2', position: { x: 400, y: 100 }, data: { kind: 'text', title: 'T2', text: 'b' } },
+      ],
+      edges: [],
+      groups: [{ id: 'g1', title: 'G1', nodeIds: ['t1', 't2'] }],
+    };
+    const { container } = mount(graph);
+    const canvas = container.querySelector<HTMLDivElement>('.node-canvas')!;
+    const pane = container.querySelector<HTMLDivElement>('.react-flow__pane')!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800, x: 0, y: 0, toJSON: () => ({}) });
+    canvas.setPointerCapture = () => {};
+
+    // Collapse the group.
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Collapse group"]')!.click());
+    expect(flow.props!.nodes.find((n) => n.id === 't1')?.hidden).toBe(true);
+
+    // Ensure Pan mode is active.
+    const panBtn = container.querySelector<HTMLButtonElement>('button[aria-label^="Pan"]')!;
+    act(() => panBtn.click());
+
+    // Double pointerdown on empty pane and drag box over (50,50)..(700,400).
+    const downEvt = (x: number, y: number) =>
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: x, clientY: y });
+    const moveEvt = (x: number, y: number) =>
+      new MouseEvent('pointermove', { bubbles: true, button: 0, clientX: x, clientY: y });
+    const upEvt = (x: number, y: number) =>
+      new MouseEvent('pointerup', { bubbles: true, button: 0, clientX: x, clientY: y });
+
+    act(() => { pane.dispatchEvent(downEvt(50, 50)); });
+    act(() => { pane.dispatchEvent(downEvt(50, 50)); });
+    act(() => { canvas.dispatchEvent(moveEvt(700, 400)); });
+    act(() => { canvas.dispatchEvent(upEvt(700, 400)); });
+
+    // Hidden members must NOT be selected (Delete button stays disabled with 0 selected).
+    const delNav = container.querySelector<HTMLButtonElement>('button[aria-label^="Delete selected"]')
+      ?? container.querySelector<HTMLButtonElement>('button[aria-label^="Delete "]');
+    expect(delNav?.disabled).toBe(true);
+    expect(delNav?.getAttribute('aria-label')).toBe('Delete selected (Del)');
   });
 });
