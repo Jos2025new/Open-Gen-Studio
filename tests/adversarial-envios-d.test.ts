@@ -244,6 +244,36 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
   });
 });
 
+describe('1b. Huecos residuales de D2 (Neon, verificación)', () => {
+  it('CRÍTICO: catálogo/estimado $0 y quote $0, el proveedor reporta $0.10 en el 1.º y falla el 2.º → se anota $0.10', async () => {
+    vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0);
+    let n = 0;
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
+      if (++n === 2) throw new HttpError(500, 'boom', {});
+      return imgOut('z1', 0.1);
+    });
+    const g = make(2, ATLAS);
+    patchG(g.id, { estimate: { usd: 0, approximate: false }, retryBaseEstimate: { usd: 0, approximate: false } });
+    await expect(runGeneration(g.id)).rejects.toThrow();
+    expect(genOf(g.id).assetIds).toHaveLength(1);
+    expect(spent()).toBeCloseTo(0.1);
+    expect(logLen()).toBe(1);
+  });
+
+  it('MEDIO: ningún ítem reporta precio (estimado null) → actualUsd queda desconocido y no hay aviso de exceso falso', async () => {
+    setupStore({ budgetOn: true, budgetUsd: 0.2 });
+    useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [NANO]: { ...s.catalog.models[NANO], price: undefined } } } as never }));
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => ({ ...imgOut('u'), costUsd: undefined }));
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'unpriced-all', modelRef: NANO, settings: { count: 2, advanced: {} }, inputs: { refs: [] }, estimate: { usd: 0, approximate: true } });
+    patchG(g.id, { estimate: { usd: null, approximate: true }, retryBaseEstimate: { usd: null, approximate: true } });
+    await runGeneration(g.id);
+    expect(genOf(g.id).status).toBe('done');
+    expect(genOf(g.id).actualUsd).toBeUndefined();
+    const notices = useStore.getState().sessions[sid()].feed.filter((f) => f.type === 'notice' && f.overLimitFor?.gen === g.id);
+    expect(notices).toHaveLength(0);
+  });
+});
+
 describe('2. Rutas verificadas que sí cuadran el gasto', () => {
   it('onGenerationCredit (always) en lote parcial real: 1.º NanoGPT ($0.10) + 2.º HTTP 402 → Atlas ($0.08) = $0.18 una vez', async () => {
     setupStore({ autoSwitch: 'always' });
