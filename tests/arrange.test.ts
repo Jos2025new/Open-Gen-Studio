@@ -10,9 +10,11 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async (id: string) => id,
 }));
 
-import { useStore } from '../src/store/store';
-import { alignPositions, copyNodes, cutNodes, detachOutputs, detachedOutputGroup, groupNodes, pasteNodes, reattachOutputs, ungroup, wholeGroup } from '../src/engine/flow/arrange';
-import { deleteNodes } from '../src/engine/flow/actions';
+import { createSession, useStore } from '../src/store/store';
+import { alignPositions, copyNodes, cutNodes, detachOutputs, detachedOutputGroup, groupNodes, pasteNodes, reattachOutputs, renameGroup, setGroupColor, ungroup, wholeGroup } from '../src/engine/flow/arrange';
+import { deleteNodes, tryConnect } from '../src/engine/flow/actions';
+import { graphHistory, travelGraph } from '../src/engine/flow/history';
+import { applyEdit } from '../src/engine/nodecore/edit';
 import { connect, graphToSteps, nodeOutputAsset } from '../src/engine/flow/graph';
 import { nodeRequest, stable } from '../src/engine/flow/freshness';
 import type { Generation, GenNodeData, Graph } from '../src/engine/types';
@@ -203,4 +205,70 @@ describe('detach and reattach existing node outputs', () => {
     expect(g(sid)).toEqual(before);
   });
 
+});
+
+describe('group frame undo and redo', () => {
+  const travel = (sid: string, dir: 'undo' | 'redo') =>
+    travelGraph(sid, g(sid), dir, 1, (next) => applyEdit({ session: sid, op: { op: 'travel', graph: next } }).ok);
+
+  it('records group, rename, color, and ungroup with exact undo/redo without undoing prior edges', () => {
+    const sess = createSession(`grp-undo-${Math.random()}`);
+    const sid = sess.id;
+    useStore.setState((st) => ({
+      sessions: {
+        ...st.sessions,
+        [sid]: {
+          ...sess,
+          graph: {
+            nodes: [
+              { id: 't1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'T1', text: 'hi' } },
+              { id: 'i1', position: { x: 300, y: 0 }, data: img('I1') as GenNodeData },
+            ],
+            edges: [],
+          },
+          feed: [],
+        },
+      },
+    }));
+
+    void tryConnect(sid, { source: 't1', target: 'i1', targetHandle: 'prompt', sourceHandle: 'out' });
+    expect(g(sid).edges.length).toBe(1);
+
+    const gid = groupNodes(sid, ['t1', 'i1'])!;
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Group 1', nodeIds: ['t1', 'i1'] }]);
+    expect(graphHistory(sid, 'undo')).toHaveLength(2);
+
+    // Undo group: frame gone, prior edge intact; Redo recreates the exact frame.
+    expect(travel(sid, 'undo')).toBe(true);
+    expect(g(sid).groups).toBeUndefined();
+    expect(g(sid).edges).toHaveLength(1);
+    expect(travel(sid, 'redo')).toBe(true);
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Group 1', nodeIds: ['t1', 'i1'] }]);
+
+    // Rename & color each create their own undo/redo steps.
+    renameGroup(sid, gid, 'Shot A');
+    setGroupColor(sid, gid, '#5ec8ff');
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Shot A', nodeIds: ['t1', 'i1'], color: '#5ec8ff' }]);
+
+    // Ungroup > undo brings the frame back (not the earlier edge), redo ungroups again.
+    ungroup(sid, gid);
+    expect(g(sid).groups).toEqual([]);
+    expect(travel(sid, 'undo')).toBe(true);
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Shot A', nodeIds: ['t1', 'i1'], color: '#5ec8ff' }]);
+    expect(g(sid).edges).toHaveLength(1);
+
+    // Undo color & rename accurately.
+    expect(travel(sid, 'undo')).toBe(true);
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Shot A', nodeIds: ['t1', 'i1'] }]);
+    expect(travel(sid, 'undo')).toBe(true);
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Group 1', nodeIds: ['t1', 'i1'] }]);
+
+    // Redo all the way to ungrouped.
+    expect(travel(sid, 'redo')).toBe(true);
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Shot A', nodeIds: ['t1', 'i1'] }]);
+    expect(travel(sid, 'redo')).toBe(true);
+    expect(g(sid).groups).toEqual([{ id: gid, title: 'Shot A', nodeIds: ['t1', 'i1'], color: '#5ec8ff' }]);
+    expect(travel(sid, 'redo')).toBe(true);
+    expect(g(sid).groups).toEqual([]);
+  });
 });
