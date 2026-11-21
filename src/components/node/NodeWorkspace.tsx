@@ -140,13 +140,26 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const t = window.setTimeout(() => void rf.fitView({ nodes: focus.ids.map((id) => ({ id })), padding: 0.3, maxZoom: 1, duration: 450 }), 150);
     return () => window.clearTimeout(t);
   }, [focus.tick]);
+  const hydrated = useStore((s) => s.hydrated);
   // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
-  // Cards that came with the saved graph keep their saved position: only ones added or imported afterwards are settled.
-  const loadedRef = useRef<{ sessionId: string; ids: Set<string> } | null>(null);
-  if (loadedRef.current?.sessionId !== sessionId) loadedRef.current = { sessionId, ids: new Set(fullGraph.nodes.map((n) => n.id)) };
+  // Cards present on load (or once hydrated) keep their saved position; deleted ids drop so undo/restore can settle.
+  const loadedRef = useRef<{ sessionId: string; hydrated: boolean; ids: Set<string> } | null>(null);
+  if (loadedRef.current?.sessionId !== sessionId || (!loadedRef.current.hydrated && hydrated)) {
+    loadedRef.current = { sessionId, hydrated, ids: new Set(fullGraph.nodes.map((n) => n.id)) };
+  } else if (loadedRef.current.ids.size) {
+    const live = new Set(fullGraph.nodes.map((n) => n.id));
+    for (const id of loadedRef.current.ids) if (!live.has(id)) loadedRef.current.ids.delete(id);
+  }
+  useEffect(() => {
+    const live = new Set(fullRevision.nodes.map((n) => n.id));
+    setMeasured((prev) => {
+      for (const id of prev.keys()) if (!live.has(id)) return new Map([...prev].filter(([k]) => live.has(k)));
+      return prev;
+    });
+  }, [fullRevision.nodes]);
   const { dragPos, applyDragChanges, startDrag, endDrag, startSelection, endSelection } = useNodeDrag(sessionId, measuredRef);
 
   const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
