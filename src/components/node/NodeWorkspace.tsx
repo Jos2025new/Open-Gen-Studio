@@ -144,6 +144,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
+  // Cards that came with the saved graph keep their saved position: only ones added or imported afterwards are settled.
+  const loadedRef = useRef<{ sessionId: string; ids: Set<string> } | null>(null);
+  if (loadedRef.current?.sessionId !== sessionId) loadedRef.current = { sessionId, ids: new Set(fullGraph.nodes.map((n) => n.id)) };
   const { dragPos, applyDragChanges, startDrag, endDrag, startSelection, endSelection } = useNodeDrag(sessionId, measuredRef);
 
   const { notices, byPort, byCable, spaceProblems } = useCanvasNotices(fullRevision, ordinaryRevision, omni, sessionId);
@@ -203,8 +206,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         });
       }
       if (sizes.length) setMeasured((prev) => new Map([...prev, ...sizes]));
-      // First sizes of nodes (new, imported, or opened): settle them off their neighbours (no undo step of its own).
-      const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id)).map(([id]) => id));
+      // First sizes of nodes added or imported in this session of the interface: settle them off their neighbours (no undo step
+      // of its own). Cards restored from the saved graph are never moved: their saved position is exact.
+      const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id) && !loadedRef.current?.ids.has(id)).map(([id]) => id));
       if (fresh.size) settleNewNodes(sessionId, fresh, new Map([...measuredRef.current, ...sizes]));
     },
     [sessionId, applyDragChanges],
