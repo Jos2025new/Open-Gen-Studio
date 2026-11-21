@@ -18,7 +18,7 @@
 .sess-row .sess-cover { border-radius: 7px; }
 /* List columns: mode, counts and spend beside the name, sortable and resizable from the header. */
 .sessions { --pc-w-mode: 4.5rem; --pc-w-gens: 5.25rem; --pc-w-nodes: 3.5rem; --pc-w-designs: 4rem; --pc-w-spend: 4rem; --pc-w-date: 4rem; --pc-w-tools: 13.125rem; }
-/* Sessions rows: figures that read as figures. */(shown on hover or focus; the open session keeps its Open tag). */
+/* Sessions rows: figures that read as figures. */
 .sess-row .pc-col.num { color: var(--text); font-size: var(--fs-m); font-weight: 600; }
 .pc-col-mode { width: var(--pc-w-mode); }
 .pc-col-gens { width: var(--pc-w-gens); }
