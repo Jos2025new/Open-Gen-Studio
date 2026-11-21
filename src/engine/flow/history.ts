@@ -140,7 +140,7 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
   const saved = direction === 'undo' ? target.before : target.after;
   const currentById = new Map<string, Graph['nodes'][number]>();
   for (const p of current.nodes) if (!currentById.has(p.id)) currentById.set(p.id, p);
-  const graph = { ...structuredClone(saved), viewport: current.viewport, nodes: saved.nodes.map(n => {
+  const graph = { ...structuredClone(saved), viewport: current.viewport, omniViewport: current.omniViewport, nodes: saved.nodes.map(n => {
     const live = currentById.get(n.id) ?? s.latest.get(n.id);
     if (live && live.data.kind === n.data.kind && 'outputIndex' in n.data && 'outputIndex' in live.data) {
       const newerOutput = n.data.generationId !== live.data.generationId;

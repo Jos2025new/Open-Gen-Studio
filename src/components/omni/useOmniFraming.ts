@@ -5,9 +5,10 @@ import { useStore } from '../../store/store';
 /** The omnicanvas opens framed on the session's main parts (Studio, Nodes, Designer, chat, agent), at 60 % zoom or more when they fit, otherwise at the zoom that fits them (never below 35 %). */
 export const OMNI_OPEN_MIN_ZOOM = 0.35;
 
-export function useOmniFraming(omni: boolean, sessionId: string, rf: ReactFlowInstance): void {
+export function useOmniFraming(omni: boolean, sessionId: string, rf: ReactFlowInstance, remembered = false): void {
   useEffect(() => {
-    if (!omni) return;
+    // A view left here before is restored by the canvas; only the first visit frames.
+    if (!omni || remembered) return;
     const t = window.setTimeout(() => {
       const main = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => n.data.kind === 'ref' && (n.data.type === 'space' || n.data.type === 'chat' || n.data.type === 'agent')).map((n) => ({ id: n.id })) ?? [];
       if (main.length) void rf.fitView({ nodes: main, padding: 0.1, minZoom: OMNI_OPEN_MIN_ZOOM, maxZoom: 1, duration: 0 });

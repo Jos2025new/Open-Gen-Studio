@@ -26,6 +26,7 @@ import { AddNodeItems } from './AddNodeItems';
 import { AddNodeMenu, CanvasChatImport, RunAll } from './NodeCanvasParts';
 import { omniWidth } from '../omni/RefNode';
 import { useOmniFraming } from '../omni/useOmniFraming';
+import { useViewMemory } from './useViewMemory';
 import { revealRect } from '../omni/revealNode';
 import { useOmniEntries } from '../omni/useOmniEntries';
 import { settleNewNodes } from '../../engine/flow/settle';
@@ -46,6 +47,7 @@ import { useBoardFocus } from '../studio/useBoardFocus';
 import { closedGroupNotices, isNodeSelectable, useCanvasElements, useCanvasGroups } from './CanvasElements';
 import { CanvasProblems, noticeEdgeTypes } from './CanvasNotices';
 import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
+import { useLoadedIds } from './useLoadedIds';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
@@ -131,7 +133,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
-  useOmniFraming(omni, sessionId, rf);
+  const view = useViewMemory(sessionId, omni, !embedded);
+  useOmniFraming(omni, sessionId, rf, Boolean(view.saved));
   usePortZoom(omni, canvasRef);
   // Nodes the agent just added: frame them once they are measured.
   const focus = useNodeFocus();
@@ -140,19 +143,11 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const t = window.setTimeout(() => void rf.fitView({ nodes: focus.ids.map((id) => ({ id })), padding: 0.3, maxZoom: 1, duration: 450 }), 150);
     return () => window.clearTimeout(t);
   }, [focus.tick]);
-  const hydrated = useStore((s) => s.hydrated);
   // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
-  // Cards present on load (or once hydrated) keep their saved position; deleted ids drop so undo/restore can settle.
-  const loadedRef = useRef<{ sessionId: string; hydrated: boolean; ids: Set<string> } | null>(null);
-  if (loadedRef.current?.sessionId !== sessionId || (!loadedRef.current.hydrated && hydrated)) {
-    loadedRef.current = { sessionId, hydrated, ids: new Set(fullGraph.nodes.map((n) => n.id)) };
-  } else if (loadedRef.current.ids.size) {
-    const live = new Set(fullGraph.nodes.map((n) => n.id));
-    for (const id of loadedRef.current.ids) if (!live.has(id)) loadedRef.current.ids.delete(id);
-  }
+  const loadedRef = useLoadedIds(sessionId, fullGraph);
   useEffect(() => {
     const live = new Set(fullRevision.nodes.map((n) => n.id));
     setMeasured((prev) => {
@@ -451,7 +446,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         connectionLineStyle={{ stroke: 'var(--text-2)', strokeWidth: 2, strokeDasharray: '6 6' }}
         isValidConnection={isValidConnection}
         colorMode="dark"
-        fitView
+        fitView={!view.saved}
+        defaultViewport={view.saved}
+        onMoveEnd={view.onMoveEnd}
         fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
         minZoom={NODE_MIN_ZOOM}
         maxZoom={NODE_MAX_ZOOM}
@@ -481,6 +478,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
           tool={tool}
           onTool={pickTool}
           selectedCount={liveSelected.length + liveSelectedEdgeSet.size}
+          selectedIds={liveSelected}
           onDelete={() => del.request(liveSelected, [...liveSelectedEdgeSet])}
           omni={omni}
         /></>}
