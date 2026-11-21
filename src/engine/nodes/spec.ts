@@ -143,6 +143,14 @@ export function systemNodePorts(data: RefNodeData): PortSpec[] {
   return (data.type === 'space' ? omniSpacePorts(data.ref) : undefined) ?? SYSTEM_NODE_TYPES[data.type]?.ports ?? [];
 }
 
+export const CREATIVE_LINK_PORTS: readonly PortSpec[] = [
+  { id: 'sys_ref', direction: 'in', kind: 'ref', type: 'any', multi: true, label: 'References' },
+  { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Reference' },
+  { id: 'model', direction: 'in', kind: 'control', type: 'model', multi: false, label: 'Model' },
+  { id: 'control', direction: 'in', kind: 'control', type: 'control', multi: true, label: 'Control' },
+  { id: 'out_control', direction: 'out', kind: 'control', type: 'control', multi: true, label: 'Control' },
+];
+
 export function allNodePorts(
   data: GraphNodeData,
   _assets: Record<string, Asset>,
@@ -159,13 +167,7 @@ export function allNodePorts(
     label: p.label,
   }));
   if (creativeOut) ports.push({ id: 'out', direction: 'out', kind: 'data', type: creativeOut, multi: true, label: 'Output' });
-  ports.push(
-    { id: 'sys_ref', direction: 'in', kind: 'ref', type: 'any', multi: true, label: 'References' },
-    { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Reference' },
-    { id: 'model', direction: 'in', kind: 'control', type: 'model', multi: false, label: 'Model' },
-    { id: 'control', direction: 'in', kind: 'control', type: 'control', multi: true, label: 'Control' },
-    { id: 'out_control', direction: 'out', kind: 'control', type: 'control', multi: true, label: 'Control' },
-  );
+  ports.push(...CREATIVE_LINK_PORTS.map((port) => ({ ...port })));
   return ports;
 }
 

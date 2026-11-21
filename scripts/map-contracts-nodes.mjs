@@ -48,6 +48,15 @@ export default [{
   ],
   tests: ['tests/system-nodes.test.ts', 'tests/omnicanvas.test.ts', 'tests/adversarial-p7-add-node.test.ts'],
 }, {
+  id: 'creative-link-ports',
+  what: 'El motor y LinkHandles comparten los cinco puertos de enlace de los nodos creativos. El motor conserva su orden de resolución y la interfaz agrupa por dirección conservando las posiciones.',
+  sides: [
+    ['src/engine/nodes/spec.ts', 'export const CREATIVE_LINK_PORTS'],
+    ['src/engine/nodes/spec.ts', 'ports.push(...CREATIVE_LINK_PORTS'],
+    ['src/components/node/SystemNode.tsx', 'CREATIVE_LINK_PORTS.filter'],
+  ],
+  tests: ['tests/puertos-creativos.test.ts'],
+}, {
   id: 'node-core',
   what: 'ADR 0031: descriptor por tipo de nodo, un resolvedor de entradas, una capa de edición con revisión esperada, acciones con instantánea y cables inválidos.',
   sides: [
