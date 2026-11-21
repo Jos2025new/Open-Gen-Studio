@@ -40,13 +40,20 @@ Fuente: bus `20261121-neon-critica-direccion-5.md`; observaciones en [metodo-tra
 4. Hay que mantener el foco en los frentes que pidió el usuario.
 
 ## Pendiente, en orden (sustituye a la lista de 072; prioridades del usuario, 2026-11-21)
-1. **Núcleo del dinero en los envíos**, con GPT y Neon revisando con KISS y SOLID:
+1. **Que añadir sea solo registrar.** Primer lugar por decisión del usuario: sin esto, la app crece a base de regresiones y parches.
+   - **Antes que nada:** un buen diagnóstico y una propuesta que haga lo mínimo con el mayor impacto.
+   - **Huecos de hoy en `main`:**
+     - la interfaz de cada tipo de nodo (menú «Add node», tarjeta) está escrita a mano; su registro está en `task/descriptor-2`, sin fusionar;
+     - los paneles y componentes nuevos no tienen envoltorio; la regla del [ADR 0031](../decisions/0031-nucleo-de-nodos.md) es leer del nodo y escribir por una sola vía;
+     - los nodos de sistema siguen fuera del registro, en `spec.ts`.
+   - **Lo que ya funciona así:** los comandos ([ADR 0030](../decisions/0030-nucleo-de-comandos.md)) y la lógica de los tipos de nodo ([ADR 0031](../decisions/0031-nucleo-de-nodos.md)).
+   - **Resultado:** una guía corta de cómo se añade cada cosa (comando, tipo de nodo, panel, puerto), cada regla con su comprobación en `npm test`.
+2. **Núcleo del dinero en los envíos**, con GPT y Neon revisando con KISS y SOLID:
    - proveedor síncrono sin id;
    - aprobaciones solo en memoria;
    - `purgeDiscarded`;
    - LLM fuera de `jobs.ts`;
    - gasto estimado de un lote recargado sin precio.
-2. **Reglas para añadir sin rediseñar:** una guía corta de cómo se conecta cada cosa nueva. Las reglas están repartidas entre el [ADR 0030](../decisions/0030-nucleo-de-comandos.md), el [ADR 0031](../decisions/0031-nucleo-de-nodos.md), AGENTS.md y el mapa. Hay que reunirlas antes de cambiar la interfaz.
 3. **Refrescar las 14 dudas de interfaz y arrastre** del bus `20261120-master-para-usuario.md` contra `main`: qué sigue vigente.
 4. **Probar en el sandbox la vista por espacio** y «Ajustar».
 5. **Revisar el plan «Todo es un nodo»** buscando antes lo ya discutido. Va más o menos por la mitad; la tabla es del 2026-11-14 y está desactualizada. Nada bloquea aplazarlo una semana.
