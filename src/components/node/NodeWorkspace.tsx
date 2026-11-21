@@ -468,6 +468,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
           tool={tool}
           onTool={pickTool}
           selectedCount={liveSelected.length + liveSelectedEdgeSet.size}
+          selectedIds={liveSelected}
           onDelete={() => del.request(liveSelected, [...liveSelectedEdgeSet])}
           omni={omni}
         /></>}

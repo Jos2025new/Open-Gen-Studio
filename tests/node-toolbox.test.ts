@@ -8,7 +8,7 @@ const parts = readFileSync('src/components/node/NodeCanvasParts.tsx', 'utf8');
 it('Nodes has one vertical canvas toolbox with every canvas tool, in order (Create and Conversation under Add node, Auto layout under Pan, Delete with Undo and Redo), its popovers opening to the right', () => {
   expect(nav).toMatch(/<Panel position="top-left" className="canvas-navigation" role="toolbar" aria-label="Canvas tools" aria-orientation="vertical">/);
   const panel = nav.slice(nav.indexOf('<Panel position'), nav.indexOf('</Panel>'));
-  const order = ['{add}', '<CornerButtons', 'MousePointer2', 'icon={Hand}', 'icon={LayoutDashboard}', 'label="Fit view" disabled', 'icon={Map}', 'icon={Undo2}', 'icon={Redo2}', 'icon={Trash}', 'label="Zoom in"', 'canvas-zoom num', 'label="Zoom out"', 'label="Search canvas"'].map((t) => panel.indexOf(t));
+  const order = ['{add}', '<CornerButtons', 'MousePointer2', 'icon={Hand}', 'icon={LayoutDashboard}', 'label="Fit view (Shift+1 all, Shift+2 selection)" disabled', 'icon={Map}', 'icon={Undo2}', 'icon={Redo2}', 'icon={Trash}', 'label="Zoom in"', 'canvas-zoom num', 'label="Zoom out"', 'label="Search canvas"'].map((t) => panel.indexOf(t));
   expect(order.every((i) => i > 0)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   expect(nav.match(/placement="right-start"/g)).toHaveLength(3);
