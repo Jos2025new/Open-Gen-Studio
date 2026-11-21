@@ -72,6 +72,12 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const [tool, setTool] = useState<NodeTool>(loadNodeTool);
   const lastTool = useRef<'select' | 'pan'>(tool === 'select' ? 'select' : 'pan');
   const pickTool = (t: NodeTool) => { setTool(t); if (t === 'cut') return; lastTool.current = t; try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  const pickToolRef = useRef(pickTool);
+  pickToolRef.current = pickTool;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   const cut = useCutTool({ active: tool === 'cut', canvasRef, onCut: (ids) => void disconnectEdges(sessionId, ids) });
   // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
   const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -317,18 +323,18 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const key = (e: KeyboardEvent) => {
       if (!insideRef.current || e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
       const k = e.key.toLowerCase();
-      if (k === 'x') { e.preventDefault(); pickTool(tool === 'cut' ? lastTool.current : 'cut'); }
-      else if (k === 'escape' && tool === 'cut') pickTool(lastTool.current);
+      if (k === 'x') { e.preventDefault(); pickToolRef.current(toolRef.current === 'cut' ? lastTool.current : 'cut'); }
+      else if (k === 'escape' && toolRef.current === 'cut') pickToolRef.current(lastTool.current);
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  });
+  }, [embedded]);
 
   // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (!insideRef.current || !(e.ctrlKey || e.metaKey) || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
-      const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id) ?? [];
+      const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selectedRef.current.has(n.id)).map((n) => n.id) ?? [];
       const k = e.key.toLowerCase();
       if (!ids.length || window.getSelection()?.toString()) return;
       if (k === 'c') { copyNodes(sessionId, ids); toast(`Copied ${ids.length} node${ids.length === 1 ? '' : 's'}`, 'success'); }
@@ -340,7 +346,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [sessionId, selected]);
+  }, [sessionId]);
 
   const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 

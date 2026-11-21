@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
 import { Hand, LayoutDashboard, Scissors, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from '../ui/icons';
 import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
@@ -100,16 +100,18 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
     });
     history.close();
   };
+  const travelRef = useRef(travel);
+  travelRef.current = travel;
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) return;
       if (!(e.ctrlKey || e.metaKey) || !['z', 'y'].includes(e.key.toLowerCase())) return;
       e.preventDefault();
-      travel(e.key.toLowerCase() === 'y' || e.shiftKey ? 'redo' : 'undo');
+      travelRef.current(e.key.toLowerCase() === 'y' || e.shiftKey ? 'redo' : 'undo');
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  });
+  }, []);
   const showHistory = (e: React.MouseEvent, dir: 'undo' | 'redo') => { e.preventDefault(); e.stopPropagation(); setDirection(dir); history.setOpen(true); };
   return (
     <>
