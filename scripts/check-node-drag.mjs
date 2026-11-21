@@ -1,8 +1,7 @@
 /**
  * Permanent drag-perf guard (single-scan AST check with lexical scope stack):
- * 1. In-progress drag handlers (`onNodeDrag`, `onSelectionDrag`, and `dragging: true` / unguarded `position` paths of
- *    `onNodesChange` / `applyDragChanges`) must never reach `editPresentation`, `setGraph`, `patchSession`, `applyEdit`,
- *    `moveGroup`, `recordGraph`, `travelGraph`, or serialization (`persistState`, `JSON.stringify`).
+ * 1. In-progress drag paths (`onNodeDrag`, `onSelectionDrag`, `onNodesChange`, `applyDragChanges`) must not reach
+ *    `editPresentation`, `setGraph`, `patchSession`, `applyEdit`, `moveGroup`, `recordGraph`, `travelGraph`, `persistState`, `JSON.stringify`.
  * 2. Card components must not mount `<NodeToolbar` unconditionally.
  * 3. `useCutTool` pointermove handlers must not rescan the full trail (`trailCuts` or loop over `trail`).
  */
@@ -24,65 +23,57 @@ const DRAG_HINT = 'No escribas el grafo, historial ni serialices durante el arra
 const CUT_HINT = 'No recorras todo el trazo de la tijera en cada pointermove; prueba solo el segmento [anterior, actual] y acumula los cortes.';
 const TOOLBAR_HINT = 'NodeToolbar montado incondicionalmente; móntalo solo cuando la tarjeta esté seleccionada.';
 
-function rawMemberName(n) {
+function memberName(n) {
   if (!n) return '';
   if (n.type === 'Identifier') return n.name;
   if (n.type === 'MemberExpression') {
-    const obj = rawMemberName(n.object), prop = n.property?.name ?? n.property?.value ?? '';
+    const obj = memberName(n.object), prop = n.property?.name ?? n.property?.value ?? '';
     return obj && prop ? `${obj}.${prop}` : prop;
   }
   return '';
 }
-
 function calleeName(c) {
-  if (c?.type === 'MemberExpression' && (c.property?.name === 'call' || c.property?.name === 'apply') && c.object) return calleeName(c.object);
-  return rawMemberName(c);
+  return c?.type === 'MemberExpression' && (c.property?.name === 'call' || c.property?.name === 'apply') && c.object ? calleeName(c.object) : memberName(c);
 }
-
 function unwrapFn(n) {
   if (!n) return null;
   if (n.type === 'ArrowFunctionExpression' || n.type === 'FunctionExpression' || n.type === 'FunctionDeclaration') return n;
-  if (n.type === 'CallExpression' && /^(?:.*\.)?(?:useCallback|useMemo)$/.test(calleeName(n.callee))) return unwrapFn(n.arguments?.[0]);
-  return null;
+  return n.type === 'CallExpression' && /^(?:.*\.)?(?:useCallback|useMemo)$/.test(calleeName(n.callee)) ? unwrapFn(n.arguments?.[0]) : null;
 }
-
 function walkSubtree(node, fn) {
   if (!node || typeof node.type !== 'string' || fn(node) === false) return;
-  for (const k of Object.keys(node)) {
-    const child = node[k];
+  for (const child of Object.values(node)) {
     if (Array.isArray(child)) child.forEach((c) => walkSubtree(c, fn));
     else if (child && typeof child === 'object') walkSubtree(child, fn);
   }
 }
-
-function isDraggingMember(node, trueVars) {
+function isDragMem(node, trueVars) {
   return Boolean(node && ((node.type === 'MemberExpression' && node.property?.name === 'dragging') || (node.type === 'Identifier' && trueVars.has(node.name))));
 }
-
-function isDraggingTest(test, wantTrue, trueVars, falseVars) {
+function isDragTest(test, wantTrue, trueVars, falseVars) {
   if (!test) return false;
-  if (test.type === 'LogicalExpression' && test.operator === '&&') {
-    return isDraggingTest(test.left, wantTrue, trueVars, falseVars) || isDraggingTest(test.right, wantTrue, trueVars, falseVars);
+  if (test.type === 'LogicalExpression') {
+    if (test.operator === '&&') return isDragTest(test.left, wantTrue, trueVars, falseVars) || isDragTest(test.right, wantTrue, trueVars, falseVars);
+    if (test.operator === '||') return isDragTest(test.left, wantTrue, trueVars, falseVars) && isDragTest(test.right, wantTrue, trueVars, falseVars);
   }
-  if (wantTrue && isDraggingMember(test, trueVars)) return true;
+  if (wantTrue && isDragMem(test, trueVars)) return true;
   if (!wantTrue && test.type === 'Identifier' && falseVars.has(test.name)) return true;
-  if (test.type === 'UnaryExpression' && test.operator === '!') return isDraggingTest(test.argument, !wantTrue, trueVars, falseVars);
+  if (test.type === 'UnaryExpression' && test.operator === '!') return isDragTest(test.argument, !wantTrue, trueVars, falseVars);
   if (test.type === 'BinaryExpression') {
     const { left, right, operator } = test;
-    const eq = operator === '===' || operator === '==';
-    const neq = operator === '!==' || operator === '!=';
+    if (operator === '>' && right?.value === 0 && /^(?:draggingIdsRef|framePreviewsRef)\b/.test(memberName(left))) return wantTrue;
+    const eq = operator === '===' || operator === '==', neq = operator === '!==' || operator === '!=';
     if (eq || neq) {
+      if (right?.value === 0 && /^(?:draggingIdsRef|framePreviewsRef)\b/.test(memberName(left))) return eq ? !wantTrue : wantTrue;
       const target = eq ? wantTrue : !wantTrue;
-      return (isDraggingMember(left, trueVars) && right?.value === target) || (isDraggingMember(right, trueVars) && left?.value === target);
+      return (isDragMem(left, trueVars) && right?.value === target) || (isDragMem(right, trueVars) && left?.value === target);
     }
   }
   return false;
 }
-
-function collectDraggingAliases(fnNode) {
+function dragAliases(fnNode) {
   const trueVars = new Set(), falseVars = new Set();
-  let changed = true;
-  while (changed) {
+  for (let changed = true; changed;) {
     changed = false;
     walkSubtree(fnNode, (n) => {
       if (n.type === 'ObjectPattern') {
@@ -92,79 +83,110 @@ function collectDraggingAliases(fnNode) {
         }
       } else if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier' && n.init) {
         const name = n.id.name;
-        if (!trueVars.has(name) && isDraggingTest(n.init, true, trueVars, falseVars)) { trueVars.add(name); changed = true; }
-        else if (!falseVars.has(name) && isDraggingTest(n.init, false, trueVars, falseVars)) { falseVars.add(name); changed = true; }
+        if (!trueVars.has(name) && isDragTest(n.init, true, trueVars, falseVars)) { trueVars.add(name); changed = true; }
+        else if (!falseVars.has(name) && isDragTest(n.init, false, trueVars, falseVars)) { falseVars.add(name); changed = true; }
       }
     });
   }
   return { trueVars, falseVars };
 }
-
 function alwaysExits(stmt) {
   if (!stmt) return false;
   if (stmt.type === 'ReturnStatement' || stmt.type === 'ContinueStatement' || stmt.type === 'ThrowStatement' || stmt.type === 'BreakStatement') return true;
   return stmt.type === 'BlockStatement' && stmt.body.length > 0 && alwaysExits(stmt.body.at(-1));
 }
-
-function registerVarDecls(scope, decls, scopesSnap) {
+const isFnDef = (n) => n.type === 'FunctionDeclaration' || (n.type === 'VariableDeclarator' && Boolean(unwrapFn(n.init)));
+function bindIds(scope, list, kind) {
+  for (const p of list ?? []) {
+    if (!p) continue;
+    if (p.type === 'Identifier') scope.set(p.name, { kind });
+    else if (p.type === 'AssignmentPattern') bindIds(scope, [p.left], kind);
+    else if (p.type === 'RestElement') bindIds(scope, [p.argument], kind);
+    else if (p.type === 'ObjectPattern') bindIds(scope, (p.properties ?? []).map((pr) => pr.value ?? pr.argument), kind);
+    else if (p.type === 'ArrayPattern') bindIds(scope, p.elements, kind);
+  }
+}
+function regVars(scope, decls, snap) {
   for (const d of decls ?? []) {
+    bindIds(scope, [d.id], 'local');
     if (!d.init) continue;
     if (d.id?.type === 'Identifier') {
       const idName = d.id.name, fn = unwrapFn(d.init);
-      if (fn) scope.set(idName, { kind: 'fn', node: fn, scopes: scopesSnap });
+      if (fn) scope.set(idName, { kind: 'fn', node: fn, scopes: snap });
       else if (d.init.type === 'Identifier' || d.init.type === 'MemberExpression') {
-        const target = rawMemberName(d.init);
-        if (target) scope.set(idName, { kind: 'alias', target, scopes: scopesSnap });
+        const target = memberName(d.init);
+        if (target) scope.set(idName, { kind: 'alias', target, scopes: snap });
       } else if (d.init.type === 'ObjectExpression') {
         for (const p of d.init.properties ?? []) {
           const key = p.key?.name ?? p.key?.value, pFn = unwrapFn(p.value);
           if (!key || !p.value) continue;
-          if (pFn) scope.set(`${idName}.${key}`, { kind: 'fn', node: pFn, scopes: scopesSnap });
-          else if (rawMemberName(p.value)) scope.set(`${idName}.${key}`, { kind: 'alias', target: rawMemberName(p.value), scopes: scopesSnap });
+          if (pFn) scope.set(`${idName}.${key}`, { kind: 'fn', node: pFn, scopes: snap });
+          else if (memberName(p.value)) scope.set(`${idName}.${key}`, { kind: 'alias', target: memberName(p.value), scopes: snap });
         }
       }
     } else if (d.id?.type === 'ObjectPattern') {
-      const initName = rawMemberName(d.init);
+      const initName = memberName(d.init);
       for (const p of d.id.properties ?? []) {
         const key = p.key?.name ?? p.key?.value, val = (p.value?.type === 'AssignmentPattern' ? p.value.left : p.value)?.name;
-        if (key && val) scope.set(val, { kind: 'alias', target: initName ? `${initName}.${key}` : key, scopes: scopesSnap });
+        if (key && val) scope.set(val, { kind: 'alias', target: initName ? `${initName}.${key}` : key, scopes: snap });
       }
     }
   }
 }
-
-function populateScope(scope, stmts, scopesSnap) {
+function populateScope(scope, stmts, snap) {
   for (const s of stmts ?? []) {
     if (s.type === 'ImportDeclaration' && s.source?.value) {
       for (const sp of s.specifiers ?? []) {
         if (sp.type === 'ImportSpecifier' && sp.local?.name) scope.set(sp.local.name, { kind: 'import', source: s.source.value, imported: sp.imported?.name ?? sp.imported?.value });
         else if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) scope.set(sp.local.name, { kind: 'ns', source: s.source.value });
       }
-    } else if (s.type === 'FunctionDeclaration' && s.id?.name) scope.set(s.id.name, { kind: 'fn', node: s, scopes: scopesSnap });
-    else if (s.type === 'VariableDeclaration') registerVarDecls(scope, s.declarations, scopesSnap);
+    } else if (s.type === 'FunctionDeclaration' && s.id?.name) scope.set(s.id.name, { kind: 'fn', node: s, scopes: snap });
+    else if (s.type === 'VariableDeclaration') regVars(scope, s.declarations, snap);
     else if (s.type === 'ExportNamedDeclaration') {
-      if (s.declaration?.type === 'FunctionDeclaration' && s.declaration.id?.name) scope.set(s.declaration.id.name, { kind: 'fn', node: s.declaration, scopes: scopesSnap });
-      else if (s.declaration?.type === 'VariableDeclaration') registerVarDecls(scope, s.declaration.declarations, scopesSnap);
+      if (s.declaration?.type === 'FunctionDeclaration' && s.declaration.id?.name) scope.set(s.declaration.id.name, { kind: 'fn', node: s.declaration, scopes: snap });
+      else if (s.declaration?.type === 'VariableDeclaration') regVars(scope, s.declaration.declarations, snap);
       for (const sp of s.specifiers ?? []) {
         const local = sp.local?.name ?? sp.local?.value, exported = sp.exported?.name ?? sp.exported?.value;
         if (!local || !exported) continue;
         if (s.source?.value) scope.set(exported, { kind: 'import', source: s.source.value, imported: local });
-        else if (local !== exported) scope.set(exported, { kind: 'alias', target: local, scopes: scopesSnap });
+        else if (local !== exported) scope.set(exported, { kind: 'alias', target: local, scopes: snap });
       }
     }
   }
 }
-
+function bindParams(fnNode, sc) {
+  const scope = new Map(); bindIds(scope, fnNode.params, 'param'); return [...sc, scope];
+}
+function extendScope(node, sc) {
+  if (node.type === 'Program' || node.type === 'BlockStatement') {
+    const scope = new Map(), next = [...sc, scope]; populateScope(scope, node.body, next); return next;
+  }
+  if (node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') return bindParams(node, sc);
+  if (node.type === 'ForStatement' || node.type === 'ForOfStatement' || node.type === 'ForInStatement') {
+    const decl = node.init ?? node.left;
+    if (decl?.type === 'VariableDeclaration') {
+      const scope = new Map(), next = [...sc, scope]; regVars(scope, decl.declarations, next); return next;
+    }
+  }
+  return sc;
+}
+function walkScopes(node, sc, fn) {
+  if (!node || typeof node.type !== 'string') return;
+  const next = extendScope(node, sc);
+  if (fn(node, next) === false) return;
+  for (const child of Object.values(node)) {
+    if (Array.isArray(child)) child.forEach((c) => walkScopes(c, next, fn));
+    else if (child && typeof child === 'object') walkScopes(child, next, fn);
+  }
+}
 function lookup(name, scopes) {
   for (let i = scopes.length - 1; i >= 0; i--) if (scopes[i].has(name)) return scopes[i].get(name);
   return null;
 }
 
-/** Problems under `root`, as `file:line — message` strings. */
 export function check(root = '.') {
   const extMods = new Map();
-
-  function getModuleScope(fromRel, spec) {
+  function modScope(fromRel, spec) {
     if (!spec?.startsWith('.')) return null;
     const base = posix.normalize(posix.join(posix.dirname(fromRel), spec.split('?')[0].replace(/\.(?:[cm]?[jt]sx?)$/, '')));
     for (const cand of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]) {
@@ -173,26 +195,22 @@ export function check(root = '.') {
       if (existsSync(abs)) {
         const { program } = parseSync(abs, readFileSync(abs, 'utf8'));
         const scope = new Map(), mod = { rel: cand, scopes: [scope] };
-        populateScope(scope, program.body, mod.scopes);
-        extMods.set(cand, mod);
-        return mod;
+        populateScope(scope, program.body, mod.scopes); extMods.set(cand, mod); return mod;
       }
     }
     return null;
   }
-
   function resolveImport(fromRel, source, imported, seen) {
-    const mod = getModuleScope(fromRel, source);
-    return (mod && resolveSymbol(mod.rel, imported, mod.scopes, seen)) || (TRACKED.has(imported) ? { kind: 'tracked', name: imported } : null);
+    const mod = modScope(fromRel, source);
+    return (mod && resolveSym(mod.rel, imported, mod.scopes, seen)) || (TRACKED.has(imported) ? { kind: 'tracked', name: imported } : null);
   }
-
-  function resolveSymbol(rel, name, scopes, seen = new Set()) {
+  function resolveSym(rel, name, scopes, seen = new Set()) {
     if (!name || seen.has(`${rel}::${name}`)) return null;
     seen.add(`${rel}::${name}`);
     const b = lookup(name, scopes);
     if (b) {
-      if (b.kind === 'param') return null;
-      if (b.kind === 'alias') return resolveSymbol(rel, b.target, b.scopes, seen);
+      if (b.kind === 'param' || b.kind === 'local') return null;
+      if (b.kind === 'alias') return resolveSym(rel, b.target, b.scopes, seen);
       if (b.kind === 'fn') return { kind: 'fn', rel, name, node: b.node, scopes: b.scopes };
       if (b.kind === 'import') return resolveImport(rel, b.source, b.imported, seen);
     }
@@ -200,35 +218,26 @@ export function check(root = '.') {
     if (name.includes('.')) {
       const [obj, ...rest] = name.split('.'), prop = rest.join('.'), objB = lookup(obj, scopes);
       if (objB?.kind === 'ns') return resolveImport(rel, objB.source, prop, seen);
-      if (objB?.kind === 'alias') return resolveSymbol(rel, `${objB.target}.${prop}`, objB.scopes, seen);
+      if (objB?.kind === 'alias') return resolveSym(rel, `${objB.target}.${prop}`, objB.scopes, seen);
       const last = rest.at(-1);
       if (FORBIDDEN.has(last) && obj !== 'JSON') return { kind: 'tracked', name: last };
     }
     return null;
   }
-
-  function bodyScopesForFn(fnB) {
-    const fnScope = new Map(), nextScopes = [...fnB.scopes, fnScope];
-    for (const p of fnB.node.params ?? []) if (p.type === 'Identifier') fnScope.set(p.name, { kind: 'param' });
-    if (fnB.node.body?.type === 'BlockStatement') populateScope(fnScope, fnB.node.body.body, nextScopes);
-    return nextScopes;
-  }
-
-  function callForbiddenTarget(rel, callNode, scopes, seen = new Set()) {
+  function badCall(rel, callNode, scopes, seen = new Set()) {
     const cname = callNode?.type === 'CallExpression' ? calleeName(callNode.callee) : '';
-    const resolved = cname ? resolveSymbol(rel, cname, scopes) : null;
-    if (!resolved) return null;
-    if (resolved.kind === 'tracked' && FORBIDDEN.has(resolved.name)) return cname !== resolved.name ? `${cname} -> ${resolved.name}` : cname;
-    if (resolved.kind === 'fn') {
-      const fnKey = `${resolved.rel}::${resolved.name}::${resolved.node.start}`;
+    const res = cname ? resolveSym(rel, cname, scopes) : null;
+    if (!res) return null;
+    if (res.kind === 'tracked' && FORBIDDEN.has(res.name)) return cname !== res.name ? `${cname} -> ${res.name}` : cname;
+    if (res.kind === 'fn') {
+      const fnKey = `${res.rel}::${res.name}::${res.node.start}`;
       if (seen.has(fnKey)) return null;
       seen.add(fnKey);
-      const innerScopes = bodyScopesForFn(resolved);
       let hit = null;
-      walkSubtree(resolved.node.body, (n) => {
-        if (hit) return false;
+      walkScopes(res.node.body, bindParams(res.node, res.scopes), (n, sc) => {
+        if (hit || isFnDef(n)) return false;
         if (n.type === 'CallExpression') {
-          const sub = callForbiddenTarget(resolved.rel, n, innerScopes, new Set(seen));
+          const sub = badCall(res.rel, n, sc, new Set(seen));
           if (sub) { hit = `${cname} -> ${sub}`; return false; }
         }
       });
@@ -236,13 +245,11 @@ export function check(root = '.') {
     }
     return null;
   }
-
-  function isNodeToolbarJsx(rel, node, scopes) {
+  function isToolbar(rel, node, scopes) {
     if (node.type !== 'JSXElement') return false;
     const n = node.openingElement?.name;
     const tag = n?.type === 'JSXIdentifier' ? n.name : n?.type === 'JSXMemberExpression' ? `${n.object?.name ?? ''}.${n.property?.name ?? ''}` : '';
-    if (!tag) return false;
-    return tag === 'NodeToolbar' || tag.endsWith('.NodeToolbar') || resolveSymbol(rel, tag, scopes)?.name === 'NodeToolbar';
+    return Boolean(tag && (tag === 'NodeToolbar' || tag.endsWith('.NodeToolbar') || resolveSym(rel, tag, scopes)?.name === 'NodeToolbar'));
   }
 
   const raw = scan(root, {
@@ -251,97 +258,69 @@ export function check(root = '.') {
     rules: ({ rel, text }) => {
       if (!RELEVANT_RE.test(text)) return { enter() {} };
       const scopes = [], condStack = [], cutToolNodes = new Set();
-
-      const flagCalls = (rootNode, activeScopes, report, skipFalseVars) => {
-        const walk = (n) => {
-          if (!n || typeof n.type !== 'string') return;
-          if (skipFalseVars && n.type === 'IfStatement' && isDraggingTest(n.test, false, skipFalseVars.trueVars, skipFalseVars.falseVars)) {
-            if (n.alternate) walk(n.alternate);
-            return;
-          }
-          if (n.type === 'CallExpression') {
-            const hit = callForbiddenTarget(rel, n, activeScopes);
-            if (hit) report(n, `Escritura/serialización durante el arrastre${hit.includes(' -> ') ? ` vía ${hit}` : ` (${hit})`}. ${DRAG_HINT}`);
-          }
-          for (const k of Object.keys(n)) {
-            const child = n[k];
-            if (Array.isArray(child)) child.forEach(walk);
-            else if (child && typeof child === 'object') walk(child);
+      const checkHandler = (fnNode, name, activeScopes, report) => {
+        if (!fnNode?.body) return;
+        const fnScopes = bindParams(fnNode, activeScopes);
+        const flagCall = (n, sc, inNonDrag = false) => {
+          const hit = badCall(rel, n, sc);
+          if (hit && !(inNonDrag && /^(?:ungroup|deleteNodes|settleNewNodes)\b/.test(hit))) {
+            report(n, `Escritura/serialización durante el arrastre${hit.includes(' -> ') ? ` vía ${hit}` : ` (${hit})`}. ${DRAG_HINT}`);
           }
         };
-        walk(rootNode);
-      };
-
-      const checkDragHandler = (fnNode, name, activeScopes, report) => {
-        if (!fnNode?.body) return;
-        const handlerScopes = bodyScopesForFn({ node: fnNode, scopes: activeScopes });
-        if (name === 'onNodeDrag' || name === 'onSelectionDrag') { flagCalls(fnNode.body, handlerScopes, report); return; }
-        const { trueVars, falseVars } = collectDraggingAliases(fnNode);
-        let guarded = false;
-        const walkPaths = (node) => {
-          if (!node || typeof node.type !== 'string') return;
-          if (node.type === 'BlockStatement' && Array.isArray(node.body)) {
-            for (let i = 0; i < node.body.length; i++) {
-              const s = node.body[i];
-              if (s.type === 'IfStatement') {
-                if (isDraggingTest(s.test, true, trueVars, falseVars)) {
-                  guarded = true;
-                  flagCalls(s.consequent, handlerScopes, report);
-                  if (s.alternate) walkPaths(s.alternate);
-                  else if (!alwaysExits(s.consequent)) for (const r of node.body.slice(i + 1)) flagCalls(r, handlerScopes, report, { trueVars, falseVars });
-                  continue;
-                }
-                if (isDraggingTest(s.test, false, trueVars, falseVars)) {
-                  guarded = true;
-                  walkPaths(s.consequent);
-                  if (s.alternate) flagCalls(s.alternate, handlerScopes, report);
-                  if (alwaysExits(s.consequent)) { for (const r of node.body.slice(i + 1)) flagCalls(r, handlerScopes, report); break; }
-                  continue;
-                }
-              }
-              walkPaths(s);
+        if (name === 'onNodeDrag' || name === 'onSelectionDrag') {
+          walkScopes(fnNode.body, fnScopes, (n, sc) => { if (isFnDef(n)) return false; if (n.type === 'CallExpression') flagCall(n, sc); });
+          return;
+        }
+        const { trueVars, falseVars } = dragAliases(fnNode);
+        const isNonDragGuard = (t) => {
+          const c = memberName(t);
+          return c === 'removed.length' || c === 'fresh.size' || (t?.type === 'BinaryExpression' && (t.operator === '===' || t.operator === '==') &&
+            ((memberName(t.left).endsWith('.type') && t.right?.value === 'remove') || (memberName(t.right).endsWith('.type') && t.left?.value === 'remove')));
+        };
+        const walk = (node, curScopes, active = true, nonDrag = false) => {
+          if (!node || typeof node.type !== 'string' || isFnDef(node)) return;
+          const next = extendScope(node, curScopes);
+          if (active && node.type === 'BlockStatement' && Array.isArray(node.body)) {
+            for (const s of node.body) {
+              walk(s, next, true, nonDrag);
+              if (s.type === 'IfStatement' && !s.alternate && isDragTest(s.test, true, trueVars, falseVars) && alwaysExits(s.consequent)) break;
             }
             return;
           }
-          if (node.type === 'ConditionalExpression') {
-            if (isDraggingTest(node.test, true, trueVars, falseVars)) { guarded = true; flagCalls(node.consequent, handlerScopes, report); return; }
-            if (isDraggingTest(node.test, false, trueVars, falseVars)) { guarded = true; flagCalls(node.alternate, handlerScopes, report); return; }
+          if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
+            if (active) walk(node.test, next, true, nonDrag);
+            if (isDragTest(node.test, true, trueVars, falseVars)) { walk(node.consequent, next, true, nonDrag); if (node.alternate) walk(node.alternate, next, false); return; }
+            if (isDragTest(node.test, false, trueVars, falseVars)) { walk(node.consequent, next, false); if (node.alternate) walk(node.alternate, next, active, nonDrag); return; }
+            walk(node.consequent, next, active, nonDrag || (node.type === 'IfStatement' && isNonDragGuard(node.test)));
+            if (node.alternate) walk(node.alternate, next, active, nonDrag);
+            return;
           }
-          if (node.type === 'LogicalExpression') {
-            if (node.operator === '&&' && isDraggingTest(node.left, true, trueVars, falseVars)) { guarded = true; flagCalls(node.right, handlerScopes, report); return; }
-            if (node.operator === '||' && isDraggingTest(node.left, false, trueVars, falseVars)) { guarded = true; flagCalls(node.right, handlerScopes, report); return; }
+          if (active && node.type === 'LogicalExpression') {
+            walk(node.left, next, true, nonDrag);
+            const dropRight = (node.operator === '&&' && isDragTest(node.left, false, trueVars, falseVars)) || (node.operator === '||' && isDragTest(node.left, true, trueVars, falseVars));
+            walk(node.right, next, !dropRight, nonDrag);
+            return;
           }
-          for (const k of Object.keys(node)) {
-            const child = node[k];
-            if (Array.isArray(child)) child.forEach(walkPaths);
-            else if (child && typeof child === 'object') walkPaths(child);
+          if (active && node.type === 'CallExpression') flagCall(node, next, nonDrag);
+          for (const child of Object.values(node)) {
+            if (Array.isArray(child)) child.forEach((c) => walk(c, next, active, nonDrag));
+            else if (child && typeof child === 'object') walk(child, next, active, nonDrag);
           }
         };
-        walkPaths(fnNode.body);
-        if (!guarded) {
-          let mentionsPos = false;
-          walkSubtree(fnNode.body, (n) => { if (n.type === 'Literal' && n.value === 'position') mentionsPos = true; });
-          if (mentionsPos) {
-            walkSubtree(fnNode.body, (n) => {
-              const hit = callForbiddenTarget(rel, n, handlerScopes);
-              if (hit && hit !== 'ungroup' && hit !== 'deleteNodes') report(n, `Commit de posición en onNodesChange sin distinguir \`dragging: false\` (${hit}). ${DRAG_HINT}`);
-            });
-          }
-        }
+        walk(fnNode.body, fnScopes);
       };
-
-      const cutMoveRescansTrail = (fnNode, activeScopes, report) => {
+      const checkCut = (fnNode, activeScopes, report) => {
         const refsTrail = (node) => { let hit = false; walkSubtree(node, (n) => { if (n.type === 'Identifier' && TRAIL_NAMES.has(n.name)) { hit = true; return false; } }); return hit; };
-        const hasTrailScan = (curRel, node, curScopes, seen = new Set()) => {
+        const hasScan = (curRel, node, sc0, seen = new Set()) => {
           let hit = null;
-          walkSubtree(node, (n) => {
+          walkScopes(node, sc0, (n, sc) => {
             if (hit) return false;
             if (n.type === 'CallExpression') {
-              const resolved = resolveSymbol(curRel, calleeName(n.callee), curScopes);
-              if (resolved?.name === 'trailCuts') { hit = n; return false; }
-              if (resolved?.kind === 'fn' && !seen.has(`${resolved.rel}::${resolved.name}::${resolved.node.start}`)) {
-                seen.add(`${resolved.rel}::${resolved.name}::${resolved.node.start}`);
-                if (hasTrailScan(resolved.rel, resolved.node.body, bodyScopesForFn(resolved), seen)) { hit = n; return false; }
+              const res = resolveSym(curRel, calleeName(n.callee), sc);
+              if (res?.name === 'trailCuts') { hit = n; return false; }
+              if (res?.kind === 'fn' && !seen.has(`${res.rel}::${res.name}::${res.node.start}`)) {
+                seen.add(`${res.rel}::${res.name}::${res.node.start}`);
+                if (hasScan(res.rel, res.node.body, bindParams(res.node, res.scopes), seen)) { hit = n; return false; }
               }
               if (n.callee?.type === 'MemberExpression' && ITER_METHODS.has(n.callee.property?.name) && refsTrail(n.callee.object)) { hit = n; return false; }
             }
@@ -349,40 +328,33 @@ export function check(root = '.') {
           });
           return hit;
         };
-        const bad = hasTrailScan(rel, fnNode.body, bodyScopesForFn({ node: fnNode, scopes: activeScopes }));
+        const bad = hasScan(rel, fnNode.body, bindParams(fnNode, activeScopes));
         if (bad) report(bad, `La tijera recorre todo el trazo en pointermove. ${CUT_HINT}`);
       };
-
       const isScope = (n) => n.type === 'Program' || n.type === 'BlockStatement' || n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression';
-
       return {
         enter: (node, report) => {
-          if (isScope(node)) {
-            const scope = new Map();
-            scopes.push(scope);
-            for (const p of node.params ?? []) if (p.type === 'Identifier') scope.set(p.name, { kind: 'param' });
-            if (node.type === 'Program' || node.type === 'BlockStatement') populateScope(scope, node.body, [...scopes]);
-          }
+          const base = [...scopes];
+          if (isScope(node)) scopes.push(extendScope(node, base).at(-1));
           if ((node.type === 'FunctionDeclaration' || node.type === 'VariableDeclarator') && node.id?.name === 'useCutTool') cutToolNodes.add(node);
           if (node.type === 'ConditionalExpression' || node.type === 'LogicalExpression') condStack.push(node);
           if (cutToolNodes.size > 0 && (node.id?.name === 'move' || node.id?.name === 'onPointerMove')) {
             const fn = node.type === 'FunctionDeclaration' ? node : unwrapFn(node.init);
-            if (fn) cutMoveRescansTrail(fn, [...scopes], report);
+            if (fn) checkCut(fn, node.type === 'FunctionDeclaration' ? base : [...scopes], report);
           }
           if (node.type === 'VariableDeclarator' && HANDLERS.has(node.id?.name) && node.init) {
-            const fn = unwrapFn(node.init);
-            if (fn) checkDragHandler(fn, node.id.name, [...scopes], report);
+            const fn = unwrapFn(node.init); if (fn) checkHandler(fn, node.id.name, [...scopes], report);
           } else if (node.type === 'FunctionDeclaration' && HANDLERS.has(node.id?.name)) {
-            checkDragHandler(node, node.id.name, [...scopes], report);
+            checkHandler(node, node.id.name, base, report);
           } else if (node.type === 'JSXAttribute' && JSX_DRAG_ATTRS.has(node.name?.name) && node.value?.type === 'JSXExpressionContainer') {
             const expr = node.value.expression, fn = unwrapFn(expr);
-            if (fn) checkDragHandler(fn, node.name.name, [...scopes], report);
+            if (fn) checkHandler(fn, node.name.name, [...scopes], report);
             else if (expr?.type === 'Identifier' && !HANDLERS.has(expr.name)) {
-              const resolved = resolveSymbol(rel, expr.name, scopes);
-              if (resolved?.kind === 'fn') checkDragHandler(resolved.node, node.name.name, resolved.scopes, report);
+              const res = resolveSym(rel, expr.name, scopes);
+              if (res?.kind === 'fn') checkHandler(res.node, node.name.name, res.scopes, report);
             }
           }
-          if (isNodeToolbarJsx(rel, node, scopes) && !rel.endsWith('Operations.tsx') && condStack.length === 0) report(node, TOOLBAR_HINT);
+          if (isToolbar(rel, node, scopes) && !rel.endsWith('Operations.tsx') && condStack.length === 0) report(node, TOOLBAR_HINT);
         },
         leave: (node) => {
           if (node.type === 'ConditionalExpression' || node.type === 'LogicalExpression') condStack.pop();

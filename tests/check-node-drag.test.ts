@@ -130,4 +130,79 @@ describe('check-node-drag AST guard', () => {
     `);
     expect(loopsTrail).toHaveLength(1);
   });
+
+  it('rejects an unconditional editPresentation call at the start of applyDragChanges even when later branches check dragging', () => {
+    const errors = fixture('useNodeDrag.ts', `
+      import { editPresentation } from '../../engine/nodecore/edit';
+      export function useNodeDrag(sessionId: string) {
+        const applyDragChanges = (changes: any[]) => {
+          editPresentation(sessionId, (g: any) => g);
+          for (const c of changes) {
+            if (c.type !== 'position') continue;
+            if (c.dragging === true) {
+              // preview only
+            } else {
+              editPresentation(sessionId, (g: any) => g);
+            }
+          }
+        };
+        return { applyDragChanges };
+      }
+    `);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/useNodeDrag\.ts:\d+ — .*editPresentation/);
+  });
+
+  it('resolves calls in inner blocks with their lexical scope (no false positive on shadowed alias, catches inner-block alias)', () => {
+    const shadowedInBlock = fixture('useNodeDrag.ts', `
+      import { editPresentation as commit } from '../../engine/nodecore/edit';
+      export function useNodeDrag(sessionId: string) {
+        const applyDragChanges = (changes: any[]) => {
+          for (const c of changes) {
+            if (c.type === 'position' && c.dragging === true) {
+              const commit = (id: string) => id;
+              commit(c.id);
+            }
+          }
+        };
+        return { applyDragChanges, commit };
+      }
+    `);
+    expect(shadowedInBlock).toEqual([]);
+
+    const shadowedInHelperBlock = fixture('useNodeDrag.ts', `
+      import { editPresentation as commit } from '../../engine/nodecore/edit';
+      function touch(id: string) {
+        {
+          const commit = (x: string) => x;
+          commit(id);
+        }
+      }
+      export function useNodeDrag() {
+        const applyDragChanges = (changes: any[]) => {
+          for (const c of changes) {
+            if (c.type === 'position' && c.dragging === true) touch(c.id);
+          }
+        };
+        return { applyDragChanges };
+      }
+    `);
+    expect(shadowedInHelperBlock).toEqual([]);
+
+    const innerBlockAlias = fixture('useNodeDrag.ts', `
+      import { editPresentation } from '../../engine/nodecore/edit';
+      export function useNodeDrag(sessionId: string) {
+        const applyDragChanges = (changes: any[]) => {
+          for (const c of changes) {
+            if (c.type === 'position' && c.dragging === true) {
+              const localWrite = editPresentation;
+              localWrite(sessionId, (g: any) => g);
+            }
+          }
+        };
+        return { applyDragChanges };
+      }
+    `);
+    expect(innerBlockAlias).toHaveLength(1);
+  });
 });
