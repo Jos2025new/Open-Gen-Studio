@@ -54,3 +54,6 @@ Uno general, uno por área y un índice que enlaza todo. Cada ítem vive en un s
 |---|---|---|---|
 | 2026-10-31 | G1 | Primera ejecución: 2 sliders en `ColorChannels.tsx` (34, 41), pistas con degradado de canal | por decidir: ¿excepción o `InlineSlider`? |
 | 2026-10-31 | F1 | Línea base: 234 etiquetas | — |
+| 2026-11-21 | AGENTS 4 (`test:related` tras cada cambio) | Con la máquina cargada tarda 13–24 min; Hydrogen murió dos veces esperándolo sin commit | Workers: vitest dirigido + `tsc` + `npm run check`; `test:related`/`npm test` una vez al integrar |
+| 2026-11-21 | Delicado / dos lados del contrato | Salidas por nombre implementadas solo en lectura; `connect` guardaba `out` y un puerto retirado caía en silencio a `out` (GPT, antes de fusionar) | Todo brief de contrato: tabla escritura↔lectura↔persistencia, ciclo de vida del puerto y consumidor real en la misma tanda |
+| 2026-11-21 | AGENTS 2 (evidencia del caso) | El orquestador resumió a Haiku de memoria (Y en Nodes en vez de X en omnicanvas) y dio una rama por lista sin sandbox | Leer el informe completo del bus; un fallo visto en pantalla se re-prueba en sandbox antes de «listo» |
