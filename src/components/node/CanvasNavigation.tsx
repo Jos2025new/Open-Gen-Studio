@@ -121,6 +121,9 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
   // keyboard (! and " there) works too; never while typing, never with another modifier.
   const selectedRef = useRef(selectedIds);
   selectedRef.current = selectedIds;
+  // Registered once: the canvas and the session are read through a ref, so a re-render never adds a listener.
+  const fitRef = useRef({ rf, sessionId });
+  fitRef.current = { rf, sessionId };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const scope = e.code === 'Digit1' ? 'all' : e.code === 'Digit2' ? 'selection' : null;
@@ -129,11 +132,11 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
       if (ui.home || ui.space || ui.lightbox || ui.textView || ui.sketch) return;
       if (document.querySelector('.popover, .lightbox, .sketch-editor, [role="dialog"]')) return;
       if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), .side-panel')) return;
-      if (fitCanvas(rf, sessionId, selectedRef.current, scope)) e.preventDefault();
+      if (fitCanvas(fitRef.current.rf, fitRef.current.sessionId, selectedRef.current, scope)) e.preventDefault();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [rf, sessionId]);
+  }, []);
   const showHistory = (e: React.MouseEvent, dir: 'undo' | 'redo') => { e.preventDefault(); e.stopPropagation(); setDirection(dir); history.setOpen(true); };
   return (
     <>
