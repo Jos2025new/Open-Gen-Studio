@@ -25,7 +25,18 @@ export function useViewMemory(sessionId: string, omni: boolean, enabled = true) 
     pending.current = null;
     if (view) rememberView(sessionId, variant, view);
   }, [sessionId, variant]);
-  useEffect(() => flush, [flush]);
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    // Capture phase runs before store.ts's bubble-phase pagehide/visibilitychange flushWrite(),
+    // so a pan within the last 600 ms reaches IndexedDB and disk on reload/close.
+    window.addEventListener('pagehide', flush, true);
+    document.addEventListener('visibilitychange', onHide, true);
+    return () => {
+      window.removeEventListener('pagehide', flush, true);
+      document.removeEventListener('visibilitychange', onHide, true);
+      flush();
+    };
+  }, [flush]);
   const onMoveEnd = useCallback((_event: unknown, view: Viewport) => {
     if (!enabled) return;
     pending.current = { x: view.x, y: view.y, zoom: view.zoom };

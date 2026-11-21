@@ -1,7 +1,8 @@
 import type { GraphNode } from '../types';
+import { omniOnly } from '../nodes/omniSpaces';
 
-/** System cards (chat, agent, models, Spaces) are drawn by the app, not made by the user. */
-const isSystemCard = (n: GraphNode): boolean => n.data.kind === 'ref';
+/** Omnicanvas-only cards (system/Space `ref` cards and auto-brought `omni: true` assets) are placed by the app, not by the user. */
+const isSystemCard = omniOnly;
 
 export type FitScope = 'auto' | 'all' | 'selection';
 

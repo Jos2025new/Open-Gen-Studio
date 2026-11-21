@@ -12,6 +12,7 @@ import { IconButton, MenuItem } from '../ui/primitives';
 import { InlineSlider } from '../designer/InlineControls';
 import { CornerButtons } from './NodeSide';
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
+import { omniOnly } from '../../engine/nodes/omniSpaces';
 import { fitCanvas } from './fitCanvas';
 
 export type NodeTool = 'select' | 'pan' | 'cut';
@@ -68,7 +69,10 @@ function CanvasSearchResults({ sessionId, submitted, onSelect }: { sessionId: st
  *  tool: Add node (`add`), Select, Pan, Cut and Auto layout, Fit view and Map, Undo, Redo and Delete, zoom, Search. Its
  *  popovers open to the right. `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
 export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool, onTool, selectedCount, selectedIds = [], onDelete, omni = false }: { sessionId: string; add?: ReactNode; onAutoLayout?: () => void; onSelect: (id: string) => void; tool: NodeTool; onTool: (t: NodeTool) => void; selectedCount: number; /** The selected nodes: Fit view frames them (and Shift+2). */ selectedIds?: readonly string[]; onDelete: () => void; /** The omnicanvas keeps only the tools that move around the canvas (see the omni notes in docs). */ omni?: boolean }) {
-  const hasNodes = useStore(s => Boolean(s.sessions[sessionId]?.graph.nodes.length));
+  const hasNodes = useStore(s => {
+    const ns = s.sessions[sessionId]?.graph.nodes;
+    return Boolean(ns && (omni ? ns.length : ns.some(n => !omniOnly(n))));
+  });
   const hasEdges = useStore(s => Boolean(s.sessions[sessionId]?.graph.edges.length));
   const hasRunning = useStore(s => s.sessions[sessionId]?.graph.nodes.some(n => 'generationId' in n.data && Boolean(n.data.generationId) && ['running', 'queued'].includes(s.generations[n.data.generationId!]?.status)) ?? false);
   useSyncExternalStore(subscribeGraphHistory, historyRevision);
@@ -121,7 +125,10 @@ export function CanvasNavigation({ sessionId, add, onAutoLayout, onSelect, tool,
     const key = (e: KeyboardEvent) => {
       const scope = e.code === 'Digit1' ? 'all' : e.code === 'Digit2' ? 'selection' : null;
       if (!scope || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      const ui = useStore.getState().ui;
+      if (ui.home || ui.space || ui.lightbox || ui.textView || ui.sketch) return;
+      if (document.querySelector('.popover, .lightbox, .sketch-editor, [role="dialog"]')) return;
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), .side-panel')) return;
       if (fitCanvas(rf, sessionId, selectedRef.current, scope)) e.preventDefault();
     };
     window.addEventListener('keydown', key);
