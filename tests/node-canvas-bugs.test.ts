@@ -1,0 +1,145 @@
+// @vitest-environment jsdom
+import { act, createElement, Fragment, type ReactNode } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { Edge, EdgeChange, Node, NodeChange, NodeTypes } from '@xyflow/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NodeWorkspace, OmniCanvas } from '../src/components/node/NodeWorkspace';
+import type { Graph } from '../src/engine/types';
+import { createSession, useStore } from '../src/store/store';
+
+const flow = vi.hoisted(() => ({
+  props: null as null | {
+    nodes: Node[];
+    edges: Edge[];
+    children: ReactNode;
+    onNodesChange(changes: NodeChange[]): void;
+    onEdgesChange(changes: EdgeChange[]): void;
+  },
+}));
+
+vi.mock('@xyflow/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@xyflow/react')>();
+  return {
+    ...actual,
+    ReactFlow(props: NonNullable<typeof flow.props> & { nodeTypes: NodeTypes }) {
+      flow.props = props;
+      return createElement(
+        Fragment,
+        null,
+        props.children,
+        ...props.nodes
+          .filter((n) => !n.hidden)
+          .map((n) =>
+            createElement(props.nodeTypes[n.type!], {
+              ...n,
+              key: n.id,
+              type: n.type!,
+              selected: Boolean(n.selected),
+              dragging: false,
+              draggable: n.draggable ?? true,
+              selectable: n.selectable ?? true,
+              deletable: n.deletable ?? true,
+              isConnectable: n.connectable ?? true,
+              zIndex: n.zIndex ?? 0,
+              positionAbsoluteX: n.position.x,
+              positionAbsoluteY: n.position.y,
+            }),
+          ),
+      );
+    },
+    useReactFlow: () => ({
+      fitView: vi.fn(),
+      screenToFlowPosition: (p: { x: number; y: number }) => p,
+      zoomIn: vi.fn(),
+      zoomOut: vi.fn(),
+      zoomTo: vi.fn(),
+      getZoom: () => 1,
+      getNodes: () => [],
+    }),
+    useOnViewportChange: () => {},
+    useViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+    useConnection: () => false,
+    useUpdateNodeInternals: () => () => {},
+    useStore: (sel: (s: { transform: [number, number, number] }) => unknown) => sel({ transform: [0, 0, 1] }),
+    Background: () => null,
+    MiniMap: () => null,
+    Panel: ({ children, ...rest }: { children?: ReactNode } & Record<string, unknown>) =>
+      createElement('div', rest, children),
+    Handle: () => null,
+    NodeToolbar: ({ isVisible = true, children }: { isVisible?: boolean; children?: ReactNode }) =>
+      isVisible ? createElement('div', null, children) : null,
+  };
+});
+
+vi.mock('../src/lib/idb', () => ({
+  stateDb: { get: async () => undefined, set: async () => undefined },
+  cacheDb: { get: async () => undefined, set: async () => undefined },
+  peekAssetUrl: () => undefined,
+  loadAssetUrl: async () => undefined,
+}));
+
+const cleanups: Array<() => void> = [];
+afterEach(() => {
+  while (cleanups.length) cleanups.pop()!();
+  vi.restoreAllMocks();
+});
+
+function mount(graph: Graph, omni = false) {
+  const session = createSession(`bugs-${Math.random()}`);
+  useStore.setState((s) => ({
+    activeSessionId: session.id,
+    generations: {},
+    assets: {},
+    sessions: { ...s.sessions, [session.id]: { ...session, graph, feed: [] } },
+  }));
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  cleanups.push(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+  act(() => root.render(createElement(omni ? OmniCanvas : NodeWorkspace)));
+  return { sessionId: session.id, container };
+}
+
+describe('NodeWorkspace delete confirmation', () => {
+  it('Operations Delete asks confirmation before removing a ref node with model links', () => {
+    const graph: Graph = {
+      nodes: [
+        { id: 'm1', position: { x: 0, y: 0 }, data: { kind: 'ref', type: 'model', ref: 'atlas::nb', title: 'Model' } },
+        { id: 'a1', position: { x: 300, y: 0 }, data: { kind: 'ref', type: 'agent', ref: 'agent', title: 'Agent' } },
+        { id: 't1', position: { x: 600, y: 0 }, data: { kind: 'text', title: 'Prompt', text: 'hi' } },
+      ],
+      edges: [{ id: 'e_ctrl', source: 'm1', sourceHandle: 'out_control', target: 'a1', targetHandle: 'model', kind: 'control' }],
+    };
+    const { sessionId, container } = mount(graph, true);
+
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'a1', type: 'select', selected: true },
+        { id: 't1', type: 'select', selected: true },
+      ]);
+    });
+
+    const opsBtn = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Operations'));
+    expect(opsBtn).toBeDefined();
+    act(() => opsBtn!.click());
+
+    const delBtn = container.querySelector<HTMLButtonElement>('.ops-bar button[aria-label="Delete"]');
+    expect(delBtn).not.toBeNull();
+    act(() => delBtn!.click());
+
+    // Must not delete without confirmation!
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 'a1')).toBe(true);
+    const dialog = container.querySelector('[role="alertdialog"][aria-label="Remove from canvas"]');
+    expect(dialog).not.toBeNull();
+
+    const confirmBtn = [...dialog!.querySelectorAll('button')].find((b) => b.textContent === 'Remove');
+    expect(confirmBtn).toBeDefined();
+    act(() => confirmBtn!.click());
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 'a1')).toBe(false);
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 't1')).toBe(false);
+  });
+});
