@@ -12,11 +12,12 @@ export function check(root = '.') {
   const types = readFileSync(at('src/engine/graphTypes.ts'), 'utf8');
   const union = /export type NodeKind = ([^;]+);/.exec(types);
   const errors = [];
-  const base = /export type BaseNodeKind = ([^;]+);/.exec(types) ?? union;
+  const base = /export const BASE_NODE_KINDS\s*=\s*\[([^\]]*)\]\s*as const\b/.exec(types)
+    ?? /export type BaseNodeKind = ([^;]+);/.exec(types) ?? union;
   const dir = 'src/engine/nodecore/types';
   const kinds = base ? [...base[1].matchAll(/'([a-z0-9]+)'/g)].map((m) => m[1]) : [];
-  if (!kinds.length) errors.push('src/engine/graphTypes.ts:1: cannot read `BaseNodeKind`; keep it a union of string literals so this check can list the node types.');
-  // Open registry: a descriptor file outside the base union is a type of its own when it declares its data by merging `ExtraNodeKinds`.
+  if (!kinds.length) errors.push('src/engine/graphTypes.ts:1: cannot read the base node kinds; declare them as string literals in `BASE_NODE_KINDS`.');
+  // Open registry: a descriptor file outside the base kinds is a type of its own when it declares its data by merging `ExtraNodeKinds`.
   const extra = existsSync(at(dir)) ? readdirSync(at(dir)).filter((f) => f.endsWith('.node.ts')).map((f) => f.replace('.node.ts', '')).filter((k) => !kinds.includes(k) && new RegExp(`interface ExtraNodeKinds\\s*\\{[^}]*\\b${k}\\b`).test(readFileSync(at(`${dir}/${k}.node.ts`), 'utf8'))) : [];
   kinds.push(...extra);
   /** A descriptor that moves past version 1 must say how to migrate saved nodes. */

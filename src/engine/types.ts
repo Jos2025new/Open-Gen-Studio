@@ -17,7 +17,8 @@ export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 /** auto (card if missing), guided (asks), direct (no card). */
 export type AgentStyle = 'auto' | 'guided' | 'direct';
 /** Generated media types are persistable assets. */
-export type MediaKind = 'image' | 'video' | 'audio' | 'model3d';
+export const MEDIA_KINDS = ['image', 'video', 'audio', 'model3d'] as const;
+export type MediaKind = typeof MEDIA_KINDS[number];
 export type AssetKind = MediaKind;
 
 export type ProviderId = 'local' | 'openrouter' | 'fal' | 'nanogpt' | 'atlas';

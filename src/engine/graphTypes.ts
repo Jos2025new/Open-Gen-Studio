@@ -11,14 +11,18 @@ export interface ExtraNodeKinds {}
 /** Same for a system part: its file merges `interface ExtraSystemTypes { <type>: true }`. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ExtraSystemTypes {}
-export type BaseNodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset' | 'ref';
+export const BASE_NODE_KINDS = ['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset', 'ref'] as const;
+export type BaseNodeKind = typeof BASE_NODE_KINDS[number];
 export type NodeKind = BaseNodeKind | keyof ExtraNodeKinds;
 export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
 /** Link classes: `data` carries values and runs in order; `ref` points; `control` governs. `both` only on ref and control. */
-export type LinkKind = 'data' | 'ref' | 'control';
-export type BaseSystemNodeType = 'chat' | 'agent' | 'provider' | 'model' | 'session' | 'space' | 'designer.doc' | 'library' | 'toolset' | 'prompt' | 'mediaSettings';
+export const LINK_KINDS = ['data', 'ref', 'control'] as const;
+export type LinkKind = typeof LINK_KINDS[number];
+export const BASE_SYSTEM_NODE_TYPES = ['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset', 'prompt', 'mediaSettings'] as const;
+export type BaseSystemNodeType = typeof BASE_SYSTEM_NODE_TYPES[number];
 export type SystemNodeType = BaseSystemNodeType | keyof ExtraSystemTypes;
-export type ModelAttachMode = 'wired' | 'docked' | 'grouped' | 'merged';
+export const MODEL_ATTACH_MODES = ['wired', 'docked', 'grouped', 'merged'] as const;
+export type ModelAttachMode = typeof MODEL_ATTACH_MODES[number];
 
 export interface PortSpec {
   id: string;
