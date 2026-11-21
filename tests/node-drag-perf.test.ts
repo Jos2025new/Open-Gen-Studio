@@ -280,6 +280,89 @@ describe('node drag publication counts', () => {
     expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
   });
 
+  it('discards hanging preview from an unfinished gesture when a new gesture starts', () => {
+    const { sessionId } = mountWorkspace(5);
+
+    // Gesture 1 on n0 (and partial drop on n1) loses its final dragging: false event.
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'n0', type: 'position', position: { x: 150, y: 80 }, dragging: true },
+        { id: 'n1', type: 'position', position: { x: 360, y: 80 }, dragging: true },
+      ]);
+      flow.props!.onNodesChange([{ id: 'n1', type: 'position', dragging: false }]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 150, y: 80 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 360, y: 80 });
+
+    // Gesture 2 starts on n2: hanging previews of n0 and n1 from the unfinished gesture are discarded.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n2', type: 'position', position: { x: 600, y: 90 }, dragging: true }]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
+    expect(flow.props!.nodes.find((n) => n.id === 'n2')?.position).toEqual({ x: 600, y: 90 });
+
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n2', type: 'position', dragging: false }]);
+    });
+    const after = useStore.getState().sessions[sessionId].graph;
+    expect(after.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+    expect(after.nodes.find((n) => n.id === 'n1')?.position).toEqual({ x: 260, y: 0 });
+    expect(after.nodes.find((n) => n.id === 'n2')?.position).toEqual({ x: 600, y: 90 });
+  });
+
+  it('discards hanging preview when undo/redo or graph load updates a previewed node ID', () => {
+    const { sessionId } = mountWorkspace(4);
+
+    // Commit a real move on n0: (0,0) -> (100,50).
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 100, y: 50 }, dragging: true }]);
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', dragging: false }]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
+
+    // Start a second drag on n0 to (220,90) whose final event is lost.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 220, y: 90 }, dragging: true }]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 220, y: 90 });
+
+    // Undo restores n0 to (0,0) in the store and must discard the hanging preview on n0.
+    act(() => {
+      const cur = useStore.getState().sessions[sessionId].graph;
+      expect(travelGraph(sessionId, cur, 'undo', 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 0, y: 0 });
+
+    // Another hanging preview on n0 at (300,120) is discarded by Redo -> (100,50).
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 300, y: 120 }, dragging: true }]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 300, y: 120 });
+    act(() => {
+      const cur = useStore.getState().sessions[sessionId].graph;
+      expect(travelGraph(sessionId, cur, 'redo', 1, (next) => edit.applyEdit({ session: sessionId, op: { op: 'travel', graph: next } }).ok)).toBe(true);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 100, y: 50 });
+
+    // Hanging preview on n0 at (400,160) is discarded when a graph is loaded/hydrated into the session.
+    act(() => {
+      flow.props!.onNodesChange([{ id: 'n0', type: 'position', position: { x: 400, y: 160 }, dragging: true }]);
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 400, y: 160 });
+    act(() => {
+      const cur = useStore.getState().sessions[sessionId].graph;
+      const loaded: Graph = {
+        ...cur,
+        nodes: cur.nodes.map((n) => (n.id === 'n0' ? { ...n, position: { x: 40, y: 60 } } : { ...n })),
+      };
+      useStore.setState((s) => ({
+        sessions: { ...s.sessions, [sessionId]: { ...s.sessions[sessionId], graph: loaded } },
+      }));
+    });
+    expect(flow.props!.nodes.find((n) => n.id === 'n0')?.position).toEqual({ x: 40, y: 60 });
+  });
+
   it('preserves main generation history tie-breaking order when current is outside the node bucket', () => {
     const base = { kind: 'image' as const, status: 'done' as const, prompt: 'p', modelRef: 'm', modelName: 'Model', provider: 'atlas' as const, origin: 'node' as const, estimate: {} as Generation['estimate'], settings: { count: 1, advanced: {} }, inputs: { refs: [] }, assetIds: ['a1'] };
     const generations: Record<string, Generation> = {

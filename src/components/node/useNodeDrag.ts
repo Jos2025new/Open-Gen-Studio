@@ -19,11 +19,18 @@ export function useNodeDrag(
   const framePreviewsRef = useRef<Map<string, Set<string>>>(new Map());
   const draggingIdsRef = useRef<Set<string>>(new Set());
   const pendingCommitsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const baseNodesRef = useRef<Map<string, { node: GraphNode; x: number; y: number }>>(new Map());
 
   const reconcileWithGraph = useCallback((g: Graph | undefined) => {
     if (!dragPosRef.current.size && !framePreviewsRef.current.size && !draggingIdsRef.current.size && !pendingCommitsRef.current.size) return;
-    const liveNodeIds = new Set((g?.nodes ?? []).map((n) => n.id));
+    const liveNodesById = new Map((g?.nodes ?? []).map((n) => [n.id, n]));
     const liveGroups = new Map((g?.groups ?? []).map((gr) => [gr.id, new Set(gr.nodeIds)]));
+    const isNodeStale = (id: string) => {
+      const live = liveNodesById.get(id);
+      if (!live) return true;
+      const base = baseNodesRef.current.get(id);
+      return Boolean(base && (live !== base.node || live.position.x !== base.x || live.position.y !== base.y));
+    };
     const staleIds = new Set<string>();
     for (const [gid, memberIds] of framePreviewsRef.current) {
       const liveMembers = liveGroups.get(gid);
@@ -33,7 +40,7 @@ export function useNodeDrag(
         draggingIdsRef.current.delete(gid);
       } else {
         for (const id of memberIds) {
-          if (!liveMembers.has(id) || !liveNodeIds.has(id)) {
+          if (!liveMembers.has(id) || isNodeStale(id)) {
             staleIds.add(id);
             memberIds.delete(id);
           }
@@ -45,18 +52,19 @@ export function useNodeDrag(
       }
     }
     for (const id of dragPosRef.current.keys()) {
-      if (!liveNodeIds.has(id)) staleIds.add(id);
+      if (isNodeStale(id)) staleIds.add(id);
     }
     for (const id of [...draggingIdsRef.current]) {
-      if (!liveNodeIds.has(id) && !liveGroups.has(id)) staleIds.add(id);
+      if (!liveGroups.has(id) && isNodeStale(id)) staleIds.add(id);
     }
     for (const id of [...pendingCommitsRef.current.keys()]) {
-      if (!liveNodeIds.has(id)) staleIds.add(id);
+      if (isNodeStale(id)) staleIds.add(id);
     }
     if (staleIds.size) {
       for (const id of staleIds) {
         draggingIdsRef.current.delete(id);
         pendingCommitsRef.current.delete(id);
+        baseNodesRef.current.delete(id);
       }
       const next = new Map(dragPosRef.current);
       let changed = false;
@@ -73,6 +81,7 @@ export function useNodeDrag(
     framePreviewsRef.current.clear();
     draggingIdsRef.current.clear();
     pendingCommitsRef.current.clear();
+    baseNodesRef.current.clear();
     dragPosRef.current = EMPTY_DRAG_POS;
     setDragPos(EMPTY_DRAG_POS);
     return useStore.subscribe((state, prev) => {
@@ -89,13 +98,71 @@ export function useNodeDrag(
       removed: string[],
     ) => {
       reconcileWithGraph(liveGraph);
-      const currentDrag = dragPosRef.current;
       const removedSet = new Set(removed);
       const liveNodesById = liveGraph
         ? new Map(liveGraph.nodes.filter((n) => !removedSet.has(n.id)).map((n) => [n.id, n]))
         : undefined;
-      const previewMoves = new Map<string, { x: number; y: number }>();
+      const activeNodesInBatch = new Set<string>();
+      const activeFramesInBatch = new Set<string>();
+      const droppingInBatch = new Set<string>();
+      for (const c of changes) {
+        if (c.type !== 'position') continue;
+        if (groupById.has(c.id)) {
+          const g = groupById.get(c.id)!;
+          if (c.dragging === true) {
+            if (c.position) {
+              activeFramesInBatch.add(c.id);
+              for (const id of g.nodeIds) if (!removedSet.has(id) && (!liveNodesById || liveNodesById.has(id))) activeNodesInBatch.add(id);
+            }
+          } else {
+            droppingInBatch.add(c.id);
+            for (const id of g.nodeIds) droppingInBatch.add(id);
+          }
+        } else if (!removedSet.has(c.id) && (!liveNodesById || liveNodesById.has(c.id))) {
+          if (c.dragging === true) {
+            if (c.position) activeNodesInBatch.add(c.id);
+          } else {
+            droppingInBatch.add(c.id);
+          }
+        }
+      }
       const droppedIds = new Set<string>();
+      if (activeNodesInBatch.size > 0 || activeFramesInBatch.size > 0) {
+        const restartGesture = pendingCommitsRef.current.size > 0;
+        for (const [gid, memberIds] of [...framePreviewsRef.current]) {
+          if (restartGesture || (!activeFramesInBatch.has(gid) && !droppingInBatch.has(gid))) {
+            for (const id of memberIds) {
+              if (!activeNodesInBatch.has(id)) droppedIds.add(id);
+              draggingIdsRef.current.delete(id);
+              pendingCommitsRef.current.delete(id);
+              baseNodesRef.current.delete(id);
+            }
+            framePreviewsRef.current.delete(gid);
+            draggingIdsRef.current.delete(gid);
+          }
+        }
+        for (const id of [...dragPosRef.current.keys(), ...draggingIdsRef.current, ...pendingCommitsRef.current.keys()]) {
+          if (restartGesture || (!activeNodesInBatch.has(id) && !activeFramesInBatch.has(id) && !droppingInBatch.has(id))) {
+            if (!activeNodesInBatch.has(id)) droppedIds.add(id);
+            draggingIdsRef.current.delete(id);
+            pendingCommitsRef.current.delete(id);
+            baseNodesRef.current.delete(id);
+          }
+        }
+        for (const gid of activeFramesInBatch) {
+          if (!framePreviewsRef.current.has(gid)) {
+            for (const id of groupById.get(gid)!.nodeIds) {
+              droppedIds.add(id);
+              pendingCommitsRef.current.delete(id);
+              baseNodesRef.current.delete(id);
+            }
+          }
+        }
+      }
+      const currentDrag = droppedIds.size
+        ? new Map([...dragPosRef.current].filter(([id]) => !droppedIds.has(id)))
+        : dragPosRef.current;
+      const previewMoves = new Map<string, { x: number; y: number }>();
       const frameChanges: Array<{ group: GraphGroup; pos?: { x: number; y: number }; dragging: boolean }> = [];
       for (const c of changes) {
         if (c.type !== 'position') continue;
@@ -197,20 +264,24 @@ export function useNodeDrag(
       }
       const stillDragging = draggingIdsRef.current.size > 0 || framePreviewsRef.current.size > 0;
       if (previewMoves.size || droppedIds.size || removed.length || (!stillDragging && dragPosRef.current.size)) {
-        const next = new Map(currentDrag);
+        const next = new Map(dragPosRef.current);
         let changed = false;
         if (!stillDragging) {
           for (const id of droppedIds) if (next.delete(id)) changed = true;
           for (const id of pendingCommitsRef.current.keys()) if (next.delete(id)) changed = true;
         } else {
           for (const id of droppedIds) {
-            if (!pendingCommitsRef.current.has(id) && next.delete(id)) changed = true;
+            if (!pendingCommitsRef.current.has(id) && !previewMoves.has(id) && next.delete(id)) changed = true;
           }
         }
         for (const id of removed) if (next.delete(id)) changed = true;
         for (const [id, pos] of previewMoves) {
           if (!stillDragging && (droppedIds.has(id) || pendingCommitsRef.current.has(id))) continue;
           if (!removedSet.has(id) && (!liveNodesById || liveNodesById.has(id))) {
+            const liveNode = liveNodesById?.get(id);
+            if (liveNode && !baseNodesRef.current.has(id)) {
+              baseNodesRef.current.set(id, { node: liveNode, x: liveNode.position.x, y: liveNode.position.y });
+            }
             const prev = next.get(id);
             if (!prev || prev.x !== pos.x || prev.y !== pos.y) {
               next.set(id, pos);
@@ -222,15 +293,20 @@ export function useNodeDrag(
           for (const id of next.keys()) {
             if (!liveNodesById.has(id)) {
               next.delete(id);
+              baseNodesRef.current.delete(id);
               changed = true;
             }
           }
         }
+        for (const id of [...baseNodesRef.current.keys()]) {
+          if (!next.has(id)) baseNodesRef.current.delete(id);
+        }
         if (!next.size) {
           framePreviewsRef.current.clear();
+          baseNodesRef.current.clear();
         } else if (droppedIds.size || removed.length) {
           for (const [gid, memberIds] of framePreviewsRef.current) {
-            for (const id of droppedIds) if (!pendingCommitsRef.current.has(id)) memberIds.delete(id);
+            for (const id of droppedIds) if (!pendingCommitsRef.current.has(id) && !previewMoves.has(id)) memberIds.delete(id);
             for (const id of removed) memberIds.delete(id);
             if (!memberIds.size) framePreviewsRef.current.delete(gid);
           }
