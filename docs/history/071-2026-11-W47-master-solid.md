@@ -41,9 +41,19 @@ Rama `task/solid-int`, fusionada en `main` con el sí del usuario. Evidencia, no
 ## Tests
 `npm test`: 4633 en verde. Falla solo `pdf-look` («300 groups»), una prueba de tiempo con la RAM al límite: 3,3 s frente a un tope de 3 s. Sola pasa 29/29.
 
-## Pendiente, en orden
-1. Arrastre a menos de 3 fps con 200 nodos.
-2. Comprobar en pantalla, con claves, las confirmaciones de gasto: Nodes con 2 pasos, `SketchEditor` y «Mejorar plano» en un Space.
-3. Comprobar que el clic en «Star» cambia de modo; Haiku no lo consiguió.
-4. Revisar el indicador «!1» del omnicanvas.
-5. Que la prueba de tiempo de `pdf-look` no dependa de la carga de la máquina.
+## Pendiente, en orden (próxima sesión maestra; sustituye a la lista de 070)
+
+1. **Arrastre a menos de 3 fps con 200 nodos.** Es crítico y ya existía. Hay que medirlo con la sonda y arreglarlo. Neon señaló cálculos O(n) en `CanvasNavigation` y `NodeSide`.
+2. **Check permanente** que impida cálculos pesados del lienzo en cada arrastre.
+3. **Las revisiones de Neon corren la suite de su área**, no solo los tests tocados. Se escribe en sus encargos.
+4. **Descriptor:** completar frescura, selección e interfaz, y ajustar su contrato antes del subnet (`env`, `sourceHandle`, `PlanStep[]`, `DefaultsEnv`).
+5. **Envolver los componentes y el subnet.**
+6. **Prueba del usuario con una clave real**, y paso de la app real a `main`.
+7. **Registro durable de envíos** en `jobs.ts`.
+8. **Agentes de suscripción** (baja prioridad).
+
+Sin comprobar de esta sesión:
+- Ver en pantalla, con claves, las confirmaciones de gasto: Nodes con 2 pasos, `SketchEditor` y «Mejorar plano» en un Space.
+- Que el clic en «Star» cambie de modo (Haiku no lo consiguió).
+- El indicador «!1» del omnicanvas.
+- La prueba de tiempo de `pdf-look`, que depende de la carga de la máquina.
