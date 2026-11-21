@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement, Fragment, type ReactNode } from 'react';
+import { act, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Edge, EdgeChange, Node, NodeChange, NodeTypes } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
