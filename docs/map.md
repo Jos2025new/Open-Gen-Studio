@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 437 | 347 |
-| [store.ts](../src/store/store.ts) | 295 | 338 |
+| [types.ts](../src/engine/types.ts) | 437 | 348 |
+| [store.ts](../src/store/store.ts) | 295 | 339 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 150 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 107 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
@@ -51,29 +51,29 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 15 | 18 |
 | `src/components/designer` | 121 | 57 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 27 | 25 |
+| `src/components/node` | 27 | 26 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 32 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 19 |
-| `src/engine` | 84 | 412 |
+| `src/engine` | 84 | 413 |
 | `src/engine/agent` | 64 | 153 |
 | `src/engine/commands` | 7 | 21 |
 | `src/engine/design` | 163 | 207 |
-| `src/engine/flow` | 19 | 75 |
+| `src/engine/flow` | 19 | 76 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/nodecore` | 23 | 38 |
+| `src/engine/nodecore` | 23 | 39 |
 | `src/engine/nodes` | 8 | 27 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 18 | 2 |
 | `src/engine/providers` | 15 | 81 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 434 |
-| `src/store` | 19 | 340 |
+| `src/lib` | 38 | 435 |
+| `src/store` | 19 | 341 |
 
-277 de 780 módulos no tienen ningún test que los importe directamente.
+276 de 780 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
