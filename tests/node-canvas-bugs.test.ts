@@ -188,3 +188,39 @@ describe('Pan box selection with collapsed groups', () => {
     expect(delNav?.getAttribute('aria-label')).toBe('Delete selected (Del)');
   });
 });
+
+describe('NodeWorkspace keydown listener stability', () => {
+  it('does not re-register keydown listeners on re-renders while preserving X/Esc and Ctrl+G/Ctrl+Shift+G shortcuts', () => {
+    const graph: Graph = {
+      nodes: [
+        { id: 't1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'T1', text: 'a' } },
+        { id: 't2', position: { x: 300, y: 0 }, data: { kind: 'text', title: 'T2', text: 'b' } },
+      ],
+      edges: [],
+    };
+    const addSpy = vi.spyOn(window, 'addEventListener');
+    const { sessionId, container } = mount(graph);
+    addSpy.mockClear();
+
+    // Re-render via selection changes and tool toggle.
+    act(() => { flow.props!.onNodesChange([{ id: 't1', type: 'select', selected: true }]); });
+    act(() => { flow.props!.onNodesChange([{ id: 't2', type: 'select', selected: true }]); });
+    act(() => { container.querySelector<HTMLButtonElement>('button[aria-label^="Select:"]')!.click(); });
+
+    const keydownRegistrations = addSpy.mock.calls.filter(([type]) => type === 'keydown');
+    expect(keydownRegistrations).toHaveLength(0);
+
+    // Shortcuts still work: Ctrl+G groups selected, Ctrl+Shift+G ungroups, X toggles cut, Escape exits cut.
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', ctrlKey: true, bubbles: true })); });
+    expect(useStore.getState().sessions[sessionId].graph.groups).toHaveLength(1);
+
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'G', ctrlKey: true, shiftKey: true, bubbles: true })); });
+    expect(useStore.getState().sessions[sessionId].graph.groups).toEqual([]);
+
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true })); });
+    expect(container.querySelector('.node-canvas')?.classList.contains('is-cut-tool')).toBe(true);
+
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(container.querySelector('.node-canvas')?.classList.contains('is-cut-tool')).toBe(false);
+  });
+});
