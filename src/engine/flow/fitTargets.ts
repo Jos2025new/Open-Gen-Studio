@@ -1,7 +1,7 @@
 import type { GraphNode } from '../types';
 
 /** System cards (chat, agent, models, Spaces) are drawn by the app, not made by the user. */
-export const isSystemCard = (n: GraphNode): boolean => n.data.kind === 'ref';
+const isSystemCard = (n: GraphNode): boolean => n.data.kind === 'ref';
 
 export type FitScope = 'auto' | 'all' | 'selection';
 
