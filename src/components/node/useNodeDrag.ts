@@ -17,24 +17,32 @@ export function useNodeDrag(
   const dragPosRef = useRef(dragPos);
   dragPosRef.current = dragPos;
   const framePreviewsRef = useRef<Map<string, Set<string>>>(new Map());
-  const groups = useStore((s) => s.sessions[sessionId]?.graph.groups);
-  useEffect(() => {
-    framePreviewsRef.current.clear();
-    dragPosRef.current = EMPTY_DRAG_POS;
-    setDragPos(EMPTY_DRAG_POS);
-  }, [sessionId]);
+  const graph = useStore((s) => s.sessions[sessionId]?.graph);
 
-  useEffect(() => {
-    if (!framePreviewsRef.current.size) return;
-    const liveGroupIds = new Set((groups ?? []).map((g) => g.id));
-    const staleIds: string[] = [];
+  const reconcileWithGraph = useCallback((g: Graph | undefined) => {
+    if (!dragPosRef.current.size && !framePreviewsRef.current.size) return;
+    const liveNodeIds = new Set((g?.nodes ?? []).map((n) => n.id));
+    const liveGroups = new Map((g?.groups ?? []).map((gr) => [gr.id, new Set(gr.nodeIds)]));
+    const staleIds = new Set<string>();
     for (const [gid, memberIds] of framePreviewsRef.current) {
-      if (!liveGroupIds.has(gid)) {
-        for (const id of memberIds) staleIds.push(id);
+      const liveMembers = liveGroups.get(gid);
+      if (!liveMembers) {
+        for (const id of memberIds) staleIds.add(id);
         framePreviewsRef.current.delete(gid);
+      } else {
+        for (const id of memberIds) {
+          if (!liveMembers.has(id) || !liveNodeIds.has(id)) {
+            staleIds.add(id);
+            memberIds.delete(id);
+          }
+        }
+        if (!memberIds.size) framePreviewsRef.current.delete(gid);
       }
     }
-    if (staleIds.length) {
+    for (const id of dragPosRef.current.keys()) {
+      if (!liveNodeIds.has(id)) staleIds.add(id);
+    }
+    if (staleIds.size) {
       const next = new Map(dragPosRef.current);
       let changed = false;
       for (const id of staleIds) if (next.delete(id)) changed = true;
@@ -44,7 +52,21 @@ export function useNodeDrag(
         setDragPos(resolved);
       }
     }
-  }, [groups]);
+  }, []);
+
+  useEffect(() => {
+    framePreviewsRef.current.clear();
+    dragPosRef.current = EMPTY_DRAG_POS;
+    setDragPos(EMPTY_DRAG_POS);
+    return useStore.subscribe((state, prev) => {
+      const nextGraph = state.sessions[sessionId]?.graph;
+      if (nextGraph !== prev.sessions[sessionId]?.graph) reconcileWithGraph(nextGraph);
+    });
+  }, [sessionId, reconcileWithGraph]);
+
+  useEffect(() => {
+    reconcileWithGraph(graph);
+  }, [graph, reconcileWithGraph]);
 
   const applyDragChanges = useCallback(
     (
@@ -53,6 +75,11 @@ export function useNodeDrag(
       groupById: Map<string, GraphGroup>,
       removed: string[],
     ) => {
+      reconcileWithGraph(liveGraph);
+      const removedSet = new Set(removed);
+      const liveNodesById = liveGraph
+        ? new Map(liveGraph.nodes.filter((n) => !removedSet.has(n.id)).map((n) => [n.id, n]))
+        : undefined;
       const previewMoves = new Map<string, { x: number; y: number }>();
       const commitMoves = new Map<string, { x: number; y: number }>();
       const droppedIds = new Set<string>();
@@ -72,6 +99,10 @@ export function useNodeDrag(
           framePreviewsRef.current.delete(c.id);
           continue;
         }
+        if (removedSet.has(c.id) || (liveNodesById && !liveNodesById.has(c.id))) {
+          droppedIds.add(c.id);
+          continue;
+        }
         if (c.dragging === true) {
           if (c.position) previewMoves.set(c.id, c.position);
         } else {
@@ -81,10 +112,8 @@ export function useNodeDrag(
         }
       }
       const currentDrag = dragPosRef.current;
-      const liveNodesById = liveGraph ? new Map(liveGraph.nodes.map((n) => [n.id, n])) : undefined;
       if (frameChanges.length && liveGraph && liveNodesById) {
-        const previewPosOf = (n: GraphNode) =>
-          commitMoves.get(n.id) ?? previewMoves.get(n.id) ?? currentDrag.get(n.id) ?? n.position;
+        const preBatchPosOf = (n: GraphNode) => currentDrag.get(n.id) ?? n.position;
         for (const { group: g, pos: p, dragging } of frameChanges) {
           if (!dragging) {
             const tracked = framePreviewsRef.current.get(g.id);
@@ -93,11 +122,10 @@ export function useNodeDrag(
               framePreviewsRef.current.delete(g.id);
             }
           }
-          if (g.nodeIds.some((id) => previewMoves.has(id) || commitMoves.has(id))) continue;
           const members: GraphNode[] = [];
           for (const id of g.nodeIds) {
             const n = liveNodesById.get(id);
-            if (n) members.push({ ...n, position: previewPosOf(n) });
+            if (n) members.push({ ...n, position: preBatchPosOf(n) });
           }
           const b = groupBounds(members, measuredRef.current);
           const dx = p && b ? p.x - b.x : 0;
@@ -113,22 +141,31 @@ export function useNodeDrag(
           }
           for (const m of members) {
             const nextPos = { x: m.position.x + dx, y: m.position.y + dy };
-            if (dragging) previewMoves.set(m.id, nextPos);
-            else {
-              commitMoves.set(m.id, nextPos);
+            if (dragging) {
+              if (!previewMoves.has(m.id)) previewMoves.set(m.id, nextPos);
+            } else {
+              if (!commitMoves.has(m.id)) commitMoves.set(m.id, nextPos);
               droppedIds.add(m.id);
             }
           }
         }
       }
-      if (previewMoves.size || droppedIds.size || removed.length) {
+      if ((droppedIds.size || commitMoves.size) && !previewMoves.size) {
+        framePreviewsRef.current.clear();
+        if (dragPosRef.current.size) {
+          dragPosRef.current = EMPTY_DRAG_POS;
+          setDragPos(EMPTY_DRAG_POS);
+        }
+      } else if (previewMoves.size || droppedIds.size || removed.length) {
         const next = new Map(currentDrag);
         for (const id of droppedIds) next.delete(id);
         for (const id of removed) next.delete(id);
+        for (const [id, pos] of previewMoves) {
+          if (!removedSet.has(id) && (!liveNodesById || liveNodesById.has(id))) next.set(id, pos);
+        }
         if (liveNodesById) {
           for (const id of next.keys()) if (!liveNodesById.has(id)) next.delete(id);
         }
-        for (const [id, pos] of previewMoves) next.set(id, pos);
         const resolved = next.size ? next : EMPTY_DRAG_POS;
         dragPosRef.current = resolved;
         setDragPos(resolved);
@@ -149,7 +186,7 @@ export function useNodeDrag(
         }
       }
     },
-    [sessionId, measuredRef],
+    [sessionId, measuredRef, reconcileWithGraph],
   );
 
   return { dragPos, applyDragChanges };

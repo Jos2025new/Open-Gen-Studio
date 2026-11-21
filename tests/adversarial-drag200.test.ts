@@ -138,8 +138,7 @@ describe('Attack 1: drag gestures, frames, cables, mid-drag mutations, session s
     expect(sPos(sid, 'n2')).toEqual({ x: 650, y: 80 });
   });
 
-  // FAILS: useNodeDrag.ts:20-47 never prunes dragPos on external delete (Del/Trash/Operations/Menu); Undo renders ghost (150,80).
-  it.fails('delete mid-drag via deleteNodes/Del + Undo must not render ghost drag position', () => {
+  it('delete mid-drag via deleteNodes/Del + Undo must not render ghost drag position', () => {
     const { sid } = mountCanvas(makeGraph(4));
     onCh([pCh('n0', true, { x: 150, y: 80 })]);
     act(() => { deleteNodes(sid, ['n0']); });
@@ -147,8 +146,7 @@ describe('Attack 1: drag gestures, frames, cables, mid-drag mutations, session s
     expect(sPos(sid, 'n0')).toEqual({ x: 0, y: 0 }); expect(rPos('n0')).toEqual({ x: 0, y: 0 });
   });
 
-  // FAILS: useNodeDrag.ts:128-131 prunes !liveNodesById before inserting previewMoves; trailing dragging:true pollutes dragPos.
-  it.fails('trailing dragging:true after delete must not pollute dragPos for subsequent Undo', () => {
+  it('trailing dragging:true after delete must not pollute dragPos for subsequent Undo', () => {
     const { sid } = mountCanvas(makeGraph(4));
     act(() => { deleteNodes(sid, ['n0']); });
     onCh([pCh('n0', true, { x: 222, y: 111 })]);
@@ -156,8 +154,7 @@ describe('Attack 1: drag gestures, frames, cables, mid-drag mutations, session s
     expect(rPos('n0')).toEqual({ x: 0, y: 0 });
   });
 
-  // FAILS: useNodeDrag.ts:89-96 puts g0 members in droppedIds then `continue`s when n0 is in commitMoves, dropping n1 back to (260,0).
-  it.fails('dropping dragged group frame with one member in same batch must commit other member too', () => {
+  it('dropping dragged group frame with one member in same batch must commit other member too', () => {
     const { sid } = mountCanvas(makeGraph(4));
     const st = rPos('g0')!;
     onCh([pCh('g0', true, { x: st.x + 80, y: st.y + 40 })]);
