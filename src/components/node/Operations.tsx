@@ -78,10 +78,10 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect, onDelete }:
             <button type="button" className="nt-btn nt-icon" aria-label="Copy" data-tip="Copy (Ctrl+C)" onClick={() => toast(`Copied ${copyNodes(sessionId, ids)} nodes · Ctrl+V to paste`, 'success')}>
               <ClipboardCopy size={14} />
             </button>
-            <button type="button" className="nt-btn nt-icon" aria-label="Cut" data-tip="Cut (Ctrl+X)" onClick={() => { if (requestDelete) requestDelete(ids, [], () => { copyNodes(sessionId, ids); }); else { cutNodes(sessionId, ids); onSelect([]); } }}>
+            <button type="button" className="nt-btn nt-icon" aria-label="Cut" data-tip="Cut (Ctrl+X)" onClick={() => { if (requestDelete) requestDelete(ids, [], () => { copyNodes(sessionId, ids); onSelect([]); }); else { cutNodes(sessionId, ids); onSelect([]); } }}>
               <Scissors size={14} />
             </button>
-            <button type="button" className="nt-btn nt-icon nt-danger" aria-label="Delete" data-tip="Delete" onClick={() => { if (requestDelete) requestDelete(ids); else { deleteNodes(sessionId, ids); onSelect([]); } }}>
+            <button type="button" className="nt-btn nt-icon nt-danger" aria-label="Delete" data-tip="Delete" onClick={() => { if (requestDelete) requestDelete(ids, [], () => { onSelect([]); }); else { deleteNodes(sessionId, ids); onSelect([]); } }}>
               <Trash size={14} />
             </button>
             <span className="nt-sep" />

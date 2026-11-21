@@ -187,6 +187,50 @@ describe('NodeWorkspace delete confirmation', () => {
     const pastedAfterConfirm = pasteNodes(sessionId);
     expect(useStore.getState().sessions[sessionId].graph.nodes.filter((n) => pastedAfterConfirm.includes(n.id)).map((n) => n.data.title)).toContain('CutMe');
   });
+
+  it('Operations Cut and Delete clear the whole selection including unrelated selected edges (as in main)', () => {
+    const graph: Graph = {
+      nodes: [
+        { id: 't1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'T1', text: 'a' } },
+        { id: 't2', position: { x: 200, y: 0 }, data: { kind: 'text', title: 'T2', text: 'b' } },
+        { id: 't3', position: { x: 400, y: 0 }, data: { kind: 'text', title: 'T3', text: 'c' } },
+        { id: 't4', position: { x: 600, y: 0 }, data: { kind: 'text', title: 'T4', text: 'd' } },
+        { id: 't5', position: { x: 800, y: 0 }, data: { kind: 'text', title: 'T5', text: 'e' } },
+        { id: 't6', position: { x: 1000, y: 0 }, data: { kind: 'text', title: 'T6', text: 'f' } },
+      ],
+      edges: [{ id: 'e_other', source: 't5', sourceHandle: 'out', target: 't6', targetHandle: 'in' }],
+    };
+    const { container } = mount(graph);
+
+    // Select t1, t2 and an unrelated edge e_other, then Cut from Operations.
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 't1', type: 'select', selected: true },
+        { id: 't2', type: 'select', selected: true },
+      ]);
+      flow.props!.onEdgesChange([{ id: 'e_other', type: 'select', selected: true }]);
+    });
+    expect(flow.props!.edges.find((e) => e.id === 'e_other')?.selected).toBe(true);
+    act(() => [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Operations'))!.click());
+    act(() => container.querySelector<HTMLButtonElement>('.ops-bar button[aria-label="Cut"]')!.click());
+    expect(flow.props!.nodes.some((n) => n.selected)).toBe(false);
+    expect(flow.props!.edges.find((e) => e.id === 'e_other')?.selected).toBe(false);
+
+    // Select t3, t4 and unrelated edge e_other, then Delete from Operations.
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 't3', type: 'select', selected: true },
+        { id: 't4', type: 'select', selected: true },
+      ]);
+      flow.props!.onEdgesChange([{ id: 'e_other', type: 'select', selected: true }]);
+    });
+    expect(flow.props!.edges.find((e) => e.id === 'e_other')?.selected).toBe(true);
+    const openOps = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Operations'));
+    if (openOps) act(() => openOps.click());
+    act(() => container.querySelector<HTMLButtonElement>('.ops-bar button[aria-label="Delete"]')!.click());
+    expect(flow.props!.nodes.some((n) => n.selected)).toBe(false);
+    expect(flow.props!.edges.find((e) => e.id === 'e_other')?.selected).toBe(false);
+  });
 });
 
 describe('Pan box selection with collapsed groups', () => {
