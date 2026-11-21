@@ -25,8 +25,8 @@ vi.mock('../src/lib/media', async (original) => ({
   probeMedia: async () => ({ width: 512, height: 512 }),
 }));
 
-import { useStore } from '../src/store/store';
-import { createGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
+import { saveNow, useStore } from '../src/store/store';
+import { canRecheck, createGeneration, recheckGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
 import { RECRAFT_STYLE_REF } from '../src/engine/catalog';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import type { ModelSummary } from '../src/engine/types';
@@ -203,5 +203,122 @@ describe('durable send ledger across reloads in specialSends.ts', () => {
     expect(end?.status).toBe('done');
     expect(end?.text).toBe('ok_result');
     expect(end?.sends?.[0]).toMatchObject({ index: 0, status: 'done', remoteJob: { id: job.id } });
+  });
+});
+
+describe('per-request recovery, reentry preservation, and idempotent rehydration', () => {
+  it('execute() does not erase remoteJob or lostJob on reentry', async () => {
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 1, advanced: {} }, inputs: { refs: [] } });
+    useStore.setState((s) => ({
+      generations: {
+        ...s.generations,
+        [g.id]: { ...s.generations[g.id], remoteJob: { provider: 'nanogpt', id: 'kept_1', meta: {} }, lostJob: true },
+      },
+    }));
+    let seenDuring: { remoteJobId?: string; lostJob?: boolean } = {};
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementationOnce(async () => {
+      const cur = useStore.getState().generations[g.id];
+      seenDuring = { remoteJobId: cur.remoteJob?.id, lostJob: cur.lostJob };
+      throw new Error('stop');
+    });
+    await runGeneration(g.id).catch(() => undefined);
+    expect(seenDuring).toEqual({ remoteJobId: 'kept_1', lostJob: true });
+  });
+
+  it('followRemote preserves prior assetIds from earlier batch requests', async () => {
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 2, advanced: {} }, inputs: { refs: [] } });
+    useStore.setState((s) => ({
+      assets: {
+        ...s.assets,
+        ast_prev: { id: 'ast_prev', kind: 'image', mime: 'image/png', width: 512, height: 512, sessionId: sid(), origin: 'generated', stored: true, favorite: false, createdAt: 1 } as never,
+      },
+      generations: {
+        ...s.generations,
+        [g.id]: {
+          ...s.generations[g.id],
+          status: 'error',
+          assetIds: ['ast_prev'],
+          remoteJob: { provider: 'nanogpt', id: 'j_2', meta: {} },
+          sends: [
+            { id: 'r0', index: 0, status: 'done', remoteJob: { provider: 'nanogpt', id: 'j_1', meta: {} } },
+            { id: 'r1', index: 1, status: 'sent', remoteJob: { provider: 'nanogpt', id: 'j_2', meta: {} } },
+          ],
+        },
+      },
+    }));
+    vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValueOnce({
+      outputs: [{ blob: new Blob(['two'], { type: 'image/png' }), mime: 'image/png' }],
+      costUsd: 0.1,
+    });
+    const added = await recheckGeneration(g.id);
+    expect(added).toHaveLength(1);
+    expect(useStore.getState().generations[g.id].assetIds).toEqual(['ast_prev', added[0]]);
+  });
+
+  it('canRecheck and recheckGeneration recover a pending request from g.sends even when top-level remoteJob is absent', async () => {
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 2, advanced: {} }, inputs: { refs: [] } });
+    useStore.setState((s) => ({
+      generations: {
+        ...s.generations,
+        [g.id]: {
+          ...s.generations[g.id],
+          status: 'error',
+          remoteJob: undefined,
+          sends: [
+            { id: 'r0', index: 0, status: 'done', remoteJob: { provider: 'nanogpt', id: 'j_1', meta: {} } },
+            { id: 'r1', index: 1, status: 'sent', remoteJob: { provider: 'nanogpt', id: 'j_from_sends', meta: {} } },
+          ],
+        },
+      },
+    }));
+    expect(canRecheck(useStore.getState().generations[g.id])).toBe(true);
+    const spy = vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValueOnce({
+      outputs: [{ blob: new Blob(['ok'], { type: 'image/png' }), mime: 'image/png' }],
+      costUsd: 0.1,
+    });
+    await recheckGeneration(g.id);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0].id).toBe('j_from_sends');
+  });
+
+  it('rehydrating twice yields a single spend and a single delivery', async () => {
+    const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 1, advanced: {} }, inputs: { refs: [] } });
+    useStore.setState((s) => ({
+      generations: {
+        ...s.generations,
+        [g.id]: {
+          ...s.generations[g.id],
+          status: 'running',
+          remoteJob: { provider: 'nanogpt', id: 'j_once', meta: {} },
+          sends: [{ id: 'r0', index: 0, status: 'sent', remoteJob: { provider: 'nanogpt', id: 'j_once', meta: {} } }],
+        },
+      },
+    }));
+    await saveNow();
+
+    let release!: () => void;
+    const resumeSpy = vi.spyOn(ADAPTERS.nanogpt, 'resume').mockImplementation(async () => {
+      await new Promise<void>((r) => { release = r; });
+      return { outputs: [{ blob: new Blob(['img'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.1 };
+    });
+
+    // Two concurrent resumeInterrupted calls before completion: deduplicated.
+    const first = resumeInterrupted();
+    const second = resumeInterrupted();
+    await new Promise((r) => setTimeout(r, 10));
+    release();
+    await Promise.all([first, second]);
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Second full store rehydrate + resumeInterrupted after completion: still 1 spend and 1 delivery.
+    await useStore.persist.rehydrate();
+    await resumeInterrupted();
+
+    const st = useStore.getState();
+    expect(resumeSpy).toHaveBeenCalledTimes(1);
+    expect(st.spendLog).toHaveLength(1);
+    expect(st.spentUsd).toBeCloseTo(0.1);
+    expect(st.generations[g.id].assetIds).toHaveLength(1);
+    expect(Object.keys(st.assets)).toHaveLength(1);
   });
 });
