@@ -150,7 +150,8 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
   }) };
   replay = true;
   try { if (!apply(reconciled(graph, target.time))) return false; } finally { replay = false; }
-  for (let i = 0; i < count; i++) to.push(from.pop()!);
+  // A travelled step is closed: a later nudge never fuses into it.
+  for (let i = 0; i < count; i++) { const e = from.pop()!; delete e.nudge; to.push(e); }
   notify();
   return true;
 }
