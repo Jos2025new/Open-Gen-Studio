@@ -90,19 +90,23 @@ export function recordGraph(id: string, before: Graph, after: Graph) {
     notify();
     return;
   }
+  const beforeById = new Map<string, Graph['nodes'][number]>();
+  for (const p of before.nodes) if (!beforeById.has(p.id)) beforeById.set(p.id, p);
+  const afterById = new Map<string, Graph['nodes'][number]>();
+  for (const n of after.nodes) if (!afterById.has(n.id)) afterById.set(n.id, n);
   const edits = { ...after, nodes: after.nodes.map(n => {
-    const prev = before.nodes.find(p => p.id === n.id);
+    const prev = beforeById.get(n.id);
     if (prev && 'outputIndex' in prev.data && 'outputIndex' in n.data && prev.data.generationId !== n.data.generationId) {
       return { ...n, data: { ...n.data, outputIndex: prev.data.outputIndex, sketchAssetId: prev.data.sketchAssetId } };
     }
     return n;
   }) };
   if (replay || logical(before) === logical(edits)) return;
-  const added = after.nodes.filter(n => !before.nodes.some(p => p.id === n.id));
-  const removed = before.nodes.filter(n => !after.nodes.some(p => p.id === n.id));
-  const changed = after.nodes.filter(n => { const prev = before.nodes.find(p => p.id === n.id); return prev && logical({ nodes: [prev], edges: [] }) !== logical({ nodes: [n], edges: [] }); });
+  const added = after.nodes.filter(n => !beforeById.has(n.id));
+  const removed = before.nodes.filter(n => !afterById.has(n.id));
+  const changed = after.nodes.filter(n => { const prev = beforeById.get(n.id); return prev && logical({ nodes: [prev], edges: [] }) !== logical({ nodes: [n], edges: [] }); });
   const edges = JSON.stringify([before.edges, before.broken ?? []]) !== JSON.stringify([after.edges, after.broken ?? []]);
-  const moved = changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(before.nodes.find(p => p.id === n.id)!.data));
+  const moved = changed.length > 0 && changed.every(n => JSON.stringify(n.data) === JSON.stringify(beforeById.get(n.id)!.data));
   const label = added.length ? `Add ${added.map(n => n.data.title).join(', ')}` : removed.length ? `Delete ${removed.map(n => n.data.title).join(', ')}` : edges ? 'Change connections' : `${moved ? 'Move' : 'Edit'} ${changed.map(n => n.data.title).join(', ')}`;
   const key = `${moved ? 'move' : 'edit'}:${changed.map(n => n.id).join(',')}`;
   const time = Date.now();
@@ -124,8 +128,10 @@ export function travelGraph(id: string, current: Graph, direction: 'undo' | 'red
   if (!Number.isInteger(count) || count < 1 || count > from.length) return false;
   const target = from[from.length - count];
   const saved = direction === 'undo' ? target.before : target.after;
+  const currentById = new Map<string, Graph['nodes'][number]>();
+  for (const p of current.nodes) if (!currentById.has(p.id)) currentById.set(p.id, p);
   const graph = { ...structuredClone(saved), viewport: current.viewport, nodes: saved.nodes.map(n => {
-    const live = current.nodes.find(p => p.id === n.id) ?? s.latest.get(n.id);
+    const live = currentById.get(n.id) ?? s.latest.get(n.id);
     if (live && live.data.kind === n.data.kind && 'outputIndex' in n.data && 'outputIndex' in live.data) {
       const newerOutput = n.data.generationId !== live.data.generationId;
       return { ...n, data: { ...n.data, generationId: live.data.generationId, ...(newerOutput ? { outputIndex: live.data.outputIndex, sketchAssetId: live.data.sketchAssetId } : {}) } };
