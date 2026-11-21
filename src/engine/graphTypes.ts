@@ -149,7 +149,10 @@ export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
   groups?: GraphGroup[];
+  /** Where the Nodes canvas was left (flow offset and zoom); not part of undo. */
   viewport?: { x: number; y: number; zoom: number };
+  /** The same for the omnicanvas, which keeps its own view. */
+  omniViewport?: { x: number; y: number; zoom: number };
   /** When the omnicanvas last brought the session's assets in: older ones the user removed do not come back. */
   omniAt?: number;
   /** Asset ids already seen at `omniAt`, so new assets sharing that timestamp are not discarded. */

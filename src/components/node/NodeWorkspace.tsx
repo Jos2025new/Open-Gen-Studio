@@ -26,6 +26,7 @@ import { AddNodeItems } from './AddNodeItems';
 import { AddNodeMenu, CanvasChatImport, RunAll } from './NodeCanvasParts';
 import { omniWidth } from '../omni/RefNode';
 import { useOmniFraming } from '../omni/useOmniFraming';
+import { useViewMemory } from './useViewMemory';
 import { revealRect } from '../omni/revealNode';
 import { useOmniEntries } from '../omni/useOmniEntries';
 import { settleNewNodes } from '../../engine/flow/settle';
@@ -131,7 +132,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
-  useOmniFraming(omni, sessionId, rf);
+  const view = useViewMemory(sessionId, omni, !embedded);
+  useOmniFraming(omni, sessionId, rf, Boolean(view.saved));
   usePortZoom(omni, canvasRef);
   // Nodes the agent just added: frame them once they are measured.
   const focus = useNodeFocus();
@@ -434,7 +436,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         connectionLineStyle={{ stroke: 'var(--text-2)', strokeWidth: 2, strokeDasharray: '6 6' }}
         isValidConnection={isValidConnection}
         colorMode="dark"
-        fitView
+        fitView={!view.saved}
+        defaultViewport={view.saved}
+        onMoveEnd={view.onMoveEnd}
         fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
         minZoom={NODE_MIN_ZOOM}
         maxZoom={NODE_MAX_ZOOM}
