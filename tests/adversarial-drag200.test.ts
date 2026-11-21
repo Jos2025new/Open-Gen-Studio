@@ -396,37 +396,41 @@ describe('Attack 7: evading scripts/check-node-drag.mjs', () => {
     expect(e).toHaveLength(1); expect(e[0]).toMatch(/^src\/components\/node\/NodeWorkspace\.tsx:\d+ — .*dragging: false/);
   });
 
-  // FAILS: check-node-drag.mjs:125-138 scans each file in isolation, missing cross-file re-exports ([]).
-  it.fails('catches re-exported alias from another file', () => {
+  it('catches re-exported alias from another file', () => {
     expect(runFix({ 'src/components/node/re.ts': `export { editPresentation as savePos } from './e';`, [WS]: `import { savePos } from './re'; ${h(`${ifDrag} savePos('s', (g: any) => g)`)}` }).length).toBeGreaterThan(0);
   });
 
-  // FAILS: check-node-drag.mjs:162-189 only indexes top-level localBodies in same file, missing cross-file helpers ([]).
-  it.fails('catches helper function in another file', () => {
+  it('catches helper function in another file', () => {
     expect(runFix({ 'src/components/node/h.ts': `import { editPresentation } from './e'; export function flush(s: string) { editPresentation(s, (g: any) => g); }`, [WS]: `import { flush } from './h'; ${h(`${ifDrag} flush('s')`)}` }).length).toBeGreaterThan(0);
   });
 
-  // FAILS: check-node-drag.mjs:139-160 misses .call(), object indirection, destructuring, and JSON.stringify aliases ([]).
-  it.fails('catches indirect same-file calls (.call, object, destructuring, JSON.stringify alias)', () => {
+  it('catches indirect same-file calls (destructuring, JSON.stringify alias) and runtime publication count detects dynamic .call / object-wrapped writes', () => {
     expect(runFix({ [WS]: `import { editPresentation } from './e'; ${h(`${ifDrag} editPresentation.call(null, 's', (g: any) => g)`)}` }).length).toBeGreaterThan(0);
     expect(runFix({ [WS]: `import { editPresentation } from './e'; const o = { w: editPresentation }; ${h(`${ifDrag} o.w('s', (g: any) => g)`)}` }).length).toBeGreaterThan(0);
     expect(runFix({ [WS]: `import * as ed from './e'; const { editPresentation: w } = ed; ${h(`${ifDrag} w('s', (g: any) => g)`)}` }).length).toBeGreaterThan(0);
     expect(runFix({ [WS]: `const ser = JSON.stringify; ${h(`${ifDrag} ser(c)`)}` }).length).toBeGreaterThan(0);
+
+    // Runtime publication-count guarantee (node-drag-perf contract): 0 writes during live drag, whereas a dynamic .call or object-wrapped write is caught by the publication counter.
+    const { sid } = mountCanvas(makeGraph(4));
+    let w = 0;
+    cleanups.push(useStore.subscribe((n, p) => { if (n.sessions[sid]?.graph !== p.sessions[sid]?.graph) w++; }));
+    onCh([pCh('n0', true, { x: 120, y: 40 })]);
+    expect(w).toBe(0);
+    const dynObj: Record<string, typeof edit.editPresentation> = { ['w']: edit.editPresentation };
+    act(() => { dynObj['w'].call(null, sid, (g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === 'n0' ? { ...n, position: { x: 120, y: 40 } } : n)) })); });
+    expect(w).toBe(1);
   });
 
-  // FAILS: check-node-drag.mjs:162-172 only scans program.body, missing component/hook closures ([]).
-  it.fails('catches nested helper closure inside a React component or hook', () => {
+  it('catches nested helper closure inside a React component or hook', () => {
     expect(runFix({ [WS]: `import { editPresentation } from './e'; function C() { const save = () => editPresentation('s', (g: any) => g); const onNodesChange = useCallback((cs: any[]) => { for (const c of cs) ${ifDrag} save(); }, []); return onNodesChange; }` }).length).toBeGreaterThan(0);
   });
 
-  // FAILS: check-node-drag.mjs:47-67 misses aliased `const d = c.dragging` and line 346 ignores inline JSX onNodesChange ([]).
-  it.fails('catches aliased c.dragging variable or inline ReactFlow onNodesChange handler', () => {
+  it('catches aliased c.dragging variable or inline ReactFlow onNodesChange handler', () => {
     expect(runFix({ [WS]: `import { editPresentation } from './e'; ${h(`{ const d = c.dragging; if (c.type === 'position' && d) editPresentation('s', (g: any) => g); }`)}` }).length).toBeGreaterThan(0);
     expect(runFix({ [WS]: `import { editPresentation } from './e'; function C() { return <ReactFlow onNodesChange={(cs: any[]) => { for (const c of cs) if (c.type === 'position' && c.dragging) editPresentation('s', (g: any) => g); }} />; }` }).length).toBeGreaterThan(0);
   });
 
-  // FAILS: check-node-drag.mjs:298 & 117 check literal names 'trailCuts' and 'NodeToolbar' without import-alias resolution ([]).
-  it.fails('catches aliased trailCuts in CutTool and aliased NodeToolbar in cards', () => {
+  it('catches aliased trailCuts in CutTool and aliased NodeToolbar in cards', () => {
     expect(runFix({ 'src/components/node/CutTool.tsx': `import { trailCuts as scan } from './g'; function useCutTool() { const move = (e: any) => { scan([e], []); }; return { move }; }` }).length).toBeGreaterThan(0);
     expect(runFix({ 'src/components/node/nodes.tsx': `import { NodeToolbar as Toolbar } from '@xyflow/react'; function Card({ selected }: { selected: boolean }) { return <><Toolbar isVisible={selected}><div /></Toolbar></>; }` }).length).toBeGreaterThan(0);
   });
