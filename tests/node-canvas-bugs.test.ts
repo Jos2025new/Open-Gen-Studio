@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import type { Edge, EdgeChange, Node, NodeChange, NodeTypes } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NodeWorkspace, OmniCanvas } from '../src/components/node/NodeWorkspace';
+import { copyNodes, pasteNodes } from '../src/engine/flow/arrange';
 import type { Graph } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
 
@@ -141,6 +142,50 @@ describe('NodeWorkspace delete confirmation', () => {
     act(() => confirmBtn!.click());
     expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 'a1')).toBe(false);
     expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 't1')).toBe(false);
+  });
+
+  it('Operations Cut and Ctrl+X ask confirmation on model-linked ref node and copy to clipboard only when confirmed', () => {
+    const graph: Graph = {
+      nodes: [
+        { id: 'm1', position: { x: 0, y: 0 }, data: { kind: 'ref', type: 'model', ref: 'atlas::nb', title: 'Model' } },
+        { id: 'a1', position: { x: 300, y: 0 }, data: { kind: 'ref', type: 'agent', ref: 'agent', title: 'Agent' } },
+        { id: 't1', position: { x: 600, y: 0 }, data: { kind: 'text', title: 'CutMe', text: 'cut-payload' } },
+        { id: 't2', position: { x: 900, y: 0 }, data: { kind: 'text', title: 'PriorClip', text: 'prior' } },
+      ],
+      edges: [{ id: 'e_ctrl', source: 'm1', sourceHandle: 'out_control', target: 'a1', targetHandle: 'model', kind: 'control' }],
+    };
+    const { sessionId, container } = mount(graph, true);
+    copyNodes(sessionId, ['t2']);
+
+    act(() => {
+      flow.props!.onNodesChange([
+        { id: 'a1', type: 'select', selected: true },
+        { id: 't1', type: 'select', selected: true },
+      ]);
+    });
+
+    // Ctrl+X opens confirmation dialog without deleting or overwriting clipboard yet.
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', ctrlKey: true, bubbles: true })); });
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 'a1')).toBe(true);
+    let dialog = container.querySelector('[role="alertdialog"][aria-label="Remove from canvas"]');
+    expect(dialog).not.toBeNull();
+    act(() => [...dialog!.querySelectorAll('button')].find((b) => b.textContent === 'Cancel')!.click());
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 't1')).toBe(true);
+    const pastedAfterCancel = pasteNodes(sessionId);
+    expect(pastedAfterCancel).toHaveLength(1);
+    expect(useStore.getState().sessions[sessionId].graph.nodes.find((n) => n.id === pastedAfterCancel[0])?.data.title).toBe('PriorClip');
+
+    // Operations Cut opens confirmation and copies+deletes when Remove is clicked.
+    const opsBtn = [...container.querySelectorAll('button')].find((b) => b.textContent?.includes('Operations'));
+    act(() => opsBtn!.click());
+    act(() => container.querySelector<HTMLButtonElement>('.ops-bar button[aria-label="Cut"]')!.click());
+    dialog = container.querySelector('[role="alertdialog"][aria-label="Remove from canvas"]');
+    expect(dialog).not.toBeNull();
+    act(() => [...dialog!.querySelectorAll('button')].find((b) => b.textContent === 'Remove')!.click());
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 'a1')).toBe(false);
+    expect(useStore.getState().sessions[sessionId].graph.nodes.some((n) => n.id === 't1')).toBe(false);
+    const pastedAfterConfirm = pasteNodes(sessionId);
+    expect(useStore.getState().sessions[sessionId].graph.nodes.filter((n) => pastedAfterConfirm.includes(n.id)).map((n) => n.data.title)).toContain('CutMe');
   });
 });
 

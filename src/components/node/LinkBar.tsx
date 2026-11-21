@@ -66,12 +66,12 @@ export function LinkBar({ sessionId, graph, selected }: { sessionId: string; gra
   );
 }
 
-export const DeleteRequestContext = createContext<((nodeIds: string[], edgeIds?: string[]) => void) | null>(null);
+export const DeleteRequestContext = createContext<((nodeIds: string[], edgeIds?: string[], beforeDelete?: () => void) => void) | null>(null);
 export const useDeleteRequestContext = () => useContext(DeleteRequestContext);
 
 /** A system node is a pointer: removing it only takes it off the canvas. When it holds model links, ask first. */
 export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[], edges: string[]) => void) {
-  const [ask, setAsk] = useState<{ nodes: string[]; edges: string[] } | null>(null);
+  const [ask, setAsk] = useState<{ nodes: string[]; edges: string[]; beforeDelete?: () => void } | null>(null);
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
   const needsConfirm = (ids: string[]) => {
     const g = useStore.getState().sessions[sessionId]?.graph ?? graph;
@@ -83,7 +83,7 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
     });
   };
   /** Deletes nodes (with their connected links), standalone links, and group frames as one atomic undo step. */
-  const runDelete = (nodeIds: string[], edgeIds: string[] = []) => {
+  const runDelete = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
     const g = useStore.getState().sessions[sessionId]?.graph;
     if (!g) return;
     const groupSet = new Set((g.groups ?? []).map((gr) => gr.id));
@@ -98,6 +98,7 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
       return Boolean(e && !dropSet.has(e.source) && !dropSet.has(e.target));
     });
     if (!groupIds.length && !realNodes.length && !standaloneEdges.length) return;
+    beforeDelete?.();
     const h = openHistoryGroup(sessionId);
     try {
       for (const gid of groupIds) ungroup(sessionId, gid);
@@ -108,9 +109,9 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
     }
     afterDelete(nodeIds, edgeIds);
   };
-  const request = (nodeIds: string[], edgeIds: string[] = []) => {
-    if (needsConfirm(nodeIds)) setAsk({ nodes: nodeIds, edges: edgeIds });
-    else runDelete(nodeIds, edgeIds);
+  const request = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
+    if (needsConfirm(nodeIds)) setAsk({ nodes: nodeIds, edges: edgeIds, beforeDelete });
+    else runDelete(nodeIds, edgeIds, beforeDelete);
   };
   const card = useMemo(() => {
     if (!ask || !graph) return null;
@@ -121,7 +122,7 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
         <p>Remove <strong>{names}</strong> from the canvas? It only takes the node off the canvas; the data stays where it is. {links} link{links === 1 ? '' : 's'} (models included) will be detached.</p>
         <div className="spend-actions">
           <Button variant="ghost" onClick={() => setAsk(null)}>Cancel</Button>
-          <Button variant="danger" onClick={() => { runDelete(ask.nodes, ask.edges); setAsk(null); }}>Remove</Button>
+          <Button variant="danger" onClick={() => { runDelete(ask.nodes, ask.edges, ask.beforeDelete); setAsk(null); }}>Remove</Button>
         </div>
       </Panel>
     );

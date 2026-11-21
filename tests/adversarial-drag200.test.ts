@@ -313,8 +313,7 @@ describe('Attack 4: delete confirmation across all entry points', () => {
     run((el) => { onCh(sCh('t1')); act(() => btn(el, 'button[aria-label="Delete node"]').click()); clickTxt(document.body, '.confirm button', 'Delete'); }, ['t1']);
   });
 
-  // FAILS: Operations.tsx:81 & NodeWorkspace.tsx:341 invoke cutNodes -> deleteNodes directly, bypassing model-link confirmation.
-  it.fails('Operations Cut and Ctrl+X should not bypass model-link confirmation', () => {
+  it('Operations Cut and Ctrl+X should not bypass model-link confirmation', () => {
     const { sid, el } = mountCanvas(mGraph(), 'omni');
     onCh(sCh('a1', 't1')); clickTxt(el, 'button', 'Operations');
     act(() => btn(el, '.ops-bar button[aria-label="Cut"]').click());

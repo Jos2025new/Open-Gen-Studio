@@ -36,7 +36,7 @@ import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from '.
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
 import { DeleteRequestContext, LinkBar, useDeleteRequest } from './LinkBar';
-import { copyNodes, cutNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { copyNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { liveGroupsMap, useNodeDrag } from './useNodeDrag';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
 import { loadNodeTool } from './nodeToolStorage';
@@ -78,6 +78,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   pickToolRef.current = pickTool;
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const requestDeleteRef = useRef(del.request);
+  requestDeleteRef.current = del.request;
   const cut = useCutTool({ active: tool === 'cut', canvasRef, onCut: (ids) => void disconnectEdges(sessionId, ids) });
   // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
   const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -338,7 +340,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       const k = e.key.toLowerCase();
       if (!ids.length || window.getSelection()?.toString()) return;
       if (k === 'c') { copyNodes(sessionId, ids); toast(`Copied ${ids.length} node${ids.length === 1 ? '' : 's'}`, 'success'); }
-      else if (k === 'x') { cutNodes(sessionId, ids); setSelected(new Set()); }
+      else if (k === 'x') { requestDeleteRef.current(ids, [], () => { copyNodes(sessionId, ids); }); }
       else if (k === 'g' && e.shiftKey) { const g = wholeGroup(useStore.getState().sessions[sessionId].graph, ids); if (g) ungroup(sessionId, g.id); }
       else if (k === 'g' && ids.length > 1) groupNodes(sessionId, ids);
       else return;
