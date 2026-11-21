@@ -317,9 +317,9 @@ async function execute(id: string): Promise<string[]> {
       assetIds.push(...assets.map((a) => a.id));
       const items = Math.max(1, Math.min(n, result.outputs.length));
       done += items;
-      // This request delivered: its record carries its cost and is booked now, once (sendLedger).
+      // This request delivered: its record carries its cost and is booked now, once (sendLedger). A provider-reported cost books even when the send looked free.
       const before = get().generations[id];
-      if (before && (activeReqId || before.sends)) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
+      if (before && (activeReqId || before.sends || (reqCost != null && reqCost > 0))) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
       const batchDone = done >= total || !result.outputs.length;
       patchGeneration(id, {
         assetIds: [...assetIds],
