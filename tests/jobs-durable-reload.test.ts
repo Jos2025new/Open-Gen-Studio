@@ -27,6 +27,7 @@ vi.mock('../src/lib/media', async (original) => ({
 
 import { useStore } from '../src/store/store';
 import { createGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
+import { RECRAFT_STYLE_REF } from '../src/engine/catalog';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import type { ModelSummary } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
@@ -135,5 +136,72 @@ describe('durable send ledger across reloads in jobs.ts', () => {
 
     releaseStore();
     await p.catch(() => undefined);
+  });
+});
+
+describe('durable send ledger across reloads in specialSends.ts', () => {
+  it.each([
+    ['transcribe', () => {
+      const st = useStore.getState();
+      const TR = 'nanogpt::transcriber';
+      useStore.setState({
+        assets: { ...st.assets, au: { id: 'au', kind: 'audio', mime: 'audio/mpeg', duration: 10, sessionId: sid(), origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never },
+        catalog: { ...st.catalog, transcribers: { [TR]: { ref: TR, provider: 'nanogpt', name: 'T', id: 'transcriber', usdPerMinute: 0.01, maxDirectBytes: 1_000_000, video: false, diarization: false } } } as never,
+      });
+      return {
+        g: createGeneration({ sessionId: sid(), origin: 'op', kind: 'text', prompt: '', modelRef: TR, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: 'transcribe', sourceAssetId: 'au', params: { language: 'es' } } } as never),
+        spy: () => vi.spyOn(ADAPTERS.nanogpt, 'transcribe'),
+        job: { provider: 'nanogpt' as const, id: 'tr_1', meta: {} },
+      };
+    }],
+    ['createVoice', () => {
+      const st = useStore.getState();
+      useStore.setState({
+        assets: { ...st.assets, au: { id: 'au', kind: 'audio', mime: 'audio/mpeg', duration: 10, sessionId: sid(), origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never },
+        settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } },
+      });
+      return {
+        g: createGeneration({ sessionId: sid(), origin: 'op', kind: 'text', prompt: '', modelRef: 'fal::kling-voice', settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: 'create_voice', sourceAssetId: 'au', params: {} } } as never),
+        spy: () => vi.spyOn(ADAPTERS.fal, 'createVoice'),
+        job: { provider: 'fal' as const, id: 'vc_1', meta: {} },
+      };
+    }],
+    ['createStyle', () => {
+      const st = useStore.getState();
+      useStore.setState({
+        assets: { ...st.assets, a1: { id: 'a1', kind: 'image', mime: 'image/png', width: 1, height: 1, sessionId: sid(), origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never },
+        settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } },
+      });
+      return {
+        g: createGeneration({ sessionId: sid(), origin: 'composer', kind: 'text', prompt: 'style', modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: ['a1'] } }),
+        spy: () => vi.spyOn(ADAPTERS.fal, 'createStyle'),
+        job: { provider: 'fal' as const, id: 'st_1', meta: {} },
+      };
+    }],
+  ])('%s flushes remoteJob on onRemoteJob and marks send done + flushes on finish', async (_name, setup) => {
+    const { g, spy, job } = setup();
+    let release!: () => void;
+    const jobFlushed = new Promise<void>((resolve) => {
+      spy().mockImplementation(async (req) => {
+        req.onRemoteJob?.(job as never);
+        await new Promise((r) => setTimeout(r, 10));
+        resolve();
+        await new Promise<void>((r) => { release = r; });
+        return { outputs: [], text: 'ok_result', costUsd: 0.02 } as never;
+      });
+    });
+
+    const p = runGeneration(g.id);
+    await jobFlushed;
+    const mid = savedGeneration(g.id);
+    expect(mid?.remoteJob).toMatchObject({ id: job.id });
+    expect(mid?.sends?.[0]).toMatchObject({ index: 0, status: 'sent', remoteJob: { id: job.id } });
+
+    release();
+    await p;
+    const end = savedGeneration(g.id);
+    expect(end?.status).toBe('done');
+    expect(end?.text).toBe('ok_result');
+    expect(end?.sends?.[0]).toMatchObject({ index: 0, status: 'done', remoteJob: { id: job.id } });
   });
 });
