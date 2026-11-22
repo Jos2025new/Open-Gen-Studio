@@ -67,7 +67,7 @@ describe('check-test-discovery: dead tests it does not see (MEDIUM, new check)',
   it('catches a .test.mts / .test.js under tests/ (sanity)', () => {
     expect(testDiscovery(rootWith(['tests/b.test.mts', 'tests/e.test.js']))).toHaveLength(2);
   });
-  it.fails('catches a *.spec.ts under tests/ (never runs: include only lists *.test.ts[x])', () => {
+  it('catches a *.spec.ts under tests/ (never runs: include only lists *.test.ts[x])', () => {
     expect(testDiscovery(rootWith(['tests/c.spec.ts']))).not.toHaveLength(0);
   });
   it.fails('catches a *.test.ts outside tests/ (src/, spike/: vitest never includes it; spike/sqlite/*.test.ts exists today)', () => {

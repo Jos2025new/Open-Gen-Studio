@@ -1,6 +1,6 @@
 /**
- * Every test file under `tests/` (`tests/**\/*.test.*`) must be matched by vitest's `test.include` in `vite.config.ts`,
- * unless it is explicitly listed in `EXCLUDED` with a reason. Prevents silent dead tests (e.g. a `.test.tsx` that never ran).
+ * Every test file under `tests/` (`tests/**\/*.{test,spec}.*`) must be matched by vitest's `test.include` in `vite.config.ts`,
+ * unless it is explicitly listed in `EXCLUDED` with a reason. Prevents silent dead tests (e.g. a `.test.tsx` or `.spec.ts` that never ran).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -23,7 +23,7 @@ function walkTests(dir, out = []) {
     if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) walkTests(full, out);
-    else if (/\.test\.[^/]+$/.test(entry.name) && !entry.name.endsWith('.d.ts')) out.push(full);
+    else if (/\.(?:test|spec)\.[^/]+$/.test(entry.name) && !entry.name.endsWith('.d.ts')) out.push(full);
   }
   return out;
 }
@@ -92,7 +92,7 @@ export function readVitestInclude(configPath) {
   return { patterns, line };
 }
 
-/** Return `file:line: message` errors for every `tests/**\/*.test.*` file left out of vitest's `test.include`. */
+/** Return `file:line: message` errors for every `tests/**\/*.{test,spec}.*` file left out of vitest's `test.include`. */
 export function check(root = '.', { excluded = EXCLUDED } = {}) {
   const configPath = join(root, 'vite.config.ts');
   if (!existsSync(configPath)) return ['vite.config.ts:1: missing vite.config.ts. Ensure vitest config exists at the repo root.'];
@@ -119,5 +119,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(`check-test-discovery: FAIL (${errors.length} test file(s) outside vitest include)\n${errors.map((e) => `  ${e}`).join('\n')}`);
     process.exit(1);
   }
-  console.log(`check-test-discovery: PASS (all tests/**/*.test.* match vite.config.ts test.include; ${EXCLUDED.size} documented exclusion(s))`);
+  console.log(`check-test-discovery: PASS (all tests/**/*.{test,spec}.* match vite.config.ts test.include; ${EXCLUDED.size} documented exclusion(s))`);
 }

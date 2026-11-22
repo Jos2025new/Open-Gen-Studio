@@ -31,19 +31,21 @@ describe('check-test-discovery', () => {
     expect(re.test('tests/foo.test.tsx')).toBe(false);
   });
 
-  it('fails with file:line and fix hint when a .test.tsx or .test.js file is left out of test.include', () => {
+  it('fails with file:line and fix hint when a .test.tsx, .test.js, or .spec.ts file is left out of test.include', () => {
     withTempRepo({
       'vite.config.ts': `export default { test: { include: ['tests/**/*.test.ts'] } };\n`,
       'tests/runs.test.ts': 'export {};',
       'tests/nested/runs.test.ts': 'export {};',
       'tests/missed.test.tsx': 'export {};',
+      'tests/missed-spec.spec.ts': 'export {};',
       'tests/sub/also-missed.test.js': 'export {};',
       'tests/helper.ts': 'export {};',
     }, (root) => {
       const errors = check(root, { excluded: new Map() });
-      expect(errors).toHaveLength(2);
-      expect(errors[0]).toMatch(/^tests\/missed\.test\.tsx:1:.*vite\.config\.ts:1/);
-      expect(errors[1]).toMatch(/^tests\/sub\/also-missed\.test\.js:1:.*vite\.config\.ts:1/);
+      expect(errors).toHaveLength(3);
+      expect(errors[0]).toMatch(/^tests\/missed-spec\.spec\.ts:1:.*vite\.config\.ts:1/);
+      expect(errors[1]).toMatch(/^tests\/missed\.test\.tsx:1:.*vite\.config\.ts:1/);
+      expect(errors[2]).toMatch(/^tests\/sub\/also-missed\.test\.js:1:.*vite\.config\.ts:1/);
     });
   });
 
