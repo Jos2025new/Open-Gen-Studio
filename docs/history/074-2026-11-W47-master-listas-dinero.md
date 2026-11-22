@@ -38,6 +38,6 @@ La lista vigente es la del bus `20261122-master6-orden-prioridad.md` (cruce de N
 - **Alto:** checks de disciplina (todo test corre, literal de medio fuera de `types.ts` falla, tamaño avisa al 90%); enums de medio literales → `MEDIA_KINDS`; una tabla para los nodos de sistema; dividir `llmTurn.ts`.
 - **Medio:**
   - **Cierre de plan y «Continue once», decidido por el usuario (2026-11-22):** el resumen del plan vuelve a preguntar, con una opción «no volver a preguntar». La misma opción está en settings, junto al tope de gasto, sin enredar los settings. Con «no preguntar» activo, se pregunta una vez (al pasar el tope) y el resumen ya no vuelve a preguntar. La pregunta es tan sencilla como en cualquier app de su tipo.
-  - **Aprobaciones al recargar:** pendiente; el usuario pide lo convencional en apps similares.
+  - **Aprobaciones al recargar, decidido por el usuario (2026-11-22): lo convencional.** Al recargar nunca se envía nada sin el usuario (fail-closed, como hoy). El envío pendiente sigue a la vista como «esperando aprobación» y se aprueba de nuevo con un clic. Lo ya enviado al proveedor sigue su curso, como en ComfyUI o Midjourney.
   - Nodos apilados y handles ≥24 px; `exhaustive-deps` en `src/components/node` como error; `it.fails` sin dueño.
 - **Después:** 073 puntos 3 a 7 (14 dudas de interfaz, vista por espacio en sandbox, «Todo es un nodo», subnet, agentes de suscripción).
