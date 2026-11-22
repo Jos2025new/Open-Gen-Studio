@@ -32,14 +32,12 @@ describe('adversarial p10: placement of new nodes', () => {
     expect(rectsOverlap(imagePanel, textRect), `text at ${JSON.stringify(at)} sits under the Image composer`).toBe(false);
   });
 
-  // reproduce: deseado NaN (p. ej. un puntero sin medir) se devuelve tal cual en lugar de una posición finita
-  it.fails('a non-finite desired position still gives a finite placement', () => {
+  it('a non-finite desired position still gives a finite placement', () => {
     const at = findFreePositionFor(IMAGE, { x: Number.NaN, y: 0 }, []);
     expect(Number.isFinite(at.x) && Number.isFinite(at.y)).toBe(true);
   });
 
-  // reproduce: lienzo bloqueado (ningún hueco en el anillo) más un nodo importado con y NaN; el fallback usa max() y devuelve y NaN
-  it.fails('an existing node with a NaN position does not make the fallback position NaN', () => {
+  it('an existing node with a NaN position does not make the fallback position NaN', () => {
     const block: NodeRect = { x: -1e6, y: -1e6, width: 2e6, height: 2e6 };
     const broken: NodeRect = { x: 0, y: Number.NaN, width: 260, height: 220 };
     const at = findFreePositionFor(IMAGE, { x: 0, y: 0 }, [block, broken]);

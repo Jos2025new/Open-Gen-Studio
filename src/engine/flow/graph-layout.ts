@@ -55,6 +55,10 @@ export function findFreePosition(
 ): { x: number; y: number } {
   const gapX = opts?.gapX ?? 48;
   const gapY = opts?.gapY ?? 56;
+  // A non-finite coordinate (an unmeasured pointer, an imported node) never reaches the result: the desired one falls to the origin, a broken rect is ignored.
+  const finite = (n: number) => Number.isFinite(n);
+  if (!finite(desired.x) || !finite(desired.y)) desired = { x: finite(desired.x) ? desired.x : 0, y: finite(desired.y) ? desired.y : 0 };
+  occupied = occupied.filter((o) => finite(o.x) && finite(o.y) && finite(o.width) && finite(o.height));
   const clear = (x: number, y: number) => {
     const r: NodeRect = { x, y, width: size.width, height: size.height };
     return !occupied.some((o) => rectsOverlap(r, o, gapX, gapY));
