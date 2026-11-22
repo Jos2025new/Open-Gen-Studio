@@ -58,7 +58,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   const engine = agentEngine(sessionId, owner);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   const runId = opts.runId ?? uid('turn');
-  const guard = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => (session(sessionId) && !mine().busy ? llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: true }) : undefined), opts.budgetPass);
+  const guard = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => { if (!session(sessionId)) return; if (mine().busy) { notice(sessionId, workspace, 'The agent is busy. Send again when it finishes.', 'info'); return; } void llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: true }); }, opts.budgetPass);
   if (!guard()) return;
   void loadLlmCatalog(engine.provider);
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
@@ -436,7 +436,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((mine().settingsParts ?? []).map((p) => [p.kind, p])) : mine().settings)) : null;
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, feedOfAgent(sessionId, owner), get().composer.agentStyle, v.data.revision === true);
           if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, owner, v.data.steps))) {
-            // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
+            // Auto: the app confirms itself and answers with the effective settings; the plan is not shown (a flow step, not a rejection).
             const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, owner, rowCanvas(workspace), call.id, v.data.steps, until, log, turnMeta()) : (gate ?? draft)!;
             if (told !== null) {
               if (get().composer.agentStyle !== 'auto') recordMetric(sessionId, { type: 'rejected' });
