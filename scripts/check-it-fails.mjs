@@ -10,6 +10,15 @@ import { pathToFileURL } from 'node:url';
 import { parseSync } from 'rolldown/utils';
 
 const REPRODUCE_RE = /^\s*reproduce:\s*\S/;
+const TEST_MODIFIERS = new Set([
+  'extend',
+  'skip',
+  'only',
+  'concurrent',
+  'sequential',
+  'runIf',
+  'skipIf',
+]);
 const SCOPED_TYPES = new Set([
   'BlockStatement',
   'FunctionDeclaration',
@@ -80,6 +89,8 @@ function unwrapChain(expr) {
       cur = cur.callee;
     } else if (cur.type === 'TaggedTemplateExpression') {
       cur = cur.tag;
+    } else if (cur.type === 'AwaitExpression') {
+      cur = cur.argument;
     } else if (
       cur.type === 'ChainExpression'
       || cur.type === 'TSAsExpression'
@@ -95,12 +106,22 @@ function unwrapChain(expr) {
   return { base: cur, props };
 }
 
+function getBaseKind(base, scope) {
+  if (base?.type === 'Identifier') return scope.get(base.name) ?? null;
+  if (base?.type === 'ImportExpression' && base.source?.type === 'Literal' && base.source.value === 'vitest') {
+    return 'vitest-ns';
+  }
+  return null;
+}
+
 function classifyExpr(expr, scope) {
   const { base, props } = unwrapChain(expr);
-  if (base?.type !== 'Identifier') return null;
-  let kind = scope.get(base.name);
+  let kind = getBaseKind(base, scope);
+  if (!kind) return null;
   let rest = props;
   if (kind === 'vitest-ns') {
+    if (rest[0] === 'default') rest = rest.slice(1);
+    if (rest.length === 0) return 'vitest-ns';
     if (rest[0] !== 'it' && rest[0] !== 'test') return null;
     kind = 'test';
     rest = rest.slice(1);
@@ -108,7 +129,7 @@ function classifyExpr(expr, scope) {
   if (kind === 'fails') return 'fails';
   if (kind === 'test') {
     if (rest.includes('fails')) return 'fails';
-    if (rest.length === 0) return 'test';
+    if (rest.length === 0 || rest.every((p) => p !== null && TEST_MODIFIERS.has(p))) return 'test';
   }
   return null;
 }
@@ -146,7 +167,9 @@ function bindDeclarator(node, scope) {
             ? prop.key.value
             : null;
         if (initKind === 'test' && key === 'fails') scope.set(prop.value.name, 'fails');
+        else if (initKind === 'test' && key && TEST_MODIFIERS.has(key)) scope.set(prop.value.name, 'test');
         else if (initKind === 'vitest-ns' && (key === 'it' || key === 'test')) scope.set(prop.value.name, 'test');
+        else if (initKind === 'vitest-ns' && key === 'default') scope.set(prop.value.name, 'vitest-ns');
         else scope.delete(prop.value.name);
       } else {
         unbindPattern(prop.type === 'Property' ? prop.value : prop.argument, scope);
@@ -165,7 +188,7 @@ function walk(node, scope, onCall) {
       if (spec.type === 'ImportSpecifier') {
         const imported = spec.imported?.name ?? spec.imported?.value;
         if (imported === 'it' || imported === 'test') scope.set(spec.local.name, 'test');
-      } else if (spec.type === 'ImportNamespaceSpecifier') {
+      } else if (spec.type === 'ImportNamespaceSpecifier' || spec.type === 'ImportDefaultSpecifier') {
         scope.set(spec.local.name, 'vitest-ns');
       }
     }

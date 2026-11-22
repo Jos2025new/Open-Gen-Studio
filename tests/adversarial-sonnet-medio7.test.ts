@@ -48,18 +48,15 @@ describe('check-it-fails: evasions (ataque Sonnet, punto 12)', () => {
 });
 
 describe('check-it-fails: re-ataque (b609b8f0)', () => {
-  // reproduce: `const test = it.extend({}); test.fails('x', fn)` (idioma habitual de vitest) sin `// reproduce:` pasa: classifyExpr devuelve null para `it.extend(...)` y bindDeclarator borra el binding, desde b609b8f0; cierre: scripts/check-it-fails.mjs classifyExpr debe tratar `.extend(...)` como 'test'.
-  it.fails('flags test.fails on a test created with it.extend', () => {
+  it('flags test.fails on a test created with it.extend', () => {
     expect(errorsFor("import { it } from 'vitest';\nconst test = it.extend({});\ntest.fails('x', () => {});")).toHaveLength(1);
   });
 
-  // reproduce: `const s = it.skip; s.fails(...)` y `const c = it.concurrent; c.fails(...)` pasan sin comentario (classifyExpr solo acepta rest vacio o con 'fails'), desde b609b8f0; cierre: scripts/check-it-fails.mjs classifyExpr debe tratar skip/only/concurrent/sequential/runIf/skipIf como 'test'.
-  it.fails('flags .fails on an alias of it.skip / it.concurrent', () => {
+  it('flags .fails on an alias of it.skip / it.concurrent', () => {
     expect(errorsFor("const s = it.skip; s.fails('x', () => {});")).toHaveLength(1);
   });
 
-  // reproduce: `const { it: t } = await import('vitest'); t.fails(...)` y `import vitest from 'vitest'; vitest.it.fails(...)` pasan sin comentario, desde b609b8f0; cierre: scripts/check-it-fails.mjs bindDeclarator/walk debe reconocer import() dinamico e import por defecto de vitest.
-  it.fails('flags it.fails obtained through dynamic or default import of vitest', () => {
+  it('flags it.fails obtained through dynamic or default import of vitest', () => {
     expect(errorsFor("const { it: t } = await import('vitest');\nt.fails('x', () => {});")).toHaveLength(1);
   });
 });
