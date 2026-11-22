@@ -91,13 +91,13 @@ describe('check-sizes: baseline ratchet (LOW-MEDIUM, new)', () => {
     writeFileSync(join(root, 'big.ts'), 'x'.repeat(31_500));
     expect(() => checkSizes(root)).toThrow(/grew from/);
   });
-  it.fails('fails when the baseline is raised by hand together with the file (nothing compares it to the committed baseline)', () => {
+  it('fails when the baseline is raised by hand together with the file (nothing compares it to the committed baseline)', () => {
     const root = repo(31_000, 31_000);
     writeFileSync(join(root, 'big.ts'), 'x'.repeat(40_000));
     writeFileSync(join(root, 'scripts/size-baseline.json'), JSON.stringify({ 'big.ts': 40_000 }));
     expect(() => checkSizes(root)).toThrow();
   });
-  it.fails('fails when a brand-new over-limit file is added to the baseline by hand', () => {
+  it('fails when a brand-new over-limit file is added to the baseline by hand', () => {
     const root = repo(31_000, 31_000);
     writeFileSync(join(root, 'new.ts'), 'x'.repeat(35_000));
     writeFileSync(join(root, 'scripts/size-baseline.json'), JSON.stringify({ 'big.ts': 31_000, 'new.ts': 35_000 }));

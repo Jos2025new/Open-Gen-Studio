@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MAX_BYTES,
   WARN_BYTES,
+  baselineRegressions,
+  checkSizes,
   ratchetBaseline,
   sizeViolations,
   sizeWarnings,
@@ -66,5 +72,33 @@ describe('check-sizes discipline rules', () => {
       'src/grew.ts': 35_000,
       'src/shrank.ts': 34_200,
     });
+  });
+
+  it('baselineRegressions flags raised limits and new entries vs HEAD, while allowing lowered/removed ones', () => {
+    const committed = { 'src/a.ts': 35_000, 'src/b.ts': 34_000, 'src/c.ts': 32_000 };
+    const current = { 'src/a.ts': 36_000, 'src/b.ts': 33_500, 'src/new.ts': 31_000 };
+    const errors = baselineRegressions(current, committed);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain('src/a.ts baseline raised from 35000 to 36000');
+    expect(errors[1]).toContain('src/new.ts (31000 bytes) is a new entry not in HEAD');
+  });
+
+  it('skips committed baseline comparison with a clear note when HEAD has no baseline', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-sizes-nohead-'));
+    try {
+      mkdirSync(join(root, 'scripts'), { recursive: true });
+      writeFileSync(join(root, 'a.ts'), 'x'.repeat(100));
+      writeFileSync(join(root, 'scripts/size-baseline.json'), '{}');
+      execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        expect(() => checkSizes(root)).not.toThrow();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('HEAD:scripts/size-baseline.json unavailable'));
+      } finally {
+        warn.mockRestore();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

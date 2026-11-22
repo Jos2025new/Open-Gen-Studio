@@ -44,6 +44,29 @@ export function staleBaselines(files, baseline) {
   return errors;
 }
 
+/** Entries in `baseline` that raised their limit or appeared new compared to `committedBaseline` (`HEAD`). */
+export function baselineRegressions(baseline, committedBaseline) {
+  const errors = [];
+  for (const [path, allowed] of Object.entries(baseline)) {
+    const prev = committedBaseline[path];
+    if (prev === undefined) {
+      errors.push(`scripts/size-baseline.json:1: ${path} (${allowed} bytes) is a new entry not in HEAD (baselines may only shrink or be removed).`);
+    } else if (allowed > prev) {
+      errors.push(`scripts/size-baseline.json:1: ${path} baseline raised from ${prev} to ${allowed} bytes (baselines may only go down).`);
+    }
+  }
+  return errors;
+}
+
+function readCommittedBaseline(root) {
+  try {
+    const raw = execFileSync('git', ['show', 'HEAD:scripts/size-baseline.json'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 /** Non-failing warnings for non-exempt files over 90% of MAX_BYTES (27 000 B) and up to MAX_BYTES. */
 export function sizeWarnings(files) {
   const warnings = [];
@@ -94,9 +117,17 @@ export function updateSizeBaseline(root) {
 export function checkSizes(root) {
   const files = listTrackedFiles(root);
   const baseline = JSON.parse(readFileSync(join(root, 'scripts/size-baseline.json'), 'utf8'));
+  const committedBaseline = readCommittedBaseline(root);
+  if (!committedBaseline) {
+    console.warn('check-sizes: note: git HEAD:scripts/size-baseline.json unavailable (e.g. CI without git); skipping committed baseline check.');
+  }
   const warnings = sizeWarnings(files);
   for (const w of warnings) console.warn(w);
-  const errors = [...sizeViolations(files, baseline), ...staleBaselines(files, baseline)];
+  const errors = [
+    ...sizeViolations(files, baseline),
+    ...staleBaselines(files, baseline),
+    ...(committedBaseline ? baselineRegressions(baseline, committedBaseline) : []),
+  ];
   if (errors.length) throw new Error(`check-sizes: FAIL\n${errors.join('\n')}`);
   const over = files.filter(({ path, bytes }) => bytes > MAX_BYTES && !EXEMPT.some((pattern) => pattern.test(path)));
   console.log(`check-sizes: PASS (${files.length} files; ${over.length} over ${MAX_BYTES} bytes held at their baseline; ${warnings.length} over ${WARN_BYTES} bytes warning)`);
