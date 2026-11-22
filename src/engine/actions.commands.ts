@@ -176,7 +176,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
     debt: 'Changes the composer and screen; missing model views only produce a notice.',
-    run: (_ctx, args) => { A.useAsReference(args.assetId); },
+    run: (_ctx, args) => { A.addAsReference(args.assetId); },
   }),
   defineCommand({
     id: 'studio.asset.attach',
@@ -315,7 +315,7 @@ export const STUDIO_ACTIONS: Record<string, string> = {
   applyLyrics: 'studio.lyrics.apply',
   editInComposer: 'studio.generation.edit',
   toggleFavorite: 'studio.asset.favorite',
-  useAsReference: 'studio.asset.reference',
+  addAsReference: 'studio.asset.reference',
   toggleAgentAttachment: 'studio.asset.attach',
   addAssetNode: 'studio.node.add_asset',
   sendToNodes: 'studio.node.send_asset',

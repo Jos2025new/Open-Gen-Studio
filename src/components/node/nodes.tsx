@@ -8,7 +8,7 @@ import { addConnected, deleteNodes, duplicateNode, newNodeData, patchNodeData, r
 import { nodeAttempt, inputPorts, nodeOutputAsset, outputPort, runsGeneration } from '../../engine/flow/graph';
 import { detachOutputs, reattachOutputs } from '../../engine/flow/arrange';
 import { extensionForMime } from '../../lib/media';
-import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
+import { deleteAssets, downloadAsset, addAsReference } from '../../engine/actions';
 import type { Asset, Generation, GenNodeData, GraphEdge, GraphGroup, GraphNode, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -367,7 +367,7 @@ function NodeActions({ node, out, panel }: { node: GraphNode; out: PortType | nu
             </button>
           ) : null}
           {panel ? null : (
-            <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => useAsReference(assetId)}>
+            <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => addAsReference(assetId)}>
               <Paperclip size={14} />
             </button>
           )}

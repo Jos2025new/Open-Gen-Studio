@@ -7,6 +7,7 @@ import { setShapeEdit } from '../../engine/design/objectSelection';
 import { InlineSlider } from './InlineControls';
 
 export function MultiRectangleRadii({ sessionId, doc, targets }: { sessionId: string; doc: DesignDoc; targets: RectangleTarget[] }) {
+  const helpUid = useId(); // before any early return: hooks run in the same order every render
   if (targets.length < 2) return null;
   const shapes = targets.map((target) => {
     const layer = doc.layers.find((item) => item.id === target.layerId);
@@ -27,7 +28,7 @@ export function MultiRectangleRadii({ sessionId, doc, targets }: { sessionId: st
   };
   const maxRx = Math.max(1, ...shapes.map((shape) => Math.ceil(Math.abs(shape.w) / 2)));
   const maxRy = Math.max(1, ...shapes.map((shape) => Math.ceil(Math.abs(shape.h) / 2)));
-  const helpId = `rounding-selection-help-${useId()}`;
+  const helpId = `rounding-selection-help-${helpUid}`;
   const scope = mixed
     ? 'Values differ; changing Rx or Ry applies it to every selected visible, unlocked rectangle.'
     : 'Applies to selected visible, unlocked rectangles; other shapes and layers stay unchanged.';

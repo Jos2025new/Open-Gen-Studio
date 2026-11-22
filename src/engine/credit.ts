@@ -305,7 +305,7 @@ export async function onAgentCredit(): Promise<boolean> {
       choices.push({ p, m, same });
     }
   }
-  const use = (c: (typeof choices)[number]) => {
+  const switchTo = (c: (typeof choices)[number]) => {
     useStore.setState((s) => ({ settings: { ...s.settings, agent: { ...s.settings.agent, provider: c.p, model: c.m.id, modelPinned: true } } }));
   };
   const auto = choices.find((c) => c.same);
@@ -315,14 +315,14 @@ export async function onAgentCredit(): Promise<boolean> {
       level: 'warn',
       text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Use the same model at ${PROVIDER_LABELS[auto.p]} instead (${auto.m.name}, same price or less) and press Retry?`,
       actions: [
-        { label: 'Yes, this time', run: () => { use(auto); dismissAlert(id); } },
-        { label: 'Don\u2019t ask again', run: () => { setSettings({ autoSwitchProvider: 'always' }); use(auto); dismissAlert(id); } },
+        { label: 'Yes, this time', run: () => { switchTo(auto); dismissAlert(id); } },
+        { label: 'Don\u2019t ask again', run: () => { setSettings({ autoSwitchProvider: 'always' }); switchTo(auto); dismissAlert(id); } },
       ],
     });
     return false;
   }
   if (auto && mode === 'always') {
-    use(auto);
+    switchTo(auto);
     pushAlert({ level: 'info', text: `${empty} has no credit: the agent switched to the same model at ${PROVIDER_LABELS[auto.p]} (${auto.m.name}, same price or less).` });
     return true;
   }
@@ -334,7 +334,7 @@ export async function onAgentCredit(): Promise<boolean> {
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Switch to a model with credit and press Retry, or recharge ${empty}:`,
-      actions: near.map((c) => ({ label: `${c.m.name} · ${PROVIDER_LABELS[c.p]}`, run: () => { use(c); dismissAlert(id); } })),
+      actions: near.map((c) => ({ label: `${c.m.name} · ${PROVIDER_LABELS[c.p]}`, run: () => { switchTo(c); dismissAlert(id); } })),
     });
     return false;
   }

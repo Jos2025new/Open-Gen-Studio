@@ -37,7 +37,7 @@ import {
   Sparkles,
 } from '../ui/icons';
 import { OPS, opsFor } from '../../engine/ops';
-import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
+import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, addAsReference } from '../../engine/actions';
 import { beginAssetEdit } from '../../engine/assetRevisions';
 import { openAssetInDesigner } from '../../engine/design/actions';
 import type { OpId, SubjectKind } from '../../engine/types';
@@ -316,7 +316,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
                   label="Use as reference"
                   onClick={() => {
                     close();
-                    useAsReference(assetId);
+                    addAsReference(assetId);
                   }}
                 />
                 <MenuItem icon={UserPlus} label="Save to library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
@@ -346,7 +346,7 @@ export function FavoriteButton({ assetId, size = 'sm' }: { assetId: string; size
 
 /** Attach this file to the prompt (as a reference, start frame or input, depending on the mode). */
 export function AttachButton({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
-  return <IconButton icon={Paperclip} label="Attach to prompt" size={size} onClick={() => useAsReference(assetId)} />;
+  return <IconButton icon={Paperclip} label="Attach to prompt" size={size} onClick={() => addAsReference(assetId)} />;
 }
 
 export function DownloadButton({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {

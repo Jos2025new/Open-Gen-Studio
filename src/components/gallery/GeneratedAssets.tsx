@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Archive, AudioLines, Box, Download, Eye, EyeOff, Film, Folder, Funnel, Image, LayoutGrid, MessageSquare, Paperclip, Star, Trash, X } from '../ui/icons';
 import { setUi, useStore } from '../../store/store';
-import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
+import { deleteAssets, downloadAsset, addAsReference } from '../../engine/actions';
 import { groupByDate } from '../../lib/format';
 import { IconButton, Button } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
@@ -169,7 +169,7 @@ export function GeneratedAssets({ source, chrome, view, setView, cols, setCols }
             {/* All selects everything; pressed again with everything selected, it clears the selection. */}
             <Button size="sm" variant="ghost" onClick={() => setSelected(allPicked ? new Set() : new Set(list.map((a) => a.id)))}>{allPicked ? 'None' : 'All'}</Button>
             <IconButton icon={allHidden ? Eye : EyeOff} label={allHidden ? 'Unhide' : 'Hide'} size="sm" onClick={() => { setUserHidden('asset', ids, !allHidden); setSelected(new Set()); }} />
-            <IconButton icon={Paperclip} label="Use as references" size="sm" onClick={() => ids.forEach((id) => useAsReference(id))} />
+            <IconButton icon={Paperclip} label="Use as references" size="sm" onClick={() => ids.forEach((id) => addAsReference(id))} />
             <IconButton icon={Download} label="Download" size="sm" onClick={() => ids.forEach((id) => void downloadAsset(id))} />
             <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={del.toggle} />
             <IconButton icon={X} label="Clear selection" size="sm" onClick={() => setSelected(new Set())} />

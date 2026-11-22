@@ -7,7 +7,7 @@ import { ArrowUp, Layers, Pencil, X, Zap } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { recipientOf } from '../../engine/agent/recipient';
-import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';
+import { attachFiles, checkDirect, generateDirect, addAsReference } from '../../engine/actions';
 import { lineRoutes, modelSummary, pickComposerModel, sentModelRef } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
@@ -348,7 +348,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
       });
     return [...images, ...made, ...saved, ...favorites];
   }, [liveAttachments, assets, subjects, currentRef, mediaSlots, mode, generations, sessionId, spaceId]);
-  const mentions = useReferenceMentions(taRef, text, value => setComposer({ text: value }), mentionChoices, useAsReference);
+  const mentions = useReferenceMentions(taRef, text, value => setComposer({ text: value }), mentionChoices, addAsReference);
   const lastCount = useRef(imageCount);
   useEffect(() => {
     const before = lastCount.current;

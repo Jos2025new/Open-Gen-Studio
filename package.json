@@ -12,6 +12,7 @@
     "check": "node scripts/check-all.mjs",
     "test": "node scripts/check-all.mjs && vitest run",
     "test:related": "node scripts/test-related.mjs",
+    "lint": "oxlint -c .oxlintrc.json src",
     "map": "node scripts/map.mjs --write",
     "snapshot:models": "node scripts/model-snapshot.mjs",
     "dev:sandbox": "DATA_DIR=.sandbox/data node scripts/dev-sandbox.mjs",
@@ -54,6 +55,7 @@
     "canvaskit-wasm": "^0.42.0",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.1.1",
+    "oxlint": "1.94.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.1"

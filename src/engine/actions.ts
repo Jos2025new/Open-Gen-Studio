@@ -564,7 +564,7 @@ export async function copyText(text: string): Promise<void> {
 
 export { downloadAsset } from './download';
 
-export function useAsReference(assetId: string): void {
+export function addAsReference(assetId: string): void {
   const st = get();
   const a = st.assets[assetId];
   if (!a) return;
