@@ -48,6 +48,17 @@ export default [{
   ],
   tests: ['tests/system-nodes.test.ts', 'tests/omnicanvas.test.ts', 'tests/adversarial-p7-add-node.test.ts'],
 }, {
+  id: 'node-ui-catalog',
+  what: 'El menú de añadir, la biblioteca comparten la tabla ordenada `NODE_UIS`, y sus iconos salen de `KIND_ICON` (separada del descriptor puro en `engine/nodecore`). El orden del array es el del menú y la biblioteca.',
+  sides: [
+    ['src/components/node/nodeUi.ts', 'export const NODE_UIS'],
+    ['src/components/node/AddNodeItems.tsx', '...NODE_UIS.map(node)'],
+    ['src/components/node/AddNodeItems.tsx', 'NODE_UIS.filter((ui) => takes(ui.kind) && matches(ui.menuKeywords))'],
+    ['src/components/node/nodeUi.ts', 'export const KIND_ICON'],
+    ['src/components/node/nodes.tsx', "import { KIND_ICON } from './nodeUi'"],
+  ],
+  tests: ['tests/descriptor-ui-registry.test.tsx', 'tests/node-library.test.ts'],
+}, {
   id: 'creative-link-ports',
   what: 'El motor y LinkHandles comparten los cinco puertos de enlace de los nodos creativos. El motor conserva su orden de resolución y la interfaz agrupa por dirección conservando las posiciones.',
   sides: [

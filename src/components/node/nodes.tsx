@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Handle, NodeToolbar, Position, useConnection, useUpdateNodeInternals, useStore as useFlowStore, type Node, type NodeProps } from '@xyflow/react';
-import { X, Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, GripVertical, Image as ImageIcon, LoaderCircle, Maximize2, Music, Trash, Type, Wand, FileImage, Check, Paperclip, Layers } from '../ui/icons';
+import { X, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, GripVertical, LoaderCircle, Maximize2, Trash, Check, Paperclip } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { ratioOf } from '../../engine/params';
 import { addConnected, deleteNodes, duplicateNode, newNodeData, patchNodeData, restoreNodeGeneration, renameNode, setSketch } from '../../engine/flow/actions';
@@ -32,7 +32,8 @@ export { RunButton } from './NodeRunButton';
 export type FlowNodeData = { node: GraphNode; solo: boolean; panel?: boolean; missing?: PortNotice[]; noticeIn?: boolean; noticeOut?: boolean; spaceProblems?: number; spaceHasErrors?: boolean };
 export type FlowNode = Node<FlowNodeData>;
 
-export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage, ref: Layers } as const;
+import { KIND_ICON } from './nodeUi';
+export { KIND_ICON };
 
 /** `quiet`: a secondary input, shown only while a connection is being dragged (or once something is connected to it). */
 function PortHandle({ id, type, side, top, label, portType, quiet, problem }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null; quiet?: boolean; problem?: string }) {
