@@ -17,6 +17,12 @@ vi.mock('../src/lib/media', async (orig) => ({
   jpegThumbnail: async () => undefined,
 }));
 
+const quoteOverride = vi.hoisted(() => ({ usd: undefined as number | undefined, ref: '' }));
+vi.mock('../src/engine/retryPartial', async (orig) => {
+  const real = await orig<typeof import('../src/engine/retryPartial')>();
+  return { ...real, estimateForRetry: (g: Parameters<typeof real.estimateForRetry>[0]) => (quoteOverride.usd != null && g.modelRef === quoteOverride.ref ? { usd: quoteOverride.usd, approximate: false } : real.estimateForRetry(g)) };
+});
+
 import { useStore, patchGeneration } from '../src/store/store';
 import { askAgain, budgetVerdict, passActiveFor, takeGenerationPass, withOncePass } from '../src/engine/budget';
 import { cancelGeneration, createGeneration, type GenerationSpec } from '../src/engine/jobs';
@@ -24,6 +30,8 @@ import { deleteGeneration } from '../src/engine/assetActions';
 import { deleteSession } from '../src/engine/actions';
 import { forgetBalances, onGenerationCredit } from '../src/engine/credit';
 import { ADAPTERS } from '../src/engine/providers/registry';
+import { HttpError } from '../src/lib/http';
+import { runGeneration } from '../src/engine/jobs';
 import { useAlerts } from '../src/engine/alerts';
 import type { ModelSummary } from '../src/engine/types';
 
@@ -172,5 +180,33 @@ describe('Attack 3a: check-budget-verdict can be dodged', () => {
     }, (root) => {
       expect((check(root) as string[]).some((e) => e.startsWith('src/components/chat/Dodge.tsx:'))).toBe(true);
     });
+  });
+});
+
+describe('Re-attack 3b: deferred 402 substitute pass in ask mode', () => {
+  // Finding Q1 (new, low-medium): the deferred entitlement is not bound to the approved amount. If the substitute's
+  // estimate (e.g. an Atlas quote) is higher than what the user approved, "Yes, this time" spends it without asking.
+  it.fails('ask mode: a substitute whose estimate exceeds the approved $0.10 still asks for the limit', async () => {
+    useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: 'ask' } }));
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    let atlasCalls = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', null));
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
+      atlasCalls++;
+      return { outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.5 };
+    });
+    await withOncePass(sid, async (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      await runGeneration(g.id).catch(() => undefined);
+    });
+    const offer = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
+    quoteOverride.ref = ATLAS;
+    quoteOverride.usd = 0.5;
+    try {
+      offer.actions!.find((x) => x.label === 'Yes, this time')!.run();
+      await vi.waitFor(() => expect(atlasCalls > 0 || useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === "Continue once"))).toBe(true));
+    } finally { quoteOverride.usd = undefined; }
+    expect(atlasCalls).toBe(0);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);
   });
 });
