@@ -20,10 +20,10 @@ import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
 import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
-import { addAssets, patchGeneration, saveNow, toast, upsertGeneration, useStore } from '../store/store';
+import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { deliverSend, shareOfEstimate } from './sendLedger';
-import { flushSendSave, interruptedByReload, isFreeSend, markSending, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -215,6 +215,7 @@ async function execute(id: string): Promise<string[]> {
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     let activeReqId: string | undefined;
+    let inTransport = false;
     try {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
@@ -223,21 +224,19 @@ async function execute(id: string): Promise<string[]> {
       const quote = await requestQuote(g.modelRef, schema, settings, n);
       const reqIndex = batchIndex++;
       activeReqId = undefined;
+      inTransport = false;
       const send = async () => {
-        freeSend = isFreeSend(g, quote);
-        if (freeSend) {
-          activeReqId = undefined;
-          void saveNow().catch(() => undefined);
-        } else {
-          activeReqId = await markSending(id, reqIndex, activeReqId);
-        }
-        try {
-          signal.throwIfAborted();
-          if (proposed) checkStepAuthorization(g, proposed);
-        } catch (err) {
-          rollbackSendIntent(id, activeReqId);
-          throw err;
-        }
+        const committed = await commitPaidSend({
+          g,
+          index: reqIndex,
+          reqId: activeReqId,
+          quote,
+          signal,
+          authorize: proposed ? () => checkStepAuthorization(g, proposed) : undefined,
+        });
+        freeSend = committed.freeSend;
+        activeReqId = committed.reqId;
+        inTransport = true;
         return adapter.generate({
         kind,
         model,
@@ -284,6 +283,7 @@ async function execute(id: string): Promise<string[]> {
         try {
           result = await once();
           submitted = false;
+          inTransport = false;
           break;
         } catch (err) {
           const policy = adapter.retry;
@@ -298,6 +298,7 @@ async function execute(id: string): Promise<string[]> {
           logEvent('retry', { generation: id, model: g.modelName, reason: policy.reason.toLowerCase(), waitMs: wait, attempt: retry + 2, image: done + 1 });
           rollbackSendIntent(id, activeReqId);
           activeReqId = undefined;
+          inTransport = false;
           await sleep(wait, signal);
         }
       }
@@ -339,7 +340,8 @@ async function execute(id: string): Promise<string[]> {
       const cur = get().generations[id];
       const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
       const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
+      const abortedInFlight = inTransport && (isAbort(innerErr) || signal.aborted);
+      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)) || abortedInFlight);
       if (activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
         const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
         if (cur?.sends) patchGeneration(id, { sends });
@@ -361,7 +363,8 @@ async function execute(id: string): Promise<string[]> {
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, sending: undefined });
+      const uncertain = Boolean(cur && !wasFreeSend(cur, freeSend) && !remoteJob && cur.sends?.some((s) => s.status === 'uncertain'));
+      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, ...(uncertain ? { lostJob: true } : {}), sending: undefined });
       if (cur?.assetIds.length) chargePartial(cur);
       throw new AbortedError();
     }

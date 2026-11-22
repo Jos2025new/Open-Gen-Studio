@@ -156,7 +156,7 @@ afterEach(() => {
 });
 
 describe('1. specialSends (transcribe) tras await markSending', () => {
-  it.fails('plan revocado durante la espera de markSending -> 0 llamadas al adaptador y rollback de sends', async () => {
+  it('plan revocado durante la espera de markSending -> 0 llamadas al adaptador y rollback de sends', async () => {
     const sId = sid();
     const step = { id: 's_tr', kind: 'op', op: 'transcribe', title: 'Transcribe', prompt: '', modelRef: TR, settings: defSet, refs: [] } as never as PlanStep;
     const gSpec = {
@@ -210,7 +210,7 @@ describe('1. specialSends (transcribe) tras await markSending', () => {
 });
 
 describe('2. Proveedor síncrono sin id: abortar durante el transporte', () => {
-  it.fails('abortar durante POST síncrono marca sends[0]=uncertain y lostJob=true', async () => {
+  it('abortar durante POST síncrono marca sends[0]=uncertain y lostJob=true', async () => {
     let posted!: () => void;
     const inFlight = new Promise<void>((r) => { posted = r; });
     vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_res, rej) => {
