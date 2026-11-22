@@ -35,7 +35,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
         toast(problem, 'info');
         return;
       }
-      return resumePlan(sessionId, item.id, mode, true, pass);
+      return pass ? resumePlan(sessionId, item.id, mode, true, pass) : resumePlan(sessionId, item.id, mode, true);
     };
     void (readBudgetVerdict(mode === 'retry' ? r.estimate : r.rest, sessionId).over ? withOncePass(sessionId, go) : go());
   };

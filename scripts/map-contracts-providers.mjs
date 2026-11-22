@@ -58,4 +58,15 @@ export default [
     ],
     tests: ['tests/chat-cards-c7b.test.ts', 'tests/sent-prompt.test.ts'],
   },
+  {
+    id: 'budget-verdict-boundary',
+    what: 'budgetVerdict es la única regla del tope; los pases Continue once pertenecen a la acción en memoria (nunca a la sesión) y solo budget.ts, credit.ts y useBudgetVerdict.ts importan overLimit/budgetVerdict.',
+    sides: [
+      ['src/engine/budget.ts', 'export function budgetVerdict('],
+      ['src/engine/credit.ts', 'budgetVerdict('],
+      ['src/components/ui/useBudgetVerdict.ts', 'export function useBudgetVerdict('],
+      ['scripts/check-budget-verdict.mjs', 'export function check('],
+    ],
+    tests: ['tests/budget-action-pass.test.ts', 'tests/check-budget-verdict.test.ts'],
+  },
 ];

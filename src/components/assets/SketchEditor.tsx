@@ -179,7 +179,7 @@ export function SketchEditor() {
       const source = target.assetId;
       const mask = await canvasToAsset(opSessionId(source, true), maskCanvas(), 'mask');
       close();
-      await runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() }, undefined, undefined, undefined, undefined, pass);
+      await (pass ? runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() }, undefined, undefined, undefined, undefined, pass) : runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() }));
     } catch (err) {
       toast((err as Error).message, 'error');
     } finally {

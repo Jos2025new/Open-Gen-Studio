@@ -27,7 +27,7 @@ export function ImproveShotButton({ g }: { g: Generation }) {
           lines={[plan.mode === 'rerender' ? `Mismo prompt y semilla en ${plan.resolution}.` : 'Este modelo no llega a 1080p: el clip pasa por el reescalador de video.']}
           estimate={estimate}
           confirmLabel="Mejorar"
-          onConfirm={(pass) => { pop.close(); return improveShot(g.id, pass); }}
+          onConfirm={(pass) => { pop.close(); return pass ? improveShot(g.id, pass) : improveShot(g.id); }}
           onCancel={pop.close}
           sessionId={improveSessionId(g, plan)}
           resolveSessionId={() => improveSessionId(g, plan, true)}

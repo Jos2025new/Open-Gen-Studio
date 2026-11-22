@@ -25,7 +25,7 @@ export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKin
   const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, sid, noAsk, workspace, models, quotes]);
   const pop = usePopover();
   const unknown = check.estimate.usd == null;
-  const launch = (pass?: BudgetPass) => { onLaunch?.(useStore.getState().composer.text); return generateDirect(kind, pass); };
+  const launch = (pass?: BudgetPass) => { onLaunch?.(useStore.getState().composer.text); return pass ? generateDirect(kind, pass) : generateDirect(kind); };
   const onClick = () => {
     if (!check.ok) {
       toast(check.reason ?? 'Not ready', 'error');

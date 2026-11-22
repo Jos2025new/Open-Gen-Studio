@@ -150,7 +150,7 @@ function SavedStyles({ kind, p }: { kind: MediaKind; p: ParamDef }) {
           confirmLabel="Create style"
           onConfirm={(pass) => {
             setConfirming(false);
-            const p = createRecraftStyle(sessionId, name || 'Style', pass);
+            const p = pass ? createRecraftStyle(sessionId, name || 'Style', pass) : createRecraftStyle(sessionId, name || 'Style');
             setName('');
             return p;
           }}

@@ -407,7 +407,7 @@ function SubjectsChip() {
                     confirmLabel="Create voice"
                     onConfirm={(pass) => {
                       setVoiceFor(null);
-                      return createSubjectVoice(sessionId, s.id, pass);
+                      return pass ? createSubjectVoice(sessionId, s.id, pass) : createSubjectVoice(sessionId, s.id);
                     }}
                     onCancel={() => setVoiceFor(null)}
                   />

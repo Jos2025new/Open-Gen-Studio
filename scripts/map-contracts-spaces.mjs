@@ -20,7 +20,7 @@ export default [
     sides: [
       ['src/store/spaceSession.ts', 'export function ensureSpaceSession'],
       ['src/engine/actions.ts', 'const sessionId = ensureSendSession()'],
-      ['src/components/composer/Composer.tsx', 'resolveSessionId={ensureSendSession}'],
+      ['src/components/composer/SendDirect.tsx', 'resolveSessionId={ensureSendSession}'],
       ['src/store/spaceSession.ts', 'export function visibleSessions'],
       ['src/components/shell/SessionSwitcher.tsx', 'visibleSessions(sessions)'],
       ['src/components/shell/SessionsPanel.tsx', 'visibleSessions(sessions)'],
@@ -69,7 +69,7 @@ export default [
       ['src/lib/promptHistory.ts', "createStore('ogs-prompts', 'kv')"],
       ['src/components/space/PromptHistory.tsx', 'history.favorites.length >= 1000'],
       ['src/components/space/SpacePanel.tsx', 'onLaunch={recordCreatePrompt}'],
-      ['src/components/composer/Composer.tsx', 'onLaunch?.(useStore.getState().composer.text)'],
+      ['src/components/composer/SendDirect.tsx', 'onLaunch?.(useStore.getState().composer.text)'],
       ['src/lib/idb.ts', "'ogs-store-v2', 'ogs-prompts'"],
     ],
     tests: ['tests/prompt-history.test.ts', 'tests/prompt-history-ui.test.ts', 'tests/prompt-history-wipe.test.ts'],

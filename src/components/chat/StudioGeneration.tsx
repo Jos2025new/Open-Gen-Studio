@@ -100,7 +100,7 @@ export function StudioGeneration({ generationId, fallback, grouped }: { generati
       {busy && g.remoteJob ? <IconButton ref={stopFollowing.ref} icon={CircleStop} label="Dejar de seguir" size="sm" tone="danger" active={stopFollowing.open} onClick={stopFollowing.toggle} /> : busy ? <IconButton icon={CircleStop} label="Stop" size="sm" tone="danger" onClick={() => cancelGeneration(g.id)} /> : null}
     </div>
     <Popover open={regen.open} anchor={regen.ref} onClose={regen.close} width={300} label="Regenerate">
-      <SpendConfirm title={g.op ? `Run ${OPS[g.op.id].label} again` : 'Regenerate with a new seed'} estimate={regen.open ? regenerateEstimate(g.id) ?? g.estimate : g.estimate} confirmLabel="Regenerate" onConfirm={(pass) => { regen.close(); return regenerate(g.id, pass); }} onCancel={regen.close} sessionId={g.sessionId} />
+      <SpendConfirm title={g.op ? `Run ${OPS[g.op.id].label} again` : 'Regenerate with a new seed'} estimate={regen.open ? regenerateEstimate(g.id) ?? g.estimate : g.estimate} confirmLabel="Regenerate" onConfirm={(pass) => { regen.close(); return pass ? regenerate(g.id, pass) : regenerate(g.id); }} onCancel={regen.close} sessionId={g.sessionId} />
     </Popover>
     <StopFollowingPopover g={g} pop={stopFollowing} />
     <Popover open={info.open} anchor={info.ref} onClose={info.close} width={340} label="Details" className="pop-scroll">

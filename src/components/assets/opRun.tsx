@@ -75,7 +75,8 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null, seed?: ToolSeed)
   /** The one launch: the same calls the op popover makes after its cost confirmation. */
   const run = (pass?: BudgetPass) => {
     if (!target || pending) return;
-    return target.kind === 'asset' ? runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined, undefined, undefined, pass) : runLayerOp(target.sessionId, target.docId, target.layerId, op, params, pass);
+    if (target.kind === 'asset') return pass ? runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined, undefined, undefined, pass) : runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined);
+    return pass ? runLayerOp(target.sessionId, target.docId, target.layerId, op, params, pass) : runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
   };
   const sessionId = target ? (target.kind === 'asset' ? opSessionId(target.assetId) : target.sessionId) : undefined;
   const resolveSessionId = () => target?.kind === 'asset' ? opSessionId(target.assetId, true) : sessionId;

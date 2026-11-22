@@ -309,7 +309,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
           confirmLabel="Regenerate"
           onConfirm={(pass) => {
             regen.close();
-            return regenerate(g.id, pass);
+            return pass ? regenerate(g.id, pass) : regenerate(g.id);
           }}
           onCancel={regen.close}
           sessionId={g.sessionId}
