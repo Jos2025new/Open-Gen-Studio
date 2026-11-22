@@ -85,6 +85,33 @@ export function findFreePosition(
   return { x: desired.x, y: bottom + gapY };
 }
 
+/** Image, video, audio, 3D and tool cards open a composer panel under the card while selected (400 px wide, 12 px below, at
+ *  least 190 px tall). It is not part of the card, so a neighbour placed under the card at the usual gap sat beneath it. */
+const PANEL = { width: 400, gap: 12, height: 190 };
+
+export function panelZone(data: GraphNodeData, card: NodeRect): NodeRect | null {
+  if (data.kind === 'text' || data.kind === 'asset' || data.kind === 'ref') return null;
+  return { x: card.x + card.width / 2 - PANEL.width / 2, y: card.y + card.height + PANEL.gap, width: PANEL.width, height: PANEL.height };
+}
+
+/** `findFreePosition` for a node about to be added: the spot also leaves the node's composer panel clear of other cards. */
+export function findFreePositionFor(
+  data: GraphNodeData,
+  desired: { x: number; y: number },
+  occupied: readonly NodeRect[],
+  opts?: { gapX?: number; gapY?: number; width?: number },
+): { x: number; y: number } {
+  const width = opts?.width ?? nodeWidth(data);
+  const height = estimatedHeight(data);
+  const zone = panelZone(data, { x: 0, y: 0, width, height });
+  const gaps = { gapX: opts?.gapX ?? 48, gapY: opts?.gapY ?? 56 };
+  if (!zone) return findFreePosition(desired, { width, height }, occupied, gaps);
+  // The footprint is the card plus its panel: wider on both sides, taller below.
+  const left = Math.max(0, -zone.x);
+  const at = findFreePosition({ x: desired.x - left, y: desired.y }, { width: Math.max(width, zone.width), height: zone.y + zone.height }, occupied, gaps);
+  return { x: at.x + left, y: at.y };
+}
+
 /** Nodes whose size is known only now (first measurement) move off the nodes they stack on. Placement before the
  *  measurement works with estimated sizes, which are smaller than the cards, so new nodes landed on each other.
  *  `fresh`: ids measured for the first time. Returns new positions for those that overlap; the rest stay put. */
