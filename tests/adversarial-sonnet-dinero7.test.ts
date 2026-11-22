@@ -38,7 +38,6 @@ import { forgetBalances } from '../src/engine/credit';
 import { createGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
 import { controllers, running } from '../src/engine/jobState';
 import { ADAPTERS } from '../src/engine/providers/registry';
-import { SpendingPanel } from '../src/components/shell/SpendingPanel';
 import { SessionInfo } from '../src/components/shell/SessionTools';
 import { sessionStats } from '../src/components/shell/SessionRow';
 import type { Generation, ModelSummary } from '../src/engine/types';
@@ -53,7 +52,6 @@ const sid = () => useStore.getState().activeSessionId;
 const genOf = (id: string) => useStore.getState().generations[id];
 const rj = (id: string) => ({ provider: 'nanogpt' as const, id, meta: {} });
 const imgOut = (tag: string, costUsd?: number) => ({ outputs: [{ blob: new Blob([tag], { type: 'image/png' }), mime: 'image/png' }], costUsd });
-const patchG = (id: string, patch: Partial<Generation>) => useStore.setState((s) => ({ generations: { ...s.generations, [id]: { ...s.generations[id], ...patch } } }));
 
 const reloadFromDisk = async () => {
   running.clear();
