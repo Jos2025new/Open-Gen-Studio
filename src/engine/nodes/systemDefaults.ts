@@ -1,19 +1,35 @@
 import type { Session, SystemNodeType } from '../types';
 
+/** What a default ref may depend on: the session the node lands in, the composer's image model and that session's data. */
+export interface SystemRefCtx { sessionId: string; imageModelRef: string; session?: Session }
+
+/**
+ * What a new system node starts with, one entry per type (the exhaustive record makes `tsc` ask for a new type's entry).
+ * `ref`: what it points at when nothing is given. `addRef`: only when `addSystemNode` has always started it from
+ * something else (prompt and mediaSettings; inherited, kept so saved graphs and tests do not move).
+ * The menu side of each type (label, icon, keywords) is `SYSTEM_UIS` in components/node/systemUi.ts.
+ */
+export const SYSTEM_DEFAULTS: Record<SystemNodeType, { ref: (c: SystemRefCtx) => string; addRef?: string }> = {
+  chat: { ref: (c) => c.sessionId },
+  agent: { ref: (c) => c.sessionId },
+  session: { ref: (c) => c.sessionId },
+  model: { ref: (c) => c.imageModelRef },
+  provider: { ref: () => 'openrouter' },
+  space: { ref: () => 'create' },
+  'designer.doc': { ref: (c) => c.session?.activeDocId ?? c.session?.docs[0]?.id ?? 'active' },
+  library: { ref: () => 'library' },
+  toolset: { ref: () => 'toolset' },
+  prompt: { ref: () => 'composer', addRef: 'prompt' },
+  mediaSettings: { ref: () => 'image', addRef: 'mediaSettings' },
+};
+
 /** What a new system node points at when nothing is given: the active session, the composer's model, and so on. */
 export function systemRefDefault(type: SystemNodeType, activeSessionId: string, imageModelRef: string, session?: Session): string {
-  const defaults: Record<SystemNodeType, string> = {
-    chat: activeSessionId,
-    agent: activeSessionId,
-    session: activeSessionId,
-    model: imageModelRef,
-    provider: 'openrouter',
-    space: 'create',
-    'designer.doc': session?.activeDocId ?? session?.docs[0]?.id ?? 'active',
-    library: 'library',
-    toolset: 'toolset',
-    prompt: 'composer',
-    mediaSettings: 'image',
-  };
-  return defaults[type];
+  return SYSTEM_DEFAULTS[type].ref({ sessionId: activeSessionId, imageModelRef, session });
+}
+
+/** The same for `addSystemNode`, which starts prompt and mediaSettings from their own type name. */
+export function systemAddRefDefault(type: SystemNodeType, sessionId: string, imageModelRef: string, session?: Session): string {
+  const d = SYSTEM_DEFAULTS[type];
+  return d.addRef ?? d.ref({ sessionId, imageModelRef, session });
 }
