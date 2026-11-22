@@ -1,6 +1,7 @@
 import { uid } from '../../lib/id';
 import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { useStore } from '../../store/store';
+import type { BudgetPass } from '../budget';
 import type { ExecResult } from '../executor';
 import { prepareNodeRun, runNodes, type NodeRunPreview } from '../flow/actions';
 import { resolveInputs, storeEnv } from './resolver';
@@ -114,10 +115,10 @@ export function adoptPreview(session: string, targets: string[], force: boolean,
  * The interface's Run buttons: the reviewed preview runs through the same registry, under the id of this confirmation.
  * Each confirmation is its own approval; the same confirmation clicked twice gets the run it already started.
  */
-export function runApproved(session: string, targets: string[], force: boolean, preview: NodeRunPreview, runId: string, onState?: StepStateHook): Promise<ActionRecord> {
+export function runApproved(session: string, targets: string[], force: boolean, preview: NodeRunPreview, runId: string, onState?: StepStateHook, budgetPass?: BudgetPass): Promise<ActionRecord> {
   const known = ledger.get(runId);
   if (known && known.session === session && known.targets.join(',') === targets.join(',')) return known.done;
-  return runAction(adoptPreview(session, targets, force, preview), runId, onState);
+  return runAction(adoptPreview(session, targets, force, preview), runId, onState, budgetPass);
 }
 
 /**
@@ -125,7 +126,7 @@ export function runApproved(session: string, targets: string[], force: boolean, 
  * same run, done and failed give their record (a failed or interrupted send may have reached the provider, so the
  * state is kept as it is). Trying again means a new approval and a new id. An id belongs to one approval only.
  */
-export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), onState?: StepStateHook): Promise<ActionRecord> {
+export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), onState?: StepStateHook, budgetPass?: BudgetPass): Promise<ActionRecord> {
   const known = ledger.get(runId);
   if (known) {
     if (known.approval !== snapshot.id) return Promise.resolve({ runId, approval: snapshot.id, session: snapshot.session, targets: snapshot.targets, status: 'stale', sends: 0, seq: 0, error: 'This run id belongs to another approval; approve again and use a new id.' });
@@ -151,7 +152,7 @@ export function runAction(snapshot: ActionSnapshot, runId: string = uid('run'), 
     try {
       record.attempted = true;
       snapshots.delete(snapshot.id); // one send per approval: from here it is only a record
-      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } onState?.(step, state, info); });
+      const result = await runNodes(snapshot.session, snapshot.targets, snapshot.preview, snapshot.force, (step, state, info) => { if (state === 'running' && info?.generationId) { record.sends += 1; (record.generationIds ??= []).push(info.generationId); } onState?.(step, state, info); }, budgetPass);
       if (result == null) { settle(runId, { status: 'stale', error: 'The graph changed after it was reviewed; review it again.', result }); return finish(); }
       settle(runId, { status: result.failed.length ? 'failed' : 'done', result, ...(result.failed.length ? { error: result.failed[0].error } : {}) });
     } catch (err) {

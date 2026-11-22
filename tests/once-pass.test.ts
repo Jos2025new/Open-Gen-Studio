@@ -28,7 +28,7 @@ describe('Continue once lives only as long as the approved action', () => {
   it('an approved action that aborts (the graph changed) leaves no pass: the next action asks', async () => {
     const card = await presentNodeRun(sid, ['a'], null, undefined, 'main');
     patchNodeData(sid, 'a', { prompt: 'edited after the preview' });
-    await withOncePass(sid, () => approvePlan(sid, card.itemId!));
+    await withOncePass(sid, (pass) => approvePlan(sid, card.itemId!, pass));
     expect(execute).not.toHaveBeenCalled();
     expect((useStore.getState().sessions[sid].feed.find((f) => f.id === card.itemId) as PlanFeedItem).status).toBe('awaiting');
     expect(overLimit(known, sid)).toBe(true);
@@ -38,22 +38,23 @@ describe('Continue once lives only as long as the approved action', () => {
     expect(overLimit(known, sid)).toBe(true);
   });
   it('the approved action passes while it runs, painting does not spend it, and it ends with the action', async () => {
-    await withOncePass(sid, async () => {
-      for (let i = 0; i < 5; i++) expect(overLimit(known, sid)).toBe(false);
-      expect(overLimit(known, 'other')).toBe(true);
+    await withOncePass(sid, async (pass) => {
+      for (let i = 0; i < 5; i++) expect(overLimit(known, sid, pass)).toBe(false);
+      expect(overLimit(known, 'other', pass)).toBe(true);
     });
     expect(overLimit(known, sid)).toBe(true);
   });
   it('a batch approved once counts as one run: it passes until its first generation, then the next asks', async () => {
-    await withOncePass(sid, async () => {
-      expect(overLimit({ usd: 3, approximate: false }, sid)).toBe(false);
-      consumeOnce(sid); // first generation of the batch
-      expect(overLimit({ usd: 3, approximate: false }, sid)).toBe(true);
+    await withOncePass(sid, async (pass) => {
+      expect(overLimit({ usd: 3, approximate: false }, sid, pass)).toBe(false);
+      consumeOnce(pass); // first generation of the batch
+      expect(overLimit({ usd: 3, approximate: false }, sid, pass)).toBe(true);
     });
     expect(overLimit(known, sid)).toBe(true);
   });
   it('a synchronous action ends its pass too', () => {
-    withOncePass(sid, () => { expect(overLimit(known, sid)).toBe(false); });
-    expect(overLimit(known, sid)).toBe(true);
+    let leaked: import('../src/engine/budget').BudgetPass | undefined;
+    withOncePass(sid, (pass) => { leaked = pass; expect(overLimit(known, sid, pass)).toBe(false); });
+    expect(overLimit(known, sid, leaked)).toBe(true);
   });
 });

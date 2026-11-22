@@ -1,6 +1,7 @@
 import { uid } from '../lib/id';
 import { isAbort } from '../lib/http';
 import { opModelFor } from './catalog';
+import type { BudgetPass } from './budget';
 import { budgetProblem, opEstimate, runAssetOp } from './actions';
 import { opSessionId } from './opSession';
 import { estimateMedia } from './costs';
@@ -40,18 +41,18 @@ export function improveSessionId(g: Generation, plan: ImprovePlan, create = fals
 }
 
 /** Run the improvement. Call after the user confirmed the cost. */
-export async function improveShot(generationId: string): Promise<void> {
+export async function improveShot(generationId: string, budgetPass?: BudgetPass): Promise<void> {
   const g = get().generations[generationId];
   const plan = g && improvePlan(g);
   if (!g || !plan) return;
   const estimate = await improveEstimate(g, plan);
-  const problem = budgetProblem(estimate, improveSessionId(g, plan, true));
+  const problem = budgetProblem(estimate, improveSessionId(g, plan, true), budgetPass);
   if (problem) { toast(problem, 'error'); return; }
-  if (plan.mode === 'upscale') { await runAssetOp(g.assetIds[0], 'video_upscale', {}, undefined, undefined, g.place, g.mode); return; }
+  if (plan.mode === 'upscale') { await runAssetOp(g.assetIds[0], 'video_upscale', {}, undefined, undefined, g.place, g.mode, budgetPass); return; }
   const next = createGeneration({
     sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, inputs: g.inputs, origin: g.origin, place: g.place, mode: g.mode,
     settings: { ...g.settings, resolution: plan.resolution },
-    parentId: g.id, operationId: g.operationId ?? g.id, estimate,
+    parentId: g.id, operationId: g.operationId ?? g.id, estimate, budgetPass,
   });
   appendFeed(g.sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'chat', type: 'generation', generationId: next.id });
   runGeneration(next.id).catch((err) => { if (!isAbort(err)) toast((err as Error).message, 'error'); });

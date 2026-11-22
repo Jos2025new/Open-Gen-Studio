@@ -2,7 +2,7 @@ import { JobFailedError } from '../lib/http';
 import { getAssetBlob } from '../lib/idb';
 import { patchGeneration, saveNow, useStore } from '../store/store';
 import { addSpend } from '../store/spend';
-import { noteExcess } from './budget';
+import { noteExcess, type BudgetPass } from './budget';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { deliveryNotes } from './delivery';
 import { isVideoOpEngine, OPS } from './ops';
@@ -34,6 +34,8 @@ export interface GenerationSpec {
   stepId?: string;
   /** Runtime token covering the steps of an approved Nodes run; never persisted. */
   batchToken?: symbol;
+  /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
+  budgetPass?: BudgetPass;
   estimate?: Estimate;
   variants?: string[];
 }

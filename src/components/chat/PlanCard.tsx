@@ -13,7 +13,8 @@ import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
-import { dontAskAgain, withOncePass, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
+import { dontAskAgain, withOncePass } from '../../engine/budget';
+import { readBudgetVerdict, useBudgetVerdict } from '../ui/useBudgetVerdict';
 import type { Estimate, Generation, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
@@ -137,10 +138,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const assets = useStore((s) => s.assets);
-  useStore((s) => s.spentUsd);
-  useStore((s) => s.settings);
   useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
-  const remaining = remainingBudget();
   const workspace = useStore((s) => s.ui.workspace);
   // While the agent revises this plan after a comment, it must not run in its old form.
   const revising = useStore(() => laneState(sessionId, resolveOwner(sessionId, item.meta?.agentNodeId))?.revising === item.id); // the agent that owns the card, not the one on screen
@@ -180,7 +178,9 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
     const st = plan.steps.find((x) => x.id === ref.split('#')[0]);
     return st ? `“${st.title}”` : ref;
   };
-  const over = awaiting && overLimit(total, sessionId);
+  const verdict = useBudgetVerdict(total, sessionId);
+  const remaining = verdict.remaining;
+  const over = awaiting && verdict.over;
   const [showAdj, setShowAdj] = useState(false);
   const [suggest, setSuggest] = useState(false);
   const generations = useStore((s) => s.generations);
@@ -289,8 +289,8 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   <span className="step-script">
                     <p>{item.stepCostReviews[s.id].message}</p>
                     {(() => {
-                      const stepOver = overLimit(item.stepCostReviews[s.id].proposed.estimate, sessionId);
-                      return <Button size="sm" variant="primary" data-tip={stepOver ? overLimitText(item.stepCostReviews[s.id].proposed.estimate) : undefined} onClick={() => { void (stepOver ? withOncePass(sessionId, () => resolveStepCostReview(sessionId, item.id, s.id, 'continue')) : resolveStepCostReview(sessionId, item.id, s.id, 'continue')); }}>{stepOver ? 'Continuar una vez' : 'Continuar'}</Button>;
+                      const stepVerdict = readBudgetVerdict(item.stepCostReviews[s.id].proposed.estimate, sessionId);
+                      return <Button size="sm" variant="primary" data-tip={stepVerdict.over ? stepVerdict.text : undefined} onClick={() => { void (stepVerdict.over ? withOncePass(sessionId, (pass) => resolveStepCostReview(sessionId, item.id, s.id, 'continue', pass)) : resolveStepCostReview(sessionId, item.id, s.id, 'continue')); }}>{stepVerdict.over ? 'Continuar una vez' : 'Continuar'}</Button>;
                     })()}
                     <Button size="sm" variant="ghost" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'cancel'); }}>Cancelar paso</Button>
                   </span>
@@ -352,9 +352,9 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               className="cc-approve"
               disabled={revising || rewriting || Boolean(rewriteFailed) || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
-                void (over ? withOncePass(sessionId, () => approvePlan(sessionId, item.id)) : approvePlan(sessionId, item.id));
+                void (over ? withOncePass(sessionId, (pass) => approvePlan(sessionId, item.id, pass)) : approvePlan(sessionId, item.id));
               }}
-              data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}
+              data-tip={over ? verdict.text : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}
             >
               {free ? 'Approve' : <>{over ? 'Continue once' : 'Approve'}<span className="cc-ap-sep" aria-hidden>·</span><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
             </Button>

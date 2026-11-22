@@ -2,7 +2,7 @@ import { pruneJoins } from '../plan';
 import { estimateSteps } from '../executor';
 import { canRecheck } from '../jobs';
 import { planRetryEstimate } from '../retryPartial';
-import { overLimit, overLimitText } from '../budget';
+import { budgetProblem, type BudgetPass } from '../budget';
 import { get } from './runtimeShared';
 import type { Estimate, PlanFeedItem, PlanStep } from '../types';
 
@@ -35,12 +35,12 @@ export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: 
 }
 
 /** Why a recovery cannot start, in words for the user or the agent; null when it can. */
-export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode, sessionId: string): string | null {
+export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode, sessionId: string, budgetPass?: BudgetPass): string | null {
   const r = planRecovery(item);
   if (!r) return item.plan.workspace === 'node' ? 'Plans on the Node canvas are rerun from their nodes.' : 'This plan has no failed steps.';
   if (mode === 'check' && !r.checkable.length) {
     return 'No failed step has a submitted job to check: the provider gave no job id (NanoGPT returns images in the same request, so a dropped connection leaves nothing to ask for). Retry runs them again.';
   }
   const cost = mode === 'check' ? r.rest : r.estimate;
-  return overLimit(cost, sessionId) ? overLimitText(cost) : null;
+  return budgetProblem(cost, sessionId, budgetPass);
 }

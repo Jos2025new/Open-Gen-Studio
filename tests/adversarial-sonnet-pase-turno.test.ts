@@ -140,10 +140,10 @@ describe('pase de turno: aislamiento y alcance', () => {
   it('Continue once de otra accion (pase de sesion) no abre el turno del agente ni lo consume el agente', async () => {
     paid();
     const posts = mockLlmFetch(() => sse([textChunk('ok')]));
-    await withOncePass(sid(), async () => {
+    await withOncePass(sid(), async (pass) => {
       await llmTurn(sid(), 'chat', { route: 'new', agentNodeId: 'main' });
       expect(posts).toHaveLength(0);
-      expect(overLimitAccepted(sid())).toBe(true); // sigue vivo para su dueno
+      expect(overLimitAccepted(sid(), pass)).toBe(true); // sigue vivo para su dueno
     });
     expect(overLimitAccepted(sid())).toBe(false);
   });

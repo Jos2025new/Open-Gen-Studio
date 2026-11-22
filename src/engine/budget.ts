@@ -24,30 +24,41 @@ export function remainingBudget(state: { settings: { budgetOn: boolean; budgetUs
 }
 
 /**
- * "Continue once": a pass per session that lives exactly as long as the approved action (withOncePass). It is also spent
- * when that action creates its first generation (so a batch such as Run all, approved once, is one run). Painting never
- * spends it. If the action ends without creating one (the graph changed, a recovery was refused, an error), it dies with it.
+ * Unforgeable in-memory pass owned by one approved action (never a session-wide grant, never persisted).
+ * Another action in the same session neither sees it nor spends it.
  */
-const oncePasses = new Map<string, Set<symbol>>();
-/** Sequence-level passes for "Allow this time": each grant stays alive across all spend steps of its sequence until ended. */
-const sequencePasses = new Map<string, Set<symbol>>();
-/** Approved multi-step batches (Nodes runs): scoped to one run's steps so unrelated sends still ask. */
-const approvedBatches = new Map<symbol, { sessionId: string; steps: Set<string> }>();
-
-function addPass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
-  let tokens = store.get(sessionId);
-  if (!tokens) {
-    tokens = new Set();
-    store.set(sessionId, tokens);
-  }
-  tokens.add(token);
+export interface BudgetPass {
+  readonly sessionId: string;
+  readonly kind: 'once' | 'sequence';
 }
 
-function removePass(store: Map<string, Set<symbol>>, sessionId: string, token: symbol): void {
-  const tokens = store.get(sessionId);
-  if (!tokens) return;
-  tokens.delete(token);
-  if (tokens.size === 0) store.delete(sessionId);
+export interface BudgetPassHandle {
+  readonly pass: BudgetPass;
+  end: () => void;
+}
+
+export interface BudgetVerdict {
+  /** Would go over an active limit without a matching durable rule or action pass. */
+  over: boolean;
+  /** Remaining budget in USD, or null when the spending limit is off. */
+  remaining: number | null;
+  /** True when the price is not published (`usd == null`). */
+  unknownPrice: boolean;
+  /** Ready-to-show warning copy when `over` is true. */
+  text?: string;
+}
+
+/** Active passes keyed by object identity so forged objects are rejected and reload clears everything. */
+const activePasses = new Map<BudgetPass, { sessionId: string; kind: 'once' | 'sequence' }>();
+/** One-shot in-memory pass for an automatic same-price 402 substitute of a generation approved with a once-pass. */
+const substitutePasses = new Map<string, BudgetPass>();
+/** Approved multi-step batches (Nodes runs): scoped to one run's steps so unrelated sends still ask. */
+const approvedBatches = new Map<symbol, { sessionId: string; steps: Set<string>; hadPass: boolean }>();
+
+function passHolds(pass: BudgetPass | undefined, sessionId: string): boolean {
+  if (!pass) return false;
+  const entry = activePasses.get(pass);
+  return Boolean(entry && entry.sessionId === sessionId);
 }
 
 function runWithPass<T>(end: () => void, action: () => T): T {
@@ -92,27 +103,50 @@ export function subscribeUntilNextSession(fn: () => void): () => void {
   return () => void untilNextListeners.delete(fn);
 }
 
-/** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", "Don't ask again until next session", or a pass just given. */
-export function overLimitAccepted(sessionId?: string): boolean {
+/** Over-limit runs go ahead without asking: no limit, "Don't ask in any session" (or a limit accepted by an older version), this session's "Don't ask again", "Don't ask again until next session", or this action's own active pass. */
+export function overLimitAccepted(sessionId?: string, pass?: BudgetPass): boolean {
   const { budgetOn } = get().settings;
-  return !budgetOn || noAskDurable(get(), sessionId) || passFor(sessionId ?? get().activeSessionId);
+  const sid = sessionId ?? get().activeSessionId;
+  return !budgetOn || noAskDurable(get(), sid) || passHolds(pass, sid);
 }
 
-function passFor(sessionId: string): boolean {
-  return (oncePasses.get(sessionId)?.size ?? 0) > 0 || (sequencePasses.get(sessionId)?.size ?? 0) > 0;
+/** True when `pass` is currently active for `sessionId`. */
+export function passActiveFor(pass: BudgetPass | undefined, sessionId: string): boolean {
+  return passHolds(pass, sessionId);
 }
 
-/** The approved action started spending: the pass is used up. */
-export function consumeOnce(sessionId: string): void {
-  oncePasses.delete(sessionId);
+/** The approved action started spending: retire its own once-pass (sequence passes stay alive until ended). */
+export function consumeOnce(pass?: BudgetPass): void {
+  if (!pass) return;
+  const entry = activePasses.get(pass);
+  if (entry && entry.kind === 'once') activePasses.delete(pass);
 }
 
-/** This run would go over an active limit nobody agreed to go past. Free runs ($0) never go over; an unknown price cannot be checked against it, so it asks too. */
-export function overLimit(e: Estimate, sessionId?: string, opts: { sessionPasses?: boolean } = {}): boolean {
-  if (e.usd === 0) return false;
-  const left = remainingBudget();
-  const accepted = opts.sessionPasses === false ? !get().settings.budgetOn || noAskDurable(get(), sessionId) : overLimitAccepted(sessionId);
-  return left != null && !accepted && (e.usd == null || e.usd > left + 1e-9);
+/**
+ * The single spending-limit rule. Free runs ($0) never go over; an unknown price cannot be checked against an active
+ * limit, so it asks too. A `pass` applies only to the action carrying it and only for its own session.
+ */
+export function budgetVerdict(
+  e: Estimate,
+  opts: { sessionId?: string; pass?: BudgetPass; choices?: string } = {},
+): BudgetVerdict {
+  const remaining = remainingBudget();
+  const unknownPrice = e.usd == null;
+  if (e.usd === 0) return { over: false, remaining, unknownPrice: false };
+  const sid = opts.sessionId ?? get().activeSessionId;
+  const accepted = overLimitAccepted(sid, opts.pass);
+  const over = remaining != null && !accepted && (unknownPrice || e.usd! > remaining + 1e-9);
+  return { over, remaining, unknownPrice, ...(over ? { text: overLimitText(e, opts.choices) } : {}) };
+}
+
+/** This run would go over an active limit nobody agreed to go past. Delegates to `budgetVerdict`. */
+export function overLimit(e: Estimate, sessionId?: string, pass?: BudgetPass): boolean {
+  return budgetVerdict(e, { sessionId, pass }).over;
+}
+
+/** Why a run needs confirmation: it goes over a limit not yet accepted. Null when allowed. */
+export function budgetProblem(e: Estimate, sessionId?: string, pass?: BudgetPass): string | null {
+  return budgetVerdict(e, { sessionId, pass }).text ?? null;
 }
 
 /** A send that would pass the spending limit and nobody agreed: createGeneration refuses it (the safety net behind every entry). */
@@ -125,11 +159,11 @@ export class OverLimitError extends Error {
 
 /**
  * The central check of the promise «new paid runs will ask first»: an entry that forgot to ask is stopped here.
- * Free runs and approved plan steps go through. For other runs, use the same rule as the entries: a price that
- * exceeds the remaining budget or is unpublished needs approval when the limit is active.
+ * Free runs and approved plan steps go through. For other runs, use the same rule as the entries (`budgetVerdict`):
+ * a price that exceeds the remaining budget or is unpublished needs approval when the limit is active.
  */
-export function assertWithinLimit(e: Estimate, sessionId: string, approvedByPlan: boolean): void {
-  if (approvedByPlan || e.usd === 0 || !overLimit(e, sessionId)) return;
+export function assertWithinLimit(e: Estimate, sessionId: string, approvedByPlan: boolean, pass?: BudgetPass): void {
+  if (approvedByPlan || e.usd === 0 || !budgetVerdict(e, { sessionId, pass }).over) return;
   throw new OverLimitError(e);
 }
 
@@ -142,32 +176,59 @@ export function overLimitText(e: Estimate, choices = '“Continue once” lets o
 }
 
 /**
- * "Continue once": run the approved action with this session's pass, and retire the pass when the action ends, finishes
- * or fails, whether or not it created a generation. The next run that goes over asks again.
+ * "Continue once": run the approved action with its own pass, and retire the pass when the action ends, finishes
+ * or fails, whether or not it created a generation. Unrelated actions in the same session never see it.
  */
-export function withOncePass<T>(sessionId: string, action: () => T): T {
-  const token = Symbol();
-  addPass(oncePasses, sessionId, token);
-  return runWithPass(() => removePass(oncePasses, sessionId, token), action);
+export function withOncePass<T>(sessionId: string, action: (pass: BudgetPass) => T): T {
+  const pass: BudgetPass = Object.freeze({ sessionId, kind: 'once' });
+  activePasses.set(pass, { sessionId, kind: 'once' });
+  return runWithPass(() => { activePasses.delete(pass); }, () => action(pass));
 }
 
 /**
- * "Allow this time": grants a sequence-level pass for `sessionId` until the returned cleanup function is called.
+ * "Allow this time": grants a sequence-level pass for `sessionId` until `end()` is called. Only steps carrying
+ * the returned `pass` see it; unrelated actions in the same session still ask.
  */
-export function beginOncePass(sessionId: string): () => void {
-  const token = Symbol();
-  addPass(sequencePasses, sessionId, token);
-  return () => removePass(sequencePasses, sessionId, token);
+export function beginOncePass(sessionId: string): BudgetPassHandle {
+  const pass: BudgetPass = Object.freeze({ sessionId, kind: 'sequence' });
+  activePasses.set(pass, { sessionId, kind: 'sequence' });
+  return { pass, end: () => { activePasses.delete(pass); } };
+}
+
+/** Bind a one-shot in-memory pass to `generationId` so an automatic same-price 402 substitute within the same run can proceed. */
+export function bindGenerationPass(generationId: string, sessionId: string): void {
+  const prev = substitutePasses.get(generationId);
+  if (prev) activePasses.delete(prev);
+  const pass: BudgetPass = Object.freeze({ sessionId, kind: 'once' });
+  activePasses.set(pass, { sessionId, kind: 'once' });
+  substitutePasses.set(generationId, pass);
+}
+
+/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, if any. */
+export function takeGenerationPass(generationId: string): BudgetPass | undefined {
+  const pass = substitutePasses.get(generationId);
+  if (!pass) return undefined;
+  substitutePasses.delete(generationId);
+  return pass;
+}
+
+/** Retire any unused 402 substitute pass when `generationId` finishes. */
+export function clearGenerationPass(generationId: string): void {
+  const pass = substitutePasses.get(generationId);
+  if (!pass) return;
+  substitutePasses.delete(generationId);
+  activePasses.delete(pass);
 }
 
 /**
- * Cover every step of an approved multi-step Nodes run. Spends any once-pass for `sessionId` immediately so
+ * Cover every step of an approved multi-step Nodes run. Spends the action's once-pass immediately so
  * unrelated runs in the same session still ask while this batch is executing.
  */
-export function beginBatchPass(sessionId: string, stepIds: Iterable<string>): { token: symbol; end: () => void } {
-  consumeOnce(sessionId);
+export function beginBatchPass(sessionId: string, stepIds: Iterable<string>, pass?: BudgetPass): { token: symbol; end: () => void } {
+  const hadPass = passHolds(pass, sessionId);
+  consumeOnce(pass);
   const token = Symbol('batch');
-  approvedBatches.set(token, { sessionId, steps: new Set(stepIds) });
+  approvedBatches.set(token, { sessionId, steps: new Set(stepIds), hadPass });
   return { token, end: () => void approvedBatches.delete(token) };
 }
 
@@ -176,6 +237,13 @@ export function batchStepApproved(sessionId: string, token: symbol | undefined, 
   if (!token || !stepId) return false;
   const batch = approvedBatches.get(token);
   return Boolean(batch && batch.sessionId === sessionId && batch.steps.has(stepId));
+}
+
+/** True when the approved batch covering `stepId` was started with a once-pass. */
+export function batchStepHadPass(sessionId: string, token: symbol | undefined, stepId: string | undefined): boolean {
+  if (!token || !stepId) return false;
+  const batch = approvedBatches.get(token);
+  return Boolean(batch && batch.sessionId === sessionId && batch.steps.has(stepId) && batch.hadPass);
 }
 
 /** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */
@@ -199,8 +267,12 @@ export function dontAskUntilNextSession(): void {
 
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
-  oncePasses.delete(sessionId);
-  sequencePasses.delete(sessionId);
+  for (const [pass, entry] of activePasses) {
+    if (entry.sessionId === sessionId) activePasses.delete(pass);
+  }
+  for (const [genId, pass] of substitutePasses) {
+    if (pass.sessionId === sessionId) substitutePasses.delete(genId);
+  }
   endUntilNextSession();
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }
@@ -240,10 +312,10 @@ export function ignoreExcess(sessionId: string, itemId: string): void {
 
 /** A Nodes run that did not start: the real reason for the card (the limit, or the graph changed). */
 export function rerunNote(e: Estimate, sessionId?: string): string {
-  return overLimit(e, sessionId) ? overLimitText(e) : 'The execution changed. Review and approve again.';
+  return budgetVerdict(e, { sessionId }).text ?? 'The execution changed. Review and approve again.';
 }
 
-/** Nominal cost estimate for one LLM call so `overLimit` can guard LLM entries before tokens are known. */
+/** Nominal cost estimate for one LLM call so `budgetVerdict` can guard LLM entries before tokens are known. */
 export function llmCallEstimate(provider: LlmProviderId, model: string): Estimate {
   const m = get().catalog.llm[provider]?.find((x) => x.id === model);
   if (m && m.inputPrice === 0 && m.outputPrice === 0) return { usd: 0, approximate: false };

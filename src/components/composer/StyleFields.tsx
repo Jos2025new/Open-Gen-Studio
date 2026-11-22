@@ -148,9 +148,9 @@ function SavedStyles({ kind, p }: { kind: MediaKind; p: ParamDef }) {
           lines={[`fal.ai learns the style from ${images} attached image${images === 1 ? '' : 's'} (1–10).`]}
           estimate={{ usd: null, approximate: true, note: 'fal bills the style when it is created' }}
           confirmLabel="Create style"
-          onConfirm={() => {
+          onConfirm={(pass) => {
             setConfirming(false);
-            const p = createRecraftStyle(sessionId, name || 'Style');
+            const p = createRecraftStyle(sessionId, name || 'Style', pass);
             setName('');
             return p;
           }}

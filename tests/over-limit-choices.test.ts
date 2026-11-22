@@ -24,36 +24,36 @@ afterEach(() => vi.useRealTimers());
 describe('over the limit: Continue once, Don\u2019t ask again, app switch (2026-10-29)', () => {
   // The pass lives exactly as long as the approved action (tests/once-pass.test.ts has the abort and throw cases).
   it('Continue once passes the approved action, painting does not spend it, and the next run asks again', () => {
-    withOncePass('A', () => {
-      for (let i = 0; i < 5; i++) expect(overLimit(known, 'A')).toBe(false); // evaluating while painting
-      consumeOnce('A'); // the approved action creates its first generation
-      expect(overLimit(known, 'A')).toBe(true);
+    withOncePass('A', (pass) => {
+      for (let i = 0; i < 5; i++) expect(overLimit(known, 'A', pass)).toBe(false); // evaluating while painting
+      consumeOnce(pass); // the approved action creates its first generation
+      expect(overLimit(known, 'A', pass)).toBe(true);
     });
     expect(overLimit(known, 'A')).toBe(true);
     expect(useStore.getState().sessions.A.noAskOverLimit).toBeFalsy();
   });
 
   it('another session does not inherit the pass, and its generation does not spend it', () => {
-    withOncePass('A', () => {
-      expect(overLimit(known, 'B')).toBe(true);
-      consumeOnce('B');
-      expect(overLimit(known, 'A')).toBe(false); // B starting a run does not spend A's pass
+    withOncePass('A', (passA) => {
+      expect(overLimit(known, 'B', passA)).toBe(true);
+      withOncePass('B', (passB) => { consumeOnce(passB); });
+      expect(overLimit(known, 'A', passA)).toBe(false); // B starting a run does not spend A's pass
     });
     expect(overLimit(known, 'A')).toBe(true);
   });
 
   it('one approval covers a whole batch (Run all): the pass holds until its first generation, then ends', () => {
-    withOncePass('A', () => {
-      expect(overLimit({ usd: 3, approximate: false }, 'A')).toBe(false); // the batch gate and the run gate both pass
-      expect(overLimit({ usd: 3, approximate: false }, 'A')).toBe(false);
-      consumeOnce('A'); // first node's generation created; the rest of the batch was already approved
-      expect(overLimit({ usd: 3, approximate: false }, 'A')).toBe(true);
+    withOncePass('A', (pass) => {
+      expect(overLimit({ usd: 3, approximate: false }, 'A', pass)).toBe(false); // the batch gate and the run gate both pass
+      expect(overLimit({ usd: 3, approximate: false }, 'A', pass)).toBe(false);
+      consumeOnce(pass); // first node's generation created; the rest of the batch was already approved
+      expect(overLimit({ usd: 3, approximate: false }, 'A', pass)).toBe(true);
     });
   });
 
   it('Don\u2019t ask again stops asking in that session only, and Ask again brings it back', () => {
     dontAskAgain('A');
-    consumeOnce('A');
+    consumeOnce(undefined);
     expect(overLimit(known, 'A')).toBe(false);
     expect(overLimit(unknown, 'A')).toBe(false);
     expect(overLimit(known, 'B')).toBe(true);

@@ -14,7 +14,7 @@ import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
 import { mayStartWork } from '../../lib/writerLock';
-import { llmCallEstimate, overLimit, overLimitText } from '../budget';
+import { budgetProblem, llmCallEstimate } from '../budget';
 import { agentEngine, llmCallUsd } from './runtime';
 import { settingsOptions } from './settingsCard';
 import { rememberSessionModel } from './sessionModel';
@@ -183,7 +183,7 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const guardBlock = (): string | null => {
     if (!mayStartWork()) return 'Open Gen Studio is open in another tab';
     const est = llmCallEstimate(engine.provider, engine.model);
-    return overLimit(est, sessionId) ? overLimitText(est) : null;
+    return budgetProblem(est, sessionId);
   };
   const run = (runs.get(itemId) ?? 0) + 1;
   runs.set(itemId, run);

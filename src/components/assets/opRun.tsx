@@ -3,6 +3,7 @@ import { ChevronDown } from '../ui/icons';
 import { opFollowsSource } from '../../engine/catalog';
 import { OPS, defaultOpParams } from '../../engine/ops';
 import { layerOpEstimate, opEstimate, runAssetOp, runLayerOp } from '../../engine/actions';
+import type { BudgetPass } from '../../engine/budget';
 import { opSessionId } from '../../engine/opSession';
 import type { AdvancedValue, Estimate, OpId } from '../../engine/types';
 import type { ToolSeed } from '../../store/spaceUi';
@@ -72,9 +73,9 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null, seed?: ToolSeed)
   const blocked = pending ? 'Calculating the cost…' : op === 'video_upscale' && !via ? estimate.note ?? 'Choose an available video upscaler.' : missing ? `Fill in “${missing.label}”.` : null;
 
   /** The one launch: the same calls the op popover makes after its cost confirmation. */
-  const run = () => {
+  const run = (pass?: BudgetPass) => {
     if (!target || pending) return;
-    return target.kind === 'asset' ? runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined) : runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
+    return target.kind === 'asset' ? runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined, undefined, undefined, pass) : runLayerOp(target.sessionId, target.docId, target.layerId, op, params, pass);
   };
   const sessionId = target ? (target.kind === 'asset' ? opSessionId(target.assetId) : target.sessionId) : undefined;
   const resolveSessionId = () => target?.kind === 'asset' ? opSessionId(target.assetId, true) : sessionId;

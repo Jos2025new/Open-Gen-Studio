@@ -118,7 +118,7 @@ describe('price notices reach the model over the existing channel', () => {
     expect(mediaCalls).toBe(0);
     expect(useStore.getState().generations[gid].status).toBe('review');
     expect(plan().stepCostReviews?.s1.decisions ?? []).toHaveLength(0);
-    await withOncePass(sid(), () => resolveStepCostReview(sid(), 'card', 's1', 'continue'));
+    await withOncePass(sid(), (pass) => resolveStepCostReview(sid(), 'card', 's1', 'continue', pass));
     expect(mediaCalls).toBe(1);
     useStore.setState((st) => ({ settings: { ...st.settings, budgetOn: false } }));
   });

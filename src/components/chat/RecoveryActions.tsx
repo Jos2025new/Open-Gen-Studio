@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { RefreshCw, RotateCw } from '../ui/icons';
 import { planRecovery, planRecoveryProblem, resumePlan, type PlanRecoveryMode } from '../../engine/agent/runtime';
-import { dontAskAgain, withOncePass, overLimit, overLimitText } from '../../engine/budget';
+import { dontAskAgain, withOncePass, type BudgetPass } from '../../engine/budget';
 import { canRecheck, recheckGeneration, retryGeneration } from '../../engine/jobs';
+import { FREE } from '../../engine/pricing';
 import { estimateForRetry } from '../../engine/retryPartial';
 import type { Generation, PlanFeedItem } from '../../engine/types';
 import { toast, useStore } from '../../store/store';
 import { Button, costLabel } from '../ui/primitives';
+import { readBudgetVerdict, useBudgetVerdict } from '../ui/useBudgetVerdict';
 
 /*
  * What to do after a generation fails: Check status asks the provider again about a job it received (only when it
@@ -21,20 +23,21 @@ const isUncertain = (g: Generation | undefined) => Boolean(g && (g.lostJob || g.
 export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item: PlanFeedItem }) {
   const [confirmRetry, setConfirmRetry] = useState<'once' | 'quiet' | null>(null);
   const gens = useStore((s) => s.generations);
-  useStore((s) => s.spentUsd);
   const r = planRecovery(item);
+  const retryVerdict = useBudgetVerdict(r ? r.estimate : FREE, sessionId);
+  const checkVerdict = useBudgetVerdict(r ? r.rest : FREE, sessionId);
   if (!r) return null;
   const uncertain = r.retry.some((st) => isUncertain(gens[item.stepGenerations[st.id] ?? '']));
   const run = (mode: PlanRecoveryMode) => {
-    const go = () => {
-      const problem = planRecoveryProblem(item, mode, sessionId);
+    const go = (pass?: BudgetPass) => {
+      const problem = planRecoveryProblem(item, mode, sessionId, pass);
       if (problem) {
         toast(problem, 'info');
         return;
       }
-      return resumePlan(sessionId, item.id, mode, true);
+      return resumePlan(sessionId, item.id, mode, true, pass);
     };
-    void (overLimit(mode === 'retry' ? r.estimate : r.rest, sessionId) ? withOncePass(sessionId, go) : go());
+    void (readBudgetVerdict(mode === 'retry' ? r.estimate : r.rest, sessionId).over ? withOncePass(sessionId, go) : go());
   };
   const quiet = (mode: PlanRecoveryMode) => { dontAskAgain(sessionId); run(mode); };
   const confirmAndRetry = () => {
@@ -43,12 +46,12 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
     if (mode === 'quiet') quiet('retry');
     else run('retry');
   };
-  const over = overLimit(r.estimate, sessionId);
+  const over = retryVerdict.over;
   return (
     <div className="recover-chips">
       {r.checkable.length ? (
-        <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => run('check')} data-tip={overLimit(r.rest, sessionId) ? overLimitText(r.rest) : 'Ask the provider again about the jobs it received; the steps waiting for them run next'}>
-          {overLimit(r.rest, sessionId) ? 'Check once' : 'Check status'}
+        <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => run('check')} data-tip={checkVerdict.over ? checkVerdict.text : 'Ask the provider again about the jobs it received; the steps waiting for them run next'}>
+          {checkVerdict.over ? 'Check once' : 'Check status'}
         </Button>
       ) : null}
       {confirmRetry ? (
@@ -62,7 +65,7 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
       ) : (
         <>
           {over ? <Button size="sm" variant="ghost" onClick={() => (uncertain ? setConfirmRetry('quiet') : quiet('retry'))} data-tip="Retry and stop asking in this session. Change it in Settings → Budget.">Don’t ask again</Button> : null}
-          <Button size="sm" variant="secondary" icon={RotateCw} onClick={() => (uncertain ? setConfirmRetry('once') : run('retry'))} data-tip={over ? overLimitText(r.estimate) : r.checkable.length ? 'Runs the failed steps again (charged again)' : NO_JOB_TIP}>
+          <Button size="sm" variant="secondary" icon={RotateCw} onClick={() => (uncertain ? setConfirmRetry('once') : run('retry'))} data-tip={over ? retryVerdict.text : r.checkable.length ? 'Runs the failed steps again (charged again)' : NO_JOB_TIP}>
             {over ? 'Continue once' : 'Retry failed'} · {costLabel(r.estimate, { short: true })}
           </Button>
         </>
@@ -75,12 +78,12 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
 export function GenerationRecovery({ g }: { g: Generation }) {
   const [confirmUncertain, setConfirmUncertain] = useState<'once' | 'quiet' | null>(null);
   const planItem = useStore((s) => (g.planId ? s.sessions[g.sessionId]?.feed.find((f): f is PlanFeedItem => f.type === 'plan' && f.plan.id === g.planId) : undefined));
-  useStore((s) => s.spentUsd);
+  const estimate = estimateForRetry(g);
+  const verdict = useBudgetVerdict(estimate, g.sessionId);
   if (planItem && planRecovery(planItem)) return <PlanRecoveryChips sessionId={g.sessionId} item={planItem} />;
   const checkable = canRecheck(g);
   const uncertain = isUncertain(g);
-  const estimate = estimateForRetry(g);
-  const over = overLimit(estimate, g.sessionId);
+  const over = verdict.over;
   const startRetry = () => {
     const mode = confirmUncertain;
     setConfirmUncertain(null);
@@ -89,7 +92,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
       void retryGeneration(g.id);
       return;
     }
-    void (over ? withOncePass(g.sessionId, () => retryGeneration(g.id)) : retryGeneration(g.id));
+    void (over ? withOncePass(g.sessionId, (pass) => retryGeneration(g.id, undefined, pass)) : retryGeneration(g.id));
   };
   return (
     <div className="recover-chips">
@@ -113,7 +116,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
             size="sm"
             variant="secondary"
             icon={RotateCw}
-            data-tip={over ? overLimitText(estimate) : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
+            data-tip={over ? verdict.text : checkable ? 'Runs it again (charged again)' : NO_JOB_TIP}
             onClick={() => (uncertain ? setConfirmUncertain('once') : startRetry())}
           >
             {over ? 'Continue once' : 'Retry'} · {costLabel(estimate, { short: true })}

@@ -58,7 +58,7 @@ export const commands = [
     effect: 'read',
     needs: ['session'],
     available: (ctx) => session(ctx),
-    run: ({ on }, args) => { const problem = A.budgetProblem(args.estimate, on.session); if (problem) throw new Error(problem); },
+    run: ({ on, budgetPass }, args) => { const problem = A.budgetProblem(args.estimate, on.session, budgetPass); if (problem) throw new Error(problem); },
   }),
   defineCommand({
     id: 'studio.direct.check',
@@ -231,7 +231,7 @@ export const commands = [
     available: (ctx) => onScreen(ctx),
     estimate: (_ctx, args) => A.checkDirect(args.kind).estimate,
     debt: 'Reads the active session, composer and screen; the action reports some failures only as notices.',
-    run: async ({ on }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session); if (problem) throw new Error(problem); await A.generateDirect(args.kind); },
+    run: async ({ on, budgetPass }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session, budgetPass); if (problem) throw new Error(problem); await A.generateDirect(args.kind, budgetPass); },
   }),
   defineCommand({
     id: 'studio.generation.regenerate',
@@ -243,7 +243,7 @@ export const commands = [
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
     estimate: (_ctx, args) => A.regenerateEstimate(args.generationId) ?? useStore.getState().generations[args.generationId]?.estimate ?? { usd: null, approximate: true },
     debt: 'The action reports some failures only as notices.',
-    run: async (_ctx, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId); if (problem) throw new Error(problem); await A.regenerate(args.generationId); },
+    run: async ({ budgetPass }, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass); },
   }),
   defineCommand({
     id: 'studio.asset.run_op',
@@ -255,7 +255,7 @@ export const commands = [
     available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
     estimate: ({ on }, args) => estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }),
     debt: 'Reads the active session and screen; failures can be reported only as notices.',
-    run: async ({ on }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
+    run: async ({ on, budgetPass }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode, budgetPass); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
   }),
   defineCommand({
     id: 'studio.layer.run_op',
@@ -267,7 +267,7 @@ export const commands = [
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : layer(ctx, args),
     estimate: ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); return estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); },
     debt: 'The action catches failures and reports them only as notices.',
-    run: async ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params); },
+    run: async ({ on, budgetPass }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params, budgetPass); },
   }),
   defineCommand({
     id: 'studio.generation.delete',

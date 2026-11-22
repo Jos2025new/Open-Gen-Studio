@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { llmCallEstimate, overLimit, overLimitText, withOncePass } from './budget';
+import { budgetVerdict, consumeOnce, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -149,32 +149,40 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
 };
 
 /** Run `proceed` when within budget, or ask once with "Continue once" / "Cancel" above the prompt box. */
-function confirmOverLimit(sessionId: string, title: string, e: Estimate, choicesText: string, proceed: () => unknown): boolean {
-  if (!overLimit(e, sessionId)) {
-    proceed();
+function confirmOverLimit(
+  sessionId: string,
+  title: string,
+  e: Estimate,
+  choicesText: string,
+  proceed: (pass?: BudgetPass) => unknown,
+  pass?: BudgetPass,
+): boolean {
+  const verdict = budgetVerdict(e, { sessionId, pass, choices: choicesText });
+  if (!verdict.over) {
+    proceed(pass);
     return true;
   }
   const id = pushAlert({
     level: 'warn',
-    text: `${title}: ${overLimitText(e, choicesText)}`,
+    text: `${title}: ${verdict.text}`,
     actions: [
-      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, proceed); } },
+      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, (once) => proceed(once)); } },
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
   return false;
 }
 
-/** Check the spending limit before a paid LLM call. Uses its own per-turn pass (never session passes) so unrelated actions neither grant nor lose a pass. */
+/** Check the spending limit before a paid LLM call. Uses its own per-turn pass so unrelated actions neither grant nor lose a pass. */
 export function guardLlmBudget(sessionId: string, provider: LlmProviderId, model: string, title: string, resume: () => unknown, budgetPass = false): boolean {
   if (budgetPass) return true;
   const est = llmCallEstimate(provider, model);
-  // The agent's own per-turn pass only: a session pass belongs to another action.
-  if (!overLimit(est, sessionId, { sessionPasses: false })) return true;
+  const verdict = budgetVerdict(est, { sessionId, choices: '\u201cContinue once\u201d runs this agent turn.' });
+  if (!verdict.over) return true;
   let ran = false;
   const id = pushAlert({
     level: 'warn',
-    text: `${title}: ${overLimitText(est, '\u201cContinue once\u201d runs this agent turn.')}`,
+    text: `${title}: ${verdict.text}`,
     actions: [
       { label: 'Continue once', run: () => { if (ran) return; ran = true; dismissAlert(id); void resume(); } },
       { label: 'Cancel', run: () => dismissAlert(id) },
@@ -282,6 +290,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const patch = substitute(auto);
     let immediate = true;
     let run: Promise<boolean> | undefined;
+    const subPass = takeGenerationPass(genId);
     const ok = confirmOverLimit(
       g.sessionId,
       label(auto.model, undefined, auto.usd),
@@ -308,7 +317,9 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
           throw err;
         }
       },
+      subPass,
     );
+    consumeOnce(subPass);
     immediate = false;
     if (!ok || !run) return false;
     return await run;
@@ -391,7 +402,7 @@ export async function onAgentCredit(sessionId: string = get().activeSessionId): 
     return false;
   }
   if (auto && mode === 'always') {
-    if (overLimit(llmCallEstimate(auto.p, auto.m.id), sessionId)) {
+    if (budgetVerdict(llmCallEstimate(auto.p, auto.m.id), { sessionId }).over) {
       pick(auto);
       return false;
     }

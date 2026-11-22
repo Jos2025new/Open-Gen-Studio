@@ -3,6 +3,7 @@ import { ArrowUp, Zap } from '../ui/icons';
 import { sendSessionId, ensureSendSession } from '../../store/spaceSession';
 import { toast, useStore } from '../../store/store';
 import { checkDirect, generateDirect } from '../../engine/actions';
+import type { BudgetPass } from '../../engine/budget';
 import type { MediaKind } from '../../engine/types';
 import { Popover, usePopover } from '../ui/Popover';
 import { costLabel } from '../ui/primitives';
@@ -24,7 +25,7 @@ export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKin
   const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, sid, noAsk, workspace, models, quotes]);
   const pop = usePopover();
   const unknown = check.estimate.usd == null;
-  const launch = () => { onLaunch?.(useStore.getState().composer.text); return generateDirect(kind); };
+  const launch = (pass?: BudgetPass) => { onLaunch?.(useStore.getState().composer.text); return generateDirect(kind, pass); };
   const onClick = () => {
     if (!check.ok) {
       toast(check.reason ?? 'Not ready', 'error');
@@ -55,9 +56,9 @@ export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKin
           title="Generate"
           estimate={check.estimate}
           confirmLabel="Generate"
-          onConfirm={() => {
+          onConfirm={(pass) => {
             pop.close();
-            return launch();
+            return launch(pass);
           }}
           onCancel={pop.close}
         />

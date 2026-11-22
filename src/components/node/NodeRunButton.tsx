@@ -31,9 +31,9 @@ export function RunButton({ node, primary }: { node: GraphNode; primary?: boolea
             blocked={preview.errors[0] ?? null}
             sessionId={sessionId}
             onCancel={pop.close}
-            onConfirm={() => {
+            onConfirm={(pass) => {
               if (previewRun(sessionId, [node.id]).signature !== preview.signature) return;
-              return runApproved(sessionId, [node.id], true, preview, confirmId.current).then(() => pop.close());
+              return runApproved(sessionId, [node.id], true, preview, confirmId.current, undefined, pass).then(() => pop.close());
             }}
           />
         ) : null}

@@ -405,9 +405,9 @@ function SubjectsChip() {
                     lines={['fal.ai creates the voice from the attached audio (5–30 s, one speaker).']}
                     estimate={{ usd: null, approximate: true, note: 'fal bills the voice when it is created' }}
                     confirmLabel="Create voice"
-                    onConfirm={() => {
+                    onConfirm={(pass) => {
                       setVoiceFor(null);
-                      return createSubjectVoice(sessionId, s.id);
+                      return createSubjectVoice(sessionId, s.id, pass);
                     }}
                     onCancel={() => setVoiceFor(null)}
                   />

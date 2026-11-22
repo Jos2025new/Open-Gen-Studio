@@ -307,9 +307,9 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
           lines={[metaLine(g)]}
           estimate={regenEstimate}
           confirmLabel="Regenerate"
-          onConfirm={() => {
+          onConfirm={(pass) => {
             regen.close();
-            return regenerate(g.id);
+            return regenerate(g.id, pass);
           }}
           onCancel={regen.close}
           sessionId={g.sessionId}

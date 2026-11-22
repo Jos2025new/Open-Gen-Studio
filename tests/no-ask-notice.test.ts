@@ -36,9 +36,9 @@ describe('over-limit notice and the lasting no-ask rules', () => {
     withOncePass(id, () => addSpend(2, { sessionId: id } as never));
     expect(passed()).toBe(true);
     setup({});
-    const end = beginOncePass(id);
+    const grant = beginOncePass(id);
     addSpend(2, { sessionId: id } as never);
-    end();
+    grant.end();
     expect(passed()).toBe(true);
   });
 

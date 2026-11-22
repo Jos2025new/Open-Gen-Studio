@@ -72,12 +72,12 @@ export const commands = [
     args: z.object({ approval: z.string().min(1).max(80), runId: z.string().min(1).max(80).optional() }).strict(),
     effect: 'spend',
     estimate: (_on, args) => snapshotById(args.approval)?.preview.estimate ?? { usd: 0 } as never,
-    run: async (on, args) => {
+    run: async (on, args, ctx) => {
       const snapshot = snapshotById(args.approval);
       if (!snapshot || snapshot.session !== on.session) throw new Error('This approval is unknown or belongs to another session; prepare the action again.');
-      const problem = budgetProblem(snapshot.preview.estimate, on.session);
+      const problem = budgetProblem(snapshot.preview.estimate, on.session, ctx.budgetPass);
       if (problem) throw new Error(problem);
-      const record = await runAction(snapshot, args.runId);
+      const record = await runAction(snapshot, args.runId, undefined, ctx.budgetPass);
       if (record.status === 'stale' || (record.status === 'failed' && !record.result)) throw new Error(record.error ?? 'The action did not run.');
       return { runId: record.runId, status: record.status, sends: record.sends, failed: record.result?.failed ?? [], error: record.error ?? null };
     },

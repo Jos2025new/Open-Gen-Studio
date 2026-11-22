@@ -1,10 +1,9 @@
 import { decideCommandApproval } from '../../engine/agent/commandCalls';
-import { overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import type { CommandApprovalFeedItem, CommandApprovalStep } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
-import { useStore } from '../../store/store';
 import { CircleAlert, Trash, Wand } from '../ui/icons';
 import { Button, costLabel } from '../ui/primitives';
+import { useBudgetVerdict } from '../ui/useBudgetVerdict';
 
 const LIMIT_CHOICES = '“Allow this time” lets only this sequence through; “Allow for the whole session” stops asking in this session; “Don’t ask again until next session” stops asking until you open a chat in another session or the limit changes. Nothing is stopped.';
 
@@ -20,14 +19,13 @@ function stepArgSummary(step: CommandApprovalStep): string {
 }
 
 export function CommandApprovalCard({ item, sessionId }: { item: CommandApprovalFeedItem; sessionId: string }) {
-  // Subscribe to spending and budget state so the card updates when the limit or session pass changes.
-  useStore((s) => `${s.spentUsd}:${s.settings.budgetOn}:${s.settings.budgetUsd}:${s.sessions[sessionId]?.noAskOverLimit ?? false}`);
   const hasSpend = item.steps.some((s) => s.effect === 'spend');
   const hasDelete = item.steps.some((s) => s.effect === 'delete');
   const total = item.estimate;
   const free = !hasSpend || (total.usd === 0 && !total.approximate);
-  const over = item.status === 'awaiting' && hasSpend && overLimit(total, sessionId);
-  const remaining = remainingBudget();
+  const verdict = useBudgetVerdict(total, sessionId, LIMIT_CHOICES);
+  const over = item.status === 'awaiting' && hasSpend && verdict.over;
+  const remaining = verdict.remaining;
   const title =
     item.steps.length === 1
       ? item.steps[0].title
@@ -63,7 +61,7 @@ export function CommandApprovalCard({ item, sessionId }: { item: CommandApproval
       </ol>
       {over ? (
         <p className="plan-user-model">
-          <CircleAlert size={12} /> {overLimitText(total, LIMIT_CHOICES)}
+          <CircleAlert size={12} /> {verdict.text}
         </p>
       ) : null}
       {item.error ? <p className="plan-error">{item.error}</p> : null}
@@ -104,7 +102,7 @@ export function CommandApprovalCard({ item, sessionId }: { item: CommandApproval
                   variant="primary"
                   className="cc-approve"
                   onClick={() => decideCommandApproval(sessionId, item.id, 'once')}
-                  data-tip={overLimitText(total, LIMIT_CHOICES)}
+                  data-tip={verdict.text}
                 >
                   {free ? (
                     'Allow this time'

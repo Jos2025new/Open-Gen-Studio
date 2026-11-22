@@ -17,8 +17,7 @@ vi.mock('../src/lib/media', async (orig) => ({
 }));
 
 import { useStore } from '../src/store/store';
-import * as budget from '../src/engine/budget';
-import { askAgain, beginOncePass, OverLimitError, overLimit, withOncePass } from '../src/engine/budget';
+import { askAgain, beginOncePass, budgetVerdict, OverLimitError, overLimit, withOncePass, type BudgetPass } from '../src/engine/budget';
 import { budgetProblem } from '../src/engine/actions';
 import { createGeneration, runGeneration, type GenerationSpec } from '../src/engine/jobs';
 import { ADAPTERS } from '../src/engine/providers/registry';
@@ -45,7 +44,7 @@ const settings = { count: 1, advanced: {} };
 const paid = { usd: 0.1, approximate: false };
 let sid: string;
 
-const spec = (over: Partial<GenerationSpec> & { budgetPass?: unknown } = {}): GenerationSpec => ({
+const spec = (over: Partial<GenerationSpec> = {}): GenerationSpec => ({
   sessionId: sid,
   origin: 'composer',
   kind: 'image',
@@ -55,7 +54,7 @@ const spec = (over: Partial<GenerationSpec> & { budgetPass?: unknown } = {}): Ge
   inputs: { refs: [] },
   estimate: paid,
   ...over,
-} as GenerationSpec);
+});
 
 beforeEach(() => {
   const st = useStore.getState();
@@ -106,7 +105,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
     let otherBlocked = false;
     let action1CreatedId: string | undefined;
 
-    const action1 = (withOncePass as (s: string, fn: (pass: unknown) => Promise<void>) => Promise<void>)(sid, async (pass) => {
+    const action1 = withOncePass(sid, async (pass) => {
       await gate;
       const g = createGeneration(spec({ budgetPass: pass }));
       action1CreatedId = g.id;
@@ -132,15 +131,17 @@ describe('per-action budget pass and single budgetVerdict', () => {
   });
 
   it('sequence pass (beginOncePass) belongs to its sequence, not to unrelated actions in the same session', () => {
-    const grant = beginOncePass(sid) as unknown as { pass: unknown; end: () => void } | (() => void);
-    const end = typeof grant === 'function' ? grant : grant.end;
+    const grant = beginOncePass(sid);
     try {
       expect(overLimit(paid, sid)).toBe(true);
       expect(budgetProblem(paid, sid)).not.toBeNull();
       expect(() => createGeneration(spec())).toThrow(OverLimitError);
+      // Only the sequence holding grant.pass passes
+      expect(budgetVerdict(paid, { sessionId: sid, pass: grant.pass }).over).toBe(false);
     } finally {
-      end();
+      grant.end();
     }
+    expect(budgetVerdict(paid, { sessionId: sid, pass: grant.pass }).over).toBe(true);
   });
 
   it('pass survives an await and an automatic same-price 402 substitute, but never covers a second action or second generation', async () => {
@@ -167,7 +168,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
 
     let reusedPassBlocked = false;
     let genId = '';
-    await (withOncePass as (s: string, fn: (pass: unknown) => Promise<void>) => Promise<void>)(sid, async (pass) => {
+    await withOncePass(sid, async (pass) => {
       // Survives an await before creating the generation
       await new Promise((r) => setTimeout(r, 10));
       const g = createGeneration(spec({ budgetPass: pass }));
@@ -192,14 +193,13 @@ describe('per-action budget pass and single budgetVerdict', () => {
   });
 
   it('budgetVerdict is the single rule: $0 never stops, unknown price asks, pass is unforgeable and never persisted', () => {
-    const verdict = (budget as unknown as { budgetVerdict?: (e: { usd: number | null; approximate: boolean }, opts?: { sessionId?: string; pass?: unknown }) => { over: boolean } }).budgetVerdict;
-    expect(typeof verdict).toBe('function');
-    expect(verdict!({ usd: 0, approximate: false }, { sessionId: sid }).over).toBe(false);
-    expect(verdict!({ usd: null, approximate: true }, { sessionId: sid }).over).toBe(true);
+    expect(budgetVerdict({ usd: 0, approximate: false }, { sessionId: sid }).over).toBe(false);
+    expect(budgetVerdict({ usd: null, approximate: true }, { sessionId: sid }).over).toBe(true);
     // Forged pass object never works
-    expect(verdict!(paid, { sessionId: sid, pass: { sessionId: sid, kind: 'once' } }).over).toBe(true);
+    const forged: BudgetPass = { sessionId: sid, kind: 'once' };
+    expect(budgetVerdict(paid, { sessionId: sid, pass: forged }).over).toBe(true);
     // No pass is persisted in store state
-    (withOncePass as (s: string, fn: (pass: unknown) => void) => void)(sid, () => {
+    withOncePass(sid, () => {
       const serialized = JSON.stringify(useStore.getState().sessions[sid]);
       expect(serialized).not.toContain('oncePass');
       expect(serialized).not.toContain('budgetPass');

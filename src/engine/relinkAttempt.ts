@@ -1,6 +1,6 @@
 import { updateFeedItem, useStore } from '../store/store';
 import { toast } from '../store/toasts';
-import { overLimit, overLimitText } from './budget';
+import { budgetProblem, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { applyEdit } from './nodecore/edit';
 import { estimateForRetry } from './retryPartial';
@@ -22,7 +22,7 @@ export function newerAttempt(g: Generation, nodeId?: string): boolean {
 }
 
 /** The plan claims its steps only after checking the aggregate price. Standalone Retry checks its own price. */
-export function holdRetry(g: Generation, planItemId?: string): ReturnType<typeof holdAttemptNode> | SchemaUnavailableError {
+export function holdRetry(g: Generation, planItemId?: string, budgetPass?: BudgetPass): ReturnType<typeof holdAttemptNode> | SchemaUnavailableError {
   const session = useStore.getState().sessions[g.sessionId];
   if (g.planId) {
     const item = session?.feed.find((f) => f.id === planItemId);
@@ -33,7 +33,8 @@ export function holdRetry(g: Generation, planItemId?: string): ReturnType<typeof
     }
   } else {
     const estimate = estimateForRetry(g);
-    if (overLimit(estimate, g.sessionId)) {
+    const problem = budgetProblem(estimate, g.sessionId, budgetPass);
+    if (problem) {
       // An approval cannot make a derived schema sendable. Report the known refusal before asking about price.
       const { models, schemas } = useStore.getState().catalog;
       const model = models[g.modelRef];
@@ -41,7 +42,7 @@ export function holdRetry(g: Generation, planItemId?: string): ReturnType<typeof
       if (model && schema?.source === 'derived') {
         return new SchemaUnavailableError(schemaUnavailableMessage(model, g.modelRef, schema.loadError));
       }
-      toast(overLimitText(estimate), 'info');
+      toast(problem, 'info');
       return;
     }
   }

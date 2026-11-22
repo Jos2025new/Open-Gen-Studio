@@ -92,9 +92,9 @@ export function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] })
             blocked={preview.errors[0] ?? null}
             sessionId={sessionId}
             onCancel={pop.close}
-            onConfirm={() => {
+            onConfirm={(pass) => {
               if (previewRun(sessionId, ids, false).signature !== preview.signature) return;
-              return runApproved(sessionId, ids, false, preview, confirmId.current).then(() => pop.close());
+              return runApproved(sessionId, ids, false, preview, confirmId.current, undefined, pass).then(() => pop.close());
             }}
           />
         ) : null}

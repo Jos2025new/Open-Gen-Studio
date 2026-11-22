@@ -8,16 +8,16 @@ describe('budget grants', () => {
   it('keeps overlapping approved sequences valid until each finishes', () => {
     const a = createSession('a'), b = createSession('b');
     useStore.setState((s) => ({ sessions: { ...s.sessions, [a.id]: a, [b.id]: b }, activeSessionId: a.id, settings: { ...s.settings, budgetOn: true, budgetUsd: 10, budgetAccepted: undefined, budgetNoAsk: false } }));
-    const endA = beginOncePass(a.id);
-    const endB = beginOncePass(b.id);
+    const grantA = beginOncePass(a.id);
+    const grantB = beginOncePass(b.id);
     try {
-      expect(overLimitAccepted(a.id)).toBe(true);
-      expect(overLimitAccepted(b.id)).toBe(true);
-      endB();
-      expect(overLimitAccepted(a.id)).toBe(true);
+      expect(overLimitAccepted(a.id, grantA.pass)).toBe(true);
+      expect(overLimitAccepted(b.id, grantB.pass)).toBe(true);
+      grantB.end();
+      expect(overLimitAccepted(a.id, grantA.pass)).toBe(true);
     } finally {
-      endA();
-      endB();
+      grantA.end();
+      grantB.end();
     }
   });
 
@@ -40,35 +40,36 @@ describe('budget grants', () => {
       settings: { ...s.settings, budgetOn: true, budgetUsd: 10, budgetAccepted: undefined, budgetNoAsk: false },
     }));
 
-    const endA1 = beginOncePass(a.id);
-    const endA2 = beginOncePass(a.id);
-    const endB = beginOncePass(b.id);
+    const grantA1 = beginOncePass(a.id);
+    const grantA2 = beginOncePass(a.id);
+    const grantB = beginOncePass(b.id);
     try {
-      consumeOnce(a.id); // sequence passes survive spend steps
-      expect(overLimitAccepted(a.id)).toBe(true);
-      endA1();
-      endA1(); // idempotent cleanup must not remove endA2's token
-      expect(overLimitAccepted(a.id)).toBe(true);
+      consumeOnce(grantA1.pass); // sequence passes survive spend steps
+      expect(overLimitAccepted(a.id, grantA1.pass)).toBe(true);
+      grantA1.end();
+      grantA1.end(); // idempotent cleanup must not remove grantA2's token
+      expect(overLimitAccepted(a.id, grantA1.pass)).toBe(false);
+      expect(overLimitAccepted(a.id, grantA2.pass)).toBe(true);
       askAgain(a.id);
-      expect(overLimitAccepted(a.id)).toBe(false);
-      expect(overLimitAccepted(b.id)).toBe(true);
-      endA2();
-      expect(overLimitAccepted(b.id)).toBe(true);
+      expect(overLimitAccepted(a.id, grantA2.pass)).toBe(false);
+      expect(overLimitAccepted(b.id, grantB.pass)).toBe(true);
+      grantA2.end();
+      expect(overLimitAccepted(b.id, grantB.pass)).toBe(true);
     } finally {
-      endA1();
-      endA2();
-      endB();
+      grantA1.end();
+      grantA2.end();
+      grantB.end();
     }
 
-    await withOncePass(a.id, async () => {
-      await withOncePass(b.id, async () => {
-        expect(overLimitAccepted(a.id)).toBe(true);
-        expect(overLimitAccepted(b.id)).toBe(true);
-        consumeOnce(b.id);
-        expect(overLimitAccepted(b.id)).toBe(false);
-        expect(overLimitAccepted(a.id)).toBe(true);
+    await withOncePass(a.id, async (passA) => {
+      await withOncePass(b.id, async (passB) => {
+        expect(overLimitAccepted(a.id, passA)).toBe(true);
+        expect(overLimitAccepted(b.id, passB)).toBe(true);
+        consumeOnce(passB);
+        expect(overLimitAccepted(b.id, passB)).toBe(false);
+        expect(overLimitAccepted(a.id, passA)).toBe(true);
       });
-      expect(overLimitAccepted(a.id)).toBe(true);
+      expect(overLimitAccepted(a.id, passA)).toBe(true);
     });
     expect(overLimitAccepted(a.id)).toBe(false);
   });

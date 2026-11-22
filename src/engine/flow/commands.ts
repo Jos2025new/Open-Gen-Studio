@@ -378,13 +378,13 @@ export const commands = [
     args: z.object({ targets: ids, force: z.boolean().optional() }).strict(),
     effect: 'spend',
     estimate: (on, args) => A.previewRun(on.session, args.targets, args.force ?? true).estimate,
-    run: async (on, args) => {
+    run: async (on, args, ctx) => {
       // The same registry as nodes.action.*: one approval, one send, and the inspector can tell which run made which result.
       const prepared = await prepareAction(on.session, args.targets, args.force ?? true);
       if (!prepared.ok) throw new Error(prepared.errors[0]);
-      const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session);
+      const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session, ctx.budgetPass);
       if (problem) throw new Error(problem);
-      const started = (await runAction(prepared.snapshot)).result;
+      const started = (await runAction(prepared.snapshot, undefined, undefined, ctx.budgetPass)).result;
       if (!started) throw new Error('The graph changed after it was reviewed; review it again.');
       return { outputs: Object.fromEntries(started.outputs), failed: started.failed, skipped: started.skipped, waiting: started.waiting, ...(started.stopped ? { stopped: true } : {}) };
     },
