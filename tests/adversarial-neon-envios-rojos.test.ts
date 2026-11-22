@@ -230,7 +230,7 @@ describe('2. Proveedor síncrono sin id: abortar durante el transporte', () => {
 });
 
 describe('3. purgeDiscarded en generación en error con rastro pendiente', () => {
-  it.fails('conserva generación en error con remoteJob activo tras borrar la sesión', async () => {
+  it('conserva generación en error con remoteJob activo tras borrar la sesión', async () => {
     const sId = sid();
     let release!: () => void;
     const gotJob = new Promise<void>((res) => {
@@ -253,7 +253,7 @@ describe('3. purgeDiscarded en generación en error con rastro pendiente', () =>
     expect(genOf(g.id)?.remoteJob?.id).toBe('j_active');
   });
 
-  it.fails('conserva generación en error con uncertain/lostJob tras borrar la sesión', async () => {
+  it('conserva generación en error con uncertain/lostJob tras borrar la sesión', async () => {
     const sId = sid();
     let release!: () => void;
     const inFlight = new Promise<void>((res) => {

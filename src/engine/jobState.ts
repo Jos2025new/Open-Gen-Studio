@@ -128,10 +128,19 @@ function spendEntry(g: Generation, estimated: boolean) {
   return { category: g.kind, provider: g.modelRef.split('::')[0], model: g.modelRef, sessionId: g.sessionId, estimated };
 }
 
+/** Keep a discarded generation while it still has an active remote job or unsettled send trail. */
+function hasPendingSendTrail(g: Generation): boolean {
+  return Boolean(
+    g.remoteJob ||
+    g.lostJob ||
+    g.sends?.some((s) => (s.status === 'sent' && Boolean(s.remoteJob)) || s.status === 'uncertain' || s.status === 'intent'),
+  );
+}
+
 /** An ended generation of a deleted session: already charged, so remove it and its results. */
 export function purgeDiscarded(id: string): void {
   const g = get().generations[id];
-  if (!g?.discard || running.has(id) || g.status === 'running' || g.status === 'queued') return;
+  if (!g?.discard || running.has(id) || g.status === 'running' || g.status === 'queued' || hasPendingSendTrail(g)) return;
   const st = get();
   const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
   const ids = Object.values(st.assets).filter((a) => (a.generationId === id || g.assetIds.includes(a.id)) && !kept.has(a.id)).map((a) => a.id);
