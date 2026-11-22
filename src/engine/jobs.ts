@@ -107,12 +107,12 @@ export function runGeneration(id: string, nodeLock?: () => void): Promise<string
   const existing = running.get(id);
   if (existing) return existing;
   if (!mayStartWork()) {
-    clearGenerationPass(id);
+    clearGenerationPass(id, true);
     return Promise.reject(new Error('Open Gen Studio is open in another tab'));
   }
   const generation = get().generations[id];
   if (generation?.status === 'review') {
-    clearGenerationPass(id);
+    clearGenerationPass(id, true);
     return Promise.reject(new PriceReviewRequired('Necesita revisión'));
   }
   startGenerationPass(id);
@@ -414,7 +414,7 @@ function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
 }
 
 export function cancelGeneration(id: string): void {
-  clearGenerationPass(id);
+  clearGenerationPass(id, true);
   controllers.get(id)?.abort();
   const g = get().generations[id];
   if (g && g.status === 'queued') patchGeneration(id, { status: 'canceled', finishedAt: Date.now() });
@@ -457,6 +457,7 @@ export function retryGeneration(id: string, planItemId?: string, budgetPass?: Bu
   if (held instanceof SchemaUnavailableError) return Promise.reject(held);
   if (!held) return Promise.resolve(g.assetIds);
   try {
+    clearGenerationPass(id, true);
     // New Generation: another attempt of the same operation.
     const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), budgetPass });
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });

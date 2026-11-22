@@ -53,6 +53,7 @@ type GenerationPassEntry = {
   budgetUsd: number;
   started: boolean;
   owner?: BudgetPass | symbol;
+  deferred?: boolean;
 };
 
 /** Active passes keyed by object identity so forged objects are rejected and reload clears everything. */
@@ -247,8 +248,17 @@ export function takeGenerationPass(generationId: string): BudgetPass | undefined
   return pass;
 }
 
+/** Keep `generationId`'s 402 substitute entitlement past `runGeneration.finally` while a same-price `ask` alert awaits the user's reply. */
+export function deferGenerationPass(generationId: string): void {
+  const entry = substitutePasses.get(generationId);
+  if (entry) entry.deferred = true;
+}
+
 /** Retire any unused 402 substitute entitlement when `generationId` finishes, cancels or is deleted. */
-export function clearGenerationPass(generationId: string): void {
+export function clearGenerationPass(generationId: string, force = false): void {
+  const entry = substitutePasses.get(generationId);
+  if (!entry) return;
+  if (!force && entry.deferred) return;
   substitutePasses.delete(generationId);
 }
 

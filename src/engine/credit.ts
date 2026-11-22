@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { budgetVerdict, consumeOnce, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
+import { budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -259,28 +259,36 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     }
   })().catch(logged(what));
 
-  const answer = (o: CreditOption, what: string, remember = false) => {
-    if (stale()) return;
+  const answer = (o: CreditOption, what: string, remember = false, useSubPass = false) => {
+    if (stale()) { clearGenerationPass(genId, true); return; }
     if (remember) setSettings({ autoSwitchProvider: 'always' });
     const patch = substitute(o);
     // The plan's Retry prices the whole recovery and is the only entry point for this step.
     if (g.planId) {
+      clearGenerationPass(genId, true);
       applySubstitute(o, patch);
       pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Review the updated price on the plan before choosing Retry.` });
       return;
     }
-    confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), retryEstimateFor(patch), '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what));
+    const est = retryEstimateFor(patch);
+    const subPass = useSubPass && (est.usd != null || g.estimate.usd == null) ? takeGenerationPass(genId) : undefined;
+    try {
+      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what), subPass);
+    } finally {
+      consumeOnce(subPass);
+    }
   };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
   if (auto && mode === 'ask') {
     // First time (and until "Don't ask again"): the user decides, seeing the new provider and price. Same model, same price or less (ADR 0025 C).
+    if (!g.planId) deferGenerationPass(genId);
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it on ${PROVIDER_LABELS[auto.model.provider]} instead (${label(auto.model, undefined, auto.usd)}, same model, same price or less)?`,
       actions: [
-        { label: 'Yes, this time', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit'); } },
-        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', true); } },
+        { label: 'Yes, this time', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', false, true); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', true, true); } },
       ],
     });
     return false;

@@ -205,4 +205,87 @@ describe('per-action budget pass and single budgetVerdict', () => {
       expect(serialized).not.toContain('budgetPass');
     });
   });
+
+  it('402 substitute in ask mode after Continue once: "Yes, this time" does not ask a second time for the same limit', async () => {
+    useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: 'ask' } }));
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    let atlasCalls = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', null));
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
+      atlasCalls++;
+      return { outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.08 };
+    });
+
+    let genId = '';
+    await withOncePass(sid, async (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      genId = g.id;
+      await runGeneration(g.id).catch(() => undefined);
+    });
+
+    const offer = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'));
+    expect(offer).toBeDefined();
+    // While the 402 alert waits, another unrelated action in the same session still asks and cannot steal the pass.
+    expect(overLimit(paid, sid)).toBe(true);
+    expect(() => createGeneration(spec())).toThrow(OverLimitError);
+
+    offer!.actions!.find((x) => x.label === 'Yes, this time')!.run();
+    await vi.waitFor(() => expect(useStore.getState().generations[genId]?.status).toBe('done'));
+
+    expect(atlasCalls).toBe(1);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(false);
+    // And after finishing, a second action still asks.
+    expect(overLimit(paid, sid)).toBe(true);
+    expect(() => createGeneration(spec())).toThrow(OverLimitError);
+  });
+
+  it('402 substitute in ask mode still asks if the limit changed, askAgain ran, or the substitute is pricier', async () => {
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    let atlasCalls = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', null));
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
+      atlasCalls++;
+      return { outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.08 };
+    });
+
+    // 1. Limit lowered after approval -> must ask again for the new limit.
+    useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: 'ask', budgetUsd: 1.0 } }));
+    await withOncePass(sid, async (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      await runGeneration(g.id).catch(() => undefined);
+    });
+    const offer1 = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
+    useStore.setState((s) => ({ settings: { ...s.settings, budgetUsd: 0.5 } }));
+    offer1.actions!.find((x) => x.label === 'Yes, this time')!.run();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(atlasCalls).toBe(0);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);
+
+    // 2. askAgain called before answering -> must ask again.
+    useAlerts.setState({ alerts: [] });
+    useStore.setState((s) => ({ settings: { ...s.settings, budgetUsd: 1.0 } }));
+    await withOncePass(sid, async (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      await runGeneration(g.id).catch(() => undefined);
+    });
+    const offer2 = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
+    askAgain(sid);
+    offer2.actions!.find((x) => x.label === 'Yes, this time')!.run();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(atlasCalls).toBe(0);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);
+
+    // 3. Pricier substitute ($0.14 > $0.10) -> still asks even though original had Continue once.
+    useAlerts.setState({ alerts: [] });
+    useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [ATLAS]: mkModel('atlas', 0.14) } } }));
+    await withOncePass(sid, async (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      await runGeneration(g.id).catch(() => undefined);
+    });
+    const offer3 = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label.includes('Atlas')))!;
+    offer3.actions!.find((x) => x.label.includes('Atlas'))!.run();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(atlasCalls).toBe(0);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);
+  });
 });

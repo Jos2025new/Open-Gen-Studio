@@ -14,7 +14,7 @@ import { clearGenerationPass } from './budget';
 const get = useStore.getState;
 
 export function deleteGeneration(generationId: string): void {
-  clearGenerationPass(generationId);
+  clearGenerationPass(generationId, true);
   const g = get().generations[generationId];
   if (!g) return;
   const assetIds = [...g.assetIds];
