@@ -38,7 +38,7 @@ export default [{
     ['src/engine/nodes/spec.ts', 'export const SYSTEM_NODE_TYPES'],
     ['src/engine/nodes/system.ts', 'export function ensureSystemNodes'],
     ['src/engine/nodes/commands.ts', 'nodes.system.link'],
-    ['src/engine/nodes/system.ts', 'resolveSystemConnection(nodePorts(src.data, st.assets)'],
+    ['src/engine/flow/graph.ts', 'resolveSystemConnection(nodePorts(src.data, assets)'],
     ['src/engine/flow/graph.ts', 'export function nodePorts'],
     ['src/engine/flow/graph.ts', 'export function executionOrder'],
     ['src/components/node/SystemNode.tsx', 'export function linkClassProps'],
@@ -57,6 +57,20 @@ export default [{
   ],
   tests: ['tests/puertos-creativos.test.ts'],
 }, {
+  id: 'node-wiring',
+  what: 'El lienzo y los comandos comparten resolución de clase y puertos y una sola edición de cable. Una entrada de un solo cable sustituye al ocupante en un paso de deshacer. Los comandos nombran el cable que esperaban sustituir. Un enlace entre nodos existentes no inicializa nodos de sistema.',
+  sides: [
+    ['src/components/node/NodeWorkspace.tsx', 'onConnect={(c) => void tryConnect'],
+    ['src/engine/flow/actions.ts', "return editError(applyEdit({ session: sessionId, op: { op: 'connect'"],
+    ['src/engine/flow/commands.ts', 'A.connectNodes(on.session'],
+    ['src/engine/nodes/commands.ts', 'linkSystemNodes(on.session'],
+    ['src/engine/nodes/system.ts', "op: 'connect', ...connection"],
+    ['src/engine/nodes/spec.ts', 'export function resolveSystemConnection'],
+    ['src/engine/flow/graph.ts', 'export function resolveWiring'],
+    ['src/engine/nodecore/edit.ts', 'const wiring = resolveWiring'],
+  ],
+  tests: ['tests/adversarial-neon-puertos.test.ts', 'tests/system-nodes.test.ts', 'tests/nodecore-core.test.ts'],
+}, {
   id: 'node-core',
   what: 'ADR 0031: descriptor por tipo de nodo, un resolvedor de entradas, una capa de edición con revisión esperada, acciones con instantánea y cables inválidos.',
   sides: [
@@ -66,7 +80,7 @@ export default [{
     ['src/engine/flow/freshness.ts', 'resolveInputs(graph, node'],
     ['src/engine/nodecore/edit.ts', 'export function applyEdit'],
     ['src/engine/flow/actions.ts', "applyEdit({ session: sessionId, op: { op: 'connect'"],
-    ['src/engine/nodes/system.ts', "op: 'connect', source: opts.source"],
+    ['src/engine/nodes/system.ts', "op: 'connect', ...connection"],
     ['src/engine/flow/actions.ts', '...runProblems(graph, run.runIds'],
     ['src/engine/graphTypes.ts', 'export interface BrokenLink'],
     ['src/engine/nodecore/action.ts', 'export function runAction'],

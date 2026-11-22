@@ -2,10 +2,10 @@ import { nextAgentTitle } from './agentNames';
 import { uid } from '../../lib/id';
 import { firstAgentId } from '../agent/threads';
 import { threadOf } from '../agent/lanes';
-import { reconcileDeletionNotices, toast, useStore } from '../../store/store';
+import { reconcileDeletionNotices, useStore } from '../../store/store';
 import { laneState, patchLane } from '../agent/lanes';
 import { applyEdit, editCompound } from '../nodecore/edit';
-import { nodePorts } from '../flow/graph';
+import { connectionError } from '../flow/graph';
 import { isOmniSpace } from './omniSpaces';
 import type {
   Graph,
@@ -486,37 +486,21 @@ export function linkSystemNodes(
     replaces?: string | null;
   },
 ): { error: string | null; edgeId?: string } {
-  ensureSystemNodes(sessionId);
   const st = useStore.getState();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return { error: 'No such session.' };
-  if (opts.both && opts.kind === 'data') {
-    const msg = 'Data links cannot be bidirectional (both is only allowed on ref and control links).';
-    toast(msg, 'error');
-    return { error: msg };
+  const connection = { ...opts, targetHandle: opts.targetHandle ?? null };
+  const missing = [opts.source, opts.target].filter((id) => !graph.nodes.some((node) => node.id === id));
+  if (missing.length) {
+    // Only initialize system parts when the link actually needs a missing system endpoint.
+    const { nodes, edges, addedIds } = buildInitialSystemGraph(sessionId, graph);
+    if (!missing.every((id) => addedIds.includes(id))) return { error: 'Unknown node.' };
+    const error = connectionError({ ...graph, nodes, edges }, st.assets, connection);
+    if (error) return { error };
+    ensureSystemNodes(sessionId);
   }
-  const src = graph.nodes.find((n) => n.id === opts.source);
-  const tgt = graph.nodes.find((n) => n.id === opts.target);
-  if (!src || !tgt) return { error: 'Unknown node.' };
-  if (opts.source === opts.target) return { error: 'A node cannot connect to itself.' };
-
-  const resolved = resolveSystemConnection(nodePorts(src.data, st.assets), nodePorts(tgt.data, st.assets), {
-    sourceHandle: opts.sourceHandle,
-    targetHandle: opts.targetHandle,
-    kind: opts.kind,
-  });
-  if (resolved.classMismatch) return { error: resolved.classMismatch };
-  if (!resolved.tgtPort) return { error: 'This node has no such input.' };
-  if (!resolved.srcPort) return { error: 'The source has no output yet.' };
-  if (!portTypeCompatible(opts.kind, resolved.srcPort.type, resolved.tgtPort.type)) {
-    return { error: `${resolved.tgtPort.label ?? resolved.tgtPort.id} expects ${resolved.tgtPort.type}, got ${resolved.srcPort.type}.` };
-  }
-  // One commit path (ADR 0031 point 5): replacement, loop check, locks, trace and the model→agent copy live in the layer.
-  const occupied = graph.edges.find((e) => e.target === opts.target && e.targetHandle === resolved.tgtPort!.id && (e.kind ?? 'data') === opts.kind && e.source !== opts.source);
-  const done = applyEdit({ session: sessionId, op: { op: 'connect', source: opts.source, target: opts.target, targetHandle: resolved.tgtPort.id, kind: opts.kind, both: opts.both, replaces: opts.replaces !== undefined ? opts.replaces : occupied?.id ?? null, ports: { srcPort: resolved.srcPort, tgtPort: resolved.tgtPort, kind: opts.kind } } });
-  const error = done.ok ? null : done.error;
-  const edgeId = done.ok ? done.edgeId : undefined;
-  return { error, ...(error ? {} : { edgeId }) };
+  const done = applyEdit({ session: sessionId, op: { op: 'connect', ...connection } });
+  return done.ok ? { error: null, edgeId: done.edgeId } : { error: done.error };
 }
 
 export function unlinkSystemNodes(

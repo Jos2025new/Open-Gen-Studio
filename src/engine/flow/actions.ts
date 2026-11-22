@@ -150,12 +150,7 @@ export function connectNodes(
   sessionId: string,
   c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean; replaces?: string | null },
 ): string | null {
-  const st = get();
-  const graph = st.sessions[sessionId]?.graph;
-  if (!graph) return 'No such session.';
-  const handle = c.targetHandle ?? c.kind ?? 'in';
-  const occupant = graph.edges.find(e => e.target === c.target && e.targetHandle === handle && (e.kind ?? 'data') === (c.kind ?? 'data'));
-  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: c.replaces !== undefined ? c.replaces : occupant?.id ?? null } }));
+  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c } }));
 }
 export function tryConnect(
   sessionId: string,

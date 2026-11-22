@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 445 | 359 |
-| [store.ts](../src/store/store.ts) | 300 | 352 |
+| [types.ts](../src/engine/types.ts) | 445 | 360 |
+| [store.ts](../src/store/store.ts) | 300 | 353 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 150 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 107 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
@@ -39,7 +39,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
 | [actions.ts](../src/engine/actions.ts) | 37 | 34 |
 | [render.ts](../src/engine/design/render.ts) | 35 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 32 | 23 |
+| [graph.ts](../src/engine/flow/graph.ts) | 32 | 24 |
 
 ## Por área
 
@@ -51,27 +51,27 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 15 | 18 |
 | `src/components/designer` | 121 | 57 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 30 | 34 |
+| `src/components/node` | 30 | 35 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 33 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 24 | 19 |
-| `src/engine` | 86 | 425 |
+| `src/engine` | 86 | 426 |
 | `src/engine/agent` | 64 | 155 |
-| `src/engine/commands` | 7 | 22 |
+| `src/engine/commands` | 7 | 23 |
 | `src/engine/design` | 163 | 210 |
-| `src/engine/flow` | 21 | 84 |
+| `src/engine/flow` | 21 | 85 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 23 | 41 |
-| `src/engine/nodes` | 8 | 31 |
+| `src/engine/nodes` | 8 | 32 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 18 | 2 |
 | `src/engine/providers` | 15 | 85 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 449 |
-| `src/store` | 19 | 354 |
+| `src/lib` | 38 | 450 |
+| `src/store` | 19 | 355 |
 
 273 de 787 módulos no tienen ningún test que los importe directamente.
 

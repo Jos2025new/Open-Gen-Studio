@@ -146,11 +146,9 @@ export function connectionError(
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
   if (!src || !tgt) return 'Unknown node.';
-  const system = systemPortsFor(src, tgt, assets, c);
-  const problem = portProblem(src, tgt, assets, c, system);
-  if (problem) return problem;
-  const kind = system?.kind ?? system?.tgtPort?.kind ?? 'data';
-  return kind === 'data' && reaches(compatibleDataEdges(graph, assets), c.target, c.source) ? 'That connection would create a loop.' : null;
+  const wiring = resolveWiring(src, tgt, assets, c);
+  if ('error' in wiring) return wiring.error;
+  return wiring.port.kind === 'data' && reaches(compatibleDataEdges(graph, assets), c.target, c.source) ? 'That connection would create a loop.' : null;
 }
 
 export { resultHandle, NO_RESULT, GONE_HANDLE } from './results';
@@ -159,6 +157,32 @@ import { resultHandle, NO_RESULT, GONE_HANDLE } from './results';
 export function handleIndex(handle: string | null | undefined): number | undefined {
   const m = handle ? /^out-(\d+)$/.exec(handle) : null;
   return m ? Number(m[1]) - 1 : undefined;
+}
+
+/** Resolve the ports of a new wire before applying the graph's replacement rule. */
+export function resolveWiring(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset> | undefined, c: ConnectionPorts):
+  { edge: Omit<GraphEdge, 'id'>; port: PortSpec } | { error: string } {
+  const sourceHandle = c.sourceHandle === GONE_HANDLE ? 'out' : c.sourceHandle;
+  const inventory = assets ?? {};
+  const unknownAsset = !assets && src.data.kind === 'asset' && !!src.data.assetId;
+  const resolved = resolveSystemConnection(nodePorts(src.data, inventory), nodePorts(tgt.data, inventory), { ...c, sourceHandle });
+  const error = portProblem(src, tgt, inventory, c, resolved, unknownAsset);
+  if (error) return { error };
+  const port = resolved.tgtPort!;
+  const kind = port.kind;
+  const out = resolved.srcPort?.id ?? 'out';
+  // A lost result stays lost. A numbered output selects that result on the data cable.
+  const outputIndex = kind === 'data' && out === 'out'
+    ? (c.sourceHandle === GONE_HANDLE ? NO_RESULT : handleIndex(c.sourceHandle))
+    : undefined;
+  const edge = {
+    source: src.id, target: tgt.id, targetHandle: port.id,
+    sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? out : resultHandle(outputIndex),
+    ...(outputIndex == null ? {} : { outputIndex }),
+    ...(kind !== 'data' || usesSystemPorts(src, tgt, c) ? { kind } : {}),
+    ...(c.both ? { both: true } : {}),
+  };
+  return { edge, port };
 }
 
 /** The same output of the same node (an output with no handle is `out`): two outputs of one node are two cables. */
@@ -178,19 +202,10 @@ export function connect(
 ): Graph {
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
-  if (src && tgt && usesSystemPorts(src, tgt, c)) {
-    const resolved = resolveSystemConnection(nodePorts(src.data, {}), nodePorts(tgt.data, {}), c);
-    const kind: LinkKind = c.kind ?? resolved.kind ?? 'data';
-    const targetHandle = resolved.tgtPort?.id ?? c.targetHandle;
-    const sourceHandle = resolved.srcPort?.id ?? (c.sourceHandle || 'out');
-    const edge: GraphEdge = { id: uid('edge'), source: c.source, target: c.target, sourceHandle, targetHandle, kind, ...(c.both && kind !== 'data' ? { both: true } : {}) };
-    return { ...graph, edges: withEdge(graph.edges, edge, resolved.tgtPort?.multi === false) };
-  }
-  const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
-  // A copy of a link that lost its image stays without one (it must not fall back to the node's chosen result).
-  const outputIndex = c.sourceHandle === GONE_HANDLE ? NO_RESULT : handleIndex(c.sourceHandle);
-  const edge: GraphEdge = { id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) };
-  return { ...graph, edges: withEdge(graph.edges, edge, Boolean(port && !port.multi)) };
+  if (!src || !tgt) return graph;
+  const wiring = resolveWiring(src, tgt, undefined, c);
+  if ('error' in wiring) return graph;
+  return { ...graph, edges: withEdge(graph.edges, { id: uid('edge'), ...wiring.edge }, wiring.port.multi === false) };
 }
 
 // ---------------------------------------------------------------------------

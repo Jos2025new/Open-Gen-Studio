@@ -200,20 +200,24 @@ export function resolveSystemConnection(
     return { srcPort: explicitSrc, tgtPort: explicitTgt, classMismatch: `Link class mismatch: port "${explicitSrc.id}" is ${explicitSrc.kind}, not ${c.kind}.` };
   }
 
-  const desiredKind: LinkKind | undefined = c.kind ?? explicitTgt?.kind ?? explicitSrc?.kind;
-  let tgtPort = explicitTgt && (!desiredKind || explicitTgt.kind === desiredKind) ? explicitTgt : undefined;
-  if (!tgtPort && desiredKind && (!c.targetHandle || c.targetHandle === desiredKind)) {
+  const desiredKind = c.kind ?? explicitTgt?.kind ?? explicitSrc?.kind ?? 'data';
+  let tgtPort = explicitTgt?.kind === desiredKind ? explicitTgt : undefined;
+  if (!tgtPort && (!c.targetHandle || c.targetHandle === desiredKind)) {
     const kindIns = ins.filter((p) => p.kind === desiredKind);
+    const kindOuts = explicitSrc?.kind === desiredKind ? [explicitSrc] : outs.filter((p) => p.kind === desiredKind);
+    // Prefer a specific type over a generic control input, keeping descriptor order for equally compatible ports.
+    const specific = desiredKind === 'control'
+      ? kindIns.find((inp) => inp.type !== 'control' && inp.type !== 'any' && kindOuts.some((outp) => outp.type === inp.type))
+      : undefined;
+    tgtPort = specific ?? kindIns.find((inp) => kindOuts.some((outp) => portTypeCompatible(desiredKind, outp.type, inp.type))) ?? kindIns[0];
+  }
+  let srcPort = explicitSrc?.kind === desiredKind ? explicitSrc : undefined;
+  if (!srcPort && (!rawSrcId || rawSrcId === desiredKind || rawSrcId === 'out')) {
     const kindOuts = outs.filter((p) => p.kind === desiredKind);
-    tgtPort = kindIns.find((inp) => kindOuts.some((outp) => portTypeCompatible(desiredKind, outp.type, inp.type))) ?? kindIns[0];
+    const targetType = tgtPort?.type;
+    srcPort = kindOuts.find((outp) => targetType && portTypeCompatible(desiredKind, outp.type, targetType)) ?? kindOuts[0];
   }
-  const resolvedKind = desiredKind ?? tgtPort?.kind;
-  let srcPort = explicitSrc && (!resolvedKind || explicitSrc.kind === resolvedKind) ? explicitSrc : undefined;
-  if (!srcPort && resolvedKind && (!rawSrcId || rawSrcId === resolvedKind || rawSrcId === 'out')) {
-    const kindOuts = outs.filter((p) => p.kind === resolvedKind);
-    srcPort = tgtPort ? kindOuts.find((outp) => portTypeCompatible(resolvedKind, outp.type, tgtPort!.type)) ?? kindOuts[0] : kindOuts[0];
-  }
-  return { srcPort, tgtPort, kind: resolvedKind };
+  return { srcPort, tgtPort, kind: desiredKind };
 }
 
 export function modelLabelForRef(ref: string): string {
