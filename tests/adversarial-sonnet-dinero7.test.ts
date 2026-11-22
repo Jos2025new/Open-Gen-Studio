@@ -153,10 +153,22 @@ describe('Re-attack (Sonnet) dinero 7: consumers that treat unknown actualUsd as
   const gen = (over: Record<string, unknown>) => ({ id: 'g1', status: 'done', kind: 'image', estimate: { usd: null }, assetIds: ['a'], settings: { count: 1 }, ...over }) as never;
 
   // Finding B (inherited for the all-unknown case, widened by the fix: mixed batches now also have actualUsd undefined).
-  it.fails('plan progress line does not say "spent $0" for a done step whose cost is unknown', async () => {
+  it('plan progress line does not say "spent $0" for a done step whose cost is unknown', async () => {
     const { plannedSpend, spentLabel } = await import('../src/components/chat/planSpent');
     const label = spentLabel(plannedSpend({ s1: 'g1' }, { g1: gen({}) }));
     expect(label).not.toMatch(/spent \$0/);
+    expect(label).toBe('price unknown');
+
+    const mixed = gen({
+      sends: [
+        { id: 'r1', index: 0, status: 'done', estimated: true, bookedUnknown: true },
+        { id: 'r2', index: 1, status: 'done', costUsd: 0.3, estimated: false, bookedUsd: 0.3 },
+      ],
+    });
+    expect(spentLabel(plannedSpend({ s1: 'g1' }, { g1: mixed }))).toBe('spent ≥$0.3');
+
+    const free = gen({ estimate: { usd: 0 } });
+    expect(spentLabel(plannedSpend({ s1: 'g1' }, { g1: free }))).toBe('spent $0');
   });
 
   // Finding C (inherited, legacy non-ledger data only): a cut-short unpriced run books nothing and annotates nothing.
