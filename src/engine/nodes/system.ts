@@ -4,8 +4,9 @@ import { firstAgentId } from '../agent/threads';
 import { threadOf } from '../agent/lanes';
 import { reconcileDeletionNotices, useStore } from '../../store/store';
 import { laneState, patchLane } from '../agent/lanes';
-import { applyEdit, editCompound } from '../nodecore/edit';
-import { connectionError } from '../flow/graph';
+import { applyEdit, editCompound, planConnect } from '../nodecore/edit';
+import { inferReplaces } from '../flow/graph';
+import { graphEditProblem } from '../flow/locks';
 import { isOmniSpace } from './omniSpaces';
 import type {
   Graph,
@@ -482,24 +483,28 @@ export function linkSystemNodes(
     both?: boolean;
     sourceHandle?: string;
     targetHandle?: string;
-    /** A caller that cannot see the port (commands, the agent) names the cable it replaces; the interface leaves it out and replaces what it shows. */
+    /** The id of the cable to replace, when needed. */
     replaces?: string | null;
   },
 ): { error: string | null; edgeId?: string } {
   const st = useStore.getState();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return { error: 'No such session.' };
-  const connection = { ...opts, targetHandle: opts.targetHandle ?? null };
   const missing = [opts.source, opts.target].filter((id) => !graph.nodes.some((node) => node.id === id));
-  if (missing.length) {
-    // Only initialize system parts when the link actually needs a missing system endpoint.
-    const { nodes, edges, addedIds } = buildInitialSystemGraph(sessionId, graph);
-    if (!missing.every((id) => addedIds.includes(id))) return { error: 'Unknown node.' };
-    const error = connectionError({ ...graph, nodes, edges }, st.assets, connection);
+  // Only initialize system parts when the link actually needs a missing system endpoint.
+  const initial = missing.length ? buildInitialSystemGraph(sessionId, graph) : undefined;
+  if (initial && !missing.every((id) => initial.addedIds.includes(id))) return { error: 'Unknown node.' };
+  const connectionGraph = initial ? { ...graph, nodes: initial.nodes, edges: initial.edges } : graph;
+  const op = { op: 'connect' as const, ...opts, targetHandle: opts.targetHandle ?? null };
+  if (op.replaces === undefined) op.replaces = inferReplaces(connectionGraph, st.assets, op);
+  if (initial) {
+    const planned = planConnect(connectionGraph, op, st.assets);
+    if ('error' in planned) return { error: planned.error };
+    const error = graphEditProblem(sessionId, graph, planned.next);
     if (error) return { error };
     ensureSystemNodes(sessionId);
   }
-  const done = applyEdit({ session: sessionId, op: { op: 'connect', ...connection } });
+  const done = applyEdit({ session: sessionId, op });
   return done.ok ? { error: null, edgeId: done.edgeId } : { error: done.error };
 }
 

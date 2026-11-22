@@ -14,7 +14,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 import { allCommands, collected, command, run } from '../src/engine/commands';
 import { graphHistory, travelGraph } from '../src/engine/flow/history';
-import { connectionError, executionOrder } from '../src/engine/flow/graph';
+import { connect, connectionError, executionOrder } from '../src/engine/flow/graph';
 import { ensureSystemNodes } from '../src/engine/nodes/system';
 import { deleteNodes, tryConnect } from '../src/engine/flow/actions';
 import { consumersOf } from '../src/engine/nodecore/deps';
@@ -154,6 +154,18 @@ describe('links with a class', () => {
     expect(graphHistory(sid, 'undo')).toHaveLength(steps + 1);
     expect(undo()).toBe(true);
     expect(incoming()).toEqual(first);
+  });
+
+  it('keeps a pinned cable when dragging onto its inferred port and shows the rejection', () => {
+    const wire = { source: 'sys_chat', target: 'sys_agent', sourceHandle: 'agent', targetHandle: null };
+    const before = { ...graph(), edges: graph().edges.map((edge) => edge.id === 'sys_edge_chat_agent' ? { ...edge, pin: 'revision-1' } : edge) };
+    setGraph(sid, () => before);
+    const steps = graphHistory(sid, 'undo').length;
+    expect(tryConnect(sid, wire)).toBe(false);
+    expect(graph()).toBe(before);
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps);
+    expect(useStore.getState().ui.toasts.at(-1)?.text).toContain('sys_edge_chat_agent');
+    expect(connect(before, { ...wire, targetHandle: 'chat' })).toBe(before);
   });
 
   it('refuses a bidirectional data link and a mismatch of classes', async () => {

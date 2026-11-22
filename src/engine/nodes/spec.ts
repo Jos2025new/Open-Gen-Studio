@@ -1,4 +1,5 @@
 import { resolveInputs, storeEnv } from '../nodecore/resolver';
+import { GONE_HANDLE } from '../flow/results';
 import { OPS, OP_IDS } from '../ops';
 import { PROVIDER_LABELS } from '../providers/types';
 import { useStore } from '../../store/store';
@@ -186,7 +187,8 @@ export function resolveSystemConnection(
 ): { srcPort?: PortSpec; tgtPort?: PortSpec; kind?: LinkKind; classMismatch?: string } {
   const outs = srcPorts.filter((p) => p.direction === 'out');
   const ins = tgtPorts.filter((p) => p.direction === 'in');
-  const rawSrcId = c.sourceHandle && /^out-\d+$/.test(c.sourceHandle) ? 'out' : c.sourceHandle;
+  const rawSrcId = c.sourceHandle === GONE_HANDLE || (c.sourceHandle && /^out-\d+$/.test(c.sourceHandle))
+    ? 'out' : c.sourceHandle;
   const explicitSrc = rawSrcId ? outs.find((p) => p.id === rawSrcId) : undefined;
   const explicitTgt = c.targetHandle ? ins.find((p) => p.id === c.targetHandle) : undefined;
 

@@ -16,7 +16,7 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
-import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
+import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
 import { beginBatchPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
@@ -150,7 +150,15 @@ export function connectNodes(
   sessionId: string,
   c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean; replaces?: string | null },
 ): string | null {
-  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c } }));
+  let replaces = c.replaces;
+  if (replaces === undefined) {
+    // Canvas gestures see the current input. Commands and agent tools pass null when they name no cable.
+    const { sessions, assets } = get();
+    replaces = inferReplaces(sessions[sessionId]?.graph, assets, c);
+  }
+  const done = applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: replaces ?? null } });
+  if (c.replaces === undefined && !done.ok && done.conflict) toast(done.error, 'error');
+  return editError(done);
 }
 export function tryConnect(
   sessionId: string,

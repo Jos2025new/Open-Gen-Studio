@@ -162,10 +162,9 @@ export function handleIndex(handle: string | null | undefined): number | undefin
 /** Resolve the ports of a new wire before applying the graph's replacement rule. */
 export function resolveWiring(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset> | undefined, c: ConnectionPorts):
   { edge: Omit<GraphEdge, 'id'>; port: PortSpec } | { error: string } {
-  const sourceHandle = c.sourceHandle === GONE_HANDLE ? 'out' : c.sourceHandle;
   const inventory = assets ?? {};
   const unknownAsset = !assets && src.data.kind === 'asset' && !!src.data.assetId;
-  const resolved = resolveSystemConnection(nodePorts(src.data, inventory), nodePorts(tgt.data, inventory), { ...c, sourceHandle });
+  const resolved = resolveSystemConnection(nodePorts(src.data, inventory), nodePorts(tgt.data, inventory), c);
   const error = portProblem(src, tgt, inventory, c, resolved, unknownAsset);
   if (error) return { error };
   const port = resolved.tgtPort!;
@@ -186,26 +185,52 @@ export function resolveWiring(src: GraphNode, tgt: GraphNode, assets: Record<str
 }
 
 /** The same output of the same node (an output with no handle is `out`): two outputs of one node are two cables. */
-export const sameSourcePort = (a: GraphEdge, b: GraphEdge): boolean => a.source === b.source && (a.sourceHandle ?? 'out') === (b.sourceHandle ?? 'out');
+export const sameSourcePort = (a: GraphEdge, b: Omit<GraphEdge, 'id'>): boolean => a.source === b.source && (a.sourceHandle ?? 'out') === (b.sourceHandle ?? 'out');
+
+export const sameTargetPort = (a: GraphEdge, b: Omit<GraphEdge, 'id'>): boolean =>
+  a.target === b.target && a.targetHandle === b.targetHandle && (a.kind ?? 'data') === (b.kind ?? 'data');
+
+/** A UI connection may infer the unpinned occupant of a single-cable input. */
+export function inferReplaces(
+  graph: Graph | undefined,
+  assets: Record<string, Asset>,
+  c: ConnectionPorts & { source: string; target: string },
+): string | undefined {
+  if (!graph) return;
+  const src = graph.nodes.find((n) => n.id === c.source);
+  const tgt = graph.nodes.find((n) => n.id === c.target);
+  if (!src || !tgt) return;
+  const wiring = resolveWiring(src, tgt, assets, c);
+  if ('error' in wiring || wiring.port.multi !== false) return;
+  const occupant = graph.edges.find((e) => sameTargetPort(e, wiring.edge) && !sameSourcePort(e, wiring.edge));
+  if (occupant && occupant.pin == null) return occupant.id;
+}
+
+const replacedBy = (old: GraphEdge, edge: Omit<GraphEdge, 'id'>, single: boolean): boolean =>
+  sameTargetPort(old, edge) && (single || sameSourcePort(old, edge));
+
+export function unnamedPinnedCable(edges: GraphEdge[], edge: Omit<GraphEdge, 'id'>, single: boolean, replaces: string | null | undefined): GraphEdge | undefined {
+  return edges.find((old) => old.pin != null && old.id !== replaces && replacedBy(old, edge, single));
+}
 
 /** `edge` joins the cables: the same cable again is replaced, and on a single-cable input so is whatever else sits there (same kind). One rule for both ways of wiring a resolved port. */
 export function withEdge(edges: GraphEdge[], edge: GraphEdge, single: boolean): GraphEdge[] {
-  const kind = edge.kind ?? 'data';
-  const here = (e: GraphEdge) => e.target === edge.target && e.targetHandle === edge.targetHandle && (e.kind ?? 'data') === kind;
-  return [...edges.filter((e) => !(here(e) && (single || sameSourcePort(e, edge)))), edge];
+  return [...edges.filter((old) => !replacedBy(old, edge, single)), edge];
 }
 
 /** Add an edge, replacing the existing edge on single-input ports. */
 export function connect(
   graph: Graph,
-  c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
+  c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null; kind?: LinkKind; both?: boolean; replaces?: string | null },
 ): Graph {
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
   if (!src || !tgt) return graph;
   const wiring = resolveWiring(src, tgt, undefined, c);
   if ('error' in wiring) return graph;
-  return { ...graph, edges: withEdge(graph.edges, { id: uid('edge'), ...wiring.edge }, wiring.port.multi === false) };
+  const single = wiring.port.multi === false;
+  if (unnamedPinnedCable(graph.edges, wiring.edge, single, c.replaces)) return graph;
+  return { ...graph, edges: withEdge(graph.edges, { id: uid('edge'), ...wiring.edge }, single) };
 }
 
 // ---------------------------------------------------------------------------
