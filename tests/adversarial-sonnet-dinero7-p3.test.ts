@@ -17,10 +17,10 @@ vi.mock('../src/lib/media', async (orig) => ({
   jpegThumbnail: async () => undefined,
 }));
 
-const quoteOverride = vi.hoisted(() => ({ usd: undefined as number | undefined, ref: '' }));
+const quoteOverride = vi.hoisted(() => ({ usd: undefined as number | null | undefined, ref: '' }));
 vi.mock('../src/engine/retryPartial', async (orig) => {
   const real = await orig<typeof import('../src/engine/retryPartial')>();
-  return { ...real, estimateForRetry: (g: Parameters<typeof real.estimateForRetry>[0]) => (quoteOverride.usd != null && g.modelRef === quoteOverride.ref ? { usd: quoteOverride.usd, approximate: false } : real.estimateForRetry(g)) };
+  return { ...real, estimateForRetry: (g: Parameters<typeof real.estimateForRetry>[0]) => (quoteOverride.usd !== undefined && g.modelRef === quoteOverride.ref ? { usd: quoteOverride.usd, approximate: quoteOverride.usd == null } : real.estimateForRetry(g)) };
 });
 
 import { useStore, patchGeneration } from '../src/store/store';
@@ -117,7 +117,7 @@ describe('Attack 3a: passes that outlive their action', () => {
   it('a pass bound to a generation that never ran (aborted or deleted before runGeneration) is dead once the approving action has ended', async () => {
     let genId = '';
     await withOncePass(sid, async (pass) => { genId = createGeneration(spec({ budgetPass: pass })).id; });
-    const leaked = takeGenerationPass(genId);
+    const leaked = takeGenerationPass(genId, paid);
     expect(leaked ? passActiveFor(leaked, sid) : false).toBe(false);
     // and it cannot pay for another over-limit run
     expect(leaked ? budgetVerdict(paid, { sessionId: sid, pass: leaked }).over : true).toBe(true);
@@ -127,18 +127,18 @@ describe('Attack 3a: passes that outlive their action', () => {
     withOncePass(sid, (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       cancelGeneration(g.id);
-      expect(takeGenerationPass(g.id)).toBeUndefined();
+      expect(takeGenerationPass(g.id, paid)).toBeUndefined();
     });
     withOncePass(sid, (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       deleteGeneration(g.id);
-      expect(takeGenerationPass(g.id)).toBeUndefined();
+      expect(takeGenerationPass(g.id, paid)).toBeUndefined();
     });
     const doomed = sid;
     withOncePass(doomed, (pass) => {
       const g = createGeneration(spec({ sessionId: doomed, budgetPass: pass }));
       deleteSession(doomed);
-      expect(takeGenerationPass(g.id)).toBeUndefined();
+      expect(takeGenerationPass(g.id, paid)).toBeUndefined();
     });
   });
 
@@ -152,10 +152,10 @@ describe('Attack 3a: passes that outlive their action', () => {
       patchGeneration(g.id, { status: 'error', startedAt: Date.now() });
       const throwingRerun = () => { throw new Error('sync boom before consumeOnce'); };
       await expect(onGenerationCredit(g.id, throwingRerun as never)).rejects.toThrow('sync boom before consumeOnce');
-      takenDuring = takeGenerationPass(g.id);
+      takenDuring = takeGenerationPass(g.id, paid);
     });
     expect(takenDuring).toBeUndefined();
-    expect(takeGenerationPass(genId)).toBeUndefined();
+    expect(takeGenerationPass(genId, paid)).toBeUndefined();
     expect(budgetVerdict(paid, { sessionId: sid }).over).toBe(true);
   });
 });
@@ -186,7 +186,7 @@ describe('Attack 3a: check-budget-verdict can be dodged', () => {
 describe('Re-attack 3b: deferred 402 substitute pass in ask mode', () => {
   // Finding Q1 (new, low-medium): the deferred entitlement is not bound to the approved amount. If the substitute's
   // estimate (e.g. an Atlas quote) is higher than what the user approved, "Yes, this time" spends it without asking.
-  it.fails('ask mode: a substitute whose estimate exceeds the approved $0.10 still asks for the limit', async () => {
+  it('ask mode: a substitute whose estimate exceeds the approved $0.10 still asks for the limit', async () => {
     useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: 'ask' } }));
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
     let atlasCalls = 0;
@@ -205,6 +205,61 @@ describe('Re-attack 3b: deferred 402 substitute pass in ask mode', () => {
     try {
       offer.actions!.find((x) => x.label === 'Yes, this time')!.run();
       await vi.waitFor(() => expect(atlasCalls > 0 || useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === "Continue once"))).toBe(true));
+    } finally { quoteOverride.usd = undefined; }
+    expect(atlasCalls).toBe(0);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);
+  });
+
+  it('always mode: a substitute whose estimate exceeds the approved $0.10 still asks for the limit', async () => {
+    useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: 'always' } }));
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    let atlasCalls = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', null));
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
+      atlasCalls++;
+      return { outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.5 };
+    });
+    quoteOverride.ref = ATLAS;
+    quoteOverride.usd = 0.5;
+    let genId = '';
+    try {
+      await withOncePass(sid, async (pass) => {
+        const g = createGeneration(spec({ budgetPass: pass }));
+        genId = g.id;
+        await runGeneration(g.id).catch(() => undefined);
+      });
+    } finally { quoteOverride.usd = undefined; }
+    expect(atlasCalls).toBe(0);
+    const prompt = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Continue once'));
+    expect(prompt).toBeDefined();
+    // Explicitly approving the pricier substitute runs it once and completes the generation.
+    prompt!.actions!.find((x) => x.label === 'Continue once')!.run();
+    await vi.waitFor(() => expect(useStore.getState().generations[genId]?.status).toBe('done'));
+    expect(atlasCalls).toBe(1);
+  });
+
+  it.each(['ask', 'always'] as const)('%s mode: a substitute with an unknown estimate still asks for the limit', async (mode) => {
+    useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: mode } }));
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    let atlasCalls = 0;
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', null));
+    vi.spyOn(ADAPTERS.atlas, 'generate').mockImplementation(async () => {
+      atlasCalls++;
+      return { outputs: [{ blob: new Blob(['i'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.08 };
+    });
+    quoteOverride.ref = ATLAS;
+    quoteOverride.usd = mode === 'always' ? null : undefined;
+    try {
+      await withOncePass(sid, async (pass) => {
+        const g = createGeneration(spec({ budgetPass: pass }));
+        await runGeneration(g.id).catch(() => undefined);
+      });
+      if (mode === 'ask') {
+        const offer = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
+        quoteOverride.usd = null;
+        offer.actions!.find((x) => x.label === 'Yes, this time')!.run();
+        await vi.waitFor(() => expect(atlasCalls > 0 || useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true));
+      }
     } finally { quoteOverride.usd = undefined; }
     expect(atlasCalls).toBe(0);
     expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);

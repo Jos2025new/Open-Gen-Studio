@@ -279,7 +279,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       return;
     }
     const est = retryEstimateFor(patch);
-    const subPass = useSubPass && (est.usd != null || g.estimate.usd == null) ? takeGenerationPass(genId) : undefined;
+    const subPass = useSubPass ? takeGenerationPass(genId, est) : undefined;
     try {
       confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what), subPass);
     } finally {
@@ -304,15 +304,16 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   if (auto && mode === 'always') {
     if (superseded()) return false;
     const patch = substitute(auto);
+    const est = retryEstimateFor(patch);
     let immediate = true;
     let run: Promise<boolean> | undefined;
-    const subPass = takeGenerationPass(genId);
+    const subPass = takeGenerationPass(genId, est);
     let ok = false;
     try {
       ok = confirmOverLimit(
         g.sessionId,
         label(auto.model, undefined, auto.usd),
-        retryEstimateFor(patch),
+        est,
         '\u201cContinue once\u201d runs only this generation on that model.',
         () => {
           if (!immediate) {

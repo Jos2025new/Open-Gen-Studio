@@ -51,6 +51,7 @@ export interface BudgetVerdict {
 type GenerationPassEntry = {
   sessionId: string;
   budgetUsd: number;
+  approvedUsd: number | null;
   started: boolean;
   owner?: BudgetPass | symbol;
   deferred?: boolean;
@@ -218,11 +219,17 @@ export function beginOncePass(sessionId: string): BudgetPassHandle {
   };
 }
 
-/** Bind a one-shot in-memory entitlement to `generationId` so a same-price 402 substitute within the same run can proceed. */
-export function bindGenerationPass(generationId: string, sessionId: string, owner?: BudgetPass | symbol): void {
+/** Bind a one-shot in-memory entitlement to `generationId` so a 402 substitute within the approved amount can proceed. */
+export function bindGenerationPass(
+  generationId: string,
+  sessionId: string,
+  approvedUsd: number | null,
+  owner?: BudgetPass | symbol,
+): void {
   substitutePasses.set(generationId, {
     sessionId,
     budgetUsd: get().settings.budgetUsd,
+    approvedUsd: approvedUsd != null && Number.isFinite(approvedUsd) ? approvedUsd : null,
     started: false,
     owner,
   });
@@ -234,8 +241,8 @@ export function startGenerationPass(generationId: string): void {
   if (entry) entry.started = true;
 }
 
-/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, activating it only while the generation and session live under the same limit. */
-export function takeGenerationPass(generationId: string): BudgetPass | undefined {
+/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, activating it only while the generation and session live under the same limit and `estimate` is known and within the approved amount. */
+export function takeGenerationPass(generationId: string, estimate: Estimate): BudgetPass | undefined {
   const entry = substitutePasses.get(generationId);
   if (!entry) return undefined;
   substitutePasses.delete(generationId);
@@ -243,6 +250,10 @@ export function takeGenerationPass(generationId: string): BudgetPass | undefined
   const g = st.generations[generationId];
   if (!g || g.status === 'canceled' || !st.sessions[entry.sessionId]) return undefined;
   if (st.settings.budgetOn && st.settings.budgetUsd !== entry.budgetUsd) return undefined;
+  if (entry.approvedUsd == null || estimate.usd == null || estimate.lowerBound || !Number.isFinite(estimate.usd)) return undefined;
+  const booked = g.sends?.some((s) => s.status === 'done') ? ledgerCost(g) : undefined;
+  if (booked?.hasUnknown) return undefined;
+  if (estimate.usd > entry.approvedUsd - (booked?.usd ?? 0) + 1e-9) return undefined;
   const pass: BudgetPass = Object.freeze({ sessionId: entry.sessionId, kind: 'once' });
   activePasses.set(pass, { sessionId: entry.sessionId, kind: 'once' });
   return pass;

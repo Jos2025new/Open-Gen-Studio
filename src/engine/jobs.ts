@@ -84,7 +84,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     createdAt: Date.now(),
   };
   upsertGeneration(g);
-  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, spec.budgetPass ?? spec.batchToken);
+  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, spec.budgetPass ?? spec.batchToken);
   return g;
 }
 
