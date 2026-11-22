@@ -13,7 +13,8 @@ import { ESTIMATE_STEP, RUN_STEP } from '../src/engine/planSteps/exec';
 
 /** Opus #5: step-kind behavior lives in planSteps. */
 function planStepKinds(): string[] {
-  const types = readFileSync('src/engine/types.ts', 'utf8');
+  // PlanStep moved to planFeedTypes.ts when types.ts was split (task/alto-7); read both so a later move still fails loudly here.
+  const types = ['src/engine/types.ts', 'src/engine/planFeedTypes.ts'].map((f) => readFileSync(f, 'utf8')).join('\n');
   const union = /export type PlanStep = ([^;]+);/.exec(types)![1].split('|').map((n) => n.trim());
   return union.map((name) => new RegExp(`export interface ${name} extends StepBase \\{\\s*kind: '([a-z0-9]+)'`).exec(types)?.[1] ?? `?${name}`);
 }
