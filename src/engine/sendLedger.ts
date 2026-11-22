@@ -75,7 +75,7 @@ export function ledgerCost(g: Pick<Generation, 'sends'>): { usd: number; known: 
   return {
     usd: round(priced.reduce((n, s) => n + s.costUsd!, 0)),
     known: done.length > 0 && !hasUnknown && priced.every((s) => !s.estimated),
-    // An unpriced request adds no estimated dollar figure: the reported part is then the whole known cost (noteExcess).
+    // Sum of estimated-only priced sends; when `hasUnknown` is true, `usd` is only a lower bound, not the full cost.
     estimatedUsd: round(priced.filter((s) => s.estimated).reduce((n, s) => n + s.costUsd!, 0)),
     hasUnknown,
   };

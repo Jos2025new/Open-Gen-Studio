@@ -44,7 +44,6 @@ import type { ModelSummary } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 
 const NANO = 'nanogpt::unpriced';
 const FREE = 'nanogpt::free';
@@ -77,6 +76,7 @@ beforeEach(() => {
   running.clear();
   controllers.clear();
   forgetBalances();
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   vi.stubGlobal('fetch', vi.fn(async (url: string) => { throw new Error(`Unexpected fetch: ${url}`); }));
   const st = useStore.getState();
   const sId = st.activeSessionId;
@@ -126,13 +126,13 @@ describe('Adversarial (Sonnet) dinero 7: mixed unknown + priced batch must not c
   };
 
   // Finding A (new): ledgerCost.hasUnknown is computed but finish() ignores it, so actualUsd = 0.3 is stored as if exact.
-  it.fails('the finished generation does not store 0.30 as its actual cost when one delivery had an unknown price', async () => {
+  it('the finished generation does not store 0.30 as its actual cost when one delivery had an unknown price', async () => {
     const id = await runMixed();
     expect(genOf(id).status).toBe('done');
     expect(genOf(id).actualUsd).toBeUndefined();
   });
 
-  it.fails('session stats and session info flag the mixed generation as a lower bound, not an exact $0.30', async () => {
+  it('session stats and session info flag the mixed generation as a lower bound, not an exact $0.30', async () => {
     await runMixed();
     const stats = sessionStats(useStore.getState().assets, useStore.getState().generations).get(sid());
     expect(stats?.spendUnknown).toBe(true);
@@ -142,7 +142,7 @@ describe('Adversarial (Sonnet) dinero 7: mixed unknown + priced batch must not c
     expect(tiles[0]).toMatch(/≥|unknown/i);
   });
 
-  it.fails('the over-limit notice does not call a partial cost the "real cost" when a delivery was unpriced', async () => {
+  it('the over-limit notice does not call a partial cost the "real cost" when a delivery was unpriced', async () => {
     const id = await runMixed(0.1);
     const notes = useStore.getState().sessions[sid()].feed.filter((f) => f.type === 'notice' && (f as { overLimitFor?: { gen: string } }).overLimitFor?.gen === id);
     for (const n of notes) expect((n as { text: string }).text).not.toMatch(/real cost/i);

@@ -5,6 +5,8 @@ import { uid } from '../lib/id';
 import { appendFeed, patchSession, setUi, updateFeedItem, useStore } from '../store/store';
 import type { Estimate, LlmProviderId, NoticeFeedItem } from './types';
 import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
+import { ledgerCost } from './sendLedger';
+import { formatSpendAmount } from './spending';
 
 export { noAskEverywhere };
 
@@ -210,17 +212,23 @@ export function openBudgetSettings(): void {
 }
 
 /**
- * A run with an unknown price was let through; once its real cost is booked and the total is over the limit, say so once,
- * naming it. No margin: any excess counts. Never stops anything.
+ * A run with an unknown price was let through; once its real (or partial known) cost is booked and the total is over
+ * the limit, say so once, naming it. No margin: any excess counts. Never stops anything.
  */
 export function noteExcess(generationId: string): void {
   const { settings, spentUsd, sessions, generations } = get();
   const g = generations[generationId];
   const session = g && sessions[g.sessionId];
-  if (!g || g.estimate.usd != null || g.actualUsd == null || !settings.budgetOn || !session || spentUsd <= settings.budgetUsd + 1e-9) return;
+  if (!g || g.estimate.usd != null || !settings.budgetOn || !session || spentUsd <= settings.budgetUsd + 1e-9) return;
+  const booked = g.sends?.some((s) => s.status === 'done') ? ledgerCost(g) : undefined;
+  const partial = Boolean(booked?.hasUnknown);
+  const reportedUsd = partial ? (booked!.usd > 0 ? booked!.usd : undefined) : g.actualUsd;
+  if (reportedUsd == null) return;
   if (session.feed.some((f) => f.type === 'notice' && f.overLimitFor?.gen === g.id)) return;
   const what = g.prompt.trim().slice(0, 40) || g.kind;
-  const text = `“${what}” had no published price. Its real cost (${formatUsd(g.actualUsd)}) took your spending to ${formatUsd(spentUsd)}, over your ${formatUsd(settings.budgetUsd)} limit.`;
+  const text = partial
+    ? `“${what}” had no published price. Its known charges (${formatSpendAmount(reportedUsd, { unknown: true })}) took your spending to ${formatSpendAmount(spentUsd, { unknown: true })}, over your ${formatUsd(settings.budgetUsd)} limit.`
+    : `“${what}” had no published price. Its real cost (${formatUsd(reportedUsd)}) took your spending to ${formatUsd(spentUsd)}, over your ${formatUsd(settings.budgetUsd)} limit.`;
   const ws = get().ui.workspace;
   appendFeed(g.sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: ws, type: 'notice', level: 'error', text, overLimitFor: { gen: g.id }, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, ws) } });
 }

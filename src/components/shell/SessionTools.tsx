@@ -6,13 +6,14 @@ import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { formatRelative, formatUsd } from '../../lib/format';
 import { formatSpendAmount, summarizeSpend } from '../../engine/spending';
+import { ledgerCost } from '../../engine/sendLedger';
 import { Popover, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { MenuConfirm, MenuItem } from '../ui/PanelControls';
 import { RunningNote } from './SessionRow';
 import './SessionTools.css';
-import type { GenerationStatus } from '../../engine/types';
+import type { Generation, GenerationStatus } from '../../engine/types';
 
 /** The open session's ⋯ menu in the top bar: the same actions as a session card, grouped, Delete last with its confirmation. */
 export function SessionMenu({ onRename }: { onRename: () => void }) {
@@ -44,6 +45,14 @@ export function SessionMenu({ onRename }: { onRename: () => void }) {
 const KIND: Record<string, string> = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
 const SPEND_KIND: Record<string, string> = { agent: 'Agent (LLM)', image: 'Images', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
 const runCost = (g: { status: GenerationStatus; actualUsd?: number; estimate: { usd?: number | null } }) => (g.status === 'done' ? (g.actualUsd ?? g.estimate.usd ?? null) : null);
+function runCostLabel(g: Generation): string {
+  if (g.sends?.some((s) => s.status === 'done')) {
+    const b = ledgerCost(g);
+    if (b.hasUnknown) return b.usd > 0 ? formatSpendAmount(b.usd, { estimated: b.estimatedUsd > 0, unknown: true }) : 'price unknown';
+  }
+  const c = runCost(g);
+  return c != null ? formatUsd(c, { approx: g.actualUsd == null && c > 0 }) : g.status === 'done' ? 'price unknown' : '';
+}
 const RUNNING: GenerationStatus[] = ['queued', 'running'];
 const statusIcon = (s: GenerationStatus) => (RUNNING.includes(s) ? <Loader size={14} className="spin" aria-label="Running" /> : s === 'done' ? <CircleCheck size={14} className="si-ok" aria-label="Done" /> : <CircleAlert size={14} className="si-warn" aria-label={s === 'review' ? 'Needs review' : 'Did not finish'} />);
 
@@ -111,8 +120,7 @@ export function SessionInfo({ onGenerations }: { onGenerations: () => void }) {
         <section className="si-sec" aria-label={data.running ? 'Running' : 'Latest'}>
           <h4>{data.running ? 'Running' : 'Latest'} <span className="num">{data.running || data.gens.length}</span></h4>
           {data.recent.length ? data.recent.map((g) => {
-            const c = runCost(g);
-            const costLabel = c != null ? formatUsd(c, { approx: g.actualUsd == null && c > 0 }) : g.status === 'done' ? 'price unknown' : '';
+            const costLabel = runCostLabel(g);
             return <div key={g.id} className="si-row si-gen" title={g.prompt}><span className="si-two"><span className="si-gen-text">{g.prompt || g.modelName}</span><small>{[g.modelName, g.settings.aspect, formatRelative(g.createdAt), costLabel].filter(Boolean).join(' · ')}</small></span>{statusIcon(g.status)}</div>;
           }) : <p className="si-empty">Nothing generated in this session yet.</p>}
           {data.gens.length ? <button type="button" className="si-more" onClick={() => go(onGenerations)}>View all</button> : null}

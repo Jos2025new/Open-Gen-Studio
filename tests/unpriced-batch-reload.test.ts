@@ -46,7 +46,6 @@ import type { Generation, ModelSummary } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 
 const NANO = 'nanogpt::unpriced';
 const FREE = 'nanogpt::free';
@@ -80,6 +79,7 @@ beforeEach(() => {
   running.clear();
   controllers.clear();
   forgetBalances();
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   vi.stubGlobal('fetch', vi.fn(async (url: string) => { throw new Error(`Unexpected fetch: ${url}`); }));
   const st = useStore.getState();
   const sId = st.activeSessionId;
@@ -237,10 +237,34 @@ describe('Unpriced batch reloaded mid-flight never counts as confirmed $0', () =
     vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValueOnce(imgOut('l1', undefined));
     await reloadFromDisk();
     await running.get(g.id);
+    await reloadFromDisk();
 
     expect(genOf(g.id).status).toBe('error');
     expect(useStore.getState().spendLog).toHaveLength(1);
     expect(useStore.getState().spendLog[0].unknownPrice).toBe(true);
+
+    // Complete legacy non-ledger generation (count: 1) also records exactly 1 unknown entry across reloads.
+    const gDone = createGeneration({
+      sessionId: sid(),
+      origin: 'composer',
+      kind: 'image',
+      prompt: 'legacy unpriced single',
+      modelRef: NANO,
+      settings: { count: 1, advanced: {} },
+      inputs: { refs: [] },
+      estimate: { usd: null, approximate: true },
+    });
+    patchG(gDone.id, { status: 'running', remoteJob: rj('j_leg_done'), sends: undefined });
+    await saveNow();
+
+    vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValueOnce(imgOut('l2', undefined));
+    await reloadFromDisk();
+    await running.get(gDone.id);
+    await reloadFromDisk();
+
+    expect(genOf(gDone.id).status).toBe('done');
+    expect(useStore.getState().spendLog).toHaveLength(2);
+    expect(useStore.getState().spendLog.every((e) => e.unknownPrice === true)).toBe(true);
   });
 
   it('mixed batch (item 1 unknown price + item 2 reports $0.30 after reload) shows lower bound >= $0.30', async () => {
@@ -280,6 +304,16 @@ describe('Unpriced batch reloaded mid-flight never counts as confirmed $0', () =
 
     const panelHost = mount(createElement(SpendingPanel));
     expect(panelHost.textContent).toContain('≥$0.30');
+
+    expect(genOf(g.id).actualUsd).toBeUndefined();
+    expect(genOf(g.id).providerReportedUsd).toBeUndefined();
+    const stats = sessionStats(useStore.getState().assets, useStore.getState().generations).get(sid());
+    expect(stats?.spend).toBeCloseTo(0.3);
+    expect(stats?.spendUnknown).toBe(true);
+
+    mount(createElement(SessionInfo, { onGenerations: () => undefined }));
+    act(() => document.querySelector<HTMLElement>('[aria-label="Session info"]')!.click());
+    expect(document.querySelector('.si-gen small')?.textContent).toContain('≥$0.3');
   });
 
   it('genuinely free ($0) generation still logs nothing and shows $0 (not unknown price)', async () => {

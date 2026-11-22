@@ -66,15 +66,15 @@ export function sessionStats(assets: Record<string, Asset>, generations: Record<
     const mode = g.mode ?? (g.origin === 'agent' ? 'agent' : g.kind === 'text' ? undefined : g.kind);
     if (mode && (!e.latestModeAt || g.createdAt > e.latestModeAt)) { e.latestMode = mode; e.latestModeAt = g.createdAt; }
     const knownCost = g.actualUsd ?? g.estimate.usd;
-    if (g.status === 'done') {
-      if (knownCost != null) e.spend += knownCost;
-      else e.spendUnknown = true;
-    } else if (g.sends?.some((s) => s.status === 'done')) {
+    if (g.sends?.some((s) => s.status === 'done')) {
       for (const s of g.sends) {
         if (s.status !== 'done') continue;
         if (s.costUsd != null) e.spend += s.costUsd;
         else e.spendUnknown = true;
       }
+    } else if (g.status === 'done') {
+      if (knownCost != null) e.spend += knownCost;
+      else e.spendUnknown = true;
     }
   }
   return m;
