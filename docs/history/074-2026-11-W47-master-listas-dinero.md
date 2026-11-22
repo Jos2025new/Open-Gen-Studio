@@ -32,6 +32,15 @@ Fuentes: bus `20261122-neon-retro-master6.md` y `20261122-sonnet-retro-master6.m
 6. **Workers:** 4 de 11 corridas de Neon se cortaron sin informe; el brief exige informe desde el minuto 1. Comprobar cuota y plan B antes de lanzar. Sonnet no implementa: gasta la cuota de la sesión.
 7. **Comunicación:** breve, parte de una línea cada ≤10 min, sin preguntar lo ya ordenado. «Tope del usuario» y «crédito del proveedor» son cosas distintas.
 
+## Prueba en sandbox de `task/dinero-7` (sesión 7, dos Haiku)
+Bus `20261122-haiku-dinero-normal.md` y `20261122-haiku-dinero-errores.md`. Origen sin comprobar (probablemente heredado).
+- **Sin proveedores en el sandbox:** ningún aviso de pago real; el dinero nuevo solo está probado con tests.
+- **Promesa rota (grave):** un plan de 6 imágenes salió como 1 imagen y 1 vídeo, sin aviso. «2 imágenes de un gato» se generaron al instante, sin plan.
+- **Sin red (grave):** Local Sketch falla con «Disk copy pending» y, al volver la red, no hay reintento.
+- **Límite sin validar (media):** acepta 0 y 1e20; -5 pasa a 0 sin aviso.
+- **Menores:** Local Sketch no lleva la etiqueta «Free» que sí tiene Local Motion; «Reset» del panel de gasto no se entiende.
+- **Bien:** enviar tres veces da una ejecución; recargar o cambiar de sesión a mitad no pierde ni duplica.
+
 ## Pendiente, en orden (sustituye a la lista de 073)
 La lista vigente es la del bus `20261122-master6-orden-prioridad.md` (cruce de Neon, Sonnet y el orquestador):
 - **Crítico:** un solo veredicto de presupuesto en `budget.ts`; lock de nodo en `runInNodes` (ver si `abe5cbbc` lo cerró); lote recargado sin precio nunca cuenta $0.
