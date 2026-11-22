@@ -75,4 +75,55 @@ describe('check-it-fails', () => {
       expect(errors.some((e) => e.startsWith('tests/string-only.test.ts:'))).toBe(false);
     });
   });
+
+  it('catches member chains, test.fails, aliases, bracket access, shared comments, and string-embedded markers', () => {
+    withTempTests({
+      'tests/chains.test.ts': `
+        it.fails.each([1])('a', () => {});
+        it.concurrent.fails('b', () => {});
+        it.skip.fails('c', () => {});
+        // reproduce: documented chain
+        it.concurrent.fails('d', () => {});
+      `,
+      'tests/test-and-aliases.test.ts': `
+        import { it as t, test as myTest } from 'vitest';
+        test.fails('a', () => {});
+        t.fails('b', () => {});
+        myTest.skip.fails('c', () => {});
+        const f = it.fails;
+        f('d', () => {});
+        const { fails } = it;
+        fails('e', () => {});
+        // reproduce: documented alias
+        f('ok', () => {});
+      `,
+      'tests/bracket.test.ts': `
+        it['fails']('a', () => {});
+        // reproduce: documented bracket
+        it['fails']('b', () => {});
+      `,
+      'tests/shared-and-string.test.ts': `
+        // reproduce: bug A
+        it.fails('a', () => {});
+        it.fails('b', () => {});
+        const s = '// reproduce: fake';
+        it.fails('c', () => {});
+        const tpl = \`
+        // reproduce: template fake
+        \`;
+        it.fails('d', () => {});
+      `,
+      'tests/non-vitest.test.ts': `
+        const obj = { fails: (_msg: string, _fn: () => void) => {} };
+        obj.fails('not vitest', () => {});
+      `,
+    }, (root) => {
+      const errors: string[] = check(root);
+      expect(errors.filter((e) => e.startsWith('tests/chains.test.ts:'))).toHaveLength(3);
+      expect(errors.filter((e) => e.startsWith('tests/test-and-aliases.test.ts:'))).toHaveLength(5);
+      expect(errors.filter((e) => e.startsWith('tests/bracket.test.ts:'))).toHaveLength(1);
+      expect(errors.filter((e) => e.startsWith('tests/shared-and-string.test.ts:'))).toHaveLength(3);
+      expect(errors.filter((e) => e.startsWith('tests/non-vitest.test.ts:'))).toHaveLength(0);
+    });
+  });
 });
