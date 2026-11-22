@@ -34,13 +34,13 @@ export function reportRefusedDrop(state: Parameters<OnConnectEnd>[1], graph: Gra
 export const PORT_MIN_ZOOM = 0.25;
 export const portZoom = (zoom: number): number => Math.max(PORT_MIN_ZOOM, zoom);
 
-/** The omnicanvas can sit far below 100 %: ports keep a minimum on-screen size through --rf-zoom (no re-render per frame).
+/** Ports keep a minimum on-screen size through --rf-zoom on both canvases (no re-render per frame; the omnicanvas can sit far below 100 %, the plain one scales the 24 px click zone with it).
  * Only the ::before of .port scales (node-system.css): the port box React Flow measures for cable anchors never changes. */
-export function usePortZoom(omni: boolean, canvas: RefObject<HTMLElement | null>) {
+export function usePortZoom(canvas: RefObject<HTMLElement | null>) {
   const rf = useReactFlow();
-  const onChange = useCallback((v: { zoom: number }) => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(portZoom(v.zoom))); }, [omni, canvas]);
+  const onChange = useCallback((v: { zoom: number }) => { canvas.current?.style.setProperty('--rf-zoom', String(portZoom(v.zoom))); }, [canvas]);
   useOnViewportChange({ onChange });
-  useEffect(() => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(portZoom(rf.getZoom()))); }, [omni, canvas, rf]);
+  useEffect(() => { canvas.current?.style.setProperty('--rf-zoom', String(portZoom(rf.getZoom()))); }, [canvas, rf]);
 }
 
 /** Only an output released on this canvas's empty pane opens the connected-node picker. */

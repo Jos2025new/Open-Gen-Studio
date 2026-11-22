@@ -137,7 +137,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   rfRef.current = rf;
   const view = useViewMemory(sessionId, omni, !embedded);
   useOmniFraming(omni, sessionId, rf, Boolean(view.saved));
-  usePortZoom(omni, canvasRef);
+  usePortZoom(canvasRef);
   // Nodes the agent just added: frame them once they are measured.
   const focusTick = useNodeFocus((s) => s.tick);
   useEffect(() => {

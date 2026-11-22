@@ -78,8 +78,7 @@ describe('adversarial p10: click zones in node-system.css', () => {
     expect(zoneLeft).toBeGreaterThanOrEqual(0);
   });
 
-  // reproduce: en el lienzo normal --rf-zoom no se define (usePortZoom solo actúa si omni); la zona es 24 px de flujo, así que con zoom 0.5 mide 12 px en pantalla
-  it.fails('the 24 px zone is 24 px on screen on the plain canvas (--rf-zoom is only set on the omnicanvas)', () => {
+  it('the 24 px zone is 24 px on screen on the plain canvas', () => {
     const connectionDrop = css('src/components/node/connectionDrop.ts');
     expect(connectionDrop).not.toMatch(/if \(omni\) canvas\.current\?\.style\.setProperty\('--rf-zoom'/);
   });
