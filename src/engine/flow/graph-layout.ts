@@ -33,12 +33,15 @@ export function estimatedHeight(data: GraphNodeData): number {
   }
 }
 
-export interface NodeRect { x: number; y: number; width: number; height: number }
+/** `panel`: the floating composer zone under the card when it has one (see `panelZone`); set by `nodeRect`, never part of the card box. */
+export interface NodeRect { x: number; y: number; width: number; height: number; panel?: NodeRect | null }
 
 /** Bounding box in flow coordinates using measured dimensions when available. */
 export function nodeRect(node: GraphNode, measured?: Map<string, { width: number; height: number }>): NodeRect {
   const m = measured?.get(node.id);
-  return { x: node.position.x, y: node.position.y, width: m?.width ?? nodeWidth(node.data), height: m?.height ?? estimatedHeight(node.data) };
+  const rect: NodeRect = { x: node.position.x, y: node.position.y, width: m?.width ?? nodeWidth(node.data), height: m?.height ?? estimatedHeight(node.data) };
+  const panel = panelZone(node.data, rect);
+  return panel ? { ...rect, panel } : rect;
 }
 
 /** Whether two rectangles intersect when padded by `(gapX, gapY)`. */
@@ -105,6 +108,8 @@ export function findFreePositionFor(
   occupied: readonly NodeRect[],
   opts?: { gapX?: number; gapY?: number; width?: number },
 ): { x: number; y: number } {
+  // Existing cards bring their own floating panel: it is as occupied as the card.
+  occupied = occupied.flatMap((o) => (o.panel ? [o, o.panel] : [o]));
   const width = opts?.width ?? nodeWidth(data);
   const height = estimatedHeight(data);
   const zone = panelZone(data, { x: 0, y: 0, width, height });

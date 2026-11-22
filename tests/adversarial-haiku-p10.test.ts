@@ -22,8 +22,7 @@ const nodeCss = css('src/styles/node.css');
 const systemCss = css('src/styles/node-system.css');
 
 describe('adversarial p10: placement of new nodes', () => {
-  // reproduce: Image existente con su panel bajo la tarjeta; el hueco bajo ella está ocupado, así que el Text nuevo cae a su lado (x -308) dentro del panel; findFreePositionFor solo reserva el panel del nodo nuevo
-  it.fails('a new Text card is not placed under the composer panel of an existing Image card', () => {
+  it('a new Text card is not placed under the composer panel of an existing Image card', () => {
     const image = card(IMAGE, 0, 0);
     const blocker = card(VIDEO, 0, 466);
     const at = findFreePositionFor(TEXT, { x: 0, y: 240 }, [image, blocker]);
