@@ -1,6 +1,6 @@
 import { isVisualStep, stepInfo } from '../planSteps/inspect';
 import { lineRoutes } from '../catalog';
-import type { PlanStep, SettingsChoice } from '../types';
+import { VISUAL_MEDIA_KINDS, type PlanStep, type SettingsChoice } from '../types';
 import { rememberSessionModel } from './sessionModel';
 
 /**
@@ -9,7 +9,7 @@ import { rememberSessionModel } from './sessionModel';
  */
 export function inheritApproved(sessionId: string, owner: string, steps: PlanStep[], comparisons: readonly ('image' | 'video')[] = []): void {
   const gens = steps.filter(isVisualStep);
-  for (const kind of ['image', 'video'] as const) {
+  for (const kind of VISUAL_MEDIA_KINDS) {
     if (comparisons.includes(kind)) continue;
     const of = gens.filter((step) => step.kind === kind && step.modelRef);
     const line = (ref: string) => lineRoutes(ref).text ?? ref;
@@ -36,7 +36,7 @@ export function inheritApproved(sessionId: string, owner: string, steps: PlanSte
  */
 export function confirmApproved(sessionId: string, owner: string, steps: PlanStep[], comparisons: readonly ('image' | 'video')[] = []): void {
   const gens = steps.filter(isVisualStep);
-  for (const kind of ['image', 'video'] as const) {
+  for (const kind of VISUAL_MEDIA_KINDS) {
     if (comparisons.includes(kind)) continue;
     const of = gens.filter((s) => s.kind === kind && s.modelRef);
     const line = (ref: string) => lineRoutes(ref).text ?? ref;

@@ -4,12 +4,11 @@ import { beginJourney, journeyIdFor, recordJourneyEvent } from '../../lib/journe
 import { adjustedNote } from '../planRevision';
 import { workflowById, refreshLoadedGuides } from '../skills';
 import { LLM_LABELS } from '../providers/llm';
-import type { LlmMessage, PlanFeedItem, QuestionsFeedItem, SettingsChoice, SettingsFeedItem, SettingsSection, StepState, Workspace } from '../types';
-import { appendFeed, autoTitleSession, removeFeedItem, setComposer, updateFeedItem, useStore } from '../../store/store';
+import { VIEWABLE_MEDIA_KINDS, type LlmMessage, type PlanFeedItem, type QuestionsFeedItem, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type Workspace } from '../types';
+import { appendFeed, autoTitleSession, removeFeedItem, setComposer, updateFeedItem } from '../../store/store';
 import { buildContext } from './context';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { startRequest } from './metrics';
-import { recordPriceResults } from './priceNotes';
 import { skillById } from '../skills';
 import { modelGuide } from '../guides';
 import { confirmedState } from './switchModel';
@@ -171,7 +170,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
 async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[], runId?: string, agentNodeId?: string) {
-  if (!attachments.some((id) => ['image', 'video', 'model3d'].includes(get().assets[id]?.kind ?? ''))) return [];
+  if (!attachments.some((id) => (VIEWABLE_MEDIA_KINDS as readonly string[]).includes(get().assets[id]?.kind ?? ''))) return [];
   if (!agentSeesImages(sessionId, agentNodeId)) {
     notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info', undefined, runId ? { runId } : undefined);
     return [];
@@ -367,49 +366,4 @@ export function repairHistory(history: LlmMessage[]): LlmMessage[] {
     }
   }
   return out;
-}
-
-/**
- * After a reload, plans that were running have lost their executor. Their generations are resumed by
- * `resumeInterrupted`; follow them and close each card with its real outcome instead of "Running" forever.
- * Nothing is submitted again: steps that had not started before the reload are reported as not run.
- */
-export function settleInterruptedPlans(): void {
-  for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan') recordPriceResults(s.id, f.id);
-  const open = new Set<string>();
-  for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan' && f.status === 'running') open.add(`${s.id}|${f.id}`);
-  if (!open.size) return;
-  const check = () => {
-    const gens = get().generations;
-    for (const key of [...open]) {
-      const [sessionId, itemId] = key.split('|');
-      const item = get().sessions[sessionId]?.feed.find((f) => f.id === itemId);
-      if (!item || item.type !== 'plan' || item.status !== 'running') {
-        open.delete(key);
-        continue;
-      }
-      const states: Record<string, StepState> = { ...item.stepStates };
-      let pending = false;
-      const review = Object.values(states).includes('review');
-      for (const st of item.plan.steps) {
-        const gid = item.stepGenerations[st.id];
-        const g = gid ? gens[gid] : undefined;
-        if (g) states[st.id] = g.status === 'review' ? 'review' : g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : ((pending = true), 'running');
-        else if (!review && states[st.id] !== 'done') states[st.id] = 'skipped';
-      }
-      if (pending) continue;
-      open.delete(key);
-      const done = Object.values(states).filter((v) => v === 'done').length;
-      const all = item.plan.steps.length;
-      updateFeedItem<PlanFeedItem>(sessionId, itemId, {
-        stepStates: states,
-        status: review ? 'review' : done === all ? 'done' : done ? 'partial' : 'error',
-        error: review || done === all ? undefined : 'Interrupted by a page reload; some steps did not run.',
-      });
-      recordPriceResults(sessionId, itemId);
-    }
-    if (!open.size) unsubscribe();
-  };
-  const unsubscribe = useStore.subscribe(check);
-  check();
 }

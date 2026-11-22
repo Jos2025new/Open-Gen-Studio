@@ -6,7 +6,7 @@ import { deleteAssetBlobs, putAssetBlob } from '../lib/idb';
 import { probeMedia } from '../lib/media';
 import { runsGeneration } from './flow/graph';
 import { placeFor } from './place';
-import type { Asset, GraphNode } from './types';
+import { MEDIA_KINDS, type Asset, type GraphNode } from './types';
 import { addAssets, setComposer, setUi, toast, useStore } from '../store/store';
 import { editCompound } from './nodecore/edit';
 import { clearGenerationPass } from './budget';
@@ -76,7 +76,7 @@ export function addAsReference(assetId: string): void {
 }
 
 /** Attachment policy for the agent's context, independent of the media generation kinds. */
-export const AGENT_ATTACHABLE: readonly string[] = ['image', 'video', 'audio', 'model3d'];
+export const AGENT_ATTACHABLE: readonly string[] = [...MEDIA_KINDS];
 
 /** Toggle an existing asset in the agent's attachment list. No asset is created or copied. */
 export function toggleAgentAttachment(assetId: string): void {

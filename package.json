@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "check": "node scripts/check-all.mjs",
+    "sizes:baseline": "node scripts/check-sizes.mjs --update",
     "test": "node scripts/check-all.mjs && vitest run",
     "test:related": "node scripts/test-related.mjs",
     "lint": "oxlint -c .oxlintrc.json src",

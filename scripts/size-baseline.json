@@ -1,10 +1,5 @@
 {
-  "src/components/node/nodes.tsx": 44895,
-  "src/engine/actions.ts": 40714,
-  "src/engine/agent/context.ts": 44464,
-  "src/engine/agent/tools.ts": 31490,
-  "src/engine/flow/actions.ts": 31176,
-  "src/engine/providers/nanogpt.ts": 32487,
-  "src/engine/types.ts": 37306,
-  "src/styles/shell.css": 42582
+  "src/engine/agent/context.ts": 44364,
+  "src/engine/providers/nanogpt.ts": 32111,
+  "src/styles/shell.css": 41272
 }

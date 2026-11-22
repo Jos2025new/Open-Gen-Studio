@@ -1,7 +1,7 @@
 import { reconcileDeletionNotices, setComposer, useStore } from '../../store/store';
 import { editCompound } from '../nodecore/edit';
 import { selectDoc } from '../design/actions';
-import type { AgentStyle, ComposerMode, GraphEdge, GraphNode, RefNodeData, SystemNodeType } from '../types';
+import { COMPOSER_MODES, type AgentStyle, type ComposerMode, type GraphEdge, type GraphNode, type RefNodeData, type SystemNodeType } from '../types';
 import { estimatedHeight, findFreePosition, NODE_WIDTH, nodeRect, rectsOverlap, type NodeRect } from '../flow/graph';
 import { COL, ROW, addSystemNode, ensureSystemNodes, linkSystemNodes, sysOrigin } from './system';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, isOmniSpace, omniSpaceNodeId, type OmniSpace } from './omniSpaces';
@@ -180,12 +180,11 @@ export function setChatUndocked(sessionId: string, nodeId: string, undocked: boo
   });
 }
 
-const MODES: ComposerMode[] = ['agent', 'image', 'video', 'audio', 'model3d'];
 const STYLES: AgentStyle[] = ['auto', 'guided', 'direct'];
 
 /** Edit a parameter shown on a Space node: it changes the same setting the Space itself changes. */
 export function setSpaceParam(sessionId: string, space: OmniSpace, id: string, value: string): string | null {
-  if (space === 'studio' && id === 'mode' && MODES.includes(value as ComposerMode)) setComposer({ mode: value as ComposerMode });
+  if (space === 'studio' && id === 'mode' && (COMPOSER_MODES as readonly string[]).includes(value)) setComposer({ mode: value as ComposerMode });
   else if (space === 'studio' && id === 'style' && STYLES.includes(value as AgentStyle)) setComposer({ agentStyle: value as AgentStyle });
   else if (space === 'designer' && id === 'doc' && useStore.getState().sessions[sessionId]?.docs.some((d) => d.id === value)) selectDoc(sessionId, value);
   else return `${OMNI_SPACE_TITLES[space]} has no parameter "${id}" with that value.`;

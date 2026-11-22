@@ -10,10 +10,10 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
-import type { Asset, Generation, Session, Workspace } from '../../engine/types';
+import type { Asset, ComposerMode, Generation, Session, Workspace } from '../../engine/types';
 import type { HeadDef } from '../gallery/ListColumns';
 
-export type QuickMode = 'all' | 'agent' | 'image' | 'video' | 'audio' | 'model3d';
+export type QuickMode = 'all' | ComposerMode;
 export const QUICK_MODES = [{ id: 'agent', label: 'Agent', icon: Workflow }, { id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Video }, { id: 'audio', label: 'Audio', icon: Music }, { id: 'model3d', label: '3D', icon: Box }] as const;
 const MODE_NAME = { agent: 'Agent', image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D' } as const;
 const MODE_ICON: Record<string, typeof Workflow> = Object.fromEntries(QUICK_MODES.map((m) => [MODE_NAME[m.id], m.icon]));

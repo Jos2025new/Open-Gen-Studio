@@ -1,5 +1,5 @@
 /**
- * The walk the static checks share: every .ts/.tsx under src/ (minus an allow list) is parsed with the syntax tree
+ * The walk the static checks share: every .ts/.tsx/.js/.jsx/.mjs under src/ (minus an allow list) is parsed with the syntax tree
  * (never lines: a call split over several lines is the same call) and every node is offered to the check.
  * A check supplies `rules(file)`: `{ enter(node, report), leave?(node) }`; `report(node, message)` records `file:line: message`.
  */
@@ -11,7 +11,7 @@ function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(name) && !name.endsWith('.d.ts')) out.push(p);
+    else if (/\.(ts|tsx|js|jsx|mjs)$/.test(name) && !/\.d\.[cm]?ts$/.test(name)) out.push(p);
   }
   return out;
 }

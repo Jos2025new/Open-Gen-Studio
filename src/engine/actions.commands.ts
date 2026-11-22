@@ -29,6 +29,7 @@ function estimateStudioOp(
 
 const id = z.string().min(1);
 const kind = z.enum(MEDIA_KINDS);
+const mode = z.enum([...MEDIA_KINDS, 'agent']);
 const op = z.enum(OP_IDS as [OpId, ...OpId[]]);
 const params = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
 const estimate = z.object({ usd: z.number().nullable(), approximate: z.boolean(), lowerBound: z.boolean().optional(), note: z.string().optional(), exact: z.boolean().optional() }).strict();
@@ -249,7 +250,7 @@ export const commands = [
     id: 'studio.asset.run_op',
     title: 'Run asset operation',
     description: 'Run asset operation.',
-    args: z.object({ assetId: id, op, params, parentId: id.optional(), modelRef: id.optional(), place: z.enum(['studio', 'canvas', 'designer', 'space-create', 'space-tools']).optional(), mode: z.enum(['image', 'video', 'audio', 'model3d', 'agent']).optional() }).strict(),
+    args: z.object({ assetId: id, op, params, parentId: id.optional(), modelRef: id.optional(), place: z.enum(['studio', 'canvas', 'designer', 'space-create', 'space-tools']).optional(), mode: mode.optional() }).strict(),
     effect: 'spend',
     needs: ['session'],
     available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),

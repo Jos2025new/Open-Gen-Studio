@@ -1,10 +1,11 @@
 import { MODE_LABEL, PLACE_LABEL, type Mode, type Place } from '../../engine/placeTypes';
+import { MEDIA_KINDS } from '../../engine/types';
 
 export type PlaceFilter = 'all' | 'none' | Place;
 export type ModeFilter = 'all' | 'none' | Mode;
 
 const PLACES: PlaceFilter[] = ['all', 'space-create', 'space-tools', 'studio', 'canvas', 'designer', 'none'];
-const MODES: ModeFilter[] = ['all', 'image', 'video', 'audio', 'model3d', 'agent', 'none'];
+const MODES: ModeFilter[] = ['all', ...MEDIA_KINDS, 'agent', 'none'];
 const label = (v: string) => (v === 'all' ? 'All' : v === 'none' ? 'None' : v);
 
 export const matchesPlace = (p: Place | undefined, f: PlaceFilter): boolean => f === 'all' || (f === 'none' ? !p : p === f);
