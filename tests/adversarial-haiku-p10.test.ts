@@ -66,14 +66,15 @@ describe('adversarial p10: click zones in node-system.css', () => {
     expect(systemCss + nodeCss).toMatch(/\.port-quiet::after\s*\{[^}]*pointer-events:\s*none/);
   });
 
-  // reproduce: .nc-next con right:-18px en tarjetas de texto mide 22 px; su zona de 24 px centrada entra 5 px en el cuerpo de la tarjeta
-  it.fails('the 24 px zone of a text card connection handle does not reach into the card body', () => {
+  it('the 24 px zone of a text card connection handle does not reach into the card body', () => {
     const right = Number(nodeCss.match(/k-text\) \.nc-next\.react-flow__handle \{ right: (-?\d+)px/)?.[1]);
     const width = Number(nodeCss.match(/\.nc-next\.react-flow__handle \{[^}]*width: (\d+)px/)?.[1]);
     expect(Number.isFinite(right) && Number.isFinite(width)).toBe(true);
     // x grows to the right; the card's right edge is x = 0. The handle's right edge is at x = -right (CSS right is negative = outside).
     // Its centre is width/2 further in, and the 24 px zone extends 12 px either side of that centre.
-    const zoneLeft = -right - width / 2 - 12;
+    // The text-card rule in node-system.css shifts the zone centre: left: calc(50% + (12px / zoom - Npx)), read here at zoom 1.
+    const shift = systemCss.match(/k-text\) \.nc-next::after \{ left: calc\(50% \+ \(12px \/ var\(--rf-zoom, 1\) - (\d+)px\)\)/);
+    const zoneLeft = -right - width / 2 - 12 + (shift ? 12 - Number(shift[1]) : 0);
     expect(zoneLeft).toBeGreaterThanOrEqual(0);
   });
 

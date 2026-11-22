@@ -59,3 +59,5 @@
 .node-canvas .port::after, .node-canvas .nc-next::after, .node-canvas .nc-result::after { content: ''; position: absolute; left: 50%; top: 50%; width: calc(24px / var(--rf-zoom, 1)); height: calc(24px / var(--rf-zoom, 1)); transform: translate(-50%, -50%); background: transparent; pointer-events: auto; }
 /* A hidden or disabled handle has no click zone either: .port-quiet is opacity 0 + pointer-events none, and the ::after above would otherwise win with pointer-events:auto. */
 .node-canvas .react-flow__handle:not(.connectable)::after, .node-canvas .port.port-quiet::after { pointer-events: none; }
+/* Text cards sit their + handle 4 px over the card edge: the zone moves out so its inner edge is the card edge (12 px on screen from it) and never covers the body. */
+.node-canvas .react-flow__node:has(.nc.k-text) .nc-next::after { left: calc(50% + (12px / var(--rf-zoom, 1) - 7px)); }
