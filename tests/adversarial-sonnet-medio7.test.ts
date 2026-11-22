@@ -46,3 +46,17 @@ describe('check-it-fails: evasions (ataque Sonnet, punto 12)', () => {
     expect(errorsFor("const s = '// reproduce: x';\nit.fails('x', () => {});")).toHaveLength(1);
   });
 });
+
+describe('check-it-fails: re-ataque (b609b8f0)', () => {
+  it('flags test.fails on a test created with it.extend', () => {
+    expect(errorsFor("import { it } from 'vitest';\nconst test = it.extend({});\ntest.fails('x', () => {});")).toHaveLength(1);
+  });
+
+  it('flags .fails on an alias of it.skip / it.concurrent', () => {
+    expect(errorsFor("const s = it.skip; s.fails('x', () => {});")).toHaveLength(1);
+  });
+
+  it('flags it.fails obtained through dynamic or default import of vitest', () => {
+    expect(errorsFor("const { it: t } = await import('vitest');\nt.fails('x', () => {});")).toHaveLength(1);
+  });
+});

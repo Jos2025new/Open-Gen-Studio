@@ -114,8 +114,32 @@ describe('check-it-fails', () => {
         it.fails('d', () => {});
       `,
       'tests/non-vitest.test.ts': `
-        const obj = { fails: (_msg: string, _fn: () => void) => {} };
+        import other from './other';
+        const obj = { fails: (_msg: string, _fn: () => void) => {}, skip: { fails: (_msg: string, _fn: () => void) => {} }, extend: () => ({ fails: (_msg: string, _fn: () => void) => {} }) };
         obj.fails('not vitest', () => {});
+        const s = obj.skip;
+        s.fails('not vitest skip', () => {});
+        obj.extend().fails('not vitest extend', () => {});
+        other.it.fails('not vitest default import', () => {});
+        const dyn = await import('./other');
+        dyn.it.fails('not vitest dynamic import', () => {});
+      `,
+      'tests/extend-modifiers-and-imports.test.ts': `
+        import vitest from 'vitest';
+        const ext = it.extend({});
+        ext.fails('a', () => {});
+        const s = it.skip;
+        s.fails('b', () => {});
+        const c = it.concurrent;
+        c.fails('c', () => {});
+        const r = it.runIf(true).sequential;
+        r.fails('d', () => {});
+        vitest.it.fails('e', () => {});
+        const { it: t } = await import('vitest');
+        t.fails('f', () => {});
+        (await import('vitest')).test.fails('g', () => {});
+        // reproduce: documented extended test
+        ext.fails('ok', () => {});
       `,
     }, (root) => {
       const errors: string[] = check(root);
@@ -124,6 +148,7 @@ describe('check-it-fails', () => {
       expect(errors.filter((e) => e.startsWith('tests/bracket.test.ts:'))).toHaveLength(1);
       expect(errors.filter((e) => e.startsWith('tests/shared-and-string.test.ts:'))).toHaveLength(3);
       expect(errors.filter((e) => e.startsWith('tests/non-vitest.test.ts:'))).toHaveLength(0);
+      expect(errors.filter((e) => e.startsWith('tests/extend-modifiers-and-imports.test.ts:'))).toHaveLength(7);
     });
   });
 });
