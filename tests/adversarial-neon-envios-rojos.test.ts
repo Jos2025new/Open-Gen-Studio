@@ -303,7 +303,7 @@ describe('4. rewritePrompts con presupuesto agotado', () => {
 });
 
 describe('5. onGenerationCredit en modo always', () => {
-  it.fails('frena la sustitución tras 402 cuando el presupuesto ya está agotado (overLimit)', async () => {
+  it('frena la sustitución tras 402 cuando el presupuesto ya está agotado (overLimit)', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.12, spentUsd: 0, autoSwitch: 'always' });
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(10);
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementationOnce(async () => {
@@ -319,7 +319,7 @@ describe('5. onGenerationCredit en modo always', () => {
     expect(atlasSpy).not.toHaveBeenCalled();
   });
 
-  it.fails('mantiene lock de nodo durante la sustitución tras 402 para bloquear runNodes concurrente', async () => {
+  it('mantiene lock de nodo durante la sustitución tras 402 para bloquear runNodes concurrente', async () => {
     setupStore({ autoSwitch: 'always' });
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(10);
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', {}));
@@ -354,7 +354,8 @@ describe('5. onGenerationCredit en modo always', () => {
     const secondResult = await concurrent;
 
     expect(lockedDuringSub).toBe(true);
-    expect(secondResult).toBeInstanceOf(Error);
+    // runNodes refuses a locked node by returning without sending (contract of tests/node-run.test.ts:141); the proof is one charge.
+    expect(secondResult).not.toBeInstanceOf(Error);
     expect(atlasSpy).toHaveBeenCalledTimes(1);
   });
 });

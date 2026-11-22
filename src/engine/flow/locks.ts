@@ -54,9 +54,10 @@ export function attemptNode(g: NodeAttempt, nodes: GraphNode[]): GraphNode | und
   return nodes.find((n) => 'generationId' in n.data && n.data.generationId && (gens[n.data.generationId]?.operationId ?? n.data.generationId) === (g.operationId ?? g.id));
 }
 
-/** Regenerate, Retry and a late 402 answer hold the same node for the duration of their attempt. */
-export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[]): { node?: GraphNode; release: () => void } | undefined {
+/** Regenerate, Retry and a 402 substitute hold the same node for the duration of their attempt. */
+export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[], reentrant = false): { node?: GraphNode; release: () => void } | undefined {
   const node = attemptNode(g, nodes);
+  if (reentrant && node && writingNodes(g.sessionId).has(node.id)) return { node, release: () => {} };
   try { return { node, release: node ? lockNodes(g.sessionId, [node.id]) : () => {} }; } catch (e) { toast((e as Error).message, 'error'); }
 }
 

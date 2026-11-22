@@ -214,6 +214,25 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     return true;
   };
 
+  const retryEstimateFor = (patch: ReturnType<typeof substitute>) => {
+    const retry = estimateForRetry({ ...g, ...patch });
+    return retry.lowerBound ? { ...retry, usd: null } : retry;
+  };
+  const sendLater = (o: CreditOption, patch: ReturnType<typeof substitute>, what: string) => () => (async () => {
+    if (stale()) return;
+    const held = holdAttemptNode(g, nodes());
+    if (!held) return;
+    try {
+      applySubstitute(o, patch);
+      await later(genId);
+      if (held.node && get().generations[genId]?.status === 'done') {
+        applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
+      }
+    } finally {
+      held.release();
+    }
+  })().catch(logged(what));
+
   const answer = (o: CreditOption, what: string, remember = false) => {
     if (stale()) return;
     if (remember) setSettings({ autoSwitchProvider: 'always' });
@@ -224,24 +243,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Review the updated price on the plan before choosing Retry.` });
       return;
     }
-    const go = async () => {
-      if (stale()) return;
-      const held = holdAttemptNode(g, nodes());
-      if (!held) return;
-      try {
-        applySubstitute(o, patch);
-        await later(genId);
-        if (held.node && get().generations[genId]?.status === 'done') {
-          applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
-        }
-      } finally {
-        held.release();
-      }
-    };
-    const send = () => go().catch(logged(what));
-    const retry = estimateForRetry({ ...g, ...patch });
-    const e = retry.lowerBound ? { ...retry, usd: null } : retry;
-    confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), e, '\u201cContinue once\u201d runs only this generation on that model.', send);
+    confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), retryEstimateFor(patch), '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what));
   };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
@@ -259,10 +261,39 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   }
   if (auto && mode === 'always') {
     if (superseded()) return false;
-    pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
-    applySubstitute(auto);
-    await rerun(genId);
-    return true;
+    const patch = substitute(auto);
+    let immediate = true;
+    let run: Promise<boolean> | undefined;
+    const ok = confirmOverLimit(
+      g.sessionId,
+      label(auto.model, undefined, auto.usd),
+      retryEstimateFor(patch),
+      '\u201cContinue once\u201d runs only this generation on that model.',
+      () => {
+        if (!immediate) {
+          if (stale()) return;
+          if (g.planId) {
+            applySubstitute(auto, patch);
+            pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
+            return;
+          }
+          return sendLater(auto, patch, 'switch provider after no credit')();
+        }
+        const held = holdAttemptNode(g, nodes(), true);
+        if (!held) { run = Promise.resolve(false); return; }
+        pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
+        applySubstitute(auto, patch);
+        try {
+          run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
+        } catch (err) {
+          held.release();
+          throw err;
+        }
+      },
+    );
+    immediate = false;
+    if (!ok || !run) return false;
+    return await run;
   }
   if (options.length) {
     const id = pushAlert({
