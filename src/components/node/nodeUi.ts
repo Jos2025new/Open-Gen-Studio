@@ -18,7 +18,7 @@ export interface NodeUi {
   /** The tip of the menu item, given the port type the menu was opened for. */
   tip(accepts?: PortType | null): string;
   /** The library chip that filters it. */
-  chip?: MediaKind | 'text';
+  chip: MediaKind | 'text';
 }
 
 /** The card icon of every node kind: the catalog entries below take theirs from here. */
