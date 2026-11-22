@@ -36,5 +36,8 @@ Fuentes: bus `20261122-neon-retro-master6.md` y `20261122-sonnet-retro-master6.m
 La lista vigente es la del bus `20261122-master6-orden-prioridad.md` (cruce de Neon, Sonnet y el orquestador):
 - **Crítico:** un solo veredicto de presupuesto en `budget.ts`; lock de nodo en `runInNodes` (ver si `abe5cbbc` lo cerró); lote recargado sin precio nunca cuenta $0.
 - **Alto:** checks de disciplina (todo test corre, literal de medio fuera de `types.ts` falla, tamaño avisa al 90%); enums de medio literales → `MEDIA_KINDS`; una tabla para los nodos de sistema; dividir `llmTurn.ts`.
-- **Medio:** cierre de plan y «Continue once» y aprobaciones al recargar (decisiones del usuario); nodos apilados y handles ≥24 px; `exhaustive-deps` en `src/components/node` como error; `it.fails` sin dueño.
+- **Medio:**
+  - **Cierre de plan y «Continue once», decidido por el usuario (2026-11-22):** el resumen del plan vuelve a preguntar, con una opción «no volver a preguntar». La misma opción está en settings, junto al tope de gasto, sin enredar los settings. Con «no preguntar» activo, se pregunta una vez (al pasar el tope) y el resumen ya no vuelve a preguntar. La pregunta es tan sencilla como en cualquier app de su tipo.
+  - **Aprobaciones al recargar:** pendiente; el usuario pide lo convencional en apps similares.
+  - Nodos apilados y handles ≥24 px; `exhaustive-deps` en `src/components/node` como error; `it.fails` sin dueño.
 - **Después:** 073 puntos 3 a 7 (14 dudas de interfaz, vista por espacio en sandbox, «Todo es un nodo», subnet, agentes de suscripción).
