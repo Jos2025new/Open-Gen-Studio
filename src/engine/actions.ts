@@ -287,9 +287,11 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   const nodes: GraphNode[] = [promptNode, ...refNodes.map(({ handle: _h, ...n }) => n), genNode];
   const pos = autoLayout(nodes, edges, origin);
   editCompound(sessionId, 'from-generation', (gr) => ({ ...gr, nodes: [...gr.nodes, ...nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }))], edges: [...gr.edges, ...edges] }));
-  runGeneration(g.id).catch((err) => {
+  const held = holdAttemptNode(g, get().sessions[sessionId]?.graph.nodes ?? []);
+  if (!held) return;
+  runGeneration(g.id, held.release).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
-  });
+  }).finally(held.release);
 }
 
 // ---------------------------------------------------------------------------
