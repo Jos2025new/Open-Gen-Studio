@@ -62,8 +62,7 @@ describe('adversarial p10: the + button path', () => {
 });
 
 describe('adversarial p10: click zones in node-system.css', () => {
-  // reproduce: .port-quiet oculta con pointer-events none, pero .port::after fija pointer-events:auto y gana al heredado; el puerto invisible sigue recibiendo clic
-  it.fails('a quiet port (opacity 0, pointer-events none) keeps no clickable 24 px zone', () => {
+  it('a quiet port (opacity 0, pointer-events none) keeps no clickable 24 px zone', () => {
     expect(systemCss + nodeCss).toMatch(/\.port-quiet::after\s*\{[^}]*pointer-events:\s*none/);
   });
 
