@@ -20,7 +20,7 @@ Rama `task/integra-7` (worktree `ogs-integra7`), fusionada en `main` (`819ed2fc`
 - **Sin fusionar.** Haiku atacó ambas (bus `20261122-haiku-ataca-p9.md` y `-p10.md`): «fusionable no».
   - p9: doble envío al re-aprobar una secuencia ya enviada en parte (`commandCalls.ts:93`, crítico, nuevo) y plan de nodos aprobado sin enviar que cierra en error (`settlePlans.ts:54`). Tests rojos en `task/p9-7-ataque` (`67505d9d`).
   - p10: un puerto oculto sigue clicable por la zona de 24 px (alta, nuevo) y un nodo nuevo cae bajo el panel de otro (media, nuevo), más 5 menores. Tests en `task/p10-7-ataque` (`9fab83bb`).
-  - Sonnet los arregla en `task/p9-7` y `task/p10-7` (bus `20261122-sonnet-arregla-p9.md` y `-p10.md`). Falta re-ataque de otro modelo, integración y un `npm test`.
+  - Sonnet arregló todo en `task/p9-7` (`a900ed77`) y `task/p10-7` (bus `20261122-sonnet-arregla-p9.md` y `-p10.md`): los rojos del atacante pasan a verde, check-all pasa. Falta re-ataque de otro modelo (huecos admitidos por Sonnet en su informe), integración y un `npm test`.
 
 ## Lecciones
 1. **Una sola corrida de agy a la vez:** una segunda la interrumpe (`"error":"interrupted"`). Neon e Hydrogen comparten cuota.
