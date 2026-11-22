@@ -1,11 +1,12 @@
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS } from '../plan';
 import { AGENT_OP_IDS } from '../ops';
+import { MEDIA_KINDS } from '../types';
 import { LAYER_DOC } from './layerDoc';
 
 /* The propose_plan tool schema offered to the agent. Split from tools.ts to stay under the 30 KB limit. */
 
-const stepKinds = ['image', 'video', 'audio', 'model3d', 'op', 'text', 'layer'] as const;
+const stepKinds = [...MEDIA_KINDS, 'op', 'text', 'layer'] as const;
 
 export const PROPOSE_PLAN_TOOL: ToolSpec = {
   type: 'function',

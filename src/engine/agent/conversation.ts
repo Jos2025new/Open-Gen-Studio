@@ -4,7 +4,7 @@ import { beginJourney, journeyIdFor, recordJourneyEvent } from '../../lib/journe
 import { adjustedNote } from '../planRevision';
 import { workflowById, refreshLoadedGuides } from '../skills';
 import { LLM_LABELS } from '../providers/llm';
-import type { LlmMessage, PlanFeedItem, QuestionsFeedItem, SettingsChoice, SettingsFeedItem, SettingsSection, Workspace } from '../types';
+import { VIEWABLE_MEDIA_KINDS, type LlmMessage, type PlanFeedItem, type QuestionsFeedItem, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type Workspace } from '../types';
 import { appendFeed, autoTitleSession, removeFeedItem, setComposer, updateFeedItem } from '../../store/store';
 import { buildContext } from './context';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
@@ -170,7 +170,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
 async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[], runId?: string, agentNodeId?: string) {
-  if (!attachments.some((id) => ['image', 'video', 'model3d'].includes(get().assets[id]?.kind ?? ''))) return [];
+  if (!attachments.some((id) => (VIEWABLE_MEDIA_KINDS as readonly string[]).includes(get().assets[id]?.kind ?? ''))) return [];
   if (!agentSeesImages(sessionId, agentNodeId)) {
     notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info', undefined, runId ? { runId } : undefined);
     return [];

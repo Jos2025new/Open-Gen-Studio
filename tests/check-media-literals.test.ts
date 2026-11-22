@@ -19,6 +19,10 @@ function withTempRepo(files: Record<string, string>, fn: (root: string) => void)
 }
 
 describe('check-media-literals', () => {
+  it('passes on the real repository', () => {
+    expect(check('.')).toEqual([]);
+  });
+
   it('flags literal media arrays, z.enum, sets, z.literal unions, and agent/llm/text variants outside types.ts', () => {
     withTempRepo({
       'src/engine/types.ts': "export const MEDIA_KINDS = ['image', 'video', 'audio', 'model3d'] as const; export const VISUAL = ['image', 'video'] as const;",

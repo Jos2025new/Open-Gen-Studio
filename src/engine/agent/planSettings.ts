@@ -10,7 +10,7 @@ import { updateFeedItem, useStore } from '../../store/store';
 import { addSpend } from '../../store/spend';
 import { laneOfItem, laneState, patchLane } from './lanes';
 import { feedOfAgentIn } from './threads';
-import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
+import { VISUAL_MEDIA_KINDS, type FeedItem, type PlanFeedItem, type PlanStep, type SettingsChoice, type SettingsFeedItem, type SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
 import { mayStartWork } from '../../lib/writerLock';
@@ -56,7 +56,7 @@ function inlineSection(feed: FeedItem[], planId: string, kind: GenKind): { item:
 export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSection[] {
   if (plan.style !== 'auto' || plan.nodeRun || plan.plan.workspace === 'node') return [];
   const out: SettingsSection[] = [];
-  for (const kind of ['image', 'video'] as const) {
+  for (const kind of VISUAL_MEDIA_KINDS) {
     const all = plan.plan.steps.filter(isGen).filter((s) => s.kind === kind);
     for (const group of new Set(all.map((s) => modelGroup(s.modelRef)))) {
       const steps = all.filter((s) => modelGroup(s.modelRef) === group);

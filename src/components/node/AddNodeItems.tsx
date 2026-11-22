@@ -3,7 +3,7 @@ import { Bot, ChevronRight, Cpu, Database, FileImage, FileText, MessageSquare, P
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
-import type { GraphNodeData, MediaKind, OpId, PortType, SystemNodeType } from '../../engine/types';
+import { MEDIA_KINDS, type GraphNodeData, type MediaKind, type OpId, type PortType, type SystemNodeType } from '../../engine/types';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, type OmniSpace } from '../../engine/nodes/omniSpaces';
 import { SYSTEM_NODE_TYPES } from '../../engine/nodes/spec';
 import { OP_ICONS } from '../assets/AssetActions';
@@ -71,7 +71,7 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); navByKey.current = true; setAt((i) => (shown.length ? (i + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length : 0)); }
     if (e.key === 'Enter' && shown[at]) { e.preventDefault(); shown[at].run(); }
   };
-  const chips: Array<Kind | 'all'> = ['all', 'image', 'video', 'audio', 'model3d', 'text'];
+  const chips: Array<Kind | 'all'> = ['all', ...MEDIA_KINDS, 'text'];
   return <div className="node-lib" onKeyDown={keys}>
     <label className="search-input node-lib-search"><Search size={14} aria-hidden /><input ref={field} type="search" aria-label="Search nodes and tools" placeholder="Search nodes and tools" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
     <div className="node-lib-chips" role="group" aria-label="Kind">

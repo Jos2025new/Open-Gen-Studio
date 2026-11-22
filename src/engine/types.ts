@@ -11,13 +11,21 @@ import type { RemoteJob, SendRecord } from './sendTypes';
 export type { RemoteJob, SendRecord, SendStatus, SpendCategory, SpendEntry } from './sendTypes';
 
 export type Workspace = 'chat' | 'node' | 'designer';
-export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 /** auto (card if missing), guided (asks), direct (no card). */
 export type AgentStyle = 'auto' | 'guided' | 'direct';
 /** Generated media types are persistable assets. */
 export const MEDIA_KINDS = ['image', 'video', 'audio', 'model3d'] as const;
 export type MediaKind = typeof MEDIA_KINDS[number];
 export type AssetKind = MediaKind;
+/** Composer modes: the agent plus every generated media kind. */
+export const COMPOSER_MODES = ['agent', ...MEDIA_KINDS] as const;
+export type ComposerMode = typeof COMPOSER_MODES[number];
+/** Model reference media kinds: LLM plus every generated media kind. */
+export const MODEL_MEDIA_KINDS = ['llm', ...MEDIA_KINDS] as const;
+/** Visual generation kinds with frames (image and video). */
+export const VISUAL_MEDIA_KINDS = ['image', 'video'] as const;
+/** Media kinds a vision-capable agent can inspect (images, video frames, 3D views). */
+export const VIEWABLE_MEDIA_KINDS = ['image', 'video', 'model3d'] as const;
 
 export type ProviderId = 'local' | 'openrouter' | 'fal' | 'nanogpt' | 'atlas';
 export type RemoteProviderId = Exclude<ProviderId, 'local'>;

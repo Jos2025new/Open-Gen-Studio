@@ -3,6 +3,7 @@ import { agentOf } from './lanes';
 import { defaultModelFor, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel, modelGuide } from '../guides';
 import { readGuide, STAGED_GUIDE } from '../skills';
+import { VISUAL_MEDIA_KINDS } from '../types';
 
 /*
  * Guides that travel with a request: the staged rules of a picked workflow, and in Direct the prompting guides of the
@@ -54,7 +55,7 @@ function directModelGuides(sessionId: string, owner: string): string {
   if (!isDirect()) return '';
   let out = '';
   const sent = new Set<string>();
-  for (const kind of ['image', 'video'] as const) {
+  for (const kind of VISUAL_MEDIA_KINDS) {
     for (const ref of directModelRefs(sessionId, owner, kind)) {
       const guide = guideForModel(ref.split('::')[1] ?? '');
       const text = guide && !sent.has(guide.id) ? readGuide(`model:${guide.id}`) : undefined;

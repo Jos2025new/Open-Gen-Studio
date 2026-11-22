@@ -4,12 +4,14 @@ import { CONTINUE_IN_CANVAS_TOOL, OPEN_BOARD_TOOL } from './agentCanvas';
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
-import { MEDIA_KINDS } from '../types';
+import { MEDIA_KINDS, VISUAL_MEDIA_KINDS } from '../types';
 import { DESIGNER_TOOLS } from './designerTools';
 import { JOB_TOOLS } from './jobStatus';
 import { PROPOSE_PLAN_TOOL } from './proposePlanTool';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
+
+const confirmSettingsKinds = [...VISUAL_MEDIA_KINDS].reverse() as ['video', 'image'];
 
 export const editNodeSchema = z.object({ node_id: z.string().min(1), expect_rev: z.string().min(1), title: z.string().optional(), prompt: z.string().optional(), model_ref: z.string().optional(), settings: z.object({
   aspect: z.string().optional(), resolution: z.string().optional(), count: z.number().int().min(1).max(8).optional(), duration: z.number().optional(), audio: z.boolean().optional(), seed: z.number().optional(), negative: z.string().optional(), advanced: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), extras: z.record(z.string(), z.unknown()).optional(), shots: z.array(z.object({ prompt:z.string(), duration:z.number() })).optional(),
@@ -155,7 +157,7 @@ export const TOOLS: ToolSpec[] = [
             items: {
               type: 'object',
               properties: {
-          kind: { type: 'string', enum: ['video', 'image'] },
+          kind: { type: 'string', enum: [...confirmSettingsKinds] },
           purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'Video only (leave out for images): draft (a test), normal (default), long (over 15 s).' },
           start_image: { type: 'boolean', description: 'Video starts from an image (first_frame).' },
           refs: { type: 'integer', description: 'How many reference or source images each step takes (identity, product, style).' },
@@ -258,7 +260,7 @@ export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'ret
 
 const num = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
 const settingsPartSchema = z.object({
-  kind: z.enum(['video', 'image']),
+  kind: z.enum(confirmSettingsKinds),
   purpose: z.unknown().optional().transform((v) => (v === 'draft' || v === 'normal' || v === 'long' ? v : undefined)),
   start_image: z.boolean().optional(),
   refs: z.number().int().min(0).max(20).optional(),
