@@ -8,7 +8,7 @@ import { applyEdit, editCompound, planConnect } from '../nodecore/edit';
 import { inferReplaces } from '../flow/graph';
 import { graphEditProblem } from '../flow/locks';
 import { isOmniSpace } from './omniSpaces';
-import { systemAddRefDefault } from './systemDefaults';
+import { systemRefDefault } from './systemDefaults';
 import type {
   Graph,
   GraphEdge,
@@ -268,7 +268,7 @@ export function addSystemNode(
   // One Studio, one Nodes and one Designer node per session: asking again gives the one that is there.
   const only = spec.type === 'space' && spec.ref && isOmniSpace(spec.ref) ? session?.graph.nodes.find((n) => n.data.kind === 'ref' && n.data.type === 'space' && n.data.ref === spec.ref) : undefined;
   if (only) return only.id;
-  const defaultRef = spec.ref ?? systemAddRefDefault(spec.type, sessionId, st.composer.image.modelRef, session);
+  const defaultRef = spec.ref ?? systemRefDefault(spec.type, sessionId, st.composer.image.modelRef, session);
   const title =
     spec.title ??
     (spec.type === 'agent'

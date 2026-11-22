@@ -13,8 +13,9 @@ let sid = '';
 beforeEach(() => { const s = createSession('System table'); sid = s.id; useStore.setState((st) => ({ activeSessionId: sid, sessions: { ...st.sessions, [sid]: s } })); });
 
 const REF_DEFAULT = (model: string): Record<string, string> => ({ chat: sid, agent: sid, session: sid, model, provider: 'openrouter', space: 'create', 'designer.doc': 'active', library: 'library', toolset: 'toolset', prompt: 'composer', mediaSettings: 'image' });
-// addSystemNode without a ref: prompt and mediaSettings fall back to their own type name (inherited difference with systemRefDefault).
-const ADD_REF = (model: string): Record<string, string> => ({ ...REF_DEFAULT(model), prompt: 'prompt', mediaSettings: 'mediaSettings' });
+// addSystemNode without a ref starts from the same value as systemRefDefault (bug fix: prompt used to start as 'prompt' and
+// mediaSettings as 'mediaSettings', which no consumer reads; they expect 'composer' and 'image').
+const ADD_REF = REF_DEFAULT;
 
 describe('system node table', () => {
   it('systemRefDefault gives each type its initial ref', () => {

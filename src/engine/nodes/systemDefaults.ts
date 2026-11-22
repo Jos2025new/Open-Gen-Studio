@@ -5,11 +5,11 @@ export interface SystemRefCtx { sessionId: string; imageModelRef: string; sessio
 
 /**
  * What a new system node starts with, one entry per type (the exhaustive record makes `tsc` ask for a new type's entry).
- * `ref`: what it points at when nothing is given. `addRef`: only when `addSystemNode` has always started it from
- * something else (prompt and mediaSettings; inherited, kept so saved graphs and tests do not move).
+ * `ref`: what it points at when nothing is given (`addSystemNode` uses the same value: prompt starts linked to the
+ * composer, mediaSettings on 'image', which is what their consumers read).
  * The menu side of each type (label, icon, keywords) is `SYSTEM_UIS` in components/node/systemUi.ts.
  */
-export const SYSTEM_DEFAULTS: Record<SystemNodeType, { ref: (c: SystemRefCtx) => string; addRef?: string }> = {
+export const SYSTEM_DEFAULTS: Record<SystemNodeType, { ref: (c: SystemRefCtx) => string }> = {
   chat: { ref: (c) => c.sessionId },
   agent: { ref: (c) => c.sessionId },
   session: { ref: (c) => c.sessionId },
@@ -19,17 +19,11 @@ export const SYSTEM_DEFAULTS: Record<SystemNodeType, { ref: (c: SystemRefCtx) =>
   'designer.doc': { ref: (c) => c.session?.activeDocId ?? c.session?.docs[0]?.id ?? 'active' },
   library: { ref: () => 'library' },
   toolset: { ref: () => 'toolset' },
-  prompt: { ref: () => 'composer', addRef: 'prompt' },
-  mediaSettings: { ref: () => 'image', addRef: 'mediaSettings' },
+  prompt: { ref: () => 'composer' },
+  mediaSettings: { ref: () => 'image' },
 };
 
 /** What a new system node points at when nothing is given: the active session, the composer's model, and so on. */
 export function systemRefDefault(type: SystemNodeType, activeSessionId: string, imageModelRef: string, session?: Session): string {
   return SYSTEM_DEFAULTS[type].ref({ sessionId: activeSessionId, imageModelRef, session });
-}
-
-/** The same for `addSystemNode`, which starts prompt and mediaSettings from their own type name. */
-export function systemAddRefDefault(type: SystemNodeType, sessionId: string, imageModelRef: string, session?: Session): string {
-  const d = SYSTEM_DEFAULTS[type];
-  return d.addRef ?? d.ref({ sessionId, imageModelRef, session });
 }
