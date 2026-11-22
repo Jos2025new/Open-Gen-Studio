@@ -49,12 +49,15 @@ export function rectsOverlap(a: NodeRect, b: NodeRect, gapX = 0, gapY = 0): bool
   return a.x < b.x + b.width + gapX && a.x + a.width + gapX > b.x && a.y < b.y + b.height + gapY && a.y + a.height + gapY > b.y;
 }
 
-/** Pick the closest non-overlapping flow position starting from `desired` (searching outward in a grid). */
+/** Pick the closest non-overlapping flow position starting from `desired` (searching outward in a grid).
+ *  Existing cards bring their floating composer panel (`NodeRect.panel`): the new card keeps clear of it. `opts.panel` is the new
+ *  card's own panel (`panelZone` of a card at 0,0): it keeps clear of existing cards (no gap beyond the panel itself); panels never
+ *  collide with panels, since only the selected card shows one. Both callers share this single mechanism. */
 export function findFreePosition(
   desired: { x: number; y: number },
   size: { width: number; height: number },
   occupied: readonly NodeRect[],
-  opts?: { gapX?: number; gapY?: number; preferRight?: boolean },
+  opts?: { gapX?: number; gapY?: number; preferRight?: boolean; panel?: NodeRect | null },
 ): { x: number; y: number } {
   const gapX = opts?.gapX ?? 48;
   const gapY = opts?.gapY ?? 56;
@@ -62,9 +65,12 @@ export function findFreePosition(
   const finite = (n: number) => Number.isFinite(n);
   if (!finite(desired.x) || !finite(desired.y)) desired = { x: finite(desired.x) ? desired.x : 0, y: finite(desired.y) ? desired.y : 0 };
   occupied = occupied.filter((o) => finite(o.x) && finite(o.y) && finite(o.width) && finite(o.height));
+  const panels = occupied.flatMap((o) => (o.panel ? [o.panel] : [])).filter((p) => finite(p.x) && finite(p.y) && finite(p.width) && finite(p.height));
+  const own = opts?.panel ?? null;
   const clear = (x: number, y: number) => {
     const r: NodeRect = { x, y, width: size.width, height: size.height };
-    return !occupied.some((o) => rectsOverlap(r, o, gapX, gapY));
+    if (occupied.some((o) => rectsOverlap(r, o, gapX, gapY)) || panels.some((p) => rectsOverlap(r, p))) return false;
+    return !own || !occupied.some((o) => rectsOverlap({ ...own, x: x + own.x, y: y + own.y }, o));
   };
   if (clear(desired.x, desired.y)) return desired;
   const stepX = size.width + gapX;
@@ -101,24 +107,17 @@ export function panelZone(data: GraphNodeData, card: NodeRect): NodeRect | null 
   return { x: card.x + card.width / 2 - PANEL.width / 2, y: card.y + card.height + PANEL.gap, width: PANEL.width, height: PANEL.height };
 }
 
-/** `findFreePosition` for a node about to be added: the spot also leaves the node's composer panel clear of other cards. */
+/** `findFreePosition` for a node about to be added: the spot also leaves the node's composer panel clear of other cards (see `findFreePosition`). */
 export function findFreePositionFor(
   data: GraphNodeData,
   desired: { x: number; y: number },
   occupied: readonly NodeRect[],
   opts?: { gapX?: number; gapY?: number; width?: number; preferRight?: boolean },
 ): { x: number; y: number } {
-  // Existing cards bring their own floating panel: it is as occupied as the card.
-  occupied = occupied.flatMap((o) => (o.panel ? [o, o.panel] : [o]));
   const width = opts?.width ?? nodeWidth(data);
   const height = estimatedHeight(data);
-  const zone = panelZone(data, { x: 0, y: 0, width, height });
-  const gaps = { gapX: opts?.gapX ?? 48, gapY: opts?.gapY ?? 56, preferRight: opts?.preferRight };
-  if (!zone) return findFreePosition(desired, { width, height }, occupied, gaps);
-  // The footprint is the card plus its panel: wider on both sides, taller below.
-  const left = Math.max(0, -zone.x);
-  const at = findFreePosition({ x: desired.x - left, y: desired.y }, { width: Math.max(width, zone.width), height: zone.y + zone.height }, occupied, gaps);
-  return { x: at.x + left, y: at.y };
+  const panel = panelZone(data, { x: 0, y: 0, width, height });
+  return findFreePosition(desired, { width, height }, occupied, { gapX: opts?.gapX, gapY: opts?.gapY, preferRight: opts?.preferRight, panel });
 }
 
 /** Nodes whose size is known only now (first measurement) move off the nodes they stack on. Placement before the
