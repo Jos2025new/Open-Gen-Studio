@@ -9,10 +9,12 @@ import { placeFor } from './place';
 import type { Asset, GraphNode } from './types';
 import { addAssets, setComposer, setUi, toast, useStore } from '../store/store';
 import { editCompound } from './nodecore/edit';
+import { clearGenerationPass } from './budget';
 
 const get = useStore.getState;
 
 export function deleteGeneration(generationId: string): void {
+  clearGenerationPass(generationId);
   const g = get().generations[generationId];
   if (!g) return;
   const assetIds = [...g.assetIds];

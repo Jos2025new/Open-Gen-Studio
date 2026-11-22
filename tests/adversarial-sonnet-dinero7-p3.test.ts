@@ -9,6 +9,7 @@ vi.mock('../src/lib/idb', () => ({
   cacheDb: { get: async () => undefined, set: async () => undefined },
   getAssetBlob: async () => new Blob([new Uint8Array([1])], { type: 'image/png' }),
   putAssetBlob: async () => undefined,
+  deleteAssetBlobs: async () => undefined,
 }));
 vi.mock('../src/lib/media', async (orig) => ({
   ...(await orig<typeof import('../src/lib/media')>()),
@@ -16,10 +17,13 @@ vi.mock('../src/lib/media', async (orig) => ({
   jpegThumbnail: async () => undefined,
 }));
 
-import { useStore } from '../src/store/store';
+import { useStore, patchGeneration } from '../src/store/store';
 import { askAgain, budgetVerdict, passActiveFor, takeGenerationPass, withOncePass } from '../src/engine/budget';
-import { createGeneration, type GenerationSpec } from '../src/engine/jobs';
-import { forgetBalances } from '../src/engine/credit';
+import { cancelGeneration, createGeneration, type GenerationSpec } from '../src/engine/jobs';
+import { deleteGeneration } from '../src/engine/assetActions';
+import { deleteSession } from '../src/engine/actions';
+import { forgetBalances, onGenerationCredit } from '../src/engine/credit';
+import { ADAPTERS } from '../src/engine/providers/registry';
 import { useAlerts } from '../src/engine/alerts';
 import type { ModelSummary } from '../src/engine/types';
 
@@ -102,13 +106,49 @@ import { check } from '../scripts/check-budget-verdict.mjs';
 describe('Attack 3a: passes that outlive their action', () => {
   // Finding P1 (new): a generation created with a Continue once pass keeps a live substitute pass in activePasses
   // after the approved action ended, if it is never run (deleted, aborted before runGeneration, session closed).
-  it.fails('a pass bound to a generation that never ran (aborted or deleted before runGeneration) is dead once the approving action has ended', async () => {
+  it('a pass bound to a generation that never ran (aborted or deleted before runGeneration) is dead once the approving action has ended', async () => {
     let genId = '';
     await withOncePass(sid, async (pass) => { genId = createGeneration(spec({ budgetPass: pass })).id; });
     const leaked = takeGenerationPass(genId);
     expect(leaked ? passActiveFor(leaked, sid) : false).toBe(false);
     // and it cannot pay for another over-limit run
     expect(leaked ? budgetVerdict(paid, { sessionId: sid, pass: leaked }).over : true).toBe(true);
+  });
+
+  it('a bound generation pass is released when the generation is canceled, deleted, or its session is closed', () => {
+    withOncePass(sid, (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      cancelGeneration(g.id);
+      expect(takeGenerationPass(g.id)).toBeUndefined();
+    });
+    withOncePass(sid, (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      deleteGeneration(g.id);
+      expect(takeGenerationPass(g.id)).toBeUndefined();
+    });
+    const doomed = sid;
+    withOncePass(doomed, (pass) => {
+      const g = createGeneration(spec({ sessionId: doomed, budgetPass: pass }));
+      deleteSession(doomed);
+      expect(takeGenerationPass(g.id)).toBeUndefined();
+    });
+  });
+
+  it('onGenerationCredit retires the taken substitute pass in finally even if rerun throws synchronously before consumeOnce', async () => {
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    let genId = '';
+    let takenDuring: ReturnType<typeof takeGenerationPass>;
+    await withOncePass(sid, async (pass) => {
+      const g = createGeneration(spec({ budgetPass: pass }));
+      genId = g.id;
+      patchGeneration(g.id, { status: 'error', startedAt: Date.now() });
+      const throwingRerun = () => { throw new Error('sync boom before consumeOnce'); };
+      await expect(onGenerationCredit(g.id, throwingRerun as never)).rejects.toThrow('sync boom before consumeOnce');
+      takenDuring = takeGenerationPass(g.id);
+    });
+    expect(takenDuring).toBeUndefined();
+    expect(takeGenerationPass(genId)).toBeUndefined();
+    expect(budgetVerdict(paid, { sessionId: sid }).over).toBe(true);
   });
 });
 

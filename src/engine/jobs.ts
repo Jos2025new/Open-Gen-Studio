@@ -24,7 +24,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { deliverSend, shareOfEstimate } from './sendLedger';
 import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
-import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, type BudgetPass } from './budget';
+import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -84,7 +84,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     createdAt: Date.now(),
   };
   upsertGeneration(g);
-  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId);
+  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, spec.budgetPass ?? spec.batchToken);
   return g;
 }
 
@@ -106,9 +106,16 @@ function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
 export function runGeneration(id: string, nodeLock?: () => void): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
-  if (!mayStartWork()) return Promise.reject(new Error('Open Gen Studio is open in another tab'));
+  if (!mayStartWork()) {
+    clearGenerationPass(id);
+    return Promise.reject(new Error('Open Gen Studio is open in another tab'));
+  }
   const generation = get().generations[id];
-  if (generation?.status === 'review') return Promise.reject(new PriceReviewRequired('Necesita revisión'));
+  if (generation?.status === 'review') {
+    clearGenerationPass(id);
+    return Promise.reject(new PriceReviewRequired('Necesita revisión'));
+  }
+  startGenerationPass(id);
   const p = attempt(id, nodeLock).finally(() => {
     running.delete(id);
     controllers.delete(id);
@@ -407,6 +414,7 @@ function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
 }
 
 export function cancelGeneration(id: string): void {
+  clearGenerationPass(id);
   controllers.get(id)?.abort();
   const g = get().generations[id];
   if (g && g.status === 'queued') patchGeneration(id, { status: 'canceled', finishedAt: Date.now() });

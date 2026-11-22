@@ -18,7 +18,7 @@ import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { sendSessionId, ensureSendSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
-import { budgetProblem, type BudgetPass } from './budget';
+import { budgetProblem, clearSessionPasses, type BudgetPass } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { dropHistory } from './design/history';
@@ -491,6 +491,7 @@ export function sendToNodes(assetId: string): void {
 // Sessions
 
 export function deleteSession(sessionId: string): void {
+  clearSessionPasses(sessionId);
   const st = get();
   const s = st.sessions[sessionId];
   if (!s) return;

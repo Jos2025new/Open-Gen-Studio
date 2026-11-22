@@ -48,12 +48,25 @@ export interface BudgetVerdict {
   text?: string;
 }
 
+type GenerationPassEntry = {
+  sessionId: string;
+  budgetUsd: number;
+  started: boolean;
+  owner?: BudgetPass | symbol;
+};
+
 /** Active passes keyed by object identity so forged objects are rejected and reload clears everything. */
 const activePasses = new Map<BudgetPass, { sessionId: string; kind: 'once' | 'sequence' }>();
-/** One-shot in-memory pass for an automatic same-price 402 substitute of a generation approved with a once-pass. */
-const substitutePasses = new Map<string, BudgetPass>();
+/** One-shot in-memory entitlement for a same-price 402 substitute of a generation approved with a pass (not in activePasses until taken). */
+const substitutePasses = new Map<string, GenerationPassEntry>();
 /** Approved multi-step batches (Nodes runs): scoped to one run's steps so unrelated sends still ask. */
 const approvedBatches = new Map<symbol, { sessionId: string; steps: Set<string>; hadPass: boolean }>();
+
+function releaseUnstartedOwned(owner: BudgetPass | symbol): void {
+  for (const [genId, entry] of substitutePasses) {
+    if (entry.owner === owner && !entry.started) substitutePasses.delete(genId);
+  }
+}
 
 function passHolds(pass: BudgetPass | undefined, sessionId: string): boolean {
   if (!pass) return false;
@@ -182,7 +195,10 @@ export function overLimitText(e: Estimate, choices = '“Continue once” lets o
 export function withOncePass<T>(sessionId: string, action: (pass: BudgetPass) => T): T {
   const pass: BudgetPass = Object.freeze({ sessionId, kind: 'once' });
   activePasses.set(pass, { sessionId, kind: 'once' });
-  return runWithPass(() => { activePasses.delete(pass); }, () => action(pass));
+  return runWithPass(() => {
+    activePasses.delete(pass);
+    releaseUnstartedOwned(pass);
+  }, () => action(pass));
 }
 
 /**
@@ -192,32 +208,58 @@ export function withOncePass<T>(sessionId: string, action: (pass: BudgetPass) =>
 export function beginOncePass(sessionId: string): BudgetPassHandle {
   const pass: BudgetPass = Object.freeze({ sessionId, kind: 'sequence' });
   activePasses.set(pass, { sessionId, kind: 'sequence' });
-  return { pass, end: () => { activePasses.delete(pass); } };
+  return {
+    pass,
+    end: () => {
+      activePasses.delete(pass);
+      releaseUnstartedOwned(pass);
+    },
+  };
 }
 
-/** Bind a one-shot in-memory pass to `generationId` so an automatic same-price 402 substitute within the same run can proceed. */
-export function bindGenerationPass(generationId: string, sessionId: string): void {
-  const prev = substitutePasses.get(generationId);
-  if (prev) activePasses.delete(prev);
-  const pass: BudgetPass = Object.freeze({ sessionId, kind: 'once' });
-  activePasses.set(pass, { sessionId, kind: 'once' });
-  substitutePasses.set(generationId, pass);
+/** Bind a one-shot in-memory entitlement to `generationId` so a same-price 402 substitute within the same run can proceed. */
+export function bindGenerationPass(generationId: string, sessionId: string, owner?: BudgetPass | symbol): void {
+  substitutePasses.set(generationId, {
+    sessionId,
+    budgetUsd: get().settings.budgetUsd,
+    started: false,
+    owner,
+  });
 }
 
-/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, if any. */
+/** Mark `generationId` as having started running so its 402 substitute entitlement outlives a fire-and-forget approving action. */
+export function startGenerationPass(generationId: string): void {
+  const entry = substitutePasses.get(generationId);
+  if (entry) entry.started = true;
+}
+
+/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, activating it only while the generation and session live under the same limit. */
 export function takeGenerationPass(generationId: string): BudgetPass | undefined {
-  const pass = substitutePasses.get(generationId);
-  if (!pass) return undefined;
+  const entry = substitutePasses.get(generationId);
+  if (!entry) return undefined;
   substitutePasses.delete(generationId);
+  const st = get();
+  const g = st.generations[generationId];
+  if (!g || g.status === 'canceled' || !st.sessions[entry.sessionId]) return undefined;
+  if (st.settings.budgetOn && st.settings.budgetUsd !== entry.budgetUsd) return undefined;
+  const pass: BudgetPass = Object.freeze({ sessionId: entry.sessionId, kind: 'once' });
+  activePasses.set(pass, { sessionId: entry.sessionId, kind: 'once' });
   return pass;
 }
 
-/** Retire any unused 402 substitute pass when `generationId` finishes. */
+/** Retire any unused 402 substitute entitlement when `generationId` finishes, cancels or is deleted. */
 export function clearGenerationPass(generationId: string): void {
-  const pass = substitutePasses.get(generationId);
-  if (!pass) return;
   substitutePasses.delete(generationId);
-  activePasses.delete(pass);
+}
+
+/** Clear all in-memory passes and 402 substitute entitlements for `sessionId` (session closed/deleted or reset). */
+export function clearSessionPasses(sessionId: string): void {
+  for (const [pass, entry] of activePasses) {
+    if (entry.sessionId === sessionId) activePasses.delete(pass);
+  }
+  for (const [genId, entry] of substitutePasses) {
+    if (entry.sessionId === sessionId) substitutePasses.delete(genId);
+  }
 }
 
 /**
@@ -229,7 +271,13 @@ export function beginBatchPass(sessionId: string, stepIds: Iterable<string>, pas
   consumeOnce(pass);
   const token = Symbol('batch');
   approvedBatches.set(token, { sessionId, steps: new Set(stepIds), hadPass });
-  return { token, end: () => void approvedBatches.delete(token) };
+  return {
+    token,
+    end: () => {
+      approvedBatches.delete(token);
+      releaseUnstartedOwned(token);
+    },
+  };
 }
 
 /** True while `stepId` belongs to a running approved batch for `sessionId`. */
@@ -267,12 +315,7 @@ export function dontAskUntilNextSession(): void {
 
 /** "Ask again": this session asks once more. */
 export function askAgain(sessionId: string = get().activeSessionId): void {
-  for (const [pass, entry] of activePasses) {
-    if (entry.sessionId === sessionId) activePasses.delete(pass);
-  }
-  for (const [genId, pass] of substitutePasses) {
-    if (pass.sessionId === sessionId) substitutePasses.delete(genId);
-  }
+  clearSessionPasses(sessionId);
   endUntilNextSession();
   patchSession(sessionId, (s) => ({ ...s, noAskOverLimit: false }));
 }

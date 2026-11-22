@@ -291,36 +291,40 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     let immediate = true;
     let run: Promise<boolean> | undefined;
     const subPass = takeGenerationPass(genId);
-    const ok = confirmOverLimit(
-      g.sessionId,
-      label(auto.model, undefined, auto.usd),
-      retryEstimateFor(patch),
-      '\u201cContinue once\u201d runs only this generation on that model.',
-      () => {
-        if (!immediate) {
-          if (stale()) return;
-          if (g.planId) {
-            applySubstitute(auto, patch);
-            pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
-            return;
+    let ok = false;
+    try {
+      ok = confirmOverLimit(
+        g.sessionId,
+        label(auto.model, undefined, auto.usd),
+        retryEstimateFor(patch),
+        '\u201cContinue once\u201d runs only this generation on that model.',
+        () => {
+          if (!immediate) {
+            if (stale()) return;
+            if (g.planId) {
+              applySubstitute(auto, patch);
+              pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
+              return;
+            }
+            return sendLater(auto, patch, 'switch provider after no credit')();
           }
-          return sendLater(auto, patch, 'switch provider after no credit')();
-        }
-        const held = holdAttemptNode(g, nodes(), nodeLock);
-        if (!held) { run = Promise.resolve(false); return; }
-        pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
-        applySubstitute(auto, patch);
-        try {
-          run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
-        } catch (err) {
-          held.release();
-          throw err;
-        }
-      },
-      subPass,
-    );
-    consumeOnce(subPass);
-    immediate = false;
+          const held = holdAttemptNode(g, nodes(), nodeLock);
+          if (!held) { run = Promise.resolve(false); return; }
+          pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
+          applySubstitute(auto, patch);
+          try {
+            run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
+          } catch (err) {
+            held.release();
+            throw err;
+          }
+        },
+        subPass,
+      );
+    } finally {
+      consumeOnce(subPass);
+      immediate = false;
+    }
     if (!ok || !run) return false;
     return await run;
   }
