@@ -10,7 +10,7 @@ import type { FxLayer } from './fx/types';
 import type { ChatMessageMeta } from './feedMeta';
 
 import type { RemoteJob, SendRecord } from './sendTypes';
-export type { RemoteJob, SendRecord, SendStatus } from './sendTypes';
+export type { RemoteJob, SendRecord, SendStatus, SpendCategory, SpendEntry } from './sendTypes';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
@@ -878,21 +878,6 @@ export interface AgentState {
 
 /** One canvas's agent conversation: what the model saw and what is waiting on the user there. */
 export type CanvasConversation = Pick<AgentState, 'history' | 'pending' | 'questionRound' | 'notes' | 'draft' | 'revising'>;
-
-/** Where money went: the agent's model calls and each paid generation. */
-export type SpendCategory = 'agent' | MediaKind | 'text';
-
-export interface SpendEntry {
-  at: number;
-  usd: number;
-  /** True when the provider did not report the cost and it comes from published prices. */
-  estimated: boolean;
-  category: SpendCategory;
-  provider: string;
-  /** Model ref, or the LLM id for agent calls. */
-  model: string;
-  sessionId: string;
-}
 
 /** What one agent request cost in calls, tokens and the agent's own time (not the user's), and how it ended. */
 export interface AgentRequestMetrics {

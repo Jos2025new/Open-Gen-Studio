@@ -1,4 +1,4 @@
-import type { RemoteProviderId } from './types';
+import type { MediaKind, RemoteProviderId } from './types';
 
 export interface RemoteJob {
   provider: RemoteProviderId;
@@ -21,4 +21,19 @@ export interface SendRecord {
   estimated?: boolean;
   /** Already booked to Spending: a record is booked once (sendLedger). */
   bookedUsd?: number;
+}
+
+/** Where money went: the agent's model calls and each paid generation. */
+export type SpendCategory = 'agent' | MediaKind | 'text';
+
+export interface SpendEntry {
+  at: number;
+  usd: number;
+  /** True when the provider did not report the cost and it comes from published prices. */
+  estimated: boolean;
+  category: SpendCategory;
+  provider: string;
+  /** Model ref, or the LLM id for agent calls. */
+  model: string;
+  sessionId: string;
 }
