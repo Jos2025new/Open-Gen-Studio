@@ -110,24 +110,18 @@ const history = () => useStore.getState().sessions[sid()].agents.main.history as
 const tick = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 describe('verificacion 2: guardLlmBudget / llmTurn', () => {
-  it('Continue once on a tool-using turn lets exactly ONE call through (3 iterations: 1 POST, then a new alert); history keeps one user message', async () => {
+  it('Continue once on a tool-using turn lets that whole turn through (3 iterations: 3 POSTs, no new alert); history keeps one user message', async () => {
+    // User's decision 2026-11-22: «Continue once» runs this agent turn, not one call.
     setupAgent({ budgetUsd: 10, spentUsd: 10, model: 'paid-model', inputPrice: 3, outputPrice: 15 });
     let n = 0;
     const posts = mockLlmFetch(() => (++n < 3 ? sse([toolChunk('read_guide', { id: 'workflow:story' })]) : sse([textChunk('done')])));
     await llmTurn(sid(), 'chat', { route: 'new', agentNodeId: 'main' });
     expect(posts).toHaveLength(0);
     click(continueOnce()[0]);
-    await vi.waitFor(() => expect(useAlerts.getState().alerts.length).toBeGreaterThan(0));
-    await tick();
-    expect(posts).toHaveLength(1);
-    expect(continueOnce()).toHaveLength(1); // stopped mid-turn: asks again
-    const h = history();
-    expect(h.filter((m) => m.role === 'user' && m.content === 'hello')).toHaveLength(1);
-    expect(h[h.length - 1].role).toBe('tool'); // consistent: assistant tool_calls answered
-    // second click resumes: another single call, still one user message
-    click(continueOnce()[0]);
+    await vi.waitFor(() => expect(posts).toHaveLength(3));
     await tick(60);
-    expect(posts).toHaveLength(2);
+    expect(posts).toHaveLength(3);
+    expect(continueOnce()).toHaveLength(0);
     expect(history().filter((m) => m.role === 'user' && m.content === 'hello')).toHaveLength(1);
   });
 
@@ -152,8 +146,7 @@ describe('verificacion 2: guardLlmBudget / llmTurn', () => {
     expect(posts).toHaveLength(1);
   });
 
-  // BUG confirmado: guardLlmBudget ve el pase de la generacion como suyo, hace la llamada de pago y lo consume.
-  it.fails('a Continue once pass opened for another action (a generation) is not stolen by an agent turn that starts meanwhile', async () => {
+  it('a Continue once pass opened for another action (a generation) is not stolen by an agent turn that starts meanwhile', async () => {
     setupAgent({ budgetUsd: 10, spentUsd: 10, model: 'paid-model', inputPrice: 3, outputPrice: 15 });
     const posts = mockLlmFetch(() => sse([textChunk('ok')]));
     const id = sid();

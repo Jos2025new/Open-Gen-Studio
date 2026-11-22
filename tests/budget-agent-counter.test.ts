@@ -158,6 +158,33 @@ describe('1. llmTurn budget limit guard', () => {
     expect(posts).toHaveLength(2);
   });
 
+  it('a tool-using turn after "Continue once" completes 2 POSTs with one click, and the next turn stops again', async () => {
+    setupAgent({ budgetUsd: 10, spentUsd: 10, model: 'paid-model', inputPrice: 3, outputPrice: 15 });
+    let n = 0;
+    const posts = mockLlmFetch(() => {
+      n++;
+      if (n === 1) return sse([toolChunk('read_guide', { id: 'workflow:story' })]);
+      return sse([textChunk('Done after tool.')]);
+    });
+
+    await llmTurn(sid(), 'chat', { route: 'new', agentNodeId: 'main' });
+    expect(posts).toHaveLength(0);
+    const alert = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Continue once'));
+    expect(alert?.text).toContain('\u201cContinue once\u201d runs this agent turn.');
+
+    alert!.actions!.find((x) => x.label === 'Continue once')!.run();
+    await vi.waitFor(() => {
+      const feed = useStore.getState().sessions[sid()].feed;
+      expect(feed.some((f) => f.type === 'assistant' && f.text === 'Done after tool.')).toBe(true);
+    });
+    expect(posts).toHaveLength(2);
+    expect(useAlerts.getState().alerts).toHaveLength(0);
+
+    await llmTurn(sid(), 'chat', { route: 'new', agentNodeId: 'main' });
+    expect(posts).toHaveLength(2);
+    expect(useAlerts.getState().alerts.some((a) => a.actions?.some((x) => x.label === 'Continue once'))).toBe(true);
+  });
+
   it('free LLM model (0/0) never brakes even when budget is exhausted', async () => {
     setupAgent({ budgetUsd: 10, spentUsd: 12, model: 'free-model', inputPrice: 0, outputPrice: 0 });
     const posts = mockLlmFetch(() => sse([textChunk('Free reply.')]));

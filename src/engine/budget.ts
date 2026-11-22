@@ -106,10 +106,11 @@ export function consumeOnce(sessionId: string): void {
 }
 
 /** This run would go over an active limit nobody agreed to go past. Free runs ($0) never go over; an unknown price cannot be checked against it, so it asks too. */
-export function overLimit(e: Estimate, sessionId?: string): boolean {
+export function overLimit(e: Estimate, sessionId?: string, opts: { sessionPasses?: boolean } = {}): boolean {
   if (e.usd === 0) return false;
   const left = remainingBudget();
-  return left != null && !overLimitAccepted(sessionId) && (e.usd == null || e.usd > left + 1e-9);
+  const accepted = opts.sessionPasses === false ? !get().settings.budgetOn || noAskDurable(get(), sessionId) : overLimitAccepted(sessionId);
+  return left != null && !accepted && (e.usd == null || e.usd > left + 1e-9);
 }
 
 /** A send that would pass the spending limit and nobody agreed: createGeneration refuses it (the safety net behind every entry). */

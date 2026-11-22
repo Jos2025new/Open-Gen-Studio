@@ -49,16 +49,16 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId: string }): Promise<void> {
-  // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
+export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; budgetPass?: boolean; runId?: string; agentNodeId: string }): Promise<void> {
+  // Canvas can change mid-turn (open_board, continue_in_*).
   let workspace = startWorkspace;
-  // A turn belongs to one agent for its whole life: every read and write below names it, whichever agent is on screen later.
+  // Turn stays bound to one agent regardless of what is on screen later.
   const owner = opts.agentNodeId;
   const mine = (): AgentState => agentOf(sessionId, owner);
   const engine = agentEngine(sessionId, owner);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   const runId = opts.runId ?? uid('turn');
-  const guard = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => (session(sessionId) && !mine().busy ? llmTurn(sessionId, workspace, { ...opts, runId }) : undefined));
+  const guard = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => (session(sessionId) && !mine().busy ? llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: true }) : undefined), opts.budgetPass);
   if (!guard()) return;
   void loadLlmCatalog(engine.provider);
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
