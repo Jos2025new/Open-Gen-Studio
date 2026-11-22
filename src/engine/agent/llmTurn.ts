@@ -127,6 +127,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         sessionId,
         owner,
         workspace,
+        onWorkspace: (next) => { workspace = next; },
         textOnly: opts.textOnly,
         result: callOutcome.result,
         textItemId: callOutcome.textItemId,

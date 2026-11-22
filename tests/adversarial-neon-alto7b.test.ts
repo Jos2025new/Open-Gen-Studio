@@ -96,7 +96,7 @@ afterEach(() => {
 
 describe('Punto 7 (d6a32e7a) — workspace viejo capturado en llmTurn tras cambio de lienzo en runTurnToolLoop', () => {
   // Severidad: Alta | Origen: Nuevo (regresión introducida en d6a32e7a)
-  it.fails('H1-a: open_board(nodes) + ask_questions en el mismo mensaje conserva meta.space del lienzo nuevo ("canvas")', async () => {
+  it('H1-a: open_board(nodes) + ask_questions en el mismo mensaje conserva meta.space del lienzo nuevo ("canvas")', async () => {
     setupSession('chat', 'guided');
     vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
       if (isLlmPost(url, init)) {
@@ -118,7 +118,7 @@ describe('Punto 7 (d6a32e7a) — workspace viejo capturado en llmTurn tras cambi
   });
 
   // Severidad: Alta | Origen: Nuevo (regresión introducida en d6a32e7a)
-  it.fails('H1-b: continue_in_canvas + propose_plan desde Designer escribe plan con meta.space "canvas" (coherente con workspace "node")', async () => {
+  it('H1-b: continue_in_canvas + propose_plan desde Designer escribe plan con meta.space "canvas" (coherente con workspace "node")', async () => {
     setupSession('designer', 'direct');
     vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
       if (isLlmPost(url, init)) {
@@ -146,20 +146,23 @@ describe('Punto 7 (d6a32e7a) — workspace viejo capturado en llmTurn tras cambi
   });
 
   // Severidad: Alta | Origen: Nuevo (regresión introducida en d6a32e7a)
-  it.fails('H1-c: stopAgent durante una tool posterior a continue_in_canvas publica el aviso "Stopped." en el lienzo nuevo ("node" / "canvas")', async () => {
+  it('H1-c: stopAgent durante una tool posterior a continue_in_canvas publica el aviso "Stopped." en el lienzo nuevo ("node" / "canvas")', async () => {
     setupSession('designer', 'guided');
     let enteredSecondTool!: () => void;
     const secondToolStarted = new Promise<void>((r) => { enteredSecondTool = r; });
 
+    let llmAnswered = false;
     vi.stubGlobal('fetch', vi.fn((url: unknown, init?: RequestInit) => {
       if (isLlmPost(url, init)) {
+        llmAnswered = true;
         return Promise.resolve(sse([multiToolChunk([
           { name: 'continue_in_canvas', args: {} },
           { name: 'find_models', args: { query: 'flux', kind: 'image' } },
         ])]));
       }
       // find_models consulta el catálogo si no está cargado; detenemos ahí para disparar stopAgent mid-loop.
-      enteredSecondTool();
+      if (String(url).includes('nano-gpt.com') || String(url).includes('/x/store/log')) return Promise.resolve(new Response('{}', { status: 200 }));
+      if (llmAnswered) enteredSecondTool(); // only the fetch made by the 2nd tool counts, not the catalog load at turn start
       return new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
       });
@@ -188,7 +191,7 @@ describe('Punto 7 (d6a32e7a) — workspace viejo capturado en llmTurn tras cambi
 
 describe('Punto 6 (0d341213..af8e3869) — divergencia heredada addRef vs systemRefDefault y consumidores', () => {
   // Severidad: Media | Origen: Heredado (preservado vía addRef en 0d341213)
-  it.fails('H2-a: addSystemNode(prompt) sin ref debería enlazar al compositor ("composer") igual que systemRefDefault y los consumidores', () => {
+  it('H2-a: addSystemNode(prompt) sin ref debería enlazar al compositor ("composer") igual que systemRefDefault y los consumidores', () => {
     const id = addSystemNode(sid, { type: 'prompt' });
     const node = useStore.getState().sessions[sid].graph.nodes.find((n) => n.id === id)!;
     const data = node.data as RefNodeData;
@@ -198,7 +201,7 @@ describe('Punto 6 (0d341213..af8e3869) — divergencia heredada addRef vs system
   });
 
   // Severidad: Media | Origen: Heredado (preservado vía addRef en 0d341213)
-  it.fails('H2-b: addSystemNode(mediaSettings) sin ref debería usar una clave válida de store.composer ("image"), no "mediaSettings"', () => {
+  it('H2-b: addSystemNode(mediaSettings) sin ref debería usar una clave válida de store.composer ("image"), no "mediaSettings"', () => {
     const id = addSystemNode(sid, { type: 'mediaSettings' });
     const node = useStore.getState().sessions[sid].graph.nodes.find((n) => n.id === id)!;
     const data = node.data as RefNodeData;

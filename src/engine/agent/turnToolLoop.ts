@@ -51,6 +51,8 @@ export async function runTurnToolLoop(opts: {
   sessionId: string;
   owner: string;
   workspace: Workspace;
+  /** Called the moment a tool changes canvas, so the turn's closures (meta, Stop, limit note) never see a stale one. */
+  onWorkspace: (workspace: Workspace) => void;
   textOnly?: boolean;
   result: ChatResult;
   textItemId: string | null;
@@ -65,7 +67,7 @@ export async function runTurnToolLoop(opts: {
   planState: ProposePlanState;
   deps: TurnToolLoopDeps;
 }): Promise<{ stop: boolean; workspace: Workspace; roundBack?: boolean }> {
-  const { sessionId, owner, textOnly, result, textItemId, hasTextBubble, until, signal, log, clockElapsed, turnMeta, guard, usage, planState, deps } = opts;
+  const { sessionId, owner, onWorkspace, textOnly, result, textItemId, hasTextBubble, until, signal, log, clockElapsed, turnMeta, guard, usage, planState, deps } = opts;
   let workspace = opts.workspace;
 
   // The wrap-up after a plan (S4) is text only: a tool call there is answered as ignored and nothing runs.
@@ -178,6 +180,7 @@ export async function runTurnToolLoop(opts: {
       onCardCommitted: () => { if (!hasTextBubble()) usage.clearPending(); },
     });
     workspace = canvas.workspace;
+    onWorkspace(workspace);
     if (canvas.stop) return { stop: true, workspace };
     if (canvas.handled) continue;
 
