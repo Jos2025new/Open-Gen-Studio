@@ -42,7 +42,7 @@ export default [
     what: 'OpenRouter reasoning_details se guardan tal cual en el mensaje assistant y se reenvían; ningún otro proveedor los recibe. Cambiar el lado de llm.ts exige revisar runtime.ts y el tipo LlmMessage.',
     sides: [
       ['src/engine/providers/llm.ts', 'function withoutDetails'],
-      ['src/engine/agent/llmTurn.ts', 'reasoning_details: result.reasoningDetails'],
+      ['src/engine/agent/turnModelCall.ts', 'reasoning_details: result.reasoningDetails'],
       ['src/engine/types.ts', 'reasoning_details?: unknown[]'],
     ],
     tests: ['tests/reasoning-details.test.ts'],

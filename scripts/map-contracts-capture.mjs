@@ -20,7 +20,7 @@ export default [
     what: 'Todo plan con video espera la tarjeta de ajustes con la elección de borrador (Borrador bloquea la resolución, el candado la libera); un borrador terminado ofrece «Mejorar esta toma» con coste confirmado.',
     sides: [
       ['src/engine/agent/draftFirst.ts', 'export function draftGate'],
-      ['src/engine/agent/llmTurn.ts', 'draftGate(v.data.steps'],
+      ['src/engine/agent/proposePlanCall.ts', 'draftGate(v.data.steps'],
       ['src/components/chat/SettingsCard.tsx', 'unlockDraft(sessionId'],
       ['src/engine/agent/draftActions.ts', 'export function unlockDraft'],
       ['src/engine/agent/conversation.ts', 'confirmedSections(item'],
