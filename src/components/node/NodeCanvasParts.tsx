@@ -32,6 +32,7 @@ export const CanvasChatImport = memo(function CanvasChatImport({ sessionId, cont
     };
   }, [sessionId]);
   const finished = useStore(useShallow(selectFinished));
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- content, feed y finished suscriben cambios del store que chatWorkNotInNodes lee internamente
   const items = useMemo(() => chatWorkNotInNodes(sessionId).map(chatItem), [sessionId, content, feed, finished]);
   return <ImportFromChat
     sessionId={sessionId}
