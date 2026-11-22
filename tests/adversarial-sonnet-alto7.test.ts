@@ -40,6 +40,7 @@ describe('check-media-literals: bypasses (MEDIUM, inherited design, new check)',
   it('catches a template-literal list', () => {
     expect(mediaLiterals(srcRoot('export const A = [`image`, `video`, `audio`];'))).not.toHaveLength(0);
   });
+  // reproduce: check-media-literals ignores objects keyed by media kinds (scripts/check-media-literals.mjs reads arrays and unions only); kept open by Hydrogen as low severity.
   it.fails('catches an object keyed by the kinds', () => {
     expect(mediaLiterals(srcRoot('export const A = { image: 1, video: 2, audio: 3 };'))).not.toHaveLength(0);
   });
@@ -103,6 +104,7 @@ describe('check-sizes: baseline ratchet (LOW-MEDIUM, new)', () => {
     writeFileSync(join(root, 'scripts/size-baseline.json'), JSON.stringify({ 'big.ts': 31_000, 'new.ts': 35_000 }));
     expect(() => checkSizes(root)).toThrow();
   });
+  // reproduce: check-sizes only warns at 99% of 30 KB (scripts/check-sizes.mjs sizeWarnings); by design a warning, not a failure.
   it.fails('a file at 99% of the limit is more than a warning (only stderr noise: 56 files warn today)', () => {
     const root = repo(10, 10);
     writeFileSync(join(root, 'scripts/size-baseline.json'), '{}');
