@@ -2,6 +2,5 @@
   "src/engine/agent/context.ts": 44364,
   "src/engine/agent/tools.ts": 31228,
   "src/engine/providers/nanogpt.ts": 32111,
-  "src/engine/types.ts": 36884,
   "src/styles/shell.css": 41272
 }
