@@ -118,11 +118,17 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
   void saveNow().catch(() => undefined);
 }
 
-/** A cut-short run: with a ledger its delivered requests are already booked; older data books the proportional share. */
+/** A cut-short run: with a ledger its delivered requests are already booked; older data books the proportional share once. */
 export function chargePartial(g: Generation): void {
-  if (usesLedger(get().generations[g.id] ?? g)) return bookDelivered(g.id);
-  const cost = partialRetryCharge(g, g.parentId ? get().generations[g.parentId] : undefined);
-  if (cost) addSpend(cost, spendEntry(g, true));
+  const cur = get().generations[g.id] ?? g;
+  if (usesLedger(cur)) return bookDelivered(g.id);
+  const cost = partialRetryCharge(cur, cur.parentId ? get().generations[cur.parentId] : undefined);
+  if (cost === 0) return;
+  if (get().generations[g.id]) {
+    deliverSend(g.id, `partial:${g.id}`, 0, cost, true);
+    return;
+  }
+  addSpend(cost, spendEntry(cur, true));
 }
 
 /** How a generation shows in the Spending panel. */

@@ -34,8 +34,11 @@ export function planRetryEstimate(steps: PlanStep[], perStep: Record<string, Est
   return unpricedSubstitute ? { ...total, usd: null } : total;
 }
 
-export function partialRetryCharge(g: Generation, parent?: Generation): number {
+export function partialRetryCharge(g: Generation, parent?: Generation): number | undefined {
   const delivered = Math.max(0, g.assetIds.length - (parent?.assetIds.length ?? 0));
+  if (!delivered) return 0;
+  const base = (g.retryBaseEstimate ?? g.estimate).usd;
+  if (base == null) return undefined;
   const total = Math.max(1, g.retryTotal ?? g.settings.count);
-  return (g.retryBaseEstimate ?? g.estimate).usd == null ? 0 : (g.retryBaseEstimate ?? g.estimate).usd! * delivered / total;
+  return base * delivered / total;
 }

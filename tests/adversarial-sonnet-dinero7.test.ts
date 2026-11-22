@@ -172,10 +172,27 @@ describe('Re-attack (Sonnet) dinero 7: consumers that treat unknown actualUsd as
   });
 
   // Finding C (inherited, legacy non-ledger data only): a cut-short unpriced run books nothing and annotates nothing.
-  it.fails('chargePartial on a legacy (no ledger) unpriced partial run records an unknown-price entry', async () => {
+  it('chargePartial on a legacy (no ledger) unpriced partial run records an unknown-price entry', async () => {
     const { chargePartial } = await import('../src/engine/jobState');
-    useStore.setState({ spendLog: [], generations: { g1: gen({ sessionId: sid(), modelRef: NANO, sends: undefined }) } });
+    const legacy = gen({ sessionId: sid(), modelRef: NANO, sends: undefined });
+    useStore.setState({ spendLog: [], generations: { g1: legacy } });
     chargePartial(genOf('g1'));
     expect(useStore.getState().spendLog.some((e) => e.unknownPrice)).toBe(true);
+    // Idempotent: calling again with fresh or stale generation must not duplicate the unknown-price entry.
+    chargePartial(genOf('g1'));
+    chargePartial(legacy);
+    expect(useStore.getState().spendLog.filter((e) => e.unknownPrice)).toHaveLength(1);
+
+    // Zero delivered outputs or genuinely free ($0) legacy partials must not record an unknown entry.
+    useStore.setState({
+      spendLog: [],
+      generations: {
+        gEmpty: gen({ id: 'gEmpty', sessionId: sid(), modelRef: NANO, assetIds: [], sends: undefined }),
+        gFree: gen({ id: 'gFree', sessionId: sid(), modelRef: FREE, estimate: { usd: 0 }, sends: undefined }),
+      },
+    });
+    chargePartial(genOf('gEmpty'));
+    chargePartial(genOf('gFree'));
+    expect(useStore.getState().spendLog).toHaveLength(0);
   });
 });
