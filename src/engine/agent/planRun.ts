@@ -24,7 +24,7 @@ import { editPairParts, WRAPUP_COMPARE_RULE } from './wrapUpPairs';
 import { agentSeesImages, userMessage } from './attachments';
 import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
-import { overLimit, overLimitText } from '../budget';
+import { budgetProblem, consumeOnce, type BudgetPass } from '../budget';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
 import { failedStepSummary } from './failureContext';
@@ -44,7 +44,7 @@ export function removeDraftNodes(sessionId: string, planId: string): void {
 // Plan approval & execution
 
 
-export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
+export async function approvePlan(sessionId: string, itemId: string, budgetPass?: BudgetPass): Promise<void> {
   claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
@@ -52,7 +52,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   if (agentOf(sessionId, owner).revising === itemId) return; // its agent is rewriting it: the old plan must not run
-  if (item.nodeRun) { await approveNodeRun(sessionId, item); return; }
+  if (item.nodeRun) { await approveNodeRun(sessionId, item, budgetPass); return; }
   if (item.plan.workspace === 'node') return; // a Nodes plan runs only as an approved node run (its card carries one); never by recompiling the live graph
   const { plan } = item;
   const off = new Set(item.skipped ?? []);
@@ -65,10 +65,12 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const { total, authorizations } = estimateSteps(chosen);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approval_attempted', reason: 'approval requested; budget check pending', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: item.status, stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd } });
   // Over an active limit, the card asks first ("Continue once"); approving without that stops here.
-  if (overLimit(total, sessionId)) {
-    toast(overLimitText(total), 'error');
+  const problem = budgetProblem(total, sessionId, budgetPass);
+  if (problem) {
+    toast(problem, 'error');
     return;
   }
+  consumeOnce(budgetPass);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === itemId;
@@ -249,7 +251,7 @@ async function executePlanItem(
 }
 
 /** Claim the waiting step synchronously; another click cannot authorize or send it again. */
-export async function resolveStepCostReview(sessionId: string, itemId: string, stepId: string, decision: 'continue' | 'cancel'): Promise<void> {
+export async function resolveStepCostReview(sessionId: string, itemId: string, stepId: string, decision: 'continue' | 'cancel', budgetPass?: BudgetPass): Promise<void> {
   claimLaneOfItem(sessionId, itemId);
   const owner = laneOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
@@ -258,7 +260,9 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   if (!item || !review || !generationId || !reviewOpen(item, stepId)) return;
   if (item.plan.workspace === 'node') return; // Nodes spend only through runAction: nothing here may decide or send for them
   // «Continuar» raises what this step spends above what was approved: over an active limit it needs the same pass as any other spend (PlanCard gives it with «Continue once»).
-  if (decision === 'continue' && overLimit(review.proposed.estimate, sessionId)) { toast(overLimitText(review.proposed.estimate), 'error'); return; }
+  const reviewProblem = decision === 'continue' ? budgetProblem(review.proposed.estimate, sessionId, budgetPass) : null;
+  if (reviewProblem) { toast(reviewProblem, 'error'); return; }
+  if (decision === 'continue') consumeOnce(budgetPass);
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
@@ -327,14 +331,15 @@ export { planRecovery, planRecoveryProblem, type PlanRecoveryMode };
  * A retry may send again something the provider already received, so it is the user's decision: it runs only with
  * `userConfirmed` (the "Retry failed" button, which shows the price). The agent never passes it.
  */
-export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode, userConfirmed = false): Promise<string> {
+export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode, userConfirmed = false, budgetPass?: BudgetPass): Promise<string> {
   if (mode === 'retry' && !userConfirmed) return RETRY_NEEDS_USER;
   claimLaneOfItem(sessionId, itemId);
   toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan') return 'No such plan.';
-  const problem = planRecoveryProblem(item, mode, sessionId);
+  const problem = planRecoveryProblem(item, mode, sessionId, budgetPass);
   if (problem) return problem;
+  consumeOnce(budgetPass);
   const { chosen, off } = approvedSteps(item);
   const failedIds = chosen.filter((st) => item.stepStates[st.id] === 'error').map((st) => st.id);
   const genOf = (id: string) => get().generations[item.stepGenerations[id] ?? ''];

@@ -1,9 +1,9 @@
 import { ComposerAlerts } from './ComposerAlerts';
 import { useRecipientThread } from '../../engine/agent/useThread';
 import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
-import { sendSessionId, ensureSendSession, isSpaceSession } from '../../store/spaceSession';
+import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowUp, Layers, Pencil, X, Zap } from '../ui/icons';
+import { Layers, Pencil, X } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { recipientOf } from '../../engine/agent/recipient';
@@ -13,17 +13,18 @@ import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
 import { clipTrim, paramByRole, placeKeyframes, routeVideoInputs } from '../../engine/params';
 import { beginJourney, recordJourneyEvent } from '../../lib/journeyTrace';
-import type { MediaKind } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Chip, costLabel } from '../ui/primitives';
-import { SpendConfirm } from '../ui/SpendConfirm';
+import { Chip } from '../ui/primitives';
+import { SendDirect } from './SendDirect';
 import { ComposerStrip } from './ComposerStrip';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
 import { DockSlot } from '../designer/ToolPalette';
 import { ScrollRail } from './ScrollRail';
 import { AgentSend } from './AgentSend';
+
+export { SendDirect };
 
 export function AttachStrip({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
@@ -176,64 +177,6 @@ export function DesignerTargetChip() {
             </span>
           </button>
         </div>
-      </Popover>
-    </>
-  );
-}
-
-export function SendDirect({ kind, onLaunch, compact = false }: { kind: MediaKind; onLaunch?: (text: string) => void; compact?: boolean }) {
-  const composer = useStore((s) => s.composer);
-  // All schemas: the check may use the family's edit variant (directModelRef), whose schema loads later.
-  const schema = useStore((s) => s.catalog.schemas);
-  const assets = useStore((s) => s.assets);
-  const spent = useStore((s) => s.spentUsd);
-  const sid = useStore(sendSessionId);
-  const budget = useStore((s) => s.settings);
-  const noAsk = useStore((s) => s.sessions[sid]?.noAskOverLimit);
-  const workspace = useStore((s) => s.ui.workspace);
-  const models = useStore((s) => s.catalog.models);
-  const quotes = useStore((s) => s.quotes);
-  // Recompute whenever any input of the check changes (an Atlas quote arriving included).
-  const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, sid, noAsk, workspace, models, quotes]);
-  const pop = usePopover();
-  const unknown = check.estimate.usd == null;
-  const launch = () => { onLaunch?.(useStore.getState().composer.text); return generateDirect(kind); };
-  const onClick = () => {
-    if (!check.ok) {
-      toast(check.reason ?? 'Not ready', 'error');
-      return;
-    }
-    // Unknown price or over the spending limit: confirm in the cost popover first.
-    if (unknown || check.overLimit) pop.toggle();
-    else launch();
-  };
-  return (
-    <>
-      {compact ? <span className="send-cost num" aria-hidden="true">{costLabel(check.estimate, { short: true })}</span> : null}
-      <button
-        ref={pop.ref}
-        type="button"
-        className={`send-btn is-generate ${check.ok ? '' : 'is-blocked'}`}
-        aria-label={`Generate · ${costLabel(check.estimate, { short: true })}`}
-        onClick={onClick}
-        aria-disabled={!check.ok}
-        data-tip={check.ok ? (unknown ? 'Price not published: you will confirm first' : check.overLimit ? 'Over your spending limit: you will confirm first' : 'Generate (Enter)') : check.reason}
-      >
-        {compact ? <ArrowUp size={16} strokeWidth={2.2} /> : <><Zap size={14} strokeWidth={2} /><span>Generate</span><span className="send-cost num">{costLabel(check.estimate, { short: true })}</span></>}
-      </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Confirm cost">
-        <SpendConfirm
-          sessionId={sid}
-          resolveSessionId={ensureSendSession}
-          title="Generate"
-          estimate={check.estimate}
-          confirmLabel="Generate"
-          onConfirm={() => {
-            pop.close();
-            return launch();
-          }}
-          onCancel={pop.close}
-        />
       </Popover>
     </>
   );

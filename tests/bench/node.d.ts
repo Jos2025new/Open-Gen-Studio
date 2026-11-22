@@ -15,7 +15,7 @@ declare module 'node:fs' {
 }
 declare module 'node:child_process' {
   export function execSync(cmd: string): { toString(): string };
-  export function execFileSync(file: string, args?: string[], opts?: { stdio?: 'ignore' }): { toString(): string };
+  export function execFileSync(file: string, args?: string[], opts?: { cwd?: string; stdio?: 'ignore' | 'pipe' }): { toString(): string };
 }
 declare module 'node:os' {
   export function tmpdir(): string;

@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { BudgetPass } from '../budget';
 import type { Estimate } from '../types';
 
 /*
@@ -27,6 +28,8 @@ export interface CommandContext {
   on: Target;
   caller: Caller;
   signal?: AbortSignal;
+  /** Per-sequence budget pass granted by "Allow this time"; never visible to other actions. */
+  budgetPass?: BudgetPass;
 }
 
 /** `true`, or the reason it cannot run now ("no layer is selected"): the agent reads it, the interface shows it. */

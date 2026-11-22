@@ -228,7 +228,7 @@ describe('run_commands', () => {
     });
     // A stand-in for a paid run: it prices $0.10 and, like the real ones, refuses itself when the limit would stop it.
     const price = { usd: 0.10, approximate: false };
-    if (!command('nodes.test.paid')) register(defineCommand({ id: 'nodes.test.paid', title: 'Paid stand-in', args: z.object({ node: z.string() }).strict(), effect: 'spend', estimate: () => price, run: (_ctx, args) => { const problem = budgetProblem(price, sid); if (problem) throw new Error(problem); return { ran: args.node }; } }));
+    if (!command('nodes.test.paid')) register(defineCommand({ id: 'nodes.test.paid', title: 'Paid stand-in', args: z.object({ node: z.string() }).strict(), effect: 'spend', estimate: () => price, run: (ctx, args) => { const problem = budgetProblem(price, sid, ctx.budgetPass); if (problem) throw new Error(problem); return { ran: args.node }; } }));
     const makeNodeAndRun = [
       { cmd: 'nodes.node.new_data', args: { kind: 'image' } },
       { cmd: 'nodes.node.add', args: { data: '$1', position: { x: 0, y: 0 } } },

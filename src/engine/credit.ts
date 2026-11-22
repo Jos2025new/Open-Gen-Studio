@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { llmCallEstimate, overLimit, overLimitText, withOncePass } from './budget';
+import { budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, dontAskAgain, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -149,34 +149,50 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
 };
 
 /** Run `proceed` when within budget, or ask once with "Continue once" / "Cancel" above the prompt box. */
-function confirmOverLimit(sessionId: string, title: string, e: Estimate, choicesText: string, proceed: () => unknown): boolean {
-  if (!overLimit(e, sessionId)) {
-    proceed();
+function confirmOverLimit(
+  sessionId: string,
+  title: string,
+  e: Estimate,
+  choicesText: string,
+  proceed: (pass?: BudgetPass) => unknown,
+  pass?: BudgetPass,
+): boolean {
+  const verdict = budgetVerdict(e, { sessionId, pass, choices: choicesText });
+  if (!verdict.over) {
+    proceed(pass);
     return true;
   }
   const id = pushAlert({
     level: 'warn',
-    text: `${title}: ${overLimitText(e, choicesText)}`,
+    text: `${title}: ${verdict.text}`,
     actions: [
-      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, proceed); } },
+      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, (once) => proceed(once)); } },
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
   return false;
 }
 
-/** Check the spending limit before a paid LLM call. Uses its own per-turn pass (never session passes) so unrelated actions neither grant nor lose a pass. */
+/** Check the spending limit before a paid LLM call. Uses its own per-turn pass so unrelated actions neither grant nor lose a pass. */
 export function guardLlmBudget(sessionId: string, provider: LlmProviderId, model: string, title: string, resume: () => unknown, budgetPass = false): boolean {
   if (budgetPass) return true;
   const est = llmCallEstimate(provider, model);
-  // The agent's own per-turn pass only: a session pass belongs to another action.
-  if (!overLimit(est, sessionId, { sessionPasses: false })) return true;
+  const verdict = budgetVerdict(est, { sessionId });
+  if (!verdict.over) return true;
   let ran = false;
+  const go = (quiet: boolean) => () => {
+    if (ran) return;
+    ran = true;
+    dismissAlert(id);
+    if (quiet && get().sessions[sessionId]) dontAskAgain(sessionId);
+    void resume();
+  };
   const id = pushAlert({
     level: 'warn',
-    text: `${title}: ${overLimitText(est, '\u201cContinue once\u201d runs this agent turn.')}`,
+    text: `${title}: ${verdict.text}`,
     actions: [
-      { label: 'Continue once', run: () => { if (ran) return; ran = true; dismissAlert(id); void resume(); } },
+      { label: 'Continue once', run: go(false) },
+      { label: 'Don\u2019t ask again', run: go(true) },
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
@@ -251,28 +267,36 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     }
   })().catch(logged(what));
 
-  const answer = (o: CreditOption, what: string, remember = false) => {
-    if (stale()) return;
+  const answer = (o: CreditOption, what: string, remember = false, useSubPass = false) => {
+    if (stale()) { clearGenerationPass(genId, true); return; }
     if (remember) setSettings({ autoSwitchProvider: 'always' });
     const patch = substitute(o);
     // The plan's Retry prices the whole recovery and is the only entry point for this step.
     if (g.planId) {
+      clearGenerationPass(genId, true);
       applySubstitute(o, patch);
       pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Review the updated price on the plan before choosing Retry.` });
       return;
     }
-    confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), retryEstimateFor(patch), '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what));
+    const est = retryEstimateFor(patch);
+    const subPass = useSubPass ? takeGenerationPass(genId, est) : undefined;
+    try {
+      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what), subPass);
+    } finally {
+      consumeOnce(subPass);
+    }
   };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
   if (auto && mode === 'ask') {
     // First time (and until "Don't ask again"): the user decides, seeing the new provider and price. Same model, same price or less (ADR 0025 C).
+    if (!g.planId) deferGenerationPass(genId);
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it on ${PROVIDER_LABELS[auto.model.provider]} instead (${label(auto.model, undefined, auto.usd)}, same model, same price or less)?`,
       actions: [
-        { label: 'Yes, this time', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit'); } },
-        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', true); } },
+        { label: 'Yes, this time', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', false, true); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); answer(auto, 'switch provider after no credit', true, true); } },
       ],
     });
     return false;
@@ -280,36 +304,44 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   if (auto && mode === 'always') {
     if (superseded()) return false;
     const patch = substitute(auto);
+    const est = retryEstimateFor(patch);
     let immediate = true;
     let run: Promise<boolean> | undefined;
-    const ok = confirmOverLimit(
-      g.sessionId,
-      label(auto.model, undefined, auto.usd),
-      retryEstimateFor(patch),
-      '\u201cContinue once\u201d runs only this generation on that model.',
-      () => {
-        if (!immediate) {
-          if (stale()) return;
-          if (g.planId) {
-            applySubstitute(auto, patch);
-            pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
-            return;
+    const subPass = takeGenerationPass(genId, est);
+    let ok = false;
+    try {
+      ok = confirmOverLimit(
+        g.sessionId,
+        label(auto.model, undefined, auto.usd),
+        est,
+        '\u201cContinue once\u201d runs only this generation on that model.',
+        () => {
+          if (!immediate) {
+            if (stale()) return;
+            if (g.planId) {
+              applySubstitute(auto, patch);
+              pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
+              return;
+            }
+            return sendLater(auto, patch, 'switch provider after no credit')();
           }
-          return sendLater(auto, patch, 'switch provider after no credit')();
-        }
-        const held = holdAttemptNode(g, nodes(), nodeLock);
-        if (!held) { run = Promise.resolve(false); return; }
-        pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
-        applySubstitute(auto, patch);
-        try {
-          run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
-        } catch (err) {
-          held.release();
-          throw err;
-        }
-      },
-    );
-    immediate = false;
+          const held = holdAttemptNode(g, nodes(), nodeLock);
+          if (!held) { run = Promise.resolve(false); return; }
+          pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
+          applySubstitute(auto, patch);
+          try {
+            run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
+          } catch (err) {
+            held.release();
+            throw err;
+          }
+        },
+        subPass,
+      );
+    } finally {
+      consumeOnce(subPass);
+      immediate = false;
+    }
     if (!ok || !run) return false;
     return await run;
   }
@@ -391,7 +423,7 @@ export async function onAgentCredit(sessionId: string = get().activeSessionId): 
     return false;
   }
   if (auto && mode === 'always') {
-    if (overLimit(llmCallEstimate(auto.p, auto.m.id), sessionId)) {
+    if (budgetVerdict(llmCallEstimate(auto.p, auto.m.id), { sessionId }).over) {
       pick(auto);
       return false;
     }

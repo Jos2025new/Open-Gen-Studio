@@ -630,6 +630,7 @@ describe('Gesture attack 3: group frames & members', () => {
 
 describe('Gesture attack 4: check-node-drag guard gaps', () => {
   // Cubierto por el test de conteo: the runtime write counters above catch any write during a drag the AST guard misses.
+  // reproduce: checkNodeDrag devuelve [] si un bloque sombrea un alias de `c.dragging` con `false` (`const d = false; if (!d) editPresentation(...)`), desde c10f99fe (2026-11-21); cierre: scripts/check-node-drag.mjs:76-94 y scripts/check-node-drag.mjs:282-312 (ámbito léxico para dragAliases/walk).
   it.fails('catches editPresentation when a block shadows a c.dragging alias with false', () => {
     const root = mkdtempSync(join(tmpdir(), 'ogs-adv-gest-'));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));

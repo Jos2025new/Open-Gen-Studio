@@ -54,11 +54,11 @@ describe('the limit warns, it does not block (G2)', () => {
     const run = { usd: 0.5, approximate: false };
     expect(overLimit(run)).toBe(true);
     expect(budgetProblem(run)).toMatch(/Continue once/);
-    withOncePass(useStore.getState().activeSessionId, () => {
-      expect(overLimit(run)).toBe(false);
-      expect(budgetProblem(run)).toBeNull();
-      consumeOnce(useStore.getState().activeSessionId);
-      expect(overLimit(run)).toBe(true);
+    withOncePass(useStore.getState().activeSessionId, (pass) => {
+      expect(overLimit(run, undefined, pass)).toBe(false);
+      expect(budgetProblem(run, undefined, pass)).toBeNull();
+      consumeOnce(pass);
+      expect(overLimit(run, undefined, pass)).toBe(true);
     });
     expect(overLimit(run)).toBe(true);
     askAgain();

@@ -133,21 +133,26 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
+  const rfRef = useRef(rf);
+  rfRef.current = rf;
   const view = useViewMemory(sessionId, omni, !embedded);
   useOmniFraming(omni, sessionId, rf, Boolean(view.saved));
   usePortZoom(omni, canvasRef);
   // Nodes the agent just added: frame them once they are measured.
-  const focus = useNodeFocus();
+  const focusTick = useNodeFocus((s) => s.tick);
   useEffect(() => {
-    if (!focus.tick || focus.sessionId !== sessionId) return;
-    const t = window.setTimeout(() => void rf.fitView({ nodes: focus.ids.map((id) => ({ id })), padding: 0.3, maxZoom: 1, duration: 450 }), 150);
+    const focus = useNodeFocus.getState();
+    if (!focusTick || focus.sessionId !== sessionId) return;
+    const t = window.setTimeout(() => void rfRef.current.fitView({ nodes: focus.ids.map((id) => ({ id })), padding: 0.3, maxZoom: 1, duration: 450 }), 150);
     return () => window.clearTimeout(t);
-  }, [focus.tick]);
+  }, [focusTick, sessionId]);
   // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
   const measuredRef = useRef(measured);
   measuredRef.current = measured;
   const loadedRef = useLoadedIds(sessionId, fullGraph);
+  const loadedIdsRef = useRef(loadedRef);
+  loadedIdsRef.current = loadedRef;
   useEffect(() => {
     const live = new Set(fullRevision.nodes.map((n) => n.id));
     setMeasured((prev) => {
@@ -216,7 +221,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       if (sizes.length) setMeasured((prev) => new Map([...prev, ...sizes]));
       // First sizes of nodes added or imported in this session of the interface: settle them off their neighbours (no undo step
       // of its own). Cards restored from the saved graph are never moved: their saved position is exact.
-      const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id) && !loadedRef.current?.ids.has(id)).map(([id]) => id));
+      const fresh = new Set(sizes.filter(([id]) => !measuredRef.current.has(id) && !loadedIdsRef.current.current?.ids.has(id)).map(([id]) => id));
       if (fresh.size) settleNewNodes(sessionId, fresh, new Map([...measuredRef.current, ...sizes]));
     },
     [sessionId, applyDragChanges],
@@ -292,7 +297,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     const images = ready.filter(f => f.type.startsWith('image/'));
     if (!images.length) return;
     const r = canvasRef.current?.getBoundingClientRect();
-    const pos = position ?? (r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
+    const pos = position ?? (r ? rfRef.current.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
     const ids = await uploadFiles(images);
     const occ = liveOccupied();
     const added = ids.map((assetId, i) => {
@@ -303,14 +308,14 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       return addNode(sessionId, data, p);
     });
     if (added.length) selectNodes(added);
-  }, [sessionId, rf, liveOccupied]);
+  }, [sessionId, liveOccupied, selectNodes]);
 
   useEffect(() => {
     if (embedded) return;
     const open = () => fileInput.current?.click();
     window.addEventListener('ogs:upload', open);
     return () => window.removeEventListener('ogs:upload', open);
-  }, []);
+  }, [embedded]);
 
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
@@ -329,7 +334,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     };
     document.addEventListener('paste', paste);
     return () => document.removeEventListener('paste', paste);
-  }, [importImages, sessionId]);
+  }, [importImages, sessionId, insideRef, selectNodes]);
 
   // X (no modifier) takes the scissors and gives them back; Escape also leaves them. Not inside text fields.
   useEffect(() => {
@@ -342,7 +347,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [embedded]);
+  }, [embedded, insideRef]);
 
   // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
   useEffect(() => {
@@ -360,7 +365,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [sessionId]);
+  }, [sessionId, insideRef]);
 
   const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 

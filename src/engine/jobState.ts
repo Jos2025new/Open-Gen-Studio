@@ -2,7 +2,7 @@ import { JobFailedError } from '../lib/http';
 import { getAssetBlob } from '../lib/idb';
 import { patchGeneration, saveNow, useStore } from '../store/store';
 import { addSpend } from '../store/spend';
-import { noteExcess } from './budget';
+import { noteExcess, type BudgetPass } from './budget';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { deliveryNotes } from './delivery';
 import { isVideoOpEngine, OPS } from './ops';
@@ -34,6 +34,8 @@ export interface GenerationSpec {
   stepId?: string;
   /** Runtime token covering the steps of an approved Nodes run; never persisted. */
   batchToken?: symbol;
+  /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
+  budgetPass?: BudgetPass;
   estimate?: Estimate;
   variants?: string[];
 }
@@ -73,10 +75,11 @@ export function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | u
 export function finishText(id: string, text: string, actualUsd: number | undefined, reqId?: string): void {
   const g = get().generations[id];
   if (!g || g.status === 'done') return;
-  if (usesLedger(g)) deliverSend(id, reqId, g.sends!.length, actualUsd ?? g.estimate.usd ?? 0, actualUsd == null);
+  const cost = actualUsd ?? g.estimate.usd ?? undefined;
+  if (usesLedger(g)) deliverSend(id, reqId, g.sends!.length, cost, actualUsd == null);
   const sends = usesLedger(g) ? undefined : markSendsDone(g.sends, reqId);
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
-  if (!usesLedger(g)) addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  if (!usesLedger(g)) addSpend(cost, spendEntry(g, actualUsd == null));
   noteExcess(id);
   void saveNow().catch(() => undefined);
 }
@@ -95,8 +98,9 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
   // Ledger: every delivered request was booked when it delivered; the generation's cost is their sum.
   const ledger = usesLedger(g);
   if (ledger) bookDelivered(id);
-  const booked = ledger ? ledgerCost(get().generations[id] ?? g) : undefined;
-  const sends = ledger ? get().generations[id]?.sends : markSendsDone(g.sends, reqId);
+  const latest = get().generations[id] ?? g;
+  const booked = ledger && latest.sends?.some((s) => s.status === 'done') ? ledgerCost(latest) : undefined;
+  const sends = ledger ? latest.sends : markSendsDone(g.sends, reqId);
   const uniqueAssetIds = [...new Set(assetIds)];
   patchGeneration(id, {
     status: 'done',
@@ -105,22 +109,28 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
     statusText: undefined,
     progress: undefined,
     finishedAt: Date.now(),
-    actualUsd: booked ? (booked.known || (booked.estimatedUsd === 0 && booked.usd > 0) ? booked.usd : undefined) : actualUsd,
-    providerReportedUsd,
+    actualUsd: booked ? (!booked.hasUnknown && (booked.known || (booked.estimatedUsd === 0 && booked.usd > 0)) ? booked.usd : undefined) : actualUsd,
+    providerReportedUsd: booked?.hasUnknown ? undefined : providerReportedUsd,
     remoteJob: undefined,
     sending: undefined,
     ...(sends ? { sends } : {}),
   });
-  if (!ledger) addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  if (!ledger) addSpend(actualUsd ?? g.estimate.usd, spendEntry(g, actualUsd == null));
   noteExcess(id);
   void saveNow().catch(() => undefined);
 }
 
-/** A cut-short run: with a ledger its delivered requests are already booked; older data books the proportional share. */
+/** A cut-short run: with a ledger its delivered requests are already booked; older data books the proportional share once. */
 export function chargePartial(g: Generation): void {
-  if (usesLedger(get().generations[g.id] ?? g)) return bookDelivered(g.id);
-  const cost = partialRetryCharge(g, g.parentId ? get().generations[g.parentId] : undefined);
-  if (cost) addSpend(cost, spendEntry(g, true));
+  const cur = get().generations[g.id] ?? g;
+  if (usesLedger(cur)) return bookDelivered(g.id);
+  const cost = partialRetryCharge(cur, cur.parentId ? get().generations[cur.parentId] : undefined);
+  if (cost === 0) return;
+  if (get().generations[g.id]) {
+    deliverSend(g.id, `partial:${g.id}`, 0, cost, true);
+    return;
+  }
+  addSpend(cost, spendEntry(cur, true));
 }
 
 /** How a generation shows in the Spending panel. */

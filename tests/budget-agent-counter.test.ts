@@ -170,7 +170,8 @@ describe('1. llmTurn budget limit guard', () => {
     await llmTurn(sid(), 'chat', { route: 'new', agentNodeId: 'main' });
     expect(posts).toHaveLength(0);
     const alert = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Continue once'));
-    expect(alert?.text).toContain('\u201cContinue once\u201d runs this agent turn.');
+    expect(alert?.text).toContain('\u201cContinue once\u201d lets only this run through; \u201cDon\u2019t ask again\u201d stops asking in this session. Nothing running is stopped.');
+    expect(alert?.actions?.map((x) => x.label)).toEqual(['Continue once', 'Don\u2019t ask again', 'Cancel']);
 
     alert!.actions!.find((x) => x.label === 'Continue once')!.run();
     await vi.waitFor(() => {

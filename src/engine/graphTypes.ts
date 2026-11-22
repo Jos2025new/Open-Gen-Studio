@@ -14,7 +14,7 @@ export interface ExtraSystemTypes {}
 export const BASE_NODE_KINDS = ['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset', 'ref'] as const;
 export type BaseNodeKind = typeof BASE_NODE_KINDS[number];
 export type NodeKind = BaseNodeKind | keyof ExtraNodeKinds;
-export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
+export type PortType = 'text' | MediaKind;
 /** Link classes: `data` carries values and runs in order; `ref` points; `control` governs. `both` only on ref and control. */
 export const LINK_KINDS = ['data', 'ref', 'control'] as const;
 export type LinkKind = typeof LINK_KINDS[number];

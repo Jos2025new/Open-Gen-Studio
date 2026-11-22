@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Panel, type Edge } from '@xyflow/react';
 import { disconnectEdges, deleteNodes } from '../../engine/flow/actions';
 import { ungroup } from '../../engine/flow/arrange';
@@ -82,8 +82,10 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
       return d?.kind === 'ref' && g.edges.some((e) => (e.kind ?? 'data') === 'control' && (e.source === id || e.target === id) && (model(e.source) || model(e.target)));
     });
   };
+  const afterDeleteRef = useRef(afterDelete);
+  afterDeleteRef.current = afterDelete;
   /** Deletes nodes (with their connected links), standalone links, and group frames as one atomic undo step. */
-  const runDelete = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
+  const runDelete = useCallback((nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
     const g = useStore.getState().sessions[sessionId]?.graph;
     if (!g) return;
     const groupSet = new Set((g.groups ?? []).map((gr) => gr.id));
@@ -107,8 +109,8 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
     } finally {
       h.close();
     }
-    afterDelete(nodeIds, edgeIds);
-  };
+    afterDeleteRef.current(nodeIds, edgeIds);
+  }, [sessionId]);
   const request = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
     if (needsConfirm(nodeIds)) setAsk({ nodes: nodeIds, edges: edgeIds, beforeDelete });
     else runDelete(nodeIds, edgeIds, beforeDelete);
@@ -126,7 +128,7 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
         </div>
       </Panel>
     );
-  }, [ask, graph, sessionId]);
+  }, [ask, graph, runDelete]);
   /** React Flow's Delete key: handle node/edge deletion atomically so node+link restore in one undo step. */
   const before = async ({ nodes, edges }: { nodes: Array<{ id: string }>; edges: Array<{ id: string }> }) => {
     const nodeIds = nodes.map((n) => n.id);

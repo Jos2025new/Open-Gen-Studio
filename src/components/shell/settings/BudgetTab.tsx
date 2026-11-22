@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Bell, BellOff, CircleDollarSign, Coins, Percent, Receipt, Wallet } from '../../ui/icons';
-import { formatUsd } from '../../../lib/format';
 import { askAgain, noAskEverywhere, subscribeUntilNextSession, untilNextSessionActive } from '../../../engine/budget';
+import { formatSpendAmount } from '../../../engine/spending';
 import { NOTICES, setMuted, useNotice, autoSwitchMode, type AutoSwitch } from '../../../engine/notices';
 import { priceMargin } from '../../../engine/priceAuthorization';
 import { setSettings, setUi, useStore } from '../../../store/store';
@@ -23,6 +23,7 @@ export function BudgetTab() {
   const sessionNoAsk = useStore((s) => Boolean(s.sessions[s.activeSessionId]?.noAskOverLimit));
   const untilNext = useSyncExternalStore(subscribeUntilNextSession, untilNextSessionActive);
   const spent = useStore((s) => s.spentUsd);
+  const hasUnknownSpend = useStore((s) => s.spendLog.some((e) => e.unknownPrice));
   const [budget, setBudget] = useState(String(settings.budgetUsd));
   useEffect(() => setBudget(String(settings.budgetUsd)), [settings.budgetUsd]);
   return <>
@@ -79,7 +80,7 @@ export function BudgetTab() {
         />
       </SetRow>
       <SetRow icon={Coins} label="Spent" className="set-row-3">
-        <span className="num">{formatUsd(spent)}</span>
+        <span className="num">{formatSpendAmount(spent, { unknown: hasUnknownSpend })}</span>
         <Button
           size="sm"
           variant="ghost"

@@ -24,7 +24,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { deliverSend, shareOfEstimate } from './sendLedger';
 import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
-import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
+import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -52,8 +52,10 @@ export function modelName(ref: string): string {
 export function createGeneration(spec: GenerationSpec): Generation {
   const estimate = spec.estimate ?? estimateSpec(spec);
   // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
-  assertWithinLimit(estimate, spec.sessionId, stepApproved(spec.sessionId, spec.planId, spec.stepId) || batchStepApproved(spec.sessionId, spec.batchToken, spec.stepId));
-  consumeOnce(spec.sessionId);
+  const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || batchStepApproved(spec.sessionId, spec.batchToken, spec.stepId);
+  assertWithinLimit(estimate, spec.sessionId, approved, spec.budgetPass);
+  const hadPass = passActiveFor(spec.budgetPass, spec.sessionId) || batchStepHadPass(spec.sessionId, spec.batchToken, spec.stepId);
+  consumeOnce(spec.budgetPass);
   const parsed = parseModelRef(spec.modelRef);
   const g: Generation = {
     id: uid('gen'),
@@ -82,6 +84,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     createdAt: Date.now(),
   };
   upsertGeneration(g);
+  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, spec.budgetPass ?? spec.batchToken);
   return g;
 }
 
@@ -103,12 +106,17 @@ function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
 export function runGeneration(id: string, nodeLock?: () => void): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
-  if (!mayStartWork()) return Promise.reject(new Error('Open Gen Studio is open in another tab'));
+  if (!mayStartWork()) return Promise.reject((clearGenerationPass(id, true), new Error('Open Gen Studio is open in another tab')));
   const generation = get().generations[id];
-  if (generation?.status === 'review') return Promise.reject(new PriceReviewRequired('Necesita revisión'));
+  if (generation?.status === 'review') {
+    clearGenerationPass(id, true);
+    return Promise.reject(new PriceReviewRequired('Necesita revisión'));
+  }
+  startGenerationPass(id);
   const p = attempt(id, nodeLock).finally(() => {
     running.delete(id);
     controllers.delete(id);
+    clearGenerationPass(id);
     purgeDiscarded(id);
   });
   running.set(id, p);
@@ -403,6 +411,7 @@ function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
 }
 
 export function cancelGeneration(id: string): void {
+  clearGenerationPass(id, true);
   controllers.get(id)?.abort();
   const g = get().generations[id];
   if (g && g.status === 'queued') patchGeneration(id, { status: 'canceled', finishedAt: Date.now() });
@@ -436,17 +445,18 @@ export async function resumeInterrupted(): Promise<void> {
   }
 }
 
-export function retryGeneration(id: string, planItemId?: string): Promise<string[]> {
+export function retryGeneration(id: string, planItemId?: string, budgetPass?: BudgetPass): Promise<string[]> {
   const ongoing = retrying.get(id);
   if (ongoing) return ongoing;
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
-  const held = holdRetry(g, planItemId);
+  const held = holdRetry(g, planItemId, budgetPass);
   if (held instanceof SchemaUnavailableError) return Promise.reject(held);
   if (!held) return Promise.resolve(g.assetIds);
   try {
+    clearGenerationPass(id, true);
     // New Generation: another attempt of the same operation.
-    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
+    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), budgetPass });
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
     // The failed attempt's card now shows this one, so the retry's result is seen.
     relinkAttempt(g.id, newG.id);

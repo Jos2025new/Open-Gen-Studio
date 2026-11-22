@@ -10,11 +10,11 @@ import { updateFeedItem, useStore } from '../../store/store';
 import { addSpend } from '../../store/spend';
 import { laneOfItem, laneState, patchLane } from './lanes';
 import { feedOfAgentIn } from './threads';
-import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
+import { VISUAL_MEDIA_KINDS, type FeedItem, type PlanFeedItem, type PlanStep, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type VisualMediaKind } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
 import { mayStartWork } from '../../lib/writerLock';
-import { llmCallEstimate, overLimit, overLimitText } from '../budget';
+import { budgetProblem, llmCallEstimate } from '../budget';
 import { agentEngine, llmCallUsd } from './runtime';
 import { settingsOptions } from './settingsCard';
 import { rememberSessionModel } from './sessionModel';
@@ -26,7 +26,7 @@ import { rememberSessionModel } from './sessionModel';
  * new model's guide, on the same card. Approve waits while it rewrites; a failure says so and offers a retry.
  */
 
-export type GenKind = 'image' | 'video';
+export type GenKind = VisualMediaKind;
 type GenStep = Extract<PlanStep, { kind: GenKind }>;
 const get = useStore.getState;
 const modelGroup = (ref: string) => lineRoutes(ref).text ?? ref;
@@ -56,7 +56,7 @@ function inlineSection(feed: FeedItem[], planId: string, kind: GenKind): { item:
 export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSection[] {
   if (plan.style !== 'auto' || plan.nodeRun || plan.plan.workspace === 'node') return [];
   const out: SettingsSection[] = [];
-  for (const kind of ['image', 'video'] as const) {
+  for (const kind of VISUAL_MEDIA_KINDS) {
     const all = plan.plan.steps.filter(isGen).filter((s) => s.kind === kind);
     for (const group of new Set(all.map((s) => modelGroup(s.modelRef)))) {
       const steps = all.filter((s) => modelGroup(s.modelRef) === group);
@@ -183,7 +183,7 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const guardBlock = (): string | null => {
     if (!mayStartWork()) return 'Open Gen Studio is open in another tab';
     const est = llmCallEstimate(engine.provider, engine.model);
-    return overLimit(est, sessionId) ? overLimitText(est) : null;
+    return budgetProblem(est, sessionId);
   };
   const run = (runs.get(itemId) ?? 0) + 1;
   runs.set(itemId, run);

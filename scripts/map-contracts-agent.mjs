@@ -48,7 +48,7 @@ export default [
     what: 'DELICADO: un modelo que el usuario nombra en la petición actual, o solo otro proveedor del mismo modelo (ADR 0025 D), se cambia solo con la tarjeta de una pregunta (plan rechazado, tarjeta compacta, parte añadida) en Guided; en Auto se aplica sin tarjeta (autoConfirmSettings).',
     sides: [
       ['src/engine/planSteps/media.ts', 'call confirm_settings for ${kind} with model'],
-      ['src/engine/agent/llmTurn.ts', 'switchSection('],
+      ['src/engine/agent/turnToolLoop.ts', 'switchSection('],
       ['src/engine/agent/autoSettings.ts', 'const chosen = sections'],
       ['src/engine/agent/switchModel.ts', 'export function confirmedState'],
       ['src/components/chat/SettingsCard.tsx', 'function SwitchModelCard'],

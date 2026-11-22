@@ -17,7 +17,7 @@ import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
-import { beginBatchPass } from '../budget';
+import { beginBatchPass, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
@@ -306,11 +306,11 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
 
 /** Revalidate the reviewed version before taking the lock or spending. */
 export async function runNodes(sessionId: string, targets: string[], approved?: NodeRunPreview, force = true,
-  onState?: import('../executor').ExecContext['onState']): Promise<import('../executor').ExecResult | null> {
+  onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass): Promise<import('../executor').ExecResult | null> {
   const preview = await prepareNodeRun(sessionId, targets, force);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
-  const problem = budgetProblem(preview.estimate, sessionId);
+  const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
@@ -328,7 +328,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
   const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
-  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id));
+  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id), budgetPass);
   try {
     const result = await executeSteps(preview.steps, {
       sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLock: release, nodeLibrary: library, nodeOperations,

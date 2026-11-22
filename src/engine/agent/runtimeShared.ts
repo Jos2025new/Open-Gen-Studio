@@ -17,7 +17,7 @@ import { autoLayout, graphBounds, planToGraph, nodeOutputAsset } from '../flow/g
 import { activeDoc } from '../design/actions';
 import { LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, resolveModel, lineRoutes, sentModelRef } from '../catalog';
-import type { AgentQuestion, AgentState, Estimate, LlmProviderId, MediaKind, NoticeFeedItem, Plan, PlanFeedItem, QuestionsFeedItem, Session, StepState, Workspace } from '../types';
+import { VISUAL_MEDIA_KINDS, type AgentQuestion, type AgentState, type Estimate, type LlmProviderId, type MediaKind, type NoticeFeedItem, type Plan, type PlanFeedItem, type QuestionsFeedItem, type Session, type StepState, type Workspace } from '../types';
 import { localTimeZone, type ChatMessageMeta } from '../feedMeta';
 import { placeFor } from '../place';
 import { appendFeed, patchSession, toast, updateFeedItem, useStore } from '../../store/store';
@@ -379,7 +379,7 @@ export async function presentPlan(
     type: 'plan',
     plan,
     style,
-    comparisonKinds: (['image', 'video'] as const).filter((k) => new Set(plan.steps.flatMap((s) => s.kind === k && 'modelRef' in s ? [lineRoutes(s.modelRef).text ?? s.modelRef] : [])).size > 1),
+    comparisonKinds: VISUAL_MEDIA_KINDS.filter((k) => new Set(plan.steps.flatMap((s) => s.kind === k && 'modelRef' in s ? [lineRoutes(s.modelRef).text ?? s.modelRef] : [])).size > 1),
     status: 'awaiting',
     stepStates: Object.fromEntries(plan.steps.map((st) => [st.id, 'pending' as StepState])),
     stepGenerations: {},

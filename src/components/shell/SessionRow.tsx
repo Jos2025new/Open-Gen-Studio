@@ -3,16 +3,17 @@ import { Archive, ArchiveRestore, Box, Eye, EyeOff, Image, MessageSquare, Music,
 import { renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { isRunning } from '../../engine/jobs';
-import { formatRelative, formatUsd } from '../../lib/format';
+import { formatSpendAmount } from '../../engine/spending';
+import { formatRelative } from '../../lib/format';
 import { Button, IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CardCheck, CardMenu, MenuConfirm, MenuItem, useTapReveal, type ItemView } from '../ui/PanelControls';
 import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
-import type { Asset, Generation, Session, Workspace } from '../../engine/types';
+import type { Asset, ComposerMode, Generation, Session, Workspace } from '../../engine/types';
 import type { HeadDef } from '../gallery/ListColumns';
 
-export type QuickMode = 'all' | 'agent' | 'image' | 'video' | 'audio' | 'model3d';
+export type QuickMode = 'all' | ComposerMode;
 export const QUICK_MODES = [{ id: 'agent', label: 'Agent', icon: Workflow }, { id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Video }, { id: 'audio', label: 'Audio', icon: Music }, { id: 'model3d', label: '3D', icon: Box }] as const;
 const MODE_NAME = { agent: 'Agent', image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D' } as const;
 const MODE_ICON: Record<string, typeof Workflow> = Object.fromEntries(QUICK_MODES.map((m) => [MODE_NAME[m.id], m.icon]));
@@ -35,6 +36,7 @@ export interface Stats {
   assets: string[];
   gens: number;
   spend: number;
+  spendUnknown?: boolean;
   cover?: string;
   modes: Set<Exclude<QuickMode, 'all'>>;
   latestMode?: Exclude<QuickMode, 'all'>;
@@ -63,7 +65,17 @@ export function sessionStats(assets: Record<string, Asset>, generations: Record<
     if (g.origin === 'agent') e.modes.add('agent');
     const mode = g.mode ?? (g.origin === 'agent' ? 'agent' : g.kind === 'text' ? undefined : g.kind);
     if (mode && (!e.latestModeAt || g.createdAt > e.latestModeAt)) { e.latestMode = mode; e.latestModeAt = g.createdAt; }
-    if (g.status === 'done') e.spend += g.actualUsd ?? g.estimate.usd ?? 0;
+    const knownCost = g.actualUsd ?? g.estimate.usd;
+    if (g.sends?.some((s) => s.status === 'done')) {
+      for (const s of g.sends) {
+        if (s.status !== 'done') continue;
+        if (s.costUsd != null) e.spend += s.costUsd;
+        else e.spendUnknown = true;
+      }
+    } else if (g.status === 'done') {
+      if (knownCost != null) e.spend += knownCost;
+      else e.spendUnknown = true;
+    }
   }
   return m;
 }
@@ -106,7 +118,8 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
   const CoverIcon = CANVAS[canvases[0] ?? 'chat'].icon;
   const modeLabel = sessionMode(session, stats);
   const stamp = basis === 'created' ? session.createdAt : session.updatedAt;
-  const details = [stats?.gens ? `${stats.gens} gen` : null, nodes ? `${nodes} nodes` : null, docs ? `${docs} design${docs === 1 ? '' : 's'}` : null, stats?.spend ? formatUsd(stats.spend) : null].filter(Boolean);
+  const spendLabel = stats && (stats.spend || stats.spendUnknown) ? formatSpendAmount(stats.spend, { unknown: stats.spendUnknown }) : null;
+  const details = [stats?.gens ? `${stats.gens} gen` : null, nodes ? `${nodes} nodes` : null, docs ? `${docs} design${docs === 1 ? '' : 's'}` : null, spendLabel].filter(Boolean);
   const open = () => {
     if (selecting) return onToggle?.();
     if (editing) return;
@@ -168,7 +181,7 @@ export function SessionRow({ session, active, stats, selecting, selected, view, 
         <span className="pc-col pc-col-gens num">{stats?.gens || '—'}</span>
         <span className="pc-col pc-col-nodes num">{nodes || '—'}</span>
         <span className="pc-col pc-col-designs num">{docs || '—'}</span>
-        <span className="pc-col pc-col-spend num">{stats?.spend ? formatUsd(stats.spend) : '—'}</span>
+        <span className="pc-col pc-col-spend num">{spendLabel ?? '—'}</span>
         {when}
         <span className="pc-tools">
           {active ? null : <Button size="sm" variant="secondary" className="pc-go" onClick={(e) => { e.stopPropagation(); open(); }}>Continue</Button>}

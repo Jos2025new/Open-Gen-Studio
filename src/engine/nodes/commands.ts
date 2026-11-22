@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { edgeRef, graphOf, hasTarget, nodeCommand, nodeRef } from '../flow/commandKit';
 import { executionOrder } from '../flow/graph';
 import { LINK_KINDS, MODEL_ATTACH_MODES, type BaseSystemNodeType } from '../graphTypes';
-import type { RefNodeData } from '../types';
+import { MODEL_MEDIA_KINDS, type RefNodeData } from '../types';
 import { ensureOmniNodes, setChatUndocked, setSpaceView } from './omni';
 import {
   addSystemNode,
@@ -22,7 +22,7 @@ const SYSTEM_ADD_TYPES = ['chat', 'agent', 'provider', 'model', 'session', 'spac
 const sysType = z.enum(SYSTEM_ADD_TYPES);
 const linkKind = z.enum(LINK_KINDS);
 const attachMode = z.enum(MODEL_ATTACH_MODES);
-const mediaKind = z.enum(['llm', 'image', 'video', 'audio', 'model3d']);
+const mediaKind = z.enum(MODEL_MEDIA_KINDS);
 const point = z.object({ x: z.number(), y: z.number() }).strict();
 
 function throwIf(error: string | null): void {

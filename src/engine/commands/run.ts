@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { BudgetPass } from '../budget';
 import { FREE, UNKNOWN, sumEstimates } from '../pricing';
 import type { Estimate } from '../types';
 import { echo } from './echo';
@@ -114,8 +115,9 @@ export interface ApprovalRequest {
   steps: ApprovalStep[];
   estimate: Estimate;
 }
+export type ApprovalOutcome = boolean | { approved: boolean; budgetPass?: BudgetPass };
 /** Shows the user what is about to happen and answers yes or no. One question per sequence, never one per step. */
-export type Approver = (request: ApprovalRequest) => boolean | Promise<boolean>;
+export type Approver = (request: ApprovalRequest) => ApprovalOutcome | Promise<ApprovalOutcome>;
 
 let approver: Approver | null = null;
 
@@ -287,6 +289,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   }
 
   const seq = steps.length > 1 ? ++sequences : undefined;
+  let budgetPass: BudgetPass | undefined;
   const runStep = (i: number, bufferedEchoes?: (() => void)[]): Promise<void> | void => {
     const step = steps[i];
     const { spec } = step;
@@ -314,10 +317,11 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         step.args = args;
         step.ready = true;
       }
-      check(spec, { on, caller: options.caller, signal: options.signal }, args);
+      const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
+      check(spec, ctx, args);
       openHistories(spec, on, args, txs);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
-      const out: unknown = spec.run({ on, caller: options.caller, signal: options.signal }, args);
+      const out: unknown = spec.run(ctx, args);
       if (thenable(out)) {
         return settle(out, txs).then(
           (val) => {
@@ -400,7 +404,9 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
     let yes = false;
     try {
-      yes = await activeApprover({ caller: options.caller, steps: asks, estimate });
+      const outcome = await activeApprover({ caller: options.caller, steps: asks, estimate });
+      yes = typeof outcome === 'boolean' ? outcome : outcome.approved;
+      if (typeof outcome === 'object' && outcome.approved) budgetPass = outcome.budgetPass;
     } catch (error) {
       for (const s of steps) s.ran = false;
       const out = fail(error, asks[0].step);

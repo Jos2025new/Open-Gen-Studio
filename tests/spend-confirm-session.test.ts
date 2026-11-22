@@ -5,7 +5,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SpendConfirm } from '../src/components/ui/SpendConfirm';
 import { createSession, useStore } from '../src/store/store';
-import { overLimit } from '../src/engine/budget';
+import { overLimit, type BudgetPass } from '../src/engine/budget';
 import { opSessionId } from '../src/engine/opSession';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,7 +25,7 @@ beforeEach(() => {
   });
 });
 
-function mount(sessionId: string | undefined, onConfirm: () => unknown) {
+function mount(sessionId: string | undefined, onConfirm: (pass?: BudgetPass) => unknown) {
   const host = document.createElement('div');
   document.body.append(host);
   act(() => createRoot(host).render(createElement(SpendConfirm, { title: 't', estimate: run, sessionId, onConfirm, onCancel() {} })));
@@ -36,7 +36,7 @@ function mount(sessionId: string | undefined, onConfirm: () => unknown) {
 describe('the confirmation belongs to the session the action checks', () => {
   it('«Continue once» for a result of B lets B through, not A', () => {
     let inA = true, inB = false;
-    const { button } = mount('B', () => { inA = overLimit(run, 'A'); inB = overLimit(run, 'B'); });
+    const { button } = mount('B', (pass) => { inA = overLimit(run, 'A', pass); inB = overLimit(run, 'B', pass); });
     act(() => button('Continue once').click());
     expect(inB).toBe(false);
     expect(inA).toBe(true);
@@ -65,7 +65,7 @@ describe('the confirmation belongs to the session the action checks', () => {
     act(() => createRoot(host).render(createElement(SpendConfirm, {
       title: 't', estimate: run, sessionId: opSessionId('xb'),
       resolveSessionId: () => opSessionId('xb', true),
-      onConfirm: () => { allowed = !overLimit(run, opSessionId('xb')); }, onCancel() {},
+      onConfirm: (pass) => { allowed = !overLimit(run, opSessionId('xb'), pass); }, onCancel() {},
     })));
     expect(Object.values(useStore.getState().sessions).some((s) => s.hidden)).toBe(false);
     const button = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Continue once'))!;

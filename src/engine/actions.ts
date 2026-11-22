@@ -1,19 +1,15 @@
 import { wrongRef } from './wrongRef';
 import { directModelRef } from './directModel';
 import { refsLimit } from './officialLimits';
-import { assetsInUse } from './flow/locks';
-import { dropResults } from './flow/dropResults';
 import { opSessionId } from './opSession';
 import { model3dProblem } from './modelRules';
-import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
-import { deleteAssetBlobs, putAssetBlob } from '../lib/idb';
-import { probeMedia } from '../lib/media';
+import { deleteAssetBlobs } from '../lib/idb';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
-import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, pickComposerModel, selectComposerModel } from './catalog';
-import { estimateMedia, estimateRecraftStyle } from './costs';
-import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
+import { ensureSchema, modelsOf, modelSummary, preferredModel, pickComposerModel, selectComposerModel } from './catalog';
+import { estimateMedia } from './costs';
+import { autoLayout, graphBounds } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
 import { preferredProviderLabel } from './providers/registry';
@@ -22,19 +18,16 @@ import { holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { sendSessionId, ensureSendSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
-import { overLimit, overLimitText } from './budget';
+import { budgetProblem, clearSessionPasses, type BudgetPass } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { dropHistory } from './design/history';
 import { designerDims, stopSession } from './agent/runtime';
-import { sheetCut } from './sheet';
-import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
+import type { AdvancedValue, Estimate, Generation, GraphNode, MediaKind, OpId, Workspace } from './types';
 import {
-  addAssets,
   appendFeed,
   autoTitleSession,
   createSession,
-  patchSession,
   setComposer,
   setComposerMedia,
   setUi,
@@ -43,6 +36,32 @@ import {
 } from '../store/store';
 import { keptDrafts } from '../store/homeDrafts';
 import { applyEdit, editCompound } from './nodecore/edit';
+import { deleteAssets } from './assetActions';
+
+export {
+  SUBJECT_KINDS,
+  saveSubject,
+  deleteSubject,
+  libraryItem,
+  subjectFromAsset,
+  saveSheetViews,
+  subjectFromAttachments,
+  createRecraftStyle,
+  createSubjectVoice,
+} from './libraryActions';
+export {
+  deleteGeneration,
+  deleteAssets,
+  toggleFavorite,
+  copyText,
+  addAsReference,
+  AGENT_ATTACHABLE,
+  toggleAgentAttachment,
+  AUDIO_MIME,
+  uploadFiles,
+  attachFiles,
+} from './assetActions';
+export { downloadAsset } from './download';
 
 const get = useStore.getState;
 
@@ -51,151 +70,9 @@ function feedBase(workspace: Workspace) {
 }
 
 // ---------------------------------------------------------------------------
-// Library: characters, objects, products and styles saved as @Name, shared by every session
-
-export const SUBJECT_KINDS: Array<{ value: SubjectKind; label: string }> = [
-  { value: 'character', label: 'Character' },
-  { value: 'object', label: 'Object' },
-  { value: 'product', label: 'Product' },
-  { value: 'location', label: 'Location' },
-  { value: 'style', label: 'Style' },
-];
-
-/** Legacy node results did not record library images. Capture them before the first library edit. */
-function rememberNodeLibrary(name: string): void {
-  useStore.setState(st => {
-    const attached = new Set(Object.values(st.sessions).flatMap(s => s.graph.nodes.flatMap(n => 'generationId' in n.data && n.data.generationId ? [n.data.generationId] : [])));
-    const generations = { ...st.generations };
-    for (const id of attached) {
-      const g = generations[id];
-      if (g && !g.nodeRequest && !g.inputs.nodeLibrary && mentionSubjects(g.prompt, [{ id: name, name }]).ids.length) {
-        generations[id] = { ...g, inputs: { ...g.inputs, nodeLibrary: structuredClone(st.library) } };
-      }
-    }
-    return { generations };
-  });
-}
-
-export function saveSubject(subject: Subject): void {
-  const previous = get().library.find(s => s.id === subject.id);
-  if (previous) rememberNodeLibrary(previous.name);
-  useStore.setState((st) => ({
-    library: st.library.some((x) => x.id === subject.id) ? st.library.map((x) => (x.id === subject.id ? subject : x)) : [...st.library, subject],
-  }));
-}
-
-export function deleteSubject(id: string): void {
-  const previous = get().library.find(s => s.id === id);
-  if (previous) rememberNodeLibrary(previous.name);
-  useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
-}
-
-export function libraryItem(name: string): Subject | undefined {
-  const clean = name.trim().replace(/^@/, '').toLowerCase();
-  return get().library.find((x) => x.name.toLowerCase() === clean);
-}
-
-/** Save to library: a taken name is refused unless `replace`; the item keeps its id and @Name. */
-export function subjectFromAsset(assetId: string, name: string, kind: SubjectKind = 'character', opts: { replace?: boolean; views?: string[] } = {}): Subject | null {
-  const clean = name.trim().replace(/^@/, '');
-  if (!clean || get().assets[assetId]?.kind !== 'image') return null;
-  const existing = libraryItem(clean);
-  if (existing && !opts.replace) {
-    toast(`@${clean} already exists in the library.`, 'error');
-    return null;
-  }
-  const views = opts.views ?? [];
-  const subject: Subject = { ...existing, id: existing?.id ?? uid('sub'), name: existing?.name ?? clean, kind, frontalAssetId: views[0] ?? assetId, refAssetIds: views.slice(1, 4), videoAssetId: undefined };
-  saveSubject(subject);
-  toast(`Saved as @${clean}: mention it in any prompt`, 'success');
-  return subject;
-}
-
-/** A reference sheet saved as separate views (Grid-split, local and free): the main view first, then the others. */
-export async function saveSheetViews(assetId: string, name: string, kind: SubjectKind, replace: boolean): Promise<Subject | null> {
-  const sessionId = get().assets[assetId]?.sessionId ?? get().activeSessionId;
-  // Cut and order: sheet.ts.
-  const { grid, order } = sheetCut(get().generations[get().assets[assetId]?.generationId ?? '']?.op);
-  try {
-    const g = createGeneration(await opSpec({ sessionId, sourceAssetId: assetId, op: 'grid_split', params: { grid }, origin: 'op' }));
-    const cut = await runGeneration(g.id);
-    // The main image comes first: a turnaround's front view.
-    const views = cut.length === order.length ? order.map((i) => cut[i]) : cut;
-    return subjectFromAsset(assetId, name, kind, { replace, views: views.length >= 3 ? views : undefined });
-  } catch (err) {
-    toast((err as Error).message, 'error');
-    return null;
-  }
-}
-
-/** A subject from the attachments: the first image is the frontal view, up to 3 more are views; or a video. */
-export function subjectFromAttachments(name: string): Subject | null {
-  const st = get();
-  const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
-  const video = st.composer.attachments.find((id) => st.assets[id]?.kind === 'video');
-  const clean = name.trim().replace(/^@/, '');
-  if (!clean || (!images.length && !video)) return null;
-  const subject: Subject = { id: uid('sub'), name: clean, frontalAssetId: images[0], refAssetIds: images.slice(1, 4), videoAssetId: images.length ? undefined : video };
-  saveSubject(subject);
-  const used = new Set([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId]);
-  setComposer((c) => ({ attachments: c.attachments.filter((a) => !used.has(a)) }));
-  return subject;
-}
-
-/** Create a Recraft V4 style from the attached images and select it (after cost confirmation). */
-export async function createRecraftStyle(sessionId: string, name: string): Promise<void> {
-  const st = get();
-  const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image').slice(0, 10);
-  if (!images.length) {
-    toast('Attach 1–10 reference images first.', 'error');
-    return;
-  }
-  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: estimateRecraftStyle() });
-  appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
-  try {
-    await runGeneration(g.id);
-    const styleId = get().generations[g.id]?.text;
-    if (!styleId) return;
-    patchSession(sessionId, (s) => ({ ...s, styles: [...(s.styles ?? []), { id: uid('sty'), name: name.trim() || 'Style', family: 'recraft-v4', styleId }] }));
-    const cur = get().composer.image.settings;
-    setComposerMedia('image', { settings: { ...cur, extras: { ...cur.extras, style_id: styleId } } });
-    toast(`Style “${name}” saved and selected.`, 'info');
-  } catch (err) {
-    if (!isAbort(err)) toast((err as Error).message, 'error');
-  }
-}
-
-/** Create a Kling voice and bind it to the subject when ready (after cost confirmation). */
-export async function createSubjectVoice(sessionId: string, subjectId: string): Promise<void> {
-  const st = get();
-  const audio = st.composer.attachments.find((id) => st.assets[id]?.kind === 'audio');
-  if (!audio) {
-    toast('Attach 5–30 s of clean speech first.', 'error');
-    return;
-  }
-  try {
-    const spec = await opSpec({ sessionId, sourceAssetId: audio, op: 'create_voice', params: {}, origin: 'op' });
-    const g = createGeneration(spec);
-    appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
-    await runGeneration(g.id);
-    const voiceId = get().generations[g.id]?.text;
-    const subject = get().library.find((x) => x.id === subjectId);
-    if (voiceId && subject) {
-      saveSubject({ ...subject, voiceId });
-      toast(`Voice bound to @${subject.name}.`, 'info');
-    }
-  } catch (err) {
-    if (!isAbort(err)) toast((err as Error).message, 'error');
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Budget
 
-/** Why a run needs confirmation: it goes over a limit not yet accepted. */
-export function budgetProblem(e: Estimate, sessionId?: string): string | null {
-  return overLimit(e, sessionId) ? overLimitText(e) : null;
-}
+export { budgetProblem } from './budget';
 
 // ---------------------------------------------------------------------------
 // Composer: direct image / video generation
@@ -268,7 +145,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (!text && !attachments.length && !settings.shots?.length) return { ok: false, reason: 'Write a prompt.', estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
   }
-  return { ok: true, estimate, overLimit: overLimit(estimate, sendSessionId(st)) };
+  return { ok: true, estimate, overLimit: budgetProblem(estimate, sendSessionId(st)) !== null };
 }
 
 /** The entries of `map` for these ids, or undefined when there are none. */
@@ -277,7 +154,7 @@ function pick<T>(map: Record<string, T> | undefined, ids: string[]): Record<stri
   return Object.keys(out).length ? out : undefined;
 }
 
-export async function generateDirect(kind: MediaKind): Promise<void> {
+export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass): Promise<void> {
   const check = checkDirect(kind);
   if (!check.ok) {
     toast(check.reason ?? 'Cannot generate yet', 'error');
@@ -320,6 +197,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     mode: kind,
     parentId,
     estimate: check.estimate,
+    budgetPass,
   };
   autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
@@ -407,9 +285,11 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   const nodes: GraphNode[] = [promptNode, ...refNodes.map(({ handle: _h, ...n }) => n), genNode];
   const pos = autoLayout(nodes, edges, origin);
   editCompound(sessionId, 'from-generation', (gr) => ({ ...gr, nodes: [...gr.nodes, ...nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }))], edges: [...gr.edges, ...edges] }));
-  runGeneration(g.id).catch((err) => {
+  const held = holdAttemptNode(g, get().sessions[sessionId]?.graph.nodes ?? []);
+  if (!held) return;
+  runGeneration(g.id, held.release).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
-  });
+  }).finally(held.release);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,11 +319,11 @@ export function regenerateEstimate(generationId: string): Estimate | null {
 }
 
 /** Run the same request again with a new seed. Call after the user confirmed the cost. */
-export async function regenerate(generationId: string): Promise<void> {
+export async function regenerate(generationId: string, budgetPass?: BudgetPass): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
   const estimate = regenerateEstimate(generationId) ?? g.estimate;
-  const problem = budgetProblem(estimate, g.sessionId);
+  const problem = budgetProblem(estimate, g.sessionId, budgetPass);
   if (problem) {
     toast(problem, 'error');
     return;
@@ -454,7 +334,7 @@ export async function regenerate(generationId: string): Promise<void> {
   const held = holdAttemptNode(g, session?.graph.nodes ?? []);
   if (!held) return;
   const node = held.node;
-  const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate });
+  const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass });
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
     applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { generationId: next.id, sketchAssetId: undefined } as Partial<GraphNode['data']> } });
@@ -515,140 +395,6 @@ export async function editInComposer(generationId: string): Promise<void> {
   setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
 }
 
-export function deleteGeneration(generationId: string): void {
-  const g = get().generations[generationId];
-  if (!g) return;
-  const assetIds = [...g.assetIds];
-  if (assetsInUse(assetIds)) { toast('A result is in use by a running flow.', 'error'); return; }
-  useStore.setState((st) => {
-    const { generations, sessions: moved } = dropResults(st, new Set(assetIds));
-    delete generations[generationId];
-    const assets = { ...st.assets };
-    for (const id of assetIds) delete assets[id];
-    const s = moved[g.sessionId];
-    const sessions = s ? { ...moved, [g.sessionId]: { ...s, feed: s.feed.filter((f) => !(f.type === 'generation' && f.generationId === generationId)) } } : moved;
-    return { generations, assets, sessions, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !assetIds.includes(a)) } };
-  });
-  if (g.sessionId in get().sessions) editCompound(g.sessionId, 'delete generation', (gr) => ({ ...gr, nodes: gr.nodes.map((n) => runsGeneration(n.data) && n.data.generationId === generationId ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] } : n) }), { silent: true });
-  void deleteAssetBlobs(assetIds);
-}
-
-export function deleteAssets(ids: string[]): void {
-  if (!ids.length) return;
-  if (assetsInUse(ids)) { toast('An asset is in use by a running flow. Wait for it to finish.', 'error'); return; }
-  const set = new Set(ids);
-  useStore.setState((st) => {
-    const assets = { ...st.assets };
-    ids.forEach((id) => delete assets[id]);
-    const { generations, sessions } = dropResults(st, set);
-    return { assets, generations, sessions, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !set.has(a)) } };
-  });
-  void deleteAssetBlobs(ids);
-}
-
-export function toggleFavorite(assetId: string): void {
-  useStore.setState((st) => {
-    const a = st.assets[assetId];
-    return a ? { assets: { ...st.assets, [assetId]: { ...a, favorite: !a.favorite } } } : {};
-  });
-}
-
-export async function copyText(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('Copied', 'success');
-  } catch {
-    toast('Clipboard is not available', 'error');
-  }
-}
-
-export { downloadAsset } from './download';
-
-export function addAsReference(assetId: string): void {
-  const st = get();
-  const a = st.assets[assetId];
-  if (!a) return;
-  // A 3D model goes in as its view image.
-  const id = a.kind === 'model3d' ? a.viewImageId : assetId;
-  if (!id || !st.assets[id]) {
-    toast('This 3D model has no view image yet. Open it once, then try again.', 'error');
-    return;
-  }
-  setComposer((c) => ({ attachments: c.attachments.includes(id) ? c.attachments : [...c.attachments, id] }));
-  setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
-}
-
-/** Attachment policy for the agent's context, independent of the media generation kinds. */
-export const AGENT_ATTACHABLE: readonly string[] = ['image', 'video', 'audio', 'model3d'];
-
-/** Toggle an existing asset in the agent's attachment list. No asset is created or copied. */
-export function toggleAgentAttachment(assetId: string): void {
-  const asset = get().assets[assetId];
-  if (!asset || !AGENT_ATTACHABLE.includes(asset.kind)) return;
-  setComposer((c) => ({
-    attachments: c.attachments.includes(assetId)
-      ? c.attachments.filter((id) => id !== assetId)
-      : [...c.attachments, assetId],
-  }));
-}
-
-/** Audio files the app stores and the providers read (MP3, WAV, M4A, AAC, OGG, FLAC, WebM). */
-export const AUDIO_MIME = /^audio\/(mpeg|mp3|wav|x-wav|mp4|x-m4a|aac|ogg|flac|webm)$/;
-
-export async function uploadFiles(files: File[]): Promise<string[]> {
-  const st = get();
-  const sessionId = st.activeSessionId;
-  const out: Asset[] = [];
-  for (const f of files) {
-    const is3d = /\.glb$/i.test(f.name);
-    if (!is3d && !AUDIO_MIME.test(f.type) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
-      toast(`${f.name}: unsupported file type`, 'error');
-      continue;
-    }
-    if (f.size > 60 * 1024 * 1024) {
-      toast(`${f.name}: file is larger than 60 MB`, 'error');
-      continue;
-    }
-    try {
-      if (is3d) await validateGlb(f);
-      const info = is3d ? { width: 0, height: 0, duration: undefined } : await probeMedia(f);
-      const id = uid('ast');
-      await putAssetBlob(id, is3d ? new Blob([f], { type: GLB_MIME }) : f);
-      out.push({
-        id,
-        kind: is3d ? 'model3d' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
-        mime: is3d ? GLB_MIME : f.type,
-        width: info.width,
-        height: info.height,
-        duration: info.duration,
-        sessionId,
-        origin: 'upload',
-        place: placeFor(st.ui, st.ui.workspace),
-        mode: is3d ? 'model3d' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
-        stored: true,
-        favorite: false,
-        createdAt: Date.now(),
-      });
-    } catch {
-      toast(`${f.name}: could not read the file`, 'error');
-    }
-  }
-  addAssets(out);
-  return out.map((a) => a.id);
-}
-
-export async function attachFiles(files: File[]): Promise<void> {
-  const ids = await uploadFiles(files);
-  // A GLB is imported to the gallery (open it there); no model takes a 3D file as input.
-  const models = ids.filter((id) => get().assets[id]?.kind === 'model3d');
-  if (models.length) toast(`${models.length} 3D model${models.length > 1 ? 's' : ''} added to the gallery.`, 'info');
-  const inputs = ids.filter((id) => !models.includes(id));
-  if (inputs.length) {
-    setComposer((c) => ({ attachments: [...c.attachments, ...inputs] }));
-    if (get().ui.workspace === 'designer') setUi({ designerDock: 'prompt' });
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Operations on assets and layers
 
@@ -660,7 +406,7 @@ export async function opEstimate(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
-export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode): Promise<string[]> {
+export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass): Promise<string[]> {
   const st = get();
   const asset = st.assets[assetId];
   if (!asset) return [];
@@ -671,12 +417,12 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
   }
   const sessionId = opSessionId(assetId, true);
   const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef, place: place ?? placeFor(st.ui, st.ui.workspace), mode: mode ?? modeFor(st.composer.mode, op) });
-  const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId);
+  const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId, budgetPass);
   if (problem) {
     toast(problem, 'error');
     return [];
   }
-  const g = createGeneration(spec);
+  const g = createGeneration({ ...spec, budgetPass });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     return await runGeneration(g.id);
@@ -687,7 +433,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Designer: run an image operation on a raster layer; the result is a new layer above it (the original is kept). */
-export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>): Promise<void> {
+export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass): Promise<void> {
   const def = OPS[op];
   if (def.input !== 'image' || def.output !== 'image') {
     toast(`${def.label} does not produce an image for a layer.`, 'error');
@@ -696,12 +442,12 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
   try {
     const source = await layerToAsset(sessionId, docId, layerId);
     const spec = await opSpec({ sessionId, sourceAssetId: source.id, op, params, origin: 'designer', place: 'designer', mode: 'image' });
-    const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId);
+    const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId, budgetPass);
     if (problem) {
       toast(problem, 'error');
       return;
     }
-    const g = createGeneration(spec);
+    const g = createGeneration({ ...spec, budgetPass });
     // Its card in the Designer's conversation, like any generation (also in Generations and Assets).
     appendFeed(sessionId, { ...feedBase('designer'), type: 'generation', generationId: g.id });
     const ids = await runGeneration(g.id);
@@ -745,6 +491,7 @@ export function sendToNodes(assetId: string): void {
 // Sessions
 
 export function deleteSession(sessionId: string): void {
+  clearSessionPasses(sessionId);
   const st = get();
   const s = st.sessions[sessionId];
   if (!s) return;

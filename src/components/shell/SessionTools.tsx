@@ -5,14 +5,15 @@ import { deleteSession } from '../../engine/actions';
 import { setUserHidden } from '../../store/userHidden';
 import { setSessionsArchived } from '../../store/sessionArchive';
 import { formatRelative, formatUsd } from '../../lib/format';
-import { summarizeSpend } from '../../engine/spending';
+import { formatSpendAmount, summarizeSpend } from '../../engine/spending';
+import { ledgerCost } from '../../engine/sendLedger';
 import { Popover, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { MenuConfirm, MenuItem } from '../ui/PanelControls';
 import { RunningNote } from './SessionRow';
 import './SessionTools.css';
-import type { GenerationStatus } from '../../engine/types';
+import type { Generation, GenerationStatus } from '../../engine/types';
 
 /** The open session's ⋯ menu in the top bar: the same actions as a session card, grouped, Delete last with its confirmation. */
 export function SessionMenu({ onRename }: { onRename: () => void }) {
@@ -43,17 +44,26 @@ export function SessionMenu({ onRename }: { onRename: () => void }) {
 
 const KIND: Record<string, string> = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
 const SPEND_KIND: Record<string, string> = { agent: 'Agent (LLM)', image: 'Images', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
-const runCost = (g: { status: GenerationStatus; actualUsd?: number; estimate: { usd?: number | null } }) => (g.status === 'done' ? g.actualUsd ?? g.estimate.usd ?? 0 : null);
+const runCost = (g: { status: GenerationStatus; actualUsd?: number; estimate: { usd?: number | null } }) => (g.status === 'done' ? (g.actualUsd ?? g.estimate.usd ?? null) : null);
+function runCostLabel(g: Generation): string {
+  if (g.sends?.some((s) => s.status === 'done')) {
+    const b = ledgerCost(g);
+    if (b.hasUnknown) return b.usd > 0 ? formatSpendAmount(b.usd, { estimated: b.estimatedUsd > 0, unknown: true }) : 'price unknown';
+  }
+  const c = runCost(g);
+  return c != null ? formatUsd(c, { approx: g.actualUsd == null && c > 0 }) : g.status === 'done' ? 'price unknown' : '';
+}
 const RUNNING: GenerationStatus[] = ['queued', 'running'];
 const statusIcon = (s: GenerationStatus) => (RUNNING.includes(s) ? <Loader size={14} className="spin" aria-label="Running" /> : s === 'done' ? <CircleCheck size={14} className="si-ok" aria-label="Done" /> : <CircleAlert size={14} className="si-warn" aria-label={s === 'review' ? 'Needs review' : 'Did not finish'} />);
 
 /** Budget counter row in Session info: shows remaining budget, or the excess in danger color when over limit. */
-export function SessionBudget({ spent, limit }: { spent: number; limit: number }) {
+export function SessionBudget({ spent, limit, unknown = false }: { spent: number; limit: number; unknown?: boolean }) {
   const over = spent > limit + 1e-9;
   const pct = over ? 100 : Math.min(100, (spent / (limit || 1)) * 100);
+  const shown = formatSpendAmount(spent, { unknown });
   const text = over
-    ? `${formatUsd(spent)} of ${formatUsd(limit)} · +${formatUsd(spent - limit)} over`
-    : `${formatUsd(spent)} of ${formatUsd(limit)} · ${formatUsd(Math.max(0, limit - spent))} left`;
+    ? `${shown} of ${formatUsd(limit)} · +${formatUsd(spent - limit)} over`
+    : `${shown} of ${formatUsd(limit)} · ${formatUsd(Math.max(0, limit - spent))} left`;
   return (
     <div className={over ? 'si-budget is-over' : 'si-budget'} title="Budget counter since the last reset (all sessions)">
       <span>Budget</span><span className="num">{text}</span>
@@ -72,7 +82,8 @@ export function SessionInfo({ onGenerations }: { onGenerations: () => void }) {
   const budgetOn = useStore((s) => s.settings.budgetOn);
   const budgetUsd = useStore((s) => s.settings.budgetUsd);
   const spentUsd = useStore((s) => s.spentUsd);
-  const budget = budgetOn ? { limit: budgetUsd, spent: spentUsd } : null;
+  const hasUnknown = useMemo(() => spendLog.some((e) => e.unknownPrice), [spendLog]);
+  const budget = budgetOn ? { limit: budgetUsd, spent: spentUsd, unknown: hasUnknown } : null;
   const pop = usePopover();
   const id = session?.id;
   const data = useMemo(() => {
@@ -92,25 +103,26 @@ export function SessionInfo({ onGenerations }: { onGenerations: () => void }) {
         <section className="si-sec" aria-label="Usage">
           <h4>Usage</h4>
           <div className="si-tiles">
-            <div className="si-tile"><span>Spent</span><b className="num">{formatUsd(data.spend.total)}</b></div>
-            <div className="si-tile"><span>Agent</span><b className="num">{formatUsd(data.spend.agent)}</b></div>
-            <div className="si-tile"><span>Media</span><b className="num">{formatUsd(data.spend.media)}</b></div>
+            <div className="si-tile"><span>Spent</span><b className="num">{formatSpendAmount(data.spend.total, { unknown: data.spend.unknownCount > 0 })}</b></div>
+            <div className="si-tile"><span>Agent</span><b className="num">{formatSpendAmount(data.spend.agent, { unknown: data.spend.unknownAgent > 0 })}</b></div>
+            <div className="si-tile"><span>Media</span><b className="num">{formatSpendAmount(data.spend.media, { unknown: data.spend.unknownMedia > 0 })}</b></div>
           </div>
           {data.spend.byCategory.length ? <ul className="si-bars" aria-label="Spent by type">
             {data.spend.byCategory.slice(0, 3).map((r) => (
-              <li key={r.key}><span>{SPEND_KIND[r.key] ?? r.key} <small className="num">×{r.count}</small></span><b className="num">{formatUsd(r.usd, { approx: r.estimated })}</b><i style={{ width: `${(r.usd / (data.spend.byCategory[0].usd || 1)) * 100}%` }} /></li>
+              <li key={r.key}><span>{SPEND_KIND[r.key] ?? r.key} <small className="num">×{r.count}</small></span><b className="num">{formatSpendAmount(r.usd, { estimated: r.estimated, unknown: r.unknownCount > 0 })}</b><i style={{ width: `${(r.usd / (data.spend.byCategory[0].usd || 1)) * 100}%` }} /></li>
             ))}
           </ul> : null}
-          {budget ? <SessionBudget spent={budget.spent} limit={budget.limit} /> : null}
+          {budget ? <SessionBudget spent={budget.spent} limit={budget.limit} unknown={budget.unknown} /> : null}
           <div className="si-row"><Sparkles size={15} /><span>Generations</span><b className="num">{data.gens.length}</b></div>
           <div className="si-row"><Clock size={15} /><span>Started</span><b>{formatRelative(session.createdAt)}</b></div>
           <button type="button" className="si-more" onClick={() => go(() => setUi({ panel: 'spending' }))}><Coins size={14} />Spending details</button>
         </section>
         <section className="si-sec" aria-label={data.running ? 'Running' : 'Latest'}>
           <h4>{data.running ? 'Running' : 'Latest'} <span className="num">{data.running || data.gens.length}</span></h4>
-          {data.recent.length ? data.recent.map((g) => (
-            <div key={g.id} className="si-row si-gen" title={g.prompt}><span className="si-two"><span className="si-gen-text">{g.prompt || g.modelName}</span><small>{[g.modelName, g.settings.aspect, formatRelative(g.createdAt), runCost(g) != null ? formatUsd(runCost(g)) : ''].filter(Boolean).join(' · ')}</small></span>{statusIcon(g.status)}</div>
-          )) : <p className="si-empty">Nothing generated in this session yet.</p>}
+          {data.recent.length ? data.recent.map((g) => {
+            const costLabel = runCostLabel(g);
+            return <div key={g.id} className="si-row si-gen" title={g.prompt}><span className="si-two"><span className="si-gen-text">{g.prompt || g.modelName}</span><small>{[g.modelName, g.settings.aspect, formatRelative(g.createdAt), costLabel].filter(Boolean).join(' · ')}</small></span>{statusIcon(g.status)}</div>;
+          }) : <p className="si-empty">Nothing generated in this session yet.</p>}
           {data.gens.length ? <button type="button" className="si-more" onClick={() => go(onGenerations)}>View all</button> : null}
         </section>
         <section className="si-sec" aria-label="Results">

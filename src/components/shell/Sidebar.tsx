@@ -8,6 +8,7 @@ import { SidebarNav } from './SidebarNav';
 import { openHome } from './navModel';
 import '../../styles/sidebar-peek.css';
 import { remainingBudget } from '../../engine/budget';
+import { formatSpendAmount } from '../../engine/spending';
 
 /** The house icon, shared by the sidebar's Home item and the top bar's Home button. */
 export function HomeIcon({ size = 18 }: { size?: number }) {
@@ -43,6 +44,7 @@ export function Sidebar() {
   const panel = useStore((s) => s.ui.panel);
   const remaining = useStore((s) => remainingBudget(s));
   const spent = useStore((s) => s.spentUsd);
+  const hasUnknownSpend = useStore((s) => s.spendLog.some((e) => e.unknownPrice));
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const home = useStore((s) => !!s.ui.home);
   const narrow = useNarrowScreen();
@@ -177,7 +179,7 @@ export function Sidebar() {
         <button
           type="button"
           className={`side-btn ${panel === 'spending' ? 'is-open' : ''}`}
-          data-tip={`Spending — ${formatUsd(spent)} spent${remaining == null ? '' : remaining < 0 ? ', over the limit' : `, ${formatUsd(remaining)} left`}`}
+          data-tip={`Spending — ${formatSpendAmount(spent, { unknown: hasUnknownSpend })}${hasUnknownSpend && spent === 0 ? '' : ' spent'}${remaining == null ? '' : remaining < 0 ? ', over the limit' : `, ${formatUsd(remaining)} left`}`}
           data-tip-side="right"
           aria-label="Spending"
           aria-expanded={panel === 'spending'}

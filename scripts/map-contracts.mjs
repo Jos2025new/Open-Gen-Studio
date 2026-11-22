@@ -137,7 +137,7 @@ export default [
     what: 'Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas.',
     sides: [
       ['src/engine/agent/context.ts', 'Guided, one questions card before every plan'],
-      ['src/engine/agent/llmTurn.ts', 'Guided mode: ask your questions first'],
+      ['src/engine/agent/proposePlanCall.ts', 'Guided mode: ask your questions first'],
       ['src/engine/agent/context.ts', "mode: guided (ask before each plan"],
     ],
     tests: ['tests/agent-mode.test.ts'],
@@ -158,7 +158,7 @@ export default [
     sides: [
       ['src/engine/procedure.ts', 'export const SETTINGS_POLICY'],
       ['src/engine/procedure.ts', 'export function planRequiresSettings'],
-      ['src/engine/agent/llmTurn.ts', 'planRequiresSettings(workspace, kinds'],
+      ['src/engine/agent/proposePlanCall.ts', 'planRequiresSettings(workspace, kinds'],
     ],
     tests: ['tests/general-model-gate.test.ts', 'tests/agent-force.test.ts'],
   },
@@ -186,7 +186,7 @@ export default [
     what: 'Decisión del usuario (ADR 0009, enmienda a 0007-9): una operación con modelo de imagen confirma su modelo (Auto una vez por sesión, Guided en cada petición; Direct usa el compositor).',
     sides: [
       ['src/engine/procedure.ts', 'An op step that runs on an image model (edit engine) needs the image kind confirmed'],
-      ['src/engine/agent/llmTurn.ts', 'const kinds = v.data.steps.map'],
+      ['src/engine/agent/proposePlanCall.ts', 'const kinds = v.data.steps.map'],
     ],
     tests: ['tests/agent-force.test.ts', 'tests/agent-fit-plan.test.ts'],
   },

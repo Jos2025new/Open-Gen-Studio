@@ -44,9 +44,11 @@ export default [{
     ['src/components/node/SystemNode.tsx', 'export function linkClassProps'],
     ['src/styles/node-system.css', '.edge-link-control'],
     ['src/engine/nodes/omniSpaces.ts', 'export const hiddenInOrdinary'],
-    ['src/components/node/AddNodeItems.tsx', 'const SYSTEM_ENTRIES'],
+    ['src/components/node/systemUi.ts', 'export const SYSTEM_UIS'],
+    ['src/engine/nodes/systemDefaults.ts', 'export const SYSTEM_DEFAULTS'],
+    ['src/components/node/AddNodeItems.tsx', 'SYSTEM_MENU_ORDER.map'],
   ],
-  tests: ['tests/system-nodes.test.ts', 'tests/omnicanvas.test.ts', 'tests/adversarial-p7-add-node.test.ts'],
+  tests: ['tests/system-nodes.test.ts', 'tests/omnicanvas.test.ts', 'tests/adversarial-p7-add-node.test.ts', 'tests/system-table.test.ts'],
 }, {
   id: 'node-ui-catalog',
   what: 'El menú de añadir, la biblioteca comparten la tabla ordenada `NODE_UIS`, y sus iconos salen de `KIND_ICON` (separada del descriptor puro en `engine/nodecore`). El orden del array es el del menú y la biblioteca.',

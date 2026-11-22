@@ -1,12 +1,12 @@
 import { ctltOf, presetById } from '../captureStyles';
-import type { GenSettings, Subject } from '../types';
+import { VISUAL_MEDIA_KINDS, type GenSettings, type Subject } from '../types';
 
 /** Context lines: the user's saved capture styles and the style selected in the composer. */
 export function captureLines(library: Subject[], composer: { image: { settings: GenSettings }; video: { settings: GenSettings } }): string[] {
   const mine = library.filter((s) => s.kind === 'style' && s.capture);
   const out: string[] = [];
   if (mine.length) out.push(`saved capture styles (capture.style = the name): ${mine.map((s) => `${s.name} (${s.capture!.camera}; ${s.capture!.tone})`).join(' | ')}`);
-  for (const k of ['image', 'video'] as const) {
+  for (const k of VISUAL_MEDIA_KINDS) {
     const c = composer[k].settings.capture;
     if (!c) continue;
     const base = ctltOf(c);

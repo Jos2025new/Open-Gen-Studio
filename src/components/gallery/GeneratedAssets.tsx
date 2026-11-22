@@ -7,7 +7,7 @@ import { IconButton, Button } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
 import { canvasLookup } from '../../engine/canvas';
-import type { Asset } from '../../engine/types';
+import type { Asset, MediaKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
 import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
@@ -20,7 +20,7 @@ import { usePref } from '../ui/hooks';
 import { GalleryTile, LibraryTextTile, assetTitle } from './GalleryTiles';
 import { LIBRARY_HEADS, ListHeader, columnValues, compareColumn, widthVars, type ColumnValues, type ColumnWidths, type ListSort } from './ListColumns';
 
-type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
+type KindFilter = 'all' | MediaKind | 'text';
 const KINDS = [{ id: 'image', label: 'Images', icon: Image }, { id: 'video', label: 'Videos', icon: Film }, { id: 'audio', label: 'Audio', icon: AudioLines }, { id: 'model3d', label: '3D', icon: Box }, { id: 'text', label: 'Text', icon: MessageSquare }] as const;
 
 /** Everything generated or uploaded: the "All" category of the Library. */

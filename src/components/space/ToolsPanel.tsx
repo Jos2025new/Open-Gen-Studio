@@ -9,7 +9,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { overLimit } from '../../engine/budget';
+import { useBudgetVerdict } from '../ui/useBudgetVerdict';
 import { ALL_TOOLS, isListed } from '../shell/navModel';
 import { SpaceHead } from './SpaceFrame';
 
@@ -75,11 +75,12 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
     if (useStore.getState().ui.toolSeed?.op === op) setUi({ toolSeed: undefined });
   }, [op]);
   const pop = usePopover();
+  const verdict = useBudgetVerdict(state.estimate, state.sessionId);
   const unknown = state.estimate.usd == null;
   const generate = () => {
     if (!target) { toast(`Add ${NOUN[def.input]} first.`, 'error'); return; }
     if (state.blocked) { toast(state.blocked, 'error'); return; }
-    if (unknown || overLimit(state.estimate, state.sessionId)) pop.toggle();
+    if (unknown || verdict.over) pop.toggle();
     else state.run();
   };
   return <>
@@ -94,7 +95,7 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
         <Zap size={14} strokeWidth={2} /><span>Generate</span>{target ? <span className="send-cost num">{costLabel(state.estimate, { short: true })}</span> : null}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Confirm cost">
-        <SpendConfirm title={<ViaPick op={op} state={state} />} estimate={state.estimate} confirmLabel="Generate" onConfirm={() => { pop.close(); return state.run(); }} onCancel={pop.close} blocked={state.blocked} sessionId={state.sessionId} resolveSessionId={state.resolveSessionId} />
+        <SpendConfirm title={<ViaPick op={op} state={state} />} estimate={state.estimate} confirmLabel="Generate" onConfirm={(pass) => { pop.close(); return state.run(pass); }} onCancel={pop.close} blocked={state.blocked} sessionId={state.sessionId} resolveSessionId={state.resolveSessionId} />
       </Popover>
     </footer>
   </>;

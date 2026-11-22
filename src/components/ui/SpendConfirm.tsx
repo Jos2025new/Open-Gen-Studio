@@ -3,7 +3,8 @@ import { Zap } from './icons';
 import { formatUsd } from '../../lib/format';
 import type { Estimate } from '../../engine/types';
 import { useStore } from '../../store/store';
-import { dontAskAgain, withOncePass, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
+import { dontAskAgain, withOncePass, type BudgetPass } from '../../engine/budget';
+import { useBudgetVerdict } from './useBudgetVerdict';
 import { Button, CostTag, costLabel } from './primitives';
 
 /** The one cost checkpoint: shown right before anything that spends money. */
@@ -23,8 +24,8 @@ export function SpendConfirm({
   lines?: ReactNode[];
   estimate: Estimate;
   confirmLabel?: string;
-  /** Return the action's promise (if any): the "Continue once" pass lives until it settles. */
-  onConfirm: () => unknown;
+  /** Return the action's promise (if any): the "Continue once" pass lives until it settles and belongs only to this action. */
+  onConfirm: (pass?: BudgetPass) => unknown;
   onCancel: () => void;
   children?: ReactNode;
   blocked?: string | null;
@@ -32,12 +33,10 @@ export function SpendConfirm({
   sessionId?: string;
   resolveSessionId?: () => string | undefined;
 }) {
-  // Re-render when spending or the limit change.
-  useStore((s) => s.spentUsd);
-  useStore((s) => s.settings);
-  const remaining = remainingBudget();
   const sid = sessionId ?? useStore.getState().activeSessionId;
-  const over = overLimit(estimate, sid);
+  const verdict = useBudgetVerdict(estimate, sid);
+  const remaining = verdict.remaining;
+  const over = verdict.over;
   return (
     <div className="spend">
       <div className="spend-head">
@@ -62,7 +61,7 @@ export function SpendConfirm({
         )}
         <span className="num">{remaining == null ? 'No spending limit' : `Budget left ${formatUsd(Math.max(0, remaining))}`}</span>
       </div>
-      {blocked || over ? <div className="spend-warn">{blocked ?? overLimitText(estimate)}</div> : null}
+      {blocked || over ? <div className="spend-warn">{blocked ?? verdict.text}</div> : null}
       <div className="spend-actions">
         <Button variant="ghost" onClick={onCancel}>
           Cancel
@@ -85,7 +84,7 @@ export function SpendConfirm({
           icon={Zap}
           disabled={Boolean(blocked)}
           onClick={() => {
-            void (over ? withOncePass(resolveSessionId?.() ?? sid, onConfirm) : onConfirm());
+            void (over ? withOncePass(resolveSessionId?.() ?? sid, (pass) => onConfirm(pass)) : onConfirm());
           }}
           autoFocus
         >

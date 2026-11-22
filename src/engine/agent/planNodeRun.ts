@@ -6,24 +6,24 @@ import { prepareNodeRun, previewRun } from '../flow/actions';
 import { runApproved } from '../nodecore/action';
 import { pushHistory } from './conversation';
 import { agentOf, patchAgent } from './runtimeShared';
-import { overLimit, overLimitText, rerunNote } from '../budget';
+import { budgetProblem, rerunNote, type BudgetPass } from '../budget';
 import { closeRequest } from './metrics';
 import { wrapUpPlan } from './planRun';
 
 /** One approval in flight per card. */
 const nodeApprovals = new Map<string, Promise<void>>();
-export function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
+export function approveNodeRun(sessionId: string, item: PlanFeedItem, budgetPass?: BudgetPass): Promise<void> {
   const key = `${sessionId}:${item.id}`;
   const open = nodeApprovals.get(key);
   if (open) return Promise.resolve();
   // The card says so at once, so no second click finds it waiting; a refusal below puts it back.
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'running' });
-  const promise = approveNodeRunNow(sessionId, item).finally(() => nodeApprovals.delete(key));
+  const promise = approveNodeRunNow(sessionId, item, budgetPass).finally(() => nodeApprovals.delete(key));
   nodeApprovals.set(key, promise);
   return promise;
 }
 
-async function approveNodeRunNow(sessionId: string, item: PlanFeedItem): Promise<void> {
+async function approveNodeRunNow(sessionId: string, item: PlanFeedItem, budgetPass?: BudgetPass): Promise<void> {
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const request = item.nodeRun!;
   const preview = await prepareNodeRun(sessionId, request.targets, request.force);
@@ -34,11 +34,12 @@ async function approveNodeRunNow(sessionId: string, item: PlanFeedItem): Promise
     });
     return;
   }
-  if (overLimit(preview.estimate, sessionId)) { updateFeedItem(sessionId, item.id, { status: 'awaiting', estimate: preview.estimate, error: overLimitText(preview.estimate) }); return; }
+  const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
+  if (problem) { updateFeedItem(sessionId, item.id, { status: 'awaiting', estimate: preview.estimate, error: problem }); return; }
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'running', error: undefined, stepStates: {} });
   const running = runApproved(sessionId, request.targets, request.force, preview, uid('run'), (id, state, info) => {
     updateFeedItem<PlanFeedItem>(sessionId, item.id, it => ({ ...it, stepStates: { ...it.stepStates, [id]: state }, stepGenerations: info?.generationId ? { ...it.stepGenerations, [id]: info.generationId } : it.stepGenerations }));
-  });
+  }, budgetPass);
   const record = await running;
   const result = record.result;
   // A send that was attempted and threw may have reached the provider: the approval is spent and the card does not go back to awaiting.

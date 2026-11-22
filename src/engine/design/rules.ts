@@ -1,8 +1,8 @@
-import type { Layer, LayerType } from '../types';
+import type { Layer, LayerType, VisualMediaKind } from '../types';
 
 /* What each layer type accepts. The whole app routes placement through these rules. */
 
-export type PlaceableContent = 'image' | 'video' | 'text' | 'shapes';
+export type PlaceableContent = VisualMediaKind | 'text' | 'shapes';
 
 const ACCEPTS: Record<Layer['type'], PlaceableContent | null> = {
   raster: 'image',

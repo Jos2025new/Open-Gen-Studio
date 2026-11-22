@@ -172,14 +172,14 @@ export function SketchEditor() {
       toast((err as Error).message, 'error');
     }
   };
-  const runMask = async () => {
+  const runMask = async (pass?: import('../../engine/budget').BudgetPass) => {
     if (!target) return;
     setSaving(true);
     try {
       const source = target.assetId;
       const mask = await canvasToAsset(opSessionId(source, true), maskCanvas(), 'mask');
       close();
-      await runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() });
+      await (pass ? runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() }, undefined, undefined, undefined, undefined, pass) : runAssetOp(source, maskOp, { mask: mask.id, instruction: change.trim() }));
     } catch (err) {
       toast((err as Error).message, 'error');
     } finally {
@@ -297,7 +297,7 @@ export function SketchEditor() {
                   confirmLabel={change.trim() ? 'Editar región' : 'Quitar objeto'}
                   sessionId={opSessionId(target.assetId)}
                   resolveSessionId={() => opSessionId(target.assetId, true)}
-                  onConfirm={() => (apply.close(), runMask())}
+                  onConfirm={(pass) => (apply.close(), runMask(pass))}
                   onCancel={apply.close}
                 />
               ) : null}

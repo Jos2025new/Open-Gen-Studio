@@ -1,13 +1,12 @@
 import { useStore } from '../../store/store';
 import { canvasIndex } from '../canvas';
 import { nodeOutputAsset } from '../flow/graph';
-import type { Asset, RefNodeData } from '../types';
+import { COMPOSER_MODES, type Asset, type RefNodeData } from '../types';
 import { OMNI_SPACE_TITLES, isOmniSpace, omniOnly } from './omniSpaces';
 import type { LiveSystemSummary } from './spec';
 
 /* What a Studio, Nodes or Designer node shows: a snapshot of its Space and its parameters, read where they live. */
 
-const COMPOSER_MODES = ['agent', 'image', 'video', 'audio', 'model3d'];
 const STYLES = ['auto', 'guided', 'direct'];
 const option = (v: string) => ({ value: v, label: v });
 const visual = (a: Asset | undefined): a is Asset => Boolean(a) && (a!.kind === 'image' || a!.kind === 'video');

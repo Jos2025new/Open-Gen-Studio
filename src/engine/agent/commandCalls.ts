@@ -1,7 +1,7 @@
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
 import { appendFeed, updateFeedItem, useStore } from '../../store/store';
-import { dontAskAgain, beginOncePass, dontAskUntilNextSession, overLimit } from '../budget';
+import { beginOncePass, budgetProblem, dontAskAgain, dontAskUntilNextSession, type BudgetPass } from '../budget';
 import { allCommands, command, findCommands, getApprover, run, type ApprovalRequest, type Approver } from '../commands';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
@@ -63,7 +63,7 @@ interface PendingCommandApproval {
   sessionId: string;
   itemId: string;
   request: ApprovalRequest;
-  resolve: (approved: boolean) => void;
+  resolve: (outcome: boolean | { approved: boolean; budgetPass?: BudgetPass }) => void;
   setReleasePass: (fn: () => void) => void;
 }
 
@@ -90,14 +90,19 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
     return true;
   }
   const hasSpend = entry.request.steps.some((s) => s.effect === 'spend');
-  const heldAtLimit = hasSpend && overLimit(entry.request.estimate, sessionId);
+  const heldAtLimit = hasSpend && budgetProblem(entry.request.estimate, sessionId) !== null;
   if (heldAtLimit && decision === 'approve') return false;
+  let budgetPass: BudgetPass | undefined;
   if (decision === 'session') dontAskAgain(sessionId);
   else if (decision === 'until-next-session') dontAskUntilNextSession();
-  else if (decision === 'once') entry.setReleasePass(beginOncePass(sessionId));
+  else if (decision === 'once') {
+    const grant = beginOncePass(sessionId);
+    entry.setReleasePass(grant.end);
+    budgetPass = grant.pass;
+  }
   pending.delete(itemId);
   updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));
-  entry.resolve(true);
+  entry.resolve(budgetPass ? { approved: true, budgetPass } : true);
   return true;
 }
 
@@ -143,7 +148,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   const sessionApprover: Approver | undefined =
     !getApprover() && useStore.getState().sessions[sessionId]
       ? (request) =>
-          new Promise<boolean>((resolve) => {
+          new Promise<boolean | { approved: boolean; budgetPass?: BudgetPass }>((resolve) => {
             if (signal?.aborted) {
               resolve(false);
               return;

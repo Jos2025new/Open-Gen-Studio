@@ -32,6 +32,7 @@ export const CanvasChatImport = memo(function CanvasChatImport({ sessionId, cont
     };
   }, [sessionId]);
   const finished = useStore(useShallow(selectFinished));
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- content, feed y finished suscriben cambios del store que chatWorkNotInNodes lee internamente
   const items = useMemo(() => chatWorkNotInNodes(sessionId).map(chatItem), [sessionId, content, feed, finished]);
   return <ImportFromChat
     sessionId={sessionId}
@@ -92,9 +93,9 @@ export function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] })
             blocked={preview.errors[0] ?? null}
             sessionId={sessionId}
             onCancel={pop.close}
-            onConfirm={() => {
+            onConfirm={(pass) => {
               if (previewRun(sessionId, ids, false).signature !== preview.signature) return;
-              return runApproved(sessionId, ids, false, preview, confirmId.current).then(() => pop.close());
+              return (pass ? runApproved(sessionId, ids, false, preview, confirmId.current, undefined, pass) : runApproved(sessionId, ids, false, preview, confirmId.current)).then(() => pop.close());
             }}
           />
         ) : null}

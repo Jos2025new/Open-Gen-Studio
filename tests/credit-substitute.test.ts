@@ -279,7 +279,7 @@ describe('402 recovery at the spending gate', () => {
     expect(overLimit(estimate, sid())).toBe(true);
     await resumePlan(sid(), 'card', 'retry', true);
     expect(atlasSends).toBe(0);
-    await withOncePass(sid(), () => resumePlan(sid(), 'card', 'retry', true));
+    await withOncePass(sid(), (pass) => resumePlan(sid(), 'card', 'retry', true, pass));
     expect(planCard().status).toBe('done');
     expect(atlasSends).toBe(1);
   });

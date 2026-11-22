@@ -4,7 +4,7 @@ import { useStore } from '../../store/store';
 import { cleanFileName } from '../../lib/media';
 import { OP_IDS } from '../ops';
 import { BASE_NODE_KINDS, BASE_SYSTEM_NODE_TYPES, LINK_KINDS, MODEL_ATTACH_MODES } from '../graphTypes';
-import { MEDIA_KINDS, type GenSettings, type GraphEdge, type GraphNode, type GraphNodeData, type OpId } from '../types';
+import { MEDIA_KINDS, MODEL_MEDIA_KINDS, type GenSettings, type GraphEdge, type GraphNode, type GraphNodeData, type OpId } from '../types';
 import { budgetProblem } from '../actions';
 import * as A from './actions';
 import { applyEdit } from '../nodecore/edit';
@@ -19,6 +19,7 @@ const kind = z.enum(BASE_NODE_KINDS);
 const sysType = z.enum(BASE_SYSTEM_NODE_TYPES);
 const linkKind = z.enum(LINK_KINDS);
 const attachMode = z.enum(MODEL_ATTACH_MODES);
+const modelMediaKind = z.enum(MODEL_MEDIA_KINDS);
 const op = z.enum(OP_IDS as [OpId, ...OpId[]]);
 const title = z.string().min(1).max(200);
 const asset = z.string().min(1).max(160);
@@ -54,7 +55,7 @@ const refNode = z
     attachMode: attachMode.optional(),
     dockedTo: z.string().optional(),
     mergedModels: z.array(z.string()).optional(),
-    mediaKind: z.enum(['llm', 'image', 'video', 'audio', 'model3d']).optional(),
+    mediaKind: modelMediaKind.optional(),
     llm: z.object({ provider: z.string(), model: z.string() }).strict().optional(),
     recipient: z.string().optional(),
     promptText: z.string().optional(),
@@ -72,7 +73,7 @@ const nodePatch = z
     attachMode: attachMode.optional(),
     dockedTo: z.string().optional(),
     mergedModels: z.array(z.string()).optional(),
-    mediaKind: z.enum(['llm', 'image', 'video', 'audio', 'model3d']).optional(),
+    mediaKind: modelMediaKind.optional(),
     llm: z.object({ provider: z.string(), model: z.string() }).strict().optional(),
     recipient: z.string().optional(),
     promptText: z.string().optional(),
@@ -378,13 +379,13 @@ export const commands = [
     args: z.object({ targets: ids, force: z.boolean().optional() }).strict(),
     effect: 'spend',
     estimate: (on, args) => A.previewRun(on.session, args.targets, args.force ?? true).estimate,
-    run: async (on, args) => {
+    run: async (on, args, ctx) => {
       // The same registry as nodes.action.*: one approval, one send, and the inspector can tell which run made which result.
       const prepared = await prepareAction(on.session, args.targets, args.force ?? true);
       if (!prepared.ok) throw new Error(prepared.errors[0]);
-      const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session);
+      const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session, ctx.budgetPass);
       if (problem) throw new Error(problem);
-      const started = (await runAction(prepared.snapshot)).result;
+      const started = (await runAction(prepared.snapshot, undefined, undefined, ctx.budgetPass)).result;
       if (!started) throw new Error('The graph changed after it was reviewed; review it again.');
       return { outputs: Object.fromEntries(started.outputs), failed: started.failed, skipped: started.skipped, waiting: started.waiting, ...(started.stopped ? { stopped: true } : {}) };
     },
