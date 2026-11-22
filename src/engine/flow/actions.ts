@@ -331,7 +331,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id));
   try {
     const result = await executeSteps(preview.steps, {
-      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLibrary: library, nodeOperations,
+      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLock: release, nodeLibrary: library, nodeOperations,
       onState: (stepId, state, info) => {
         if (info?.generationId) pending.set(stepId, info.generationId);
         const generationId = pending.get(stepId);

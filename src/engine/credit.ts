@@ -173,7 +173,7 @@ function confirmOverLimit(sessionId: string, title: string, e: Estimate, choices
  * failed model's price), a plan step is never resent outside its plan (its model changes and the plan's Retry runs it),
  * and an answer that comes after the card was retried or regenerated sends nothing.
  */
-export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun, estimateJob?: (g: Generation) => Estimate): Promise<boolean> {
+export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string, nodeLock?: () => void) => Promise<unknown> = rerun, estimateJob?: (g: Generation) => Estimate, nodeLock?: () => void): Promise<boolean> {
   const g = get().generations[genId];
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
@@ -224,7 +224,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     if (!held) return;
     try {
       applySubstitute(o, patch);
-      await later(genId);
+      await later(genId, held.release);
       if (held.node && get().generations[genId]?.status === 'done') {
         applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
       }
@@ -279,7 +279,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
           }
           return sendLater(auto, patch, 'switch provider after no credit')();
         }
-        const held = holdAttemptNode(g, nodes(), true);
+        const held = holdAttemptNode(g, nodes(), nodeLock);
         if (!held) { run = Promise.resolve(false); return; }
         pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
         applySubstitute(auto, patch);

@@ -461,7 +461,7 @@ export async function regenerate(generationId: string): Promise<void> {
   } else {
     appendFeed(g.sessionId, { ...feedBase('chat'), type: 'generation', generationId: next.id });
   }
-  runGeneration(next.id).catch((err) => {
+  runGeneration(next.id, held.release).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
   }).finally(held.release);
 }

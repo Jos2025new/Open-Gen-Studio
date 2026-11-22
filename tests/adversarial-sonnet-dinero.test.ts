@@ -48,17 +48,14 @@ vi.mock('../src/engine/design/raster', async (orig) => ({
 }));
 
 import { guard } from '../src/lib/saveGuard';
-import { HttpError, NetworkError } from '../src/lib/http';
+import { HttpError } from '../src/lib/http';
 import { useStore } from '../src/store/store';
-import { deleteSession } from '../src/engine/actions';
 import { useAlerts } from '../src/engine/alerts';
 import { rewritePrompts } from '../src/engine/agent/planSettings';
 import { forgetBalances, onAgentCredit } from '../src/engine/credit';
-import { runNodes } from '../src/engine/flow/actions';
 import { lockNodes, lockedNodes } from '../src/engine/flow/locks';
 import { cancelGeneration, createGeneration, runGeneration } from '../src/engine/jobs';
-import { controllers, purgeDiscarded, requestEstimate, running } from '../src/engine/jobState';
-import { costAuthorization } from '../src/engine/priceAuthorization';
+import { controllers, purgeDiscarded, running } from '../src/engine/jobState';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import type { Graph, ModelSummary, PlanFeedItem, PlanStep } from '../src/engine/types';
 import { patchGeneration } from '../src/store/store';
@@ -74,7 +71,6 @@ const imgOut = (tag = 'x', costUsd = 0.1) => ({
   outputs: [{ blob: new Blob([tag], { type: 'image/png' }), mime: 'image/png' }],
   costUsd,
 });
-const rj = (id: string) => ({ provider: 'nanogpt' as const, id, meta: {} });
 
 function setupStore(opts?: {
   budgetOn?: boolean;
@@ -231,7 +227,7 @@ describe('1. aborto vs transporte (commitPaidSend / inTransport)', () => {
   });
 
   // Cobro perdido: el proveedor ya respondio (cobrado) y el fallo es local (guardar el blob). inTransport=false -> el intent se borra.
-  it.fails('proveedor sincrono devuelve salida y falla el guardado local (cuota IDB): el envio no puede quedar borrado/sin lostJob (Retry = doble cobro)', async () => {
+  it('proveedor sincrono devuelve salida y falla el guardado local (cuota IDB): el envio no puede quedar borrado/sin lostJob (Retry = doble cobro)', async () => {
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockResolvedValue(imgOut('paid', 0.1));
     disk.putFail = true;
     const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'quota', modelRef: NANO, settings: defSet, inputs: { refs: [] } });
@@ -243,7 +239,7 @@ describe('1. aborto vs transporte (commitPaidSend / inTransport)', () => {
 });
 
 describe('2. holdAttemptNode reentrante', () => {
-  it.fails('un llamador SIN lock propio no debe pasar como reentrante si OTRA ejecucion escribe el nodo (doble generacion sobre el mismo nodo)', async () => {
+  it('un llamador SIN lock propio no debe pasar como reentrante si OTRA ejecucion escribe el nodo (doble generacion sobre el mismo nodo)', async () => {
     setupStore({ autoSwitch: 'always' });
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(10);
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', {}));
@@ -347,7 +343,7 @@ describe('4. purgeDiscarded', () => {
     purgeDiscarded(id);
     expect(genOf(id)).toBeUndefined();
   });
-  it.fails('una generacion ENTREGADA (done) de una sesion borrada con un uncertain historico ya resuelto por un reintento se purga (no se acumula para siempre)', () => {
+  it('una generacion ENTREGADA (done) de una sesion borrada con un uncertain historico ya resuelto por un reintento se purga (no se acumula para siempre)', () => {
     const id = finished([{ id: 'r1', index: 0, status: 'uncertain' }, { id: 'r2', index: 0, status: 'done' }] as never);
     purgeDiscarded(id);
     expect(genOf(id)).toBeUndefined();
@@ -369,7 +365,7 @@ describe('5. llmCallEstimate / presupuesto agotado', () => {
   const sse = 'data: {"choices":[{"delta":{"content":"{\\"s1\\":\\"rewritten\\"}"}}]}\n\ndata: [DONE]\n\n';
   const setLlm = (models: never[]) => { const st = useStore.getState(); useStore.setState({ catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: models } } }); };
 
-  it.fails('modelo LLM gratuito (0/0) con presupuesto agotado NO debe bloquear rewritePrompts (coste 0)', async () => {
+  it('modelo LLM gratuito (0/0) con presupuesto agotado NO debe bloquear rewritePrompts (coste 0)', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.01, spentUsd: 0.02 });
     setLlm([llm('m-a', 'Free', 0, 0)]);
     const fetchMock = vi.fn(async () => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
@@ -399,7 +395,7 @@ describe('5. llmCallEstimate / presupuesto agotado', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.fails('onAgentCredit always: sustituto gratuito (0/0) con presupuesto agotado debe cambiar de modelo (no cuesta nada)', async () => {
+  it('onAgentCredit always: sustituto gratuito (0/0) con presupuesto agotado debe cambiar de modelo (no cuesta nada)', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.01, spentUsd: 0.02, autoSwitch: 'always' });
     const st = useStore.getState();
     useStore.setState({ catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [llm('m-a', 'Model A', 0, 0)], openrouter: [llm('m-a2', 'Model A', 0, 0)] } } });

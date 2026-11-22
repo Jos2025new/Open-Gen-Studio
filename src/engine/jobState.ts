@@ -133,7 +133,7 @@ function hasPendingSendTrail(g: Generation): boolean {
   return Boolean(
     g.remoteJob ||
     g.lostJob ||
-    g.sends?.some((s) => (s.status === 'sent' && Boolean(s.remoteJob)) || s.status === 'uncertain' || s.status === 'intent'),
+    g.sends?.some((s) => (s.status === 'sent' && Boolean(s.remoteJob)) || (s.status === 'uncertain' && g.status !== 'done') || s.status === 'intent'),
   );
 }
 
