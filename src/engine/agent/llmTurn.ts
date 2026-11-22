@@ -7,7 +7,7 @@ import { isAbort, isTransient } from '../../lib/http';
 import { logEvent } from '../../lib/log';
 import { journeyIdFor, recordJourneyEvent } from '../../lib/journeyTrace';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
-import { isCreditError, onAgentCredit } from '../credit';
+import { guardLlmBudget, isCreditError, onAgentCredit } from '../credit';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, loadLlmCatalog, modelSummary } from '../catalog';
 import { uid } from '../../lib/id';
@@ -34,7 +34,6 @@ import { agentOf } from './lanes';
 import { canonicalJson } from './canonicalJson';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
-/** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
 /** Direct mode asks nothing and shows no settings card, so those two tools are not offered to the model. */
 const DIRECT_HIDDEN_TOOLS = new Set(['ask_questions', 'confirm_settings']);
 function toolsFor(style: AgentStyle) {
@@ -58,8 +57,10 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   const mine = (): AgentState => agentOf(sessionId, owner);
   const engine = agentEngine(sessionId, owner);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
-  void loadLlmCatalog(engine.provider);
   const runId = opts.runId ?? uid('turn');
+  const guard = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => (session(sessionId) && !mine().busy ? llmTurn(sessionId, workspace, { ...opts, runId }) : undefined));
+  if (!guard()) return;
+  void loadLlmCatalog(engine.provider);
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   let outcome: TurnOutcome = 'text';
   patchAgent(sessionId, { busy: true, phase: 'working' }, owner);
@@ -145,12 +146,13 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
-          if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
+      if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
         if (!cutTurn) logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: Date.now() - turnStart });
         outcome = 'cut';
         limitNote();
         return;
       }
+      if (iteration > 0 && !guard()) { outcome = 'canceled'; return; }
       let textItemId: string | null = null;
       let textItemMeta: ChatMessageMeta | undefined;
       const hasTextBubble = () => Boolean(textItemId && session(sessionId).feed.some((f) => f.id === textItemId));
@@ -493,5 +495,3 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     finish();
   }
 }
-
-/** Cost of one model call: what the provider reported, else tokens at the catalog's per-million prices. */

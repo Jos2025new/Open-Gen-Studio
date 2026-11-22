@@ -153,7 +153,12 @@ describe('recovering a failed plan', () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     await vi.waitFor(() => expect(viewed(useStore.getState().sessions[sid()]).busy).toBe(false));
-    useStore.setState((st) => ({ spentUsd: 5, settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: undefined, budgetNoAsk: false } }));
+    // Use a free agent model (0/0) so llmTurn runs while the spending limit stays exceeded for the paid plan retry.
+    useStore.setState((st) => ({
+      spentUsd: 5,
+      settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: undefined, budgetNoAsk: false },
+      catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [{ id: 'm', name: 'm', tools: true, vision: true, inputPrice: 0, outputPrice: 0 }] as never } },
+    }));
     const before = runs.length;
     replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'ok'];
     await sendAgentMessage('reinténtalo');

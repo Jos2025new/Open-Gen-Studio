@@ -47,6 +47,21 @@ const runCost = (g: { status: GenerationStatus; actualUsd?: number; estimate: { 
 const RUNNING: GenerationStatus[] = ['queued', 'running'];
 const statusIcon = (s: GenerationStatus) => (RUNNING.includes(s) ? <Loader size={14} className="spin" aria-label="Running" /> : s === 'done' ? <CircleCheck size={14} className="si-ok" aria-label="Done" /> : <CircleAlert size={14} className="si-warn" aria-label={s === 'review' ? 'Needs review' : 'Did not finish'} />);
 
+/** Budget counter row in Session info: shows remaining budget, or the excess in danger color when over limit. */
+export function SessionBudget({ spent, limit }: { spent: number; limit: number }) {
+  const over = spent > limit + 1e-9;
+  const pct = over ? 100 : Math.min(100, (spent / (limit || 1)) * 100);
+  const text = over
+    ? `${formatUsd(spent)} of ${formatUsd(limit)} · +${formatUsd(spent - limit)} over`
+    : `${formatUsd(spent)} of ${formatUsd(limit)} · ${formatUsd(Math.max(0, limit - spent))} left`;
+  return (
+    <div className={over ? 'si-budget is-over' : 'si-budget'} title="Budget counter since the last reset (all sessions)">
+      <span>Budget</span><span className="num">{text}</span>
+      <i><b style={{ width: `${pct}%` }} /></i>
+    </div>
+  );
+}
+
 /** The open session at a glance (top bar): what it cost and holds, what is running or just ran, its latest results.
  *  "View all" goes where the full list already lives: Generations (scoped to this session) and Library. */
 export function SessionInfo({ onGenerations }: { onGenerations: () => void }) {
@@ -86,10 +101,7 @@ export function SessionInfo({ onGenerations }: { onGenerations: () => void }) {
               <li key={r.key}><span>{SPEND_KIND[r.key] ?? r.key} <small className="num">×{r.count}</small></span><b className="num">{formatUsd(r.usd, { approx: r.estimated })}</b><i style={{ width: `${(r.usd / (data.spend.byCategory[0].usd || 1)) * 100}%` }} /></li>
             ))}
           </ul> : null}
-          {budget ? <div className="si-budget" title="Budget counter since the last reset (all sessions)">
-            <span>Budget</span><span className="num">{formatUsd(budget.spent)} of {formatUsd(budget.limit)} · {formatUsd(Math.max(0, budget.limit - budget.spent))} left</span>
-            <i><b style={{ width: `${Math.min(100, (budget.spent / (budget.limit || 1)) * 100)}%` }} /></i>
-          </div> : null}
+          {budget ? <SessionBudget spent={budget.spent} limit={budget.limit} /> : null}
           <div className="si-row"><Sparkles size={15} /><span>Generations</span><b className="num">{data.gens.length}</b></div>
           <div className="si-row"><Clock size={15} /><span>Started</span><b>{formatRelative(session.createdAt)}</b></div>
           <button type="button" className="si-more" onClick={() => go(() => setUi({ panel: 'spending' }))}><Coins size={14} />Spending details</button>

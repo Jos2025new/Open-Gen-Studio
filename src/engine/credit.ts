@@ -7,10 +7,10 @@ import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
 import { lineKey, modelFamily } from './variants';
 import { estimateMedia } from './costs';
-import type { Estimate, GenSettings, Generation, ModelSummary, ProviderId } from './types';
+import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { llmCallEstimate, overLimit, overLimitText, withOncePass } from './budget';
+import { consumeOnce, llmCallEstimate, overLimit, overLimitText, withOncePass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -162,6 +162,17 @@ function confirmOverLimit(sessionId: string, title: string, e: Estimate, choices
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
+  return false;
+}
+
+/** Check the spending limit before a paid LLM call. When over, shows the "Continue once" alert and returns false; otherwise spends any once-pass for paid calls and returns true. */
+export function guardLlmBudget(sessionId: string, provider: LlmProviderId, model: string, title: string, resume: () => unknown): boolean {
+  const est = llmCallEstimate(provider, model);
+  if (!overLimit(est, sessionId)) {
+    if (est.usd !== 0) consumeOnce(sessionId);
+    return true;
+  }
+  confirmOverLimit(sessionId, title, est, '\u201cContinue once\u201d runs this agent turn once.', resume);
   return false;
 }
 

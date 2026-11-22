@@ -13,7 +13,7 @@ const PARTIAL_NOT_SENT_MESSAGE = 'Next request not sent: could not save before s
 const PRIOR_UNCERTAIN_NOT_SENT_MESSAGE = 'Not sent: could not save before sending. A previous request for this generation may have been charged; check before retrying.';
 
 /** True when the send has zero cost (local models or $0 price) and never needs the paid-send gate. */
-export function isFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, quote?: number | null): boolean {
+function isFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, quote?: number | null): boolean {
   // A remote send is free only when both the estimate and the quote (if any) say $0: either one above $0 bills.
   return g.provider === 'local' || g.modelRef.startsWith('local::') || (g.estimate?.usd === 0 && (quote == null || quote === 0));
 }
