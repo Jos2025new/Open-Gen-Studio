@@ -3,7 +3,7 @@ import { placeFor } from './place';
 import { formatUsd } from '../lib/format';
 import { uid } from '../lib/id';
 import { appendFeed, patchSession, setUi, updateFeedItem, useStore } from '../store/store';
-import type { Estimate, NoticeFeedItem } from './types';
+import type { Estimate, LlmProviderId, NoticeFeedItem } from './types';
 import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
 
 export { noAskEverywhere };
@@ -231,4 +231,12 @@ export function ignoreExcess(sessionId: string, itemId: string): void {
 /** A Nodes run that did not start: the real reason for the card (the limit, or the graph changed). */
 export function rerunNote(e: Estimate, sessionId?: string): string {
   return overLimit(e, sessionId) ? overLimitText(e) : 'The execution changed. Review and approve again.';
+}
+
+/** Nominal cost estimate for one LLM call so `overLimit` can guard LLM entries before tokens are known. */
+export function llmCallEstimate(provider: LlmProviderId, model: string): Estimate {
+  const m = get().catalog.llm[provider]?.find((x) => x.id === model);
+  if (m && m.inputPrice === 0 && m.outputPrice === 0) return { usd: 0, approximate: false };
+  const raw = ((m?.inputPrice ?? 0) * 1000 + (m?.outputPrice ?? 0) * 500) / 1_000_000;
+  return { usd: Math.max(0.0001, Math.round(raw * 10000) / 10000), approximate: true };
 }

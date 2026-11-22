@@ -13,6 +13,8 @@ import { feedOfAgentIn } from './threads';
 import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
+import { mayStartWork } from '../../lib/writerLock';
+import { llmCallEstimate, overLimit, overLimitText } from '../budget';
 import { agentEngine, llmCallUsd } from './runtime';
 import { settingsOptions } from './settingsCard';
 import { rememberSessionModel } from './sessionModel';
@@ -176,11 +178,18 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const item = planOf(sessionId, itemId);
   const steps = item?.plan.steps.filter(isGen).filter((s) => s.kind === kind && s.prompt.trim() && (stepIds ? stepIds.includes(s.id) : !groupModelRef || modelGroup(s.modelRef) === modelGroup(groupModelRef))) ?? [];
   if (engine.kind !== 'llm' || !item || !steps.length) return;
-  const run = (runs.get(itemId) ?? 0) + 1;
-  runs.set(itemId, run);
-  setRewrite(itemId, true);
   const ref = steps[0].modelRef;
   const name = modelSummary(ref)?.name ?? ref;
+  const guardBlock = (): string | null => {
+    if (!mayStartWork()) return 'Open Gen Studio is open in another tab';
+    const est = llmCallEstimate(engine.provider, engine.model);
+    return overLimit(est, sessionId) ? overLimitText(est) : null;
+  };
+  const run = (runs.get(itemId) ?? 0) + 1;
+  runs.set(itemId, run);
+  const blocked = guardBlock();
+  if (blocked) return setRewrite(itemId, false, `The prompt was not rewritten for ${name}: ${blocked}`);
+  setRewrite(itemId, true);
   const guide = guideForModel(ref.split('::')[1] ?? '');
   const text = guide ? readGuide(`model:${guide.id}`) : undefined;
   const style = item.plan.style ? ` The app appends this style block to every prompt; never repeat or restate it: "${item.plan.style}".` : '';
@@ -190,6 +199,9 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   let tooLong = '';
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
+      if (runs.get(itemId) !== run) return;
+      const why = guardBlock();
+      if (why) throw new Error(why);
       const content = attempt ? `${lines}\n\nYour last answer had a prompt over ${MAX_PROMPT} characters (${tooLong}). Write them shorter.` : lines;
       const result = await chat({ provider: engine.provider, apiKey: engine.key, model: engine.model, system, messages: [userMessage(content, parts)], tools: [], signal: new AbortController().signal });
       addSpend(llmCallUsd(engine.provider, engine.model, result.usage), { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });

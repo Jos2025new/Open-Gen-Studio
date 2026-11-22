@@ -278,7 +278,7 @@ describe('3. purgeDiscarded en generación en error con rastro pendiente', () =>
 });
 
 describe('4. rewritePrompts con presupuesto agotado', () => {
-  it.fails('no envía POST a /chat/completions cuando budgetOn=true y spentUsd > budgetUsd', async () => {
+  it('no envía POST a /chat/completions cuando budgetOn=true y spentUsd > budgetUsd', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.01, spentUsd: 0.02 });
     const sse = 'data: {"choices":[{"delta":{"content":"{\\"s1\\":\\"rewritten\\"}"}}]}\n\ndata: [DONE]\n\n';
     const fetchMock = vi.fn(async () => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
@@ -363,7 +363,7 @@ describe('6. onAgentCredit con presupuesto agotado (overLimit)', () => {
   const llm = (id: string, name: string, inputPrice: number, outputPrice: number) =>
     ({ id, name, tools: true, vision: true, inputPrice, outputPrice }) as never;
 
-  it.fails('sustituto hasta 1,5x respeta overLimit antes de cambiar el modelo del agente', async () => {
+  it('sustituto hasta 1,5x respeta overLimit antes de cambiar el modelo del agente', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.01, spentUsd: 0.02, autoSwitch: 'ask' });
     const st = useStore.getState();
     useStore.setState({
@@ -386,7 +386,7 @@ describe('6. onAgentCredit con presupuesto agotado (overLimit)', () => {
     expect(useAlerts.getState().alerts.some((a) => /limit|budget/i.test(a.text))).toBe(true);
   });
 
-  it.fails('modo always no auto-sustituye el agente cuando el presupuesto está agotado', async () => {
+  it('modo always no auto-sustituye el agente cuando el presupuesto está agotado', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.01, spentUsd: 0.02, autoSwitch: 'always' });
     const st = useStore.getState();
     useStore.setState({

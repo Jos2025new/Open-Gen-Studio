@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { overLimit, overLimitText, withOncePass } from './budget';
+import { llmCallEstimate, overLimit, overLimitText, withOncePass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -148,6 +148,23 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
   return `${m.name} · ${PROVIDER_LABELS[m.provider]}${p != null ? ` · ${formatUsd(p)}` : ''}${ratio !== undefined && ratio > 1 ? ' · pricier' : ''}`;
 };
 
+/** Run `proceed` when within budget, or ask once with "Continue once" / "Cancel" above the prompt box. */
+function confirmOverLimit(sessionId: string, title: string, e: Estimate, choicesText: string, proceed: () => unknown): boolean {
+  if (!overLimit(e, sessionId)) {
+    proceed();
+    return true;
+  }
+  const id = pushAlert({
+    level: 'warn',
+    text: `${title}: ${overLimitText(e, choicesText)}`,
+    actions: [
+      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, proceed); } },
+      { label: 'Cancel', run: () => dismissAlert(id) },
+    ],
+  });
+  return false;
+}
+
 /**
  * A generation failed for lack of credit: switch it to the same model elsewhere (same or lower price, with credit)
  * and run it again, or show the choices above the prompt box. `rerun` runs it again inside the attempt that just failed;
@@ -224,15 +241,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const send = () => go().catch(logged(what));
     const retry = estimateForRetry({ ...g, ...patch });
     const e = retry.lowerBound ? { ...retry, usd: null } : retry;
-    if (!overLimit(e, g.sessionId)) return void send();
-    const id = pushAlert({
-      level: 'warn',
-      text: `${label(o.model, o.ratio, o.usd)}: ${overLimitText(e, '\u201cContinue once\u201d runs only this generation on that model.')}`,
-      actions: [
-        { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(g.sessionId, send); } },
-        { label: 'Cancel', run: () => dismissAlert(id) },
-      ],
-    });
+    confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), e, '\u201cContinue once\u201d runs only this generation on that model.', send);
   };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
@@ -283,7 +292,7 @@ const sameName = (s: string) => s.toLowerCase().replace(/^[^:]+:\s*/, '').replac
  * becomes the agent's model (said above the prompt box) and the turn runs again; otherwise up to three capable
  * models with credit are offered (tools, and vision when the current one has it), or "recharge".
  */
-export async function onAgentCredit(): Promise<boolean> {
+export async function onAgentCredit(sessionId: string = get().activeSessionId): Promise<boolean> {
   const { settings, catalog } = get();
   const provider = settings.agent.provider;
   if (provider === 'offline') return false;
@@ -308,6 +317,17 @@ export async function onAgentCredit(): Promise<boolean> {
   const switchTo = (c: (typeof choices)[number]) => {
     useStore.setState((s) => ({ settings: { ...s.settings, agent: { ...s.settings.agent, provider: c.p, model: c.m.id, modelPinned: true } } }));
   };
+  const pick = (c: (typeof choices)[number], remember = false) =>
+    confirmOverLimit(
+      sessionId,
+      `${c.m.name} · ${PROVIDER_LABELS[c.p]}`,
+      llmCallEstimate(c.p, c.m.id),
+      '\u201cContinue once\u201d switches the agent to this model.',
+      () => {
+        if (remember) setSettings({ autoSwitchProvider: 'always' });
+        switchTo(c);
+      },
+    );
   const auto = choices.find((c) => c.same);
   const mode = autoSwitchMode();
   if (auto && mode === 'ask') {
@@ -315,13 +335,17 @@ export async function onAgentCredit(): Promise<boolean> {
       level: 'warn',
       text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Use the same model at ${PROVIDER_LABELS[auto.p]} instead (${auto.m.name}, same price or less) and press Retry?`,
       actions: [
-        { label: 'Yes, this time', run: () => { switchTo(auto); dismissAlert(id); } },
-        { label: 'Don\u2019t ask again', run: () => { setSettings({ autoSwitchProvider: 'always' }); switchTo(auto); dismissAlert(id); } },
+        { label: 'Yes, this time', run: () => { dismissAlert(id); pick(auto); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); pick(auto, true); } },
       ],
     });
     return false;
   }
   if (auto && mode === 'always') {
+    if (overLimit(llmCallEstimate(auto.p, auto.m.id), sessionId)) {
+      pick(auto);
+      return false;
+    }
     switchTo(auto);
     pushAlert({ level: 'info', text: `${empty} has no credit: the agent switched to the same model at ${PROVIDER_LABELS[auto.p]} (${auto.m.name}, same price or less).` });
     return true;
@@ -334,7 +358,7 @@ export async function onAgentCredit(): Promise<boolean> {
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Switch to a model with credit and press Retry, or recharge ${empty}:`,
-      actions: near.map((c) => ({ label: `${c.m.name} · ${PROVIDER_LABELS[c.p]}`, run: () => { switchTo(c); dismissAlert(id); } })),
+      actions: near.map((c) => ({ label: `${c.m.name} · ${PROVIDER_LABELS[c.p]}`, run: () => { dismissAlert(id); pick(c); } })),
     });
     return false;
   }

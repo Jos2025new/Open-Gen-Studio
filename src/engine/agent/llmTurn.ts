@@ -206,7 +206,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
         if (isCreditError(err) && !opts.creditRetried) {
           if (textItemId) removeFeedItem(sessionId, textItemId);
-          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }); }
+          if (await until(onAgentCredit(sessionId))) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }); }
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
