@@ -54,7 +54,7 @@ export function findFreePosition(
   desired: { x: number; y: number },
   size: { width: number; height: number },
   occupied: readonly NodeRect[],
-  opts?: { gapX?: number; gapY?: number },
+  opts?: { gapX?: number; gapY?: number; preferRight?: boolean },
 ): { x: number; y: number } {
   const gapX = opts?.gapX ?? 48;
   const gapY = opts?.gapY ?? 56;
@@ -82,7 +82,7 @@ export function findFreePosition(
       }
     }
   }
-  offsets.sort((a, b) => a.dist - b.dist);
+  offsets.sort((a, b) => a.dist - b.dist || (opts?.preferRight ? b.dx - a.dx : 0));
   for (const { dx, dy } of offsets) {
     const x = desired.x + dx;
     const y = desired.y + dy;
@@ -106,14 +106,14 @@ export function findFreePositionFor(
   data: GraphNodeData,
   desired: { x: number; y: number },
   occupied: readonly NodeRect[],
-  opts?: { gapX?: number; gapY?: number; width?: number },
+  opts?: { gapX?: number; gapY?: number; width?: number; preferRight?: boolean },
 ): { x: number; y: number } {
   // Existing cards bring their own floating panel: it is as occupied as the card.
   occupied = occupied.flatMap((o) => (o.panel ? [o, o.panel] : [o]));
   const width = opts?.width ?? nodeWidth(data);
   const height = estimatedHeight(data);
   const zone = panelZone(data, { x: 0, y: 0, width, height });
-  const gaps = { gapX: opts?.gapX ?? 48, gapY: opts?.gapY ?? 56 };
+  const gaps = { gapX: opts?.gapX ?? 48, gapY: opts?.gapY ?? 56, preferRight: opts?.preferRight };
   if (!zone) return findFreePosition(desired, { width, height }, occupied, gaps);
   // The footprint is the card plus its panel: wider on both sides, taller below.
   const left = Math.max(0, -zone.x);

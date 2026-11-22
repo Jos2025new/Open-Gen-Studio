@@ -45,8 +45,7 @@ describe('adversarial p10: placement of new nodes', () => {
 });
 
 describe('adversarial p10: the + button path', () => {
-  // reproduce: addConnected sin posición pone el nodo en x+360 sin findFreePositionFor; una tarjeta ya puesta en ese hueco queda solapada
-  it.fails('a node added with the + button beside a card does not land on that card', () => {
+  it('a node added with the + button beside a card does not land on that card', () => {
     const session = createSession('adv-p10-plus');
     const src: GraphNode = { id: 'src', position: { x: 0, y: 0 }, data: TEXT };
     const blocker: GraphNode = { id: 'blk', position: { x: 360, y: 0 }, data: TEXT };
