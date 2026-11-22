@@ -33,14 +33,14 @@ vi.mock('../src/components/ui/AssetMedia', () => ({ AssetMedia: ({ assetId }: { 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { guard } from '../src/lib/saveGuard';
-import { saveNow, useStore } from '../src/store/store';
+import { useStore } from '../src/store/store';
 import { forgetBalances } from '../src/engine/credit';
 import { createGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
 import { controllers, running } from '../src/engine/jobState';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import { SessionInfo } from '../src/components/shell/SessionTools';
 import { sessionStats } from '../src/components/shell/SessionRow';
-import type { Generation, ModelSummary } from '../src/engine/types';
+import type { ModelSummary } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
