@@ -24,6 +24,7 @@ export type ComposerMode = typeof COMPOSER_MODES[number];
 export const MODEL_MEDIA_KINDS = ['llm', ...MEDIA_KINDS] as const;
 /** Visual generation kinds with frames (image and video). */
 export const VISUAL_MEDIA_KINDS = ['image', 'video'] as const;
+export type VisualMediaKind = typeof VISUAL_MEDIA_KINDS[number];
 /** Media kinds a vision-capable agent can inspect (images, video frames, 3D views). */
 export const VIEWABLE_MEDIA_KINDS = ['image', 'video', 'model3d'] as const;
 

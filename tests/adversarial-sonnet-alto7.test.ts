@@ -34,7 +34,7 @@ describe('check-media-literals: forms it must catch (sanity: these pass today)',
 
 describe('check-media-literals: bypasses (MEDIUM, inherited design, new check)', () => {
   // The real repo already has one: src/engine/placeTypes.ts:4 `type Mode = 'image' | 'video' | 'audio' | 'model3d' | 'agent'`.
-  it.fails('catches a TS union type that restates the media kinds', () => {
+  it('catches a TS union type that restates the media kinds', () => {
     expect(mediaLiterals(srcRoot("export type M = 'image' | 'video' | 'audio' | 'model3d';"))).not.toHaveLength(0);
   });
   it.fails('catches a template-literal list', () => {

@@ -1,8 +1,8 @@
 /**
- * Closed-list discipline for media kinds: any array or `z.enum` listing 2+ of `'image'`, `'video'`, `'audio'`, `'model3d'`
+ * Closed-list discipline for media kinds: any array, `z.enum`, or TS union type alias listing 2+ of `'image'`, `'video'`, `'audio'`, `'model3d'`
  * (or 1+ of them paired with `'agent'`, `'llm'`, `'text'`) outside `src/engine/types.ts` fails.
  * Deliberate subsets (e.g. `['image', 'video']`) are named once in `src/engine/types.ts` and imported everywhere else.
- * Text-parsing word lists and HTML/SVG tag lists are explicitly exempted by binding name with their reason below.
+ * Text-parsing word lists, route-kind lists, and HTML/SVG tag lists are explicitly exempted by binding name with their reason below.
  */
 import { pathToFileURL } from 'node:url';
 import { scan } from './ast-scan.mjs';
@@ -17,6 +17,10 @@ export const EXCEPTIONS = new Map([
   ['src/engine/variants.ts', new Map([
     ['ROUTE_WORDS', 'stop-words stripped from model IDs when grouping model lines by input route'],
     ['ROUTE_ORDER', 'display order of VariantRoute input kinds (text/image/edit/reference/video), not MediaKind'],
+    ['VariantRoute', 'input route union (text/edit/image/reference/video), not MediaKind'],
+  ])],
+  ['src/engine/routing.ts', new Map([
+    ['RouteMode', 'video input route union (text/image/reference), not MediaKind'],
   ])],
   ['src/engine/agent/userChoice.ts', new Map([
     ['TIER', 'generic/tier stop-words stripped from user text when matching a model brand name'],
@@ -33,7 +37,7 @@ const CORE_KINDS = new Set(['image', 'video', 'audio', 'model3d']);
 const VARIANT_KINDS = new Set(['agent', 'llm', 'text']);
 const ALL_KINDS = new Set([...CORE_KINDS, ...VARIANT_KINDS]);
 
-const HINT = "Import `MEDIA_KINDS` (or a named tuple like `COMPOSER_MODES`, `MODEL_MEDIA_KINDS`, `VISUAL_MEDIA_KINDS`, `VIEWABLE_MEDIA_KINDS`) from `src/engine/types.ts`, or derive via spread (e.g. `['agent', ...MEDIA_KINDS]`).";
+const HINT = "Import `MEDIA_KINDS` / `MediaKind` (or `COMPOSER_MODES` / `ComposerMode`, `VISUAL_MEDIA_KINDS` / `VisualMediaKind`, `MODEL_MEDIA_KINDS`, `VIEWABLE_MEDIA_KINDS`) from `src/engine/types.ts`, or derive via spread (e.g. `['agent', ...MEDIA_KINDS]`).";
 
 function stringLiteralOf(node) {
   if (!node) return null;
@@ -51,6 +55,27 @@ function stringLiteralOf(node) {
   return null;
 }
 
+function unionStringLiteralOf(node) {
+  if (node?.type === 'TSLiteralType' && node.literal?.type === 'Literal' && typeof node.literal.value === 'string') {
+    return node.literal.value;
+  }
+  return null;
+}
+
+function unwrapTypeParens(node) {
+  let cur = node;
+  while (cur?.type === 'TSParenthesizedType') cur = cur.typeAnnotation;
+  return cur;
+}
+
+function reportIfMediaList(node, values, kindLabel, report) {
+  const core = [...new Set(values.filter((v) => CORE_KINDS.has(v)))];
+  const matched = [...new Set(values.filter((v) => ALL_KINDS.has(v)))];
+  if (core.length >= 2 || (core.length >= 1 && matched.length >= 2)) {
+    report(node, `literal media kind ${kindLabel} [${matched.map((v) => `'${v}'`).join(', ')}] outside src/engine/types.ts. ${HINT}`);
+  }
+}
+
 /** Return `file:line: message` errors for literal media kind lists outside `src/engine/types.ts`. */
 export function check(root = '.') {
   return scan(root, {
@@ -64,14 +89,17 @@ export function check(root = '.') {
           if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
             bindingStack.push(node.id.name);
           }
+          if (node.type === 'TSTypeAliasDeclaration' && node.id?.type === 'Identifier') {
+            if (fileExceptions?.has(node.id.name)) return;
+            const target = unwrapTypeParens(node.typeAnnotation);
+            if (target?.type === 'TSUnionType') {
+              reportIfMediaList(target, target.types.map(unionStringLiteralOf).filter((v) => v !== null), 'union', report);
+            }
+            return;
+          }
           if (node.type !== 'ArrayExpression') return;
           if (fileExceptions && bindingStack.some((name) => fileExceptions.has(name))) return;
-          const values = node.elements.map(stringLiteralOf).filter((v) => v !== null);
-          const core = [...new Set(values.filter((v) => CORE_KINDS.has(v)))];
-          const matched = [...new Set(values.filter((v) => ALL_KINDS.has(v)))];
-          if (core.length >= 2 || (core.length >= 1 && matched.length >= 2)) {
-            report(node, `literal media kind list [${matched.map((v) => `'${v}'`).join(', ')}] outside src/engine/types.ts. ${HINT}`);
-          }
+          reportIfMediaList(node, node.elements.map(stringLiteralOf).filter((v) => v !== null), 'list', report);
         },
         leave: (node) => {
           if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {

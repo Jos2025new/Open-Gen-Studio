@@ -10,7 +10,7 @@ import { updateFeedItem, useStore } from '../../store/store';
 import { addSpend } from '../../store/spend';
 import { laneOfItem, laneState, patchLane } from './lanes';
 import { feedOfAgentIn } from './threads';
-import { VISUAL_MEDIA_KINDS, type FeedItem, type PlanFeedItem, type PlanStep, type SettingsChoice, type SettingsFeedItem, type SettingsSection } from '../types';
+import { VISUAL_MEDIA_KINDS, type FeedItem, type PlanFeedItem, type PlanStep, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type VisualMediaKind } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
 import { agentSeesImages, attachmentParts, userMessage } from './attachments';
 import { mayStartWork } from '../../lib/writerLock';
@@ -26,7 +26,7 @@ import { rememberSessionModel } from './sessionModel';
  * new model's guide, on the same card. Approve waits while it rewrites; a failure says so and offers a retry.
  */
 
-export type GenKind = 'image' | 'video';
+export type GenKind = VisualMediaKind;
 type GenStep = Extract<PlanStep, { kind: GenKind }>;
 const get = useStore.getState;
 const modelGroup = (ref: string) => lineRoutes(ref).text ?? ref;

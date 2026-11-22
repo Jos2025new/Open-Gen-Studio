@@ -20,7 +20,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 454 | 372 |
+| [types.ts](../src/engine/types.ts) | 455 | 372 |
 | [store.ts](../src/store/store.ts) | 304 | 366 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 152 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |

@@ -31,18 +31,22 @@ describe('check-media-literals', () => {
       'src/engine/badEnum.ts': "import { z } from 'zod'; export const s = z.enum(['llm', 'image', 'video', 'audio', 'model3d']);",
       'src/engine/badAgent.ts': "export const m = ['agent', 'image'] as const;",
       'src/engine/badUnion.ts': "import { z } from 'zod'; export const u = z.union([z.literal('image'), z.literal('video')]);",
+      'src/engine/badTypeUnion.ts': "export type Mode = 'image' | 'video' | 'audio' | 'model3d';",
       'src/engine/goodSpread.ts': "import { MEDIA_KINDS } from './types'; export const m = ['agent', ...MEDIA_KINDS]; export const f = ['all', ...MEDIA_KINDS, 'text'];",
+      'src/engine/goodType.ts': "import type { MediaKind } from './types'; export type KindFilter = 'all' | MediaKind;",
       'src/engine/goodSingle.ts': "export const one = ['image']; export const nonMedia = ['agent', 'llm', 'text'];",
     }, (root) => {
       const errors = check(root);
-      expect(errors).toHaveLength(4);
+      expect(errors).toHaveLength(5);
       expect(errors.some((e) => /^src\/engine\/badArray\.ts:1:.*MEDIA_KINDS/.test(e))).toBe(true);
       expect(errors.some((e) => /^src\/engine\/badEnum\.ts:1:.*MEDIA_KINDS/.test(e))).toBe(true);
       expect(errors.some((e) => /^src\/engine\/badAgent\.ts:1:.*MEDIA_KINDS/.test(e))).toBe(true);
       expect(errors.some((e) => /^src\/engine\/badUnion\.ts:1:.*MEDIA_KINDS/.test(e))).toBe(true);
+      expect(errors.some((e) => /^src\/engine\/badTypeUnion\.ts:1:.*MEDIA_KINDS/.test(e))).toBe(true);
       expect(errors.some((e) => e.startsWith('src/engine/types.ts:'))).toBe(false);
       expect(errors.some((e) => e.startsWith('src/engine/graphTypes.ts:'))).toBe(false);
       expect(errors.some((e) => e.startsWith('src/engine/goodSpread.ts:'))).toBe(false);
+      expect(errors.some((e) => e.startsWith('src/engine/goodType.ts:'))).toBe(false);
       expect(errors.some((e) => e.startsWith('src/engine/goodSingle.ts:'))).toBe(false);
     });
   });

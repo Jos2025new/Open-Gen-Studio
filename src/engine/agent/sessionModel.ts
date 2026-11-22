@@ -1,9 +1,9 @@
-import type { SettingsChoice } from '../types';
+import type { SettingsChoice, VisualMediaKind } from '../types';
 import { lineRoutes, pickComposerModel } from '../catalog';
 import { useStore } from '../../store/store';
 import { laneState, patchLane } from './lanes';
 
-type Kind = 'image' | 'video';
+type Kind = VisualMediaKind;
 
 /** Remember an explicit model choice for one session; optionally make it the composer's next default. */
 export function rememberSessionModel(sessionId: string, owner: string, kind: Kind, choice: SettingsChoice, explicit = false): void {
