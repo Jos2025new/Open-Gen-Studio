@@ -32,7 +32,10 @@ describe('check-budget-verdict', () => {
       'src/engine/badDirect.ts': "import { overLimit } from './budget'; export const x = overLimit;",
       'src/components/chat/BadUi.tsx': "import { budgetVerdict as bv } from '../../engine/budget'; export const x = bv;",
       'src/engine/badNs.ts': "import * as B from './budget'; export const x = () => B.overLimit();",
+      'src/engine/badNsDestructure.ts': "import * as B from './budget'; const { budgetVerdict, overLimit: ol } = B; export const x = [budgetVerdict, ol];",
+      'src/engine/badNsAlias.ts': "import * as B from './budget'; const C = B; let fn; ({ budgetVerdict: fn } = C); export const x = fn;",
       'src/engine/badDynamic.ts': "export async function f() { const { budgetVerdict } = await import('./budget'); return budgetVerdict(); }",
+      'src/engine/badDynamicAlias.ts': "export async function f() { const B = await import('./budget'); const { overLimit } = B; return overLimit(); }",
       'src/engine/badReexport.ts': "export { overLimit } from './budget';",
       'src/engine/goodHelper.ts': "import { budgetProblem, type BudgetVerdict } from './budget'; export type V = BudgetVerdict; export const x = budgetProblem;",
     }, (root) => {
@@ -40,7 +43,10 @@ describe('check-budget-verdict', () => {
       expect(errors.some((e) => e.startsWith('src/engine/badDirect.ts:'))).toBe(true);
       expect(errors.some((e) => e.startsWith('src/components/chat/BadUi.tsx:'))).toBe(true);
       expect(errors.some((e) => e.startsWith('src/engine/badNs.ts:'))).toBe(true);
+      expect(errors.some((e) => e.startsWith('src/engine/badNsDestructure.ts:'))).toBe(true);
+      expect(errors.some((e) => e.startsWith('src/engine/badNsAlias.ts:'))).toBe(true);
       expect(errors.some((e) => e.startsWith('src/engine/badDynamic.ts:'))).toBe(true);
+      expect(errors.some((e) => e.startsWith('src/engine/badDynamicAlias.ts:'))).toBe(true);
       expect(errors.some((e) => e.startsWith('src/engine/badReexport.ts:'))).toBe(true);
       expect(errors.some((e) => e.startsWith('src/engine/credit.ts:'))).toBe(false);
       expect(errors.some((e) => e.startsWith('src/components/ui/useBudgetVerdict.ts:'))).toBe(false);

@@ -44,6 +44,17 @@ export function check(root = '.') {
       const dynamicBudget = (node) =>
         node?.type === 'ImportExpression' && resolvesToBudget(rel, node.source?.value)
         || (node?.type === 'AwaitExpression' && node.argument?.type === 'ImportExpression' && resolvesToBudget(rel, node.argument.source?.value));
+      const isBudgetNamespace = (node) =>
+        (node?.type === 'Identifier' && namespaces.has(node.name)) || dynamicBudget(node);
+      const checkPattern = (pattern, init, report, verb) => {
+        if (pattern?.type !== 'ObjectPattern' || !isBudgetNamespace(init)) return;
+        for (const p of pattern.properties ?? []) {
+          const name = p.type === 'Property' ? keyName(p.key) : undefined;
+          if (RESTRICTED.has(name)) {
+            report(p, `${verb} \`${name}\` outside budget.ts, credit.ts and useBudgetVerdict.ts. ${HINT}`);
+          }
+        }
+      };
 
       return {
         enter: (node, report) => {
@@ -60,20 +71,21 @@ export function check(root = '.') {
           if (node.type === 'ExportAllDeclaration' && resolvesToBudget(rel, node.source?.value)) {
             report(node, `re-exports all of budget.ts (including \`overLimit\` / \`budgetVerdict\`). ${HINT}`);
           }
+          if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && isBudgetNamespace(node.init)) {
+            namespaces.add(node.id.name);
+          }
           if (node.type === 'MemberExpression') {
             const prop = keyName(node.property);
             if (!RESTRICTED.has(prop)) return;
-            if ((node.object?.type === 'Identifier' && namespaces.has(node.object.name)) || dynamicBudget(node.object)) {
+            if (isBudgetNamespace(node.object)) {
               report(node, `reads \`${prop}\` from budget.ts outside its allowed boundary. ${HINT}`);
             }
           }
-          if (node.type === 'VariableDeclarator' && node.id?.type === 'ObjectPattern' && dynamicBudget(node.init)) {
-            for (const p of node.id.properties ?? []) {
-              const name = p.type === 'Property' ? keyName(p.key) : undefined;
-              if (RESTRICTED.has(name)) {
-                report(p, `dynamically imports \`${name}\` outside budget.ts, credit.ts and useBudgetVerdict.ts. ${HINT}`);
-              }
-            }
+          if (node.type === 'VariableDeclarator') {
+            checkPattern(node.id, node.init, report, dynamicBudget(node.init) ? 'dynamically imports' : 'destructures');
+          }
+          if (node.type === 'AssignmentExpression') {
+            checkPattern(node.left, node.right, report, dynamicBudget(node.right) ? 'dynamically imports' : 'destructures');
           }
         },
       };

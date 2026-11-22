@@ -165,7 +165,7 @@ describe('Attack 3a: check-budget-verdict can be dodged', () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   };
   // Finding P2 (new): destructuring a namespace import is not reported (only dynamic import destructuring is).
-  it.fails('flags `const { budgetVerdict } = B` on a namespace import outside the boundary', () => {
+  it('flags `const { budgetVerdict } = B` on a namespace import outside the boundary', () => {
     withRepo({
       'src/engine/budget.ts': 'export const budgetVerdict = () => ({ over: false });',
       'src/components/chat/Dodge.tsx': "import * as B from '../../engine/budget'; const { budgetVerdict } = B; export const x = budgetVerdict;",
