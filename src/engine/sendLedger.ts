@@ -13,11 +13,11 @@ export function usesLedger(g: Pick<Generation, 'sends'> | undefined): boolean {
   return Boolean(g?.sends);
 }
 
-/** The proportional estimate of `items` results when the provider reports no cost and there was no quote. */
-export function shareOfEstimate(g: Generation, items: number): number {
+/** The proportional estimate of `items` results when the provider reports no cost and there was no quote; undefined when the price is unknown. */
+export function shareOfEstimate(g: Generation, items: number): number | undefined {
   const base = (g.retryBaseEstimate ?? g.estimate).usd;
   const expected = g.retryTotal ?? (g.variants ? g.assetIds.length + g.variants.length : g.settings.count);
-  return base != null && expected > 0 ? base * items / expected : 0;
+  return base != null && expected > 0 ? base * items / expected : undefined;
 }
 
 function spendEntry(g: Generation, estimated: boolean) {
@@ -27,25 +27,31 @@ function spendEntry(g: Generation, estimated: boolean) {
 /** Book the records that delivered and were not booked yet; returns the updated list. Idempotent. */
 function bookPending(g: Generation, sends: SendRecord[]): SendRecord[] {
   return sends.map((s) => {
-    if (s.status !== 'done' || s.costUsd == null || s.bookedUsd != null) return s;
+    if (s.status !== 'done' || s.bookedUsd != null || s.bookedUnknown) return s;
+    if (s.costUsd == null) {
+      if (!s.estimated) return s;
+      addSpend(null, spendEntry(g, true));
+      return { ...s, bookedUnknown: true };
+    }
     addSpend(s.costUsd, spendEntry(g, Boolean(s.estimated)));
     return { ...s, bookedUsd: s.costUsd };
   });
 }
 
 /**
- * A request delivered: mark its record done with its cost and book it, once. A request without a record
- * (a free send, a job adopted by Check status) gets one so the ledger stays the whole story.
+ * A request delivered: mark its record done with its cost (or unset when unknown) and book it, once. A request
+ * without a record (a free send, a job adopted by Check status) gets one so the ledger stays the whole story.
  */
-export function deliverSend(id: string, reqId: string | undefined, index: number, costUsd: number, estimated: boolean): SendRecord[] | undefined {
+export function deliverSend(id: string, reqId: string | undefined, index: number, costUsd: number | undefined, estimated: boolean): SendRecord[] | undefined {
   const g = get().generations[id];
   if (!g) return undefined;
   const list = g.sends ?? [];
   const at = reqId ? list.findIndex((s) => s.id === reqId) : -1;
   const prev = at >= 0 ? list[at] : undefined;
-  const rec: SendRecord = prev?.bookedUsd != null
+  const alreadyBooked = prev?.bookedUsd != null || prev?.bookedUnknown;
+  const rec: SendRecord = alreadyBooked
     ? { ...prev, status: 'done' }
-    : { ...(prev ?? { id: reqId ?? uid('req'), index }), status: 'done', costUsd, estimated };
+    : { ...(prev ?? { id: reqId ?? uid('req'), index }), status: 'done', ...(costUsd != null ? { costUsd } : {}), estimated };
   const next = at >= 0 ? list.map((s, i) => (i === at ? rec : s)) : [...list, rec];
   const sends = bookPending(g, next);
   patchGeneration(id, { sends });
@@ -60,14 +66,17 @@ export function bookDelivered(id: string): void {
   if (sends.some((s, i) => s !== g.sends![i])) patchGeneration(id, { sends });
 }
 
-/** What the generation cost by its records: the sum, and whether every amount was reported or quoted. */
-export function ledgerCost(g: Pick<Generation, 'sends'>): { usd: number; known: boolean; estimatedUsd: number } {
-  const done = (g.sends ?? []).filter((s) => s.status === 'done' && s.costUsd != null);
+/** What the generation cost by its records: the sum, whether every amount was reported or quoted, and if any had an unknown price. */
+export function ledgerCost(g: Pick<Generation, 'sends'>): { usd: number; known: boolean; estimatedUsd: number; hasUnknown: boolean } {
+  const done = (g.sends ?? []).filter((s) => s.status === 'done');
+  const priced = done.filter((s) => s.costUsd != null);
+  const hasUnknown = done.some((s) => s.costUsd == null);
   const round = (n: number) => Math.round(n * 10000) / 10000;
   return {
-    usd: round(done.reduce((n, s) => n + s.costUsd!, 0)),
-    known: done.every((s) => !s.estimated),
-    // An unpriced request estimated at $0 adds nothing: the reported part is then the whole known cost (noteExcess).
-    estimatedUsd: round(done.filter((s) => s.estimated).reduce((n, s) => n + s.costUsd!, 0)),
+    usd: round(priced.reduce((n, s) => n + s.costUsd!, 0)),
+    known: done.length > 0 && !hasUnknown && priced.every((s) => !s.estimated),
+    // An unpriced request adds no estimated dollar figure: the reported part is then the whole known cost (noteExcess).
+    estimatedUsd: round(priced.filter((s) => s.estimated).reduce((n, s) => n + s.costUsd!, 0)),
+    hasUnknown,
   };
 }

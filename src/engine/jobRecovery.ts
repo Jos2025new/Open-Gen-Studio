@@ -151,12 +151,12 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const batchIncomplete = remainingVariants ? remainingVariants.length > 0 : uniqueIds.length < expectedTotal;
       // Ledger: this job's record carries its cost and is booked now, once; older data keeps the old path.
       const ledger = usesLedger(latest);
-      if (ledger) deliverSend(id, matching?.id, latest.sends!.length, result.costUsd ?? shareOfEstimate(latest, assets.length), result.costUsd == null);
+      const cost = result.costUsd ?? shareOfEstimate(latest, assets.length);
+      if (ledger) deliverSend(id, matching?.id, latest.sends!.length, cost, result.costUsd == null);
       if (batchIncomplete) {
         const sends = ledger ? get().generations[id]?.sends : markSendsDone(latest.sends, matching?.id);
         if (!ledger) {
-          const partialUsd = result.costUsd ?? shareOfEstimate(latest, assets.length);
-          if (partialUsd > 0) addSpend(partialUsd, { category: latest.kind, provider: latest.modelRef.split('::')[0], model: latest.modelRef, sessionId: latest.sessionId, estimated: result.costUsd == null });
+          if (cost == null || cost > 0) addSpend(cost, { category: latest.kind, provider: latest.modelRef.split('::')[0], model: latest.modelRef, sessionId: latest.sessionId, estimated: result.costUsd == null });
         }
         const remaining = remainingVariants ? remainingVariants.length : Math.max(1, expectedTotal - uniqueIds.length);
         patchGeneration(id, {

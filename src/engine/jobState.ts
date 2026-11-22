@@ -73,10 +73,11 @@ export function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | u
 export function finishText(id: string, text: string, actualUsd: number | undefined, reqId?: string): void {
   const g = get().generations[id];
   if (!g || g.status === 'done') return;
-  if (usesLedger(g)) deliverSend(id, reqId, g.sends!.length, actualUsd ?? g.estimate.usd ?? 0, actualUsd == null);
+  const cost = actualUsd ?? g.estimate.usd ?? undefined;
+  if (usesLedger(g)) deliverSend(id, reqId, g.sends!.length, cost, actualUsd == null);
   const sends = usesLedger(g) ? undefined : markSendsDone(g.sends, reqId);
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
-  if (!usesLedger(g)) addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  if (!usesLedger(g)) addSpend(cost, spendEntry(g, actualUsd == null));
   noteExcess(id);
   void saveNow().catch(() => undefined);
 }
@@ -95,8 +96,9 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
   // Ledger: every delivered request was booked when it delivered; the generation's cost is their sum.
   const ledger = usesLedger(g);
   if (ledger) bookDelivered(id);
-  const booked = ledger ? ledgerCost(get().generations[id] ?? g) : undefined;
-  const sends = ledger ? get().generations[id]?.sends : markSendsDone(g.sends, reqId);
+  const latest = get().generations[id] ?? g;
+  const booked = ledger && latest.sends?.some((s) => s.status === 'done') ? ledgerCost(latest) : undefined;
+  const sends = ledger ? latest.sends : markSendsDone(g.sends, reqId);
   const uniqueAssetIds = [...new Set(assetIds)];
   patchGeneration(id, {
     status: 'done',
@@ -111,7 +113,7 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
     sending: undefined,
     ...(sends ? { sends } : {}),
   });
-  if (!ledger) addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
+  if (!ledger) addSpend(actualUsd ?? g.estimate.usd, spendEntry(g, actualUsd == null));
   noteExcess(id);
   void saveNow().catch(() => undefined);
 }

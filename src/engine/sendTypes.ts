@@ -15,12 +15,14 @@ export interface SendRecord {
   index: number;
   status: SendStatus;
   remoteJob?: RemoteJob;
-  /** What this request cost once it delivered: reported, quoted, or its share of the estimate. */
+  /** What this request cost once it delivered: reported, quoted, or its share of the estimate. Unset when unknown. */
   costUsd?: number;
-  /** `costUsd` is an estimate (no reported cost and no quote). */
+  /** `costUsd` is an estimate (no reported cost and no quote), or the price was unknown (`costUsd` unset). */
   estimated?: boolean;
-  /** Already booked to Spending: a record is booked once (sendLedger). */
+  /** Already booked to Spending: a record is booked once (sendLedger). Unset when the cost was unknown. */
   bookedUsd?: number;
+  /** True when already booked to Spending with an unknown price (`bookedUsd` stays unset, never 0). */
+  bookedUnknown?: boolean;
 }
 
 /** Where money went: the agent's model calls and each paid generation. */
@@ -31,6 +33,8 @@ export interface SpendEntry {
   usd: number;
   /** True when the provider did not report the cost and it comes from published prices. */
   estimated: boolean;
+  /** True when neither provider nor catalog had a price (`usd` is 0 as a placeholder, never a confirmed $0 charge). */
+  unknownPrice?: boolean;
   category: SpendCategory;
   provider: string;
   /** Model ref, or the LLM id for agent calls. */

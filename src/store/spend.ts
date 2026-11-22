@@ -6,8 +6,18 @@ import { toast } from './toasts';
 
 export const MAX_SPEND_LOG = 5000;
 
-/** Count money spent (never blocks). With `entry` it is itemized in the Spending panel; crossing the limit shows one notice. */
-export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): void {
+/**
+ * Count money spent (never blocks). With `entry` it is itemized in the Spending panel; crossing the limit shows one notice.
+ * Passing `usd == null` records a delivered charge whose price was unknown (never counted as confirmed $0).
+ */
+export function addSpend(usd: number | null | undefined, entry?: Omit<SpendEntry, 'at' | 'usd'>): void {
+  if (usd == null) {
+    if (!entry) return;
+    useStore.setState((st) => ({
+      spendLog: [...st.spendLog, { ...entry, at: Date.now(), usd: 0, estimated: true, unknownPrice: true }].slice(-MAX_SPEND_LOG),
+    }));
+    return;
+  }
   if (!Number.isFinite(usd) || usd <= 0) return;
   const before = useStore.getState().spentUsd;
   useStore.setState((st) => ({

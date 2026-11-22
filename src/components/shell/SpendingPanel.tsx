@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Calendar, DollarSign, ArrowDownAZ, ArrowUpDown, Layers3, Maximize2, Minimize2, X } from '../ui/icons';
 import { formatUsd } from '../../lib/format';
-import { CATEGORY_LABELS, periodStart, summarizeSpend, type SpendPeriod, type SpendRow } from '../../engine/spending';
+import { CATEGORY_LABELS, formatSpendAmount, periodStart, summarizeSpend, type SpendPeriod, type SpendRow } from '../../engine/spending';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { LLM_LABELS } from '../../engine/providers/llm';
 import type { SpendCategory } from '../../engine/types';
@@ -45,6 +45,7 @@ export function SpendingPanel() {
   const [detail, setDetail] = useState<'models' | 'sessions' | 'charges'>('models');
   const [chargeSort, setChargeSort] = useState<Sort>({ by: 'date', asc: false });
   const sum = useMemo(() => summarizeSpend(log, periodStart(period)), [log, period]);
+  const hasUnknown = useMemo(() => log.some((e) => e.unknownPrice), [log]);
 
   const providerName = (p: string) => PROVIDER_LABELS[p as keyof typeof PROVIDER_LABELS] ?? LLM_LABELS[p as keyof typeof LLM_LABELS] ?? p;
   const modelName = (ref: string) => {
@@ -73,12 +74,12 @@ export function SpendingPanel() {
           <p className="faint spend-foot">Budget counter · since last reset · independent of the period below</p>
           {limitLeft == null ? (
             <p>
-              <span className="num">{formatUsd(spent)}</span> spent · no limit: spending is only shown.
+              <span className="num">{formatSpendAmount(spent, { unknown: hasUnknown })}</span>{hasUnknown && spent === 0 ? '' : ' spent'} · no limit: spending is only shown.
             </p>
           ) : (
             <>
               <p>
-                <span className="num">{formatUsd(spent)}</span> of <span className="num">{formatUsd(settings.budgetUsd)}</span>
+                <span className="num">{formatSpendAmount(spent, { unknown: hasUnknown })}</span> of <span className="num">{formatUsd(settings.budgetUsd)}</span>
                 {limitLeft >= 0 ? <> · <span className="num">{formatUsd(limitLeft)}</span> left</> : <> · <span className="num over">{formatUsd(-limitLeft)}</span> over</>}
               </p>
               <div className="bar">
@@ -95,9 +96,9 @@ export function SpendingPanel() {
         <Segmented value={period} options={PERIODS} onChange={setPeriod} size="sm" />
 
         <div className="spend-tiles">
-          <Tile label={`Total · ${PERIODS.find((p) => p.value === period)?.label ?? period}`} usd={sum.total} note={`${sum.count} charge${sum.count === 1 ? '' : 's'}`} />
-          <Tile label="Agent (LLM)" usd={sum.agent} />
-          <Tile label="Media" usd={sum.media} />
+          <Tile label={`Total · ${PERIODS.find((p) => p.value === period)?.label ?? period}`} usd={sum.total} unknown={sum.unknownCount > 0} note={`${sum.count} charge${sum.count === 1 ? '' : 's'}`} />
+          <Tile label="Agent (LLM)" usd={sum.agent} unknown={sum.unknownAgent > 0} />
+          <Tile label="Media" usd={sum.media} unknown={sum.unknownMedia > 0} />
         </div>
 
         {sum.count ? (
@@ -120,7 +121,7 @@ export function SpendingPanel() {
                     <td className="faint num">{new Date(e.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td>{modelName(e.model)}</td>
                     <td>{CATEGORY_LABELS[e.category]}</td>
-                    <td className="num" title={e.estimated ? 'Estimated cost' : 'Reported cost'}>{spendUsd(e.usd, e.estimated)}</td>
+                    <td className="num" title={e.unknownPrice ? 'Price unknown (not reported by provider)' : e.estimated ? 'Estimated cost' : 'Reported cost'}>{spendUsd(e.usd, e.estimated, e.unknownPrice)}</td>
                   </tr>
                 ))}
                 </tbody>
@@ -138,15 +139,15 @@ export function SpendingPanel() {
   );
 }
 
-function spendUsd(usd: number, estimated = false): string {
-  return Math.abs(usd) >= 0.1 || usd === 0 ? `${estimated ? '≈' : ''}$${usd.toFixed(2)}` : formatUsd(usd, { approx: estimated });
+function spendUsd(usd: number, estimated = false, unknown = false): string {
+  return formatSpendAmount(usd, { estimated, unknown, fixed: true });
 }
 
-function Tile({ label, usd, note }: { label: string; usd: number; note?: string }) {
+function Tile({ label, usd, unknown = false, note }: { label: string; usd: number; unknown?: boolean; note?: string }) {
   return (
     <div className="spend-tile">
       <span className="faint">{label}</span>
-      <span className="num">{spendUsd(usd)}</span>
+      <span className="num">{spendUsd(usd, false, unknown)}</span>
       {note ? <span className="faint">{note}</span> : null}
     </div>
   );
@@ -166,7 +167,7 @@ function Group({ title, rows, name, limit = Infinity }: { title: string; rows: S
             <span className="spend-what" title={`${name(r.key)} · ${r.key}`}>
               {name(r.key)} <span className="faint num">×{r.count}</span>
             </span>
-            <span className="num">{spendUsd(r.usd, r.estimated)}</span>
+            <span className="num">{spendUsd(r.usd, r.estimated, r.unknownCount > 0)}</span>
             <div className="bar">
               <span style={{ width: `${(r.usd / max) * 100}%` }} />
             </div>
