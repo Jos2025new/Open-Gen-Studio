@@ -9,7 +9,7 @@ import { toast } from '../../store/toasts';
  * sources), but a node being written is never written or read by another run. Editing is always allowed (runs use a
  * snapshot); deleting a node being written waits.
  */
-interface Held { writes: Set<string>; reads: Set<string> }
+interface Held { writes: Set<string>; reads: Set<string>; release: () => void }
 const locks = new Map<string, Held[]>();
 
 /** Every node a run holds (read or written): these cannot be edited until it ends. */
@@ -23,9 +23,10 @@ export function writingNodes(sessionId: string): Set<string> {
 export function lockNodes(sessionId: string, writes: string[], reads: string[] = writes): () => void {
   const all = lockedNodes(sessionId), writing = writingNodes(sessionId);
   if (writes.some(id => all.has(id)) || reads.some(id => writing.has(id))) throw new Error('These nodes or their inputs are already running.');
-  const held: Held = { writes: new Set(writes), reads: new Set(reads.filter(id => !writes.includes(id))) };
+  const release = () => { locks.set(sessionId, (locks.get(sessionId) ?? []).filter(h => h !== held)); };
+  const held: Held = { writes: new Set(writes), reads: new Set(reads.filter(id => !writes.includes(id))), release };
   locks.set(sessionId, [...(locks.get(sessionId) ?? []), held]);
-  return () => { locks.set(sessionId, (locks.get(sessionId) ?? []).filter(h => h !== held)); };
+  return release;
 }
 /** Runs work on the graph as it was when they started, so edits are free; only deleting a node being generated waits. */
 export function graphEditProblem(sessionId: string, _before: Graph, after: Graph): string | null {
@@ -54,9 +55,12 @@ export function attemptNode(g: NodeAttempt, nodes: GraphNode[]): GraphNode | und
   return nodes.find((n) => 'generationId' in n.data && n.data.generationId && (gens[n.data.generationId]?.operationId ?? n.data.generationId) === (g.operationId ?? g.id));
 }
 
-/** Regenerate, Retry and a late 402 answer hold the same node for the duration of their attempt. */
-export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[]): { node?: GraphNode; release: () => void } | undefined {
+/** Regenerate, Retry and a 402 substitute hold the same node for the duration of their attempt. */
+export function holdAttemptNode(g: NodeAttempt, nodes: GraphNode[], ownerLock?: () => void): { node?: GraphNode; release: () => void } | undefined {
   const node = attemptNode(g, nodes);
+  if (ownerLock && node && (locks.get(g.sessionId) ?? []).some((h) => h.release === ownerLock && h.writes.has(node.id))) {
+    return { node, release: () => {} };
+  }
   try { return { node, release: node ? lockNodes(g.sessionId, [node.id]) : () => {} }; } catch (e) { toast((e as Error).message, 'error'); }
 }
 

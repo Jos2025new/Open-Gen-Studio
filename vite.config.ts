@@ -89,7 +89,7 @@ export default defineConfig({
     // past 5 s (false failures). Tests that simulate time run on fake clocks, so this budget only covers real CPU work.
     testTimeout: 20_000,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     setupFiles: ['tests/setup-writer-lock.ts'],
   },
 });

@@ -16,7 +16,7 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
-import { autoLayout, connectionError, graphToSteps, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
+import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
 import { beginBatchPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
@@ -150,12 +150,15 @@ export function connectNodes(
   sessionId: string,
   c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean; replaces?: string | null },
 ): string | null {
-  const st = get();
-  const graph = st.sessions[sessionId]?.graph;
-  if (!graph) return 'No such session.';
-  const handle = c.targetHandle ?? c.kind ?? 'in';
-  const occupant = graph.edges.find(e => e.target === c.target && e.targetHandle === handle && (e.kind ?? 'data') === (c.kind ?? 'data'));
-  return editError(applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: c.replaces !== undefined ? c.replaces : occupant?.id ?? null } }));
+  let replaces = c.replaces;
+  if (replaces === undefined) {
+    // Canvas gestures see the current input. Commands and agent tools pass null when they name no cable.
+    const { sessions, assets } = get();
+    replaces = inferReplaces(sessions[sessionId]?.graph, assets, c);
+  }
+  const done = applyEdit({ session: sessionId, op: { op: 'connect', ...c, replaces: replaces ?? null } });
+  if (c.replaces === undefined && !done.ok && done.conflict) toast(done.error, 'error');
+  return editError(done);
 }
 export function tryConnect(
   sessionId: string,
@@ -328,7 +331,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id));
   try {
     const result = await executeSteps(preview.steps, {
-      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLibrary: library, nodeOperations,
+      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLock: release, nodeLibrary: library, nodeOperations,
       onState: (stepId, state, info) => {
         if (info?.generationId) pending.set(stepId, info.generationId);
         const generationId = pending.get(stepId);

@@ -1,10 +1,10 @@
 import { uid } from '../../lib/id';
 import { recordJourneyEvent } from '../../lib/journeyTrace';
 import { setGraph, toast, useStore } from '../../store/store';
-import { connect, connectionError, inputPorts, nodePorts, sameSourcePort, withEdge } from '../flow/graph';
+import { nodePorts, resolveWiring, sameSourcePort, sameTargetPort, unnamedPinnedCable, withEdge } from '../flow/graph';
 import { graphEditProblem } from '../flow/locks';
 import { applyModelLinkToAgent } from '../nodes/system';
-import type { Graph, GraphEdge, GraphNode, GraphNodeData, LinkKind, PortSpec } from '../types';
+import type { Asset, Graph, GraphEdge, GraphNode, GraphNodeData, LinkKind } from '../types';
 import { findCycle } from './deps';
 import { stampNew } from './migrate';
 import { descriptorOf } from './registry';
@@ -17,15 +17,11 @@ import { ownerRev } from './revision';
  * the replaced cable is part of the operation (`replaces`). Connecting never starts a provider call, a send or a spend;
  * the only follow-up is the declared parameter copy of a model link into its agent (no network, no cost).
  */
-export interface ResolvedPorts { srcPort: PortSpec; tgtPort: PortSpec; kind: LinkKind }
-
 export type EditOp =
   | {
     op: 'connect'; source: string; target: string; targetHandle: string | null; sourceHandle?: string | null; kind?: LinkKind; both?: boolean;
-    /** The cable expected on a single-cable input: an edge id, or `null` for none. */
+    /** The id of the cable to replace. Omission and `null` both mean no replacement was requested. */
     replaces?: string | null;
-    /** The caller already resolved and validated the ports (the system link command); skips the UI validation. */
-    ports?: ResolvedPorts;
   }
   | { op: 'disconnect'; edges: string[] }
   | { op: 'set'; node: string; patch: Partial<GraphNodeData>; strict?: boolean; }
@@ -58,52 +54,29 @@ const refuse = (req: EditRequest, error: string, conflict?: { node: string; expe
 /** The owner revisions of the nodes an edit touches, to hand back to the caller for its next precondition. */
 export const revisionsOf = (graph: Graph, ids: string[]): Record<string, string> => Object.fromEntries(ids.map((id) => [id, ownerRev(graph, id)]));
 
-function sameKind(e: GraphEdge, kind: LinkKind) { return (e.kind ?? 'data') === kind; }
-
 /** The edge a connect would add, or the reason it cannot. Pure on the graph. */
-function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, assets: Record<string, import('../types').Asset>): { next: Graph; edgeId: string } | { error: string; conflict?: { node: string; expected: string; actual: string } } {
+export function planConnect(graph: Graph, op: Extract<EditOp, { op: 'connect' }>, assets: Record<string, Asset>): { next: Graph; edgeId: string } | { error: string; conflict?: { node: string; expected: string; actual: string }; notify?: false } {
   const { source, target } = op;
-  let next: Graph;
-  let kind: LinkKind = op.kind ?? 'data';
-  let targetHandle = op.targetHandle ?? op.kind ?? 'in';
-  let multi: boolean;
-  if (op.ports) {
-    const { srcPort, tgtPort } = op.ports;
-    kind = op.ports.kind;
-    targetHandle = tgtPort.id;
-    // The descriptor's cardinality wins over a caller's generic port table: one source of truth for «single cable».
-    const own = kind === 'data' ? inputPorts(graph.nodes.find((n) => n.id === target)!.data).find((p) => p.id === targetHandle) : undefined;
-    multi = own ? own.multi : tgtPort.multi !== false;
-    const edge: GraphEdge = { id: uid('edge'), source, target, sourceHandle: srcPort.id, targetHandle, kind, ...(op.both && kind !== 'data' ? { both: true } : {}) };
-    const dup = (e: GraphEdge) => sameSourcePort(e, edge) && e.target === target && e.targetHandle === targetHandle && sameKind(e, kind);
-    const occupant = multi ? undefined : graph.edges.find((e) => e.target === target && e.targetHandle === targetHandle && sameKind(e, kind) && !dup(e));
-    const refused = replaceConflict(occupant, op.replaces, target, targetHandle, graph);
-    if (refused) return refused;
-    const again = graph.edges.find(dup);
-    if (again?.pin && op.replaces !== again.id) return replaceConflict(again, op.replaces, target, targetHandle, graph) ?? { error: `The cable ${again.id} is pinned; name it to wire it again.` };
-    next = { ...graph, edges: withEdge(graph.edges, edge, !multi) };
-    return finishConnect(next, edge.id, source, target, kind, assets);
-  }
-  const problem = connectionError(graph, assets, { source, target, targetHandle: op.targetHandle, sourceHandle: op.sourceHandle, kind: op.kind, both: op.both });
-  if (problem) return { error: problem };
-  const tgt = graph.nodes.find((n) => n.id === target)!;
-  const legacyPort = inputPorts(tgt.data).find((p) => p.id === targetHandle);
-  const before = new Set(graph.edges.map((e) => e.id));
-  next = connect(graph, { source, target, targetHandle, sourceHandle: op.sourceHandle, kind: op.kind, both: op.both });
-  // Whatever the old edge on a single-cable input was, `replaces` must name it.
-  // against the handle the wiring resolved (a system port is named by its kind, not by the caller's null).
-  const added = next.edges.find((e) => !before.has(e.id));
-  const wired = added?.targetHandle ?? targetHandle;
-  const replacedEdge = graph.edges.find((e) => !next.edges.some((n) => n.id === e.id) && e.target === target && e.targetHandle === wired);
-  const isSingle = legacyPort ? !legacyPort.multi : replacedEdge !== undefined || typeof op.replaces === 'string';
-  // Wiring the same cable again is idempotent only while nothing is lost: a pinned cable must be named.
-  const sameSource = !!replacedEdge && !!added && sameSourcePort(replacedEdge, added) && op.replaces == null && !replacedEdge.pin; // wiring the same cable again is not a replacement
-  const refused = isSingle && !sameSource ? replaceConflict(replacedEdge, op.replaces, target, targetHandle, graph) : null;
+  const src = graph.nodes.find((n) => n.id === source);
+  const tgt = graph.nodes.find((n) => n.id === target);
+  if (!src && !tgt) return { error: 'Unknown node.', notify: false };
+  if (!src || !tgt) return { error: `No such node: ${!src ? source : target}.`, notify: false };
+  if (source === target) return { error: 'A node cannot connect to itself.', notify: false };
+  const wiring = resolveWiring(src, tgt, assets, op);
+  if ('error' in wiring) return wiring;
+  const { id: targetHandle, kind, multi } = wiring.port;
+  const single = multi === false;
+  const occupant = single ? graph.edges.find((e) => sameTargetPort(e, wiring.edge) && !sameSourcePort(e, wiring.edge)) : undefined;
+  const replaces = op.replaces ?? null;
+  const pinned = unnamedPinnedCable(graph.edges, wiring.edge, single, replaces);
+  const refused = replaceConflict(pinned ?? occupant, replaces, target, targetHandle, graph);
   if (refused) return refused;
-  return finishConnect(next, added?.id ?? '', source, target, kind, assets);
+  const edge = { id: uid('edge'), ...wiring.edge };
+  const next = { ...graph, edges: withEdge(graph.edges, edge, single) };
+  return finishConnect(next, edge.id, source, target, kind, assets);
 }
 
-function replaceConflict(occupant: GraphEdge | undefined, replaces: string | null | undefined, target: string, port: string, graph: Graph) {
+function replaceConflict(occupant: GraphEdge | undefined, replaces: string | null, target: string, port: string, graph: Graph) {
   // The cable that was expected is gone: that is a conflict too, not permission to wire over whatever is there now.
   // With no other cable on this input, the named one must still be on this very input (the same wiring again), never one of another node.
   if (!occupant) return typeof replaces === 'string' && !graph.edges.some((e) => e.id === replaces && e.target === target && e.targetHandle === port) ? { error: `The cable ${replaces} you meant to replace on "${port}" is no longer there.`, conflict: { node: target, expected: replaces, actual: 'none' } } : null;
@@ -185,11 +158,11 @@ export function applyEdit(req: EditRequest): EditResult {
   let edgeId: string | undefined;
   switch (op.op) {
     case 'connect': {
-      const missing = [op.source, op.target].find((id) => !graph.nodes.some((n) => n.id === id));
-      if (missing) return refuse(req, missing === op.source && !graph.nodes.some((n) => n.id === op.target) ? 'Unknown node.' : `No such node: ${missing}.`);
-      if (op.source === op.target) return refuse(req, 'A node cannot connect to itself.');
       const planned = planConnect(graph, op, st.assets);
-      if ('error' in planned) { if (!planned.conflict) toast(planned.error, 'error'); return refuse(req, planned.error, planned.conflict); }
+      if ('error' in planned) {
+        if (!planned.conflict && planned.notify !== false) toast(planned.error, 'error');
+        return refuse(req, planned.error, planned.conflict);
+      }
       next = planned.next; edgeId = planned.edgeId;
       break;
     }

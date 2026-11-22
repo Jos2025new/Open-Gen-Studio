@@ -82,6 +82,29 @@ export default [
     tests: ['tests/nodes-commands.test.ts'],
   },
   {
+    id: 'system-node-add-types',
+    what: 'nodes.node.add publica los once tipos base de referencia. nodes.system.add publica nueve y excluye prompt y mediaSettings. La validación precede a la escritura del grafo.',
+    sides: [
+      ['src/engine/graphTypes.ts', 'export const BASE_SYSTEM_NODE_TYPES'],
+      ['src/engine/flow/commands.ts', 'const sysType = z.enum(BASE_SYSTEM_NODE_TYPES)'],
+      ['src/engine/nodes/commands.ts', 'const sysType = z.enum(SYSTEM_ADD_TYPES)'],
+    ],
+    tests: ['tests/listas-cerradas.test.ts'],
+  },
+  {
+    id: 'media-kind-validations',
+    what: 'Los validadores del dominio completo de medios y los esquemas JSON publicados por find_models y find_assets usan MEDIA_KINDS con los mismos valores en el mismo orden.',
+    sides: [
+      ['src/engine/types.ts', 'export const MEDIA_KINDS'],
+      ['src/engine/actions.commands.ts', 'z.enum(MEDIA_KINDS)'],
+      ['src/engine/catalog.commands.ts', 'z.enum(MEDIA_KINDS)'],
+      ['src/engine/flow/commands.ts', 'z.enum(MEDIA_KINDS)'],
+      ['src/engine/agent/tools.ts', 'z.enum(MEDIA_KINDS)'],
+      ['src/engine/agent/tools.ts', 'enum: [...MEDIA_KINDS]'],
+    ],
+    tests: ['tests/listas-cerradas.test.ts'],
+  },
+  {
     id: 'sessions-commands',
     what: 'Las funciones de sesión del store son comandos (SESSION_ACTIONS) con el destino en `on.session`; ninguno lee la sesión activa salvo `sessions.list` para marcarla.',
     sides: [

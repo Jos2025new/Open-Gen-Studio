@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { budgetProblem } from '../actions';
 import { nodeCommand, nodeRef } from '../flow/commandKit';
+import { LINK_KINDS } from '../graphTypes';
 import { applyEdit } from './edit';
 import { prepareAction, runAction, snapshotById } from './action';
 import { inspectNode } from './inspect';
@@ -8,7 +9,7 @@ import { inspectNode } from './inspect';
 /* The node core as commands (ADR 0030/0031): the agent and the interface reach the same edit layer and actions. */
 
 const ids = z.array(nodeRef).min(1).max(40);
-const linkKind = z.enum(['data', 'ref', 'control']);
+const linkKind = z.enum(LINK_KINDS);
 /** Required: an edit that does not say which revision it read is refused (the layer's `require`). */
 const expect = z.record(z.string(), z.string());
 

@@ -2,6 +2,7 @@ import { useStore } from '../../store/store';
 import { z } from 'zod';
 import { edgeRef, graphOf, hasTarget, nodeCommand, nodeRef } from '../flow/commandKit';
 import { executionOrder } from '../flow/graph';
+import { LINK_KINDS, MODEL_ATTACH_MODES, type BaseSystemNodeType } from '../graphTypes';
 import type { RefNodeData } from '../types';
 import { ensureOmniNodes, setChatUndocked, setSpaceView } from './omni';
 import {
@@ -17,9 +18,10 @@ import {
 } from './system';
 
 const none = z.object({}).strict();
-const sysType = z.enum(['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset']);
-const linkKind = z.enum(['data', 'ref', 'control']);
-const attachMode = z.enum(['wired', 'docked', 'grouped', 'merged']);
+const SYSTEM_ADD_TYPES = ['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset'] as const satisfies readonly BaseSystemNodeType[];
+const sysType = z.enum(SYSTEM_ADD_TYPES);
+const linkKind = z.enum(LINK_KINDS);
+const attachMode = z.enum(MODEL_ATTACH_MODES);
 const mediaKind = z.enum(['llm', 'image', 'video', 'audio', 'model3d']);
 const point = z.object({ x: z.number(), y: z.number() }).strict();
 

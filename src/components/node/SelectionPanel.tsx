@@ -3,7 +3,7 @@ import { Brush, Download, Paperclip, RectangleHorizontal, X, type LucideIcon } f
 import { OPS, OP_IDS } from '../../engine/ops';
 import { addConnected, newNodeData } from '../../engine/flow/actions';
 import { outputPort } from '../../engine/flow/graph';
-import { downloadAsset, useAsReference } from '../../engine/actions';
+import { downloadAsset, addAsReference } from '../../engine/actions';
 import type { GraphNode, OpId, ToolNodeData } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { MenuItem } from '../ui/primitives';
@@ -34,7 +34,7 @@ export function SelectionPanel({ sessionId, node }: { sessionId: string; node: G
     if (id === 'reframe') sections.edit.push({ key: 'panorama', icon: RectangleHorizontal, label: 'Panorama', tip: 'Reframe to 21:9 (adds a connected node)', onClick: () => add('reframe', { title: 'Panorama', params: { aspect: '21:9' } }) });
   }
   if (out === 'image') sections.edit.push({ key: 'sketch', icon: Brush, label: 'Sketch', tip: 'Paint over the image; the edited version is what goes downstream', onClick: () => setUi({ sketch: { assetId, nodeId: node.id } }) });
-  sections.reuse.push({ key: 'attach', icon: Paperclip, label: 'Attach to prompt', onClick: () => useAsReference(assetId) });
+  sections.reuse.push({ key: 'attach', icon: Paperclip, label: 'Attach to prompt', onClick: () => addAsReference(assetId) });
   sections.finalize.push({ key: 'download', icon: Download, label: 'Download', onClick: () => void downloadAsset(assetId) });
   const Icon = KIND_ICON[asset?.kind ?? out] ?? KIND_ICON.image;
   return (

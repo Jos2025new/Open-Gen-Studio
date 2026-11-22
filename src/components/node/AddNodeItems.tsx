@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Bot, Box, ChevronRight, Cpu, Database, FileImage, FileText, Film, Image as ImageIcon, MessageSquare, Music, PenTool, Search, Sparkles, Type, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
+import { Bot, ChevronRight, Cpu, Database, FileImage, FileText, MessageSquare, PenTool, Search, Sparkles, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
-import type { GraphNodeData, OpId, PortType, SystemNodeType } from '../../engine/types';
+import type { GraphNodeData, MediaKind, OpId, PortType, SystemNodeType } from '../../engine/types';
 import { OMNI_SPACES, OMNI_SPACE_TITLES, type OmniSpace } from '../../engine/nodes/omniSpaces';
 import { SYSTEM_NODE_TYPES } from '../../engine/nodes/spec';
 import { OP_ICONS } from '../assets/AssetActions';
 import { MenuItem } from '../ui/primitives';
+import { NODE_UIS, type NodeUi } from './nodeUi';
 
 const MENU_TIP_DELAY = 2500;
 
-type Kind = 'image' | 'video' | 'audio' | 'model3d' | 'text';
+type Kind = MediaKind | 'text';
 interface Entry { id: string; section: 'spaces' | 'system' | 'media' | 'nodes' | 'tools'; kind?: Kind; icon: LucideIcon; label: string; sub: string; keywords: string; run: () => void }
 const KIND_LABEL: Record<Kind, string> = { image: 'Image', video: 'Video', audio: 'Audio', model3d: '3D', text: 'Text' };
 const SECTION_LABEL = { spaces: 'Spaces', system: 'System', media: 'Media', nodes: 'Nodes', tools: 'Tools' } as const;
@@ -34,15 +35,11 @@ const SYSTEM_ENTRIES: Array<[SystemNodeType, LucideIcon, string, string]> = [
 
 /** The same node kinds and tools as AddNodeItems, as one flat list for the library panel. */
 function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }): Entry[] {
-  const node = (kind: Exclude<Kind, 'text'> | 'text', icon: LucideIcon, label: string, sub: string, keywords: string): Entry => ({ id: kind, section: 'nodes', kind, icon, label, sub, keywords, run: () => onPick(newNodeData(kind)) });
+  const node = (ui: NodeUi): Entry => ({ id: ui.kind, section: 'nodes', kind: ui.chip, icon: ui.icon, label: ui.label, sub: ui.sub, keywords: ui.keywords, run: () => onPick(newNodeData(ui.kind)) });
   return [
     ...(onImport ? [{ id: 'import', section: 'media' as const, icon: Upload, label: 'Import images', sub: 'From your computer', keywords: 'upload import images files', run: onImport }] : []),
     ...(onAsset ? [{ id: 'asset', section: 'media' as const, icon: FileImage, label: 'Asset', sub: 'Drag one from the Library', keywords: 'asset gallery library', run: onAsset }] : []),
-    node('text', Type, 'Text', 'Prompt or copy that feeds other nodes', 'text prompt copy'),
-    node('image', ImageIcon, 'Image', 'Generate images', 'image generation reference'),
-    node('video', Film, 'Video', 'Generate video', 'video generation first frame motion'),
-    node('audio', Music, 'Audio', 'Generate music or song lyrics', 'audio music song lyrics voice'),
-    node('model3d', Box, '3D model', 'Generate a GLB model from text or image', '3d model glb'),
+    ...NODE_UIS.map(node),
     ...(omni && omni.spaces !== false ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
     ...(omni && omni.spaces !== false ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
@@ -104,7 +101,7 @@ export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = 
   const [tools, setTools] = useState(false);
   const [query, setQuery] = useState('');
   const matches = (text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
-  const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => portFits(accepts, p.type));
+  const takes = (kind: GraphNodeData['kind']) => !accepts || inputPorts(newNodeData(kind)).some((p) => portFits(accepts, p.type));
   const toolIds = OP_IDS.filter((id) => !OPS[id].multiInput && (!accepts || portFits(accepts, OPS[id].input)));
   if (tools && !query.trim()) {
     return (
@@ -122,11 +119,9 @@ export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = 
     <div className="menu">
       {searchable ? <label className="search-input node-add-search"><Search size={14} aria-hidden /><input autoFocus type="search" aria-label="Search compatible nodes" placeholder="Search nodes and tools…" value={query} onChange={(e) => setQuery(e.target.value)} /></label> : null}
       {onImport ? <MenuItem icon={Upload} label="Import images" onClick={onImport} /> : null}
-      {!accepts && matches('Text prompt copy') ? <MenuItem icon={Type} label="Text" tip="Prompt or copy that feeds other nodes" tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('text'))} /> : null}
-      {takes('image') && matches('Image generation reference') ? <MenuItem icon={ImageIcon} label="Image" tip={accepts === 'image' ? 'Use it as a reference' : 'Generate images'} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('image'))} /> : null}
-      {takes('video') && matches('Video generation first frame motion') ? <MenuItem icon={Film} label="Video" tip={accepts === 'image' ? 'Use it as the first frame' : accepts === 'audio' ? 'Use it as speech or soundtrack' : 'Generate video'} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('video'))} /> : null}
-      {takes('audio') && matches('Audio music song lyrics') ? <MenuItem icon={Music} label="Audio" tip={accepts === 'text' ? 'Use it as the prompt of a song' : 'Generate music or song lyrics'} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('audio'))} /> : null}
-      {takes('model3d') && matches('3D model GLB') ? <MenuItem icon={Box} label="3D model" tip="Generate a GLB model from text or image" tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('model3d'))} /> : null}
+      {NODE_UIS.filter((ui) => takes(ui.kind) && matches(ui.menuKeywords)).map((ui) => (
+        <MenuItem key={ui.kind} icon={ui.icon} label={ui.label} tip={ui.tip(accepts)} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData(ui.kind))} />
+      ))}
       {!query.trim() && toolIds.length ? <MenuItem icon={Wand} label="Tool" tip="Relight, angle, upscale, animate…" tipDelay={MENU_TIP_DELAY} right={<ChevronRight size={14} />} onClick={() => setTools(true)} /> : null}
       {query.trim() ? toolIds.filter((id) => matches(`${OPS[id].label} ${OPS[id].description}`)).map((id) => <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} tip={`${OPS[id].input} → ${OPS[id].output}`} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('tool', { op: id as OpId }))} />) : null}
       {onAsset && !accepts && matches('Asset gallery') ? <MenuItem icon={FileImage} label="Asset" tip="Drag one from the gallery onto the canvas" tipDelay={MENU_TIP_DELAY} onClick={onAsset} /> : null}

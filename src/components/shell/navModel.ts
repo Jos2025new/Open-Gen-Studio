@@ -1,5 +1,5 @@
 import { Box, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, Network, type LucideIcon } from '../ui/icons';
-import type { AssetKind, ComposerMode, OpId, Workspace } from '../../engine/types';
+import type { AssetKind, ComposerMode, MediaKind, OpId, Workspace } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
 import { newSession, setComposer, setUi } from '../../store/store';
 import { newBlankDoc } from '../../engine/design/actions';
@@ -17,7 +17,7 @@ export const SPACES: SpaceItem[] = [
 /** The omnicanvas sits next to the three Spaces: the session's parts as nodes. */
 export const OMNI_ITEM = { id: 'omni', label: 'Omnicanvas · Node canvas', hint: 'The session as nodes: Spaces, chat, agent, models and assets', icon: Network } as const;
 
-export interface CreateItem { id: 'image' | 'video' | 'audio' | 'model3d'; label: string; hint: string; icon: LucideIcon; kind: AssetKind; mode: ComposerMode; soon?: boolean }
+export interface CreateItem { id: MediaKind; label: string; hint: string; icon: LucideIcon; kind: AssetKind; mode: ComposerMode; soon?: boolean }
 export const CREATE: CreateItem[] = [
   { id: 'image', label: 'Image', hint: 'Generate pictures from a prompt', icon: ImageIcon, kind: 'image', mode: 'image' },
   { id: 'video', label: 'Video', hint: 'Animate a scene or a still', icon: Film, kind: 'video', mode: 'video' },

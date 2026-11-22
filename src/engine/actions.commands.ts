@@ -4,7 +4,7 @@ import { useStore } from '../store/store';
 import { estimateOp } from './costs';
 import { opChoice, opSpecForModel } from './opSpec';
 import { OP_IDS, OPS } from './ops';
-import type { AdvancedValue, OpId } from './types';
+import { MEDIA_KINDS, type AdvancedValue, type OpId } from './types';
 import * as A from './actions';
 
 function estimateStudioOp(
@@ -28,7 +28,7 @@ function estimateStudioOp(
 }
 
 const id = z.string().min(1);
-const kind = z.enum(['image', 'video', 'audio', 'model3d']);
+const kind = z.enum(MEDIA_KINDS);
 const op = z.enum(OP_IDS as [OpId, ...OpId[]]);
 const params = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
 const estimate = z.object({ usd: z.number().nullable(), approximate: z.boolean(), lowerBound: z.boolean().optional(), note: z.string().optional(), exact: z.boolean().optional() }).strict();
@@ -176,7 +176,7 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : asset(args?.assetId),
     debt: 'Changes the composer and screen; missing model views only produce a notice.',
-    run: (_ctx, args) => { A.useAsReference(args.assetId); },
+    run: (_ctx, args) => { A.addAsReference(args.assetId); },
   }),
   defineCommand({
     id: 'studio.asset.attach',
@@ -315,7 +315,7 @@ export const STUDIO_ACTIONS: Record<string, string> = {
   applyLyrics: 'studio.lyrics.apply',
   editInComposer: 'studio.generation.edit',
   toggleFavorite: 'studio.asset.favorite',
-  useAsReference: 'studio.asset.reference',
+  addAsReference: 'studio.asset.reference',
   toggleAgentAttachment: 'studio.asset.attach',
   addAssetNode: 'studio.node.add_asset',
   sendToNodes: 'studio.node.send_asset',

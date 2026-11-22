@@ -14,7 +14,7 @@ const imageLike: NodeDescriptor['plan'] = (d, ctx) => {
   return { id: ctx.id, kind: d.kind, title: d.title, prompt: d.prompt, promptFrom: ctx.promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep | Model3dStep;
 };
 
-const PLANS: Record<'image' | 'video' | 'audio' | 'model3d', NonNullable<NodeDescriptor['plan']>> = {
+const PLANS: Record<MediaKind, NonNullable<NodeDescriptor['plan']>> = {
   image: imageLike,
   model3d: imageLike,
   video(d, ctx) {
@@ -39,7 +39,7 @@ const PLANS: Record<'image' | 'video' | 'audio' | 'model3d', NonNullable<NodeDes
 };
 
 /** The shared descriptor of the four generation kinds: they differ in ports and output, not in contract. */
-export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d', ports: { inputs: PortInfo[]; output: PortType | ((textOutput?: boolean) => PortType) }): NodeDescriptor {
+export function generationNode(kind: MediaKind, ports: { inputs: PortInfo[]; output: PortType | ((textOutput?: boolean) => PortType) }): NodeDescriptor {
   const plan = PLANS[kind];
   return defineNode({
     kind,
@@ -52,7 +52,7 @@ export function generationNode(kind: 'image' | 'video' | 'audio' | 'model3d', po
     evaluate: deliverGenerated,
     plan,
     defaults: (_opts, st) => {
-      const c = st.composer[kind as MediaKind];
+      const c = st.composer[kind];
       const textOutput = kind === 'audio' && st.catalog.models[c.modelRef]?.textOutput;
       return { kind, title: TITLES[kind], prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0, ...(textOutput ? { textOutput: true } : {}) };
     },

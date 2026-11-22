@@ -146,11 +146,9 @@ export function connectionError(
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
   if (!src || !tgt) return 'Unknown node.';
-  const system = systemPortsFor(src, tgt, assets, c);
-  const problem = portProblem(src, tgt, assets, c, system);
-  if (problem) return problem;
-  const kind = system?.kind ?? system?.tgtPort?.kind ?? 'data';
-  return kind === 'data' && reaches(compatibleDataEdges(graph, assets), c.target, c.source) ? 'That connection would create a loop.' : null;
+  const wiring = resolveWiring(src, tgt, assets, c);
+  if ('error' in wiring) return wiring.error;
+  return wiring.port.kind === 'data' && reaches(compatibleDataEdges(graph, assets), c.target, c.source) ? 'That connection would create a loop.' : null;
 }
 
 export { resultHandle, NO_RESULT, GONE_HANDLE } from './results';
@@ -161,36 +159,78 @@ export function handleIndex(handle: string | null | undefined): number | undefin
   return m ? Number(m[1]) - 1 : undefined;
 }
 
+/** Resolve the ports of a new wire before applying the graph's replacement rule. */
+export function resolveWiring(src: GraphNode, tgt: GraphNode, assets: Record<string, Asset> | undefined, c: ConnectionPorts):
+  { edge: Omit<GraphEdge, 'id'>; port: PortSpec } | { error: string } {
+  const inventory = assets ?? {};
+  const unknownAsset = !assets && src.data.kind === 'asset' && !!src.data.assetId;
+  const resolved = resolveSystemConnection(nodePorts(src.data, inventory), nodePorts(tgt.data, inventory), c);
+  const error = portProblem(src, tgt, inventory, c, resolved, unknownAsset);
+  if (error) return { error };
+  const port = resolved.tgtPort!;
+  const kind = port.kind;
+  const out = resolved.srcPort?.id ?? 'out';
+  // A lost result stays lost. A numbered output selects that result on the data cable.
+  const outputIndex = kind === 'data' && out === 'out'
+    ? (c.sourceHandle === GONE_HANDLE ? NO_RESULT : handleIndex(c.sourceHandle))
+    : undefined;
+  const edge = {
+    source: src.id, target: tgt.id, targetHandle: port.id,
+    sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? out : resultHandle(outputIndex),
+    ...(outputIndex == null ? {} : { outputIndex }),
+    ...(kind !== 'data' || usesSystemPorts(src, tgt, c) ? { kind } : {}),
+    ...(c.both ? { both: true } : {}),
+  };
+  return { edge, port };
+}
+
 /** The same output of the same node (an output with no handle is `out`): two outputs of one node are two cables. */
-export const sameSourcePort = (a: GraphEdge, b: GraphEdge): boolean => a.source === b.source && (a.sourceHandle ?? 'out') === (b.sourceHandle ?? 'out');
+export const sameSourcePort = (a: GraphEdge, b: Omit<GraphEdge, 'id'>): boolean => a.source === b.source && (a.sourceHandle ?? 'out') === (b.sourceHandle ?? 'out');
+
+export const sameTargetPort = (a: GraphEdge, b: Omit<GraphEdge, 'id'>): boolean =>
+  a.target === b.target && a.targetHandle === b.targetHandle && (a.kind ?? 'data') === (b.kind ?? 'data');
+
+/** A UI connection may infer the unpinned occupant of a single-cable input. */
+export function inferReplaces(
+  graph: Graph | undefined,
+  assets: Record<string, Asset>,
+  c: ConnectionPorts & { source: string; target: string },
+): string | undefined {
+  if (!graph) return;
+  const src = graph.nodes.find((n) => n.id === c.source);
+  const tgt = graph.nodes.find((n) => n.id === c.target);
+  if (!src || !tgt) return;
+  const wiring = resolveWiring(src, tgt, assets, c);
+  if ('error' in wiring || wiring.port.multi !== false) return;
+  const occupant = graph.edges.find((e) => sameTargetPort(e, wiring.edge) && !sameSourcePort(e, wiring.edge));
+  if (occupant && occupant.pin == null) return occupant.id;
+}
+
+const replacedBy = (old: GraphEdge, edge: Omit<GraphEdge, 'id'>, single: boolean): boolean =>
+  sameTargetPort(old, edge) && (single || sameSourcePort(old, edge));
+
+export function unnamedPinnedCable(edges: GraphEdge[], edge: Omit<GraphEdge, 'id'>, single: boolean, replaces: string | null | undefined): GraphEdge | undefined {
+  return edges.find((old) => old.pin != null && old.id !== replaces && replacedBy(old, edge, single));
+}
 
 /** `edge` joins the cables: the same cable again is replaced, and on a single-cable input so is whatever else sits there (same kind). One rule for both ways of wiring a resolved port. */
 export function withEdge(edges: GraphEdge[], edge: GraphEdge, single: boolean): GraphEdge[] {
-  const kind = edge.kind ?? 'data';
-  const here = (e: GraphEdge) => e.target === edge.target && e.targetHandle === edge.targetHandle && (e.kind ?? 'data') === kind;
-  return [...edges.filter((e) => !(here(e) && (single || sameSourcePort(e, edge)))), edge];
+  return [...edges.filter((old) => !replacedBy(old, edge, single)), edge];
 }
 
 /** Add an edge, replacing the existing edge on single-input ports. */
 export function connect(
   graph: Graph,
-  c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null; kind?: LinkKind; both?: boolean },
+  c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null; kind?: LinkKind; both?: boolean; replaces?: string | null },
 ): Graph {
   const src = graph.nodes.find((n) => n.id === c.source);
   const tgt = graph.nodes.find((n) => n.id === c.target);
-  if (src && tgt && usesSystemPorts(src, tgt, c)) {
-    const resolved = resolveSystemConnection(nodePorts(src.data, {}), nodePorts(tgt.data, {}), c);
-    const kind: LinkKind = c.kind ?? resolved.kind ?? 'data';
-    const targetHandle = resolved.tgtPort?.id ?? c.targetHandle;
-    const sourceHandle = resolved.srcPort?.id ?? (c.sourceHandle || 'out');
-    const edge: GraphEdge = { id: uid('edge'), source: c.source, target: c.target, sourceHandle, targetHandle, kind, ...(c.both && kind !== 'data' ? { both: true } : {}) };
-    return { ...graph, edges: withEdge(graph.edges, edge, resolved.tgtPort?.multi === false) };
-  }
-  const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
-  // A copy of a link that lost its image stays without one (it must not fall back to the node's chosen result).
-  const outputIndex = c.sourceHandle === GONE_HANDLE ? NO_RESULT : handleIndex(c.sourceHandle);
-  const edge: GraphEdge = { id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex === NO_RESULT ? GONE_HANDLE : outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) };
-  return { ...graph, edges: withEdge(graph.edges, edge, Boolean(port && !port.multi)) };
+  if (!src || !tgt) return graph;
+  const wiring = resolveWiring(src, tgt, undefined, c);
+  if ('error' in wiring) return graph;
+  const single = wiring.port.multi === false;
+  if (unnamedPinnedCable(graph.edges, wiring.edge, single, c.replaces)) return graph;
+  return { ...graph, edges: withEdge(graph.edges, { id: uid('edge'), ...wiring.edge }, single) };
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from './providers/demo';
 import { listLlmModels, pickDefaultLlm } from './providers/llm';
 import { parseModelRef } from './providers/types';
 import { isVideoOpEngine, VIDEO_OP_ENGINES, type OpEngine } from './ops';
-import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId, TranscriberSummary } from './types';
+import { MEDIA_KINDS, type LlmProviderId, type MediaKind, type ModelSchema, type ModelSummary, type ProviderId, type RemoteProviderId, type TranscriberSummary } from './types';
 import { rememberSessionModel } from './agent/sessionModel';
 import { setCatalog, setComposer, setComposerMedia, setSettings, useStore } from '../store/store';
 
@@ -213,7 +213,7 @@ export function preferredModel(kind: MediaKind): string {
  */
 export function ensureComposerModels(preferRemote = false): void {
   const st = get();
-  for (const kind of ['image', 'video', 'audio', 'model3d'] as const) {
+  for (const kind of MEDIA_KINDS) {
     const ref = st.composer[kind].modelRef;
     const parsed = parseModelRef(ref);
     // A model is only replaced once its provider catalog loaded and it is missing from it.

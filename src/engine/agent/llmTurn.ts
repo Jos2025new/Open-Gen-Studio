@@ -7,7 +7,7 @@ import { isAbort, isTransient } from '../../lib/http';
 import { logEvent } from '../../lib/log';
 import { journeyIdFor, recordJourneyEvent } from '../../lib/journeyTrace';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
-import { isCreditError, onAgentCredit } from '../credit';
+import { guardLlmBudget, isCreditError, onAgentCredit } from '../credit';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, loadLlmCatalog, modelSummary } from '../catalog';
 import { uid } from '../../lib/id';
@@ -34,7 +34,6 @@ import { agentOf } from './lanes';
 import { canonicalJson } from './canonicalJson';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 
-/** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
 /** Direct mode asks nothing and shows no settings card, so those two tools are not offered to the model. */
 const DIRECT_HIDDEN_TOOLS = new Set(['ask_questions', 'confirm_settings']);
 function toolsFor(style: AgentStyle) {
@@ -50,16 +49,18 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; runId?: string; agentNodeId: string }): Promise<void> {
-  // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
+export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean; budgetPass?: boolean; runId?: string; agentNodeId: string }): Promise<void> {
+  // Canvas can change mid-turn (open_board, continue_in_*).
   let workspace = startWorkspace;
-  // A turn belongs to one agent for its whole life: every read and write below names it, whichever agent is on screen later.
+  // Turn stays bound to one agent regardless of what is on screen later.
   const owner = opts.agentNodeId;
   const mine = (): AgentState => agentOf(sessionId, owner);
   const engine = agentEngine(sessionId, owner);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
-  void loadLlmCatalog(engine.provider);
   const runId = opts.runId ?? uid('turn');
+  const guard = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => { if (!session(sessionId)) return; if (mine().busy) { notice(sessionId, workspace, 'The agent is busy. Send again when it finishes.', 'info'); return; } void llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: true }); }, opts.budgetPass);
+  if (!guard()) return;
+  void loadLlmCatalog(engine.provider);
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   let outcome: TurnOutcome = 'text';
   patchAgent(sessionId, { busy: true, phase: 'working' }, owner);
@@ -145,12 +146,13 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
-          if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
+      if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
         if (!cutTurn) logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: Date.now() - turnStart });
         outcome = 'cut';
         limitNote();
         return;
       }
+      if (iteration > 0 && !guard()) { outcome = 'canceled'; return; }
       let textItemId: string | null = null;
       let textItemMeta: ChatMessageMeta | undefined;
       const hasTextBubble = () => Boolean(textItemId && session(sessionId).feed.some((f) => f.id === textItemId));
@@ -206,7 +208,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
         if (isCreditError(err) && !opts.creditRetried) {
           if (textItemId) removeFeedItem(sessionId, textItemId);
-          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }); }
+          if (await until(onAgentCredit(sessionId))) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }); }
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
@@ -434,7 +436,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, (get().composer.agentStyle === 'guided' ? Object.fromEntries((mine().settingsParts ?? []).map((p) => [p.kind, p])) : mine().settings)) : null;
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, feedOfAgent(sessionId, owner), get().composer.agentStyle, v.data.revision === true);
           if (gate || draft || (get().composer.agentStyle === 'auto' && await modelsNeedSettings(sessionId, owner, v.data.steps))) {
-            // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
+            // Auto: the app confirms itself and answers with the effective settings; the plan is not shown (a flow step, not a rejection).
             const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, owner, rowCanvas(workspace), call.id, v.data.steps, until, log, turnMeta()) : (gate ?? draft)!;
             if (told !== null) {
               if (get().composer.agentStyle !== 'auto') recordMetric(sessionId, { type: 'rejected' });
@@ -493,5 +495,3 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
     finish();
   }
 }
-
-/** Cost of one model call: what the provider reported, else tokens at the catalog's per-million prices. */

@@ -110,11 +110,13 @@ describe('agent actions on existing nodes',()=>{
 });
 describe('a Nodes run stopped by the spending limit says so on its card',()=>{
  it('keeps the reason on the card instead of a toast only, and runs nothing',async()=>{
+  // A paid model with no published price: free ($0) runs never go over the limit.
+  {const st=useStore.getState();useStore.setState({sessions:{...st.sessions,[sid]:{...session(),graph:{...session().graph,nodes:session().graph.nodes.map(n=>({...n,data:{...n.data,modelRef:'fal::paid-img'}} as never))}}}});}
   const card=await presentNodeRun(sid, ['final'], null, undefined, 'main');const id=card.itemId!;
   const st=useStore.getState();useStore.setState({spentUsd:2,settings:{...st.settings,budgetOn:true,budgetUsd:1,budgetAccepted:null}});
   await approvePlan(sid,id);expect(execute).not.toHaveBeenCalled();
   const item=session().feed.find(f=>f.id===id) as PlanFeedItem;
-  expect(item.status).toBe('awaiting');expect(item.error).toContain('Goes over your');
+  expect(item.status).toBe('awaiting');expect(item.error).toContain('limit');
   useStore.setState({spentUsd:0,settings:{...useStore.getState().settings,budgetOn:false}});
  });
 });

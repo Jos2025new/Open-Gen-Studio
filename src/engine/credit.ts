@@ -7,10 +7,10 @@ import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
 import { lineKey, modelFamily } from './variants';
 import { estimateMedia } from './costs';
-import type { Estimate, GenSettings, Generation, ModelSummary, ProviderId } from './types';
+import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { overLimit, overLimitText, withOncePass } from './budget';
+import { llmCallEstimate, overLimit, overLimitText, withOncePass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -148,6 +148,41 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
   return `${m.name} · ${PROVIDER_LABELS[m.provider]}${p != null ? ` · ${formatUsd(p)}` : ''}${ratio !== undefined && ratio > 1 ? ' · pricier' : ''}`;
 };
 
+/** Run `proceed` when within budget, or ask once with "Continue once" / "Cancel" above the prompt box. */
+function confirmOverLimit(sessionId: string, title: string, e: Estimate, choicesText: string, proceed: () => unknown): boolean {
+  if (!overLimit(e, sessionId)) {
+    proceed();
+    return true;
+  }
+  const id = pushAlert({
+    level: 'warn',
+    text: `${title}: ${overLimitText(e, choicesText)}`,
+    actions: [
+      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, proceed); } },
+      { label: 'Cancel', run: () => dismissAlert(id) },
+    ],
+  });
+  return false;
+}
+
+/** Check the spending limit before a paid LLM call. Uses its own per-turn pass (never session passes) so unrelated actions neither grant nor lose a pass. */
+export function guardLlmBudget(sessionId: string, provider: LlmProviderId, model: string, title: string, resume: () => unknown, budgetPass = false): boolean {
+  if (budgetPass) return true;
+  const est = llmCallEstimate(provider, model);
+  // The agent's own per-turn pass only: a session pass belongs to another action.
+  if (!overLimit(est, sessionId, { sessionPasses: false })) return true;
+  let ran = false;
+  const id = pushAlert({
+    level: 'warn',
+    text: `${title}: ${overLimitText(est, '\u201cContinue once\u201d runs this agent turn.')}`,
+    actions: [
+      { label: 'Continue once', run: () => { if (ran) return; ran = true; dismissAlert(id); void resume(); } },
+      { label: 'Cancel', run: () => dismissAlert(id) },
+    ],
+  });
+  return false;
+}
+
 /**
  * A generation failed for lack of credit: switch it to the same model elsewhere (same or lower price, with credit)
  * and run it again, or show the choices above the prompt box. `rerun` runs it again inside the attempt that just failed;
@@ -156,7 +191,7 @@ const label = (m: ModelSummary, ratio?: number, usd?: number) => {
  * failed model's price), a plan step is never resent outside its plan (its model changes and the plan's Retry runs it),
  * and an answer that comes after the card was retried or regenerated sends nothing.
  */
-export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string) => Promise<unknown> = rerun, estimateJob?: (g: Generation) => Estimate): Promise<boolean> {
+export async function onGenerationCredit(genId: string, rerun: (id: string) => Promise<unknown>, later: (id: string, nodeLock?: () => void) => Promise<unknown> = rerun, estimateJob?: (g: Generation) => Estimate, nodeLock?: () => void): Promise<boolean> {
   const g = get().generations[genId];
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
@@ -197,6 +232,25 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     return true;
   };
 
+  const retryEstimateFor = (patch: ReturnType<typeof substitute>) => {
+    const retry = estimateForRetry({ ...g, ...patch });
+    return retry.lowerBound ? { ...retry, usd: null } : retry;
+  };
+  const sendLater = (o: CreditOption, patch: ReturnType<typeof substitute>, what: string) => () => (async () => {
+    if (stale()) return;
+    const held = holdAttemptNode(g, nodes());
+    if (!held) return;
+    try {
+      applySubstitute(o, patch);
+      await later(genId, held.release);
+      if (held.node && get().generations[genId]?.status === 'done') {
+        applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
+      }
+    } finally {
+      held.release();
+    }
+  })().catch(logged(what));
+
   const answer = (o: CreditOption, what: string, remember = false) => {
     if (stale()) return;
     if (remember) setSettings({ autoSwitchProvider: 'always' });
@@ -207,32 +261,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       pushAlert({ level: 'info', text: `${cur.name} will run on ${label(o.model, o.ratio, o.usd)}. Review the updated price on the plan before choosing Retry.` });
       return;
     }
-    const go = async () => {
-      if (stale()) return;
-      const held = holdAttemptNode(g, nodes());
-      if (!held) return;
-      try {
-        applySubstitute(o, patch);
-        await later(genId);
-        if (held.node && get().generations[genId]?.status === 'done') {
-          applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
-        }
-      } finally {
-        held.release();
-      }
-    };
-    const send = () => go().catch(logged(what));
-    const retry = estimateForRetry({ ...g, ...patch });
-    const e = retry.lowerBound ? { ...retry, usd: null } : retry;
-    if (!overLimit(e, g.sessionId)) return void send();
-    const id = pushAlert({
-      level: 'warn',
-      text: `${label(o.model, o.ratio, o.usd)}: ${overLimitText(e, '\u201cContinue once\u201d runs only this generation on that model.')}`,
-      actions: [
-        { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(g.sessionId, send); } },
-        { label: 'Cancel', run: () => dismissAlert(id) },
-      ],
-    });
+    confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), retryEstimateFor(patch), '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what));
   };
   const auto = options.find((o) => o.same);
   const mode = autoSwitchMode();
@@ -250,10 +279,39 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   }
   if (auto && mode === 'always') {
     if (superseded()) return false;
-    pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
-    applySubstitute(auto);
-    await rerun(genId);
-    return true;
+    const patch = substitute(auto);
+    let immediate = true;
+    let run: Promise<boolean> | undefined;
+    const ok = confirmOverLimit(
+      g.sessionId,
+      label(auto.model, undefined, auto.usd),
+      retryEstimateFor(patch),
+      '\u201cContinue once\u201d runs only this generation on that model.',
+      () => {
+        if (!immediate) {
+          if (stale()) return;
+          if (g.planId) {
+            applySubstitute(auto, patch);
+            pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
+            return;
+          }
+          return sendLater(auto, patch, 'switch provider after no credit')();
+        }
+        const held = holdAttemptNode(g, nodes(), nodeLock);
+        if (!held) { run = Promise.resolve(false); return; }
+        pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
+        applySubstitute(auto, patch);
+        try {
+          run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
+        } catch (err) {
+          held.release();
+          throw err;
+        }
+      },
+    );
+    immediate = false;
+    if (!ok || !run) return false;
+    return await run;
   }
   if (options.length) {
     const id = pushAlert({
@@ -283,7 +341,7 @@ const sameName = (s: string) => s.toLowerCase().replace(/^[^:]+:\s*/, '').replac
  * becomes the agent's model (said above the prompt box) and the turn runs again; otherwise up to three capable
  * models with credit are offered (tools, and vision when the current one has it), or "recharge".
  */
-export async function onAgentCredit(): Promise<boolean> {
+export async function onAgentCredit(sessionId: string = get().activeSessionId): Promise<boolean> {
   const { settings, catalog } = get();
   const provider = settings.agent.provider;
   if (provider === 'offline') return false;
@@ -305,9 +363,20 @@ export async function onAgentCredit(): Promise<boolean> {
       choices.push({ p, m, same });
     }
   }
-  const use = (c: (typeof choices)[number]) => {
+  const switchTo = (c: (typeof choices)[number]) => {
     useStore.setState((s) => ({ settings: { ...s.settings, agent: { ...s.settings.agent, provider: c.p, model: c.m.id, modelPinned: true } } }));
   };
+  const pick = (c: (typeof choices)[number], remember = false) =>
+    confirmOverLimit(
+      sessionId,
+      `${c.m.name} · ${PROVIDER_LABELS[c.p]}`,
+      llmCallEstimate(c.p, c.m.id),
+      '\u201cContinue once\u201d switches the agent to this model.',
+      () => {
+        if (remember) setSettings({ autoSwitchProvider: 'always' });
+        switchTo(c);
+      },
+    );
   const auto = choices.find((c) => c.same);
   const mode = autoSwitchMode();
   if (auto && mode === 'ask') {
@@ -315,14 +384,18 @@ export async function onAgentCredit(): Promise<boolean> {
       level: 'warn',
       text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Use the same model at ${PROVIDER_LABELS[auto.p]} instead (${auto.m.name}, same price or less) and press Retry?`,
       actions: [
-        { label: 'Yes, this time', run: () => { use(auto); dismissAlert(id); } },
-        { label: 'Don\u2019t ask again', run: () => { setSettings({ autoSwitchProvider: 'always' }); use(auto); dismissAlert(id); } },
+        { label: 'Yes, this time', run: () => { dismissAlert(id); pick(auto); } },
+        { label: 'Don\u2019t ask again', run: () => { dismissAlert(id); pick(auto, true); } },
       ],
     });
     return false;
   }
   if (auto && mode === 'always') {
-    use(auto);
+    if (overLimit(llmCallEstimate(auto.p, auto.m.id), sessionId)) {
+      pick(auto);
+      return false;
+    }
+    switchTo(auto);
     pushAlert({ level: 'info', text: `${empty} has no credit: the agent switched to the same model at ${PROVIDER_LABELS[auto.p]} (${auto.m.name}, same price or less).` });
     return true;
   }
@@ -334,7 +407,7 @@ export async function onAgentCredit(): Promise<boolean> {
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for the agent${cur ? ` (${cur.name})` : ''}. Switch to a model with credit and press Retry, or recharge ${empty}:`,
-      actions: near.map((c) => ({ label: `${c.m.name} · ${PROVIDER_LABELS[c.p]}`, run: () => { use(c); dismissAlert(id); } })),
+      actions: near.map((c) => ({ label: `${c.m.name} · ${PROVIDER_LABELS[c.p]}`, run: () => { dismissAlert(id); pick(c); } })),
     });
     return false;
   }

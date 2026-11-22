@@ -13,7 +13,7 @@ const PARTIAL_NOT_SENT_MESSAGE = 'Next request not sent: could not save before s
 const PRIOR_UNCERTAIN_NOT_SENT_MESSAGE = 'Not sent: could not save before sending. A previous request for this generation may have been charged; check before retrying.';
 
 /** True when the send has zero cost (local models or $0 price) and never needs the paid-send gate. */
-export function isFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, quote?: number | null): boolean {
+function isFreeSend(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, quote?: number | null): boolean {
   // A remote send is free only when both the estimate and the quote (if any) say $0: either one above $0 bills.
   return g.provider === 'local' || g.modelRef.startsWith('local::') || (g.estimate?.usd === 0 && (quote == null || quote === 0));
 }
@@ -105,6 +105,35 @@ export async function markSending(id: string, index = 0, reqId = uid('req')): Pr
 export function rollbackSendIntent(id: string, reqId: string | undefined): void {
   if (reqId) dropIntent(id, reqId);
   else patchGeneration(id, { sending: undefined });
+}
+
+/**
+ * Common gate before any provider transport: for paid sends, persist intent and `sending` to IndexedDB;
+ * then re-check abort and optional authorization right before transport, rolling back the intent if either fails.
+ */
+export async function commitPaidSend(opts: {
+  g: Generation;
+  index?: number;
+  reqId?: string;
+  quote?: number | null;
+  signal: AbortSignal;
+  authorize?: () => void;
+}): Promise<{ reqId: string | undefined; freeSend: boolean }> {
+  const freeSend = isFreeSend(opts.g, opts.quote);
+  let reqId: string | undefined;
+  if (freeSend) {
+    void saveNow().catch(() => undefined);
+  } else {
+    reqId = await markSending(opts.g.id, opts.index ?? 0, opts.reqId);
+  }
+  try {
+    opts.signal.throwIfAborted();
+    opts.authorize?.();
+  } catch (err) {
+    rollbackSendIntent(opts.g.id, reqId);
+    throw err;
+  }
+  return { reqId, freeSend };
 }
 
 /** Persist a provider job id on both the generation and its per-request ledger, flushing immediately. */

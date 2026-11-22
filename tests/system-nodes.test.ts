@@ -14,9 +14,9 @@ vi.mock('../src/lib/idb', () => ({
 }));
 import { allCommands, collected, command, run } from '../src/engine/commands';
 import { graphHistory, travelGraph } from '../src/engine/flow/history';
-import { connectionError, executionOrder } from '../src/engine/flow/graph';
+import { connect, connectionError, executionOrder } from '../src/engine/flow/graph';
 import { ensureSystemNodes } from '../src/engine/nodes/system';
-import { deleteNodes } from '../src/engine/flow/actions';
+import { deleteNodes, tryConnect } from '../src/engine/flow/actions';
 import { consumersOf } from '../src/engine/nodecore/deps';
 import { flowEdges } from '../src/components/node/LinkBar';
 import { createSession, setGraph, useStore } from '../src/store/store';
@@ -127,6 +127,45 @@ describe('links with a class', () => {
     expect(graph().edges).toHaveLength(before);
     expect(undo()).toBe(true);
     expect(graph().edges).toHaveLength(before + 1);
+  });
+
+  it.each(['canvas', 'nodes.edge.connect', 'nodes.system.link'] as const)('restores the same model cable with one undo after replacement via %s', async (path) => {
+    const image: GraphNode = {
+      id: 'image', position: { x: 0, y: 0 },
+      data: { kind: 'image', title: 'Image', prompt: '', modelRef: '', settings: { count: 1, advanced: {} }, outputIndex: 0 },
+    };
+    setGraph(sid, (g) => ({ ...g, nodes: [...g.nodes, image] }));
+    const incoming = () => graph().edges.filter((edge) => edge.target === 'image');
+    const wire = async (source: string, replaces: string | null) => {
+      if (path === 'canvas') return tryConnect(sid, { source, target: 'image', sourceHandle: 'model', targetHandle: null });
+      const args = { source, target: 'image', source_handle: 'model', kind: 'control', replaces };
+      const result = await run({ cmd: path, args: path === 'nodes.edge.connect' ? { ...args, target_handle: null } : args, on: on() }, { caller: 'agent' });
+      return result.ok;
+    };
+
+    expect(await wire('sys_model_image', null)).toBe(true);
+    const first = incoming();
+    expect(first).toHaveLength(1);
+    expect(first[0].targetHandle).toBe('model');
+    const steps = graphHistory(sid, 'undo').length;
+
+    expect(await wire('sys_model_llm', first[0].id)).toBe(true);
+    expect(incoming().map((edge) => [edge.source, edge.targetHandle])).toEqual([['sys_model_llm', 'model']]);
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps + 1);
+    expect(undo()).toBe(true);
+    expect(incoming()).toEqual(first);
+  });
+
+  it('keeps a pinned cable when dragging onto its inferred port and shows the rejection', () => {
+    const wire = { source: 'sys_chat', target: 'sys_agent', sourceHandle: 'agent', targetHandle: null };
+    const before = { ...graph(), edges: graph().edges.map((edge) => edge.id === 'sys_edge_chat_agent' ? { ...edge, pin: 'revision-1' } : edge) };
+    setGraph(sid, () => before);
+    const steps = graphHistory(sid, 'undo').length;
+    expect(tryConnect(sid, wire)).toBe(false);
+    expect(graph()).toBe(before);
+    expect(graphHistory(sid, 'undo')).toHaveLength(steps);
+    expect(useStore.getState().ui.toasts.at(-1)?.text).toContain('sys_edge_chat_agent');
+    expect(connect(before, { ...wire, targetHandle: 'chat' })).toBe(before);
   });
 
   it('refuses a bidirectional data link and a mismatch of classes', async () => {

@@ -1,5 +1,6 @@
 /* Sends that are not a media generation: transcribe, create a voice, create a style (moved out of jobs.ts, Opus #4). */
-import { JobFailedError, NetworkError } from '../lib/http';
+import { isAbort, JobFailedError, NetworkError } from '../lib/http';
+import { isRestart } from './checkStatus';
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
@@ -7,28 +8,21 @@ import { ADAPTERS, preferredProviderLabel } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenResult, type ProviderAdapter } from './providers/types';
 import type { Generation, RemoteJob } from './types';
 import { patchGeneration, useStore } from '../store/store';
-import { flushSendSave, isFreeSend, markSending, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { commitPaidSend, flushSendSave, recordRemoteJob, SendNotCommittedError, settleFailedSend, wasFreeSend } from './sendMark';
 import { finishText, requestEstimate } from './jobState';
 import { mediaInput } from './assetIO';
 
 const get = useStore.getState;
-
-function checkSpecialSend(g: Generation, signal: AbortSignal): void {
-  signal.throwIfAborted();
-  if (g.planId) checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
-}
 
 async function runSpecialSend(
   g: Generation,
   signal: AbortSignal,
   send: (hooks: { onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }) => Promise<GenResult>,
 ): Promise<void> {
-  checkSpecialSend(g, signal);
-  const reqId = isFreeSend(g) ? undefined : await markSending(g.id, 0);
-  if (signal.aborted) {
-    rollbackSendIntent(g.id, reqId);
-    signal.throwIfAborted();
-  }
+  const authorize = g.planId ? () => checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g))) : undefined;
+  signal.throwIfAborted();
+  authorize?.();
+  const { reqId, freeSend } = await commitPaidSend({ g, index: 0, signal, authorize });
   try {
     const result = await send({
       onStatus: (text) => patchGeneration(g.id, { statusText: text }),
@@ -38,11 +32,15 @@ async function runSpecialSend(
     await flushSendSave();
   } catch (err) {
     const cur = get().generations[g.id];
-    if (reqId && cur?.sends && !(err instanceof SendNotCommittedError)) {
+    if (reqId && cur?.sends && !(err instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
       if (err instanceof JobFailedError) {
         patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, false, true) });
       } else if (!cur.remoteJob) {
-        patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, !isFreeSend(cur) && err instanceof NetworkError) });
+        const uncertain = !wasFreeSend(cur, freeSend) && (err instanceof NetworkError || isAbort(err) || signal.aborted);
+        patchGeneration(g.id, {
+          sends: settleFailedSend(cur.sends, reqId, uncertain),
+          ...(uncertain ? { lostJob: true } : {}),
+        });
       }
     }
     throw err;

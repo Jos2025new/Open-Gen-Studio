@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
 import { AGENT_OP_IDS } from '../ops';
+import { MEDIA_KINDS } from '../types';
 import { DESIGNER_TOOLS } from './designerTools';
 import { JOB_TOOLS } from './jobStatus';
 import { LAYER_DOC } from './layerDoc';
@@ -37,7 +38,7 @@ export const TOOLS: ToolSpec[] = [
         type: 'object',
         properties: {
           query: { type: 'string', description: 'The model name as the user said it, e.g. "seedance 2.0 fast".' },
-          kind: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'], description: 'Optional: only models that make this.' },
+          kind: { type: 'string', enum: [...MEDIA_KINDS], description: 'Optional: only models that make this.' },
         },
         required: ['query'],
       },
@@ -65,7 +66,7 @@ export const TOOLS: ToolSpec[] = [
       parameters: {
         type: 'object',
         properties: {
-          kind: { type: 'array', items: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'] } },
+          kind: { type: 'array', items: { type: 'string', enum: [...MEDIA_KINDS] } },
           query: { type: 'string' },
           canvas: { type: 'string', enum: ['this', 'all'], description: 'this (default): the current canvas; all: every canvas of this session.' },
           since: { type: 'string' },
@@ -333,11 +334,11 @@ const questionSchema = z.object({
 
 export const findModelsSchema = z.object({
   query: z.string().min(1).max(120),
-  kind: z.enum(['image', 'video', 'audio', 'model3d']).optional(),
+  kind: z.enum(MEDIA_KINDS).optional(),
 });
 
 export const findAssetsSchema = z.object({
-  kind: z.array(z.enum(['image', 'video', 'audio', 'model3d'])).optional(),
+  kind: z.array(z.enum(MEDIA_KINDS)).optional(),
   query: z.string().max(200).optional(),
   canvas: z.enum(['this', 'all']).optional(),
   since: z.string().max(40).optional(),

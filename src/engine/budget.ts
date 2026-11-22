@@ -3,7 +3,7 @@ import { placeFor } from './place';
 import { formatUsd } from '../lib/format';
 import { uid } from '../lib/id';
 import { appendFeed, patchSession, setUi, updateFeedItem, useStore } from '../store/store';
-import type { Estimate, NoticeFeedItem } from './types';
+import type { Estimate, LlmProviderId, NoticeFeedItem } from './types';
 import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
 
 export { noAskEverywhere };
@@ -105,10 +105,12 @@ export function consumeOnce(sessionId: string): void {
   oncePasses.delete(sessionId);
 }
 
-/** This run would go over an active limit nobody agreed to go past. An unknown price cannot be checked against it, so it asks too. */
-export function overLimit(e: Estimate, sessionId?: string): boolean {
+/** This run would go over an active limit nobody agreed to go past. Free runs ($0) never go over; an unknown price cannot be checked against it, so it asks too. */
+export function overLimit(e: Estimate, sessionId?: string, opts: { sessionPasses?: boolean } = {}): boolean {
+  if (e.usd === 0) return false;
   const left = remainingBudget();
-  return left != null && !overLimitAccepted(sessionId) && (e.usd == null || e.usd > left + 1e-9);
+  const accepted = opts.sessionPasses === false ? !get().settings.budgetOn || noAskDurable(get(), sessionId) : overLimitAccepted(sessionId);
+  return left != null && !accepted && (e.usd == null || e.usd > left + 1e-9);
 }
 
 /** A send that would pass the spending limit and nobody agreed: createGeneration refuses it (the safety net behind every entry). */
@@ -231,4 +233,12 @@ export function ignoreExcess(sessionId: string, itemId: string): void {
 /** A Nodes run that did not start: the real reason for the card (the limit, or the graph changed). */
 export function rerunNote(e: Estimate, sessionId?: string): string {
   return overLimit(e, sessionId) ? overLimitText(e) : 'The execution changed. Review and approve again.';
+}
+
+/** Nominal cost estimate for one LLM call so `overLimit` can guard LLM entries before tokens are known. */
+export function llmCallEstimate(provider: LlmProviderId, model: string): Estimate {
+  const m = get().catalog.llm[provider]?.find((x) => x.id === model);
+  if (m && m.inputPrice === 0 && m.outputPrice === 0) return { usd: 0, approximate: false };
+  const raw = ((m?.inputPrice ?? 0) * 1000 + (m?.outputPrice ?? 0) * 500) / 1_000_000;
+  return { usd: Math.max(0.0001, Math.round(raw * 10000) / 10000), approximate: true };
 }

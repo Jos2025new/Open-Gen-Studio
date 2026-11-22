@@ -461,7 +461,7 @@ export async function regenerate(generationId: string): Promise<void> {
   } else {
     appendFeed(g.sessionId, { ...feedBase('chat'), type: 'generation', generationId: next.id });
   }
-  runGeneration(next.id).catch((err) => {
+  runGeneration(next.id, held.release).catch((err) => {
     if (!isAbort(err)) toast((err as Error).message, 'error');
   }).finally(held.release);
 }
@@ -564,7 +564,7 @@ export async function copyText(text: string): Promise<void> {
 
 export { downloadAsset } from './download';
 
-export function useAsReference(assetId: string): void {
+export function addAsReference(assetId: string): void {
   const st = get();
   const a = st.assets[assetId];
   if (!a) return;
@@ -578,7 +578,7 @@ export function useAsReference(assetId: string): void {
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 
-/** Kinds the agent-context checkbox can name. */
+/** Attachment policy for the agent's context, independent of the media generation kinds. */
 export const AGENT_ATTACHABLE: readonly string[] = ['image', 'video', 'audio', 'model3d'];
 
 /** Toggle an existing asset in the agent's attachment list. No asset is created or copied. */

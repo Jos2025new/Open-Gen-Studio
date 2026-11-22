@@ -1,4 +1,5 @@
 import { resolveInputs, storeEnv } from '../nodecore/resolver';
+import { GONE_HANDLE } from '../flow/results';
 import { OPS, OP_IDS } from '../ops';
 import { PROVIDER_LABELS } from '../providers/types';
 import { useStore } from '../../store/store';
@@ -143,6 +144,14 @@ export function systemNodePorts(data: RefNodeData): PortSpec[] {
   return (data.type === 'space' ? omniSpacePorts(data.ref) : undefined) ?? SYSTEM_NODE_TYPES[data.type]?.ports ?? [];
 }
 
+export const CREATIVE_LINK_PORTS: readonly PortSpec[] = [
+  { id: 'sys_ref', direction: 'in', kind: 'ref', type: 'any', multi: true, label: 'References' },
+  { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Reference' },
+  { id: 'model', direction: 'in', kind: 'control', type: 'model', multi: false, label: 'Model' },
+  { id: 'control', direction: 'in', kind: 'control', type: 'control', multi: true, label: 'Control' },
+  { id: 'out_control', direction: 'out', kind: 'control', type: 'control', multi: true, label: 'Control' },
+];
+
 export function allNodePorts(
   data: GraphNodeData,
   _assets: Record<string, Asset>,
@@ -159,13 +168,7 @@ export function allNodePorts(
     label: p.label,
   }));
   if (creativeOut) ports.push({ id: 'out', direction: 'out', kind: 'data', type: creativeOut, multi: true, label: 'Output' });
-  ports.push(
-    { id: 'sys_ref', direction: 'in', kind: 'ref', type: 'any', multi: true, label: 'References' },
-    { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', multi: true, label: 'Reference' },
-    { id: 'model', direction: 'in', kind: 'control', type: 'model', multi: false, label: 'Model' },
-    { id: 'control', direction: 'in', kind: 'control', type: 'control', multi: true, label: 'Control' },
-    { id: 'out_control', direction: 'out', kind: 'control', type: 'control', multi: true, label: 'Control' },
-  );
+  ports.push(...CREATIVE_LINK_PORTS.map((port) => ({ ...port })));
   return ports;
 }
 
@@ -184,7 +187,8 @@ export function resolveSystemConnection(
 ): { srcPort?: PortSpec; tgtPort?: PortSpec; kind?: LinkKind; classMismatch?: string } {
   const outs = srcPorts.filter((p) => p.direction === 'out');
   const ins = tgtPorts.filter((p) => p.direction === 'in');
-  const rawSrcId = c.sourceHandle && /^out-\d+$/.test(c.sourceHandle) ? 'out' : c.sourceHandle;
+  const rawSrcId = c.sourceHandle === GONE_HANDLE || (c.sourceHandle && /^out-\d+$/.test(c.sourceHandle))
+    ? 'out' : c.sourceHandle;
   const explicitSrc = rawSrcId ? outs.find((p) => p.id === rawSrcId) : undefined;
   const explicitTgt = c.targetHandle ? ins.find((p) => p.id === c.targetHandle) : undefined;
 
@@ -198,20 +202,24 @@ export function resolveSystemConnection(
     return { srcPort: explicitSrc, tgtPort: explicitTgt, classMismatch: `Link class mismatch: port "${explicitSrc.id}" is ${explicitSrc.kind}, not ${c.kind}.` };
   }
 
-  const desiredKind: LinkKind | undefined = c.kind ?? explicitTgt?.kind ?? explicitSrc?.kind;
-  let tgtPort = explicitTgt && (!desiredKind || explicitTgt.kind === desiredKind) ? explicitTgt : undefined;
-  if (!tgtPort && desiredKind && (!c.targetHandle || c.targetHandle === desiredKind)) {
+  const desiredKind = c.kind ?? explicitTgt?.kind ?? explicitSrc?.kind ?? 'data';
+  let tgtPort = explicitTgt?.kind === desiredKind ? explicitTgt : undefined;
+  if (!tgtPort && (!c.targetHandle || c.targetHandle === desiredKind)) {
     const kindIns = ins.filter((p) => p.kind === desiredKind);
+    const kindOuts = explicitSrc?.kind === desiredKind ? [explicitSrc] : outs.filter((p) => p.kind === desiredKind);
+    // Prefer a specific type over a generic control input, keeping descriptor order for equally compatible ports.
+    const specific = desiredKind === 'control'
+      ? kindIns.find((inp) => inp.type !== 'control' && inp.type !== 'any' && kindOuts.some((outp) => outp.type === inp.type))
+      : undefined;
+    tgtPort = specific ?? kindIns.find((inp) => kindOuts.some((outp) => portTypeCompatible(desiredKind, outp.type, inp.type))) ?? kindIns[0];
+  }
+  let srcPort = explicitSrc?.kind === desiredKind ? explicitSrc : undefined;
+  if (!srcPort && (!rawSrcId || rawSrcId === desiredKind || rawSrcId === 'out')) {
     const kindOuts = outs.filter((p) => p.kind === desiredKind);
-    tgtPort = kindIns.find((inp) => kindOuts.some((outp) => portTypeCompatible(desiredKind, outp.type, inp.type))) ?? kindIns[0];
+    const targetType = tgtPort?.type;
+    srcPort = kindOuts.find((outp) => targetType && portTypeCompatible(desiredKind, outp.type, targetType)) ?? kindOuts[0];
   }
-  const resolvedKind = desiredKind ?? tgtPort?.kind;
-  let srcPort = explicitSrc && (!resolvedKind || explicitSrc.kind === resolvedKind) ? explicitSrc : undefined;
-  if (!srcPort && resolvedKind && (!rawSrcId || rawSrcId === resolvedKind || rawSrcId === 'out')) {
-    const kindOuts = outs.filter((p) => p.kind === resolvedKind);
-    srcPort = tgtPort ? kindOuts.find((outp) => portTypeCompatible(resolvedKind, outp.type, tgtPort!.type)) ?? kindOuts[0] : kindOuts[0];
-  }
-  return { srcPort, tgtPort, kind: resolvedKind };
+  return { srcPort, tgtPort, kind: desiredKind };
 }
 
 export function modelLabelForRef(ref: string): string {

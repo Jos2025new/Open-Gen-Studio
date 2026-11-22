@@ -20,10 +20,10 @@ import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
 import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
-import { addAssets, patchGeneration, saveNow, toast, upsertGeneration, useStore } from '../store/store';
+import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { deliverSend, shareOfEstimate } from './sendLedger';
-import { flushSendSave, interruptedByReload, isFreeSend, markSending, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
+import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
 import { assertWithinLimit, batchStepApproved, consumeOnce } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -100,13 +100,13 @@ function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
 }
 
 /** Execute a queued generation. Resolves with the created asset ids. */
-export function runGeneration(id: string): Promise<string[]> {
+export function runGeneration(id: string, nodeLock?: () => void): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
   if (!mayStartWork()) return Promise.reject(new Error('Open Gen Studio is open in another tab'));
   const generation = get().generations[id];
   if (generation?.status === 'review') return Promise.reject(new PriceReviewRequired('Necesita revisión'));
-  const p = attempt(id).finally(() => {
+  const p = attempt(id, nodeLock).finally(() => {
     running.delete(id);
     controllers.delete(id);
     purgeDiscarded(id);
@@ -116,13 +116,13 @@ export function runGeneration(id: string): Promise<string[]> {
 }
 
 /** Retry provider credit failures as appropriate (a provider's own refusals: ProviderAdapter.retry). */
-async function attempt(id: string): Promise<string[]> {
+async function attempt(id: string, nodeLock?: () => void): Promise<string[]> {
   try {
     return await execute(id);
   } catch (err) {
     if (isCreditError(err)) {
       let rerun: Promise<string[]> | undefined;
-      await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration, requestEstimate);
+      await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration, requestEstimate, nodeLock);
       if (rerun) return rerun;
       throw err;
     }
@@ -140,6 +140,7 @@ async function execute(id: string): Promise<string[]> {
   let g = get().generations[id];
   let submitted = false;
   let freeSend = false;
+  let localPostSend = false;
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
       const assetIds = await runLocalOp(g, signal);
@@ -215,6 +216,8 @@ async function execute(id: string): Promise<string[]> {
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     let activeReqId: string | undefined;
+    let inTransport = false;
+    let requestDelivered = false;
     try {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
@@ -223,21 +226,21 @@ async function execute(id: string): Promise<string[]> {
       const quote = await requestQuote(g.modelRef, schema, settings, n);
       const reqIndex = batchIndex++;
       activeReqId = undefined;
+      inTransport = false;
+      requestDelivered = false;
+      localPostSend = false;
       const send = async () => {
-        freeSend = isFreeSend(g, quote);
-        if (freeSend) {
-          activeReqId = undefined;
-          void saveNow().catch(() => undefined);
-        } else {
-          activeReqId = await markSending(id, reqIndex, activeReqId);
-        }
-        try {
-          signal.throwIfAborted();
-          if (proposed) checkStepAuthorization(g, proposed);
-        } catch (err) {
-          rollbackSendIntent(id, activeReqId);
-          throw err;
-        }
+        const committed = await commitPaidSend({
+          g,
+          index: reqIndex,
+          reqId: activeReqId,
+          quote,
+          signal,
+          authorize: proposed ? () => checkStepAuthorization(g, proposed) : undefined,
+        });
+        freeSend = committed.freeSend;
+        activeReqId = committed.reqId;
+        inTransport = true;
         return adapter.generate({
         kind,
         model,
@@ -284,6 +287,7 @@ async function execute(id: string): Promise<string[]> {
         try {
           result = await once();
           submitted = false;
+          inTransport = false;
           break;
         } catch (err) {
           const policy = adapter.retry;
@@ -298,6 +302,7 @@ async function execute(id: string): Promise<string[]> {
           logEvent('retry', { generation: id, model: g.modelName, reason: policy.reason.toLowerCase(), waitMs: wait, attempt: retry + 2, image: done + 1 });
           rollbackSendIntent(id, activeReqId);
           activeReqId = undefined;
+          inTransport = false;
           await sleep(wait, signal);
         }
       }
@@ -311,15 +316,17 @@ async function execute(id: string): Promise<string[]> {
         await flushSendSave();
         return [];
       }
+      const items = Math.max(1, Math.min(n, result.outputs.length));
+      // This request delivered: record and book its cost before local storage so a local failure never erases a paid reply.
+      const before = get().generations[id];
+      if (before && (activeReqId || before.sends || (reqCost != null && reqCost > 0))) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
+      requestDelivered = true;
+      localPostSend = !freeSend || (reqCost != null && reqCost > 0);
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       delivered.push(...assets);
       assetIds.push(...assets.map((a) => a.id));
-      const items = Math.max(1, Math.min(n, result.outputs.length));
       done += items;
-      // This request delivered: its record carries its cost and is booked now, once (sendLedger). A provider-reported cost books even when the send looked free.
-      const before = get().generations[id];
-      if (before && (activeReqId || before.sends || (reqCost != null && reqCost > 0))) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
       const batchDone = done >= total || !result.outputs.length;
       patchGeneration(id, {
         assetIds: [...assetIds],
@@ -329,6 +336,7 @@ async function execute(id: string): Promise<string[]> {
         ...(batchDone && costKnown ? { actualUsd: cost } : {}),
         ...(batchDone && providerReportedCostKnown ? { providerReportedUsd: providerReportedCost } : {}),
       });
+      localPostSend = false;
       await flushSendSave();
       if (!result.outputs.length) break;
     }
@@ -339,8 +347,9 @@ async function execute(id: string): Promise<string[]> {
       const cur = get().generations[id];
       const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
       const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)));
-      if (activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
+      const abortedInFlight = inTransport && (isAbort(innerErr) || signal.aborted);
+      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)) || abortedInFlight);
+      if (!requestDelivered && activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
         const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
         if (cur?.sends) patchGeneration(id, { sends });
       }
@@ -361,14 +370,17 @@ async function execute(id: string): Promise<string[]> {
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, sending: undefined });
+      const uncertain = Boolean((localPostSend && !remoteJob) || (cur && !wasFreeSend(cur, freeSend) && !remoteJob && cur.sends?.some((s) => s.status === 'uncertain')));
+      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, ...(uncertain ? { lostJob: true } : {}), sending: undefined });
       if (cur?.assetIds.length) chargePartial(cur);
+      if (localPostSend) await flushSendSave();
       throw new AbortedError();
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
     const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-    const lostJob = !free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)));
+    const lostJob = (!free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)))) || (localPostSend && !remoteJob);
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
+    if (localPostSend) await flushSendSave();
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
     // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
     if (cur?.sent) logEvent('provider-error', { generation: id, model: cur?.modelName, provider: cur?.provider, jobId: remoteJob?.id, message: (err as Error).message, sent: cur.sent });
@@ -438,7 +450,7 @@ export function retryGeneration(id: string, planItemId?: string): Promise<string
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
     // The failed attempt's card now shows this one, so the retry's result is seen.
     relinkAttempt(g.id, newG.id);
-    const retry = runGeneration(newG.id).finally(() => { retrying.delete(id); held.release(); });
+    const retry = runGeneration(newG.id, held.release).finally(() => { retrying.delete(id); held.release(); });
     retrying.set(id, retry);
     return retry;
   } catch (err) {

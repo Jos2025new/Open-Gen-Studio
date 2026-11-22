@@ -27,6 +27,8 @@ export interface ExecContext {
   sessionId: string;
   planId?: string;
   batchToken?: symbol;
+  /** Node lock owned by a running graph execution so an in-attempt 402 substitute can reenter it safely. */
+  nodeLock?: () => void;
   workspace: Workspace;
   origin: GenerationOrigin;
   docId?: string;
@@ -131,7 +133,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const runSettled = async (id: string) => {
     // Cancel arrived while this step prepared its request: it is not sent.
     if (isPlanStopped(ctx.planId)) { cancelGeneration(id); throw stoppedError(); }
-    const assetIds = await runGeneration(id);
+    const assetIds = await runGeneration(id, ctx.nodeLock);
     await settleGeneration(id);
     return assetIds;
   };

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { defineCommand } from './commands/types';
 import { useStore } from '../store/store';
+import { MEDIA_KINDS } from './types';
 import * as C from './catalog';
 
-const kind = z.enum(['image', 'video', 'audio', 'model3d']);
+const kind = z.enum(MEDIA_KINDS);
 const ref = z.string().min(1);
 const modelAvailable = (value?: string) => !value || C.modelSummary(value) ? true : `No model "${value}".`;
 export const commands = [

@@ -3,7 +3,8 @@ import { defineCommand } from '../commands/types';
 import { useStore } from '../../store/store';
 import { cleanFileName } from '../../lib/media';
 import { OP_IDS } from '../ops';
-import type { GenSettings, GraphEdge, GraphNode, GraphNodeData, OpId } from '../types';
+import { BASE_NODE_KINDS, BASE_SYSTEM_NODE_TYPES, LINK_KINDS, MODEL_ATTACH_MODES } from '../graphTypes';
+import { MEDIA_KINDS, type GenSettings, type GraphEdge, type GraphNode, type GraphNodeData, type OpId } from '../types';
 import { budgetProblem } from '../actions';
 import * as A from './actions';
 import { applyEdit } from '../nodecore/edit';
@@ -14,10 +15,10 @@ import { edgeRef, findNode, graphOf, hasTarget, nodeCommand, nodeOf, nodeRef } f
 /* The node graph's actions as commands (ADR 0030). Each wraps the action the interface already calls. */
 
 const none = z.object({}).strict();
-const kind = z.enum(['text', 'image', 'video', 'audio', 'model3d', 'tool', 'asset', 'ref']);
-const sysType = z.enum(['chat', 'agent', 'provider', 'model', 'session', 'space', 'designer.doc', 'library', 'toolset', 'prompt', 'mediaSettings']);
-const linkKind = z.enum(['data', 'ref', 'control']);
-const attachMode = z.enum(['wired', 'docked', 'grouped', 'merged']);
+const kind = z.enum(BASE_NODE_KINDS);
+const sysType = z.enum(BASE_SYSTEM_NODE_TYPES);
+const linkKind = z.enum(LINK_KINDS);
+const attachMode = z.enum(MODEL_ATTACH_MODES);
 const op = z.enum(OP_IDS as [OpId, ...OpId[]]);
 const title = z.string().min(1).max(200);
 const asset = z.string().min(1).max(160);
@@ -28,7 +29,7 @@ const ids = z.array(nodeRef).min(1).max(40);
 const textNode = z.object({ kind: z.literal('text'), title, text: z.string() }).strict();
 const genNode = z
   .object({
-    kind: z.enum(['image', 'video', 'audio', 'model3d']),
+    kind: z.enum(MEDIA_KINDS),
     title,
     prompt: z.string(),
     modelRef: z.string().min(1),

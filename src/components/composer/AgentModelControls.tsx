@@ -7,16 +7,15 @@ import { filterLlm, llmMaker, llmMakers, type LlmCapability, type LlmSort } from
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw, Search } from '../ui/icons';
 import { useState } from 'react';
 import { modelSummary, pickComposerModel, preferredModel, resetAgentModel, resetComposerModel } from '../../engine/catalog';
-import type { ModelSummary } from '../../engine/types';
+import { MEDIA_KINDS, type MediaKind, type ModelSummary } from '../../engine/types';
 import { setComposer, setSettings, useStore } from '../../store/store';
 import { Chip } from '../ui/primitives';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { ModelList } from './ModelList';
 import { setSessionModelAsDefault } from '../../engine/agent/sessionModel';
 
-type PickerId = 'director' | 'image' | 'video' | 'audio' | 'model3d';
+type PickerId = 'director' | MediaKind;
 const label: Record<PickerId, string> = { director: 'Director', image: 'Image', video: 'Video', audio: 'Music', model3d: '3D' };
-const mediaKinds = ['image', 'video', 'audio', 'model3d'] as const;
 
 function modelName(ref: string | null | undefined): string {
   if (!ref) return 'No connected model';
@@ -119,13 +118,13 @@ export function AgentModelControls({ chatNodeId }: { chatNodeId?: string } = {})
     audio: Boolean(composer.userPicked?.audio),
     model3d: Boolean(composer.userPicked?.model3d),
   };
-  const manualCount = Number(Boolean(agent.modelPinned)) + mediaKinds.filter(kind => manual[kind]).length;
+  const manualCount = Number(Boolean(agent.modelPinned)) + MEDIA_KINDS.filter(kind => manual[kind]).length;
   const rows = [
     { id: 'director' as const, modelId: agent.model, name: agent.provider === 'offline' ? 'Local planner' : agent.model || 'No model resolved', state: agent.modelPinned ? 'manual' as const : 'auto' as const },
-    ...mediaKinds.map(kind => ({ id: kind, modelId: composer[kind].modelRef, name: modelName(composer[kind].modelRef), state: manual[kind] ? 'manual' as const : 'auto' as const })),
+    ...MEDIA_KINDS.map(kind => ({ id: kind, modelId: composer[kind].modelRef, name: modelName(composer[kind].modelRef), state: manual[kind] ? 'manual' as const : 'auto' as const })),
   ];
   const close = () => { setPicker(null); pop.close(); };
-  const releaseOverrides = (kind: typeof mediaKinds[number]) => {
+  const releaseOverrides = (kind: MediaKind) => {
     if (kind === 'image') setSettings(s => ({ ops: { ...s.ops, edit: null } }));
     if (kind === 'video') {
       setComposer({ videoRoutes: undefined });
@@ -144,7 +143,7 @@ export function AgentModelControls({ chatNodeId }: { chatNodeId?: string } = {})
     : null;
   const resetAll = () => {
     void resetAgentModel();
-    for (const kind of mediaKinds) {
+    for (const kind of MEDIA_KINDS) {
       releaseOverrides(kind);
       if (manual[kind]) void resetComposerModel(kind);
     }

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Handle, MarkerType, Position, type NodeProps } from '@xyflow/react';
 import { Bot, Cpu, Database, FileText, Layers, MessageSquare, Sparkles, Wand } from '../ui/icons';
 import type { LucideIcon } from '../ui/icons';
-import { resolveSystemNodeLive, systemNodePorts, type LiveSystemSummary } from '../../engine/nodes/spec';
+import { CREATIVE_LINK_PORTS, resolveSystemNodeLive, systemNodePorts, type LiveSystemSummary } from '../../engine/nodes/spec';
 import type { GraphEdge, PortSpec, PortType, SystemNodeType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import type { FlowNode } from './nodes';
@@ -38,15 +38,8 @@ export function PortDot({ port, top, labels = true }: { port: PortSpec; top: str
 
 /** Reference and control ports on creative nodes: they appear only while a connection is dragged, like their other secondary inputs. */
 export function LinkHandles() {
-  const ports: PortSpec[] = [
-    { id: 'sys_ref', direction: 'in', kind: 'ref', type: 'any', label: 'References' },
-    { id: 'model', direction: 'in', kind: 'control', type: 'model', label: 'Model' },
-    { id: 'control', direction: 'in', kind: 'control', type: 'control', label: 'Control' },
-    { id: 'out_ref', direction: 'out', kind: 'ref', type: 'any', label: 'Reference' },
-    { id: 'out_control', direction: 'out', kind: 'control', type: 'control', label: 'Control' },
-  ];
-  const ins = ports.filter((p) => p.direction === 'in');
-  const outs = ports.filter((p) => p.direction === 'out');
+  const ins = CREATIVE_LINK_PORTS.filter((p) => p.direction === 'in');
+  const outs = CREATIVE_LINK_PORTS.filter((p) => p.direction === 'out');
   return (
     <>
       {ins.map((p, i) => <PortDot key={p.id} port={p} top={`${88 - (ins.length - 1 - i) * 7}%`} />)}
