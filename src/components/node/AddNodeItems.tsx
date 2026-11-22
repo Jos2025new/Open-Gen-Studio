@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Bot, ChevronRight, Cpu, Database, FileImage, FileText, MessageSquare, PenTool, Search, Sparkles, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
+import { ChevronRight, FileImage, MessageSquare, PenTool, Search, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
@@ -9,6 +9,7 @@ import { SYSTEM_NODE_TYPES } from '../../engine/nodes/spec';
 import { OP_ICONS } from '../assets/AssetActions';
 import { MenuItem } from '../ui/primitives';
 import { NODE_UIS, type NodeUi } from './nodeUi';
+import { SYSTEM_MENU_ORDER, SYSTEM_UIS } from './systemUi';
 
 const MENU_TIP_DELAY = 2500;
 
@@ -21,18 +22,6 @@ const SECTION_LABEL = { spaces: 'Spaces', system: 'System', media: 'Media', node
 export interface OmniEntries { /** False on the ordinary Nodes canvas: system parts only, no Space nodes. */ spaces?: boolean; has: (space: OmniSpace) => boolean; onSpace: (space: OmniSpace) => void; onSystem: (type: SystemNodeType) => void }
 const SPACE_ICON: Record<OmniSpace, LucideIcon> = { studio: MessageSquare, nodes: Workflow, designer: PenTool };
 const SPACE_SUB: Record<OmniSpace, string> = { studio: 'Chat and results', nodes: 'Connected flows of cards', designer: 'Layers: raster, vector and text' };
-/** System parts as nodes: they point to the data where it lives (nothing is copied). */
-const SYSTEM_ENTRIES: Array<[SystemNodeType, LucideIcon, string, string]> = [
-  ['chat', MessageSquare, 'The chat of this session', 'chat conversation messages'],
-  ['agent', Bot, 'The agent that answers in the chat', 'agent assistant director'],
-  ['model', Sparkles, 'A model to attach to the agent or chat', 'model provider llm'],
-  ['provider', Cpu, 'A provider and its catalog', 'provider catalog openrouter'],
-  ['designer.doc', FileText, 'A Designer document', 'designer doc canvas layers'],
-  ['library', Database, 'Characters, objects and styles', 'library subjects characters'],
-  ['toolset', Wand, 'The operations catalog', 'tools operations catalog'],
-  ['session', MessageSquare, 'This session', 'session'],
-];
-
 /** The same node kinds and tools as AddNodeItems, as one flat list for the library panel. */
 function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }): Entry[] {
   const node = (ui: NodeUi): Entry => ({ id: ui.kind, section: 'nodes', kind: ui.chip, icon: ui.icon, label: ui.label, sub: ui.sub, keywords: ui.keywords, run: () => onPick(newNodeData(ui.kind)) });
@@ -41,7 +30,7 @@ function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: Gr
     ...(onAsset ? [{ id: 'asset', section: 'media' as const, icon: FileImage, label: 'Asset', sub: 'Drag one from the Library', keywords: 'asset gallery library', run: onAsset }] : []),
     ...NODE_UIS.map(node),
     ...(omni && omni.spaces !== false ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
-    ...(omni && omni.spaces !== false ? SYSTEM_ENTRIES.map(([type, icon, sub, keywords]): Entry => ({ id: `sys-${type}`, section: 'system', icon, label: SYSTEM_NODE_TYPES[type].title, sub, keywords: `system ${keywords}`, run: () => omni.onSystem(type) })) : []),
+    ...(omni && omni.spaces !== false ? SYSTEM_MENU_ORDER.map((type): Entry => { const ui = SYSTEM_UIS[type]!; return { id: `sys-${type}`, section: 'system', icon: ui.icon, label: SYSTEM_NODE_TYPES[type].title, sub: ui.sub, keywords: `system ${ui.keywords}`, run: () => omni.onSystem(type) }; }) : []),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
   ];
 }

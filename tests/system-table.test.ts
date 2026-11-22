@@ -43,3 +43,24 @@ describe('system node table', () => {
     expect(text).toContain('Chat|The chat of this session|Agent|The agent that answers in the chat|Model|A model to attach to the agent or chat|Provider|A provider and its catalog|Designer Doc|A Designer document|Library|Characters, objects and styles|Tools|The operations catalog|Session|This session');
   });
 });
+
+describe('system node tables cover every type', () => {
+  it('the menu order lists exactly the types that have a menu entry, once each', async () => {
+    const { SYSTEM_MENU_ORDER, SYSTEM_UIS } = await import('../src/components/node/systemUi');
+    const withUi = BASE_SYSTEM_NODE_TYPES.filter((t) => SYSTEM_UIS[t]);
+    expect([...SYSTEM_MENU_ORDER].sort()).toEqual([...withUi].sort());
+    expect(new Set(SYSTEM_MENU_ORDER).size).toBe(SYSTEM_MENU_ORDER.length);
+    expect(Object.keys(SYSTEM_UIS).sort()).toEqual([...BASE_SYSTEM_NODE_TYPES].sort());
+  });
+  it('the menu keywords are the ones the search has always matched', async () => {
+    const { SYSTEM_UIS } = await import('../src/components/node/systemUi');
+    expect(SYSTEM_UIS.chat?.keywords).toBe('chat conversation messages');
+    expect(SYSTEM_UIS.agent?.keywords).toBe('agent assistant director');
+    expect(SYSTEM_UIS.model?.keywords).toBe('model provider llm');
+    expect(SYSTEM_UIS.provider?.keywords).toBe('provider catalog openrouter');
+    expect(SYSTEM_UIS['designer.doc']?.keywords).toBe('designer doc canvas layers');
+    expect(SYSTEM_UIS.library?.keywords).toBe('library subjects characters');
+    expect(SYSTEM_UIS.toolset?.keywords).toBe('tools operations catalog');
+    expect(SYSTEM_UIS.session?.keywords).toBe('session');
+  });
+});

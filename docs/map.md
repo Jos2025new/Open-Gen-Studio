@@ -20,9 +20,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 453 | 371 |
-| [store.ts](../src/store/store.ts) | 306 | 366 |
-| [icons.tsx](../src/components/ui/icons.tsx) | 152 | 1 |
+| [types.ts](../src/engine/types.ts) | 454 | 371 |
+| [store.ts](../src/store/store.ts) | 306 | 367 |
+| [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 68 | 5 |
@@ -51,13 +51,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 16 | 18 |
 | `src/components/designer` | 121 | 57 |
 | `src/components/gallery` | 4 | 4 |
-| `src/components/node` | 31 | 36 |
+| `src/components/node` | 32 | 37 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 36 |
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 25 | 21 |
-| `src/engine` | 88 | 440 |
+| `src/engine` | 88 | 441 |
 | `src/engine/agent` | 69 | 162 |
 | `src/engine/commands` | 7 | 26 |
 | `src/engine/design` | 163 | 215 |
@@ -65,15 +65,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 23 | 43 |
-| `src/engine/nodes` | 8 | 34 |
+| `src/engine/nodes` | 8 | 35 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 18 | 2 |
 | `src/engine/providers` | 15 | 93 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 464 |
-| `src/store` | 19 | 368 |
+| `src/lib` | 38 | 465 |
+| `src/store` | 19 | 369 |
 
-280 de 797 módulos no tienen ningún test que los importe directamente.
+279 de 798 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -100,7 +100,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [tool.node.ts](../src/engine/nodecore/types/tool.node.ts)
 - [video.node.ts](../src/engine/nodecore/types/video.node.ts)
 - [commands.ts](../src/engine/nodes/commands.ts)
-- [systemDefaults.ts](../src/engine/nodes/systemDefaults.ts)
 - [storeWiring.ts](../src/engine/storeWiring.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)
