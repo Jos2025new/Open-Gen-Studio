@@ -148,3 +148,22 @@ describe('Adversarial (Sonnet) dinero 7: mixed unknown + priced batch must not c
     for (const n of notes) expect((n as { text: string }).text).not.toMatch(/real cost/i);
   });
 });
+
+describe('Re-attack (Sonnet) dinero 7: consumers that treat unknown actualUsd as $0', () => {
+  const gen = (over: Record<string, unknown>) => ({ id: 'g1', status: 'done', kind: 'image', estimate: { usd: null }, assetIds: ['a'], settings: { count: 1 }, ...over }) as never;
+
+  // Finding B (inherited for the all-unknown case, widened by the fix: mixed batches now also have actualUsd undefined).
+  it.fails('plan progress line does not say "spent $0" for a done step whose cost is unknown', async () => {
+    const { plannedSpend, spentLabel } = await import('../src/components/chat/planSpent');
+    const label = spentLabel(plannedSpend({ s1: 'g1' }, { g1: gen({}) }));
+    expect(label).not.toMatch(/spent \$0/);
+  });
+
+  // Finding C (inherited, legacy non-ledger data only): a cut-short unpriced run books nothing and annotates nothing.
+  it.fails('chargePartial on a legacy (no ledger) unpriced partial run records an unknown-price entry', async () => {
+    const { chargePartial } = await import('../src/engine/jobState');
+    useStore.setState({ spendLog: [], generations: { g1: gen({ sessionId: sid(), modelRef: NANO, sends: undefined }) } });
+    chargePartial(genOf('g1'));
+    expect(useStore.getState().spendLog.some((e) => e.unknownPrice)).toBe(true);
+  });
+});
