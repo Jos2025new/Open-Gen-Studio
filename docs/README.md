@@ -3,6 +3,7 @@
 ## Dónde mirar
 
 - [Reglas de trabajo](../AGENTS.md) y [método con agentes](metodo-trabajo.md): carriles rápido, estructura y delicado; checks en prueba.
+- [Cómo se añade cada cosa](como-se-anade.md): comando, tipo de nodo, puerto, cableado, panel, envío de pago; cada regla con su comprobación.
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
 - [Pendientes: índice priorizado](pendientes.md): lo más crítico ahora y la lista abierta por área, con prioridad y fecha de origen.
 - [Pendientes del agente, proveedores y coste](pendientes-agente.md): detalle de las filas A y B.
