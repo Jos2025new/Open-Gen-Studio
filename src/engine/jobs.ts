@@ -106,10 +106,7 @@ function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
 export function runGeneration(id: string, nodeLock?: () => void): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
-  if (!mayStartWork()) {
-    clearGenerationPass(id, true);
-    return Promise.reject(new Error('Open Gen Studio is open in another tab'));
-  }
+  if (!mayStartWork()) return Promise.reject((clearGenerationPass(id, true), new Error('Open Gen Studio is open in another tab')));
   const generation = get().generations[id];
   if (generation?.status === 'review') {
     clearGenerationPass(id, true);

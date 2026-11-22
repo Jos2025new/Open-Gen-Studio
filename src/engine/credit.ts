@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
+import { budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, dontAskAgain, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -177,14 +177,22 @@ function confirmOverLimit(
 export function guardLlmBudget(sessionId: string, provider: LlmProviderId, model: string, title: string, resume: () => unknown, budgetPass = false): boolean {
   if (budgetPass) return true;
   const est = llmCallEstimate(provider, model);
-  const verdict = budgetVerdict(est, { sessionId, choices: '\u201cContinue once\u201d runs this agent turn.' });
+  const verdict = budgetVerdict(est, { sessionId });
   if (!verdict.over) return true;
   let ran = false;
+  const go = (quiet: boolean) => () => {
+    if (ran) return;
+    ran = true;
+    dismissAlert(id);
+    if (quiet && get().sessions[sessionId]) dontAskAgain(sessionId);
+    void resume();
+  };
   const id = pushAlert({
     level: 'warn',
     text: `${title}: ${verdict.text}`,
     actions: [
-      { label: 'Continue once', run: () => { if (ran) return; ran = true; dismissAlert(id); void resume(); } },
+      { label: 'Continue once', run: go(false) },
+      { label: 'Don\u2019t ask again', run: go(true) },
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
