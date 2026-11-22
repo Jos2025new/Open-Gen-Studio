@@ -15,7 +15,7 @@ afterAll(() => { for (const r of roots) rmSync(r, { recursive: true, force: true
 function srcRoot(code: string, file = 'src/x.ts'): string {
   const root = mkdtempSync(join(tmpdir(), 'adv7-'));
   roots.push(root);
-  mkdirSync(join(root, 'src'), { recursive: true });
+  mkdirSync(join(root, file, '..'), { recursive: true });
   writeFileSync(join(root, file), code);
   return root;
 }
@@ -37,17 +37,17 @@ describe('check-media-literals: bypasses (MEDIUM, inherited design, new check)',
   it('catches a TS union type that restates the media kinds', () => {
     expect(mediaLiterals(srcRoot("export type M = 'image' | 'video' | 'audio' | 'model3d';"))).not.toHaveLength(0);
   });
-  it.fails('catches a template-literal list', () => {
+  it('catches a template-literal list', () => {
     expect(mediaLiterals(srcRoot('export const A = [`image`, `video`, `audio`];'))).not.toHaveLength(0);
   });
   it.fails('catches an object keyed by the kinds', () => {
     expect(mediaLiterals(srcRoot('export const A = { image: 1, video: 2, audio: 3 };'))).not.toHaveLength(0);
   });
-  it.fails('an exempt binding name does not hide a nested media list (EXCEPTIONS are by name, any depth)', () => {
+  it('an exempt binding name does not hide a nested media list (EXCEPTIONS are by name, any depth)', () => {
     const root = srcRoot("export const ROUTE_ORDER = { later: ['image', 'video', 'audio'] };", 'src/engine/variants.ts');
     expect(mediaLiterals(root)).not.toHaveLength(0);
   });
-  it.fails('also scans .js/.jsx/.mjs sources under src/', () => {
+  it('also scans .js/.jsx/.mjs sources under src/', () => {
     expect(mediaLiterals(srcRoot("export const A = ['image', 'video', 'audio'];", 'src/x.mjs'))).not.toHaveLength(0);
   });
 });
@@ -112,7 +112,7 @@ describe('check-sizes: baseline ratchet (LOW-MEDIUM, new)', () => {
 });
 
 describe('tools.ts confirm_settings kinds (LOW, new)', () => {
-  it.fails('does not hide a drift behind a tuple cast of a reversed copy', () => {
+  it('does not hide a drift behind a tuple cast of a reversed copy', () => {
     const text = readFileSync('src/engine/agent/tools.ts', 'utf8');
     expect(text).not.toMatch(/\.reverse\(\) as \[/);
   });

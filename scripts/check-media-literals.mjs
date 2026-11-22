@@ -42,6 +42,9 @@ const HINT = "Import `MEDIA_KINDS` / `MediaKind` (or `COMPOSER_MODES` / `Compose
 function stringLiteralOf(node) {
   if (!node) return null;
   if (node.type === 'Literal' && typeof node.value === 'string') return node.value;
+  if (node.type === 'TemplateLiteral' && node.expressions.length === 0 && node.quasis.length === 1) {
+    return node.quasis[0].value.cooked ?? node.quasis[0].value.raw ?? null;
+  }
   // Also catch `z.union([z.literal('image'), z.literal('video')])`.
   if (
     node.type === 'CallExpression'
@@ -68,6 +71,24 @@ function unwrapTypeParens(node) {
   return cur;
 }
 
+function directBindingArray(init) {
+  let cur = init;
+  while (cur && (cur.type === 'TSAsExpression' || cur.type === 'TSSatisfiesExpression' || cur.type === 'ParenthesizedExpression')) {
+    cur = cur.expression;
+  }
+  if (cur?.type === 'NewExpression' && cur.callee?.type === 'Identifier' && cur.callee.name === 'Set') {
+    cur = cur.arguments?.[0];
+  } else if (
+    cur?.type === 'CallExpression'
+    && cur.callee?.type === 'MemberExpression'
+    && cur.callee.object?.name === 'Object'
+    && cur.callee.property?.name === 'freeze'
+  ) {
+    cur = cur.arguments?.[0];
+  }
+  return cur?.type === 'ArrayExpression' ? cur : null;
+}
+
 function reportIfMediaList(node, values, kindLabel, report) {
   const core = [...new Set(values.filter((v) => CORE_KINDS.has(v)))];
   const matched = [...new Set(values.filter((v) => ALL_KINDS.has(v)))];
@@ -83,11 +104,13 @@ export function check(root = '.') {
     what: 'media kind literals',
     rules: ({ rel }) => {
       const fileExceptions = EXCEPTIONS.get(rel);
-      const bindingStack = [];
+      const exemptArrays = new WeakSet();
       return {
         enter: (node, report) => {
-          if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
-            bindingStack.push(node.id.name);
+          if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && fileExceptions?.has(node.id.name)) {
+            const arr = directBindingArray(node.init);
+            if (arr) exemptArrays.add(arr);
+            return;
           }
           if (node.type === 'TSTypeAliasDeclaration' && node.id?.type === 'Identifier') {
             if (fileExceptions?.has(node.id.name)) return;
@@ -97,14 +120,8 @@ export function check(root = '.') {
             }
             return;
           }
-          if (node.type !== 'ArrayExpression') return;
-          if (fileExceptions && bindingStack.some((name) => fileExceptions.has(name))) return;
+          if (node.type !== 'ArrayExpression' || exemptArrays.has(node)) return;
           reportIfMediaList(node, node.elements.map(stringLiteralOf).filter((v) => v !== null), 'list', report);
-        },
-        leave: (node) => {
-          if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
-            bindingStack.pop();
-          }
         },
       };
     },

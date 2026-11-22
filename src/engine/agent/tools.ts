@@ -11,7 +11,7 @@ import { PROPOSE_PLAN_TOOL } from './proposePlanTool';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
-const confirmSettingsKinds = [...VISUAL_MEDIA_KINDS].reverse() as ['video', 'image'];
+const confirmSettingsKinds = [VISUAL_MEDIA_KINDS[1], VISUAL_MEDIA_KINDS[0]] as const;
 
 export const editNodeSchema = z.object({ node_id: z.string().min(1), expect_rev: z.string().min(1), title: z.string().optional(), prompt: z.string().optional(), model_ref: z.string().optional(), settings: z.object({
   aspect: z.string().optional(), resolution: z.string().optional(), count: z.number().int().min(1).max(8).optional(), duration: z.number().optional(), audio: z.boolean().optional(), seed: z.number().optional(), negative: z.string().optional(), advanced: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), extras: z.record(z.string(), z.unknown()).optional(), shots: z.array(z.object({ prompt:z.string(), duration:z.number() })).optional(),
