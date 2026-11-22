@@ -1,18 +1,47 @@
 /**
- * Every test file under `tests/` (`tests/**\/*.{test,spec}.*`) must be matched by vitest's `test.include` in `vite.config.ts`,
- * unless it is explicitly listed in `EXCLUDED` with a reason. Prevents silent dead tests (e.g. a `.test.tsx` or `.spec.ts` that never ran).
+ * Every test/spec file in the repository (`** /*.{test,spec}.*`, skipping `node_modules`, `.git`, `dist`, `.sandbox`, `data`)
+ * must be matched by vitest's `test.include` in `vite.config.ts`, unless explicitly listed in `EXCLUDED` with a reason.
+ * Prevents silent dead tests (e.g. a `.test.tsx`, `.spec.ts`, or `src/*.test.ts` that never ran).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSync } from 'rolldown/utils';
 
-// Explicit exclusions: test files intentionally kept outside `vitest run`.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.sandbox', 'data']);
+
+const PLAYWRIGHT_E2E_SPECS = [
+  'tests-e2e/brush-visual.spec.ts',
+  'tests-e2e/designer-flows.spec.ts',
+  'tests-e2e/designer-monkey.spec.ts',
+  'tests-e2e/designer-tools.spec.ts',
+  'tests-e2e/edit-marquee.spec.ts',
+  'tests-e2e/fx-visual.spec.ts',
+  'tests-e2e/lineart-scale.spec.ts',
+  'tests-e2e/multi-select.spec.ts',
+  'tests-e2e/node-selection.spec.ts',
+  'tests-e2e/path-nodes-ux.spec.ts',
+  'tests-e2e/path-nodes.spec.ts',
+  'tests-e2e/raster-performance.spec.ts',
+  'tests-e2e/shape-knots.spec.ts',
+  'tests-e2e/snapping.spec.ts',
+];
+
+// Explicit exclusions: test/spec files intentionally kept outside root `vitest run`.
 export const EXCLUDED = new Map([
   [
     'tests/store-sqlite-crash.test.mjs',
     'spawns spike/sqlite/crash-test4.mjs with SIGKILL (refused by sandbox, up to 120 s); run manually with `node --no-warnings spike/sqlite/crash-test4.mjs ba 100`',
   ],
+  [
+    'spike/sqlite/round4.test.ts',
+    'SQLite spike test suite (run via `vitest run --config spike/sqlite/vitest.config.mts`, 60 s timeout; referenced in spike/sqlite/RESULTADO.md)',
+  ],
+  [
+    'spike/sqlite/store-sqlite.contract.test.ts',
+    'SQLite spike contract suite (run via `vitest run --config spike/sqlite/vitest.config.mts`, 60 s timeout)',
+  ],
+  ...PLAYWRIGHT_E2E_SPECS.map((file) => [file, 'Playwright E2E spec (run with `playwright test`, not vitest)']),
 ]);
 
 const lineOf = (text, offset) => text.slice(0, offset).split('\n').length;
@@ -20,10 +49,11 @@ const keyName = (prop) => (prop?.key?.type === 'Identifier' ? prop.key.name : pr
 
 function walkTests(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) walkTests(full, out);
-    else if (/\.(?:test|spec)\.[^/]+$/.test(entry.name) && !entry.name.endsWith('.d.ts')) out.push(full);
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) walkTests(join(dir, entry.name), out);
+    } else if (/\.(?:test|spec)\.[^/]+$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
+      out.push(join(dir, entry.name));
+    }
   }
   return out;
 }
@@ -92,22 +122,20 @@ export function readVitestInclude(configPath) {
   return { patterns, line };
 }
 
-/** Return `file:line: message` errors for every `tests/**\/*.{test,spec}.*` file left out of vitest's `test.include`. */
+/** Return `file:line: message` errors for every `*.{test,spec}.*` file in the repo left out of vitest's `test.include`. */
 export function check(root = '.', { excluded = EXCLUDED } = {}) {
   const configPath = join(root, 'vite.config.ts');
   if (!existsSync(configPath)) return ['vite.config.ts:1: missing vite.config.ts. Ensure vitest config exists at the repo root.'];
   const parsed = readVitestInclude(configPath);
   if (parsed.error) return [parsed.error];
-  const testsDir = join(root, 'tests');
-  if (!existsSync(testsDir)) return [];
   const matchers = parsed.patterns.map((p) => globToRegExp(p));
-  const files = walkTests(testsDir).map((f) => relative(root, f).split('\\').join('/')).sort();
+  const files = walkTests(root).map((f) => relative(root, f).split('\\').join('/')).sort();
   const errors = [];
   for (const rel of files) {
     if (matchers.some((re) => re.test(rel))) continue;
     if (excluded.has(rel)) continue;
     errors.push(
-      `${rel}:1: not matched by vitest test.include (${parsed.patterns.join(', ')} at vite.config.ts:${parsed.line}). Rename to match test.include (e.g. .test.ts/.test.tsx), add its glob to vite.config.ts:${parsed.line}, or document a deliberate exclusion in scripts/check-test-discovery.mjs.`,
+      `${rel}:1: not matched by vitest test.include (${parsed.patterns.join(', ')} at vite.config.ts:${parsed.line}). Rename/move to match test.include (e.g. tests/*.test.ts), add its glob to vite.config.ts:${parsed.line}, or document a deliberate exclusion in scripts/check-test-discovery.mjs.`,
     );
   }
   return errors;
@@ -119,5 +147,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(`check-test-discovery: FAIL (${errors.length} test file(s) outside vitest include)\n${errors.map((e) => `  ${e}`).join('\n')}`);
     process.exit(1);
   }
-  console.log(`check-test-discovery: PASS (all tests/**/*.{test,spec}.* match vite.config.ts test.include; ${EXCLUDED.size} documented exclusion(s))`);
+  console.log(`check-test-discovery: PASS (all repo *.{test,spec}.* match vite.config.ts test.include; ${EXCLUDED.size} documented exclusion(s))`);
 }

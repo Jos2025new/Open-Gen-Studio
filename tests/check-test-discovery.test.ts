@@ -53,9 +53,15 @@ describe('check-test-discovery', () => {
     withTempRepo({
       'vite.config.ts': `export default { test: { include: ['tests/**/*.test.ts'] } };\n`,
       'tests/manual.test.mjs': 'export {};',
+      'src/outside.test.ts': 'export {};',
+      'node_modules/pkg/ignored.test.ts': 'export {};',
+      'data/ignored.test.ts': 'export {};',
     }, (root) => {
-      expect(check(root, { excluded: new Map([['tests/manual.test.mjs', 'manual only']]) })).toEqual([]);
-      expect(check(root, { excluded: new Map() })).toEqual([expect.stringContaining('tests/manual.test.mjs:1:')]);
+      expect(check(root, { excluded: new Map([['tests/manual.test.mjs', 'manual only'], ['src/outside.test.ts', 'outside']]) })).toEqual([]);
+      expect(check(root, { excluded: new Map() })).toEqual([
+        expect.stringContaining('src/outside.test.ts:1:'),
+        expect.stringContaining('tests/manual.test.mjs:1:'),
+      ]);
     });
 
     withTempRepo({
