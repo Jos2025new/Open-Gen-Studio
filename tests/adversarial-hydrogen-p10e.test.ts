@@ -79,9 +79,7 @@ describe('p10e rendimiento: bucle cuadratico/cubico con 200 tarjetas', () => {
 });
 
 describe('p10e solapes: settleFresh con paneles de composer', () => {
-  // reproduce: settleFresh mueve una tarjeta de imagen fresca a `at`, pero hace `occupied.push({ ...r, x: at.x, y: at.y })`
-  // sin recalcular `r.panel` en `at`: la siguiente tarjeta fresca del lote evita un panel fantasma en el origen y cae encima del panel real.
-  it.fails('settleFresh updates the moved node panel position so the next fresh node does not land inside it', () => {
+  it('settleFresh updates the moved node panel position so the next fresh node does not land inside it', () => {
     const e1 = textNode('e1', 0, 0);
     const e2 = textNode('e2', 0, 276);
     const e3 = textNode('e3', 0, -276);
@@ -99,9 +97,7 @@ describe('p10e solapes: settleFresh con paneles de composer', () => {
     expect(rectsOverlap({ ...n2Pos, width: 260, height: 170 }, n1Panel)).toBe(false);
   });
 
-  // reproduce: settleFresh solo comprueba `rectsOverlap(r, o, 48, 56)` entre cuerpos e ignora `o.panel`.
-  // Si una tarjeta de imagen medida crece en altura (462 px, p. ej. 9:16), su panel (y=474..774) cubre una tarjeta debajo (0,532) sin moverla.
-  it.fails('settleFresh moves a fresh node when a taller measured image card puts its composer panel over it', () => {
+  it('settleFresh moves a fresh node when a taller measured image card puts its composer panel over it', () => {
     const img = imageNode('img', 0, 0);
     const below = textNode('below', 0, 532);
     const measured = new Map<string, { width: number; height: number }>([

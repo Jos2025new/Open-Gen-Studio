@@ -182,35 +182,6 @@ class SpatialGrid {
     }
   }
 
-  overlapsCard(r: NodeRect, gapX = 0, gapY = 0): boolean {
-    const px0 = r.x - gapX, px1 = r.x + r.width + gapX;
-    const py0 = r.y - gapY, py1 = r.y + r.height + gapY;
-    for (let i = 0; i < this.large.length; i++) {
-      const o = this.large[i];
-      if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return true;
-    }
-    const cx0 = Math.floor(px0 / CELL), cx1 = Math.floor(px1 / CELL);
-    const cy0 = Math.floor(py0 / CELL), cy1 = Math.floor(py1 / CELL);
-    if (cx0 < -CELL_BIAS || cx1 >= CELL_BIAS || cy0 < -CELL_BIAS || cy1 >= CELL_BIAS || (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > MAX_CELL_SPAN * 4) {
-      for (let i = 0; i < this.cards.length; i++) {
-        const o = this.cards[i];
-        if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return true;
-      }
-      return false;
-    }
-    for (let cx = cx0; cx <= cx1; cx++) {
-      for (let cy = cy0; cy <= cy1; cy++) {
-        const bucket = this.cells.get(cellKey(cx, cy));
-        if (!bucket) continue;
-        for (let i = 0; i < bucket.length; i++) {
-          const o = bucket[i];
-          if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return true;
-        }
-      }
-    }
-    return false;
-  }
-
   isClear(x: number, y: number, sw: number, sh: number, gapX: number, gapY: number, own: NodeRect | null): boolean {
     const px0 = x - gapX, px1 = x + sw + gapX;
     const py0 = y - gapY, py1 = y + sh + gapY;
@@ -500,10 +471,13 @@ export function settleFresh(nodes: readonly GraphNode[], fresh: ReadonlySet<stri
   for (const n of nodes) {
     if (!fresh.has(n.id)) continue;
     const r = nodeRect(n, measured);
-    if (grid.overlapsCard(r, 48, 56)) {
-      const at = findFreePositionInGrid(n.position, { width: r.width, height: r.height }, grid, { gapX: 48, gapY: 56 });
+    const own = panelZone(n.data, { x: 0, y: 0, width: r.width, height: r.height });
+    if (!grid.isClear(r.x, r.y, r.width, r.height, 48, 56, own)) {
+      const at = findFreePositionInGrid(n.position, { width: r.width, height: r.height }, grid, { gapX: 48, gapY: 56, panel: own });
       moves.set(n.id, at);
-      grid.add({ ...r, x: at.x, y: at.y });
+      const moved: NodeRect = { x: at.x, y: at.y, width: r.width, height: r.height };
+      const panel = panelZone(n.data, moved);
+      grid.add(panel ? { ...moved, panel } : moved);
     } else {
       grid.add(r);
     }
