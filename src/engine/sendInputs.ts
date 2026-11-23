@@ -4,7 +4,7 @@ import { assetRevisionIdentity } from './assetRevisions';
 import { RECRAFT_STYLE_REF, sentModelRef } from './catalog';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
-import { buildDryRequest, dryMedia, stable } from './money/transport';
+import { buildDryRequest, dryMedia, parseFingerprint, stable } from './money/transport';
 import { refsLimit } from './officialLimits';
 import { syncOpSpec, type OpSpecInput } from './opSpec';
 import { OPS, isVideoOpEngine } from './ops';
@@ -188,6 +188,20 @@ export function sendFingerprint(plan: ResolvedSendPlan, state: Pick<SendState, '
     done += n;
   }
   return stable(requests);
+}
+
+export const dynamicSendFingerprint = (plan: ResolvedSendPlan, state: Pick<SendState, 'assets'> = get()): string =>
+  stable({ dynamic: true, staticAssets: Object.fromEntries(plan.assetIds.map((id) => [id, assetRevisionIdentity(state.assets[id])])) });
+
+export function bindDynamicFingerprint(fp: string | undefined, spec: SendSpec, state: SendState = get()): string | undefined {
+  const parsed = fp ? parseFingerprint(fp) : null;
+  if (!parsed?.dynamic || parsed.requests) return fp;
+  const plan = resolveSendPlan(spec, state), engine = plan.op ? OPS[plan.op.id].engine : undefined;
+  const ready = engine === 'transcribe' ? Boolean(state.catalog.transcribers?.[plan.modelRef])
+    : engine === 'voice' || (plan.kind === 'text' && plan.modelRef === RECRAFT_STYLE_REF) ? true
+    : engine === 'local' ? false : Boolean(state.catalog.models[plan.modelRef] && state.catalog.schemas[plan.modelRef]);
+  if (!ready) return fp;
+  return stable({ requests: JSON.parse(sendFingerprint(plan, state, { ignoreSeed: true })), staticAssets: parsed.staticAssets });
 }
 
 /** Build the dry-run SendSpec for a PlanStep using the same opSpec/lyrics rules as execution. */

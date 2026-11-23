@@ -222,7 +222,7 @@ it.fails('H3a: 402 provider switch clears approvedFingerprint and sends edited a
 });
 
 // reproduce: previewRun (flow/actions.ts:272) skips stepFingerprints when dynamic=true, leaving static inputs (params.mask) on downstream nodes unprotected against in-place edits.
-it.fails('H3b: downstream node with dynamic upstream drops approvedFingerprint on its static mask asset', async () => {
+it('H3b: downstream node with dynamic upstream drops approvedFingerprint on its static mask asset', async () => {
   blobs.set('ast_mask', new Blob([new Uint8Array([5, 5, 5, 5])], { type: 'image/png' }));
   const holdUp = fake.holdNext('upstream image step');
 

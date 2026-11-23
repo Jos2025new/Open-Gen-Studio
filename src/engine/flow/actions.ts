@@ -5,7 +5,7 @@ import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModel
 import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
 import { isStepKind } from '../planSteps/inspect';
 import { nodeRequest, stable } from './freshness';
-import { resolveSendPlan, sendFingerprint, stepSendSpec } from '../sendInputs';
+import { dynamicSendFingerprint, resolveSendPlan, sendFingerprint, stepSendSpec } from '../sendInputs';
 import { rememberNodeRequest, requestContext } from './result';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
@@ -269,7 +269,7 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
     if (!spec) { sendFingerprints[step.id] = stable(step.kind === 'text' ? { kind: 'text', text: step.text } : step); continue; }
     const plan = resolveSendPlan(spec, st);
     sendFingerprints[step.id] = sendFingerprint(plan, st);
-    if (!dynamic) stepFingerprints[step.id] = sendFingerprint(plan, st, { ignoreSeed: true });
+    stepFingerprints[step.id] = dynamic ? dynamicSendFingerprint(plan, st) : sendFingerprint(plan, st, { ignoreSeed: true });
     plan.assetIds.forEach((id) => sendAssets.add(id));
   }
   const requests = [...inputs].map(id => {

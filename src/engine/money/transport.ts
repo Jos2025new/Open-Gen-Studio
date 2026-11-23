@@ -42,11 +42,27 @@ export function buildDryRequest(provider: ProviderId, req: DryMediaRequest, asse
   return adapter.buildCreateVoiceRequest?.(req.input, enc) ?? null;
 }
 
+export interface ParsedFingerprint { requests?: unknown[]; dynamic?: boolean; staticAssets?: Record<string, string> }
+export function parseFingerprint(fp: string): ParsedFingerprint | null {
+  try {
+    const parsed = JSON.parse(fp);
+    if (Array.isArray(parsed)) return { requests: parsed };
+    if (parsed && typeof parsed === 'object' && (Array.isArray(parsed.requests) || parsed.dynamic === true)) return parsed as ParsedFingerprint;
+  } catch { /* invalid */ }
+  return null;
+}
+
+export const staticAssetsMatch = (staticAssets: Record<string, string> | undefined, assets: Record<string, Asset>): boolean =>
+  !staticAssets || Object.entries(staticAssets).every(([id, rev]) => assetRevisionIdentity(assets[id]) === rev);
+
 function assertApprovedRequest(provider: ProviderId, req: MediaRequest, approvedFingerprint: string, chunkIndex: number): void {
-  const actual = buildDryRequest(provider, req, useStore.getState().assets, { ignoreSeed: true });
-  let expected: unknown;
-  try { expected = JSON.parse(approvedFingerprint); } catch { expected = null; }
-  if (!actual || !Array.isArray(expected) || chunkIndex >= expected.length || stable(expected[chunkIndex]) !== stable(actual)) throw new Error(COMMAND_REVIEW_CHANGED);
+  const assets = useStore.getState().assets;
+  const actual = buildDryRequest(provider, req, assets, { ignoreSeed: true });
+  const parsed = parseFingerprint(approvedFingerprint);
+  if (!actual || !parsed || !Array.isArray(parsed.requests) || chunkIndex >= parsed.requests.length ||
+    !staticAssetsMatch(parsed.staticAssets, assets) || stable(parsed.requests[chunkIndex]) !== stable(actual)) {
+    throw new Error(COMMAND_REVIEW_CHANGED);
+  }
 }
 
 const permit = Symbol('paid transport');

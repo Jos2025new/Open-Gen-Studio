@@ -33,7 +33,7 @@ import { requestQuote } from './quotes';
 import { chargePartial, checkDelivery, controllers, estimateSpec, finish, finishText, keptJob, purgeDiscarded, requestEstimate, running, type GenerationSpec } from './jobState';
 import { runLocalOp } from './localOps';
 import { runCreateStyle, runCreateVoice, runTranscribe } from './specialSends';
-import { materializeSendInputs, resolveSendPlan } from './sendInputs';
+import { bindDynamicFingerprint, materializeSendInputs, resolveSendPlan } from './sendInputs';
 
 // Moved out of this file (Opus #4); kept here so every caller and mock keeps its path.
 export { adoptRemoteAssets, storeModelOutputs } from './assetIO';
@@ -94,6 +94,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     ...(spec.variants?.length ? { variants: spec.variants } : {}),
     createdAt: Date.now(),
   };
+  if (g.approvedFingerprint) g.approvedFingerprint = bindDynamicFingerprint(g.approvedFingerprint, g);
   const rem = remainingBudget();
   const needsTicketPass = Boolean(
     passOwner ||
@@ -220,6 +221,8 @@ async function execute(id: string): Promise<string[]> {
       throw new Error(parsed && !isConnected(parsed.provider) ? `Connect ${prov} in Settings to use ${g.modelName}.` : `Model ${g.modelName} is not available.`);
     }
     const { model, schema } = resolved;
+    const bound = bindDynamicFingerprint(g.approvedFingerprint, g);
+    if (bound !== g.approvedFingerprint) { patchGeneration(g.id, { approvedFingerprint: bound }); g = get().generations[g.id]; }
     if (g.kind === 'text' && !model.textOutput) throw new Error(`${model.name} makes ${model.kind}, not text.`);
     // What the provider is asked for: a text-output model (lyrics) runs as its media kind.
     const kind: MediaKind = g.kind === 'text' ? model.kind : g.kind;
