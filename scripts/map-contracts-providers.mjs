@@ -66,7 +66,7 @@ export default [
       ['src/engine/budget.ts', 'export function llmCallEstimate('],
       ['src/engine/jobs.ts', 'const checkQuote = generationQuoteGuard(id)'],
       ['src/engine/commands/run.ts', 'withSequenceStepPass(budgetPass,'],
-      ['src/engine/agent/commandCalls.ts', 'beginOncePass(sessionId, entry.request.estimate.usd, unknownSteps)'],
+      ['src/engine/agent/commandCalls.ts', 'beginOncePass(sessionId, estimate.usd, unknown)'],
       ['src/components/ui/SpendConfirm.tsx', 'estimate.usd, estimate.lowerBound'],
       ['src/components/chat/PlanCard.tsx', 'total.usd, total.lowerBound'],
       ['src/components/chat/RecoveryActions.tsx', 'estimate.usd, estimate.lowerBound'],
