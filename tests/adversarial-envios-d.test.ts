@@ -233,6 +233,8 @@ describe('1. Doble asiento o asiento perdido (rutas críticas)', () => {
   it('MEDIO: lote sin precio (estimate null), ítem 1 sin coste + ítem 2 $0.30 > límite $0.20 → noteExcess no avisa', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.2 });
     useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [NANO]: { ...s.catalog.models[NANO], price: undefined } } } as never }));
+    // The user already chose to keep going past the limit (D+ asks before an unknown price otherwise).
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], noAskOverLimit: true } } }));
     let n = 0;
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => ({ ...imgOut(`m${++n}`), costUsd: n === 2 ? 0.3 : undefined }));
     const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'unpriced', modelRef: NANO, settings: { count: 2, advanced: {} }, inputs: { refs: [] }, estimate: { usd: 0, approximate: true } });
@@ -263,6 +265,8 @@ describe('1b. Huecos residuales de D2 (Neon, verificación)', () => {
   it('MEDIO: ningún ítem reporta precio (estimado null) → actualUsd queda desconocido y no hay aviso de exceso falso', async () => {
     setupStore({ budgetOn: true, budgetUsd: 0.2 });
     useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [NANO]: { ...s.catalog.models[NANO], price: undefined } } } as never }));
+    // The user already chose to keep going past the limit (D+ asks before an unknown price otherwise).
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], noAskOverLimit: true } } }));
     vi.spyOn(ADAPTERS.nanogpt, 'generate').mockImplementation(async () => ({ ...imgOut('u'), costUsd: undefined }));
     const g = createGeneration({ sessionId: sid(), origin: 'composer', kind: 'image', prompt: 'unpriced-all', modelRef: NANO, settings: { count: 2, advanced: {} }, inputs: { refs: [] }, estimate: { usd: 0, approximate: true } });
     patchG(g.id, { estimate: { usd: null, approximate: true }, retryBaseEstimate: { usd: null, approximate: true } });
