@@ -319,10 +319,10 @@ it('H7: updates plan ticket pass ceiling when user confirms a step price review 
   expect(fake.acceptedCount('price jump'), 'plan ticket kept stale $0.10 pass cap after user approved $0.50 review').toBe(1);
 });
 
-// reproduce: check-paid-send only inspects direct/indirect MemberExpression adapter calls and misses destructured or aliased adapter methods.
-it.fails('H8a: check-paid-send flags a destructured or aliased billable adapter method outside the gate', () => {
+it('H8a: check-paid-send flags a destructured or aliased billable adapter method outside the gate', () => {
   const diagnostics = scanFixture('src/engine/mediaAlias.ts', [
-    'export function send(adapter: { generate(input: unknown): unknown }, input: unknown) {',
+    "import { nanogpt as adapter } from './providers/nanogpt';",
+    'export function send(input: Parameters<typeof adapter.generate>[0]) {',
     '  const { generate } = adapter;',
     '  return generate(input);',
     '}',
@@ -330,8 +330,7 @@ it.fails('H8a: check-paid-send flags a destructured or aliased billable adapter 
   expect(diagnostics.join('\n')).toMatch(/mediaAlias\.ts:.*paidSend/);
 });
 
-// reproduce: check-paid-send only checks ObjectPattern destructuring and misses aliasing chat to a local identifier inside llmSend.ts.
-it.fails('H8b: check-paid-send flags an identifier alias of chat inside llmSend.ts outside paidSend', () => {
+it('H8b: check-paid-send flags an identifier alias of chat inside llmSend.ts outside paidSend', () => {
   const diagnostics = scanFixture('src/engine/money/llmSend.ts', [
     "import { chat } from '../providers/llm';",
     'const rawChat = chat;',
@@ -340,8 +339,7 @@ it.fails('H8b: check-paid-send flags an identifier alias of chat inside llmSend.
   expect(diagnostics.join('\n')).toMatch(/llmSend\.ts:.*paidSend/);
 });
 
-// reproduce: check-paid-send tracks namespace identifiers only on import/dynamic-import and misses local aliases of llm or providerFetch namespaces.
-it.fails('H8c: check-paid-send flags an aliased namespace import of llm or providerFetch outside allowed files', () => {
+it('H8c: check-paid-send flags an aliased namespace import of llm or providerFetch outside allowed files', () => {
   const diagnostics = scanFixture('src/engine/nsAlias.ts', [
     "import * as llm from './providers/llm';",
     'const api = llm;',

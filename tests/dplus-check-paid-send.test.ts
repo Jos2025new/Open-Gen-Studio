@@ -36,6 +36,7 @@ import { askAgain, remainingBudget } from '../src/engine/budget';
 import { decideCommandApproval, runCommandsTool } from '../src/engine/agent/commandCalls';
 import { settleInterruptedPlans } from '../src/engine/agent/runtime';
 import { setApprover } from '../src/engine/commands';
+import { ADAPTERS } from '../src/engine/providers/registry';
 import { sendLlmViaPaidGate } from '../src/engine/money/llmSend';
 import { resetActions } from '../src/engine/nodecore/action';
 import { createSession, useStore } from '../src/store/store';
@@ -61,6 +62,11 @@ describe('check-paid-send rule', () => {
     expect(check('.')).toEqual([]);
   });
 
+  it('rejects a registry method extracted and called without transport authority', async () => {
+    const { generate } = ADAPTERS.nanogpt;
+    await expect(generate({} as never, Symbol() as never)).rejects.toThrow(/paidSend authorization/);
+  });
+
   it('flags billable LLM chat(), adapter methods, and direct providerFetch outside paidSend with file:line and fix hint', () => {
     withTempRoot(
       {
@@ -69,14 +75,17 @@ describe('check-paid-send rule', () => {
           'export const bad = () => chat({} as never);',
         ].join('\n'),
         'src/engine/money/llmSend.ts': [
+          '',
           "import { chat } from '../providers/llm';",
           'export const ungated = () => chat({} as never);',
         ].join('\n'),
         'src/engine/rogueMedia.ts': [
-          'export const bad = (adapter: { generate: (x: unknown) => void }) => adapter.generate({});',
+          "import { nanogpt as adapter } from './providers/nanogpt';",
+          'export const bad = () => adapter.generate({} as never);',
         ].join('\n'),
         'src/engine/jobs.ts': [
-          'export const ungated = (adapter: { generate: (x: unknown) => void }) => adapter.generate({});',
+          "import { nanogpt as adapter } from './providers/nanogpt';",
+          'export const ungated = () => adapter.generate({} as never);',
         ].join('\n'),
         'src/engine/rogueFetch.ts': [
           "import { providerFetch } from '../lib/providerFetch';",
@@ -86,10 +95,10 @@ describe('check-paid-send rule', () => {
       (root) => {
         const errors = check(root);
         expect(errors.some((e) => /^src\/engine\/rogueLlm\.ts:1:.*sendLlmViaPaidGate/.test(e))).toBe(true);
-        expect(errors.some((e) => /^src\/engine\/money\/llmSend\.ts:2:.*outside `paidSend\(\)`/.test(e))).toBe(true);
+        expect(errors.some((e) => /^src\/engine\/money\/llmSend\.ts:2:.*outside the paidSend transport/.test(e))).toBe(true);
         expect(errors.some((e) => /^src\/engine\/rogueMedia\.ts:1:.*\.generate\(\).*paidSend/.test(e))).toBe(true);
-        expect(errors.some((e) => /^src\/engine\/jobs\.ts:1:.*outside `sendGenerationViaPaidGate`/.test(e))).toBe(true);
-        expect(errors.some((e) => /^src\/engine\/rogueFetch\.ts:1:.*providerFetch.*paidSend/.test(e))).toBe(true);
+        expect(errors.some((e) => /^src\/engine\/jobs\.ts:1:.*\.generate\(\).*paidSend/.test(e))).toBe(true);
+        expect(errors.some((e) => /^src\/engine\/rogueFetch\.ts:1:.*outside the paidSend transport/.test(e))).toBe(true);
       },
     );
   });

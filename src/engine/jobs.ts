@@ -1,3 +1,4 @@
+import { sendMediaViaPaidGate } from './money/transport';
 import { isRestart } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired, stepApproved } from './priceAuthorization';
@@ -24,7 +25,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { shareOfEstimate } from './sendLedger';
 import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
-import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendGenerationViaPaidGate, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
 import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -253,8 +254,9 @@ async function execute(id: string): Promise<string[]> {
       const reqIndex = priorCount + done;
       activeReqId = undefined;
       localPostSend = false;
-      const send = (retry: number) => sendGenerationViaPaidGate({
+      const send = (retry: number) => sendMediaViaPaidGate({
         g,
+        provider: model.provider,
         index: reqIndex,
         items: n,
         quote,
@@ -268,8 +270,7 @@ async function execute(id: string): Promise<string[]> {
           const wait = policy?.waits[retry];
           return Boolean(policy && wait != null && !submitted && !signal.aborted && !(err instanceof NetworkError) && policy.matches((err as Error).message));
         },
-        send: async ({ onRemoteJob }) => {
-          const value = await adapter.generate({
+        request: (onRemoteJob) => ({ method: 'generate', input: {
             kind,
             model,
             schema,
@@ -305,11 +306,12 @@ async function execute(id: string): Promise<string[]> {
               recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } }); } catch { /* diagnostics never block a send */ }
               patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
             },
-          });
+        } }),
+        settlement: (value) => {
           const countDelivered = g.kind === 'text' ? 1 : Math.max(1, Math.min(n, value.outputs.length));
           const knownCost = g.kind === 'text' ? (value.costUsd ?? g.estimate.usd) : (value.costUsd ?? quote);
           const costUsd = knownCost ?? shareOfEstimate(get().generations[id] ?? g, countDelivered) ?? null;
-          return { value, costUsd, estimated: knownCost == null };
+          return { costUsd, estimated: knownCost == null };
         },
       });
       const serial = adapter.serialKey?.(model) ?? null;

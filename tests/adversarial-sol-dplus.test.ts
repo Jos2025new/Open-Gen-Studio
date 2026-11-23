@@ -264,7 +264,9 @@ it('compacts terminal LLM tickets while keeping their settled spend', async () =
 it('flags an adapter generate method passed around as a bound function', () => {
   const file = 'src/engine/mediaCaller.ts';
   const diagnostics = scanFixture(file, [
-    'export function send(adapter: { generate(input: unknown): unknown }, input: unknown) {',
+    '',
+    "import { nanogpt as adapter } from './providers/nanogpt';",
+    'export function send(input: Parameters<typeof adapter.generate>[0]) {',
     '  const generate = adapter.generate.bind(adapter);',
     '  return generate(input);',
     '}',
@@ -275,8 +277,9 @@ it('flags an adapter generate method passed around as a bound function', () => {
 it('flags an eager chat call made before paidSend can reserve or persist', () => {
   const file = 'src/engine/money/llmSend.ts';
   const diagnostics = scanFixture(file, [
-    "import { chat } from '../providers/llm';",
     "import { paidSend } from './paidSend';",
+    '',
+    "import { chat } from '../providers/llm';",
     'export const attempt = (input: Parameters<typeof chat>[0]) => paidSend({ prepare: chat(input) } as never);',
   ].join('\n'));
   expect(diagnostics.join('\n')).toMatch(/llmSend\.ts:3:.*paidSend/);
@@ -285,6 +288,7 @@ it('flags an eager chat call made before paidSend can reserve or persist', () =>
 it('flags an ungated namespace chat call inside llmSend', () => {
   const file = 'src/engine/money/llmSend.ts';
   const diagnostics = scanFixture(file, [
+    '',
     "import * as llm from '../providers/llm';",
     'export const attempt = (input: Parameters<typeof llm.chat>[0]) => llm.chat(input);',
   ].join('\n'));
