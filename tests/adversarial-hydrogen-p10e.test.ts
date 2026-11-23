@@ -110,9 +110,7 @@ describe('p10e solapes: settleFresh con paneles de composer', () => {
     expect(rectsOverlap({ ...belowPos, width: 260, height: 170 }, imgPanel)).toBe(false);
   });
 
-  // reproduce: GenNodeBody siempre renderiza <InputRefs> (+Ref, 40 px + 10 px gap) encima del prompt en tarjetas con entrada de imagen.
-  // Con prompt al maximo (220 px) + padding (24) + borde (2) + gaps (20) + fila modelo (30), el panel mide >= 336 px (PANEL.height=300 deja >=36 px solapados).
-  it.fails('PANEL.height covers an Image composer panel that includes the always-present Ref row (.nt-refs) + max prompt + model row', () => {
+  it('PANEL.height covers an Image composer panel that includes the always-present Ref row (.nt-refs) + max prompt + model row', () => {
     const cssNode = readFileSync('src/styles/node.css', 'utf8');
     const settingsTsx = readFileSync('src/components/node/NodeSettings.tsx', 'utf8');
     const padding = cssNode.match(/\.nt-panel \{[^}]*padding: 0\.75rem/) ? 12 : 0;
