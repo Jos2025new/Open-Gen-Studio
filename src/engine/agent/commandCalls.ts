@@ -292,7 +292,7 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
  */
 export function decideCommandApproval(sessionId: string, itemId: string, decision: CommandApprovalDecision): boolean {
   const entry = pending.get(itemId);
-  const item = useStore.getState().sessions[sessionId]?.feed.find(f => f.id === itemId && f.type === 'commands');
+  const item = useStore.getState().sessions[sessionId]?.feed.find((f): f is CommandApprovalFeedItem => f.id === itemId && f.type === 'commands');
   if (item?.status !== 'awaiting' || replaying.has(itemId) || (entry && entry.sessionId !== sessionId)) return false;
   const ticket = storeTickets.get(commandTicketId(itemId));
   if (decision === 'cancel') {
