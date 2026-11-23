@@ -470,7 +470,7 @@ export function retryGeneration(id: string, planItemId?: string, budgetPass?: Bu
   try {
     clearGenerationPass(id, true);
     // New Generation: another attempt of the same operation.
-    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), nodeRequest: g.nodeRequest, budgetPass });
+    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), nodeRequest: g.nodeRequest, budgetPass, approvalTicketId: planItemId ? `plan:${planItemId}` : undefined });
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
     // The failed attempt's card now shows this one, so the retry's result is seen.
     relinkAttempt(g.id, newG.id);

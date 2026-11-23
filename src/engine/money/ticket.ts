@@ -350,6 +350,10 @@ export function isHeldStatus(status: TicketSendStatus): boolean {
   return status === 'in_flight' || status === 'sent' || status === 'uncertain';
 }
 
+export function ticketsInSessions(tickets?: Record<string, ApprovalTicket>, sessions?: Record<string, unknown>): ApprovalTicket[] {
+  return Object.values(tickets ?? {}).filter(ticket => !sessions || sessions[ticket.sessionId]);
+}
+
 /** Keep durable tickets only while recovery needs them. Settled media receipts live on the generation. */
 export function compactApprovalTickets(
   tickets: Record<string, ApprovalTicket>,

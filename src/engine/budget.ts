@@ -7,7 +7,7 @@ import type { Estimate, LlmProviderId, NoticeFeedItem } from './types';
 import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
 import { ledgerCost } from './sendLedger';
 import { formatSpendAmount } from './spending';
-import { priceFromEstimate, roundUsd, totalReservedUsd, type ApprovalTicket } from './money/ticket';
+import { priceFromEstimate, roundUsd, ticketsInSessions, totalReservedUsd, type ApprovalTicket } from './money/ticket';
 
 export { noAskEverywhere };
 
@@ -28,9 +28,9 @@ export function remainingBudget(
     sessions?: Record<string, unknown>;
   } = get(),
 ): number | null {
-  const { settings, spentUsd, tickets } = state;
+  const { settings, spentUsd, tickets, sessions } = state;
   if (!settings.budgetOn) return null;
-  const reserved = totalReservedUsd(Object.values(tickets ?? {}));
+  const reserved = totalReservedUsd(ticketsInSessions(tickets, sessions));
   return roundUsd(settings.budgetUsd - spentUsd - reserved);
 }
 

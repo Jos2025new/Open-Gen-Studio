@@ -42,6 +42,7 @@ import {
   settleSend,
   isSendOut,
   ticketCommittedUsd,
+  ticketsInSessions,
   UNKNOWN_PRICE,
   type ApprovalTicket,
   type MoneyPrice,
@@ -119,7 +120,7 @@ function projectTicketToGeneration(genId: string, sends: readonly TicketSend[]):
 /** Authoritative `TicketAccess` backed by `useStore.tickets` with one-way projection onto `Generation`. */
 export const storeTickets: TicketAccess = {
   get: (ticketId) => get().tickets[ticketId],
-  list: () => Object.values(get().tickets),
+  list: () => { const { tickets, sessions } = get(); return ticketsInSessions(tickets, sessions); },
   put: (ticket) => {
     const previous = get().tickets[ticket.id];
     if (previous === ticket) return;
