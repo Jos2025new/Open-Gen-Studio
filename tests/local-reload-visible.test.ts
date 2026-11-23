@@ -323,9 +323,10 @@ describe('local and free generation interrupted by reload', () => {
       await tick(30);
     });
 
-    expect(calls).toBe(2);
+    // Under a loaded full suite a fixed 30 ms is not always enough for the retry to reach the adapter: wait for it, same expectation.
+    await vi.waitFor(() => expect(calls).toBe(2), { timeout: 5000 });
     expect(useStore.getState().spentUsd).toBe(0);
-    expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(1);
+    await vi.waitFor(() => expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(1), { timeout: 5000 });
 
     release();
     await firstRun;
