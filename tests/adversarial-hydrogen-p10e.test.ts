@@ -1,0 +1,205 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  findFreePositionFor,
+  nodeRect,
+  NODE_WIDTH,
+  panelZone,
+  rectsOverlap,
+  settleFresh,
+  type NodeRect,
+} from '../src/engine/flow/graph';
+import { hitZoom, portZoom } from '../src/components/node/connectionDrop';
+import type { GraphNode, GraphNodeData } from '../src/engine/types';
+
+vi.mock('../src/lib/idb', () => ({
+  stateDb: { get: async () => undefined, set: async () => undefined },
+  cacheDb: { get: async () => undefined, set: async () => undefined },
+  peekAssetUrl: () => undefined,
+  loadAssetUrl: async () => undefined,
+}));
+
+const imageNode = (id: string, x: number, y: number): GraphNode => ({
+  id,
+  position: { x, y },
+  data: { kind: 'image', title: id } as unknown as GraphNodeData,
+});
+const textNode = (id: string, x: number, y: number): GraphNode => ({
+  id,
+  position: { x, y },
+  data: { kind: 'text', title: id, text: '' } as unknown as GraphNodeData,
+});
+const chatNode = (id: string, x: number, y: number): GraphNode => ({
+  id,
+  position: { x, y },
+  data: { kind: 'ref', type: 'chat', title: id } as unknown as GraphNodeData,
+});
+
+describe('p10e rendimiento: bucle cuadratico/cubico con 200 tarjetas', () => {
+  // reproduce: findFreePosition genera ~11*N + 288 candidatos sin deduplicar y clear() escanea O(N) por cada uno.
+  // Con 200 tarjetas frescas superpuestas en settleFresh tarda ~240 ms (frente a <50 ms de presupuesto UI; escalado ~100x desde N=20).
+  it.fails('settling 200 overlapping fresh cards stays fast (< 50 ms) and scales sub-quadratically from 20 cards', () => {
+    const run = (count: number) => {
+      const nodes: GraphNode[] = Array.from({ length: count }, (_, i) => imageNode(`n${i}`, 0, 0));
+      const fresh = new Set(nodes.map((n) => n.id));
+      const measured = new Map(nodes.map((n) => [n.id, { width: 260, height: 220 }]));
+      const t0 = performance.now();
+      const moves = settleFresh(nodes, fresh, measured);
+      return { ms: performance.now() - t0, moved: moves.size };
+    };
+    const r20 = run(20);
+    const r200 = run(200);
+    expect(r200.moved).toBe(199);
+    expect(r200.ms, `N=20: ${r20.ms.toFixed(1)} ms, N=200: ${r200.ms.toFixed(1)} ms`).toBeLessThan(50);
+  });
+
+  // reproduce: 200 soltados repetidos en el mismo punto (0,0) mediante findFreePositionFor acumulan O(N^3) comprobaciones (~325-350 ms).
+  it.fails('200 repeated drops at the same point complete without perceptible lag (< 50 ms)', () => {
+    const data = { kind: 'image', title: 'Image' } as unknown as GraphNodeData;
+    const occupied: NodeRect[] = [];
+    const t0 = performance.now();
+    for (let i = 0; i < 200; i++) {
+      const p = findFreePositionFor(data, { x: 0, y: 0 }, occupied);
+      occupied.push(nodeRect(imageNode(`d${i}`, p.x, p.y)));
+    }
+    const ms = performance.now() - t0;
+    expect(ms, `200 drops took ${ms.toFixed(1)} ms`).toBeLessThan(50);
+  });
+
+  it('measures a single findFreePositionFor call with 200 packed image cards (with panels)', () => {
+    const occupied: NodeRect[] = [];
+    for (let i = 0; i < 200; i++) {
+      const col = i % 14;
+      const row = Math.floor(i / 14);
+      occupied.push(nodeRect(imageNode(`p${i}`, (col - 7) * 320, (row - 7) * 540)));
+    }
+    const t0 = performance.now();
+    const pos = findFreePositionFor({ kind: 'image', title: 'New' } as unknown as GraphNodeData, { x: 0, y: 0 }, occupied);
+    const ms = performance.now() - t0;
+    expect(Number.isFinite(pos.x) && Number.isFinite(pos.y)).toBe(true);
+    expect(ms).toBeLessThan(50);
+  });
+});
+
+describe('p10e solapes: settleFresh con paneles de composer', () => {
+  // reproduce: settleFresh mueve una tarjeta de imagen fresca a `at`, pero hace `occupied.push({ ...r, x: at.x, y: at.y })`
+  // sin recalcular `r.panel` en `at`: la siguiente tarjeta fresca del lote evita un panel fantasma en el origen y cae encima del panel real.
+  it.fails('settleFresh updates the moved node panel position so the next fresh node does not land inside it', () => {
+    const e1 = textNode('e1', 0, 0);
+    const e2 = textNode('e2', 0, 276);
+    const e3 = textNode('e3', 0, -276);
+    const e4 = textNode('e4', -308, 0);
+    const n1 = imageNode('n1', 0, 0);
+    const n2 = textNode('n2', 350, 250);
+    const nodes = [e1, e2, e3, e4, n1, n2];
+    const measured = new Map<string, { width: number; height: number }>(
+      nodes.map((n) => [n.id, { width: 260, height: n.data.kind === 'image' ? 220 : 170 }]),
+    );
+    const moves = settleFresh(nodes, new Set(['n1', 'n2']), measured);
+    const n1Pos = moves.get('n1') ?? n1.position;
+    const n2Pos = moves.get('n2') ?? n2.position;
+    const n1Panel = panelZone(n1.data, { ...n1Pos, width: 260, height: 220 })!;
+    expect(rectsOverlap({ ...n2Pos, width: 260, height: 170 }, n1Panel)).toBe(false);
+  });
+
+  // reproduce: settleFresh solo comprueba `rectsOverlap(r, o, 48, 56)` entre cuerpos e ignora `o.panel`.
+  // Si una tarjeta de imagen medida crece en altura (462 px, p. ej. 9:16), su panel (y=474..774) cubre una tarjeta debajo (0,532) sin moverla.
+  it.fails('settleFresh moves a fresh node when a taller measured image card puts its composer panel over it', () => {
+    const img = imageNode('img', 0, 0);
+    const below = textNode('below', 0, 532);
+    const measured = new Map<string, { width: number; height: number }>([
+      ['img', { width: 260, height: 462 }],
+      ['below', { width: 260, height: 170 }],
+    ]);
+    const moves = settleFresh([img, below], new Set(['below']), measured);
+    const belowPos = moves.get('below') ?? below.position;
+    const imgPanel = panelZone(img.data, { x: 0, y: 0, width: 260, height: 462 })!;
+    expect(rectsOverlap({ ...belowPos, width: 260, height: 170 }, imgPanel)).toBe(false);
+  });
+
+  // reproduce: GenNodeBody siempre renderiza <InputRefs> (+Ref, 40 px + 10 px gap) encima del prompt en tarjetas con entrada de imagen.
+  // Con prompt al maximo (220 px) + padding (24) + borde (2) + gaps (20) + fila modelo (30), el panel mide >= 336 px (PANEL.height=300 deja >=36 px solapados).
+  it.fails('PANEL.height covers an Image composer panel that includes the always-present Ref row (.nt-refs) + max prompt + model row', () => {
+    const cssNode = readFileSync('src/styles/node.css', 'utf8');
+    const settingsTsx = readFileSync('src/components/node/NodeSettings.tsx', 'utf8');
+    const padding = cssNode.match(/\.nt-panel \{[^}]*padding: 0\.75rem/) ? 12 : 0;
+    const gap = cssNode.match(/\.nt-panel \{[^}]*gap: 0\.625rem/) ? 10 : 0;
+    const promptMax = cssNode.match(/\.nt-prompt \{[^}]*max-height: 13\.75rem/) ? 220 : 0;
+    const refHeight = cssNode.match(/\.nt-ref \{[^}]*height: 2\.5rem/) ? 40 : 0;
+    const goHeight = cssNode.match(/\.nt-go \{[^}]*height: 1\.875rem/) ? 30 : 0;
+    expect(settingsTsx).toMatch(/<InputRefs node=\{node\} \/>/);
+    const minImagePanelHeight = padding * 2 + 2 + refHeight + gap + promptMax + gap + goHeight; // 336 px
+    const panel = panelZone({ kind: 'image', title: 'Image' } as GraphNodeData, { x: 0, y: 0, width: NODE_WIDTH, height: 220 })!;
+    expect(panel.height, `reserved ${panel.height} px < actual min ${minImagePanelHeight} px`).toBeGreaterThanOrEqual(minImagePanelHeight);
+  });
+});
+
+describe('p10e posiciones lejanas sin motivo con tarjetas de distinto tamano', () => {
+  // reproduce: tarjeta chat (440x560) en (0,0) rodeada en los 4 ejes por tarjetas de texto. Al soltar en (100,100),
+  // findFreePosition salta el hueco libre en esquina (308,-226) a 387 px y coloca la tarjeta en (408,-352) a 547 px.
+  it.fails('places a text card at the nearest free corner instead of jumping past the outer row', () => {
+    const occupied = [
+      chatNode('chat', 0, 0),
+      textNode('top', 0, -226),
+      textNode('right', 488, 0),
+      textNode('left', -308, 0),
+      textNode('bottom', 0, 616),
+    ].map((n) => nodeRect(n));
+    const desired = { x: 100, y: 100 };
+    const placed = findFreePositionFor({ kind: 'text', title: 'T', text: '' } as unknown as GraphNodeData, desired, occupied);
+    const dist = Math.hypot(placed.x - desired.x, placed.y - desired.y);
+    const cornerDist = Math.hypot(308 - desired.x, -226 - desired.y);
+    expect(dist).toBeLessThanOrEqual(cornerDist + 10);
+  });
+});
+
+describe('p10e zoom extremo (0.05 y 4)', () => {
+  // reproduce: a zoom 0.05 (--rf-hit-zoom=0.05) las zonas .port::after y .nc-next::after miden 480x480 px de flujo.
+  // 80a0927a desplazo solo .k-text .nc-next::after; en Image/Video/Audio/3D/Tool, .port::after ([0,240]) y .nc-next::after ([43,260])
+  // cubren el 100 % del cuerpo de 260 px y se solapan en [43,240], dejando el cuerpo inalcanzable al clic.
+  it.fails('at zoom 0.05 on an Image card, handle hit zones do not cover 100% of the card body', () => {
+    const cssSystem = readFileSync('src/styles/node-system.css', 'utf8');
+    const cssNode = readFileSync('src/styles/node.css', 'utf8');
+    const hz = hitZoom(0.05);
+    const zoneW = 24 / hz;
+    const portRight = zoneW / 2;
+    const nextRight = Number(cssNode.match(/\.nc-next\.react-flow__handle \{[^}]*right: (-?\d+)px/)?.[1]);
+    const nextWidth = Number(cssNode.match(/\.nc-next\.react-flow__handle \{[^}]*width: (\d+)px/)?.[1]);
+    expect(nextRight).toBe(-34);
+    expect(nextWidth).toBe(22);
+    expect(/(?<!k-text\) )\.nc-next::after\s*\{[^}]*left:/.test(cssSystem)).toBe(false);
+    const nextCenter = NODE_WIDTH - nextRight - nextWidth / 2;
+    const nextLeft = nextCenter - zoneW / 2;
+    expect(portRight).toBeLessThan(nextLeft);
+  });
+
+  it('at zoom 4 the text + hit zone stays outside the card body and at least 24 px on screen', () => {
+    const cssSystem = readFileSync('src/styles/node-system.css', 'utf8');
+    const cssNode = readFileSync('src/styles/node.css', 'utf8');
+    const offset = Number(cssSystem.match(/k-text\) \.nc-next::after \{ left: calc\(50% \+ \(12px \/ var\(--rf-hit-zoom, 1\) - (\d+)px\)\)/)?.[1]);
+    const navRight = Number(cssNode.match(/k-text\) \.nc-next\.react-flow__handle \{ right: -(\d+)px/)?.[1]);
+    const hz = hitZoom(4);
+    expect(hz).toBe(4);
+    expect(portZoom(4)).toBe(4);
+    const navLeft = NODE_WIDTH + navRight - 22;
+    const center = navLeft + 11 + (12 / hz - offset);
+    const inner = center - 12 / hz;
+    expect(inner).toBeGreaterThanOrEqual(NODE_WIDTH);
+    expect((24 / hz) * 4).toBeGreaterThanOrEqual(24);
+  });
+
+  it('20 repeated drops at (0,0) never overlap each other or any panel', () => {
+    const data = { kind: 'image', title: 'Image' } as unknown as GraphNodeData;
+    const rects: NodeRect[] = [];
+    for (let i = 0; i < 20; i++) {
+      const p = findFreePositionFor(data, { x: 0, y: 0 }, rects);
+      const r = nodeRect(imageNode(`r${i}`, p.x, p.y));
+      for (const prev of rects) {
+        expect(rectsOverlap(r, prev, 48, 56)).toBe(false);
+        if (prev.panel) expect(rectsOverlap(r, prev.panel)).toBe(false);
+        if (r.panel) expect(rectsOverlap(r.panel, prev)).toBe(false);
+      }
+      rects.push(r);
+    }
+  });
+});
