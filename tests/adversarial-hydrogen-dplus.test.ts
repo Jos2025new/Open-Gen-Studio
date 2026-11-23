@@ -216,8 +216,7 @@ it.fails('H4: invalidates nodes.run.start command review signature when a mentio
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: an uncertain prompt-rewrite LLM call leaves a held reservation with no feed reconciliation notice or UI way to close/release it.
-it.fails('H5: provides explicit reconciliation for an uncertain prompt-rewrite LLM call and avoids blocking subsequent rewrites forever', async () => {
+it('H5: provides explicit reconciliation for an uncertain prompt-rewrite LLM call and avoids blocking subsequent rewrites forever', async () => {
   const item: PlanFeedItem = {
     id: 'plan-rw', createdAt: 1, type: 'plan', style: 'auto', workspace: 'chat', status: 'awaiting',
     plan: {

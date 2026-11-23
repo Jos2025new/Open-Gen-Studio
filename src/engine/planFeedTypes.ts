@@ -310,7 +310,9 @@ export interface NoticeFeedItem extends FeedBase {
   text: string;
   /** A transient agent failure (connection lost, provider busy): Retry reruns the turn. */
   retry?: { partialItemId?: string; possibleCharge?: boolean };
-  /** A recovered LLM charge whose amount still needs reconciliation. */
+  /** Durable ticket for an interrupted provider request whose charge is unknown. */
+  uncertainTicketId?: string;
+  /** LLM ticket field supported by existing saved notices. */
   uncertainLlmTicketId?: string;
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;

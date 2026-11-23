@@ -23,7 +23,6 @@ import {
   isFreePrice,
   priceFromEstimate,
   roundUsd,
-  settleSend,
   ticketCommittedUsd,
   type ApprovalTicket,
   type MoneyPrice,
@@ -63,27 +62,7 @@ export function hasLlmPossibleCharge(runId: string | undefined): boolean {
   return status === 'in_flight' || status === 'uncertain';
 }
 
-/** Close the original reservation only after an explicit decision to record its charge as unknown. */
-export function reconcileLlmCharge(sessionId: string, ticketId: string): boolean {
-  let ticket = storeTickets.get(ticketId);
-  if (ticket?.kind !== 'llm' || ticket.sessionId !== sessionId) return false;
-  const source = ticket.scope.llm;
-  const uncertain = ticket.sends.filter((send) => send.status === 'uncertain');
-  for (const send of uncertain) {
-    const settlement = settleSend(ticket, send.id, { costUsd: null, estimated: true });
-    ticket = settlement.ticket;
-    if (settlement.bookedUnknown) {
-      addSpend(null, {
-        category: 'agent', provider: source?.provider ?? 'Unknown provider', model: source?.model ?? 'Unknown model',
-        sessionId, estimated: true, sendId: send.id,
-      });
-    }
-  }
-  if (!uncertain.length) return false;
-  storeTickets.put(ticket);
-  void saveTicketMark().catch(() => undefined);
-  return true;
-}
+export { reconcileUnknownCharge as reconcileLlmCharge } from './storeBridge';
 
 function classifyLlmError(err: unknown, signal: AbortSignal): SendErrorDisposition {
   if (err instanceof NetworkError || isAbort(err) || signal.aborted) return 'uncertain';

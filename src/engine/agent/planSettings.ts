@@ -2,7 +2,7 @@ import { isVisualStep as isGen, isStepKind, stepInfo } from '../planSteps/inspec
 import { create } from 'zustand';
 import { dismissAlert, pushAlert } from '../alerts';
 import { guardLlmBudget } from '../credit';
-import { storeTickets } from '../money/storeBridge';
+import { reconcileUnknownCharge, storeTickets } from '../money/storeBridge';
 import { uid } from '../../lib/id';
 import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
@@ -184,8 +184,10 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const ref = steps[0].modelRef;
   const name = modelSummary(ref)?.name ?? ref;
   const ticketPrefix = `llm:rewrite:${itemId}:`;
-  const possibleCharge = storeTickets.list().some((ticket) => ticket.sessionId === sessionId &&
-    ticket.id.startsWith(ticketPrefix) && ticket.sends.some((send) => send.status === 'uncertain'));
+  const prior = storeTickets.list().filter((ticket) => ticket.sessionId === sessionId && ticket.id.startsWith(ticketPrefix));
+  if (usePlanRewrite.getState().busy[itemId] || prior.some((ticket) => ticket.sends.some((send) => send.status === 'in_flight'))) return;
+  const uncertain = prior.filter((ticket) => ticket.sends.some((send) => send.status === 'uncertain'));
+  const possibleCharge = uncertain.length > 0;
   if (possibleCharge && !approval?.confirmedCharge) {
     const id = pushAlert({ level: 'warn', text: 'The previous prompt rewrite may have been charged. Sending again may charge you again.', actions: [
       { label: 'Resend anyway', run: () => {
@@ -196,6 +198,7 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
     ] });
     return;
   }
+  if (approval?.confirmedCharge) for (const ticket of uncertain) reconcileUnknownCharge(sessionId, ticket.id);
   const ticketId = uid(ticketPrefix);
   const askBudget = () => guardLlmBudget(sessionId, engine.provider, engine.model, `Rewrite prompts for ${name}`, () =>
     rewritePrompts(sessionId, itemId, kind, groupModelRef, stepIds, { ...approval, budgetPass: true }), approval?.budgetPass);
@@ -217,9 +220,9 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const style = item.plan.style ? ` The app appends this style block to every prompt; never repeat or restate it: "${item.plan.style}".` : '';
   const system = `You are the plan card's prompt writer. The user changed the card; rewrite each prompt for ${name} and the step's settings and inputs listed with it${text ? ', following the prompting guide below' : ''}. Keep the content and intent: subjects, @names, the role of each image, actions, the style. Rules: English, except quoted dialogue and on-screen text, which stay as written. At most ${MAX_PROMPT} characters each; shorter is better. Fit the beats to the duration: drop beats rather than compress them, whole seconds only.${style}${kind === 'video' ? ` ${VIDEO_DIRECTION_POLICY}` : ''} The images of each step are attached after its line: look at them. Answer only a JSON object {"<step id>": "<new prompt>"}, nothing else.${text ? `\n\n---\nPrompting guide of ${name}:\n${text}` : ''}`;
   const lines = steps.map((s) => `${s.id} (${stepInputs(s)}) "${s.title}":\n${s.prompt}`).join('\n\n');
-  const parts = agentSeesImages(sessionId, owner) ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
   let tooLong = '';
   try {
+    const parts = agentSeesImages(sessionId, owner) ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
     for (let attempt = 0; attempt < 2; attempt++) {
       if (runs.get(itemId) !== run) return;
       const why = guardBlock();

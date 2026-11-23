@@ -1,9 +1,8 @@
 import type { PlanFeedItem, StepState } from '../types';
-import { appendFeed, updateFeedItem, useStore } from '../../store/store';
-import { hasActiveTicketSend, storeTickets } from '../money/storeBridge';
+import { updateFeedItem, useStore } from '../../store/store';
+import { ensureUncertainChargeNotice, hasActiveTicketSend, storeTickets } from '../money/storeBridge';
 import { markSendUncertain } from '../money/ticket';
 import { settleInterruptedCommandCards } from './commandCalls';
-import { uid } from '../../lib/id';
 import { recordPriceResults } from './priceNotes';
 
 const get = () => useStore.getState();
@@ -16,20 +15,16 @@ const get = () => useStore.getState();
 export function settleInterruptedPlans(): void {
   // Transition any unacknowledged in-flight LLM ticket sends from before reload to uncertain (keeping reservation).
   for (const t of storeTickets.list()) {
-    if (t.kind !== 'llm') continue;
+    if (t.kind !== 'llm') {
+      ensureUncertainChargeNotice(t);
+      continue;
+    }
     let next = t;
     for (const s of t.sends) {
       if (s.status === 'in_flight') next = markSendUncertain(next, s.id, 'Interrupted by reload');
     }
     if (next !== t) storeTickets.put(next);
-    if (!next.sends.some((send) => send.status === 'uncertain')) continue;
-    const feed = get().sessions[t.sessionId]?.feed;
-    if (!feed || feed.some((item) => item.type === 'notice' &&
-      (item.uncertainLlmTicketId === t.id || (item.meta?.runId && `llm:${item.meta.runId}` === t.id)))) continue;
-    appendFeed(t.sessionId, {
-      id: uid('fd'), createdAt: Date.now(), workspace: 'chat', type: 'notice', level: 'info', uncertainLlmTicketId: t.id,
-      text: 'An interrupted model request may have been charged. Its amount is unknown.',
-    });
+    ensureUncertainChargeNotice(next);
   }
   settleInterruptedCommandCards();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan') recordPriceResults(s.id, f.id);

@@ -11,12 +11,12 @@ import { guard } from '../../lib/saveGuard';
 import { holdsWriterLock } from '../../lib/writerLock';
 import { saveStatus } from '../../store/saveStatus';
 import { addSpend } from '../../store/spend';
-import { patchGeneration, saveNow, upsertTicket, useStore } from '../../store/store';
+import { appendFeed, patchGeneration, saveNow, upsertTicket, useStore } from '../../store/store';
 import { OverLimitError } from '../budget';
 import { isRestart } from '../checkStatus';
 import { noAskDurable } from '../noAsk';
 import { deliverSend, shareOfEstimate } from '../sendLedger';
-import type { Estimate, Generation, RemoteJob, SendRecord } from '../types';
+import type { Estimate, Generation, RemoteJob, SendRecord, Workspace } from '../types';
 import {
   paidSend,
   PaidSendBlockedError,
@@ -136,8 +136,53 @@ export const storeTickets: TicketAccess = {
       return genId && send !== previous?.sends[index] ? [genId] : [];
     }));
     for (const genId of changed) projectTicketToGeneration(genId, sendsForGeneration(ticket, genId));
+    if (ticket.sends.some((send, index) => send.status === 'uncertain' && send !== previous?.sends[index])) ensureUncertainChargeNotice(ticket);
   },
 };
+
+/** Keep a durable way to release an uncertain reservation even after Retry or reload. */
+export function ensureUncertainChargeNotice(ticket: ApprovalTicket): void {
+  const sends = ticket.sends.filter((send) => send.status === 'uncertain');
+  if (!sends.length) return;
+  const feed = get().sessions[ticket.sessionId]?.feed;
+  if (!feed || feed.some((item) => item.type === 'notice' &&
+    (item.uncertainTicketId === ticket.id || item.uncertainLlmTicketId === ticket.id ||
+      (item.meta?.runId && `llm:${item.meta.runId}` === ticket.id)))) return;
+  const genId = sends[0].generationId ?? generationIdFromTicket(ticket.id);
+  const origin = genId ? get().generations[genId]?.origin : undefined;
+  const workspace: Workspace = origin === 'node' || origin === 'designer' ? origin : 'chat';
+  appendFeed(ticket.sessionId, {
+    id: uid('fd'), createdAt: Date.now(), workspace, type: 'notice', level: 'warn', uncertainTicketId: ticket.id,
+    ...(ticket.kind === 'llm' ? { uncertainLlmTicketId: ticket.id } : {}),
+    text: 'An interrupted provider request may have been charged. Its amount is unknown.',
+  });
+}
+
+export function reconcileUnknownCharge(sessionId: string, ticketId: string): boolean {
+  let ticket = storeTickets.get(ticketId);
+  if (ticket?.sessionId !== sessionId || !canWriteTicket()) return false;
+  const uncertain = ticket.sends.filter((send) => send.status === 'uncertain');
+  if (!uncertain.length) return false;
+  for (const send of uncertain) {
+    const settlement = settleSend(ticket, send.id, { costUsd: null, estimated: true });
+    ticket = settlement.ticket;
+    if (!settlement.bookedUnknown) continue;
+    const genId = send.generationId ?? generationIdFromTicket(ticket.id);
+    const g = genId ? get().generations[genId] : undefined;
+    if (g) {
+      bookGenerationSpend(g, { ticketId, sendId: send.id, usd: null, estimated: true });
+    } else {
+      const source = ticket.scope.llm;
+      addSpend(null, {
+        category: 'agent', provider: source?.provider ?? 'Unknown provider', model: source?.model ?? 'Unknown model',
+        sessionId, estimated: true, sendId: send.id,
+      });
+    }
+  }
+  storeTickets.put(ticket);
+  void saveTicketMark().catch(() => undefined);
+  return true;
+}
 
 function ticketForGeneration(genId: string): ApprovalTicket | undefined {
   const { tickets, generations } = get();
