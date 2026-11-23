@@ -6,11 +6,11 @@
 4. **Antes de cambiar código:** consulta [docs/map.md](docs/map.md). Para Designer, Studio o Nodes, sigue la [regla de mapas](docs/rastreo/README.md#consulta-y-mantenimiento). Cambia los lados del contrato en el mismo commit; uno nuevo va a scripts/map-contracts.mjs. Tras cada cambio, `npm run test:related`; al entregar, `npm test`.
 5. **Persistencia protegida:** antes de modificar las zonas o pruebas de docs/persistencia-protegida.md, autorización explícita; conservar contratos y aportar pruebas y revisión independiente.
 6. **Identidad visual:** [tarjetas](docs/propuesta-sistema-visual-tarjetas.md) y [temas](docs/propuesta-temas.md) son la identidad: cambiarlas exige aprobación explícita.
-7. **[Carriles](docs/metodo-trabajo.md):** rápido sin specs; las funciones se mueven, nunca desaparecen; lo delicado lleva documento y revisión.
+7. **[Carriles y orquestar](docs/metodo-trabajo.md):** rápido sin specs; las funciones se mueven, nunca desaparecen; lo delicado lleva documento y revisión.
 
 ## Dónde mirar
 
-- [Índice](docs/README.md): features (código y test, o «sin test»), decisiones e historial.
+- [Índice](docs/README.md): features, decisiones e historial. [Añadir algo](docs/como-se-anade.md).
 - [Historial](docs/README.md#historial): lo pertinente, en orden; evidencia, no estado actual.
 - [Seguridad](docs/seguridad.md): riesgos reales y descartados; léela antes de avisar.
 - Salvaguardas: scripts/dev-sandbox.mjs y check-*.mjs; los corre npm test.

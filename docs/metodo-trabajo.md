@@ -25,6 +25,18 @@ El agente clasifica la petición y lo anuncia en una línea al empezar. Pregunta
 
 **Decisión firme:** un ADR «Aceptado» con fundamento. Reemplazarlo exige la palabra explícita del usuario y un ADR que diga «Sustituye a NNNN». Lo dicho de pasada en el chat no ata.
 
+## Orquestación: no repetir (sesión 8, [historial 076](history/076-2026-11-W47-master-dinero-dplus.md))
+
+Valen para quien orquesta y para cada worker:
+
+1. **Parar a las 2 rondas:** si el 2.º ataque halla un crítico de la misma causa o no bajan los hallazgos, nada de 3.er parche: auditoría de diseño.
+2. **Fusionar lo verde al momento:** con `npm test` verde y reataque limpio se pide el sí enseguida; como mucho una rama lista en cola.
+3. **Techo de piloto:** declarar antes el tope de archivos y líneas netas en `src/` y qué se borra; si crece sin borrar, frenar.
+4. **`npm test` temprano y una vez:** tras la 1.ª implementación; ante fallos puntuales se repiten solo esos archivos, no la suite.
+5. **Comprobar que cada worker arrancó** (cuota, memoria, timeout); el informe se abre antes de editar y todo veredicto lleva `archivo:línea`, también «de acuerdo».
+6. **Roles:** Neon, Sol y Opus diseñan y arreglan causas; Hydrogen y Haiku atacan y prueban el sandbox.
+7. **Estado al usuario:** cada parte abre con `Objetivo | En main | Listo sin fusionar | Bloqueo | Siguiente`.
+
 ## Checks en prueba
 
 | ID | Script | Qué comprueba | Estado |
