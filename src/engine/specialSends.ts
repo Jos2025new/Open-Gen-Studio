@@ -1,6 +1,4 @@
 /* Sends that are not a media generation: transcribe, create a voice, create a style (moved out of jobs.ts, Opus #4). */
-import { isAbort, JobFailedError, NetworkError } from '../lib/http';
-import { isRestart } from './checkStatus';
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
@@ -8,7 +6,8 @@ import { ADAPTERS, preferredProviderLabel } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenResult, type ProviderAdapter } from './providers/types';
 import type { Generation, RemoteJob } from './types';
 import { patchGeneration, useStore } from '../store/store';
-import { commitPaidSend, flushSendSave, recordRemoteJob, SendNotCommittedError, settleFailedSend, wasFreeSend } from './sendMark';
+import { flushSendSave } from './sendMark';
+import { sendGenerationViaPaidGate } from './money/storeBridge';
 import { finishText, requestEstimate } from './jobState';
 import { mediaInput } from './assetIO';
 
@@ -22,29 +21,21 @@ async function runSpecialSend(
   const authorize = g.planId ? () => checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g))) : undefined;
   signal.throwIfAborted();
   authorize?.();
-  const { reqId, freeSend } = await commitPaidSend({ g, index: 0, signal, authorize });
-  try {
-    const result = await send({
-      onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-      onRemoteJob: (job) => recordRemoteJob(g.id, reqId, job),
-    });
-    finishText(g.id, result.text ?? '', result.costUsd, reqId);
-    await flushSendSave();
-  } catch (err) {
-    const cur = get().generations[g.id];
-    if (reqId && cur?.sends && !(err instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
-      if (err instanceof JobFailedError) {
-        patchGeneration(g.id, { sends: settleFailedSend(cur.sends, reqId, false, true) });
-      } else if (!cur.remoteJob) {
-        const uncertain = !wasFreeSend(cur, freeSend) && (err instanceof NetworkError || isAbort(err) || signal.aborted);
-        patchGeneration(g.id, {
-          sends: settleFailedSend(cur.sends, reqId, uncertain),
-          ...(uncertain ? { lostJob: true } : {}),
-        });
-      }
-    }
-    throw err;
-  }
+  const outcome = await sendGenerationViaPaidGate({
+    g,
+    index: 0,
+    signal,
+    beforeTransport: authorize,
+    send: async ({ onRemoteJob }) => {
+      const value = await send({
+        onStatus: (text) => patchGeneration(g.id, { statusText: text }),
+        onRemoteJob,
+      });
+      return { value, costUsd: value.costUsd ?? g.estimate.usd ?? null, estimated: value.costUsd == null };
+    },
+  });
+  finishText(g.id, outcome.value.text ?? '', outcome.value.costUsd, outcome.sendId);
+  await flushSendSave();
 }
 
 /** Audio → text with the transcriber recorded on the generation. */

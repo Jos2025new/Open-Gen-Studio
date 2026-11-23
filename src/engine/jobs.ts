@@ -2,7 +2,7 @@ import { isRestart } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired, stepApproved } from './priceAuthorization';
 import { uid } from '../lib/id';
-import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
+import { AbortedError, isAbort, NetworkError, sleep } from '../lib/http';
 import { estimateMedia } from './costs';
 import { randomSeed } from '../lib/rng';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
@@ -22,9 +22,10 @@ import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
-import { deliverSend, shareOfEstimate } from './sendLedger';
-import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
-import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, startGenerationPass, type BudgetPass } from './budget';
+import { shareOfEstimate } from './sendLedger';
+import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
+import { ensureGenerationTicket, hasOpenInFlightSend, hasUncertainTicketSend, sendGenerationViaPaidGate, ticketPassFromEstimate } from './money/storeBridge';
+import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -84,9 +85,16 @@ export function createGeneration(spec: GenerationSpec): Generation {
     ...(spec.variants?.length ? { variants: spec.variants } : {}),
     createdAt: Date.now(),
   };
+  const rem = remainingBudget();
+  const needsTicketPass = Boolean(
+    passOwner ||
+    (stepApproved(spec.sessionId, spec.planId, spec.stepId) &&
+      (estimate.usd == null || estimate.lowerBound || (rem != null && estimate.usd > rem + 1e-9))),
+  );
   if (passOwner && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, passOwner);
   consumeOnce(spec.budgetPass, estimate);
   upsertGeneration(g);
+  ensureGenerationTicket(g, needsTicketPass ? { pass: ticketPassFromEstimate(estimate) } : {});
   return g;
 }
 
@@ -227,9 +235,6 @@ async function execute(id: string): Promise<string[]> {
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     let activeReqId: string | undefined;
-    let inTransport = false;
-    let requestDelivered = false;
-    try {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
@@ -237,76 +242,79 @@ async function execute(id: string): Promise<string[]> {
       const quote = await requestQuote(g.modelRef, schema, settings, n);
       const reqIndex = batchIndex++;
       activeReqId = undefined;
-      inTransport = false;
-      requestDelivered = false;
       localPostSend = false;
-      const send = async () => {
-        const committed = await commitPaidSend({
-          g,
-          index: reqIndex,
-          reqId: activeReqId,
-          quote,
-          signal,
-          authorize: () => {
-            checkQuote(quote);
-            if (proposed) checkStepAuthorization(g, proposed);
-          },
-        });
-        freeSend = committed.freeSend;
-        activeReqId = committed.reqId;
-        inTransport = true;
-        return adapter.generate({
-        kind,
-        model,
-        schema,
-        prompt: withVariation(shown, variants?.[done]),
-        settings,
-        count: n,
-        refs,
-        refVideos,
-        keyframes,
-        clips,
-        audio,
-        refAudios,
-        elements,
-        mask,
-        firstFrame,
-        lastFrame,
-        video,
-        op: g.op ? { id: g.op.id, params: g.op.params } : undefined,
-        apiKey,
+      const send = (retry: number) => sendGenerationViaPaidGate({
+        g,
+        index: reqIndex,
+        items: n,
+        quote,
         signal,
-        onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
-        onRemoteJob: (job) => {
-          submitted = true;
-          recordRemoteJob(id, activeReqId, job);
+        beforeTransport: () => {
+          checkQuote(quote);
+          if (proposed) checkStepAuthorization(g, proposed);
         },
-        // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
-        onRequest: (info) => {
-          requests += 1;
-          // Trace only in tests and the sandbox: the real app builds nothing here, so a send can never fail on it.
-          if (journeyActive()) try {
-          const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame), false, g.prompt.length);
-          const approval = approvalEstimateForPlan(g.planId);
-          recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } }); } catch { /* diagnostics never block a send */ }
-          patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
+        isRetryable: (err) => {
+          const policy = adapter.retry;
+          const wait = policy?.waits[retry];
+          return Boolean(policy && wait != null && !submitted && !signal.aborted && !(err instanceof NetworkError) && policy.matches((err as Error).message));
+        },
+        send: async ({ onRemoteJob }) => {
+          const value = await adapter.generate({
+            kind,
+            model,
+            schema,
+            prompt: withVariation(shown, variants?.[done]),
+            settings,
+            count: n,
+            refs,
+            refVideos,
+            keyframes,
+            clips,
+            audio,
+            refAudios,
+            elements,
+            mask,
+            firstFrame,
+            lastFrame,
+            video,
+            op: g.op ? { id: g.op.id, params: g.op.params } : undefined,
+            apiKey,
+            signal,
+            onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
+            onRemoteJob: (job) => {
+              submitted = true;
+              onRemoteJob(job);
+            },
+            // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
+            onRequest: (info) => {
+              requests += 1;
+              // Trace only in tests and the sandbox: the real app builds nothing here, so a send can never fail on it.
+              if (journeyActive()) try {
+              const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame), false, g.prompt.length);
+              const approval = approvalEstimateForPlan(g.planId);
+              recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } }); } catch { /* diagnostics never block a send */ }
+              patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
+            },
+          });
+          const countDelivered = g.kind === 'text' ? 1 : Math.max(1, Math.min(n, value.outputs.length));
+          const knownCost = g.kind === 'text' ? (value.costUsd ?? g.estimate.usd) : (value.costUsd ?? quote);
+          const costUsd = knownCost ?? shareOfEstimate(get().generations[id] ?? g, countDelivered) ?? null;
+          return { value, costUsd, estimated: knownCost == null };
         },
       });
-      };
       const serial = adapter.serialKey?.(model) ?? null;
-      const once = () => (serial ? oneAtATime(serial, send) : send());
+      const once = (retry: number) => (serial ? oneAtATime(serial, () => send(retry)) : send(retry));
       // ProviderAdapter.retry: only the refused request is retried, spaced out; finished images are kept.
-      let result: Awaited<ReturnType<typeof send>> | undefined;
+      let outcome: Awaited<ReturnType<typeof send>> | undefined;
       for (let retry = 0; ; retry++) {
         try {
-          result = await once();
+          outcome = await once(retry);
           submitted = false;
-          inTransport = false;
           break;
         } catch (err) {
           const policy = adapter.retry;
           const wait = policy?.waits[retry];
-          if (!policy || wait == null || submitted || signal.aborted || err instanceof NetworkError || !policy.matches((err as Error).message)) throw err;
+          if (!policy || wait == null || submitted || signal.aborted || err instanceof NetworkError || err instanceof SendNotCommittedError || !policy.matches((err as Error).message)) throw err;
           const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
           const refused = `${policy.label} refused access`;
           patchGeneration(id, {
@@ -314,12 +322,12 @@ async function execute(id: string): Promise<string[]> {
             notes: [...(get().generations[id]?.notes ?? []).filter((x) => !x.startsWith(refused)), `${refused} ("${policy.reason}")${which}; it was tried again on its own.`],
           });
           logEvent('retry', { generation: id, model: g.modelName, reason: policy.reason.toLowerCase(), waitMs: wait, attempt: retry + 2, image: done + 1 });
-          rollbackSendIntent(id, activeReqId);
-          activeReqId = undefined;
-          inTransport = false;
           await sleep(wait, signal);
         }
       }
+      freeSend = outcome.free;
+      activeReqId = outcome.sendId;
+      const result = outcome.value;
       const reqCost = result.costUsd ?? quote;
       if (reqCost != null) cost += reqCost;
       else costKnown = false;
@@ -331,11 +339,10 @@ async function execute(id: string): Promise<string[]> {
         return [];
       }
       const items = Math.max(1, Math.min(n, result.outputs.length));
-      // This request delivered: record and book its cost before local storage so a local failure never erases a paid reply.
-      const before = get().generations[id];
-      if (before && (activeReqId || before.sends || (reqCost != null && reqCost > 0))) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
-      requestDelivered = true;
+      // paidSend already settled and booked this send idempotently before local storage;
+      // keep `sending` set while blobs are written so a reload before `assetIds` lands warns the user.
       localPostSend = !freeSend || (reqCost != null && reqCost > 0);
+      if (localPostSend) patchGeneration(id, { sending: Date.now() });
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       delivered.push(...assets);
@@ -357,18 +364,6 @@ async function execute(id: string): Promise<string[]> {
     finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined, activeReqId);
     await flushSendSave();
     return assetIds;
-    } catch (innerErr) {
-      const cur = get().generations[id];
-      const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
-      const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-      const abortedInFlight = inTransport && (isAbort(innerErr) || signal.aborted);
-      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)) || abortedInFlight);
-      if (!requestDelivered && activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
-        const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
-        if (cur?.sends) patchGeneration(id, { sends });
-      }
-      throw innerErr;
-    }
   } catch (err) {
     if (err instanceof PriceReviewRequired) {
       patchGeneration(id, { sending: undefined });
@@ -376,7 +371,7 @@ async function execute(id: string): Promise<string[]> {
     }
     const cur = get().generations[id];
     if (err instanceof SendNotCommittedError) {
-      const keepLost = Boolean(cur && !wasFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
+      const keepLost = Boolean(cur && !wasFreeSend(cur) && hasUncertainTicketSend(cur));
       patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: keepLost, sending: undefined });
       toast(err.message, 'error', 9000, cur?.planId || keepLost ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
       throw err;
@@ -384,7 +379,7 @@ async function execute(id: string): Promise<string[]> {
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      const uncertain = Boolean((localPostSend && !remoteJob) || (cur && !wasFreeSend(cur, freeSend) && !remoteJob && cur.sends?.some((s) => s.status === 'uncertain')));
+      const uncertain = Boolean((localPostSend && !remoteJob) || (cur && !wasFreeSend(cur, freeSend) && !remoteJob && hasUncertainTicketSend(cur)));
       patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, ...(uncertain ? { lostJob: true } : {}), sending: undefined });
       if (cur?.assetIds.length) chargePartial(cur);
       if (localPostSend) await flushSendSave();
@@ -392,7 +387,7 @@ async function execute(id: string): Promise<string[]> {
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
     const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-    const lostJob = (!free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)))) || (localPostSend && !remoteJob);
+    const lostJob = (!free && !remoteJob && (Boolean(cur && hasUncertainTicketSend(cur)) || err instanceof NetworkError || (submitted && isCreditError(err)))) || (localPostSend && !remoteJob);
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     if (localPostSend) await flushSendSave();
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
@@ -434,7 +429,7 @@ export async function resumeInterrupted(): Promise<void> {
     if (running.has(g.id)) continue;
     const job = activeRemoteJob(g);
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
-      const hasOpenSend = Boolean(g.sending != null || g.sends?.some((s) => s.status === 'intent' || s.status === 'uncertain'));
+      const hasOpenSend = hasOpenInFlightSend(g);
       const expectedTotal = g.variants ? g.assetIds.length + g.variants.length : (g.retryTotal ?? g.settings.count);
       const allDelivered = g.status === 'running' && g.kind !== 'text' && !job && !hasOpenSend && g.assetIds.length > 0 && (g.variants ? g.variants.length === 0 : g.assetIds.length >= expectedTotal);
       if (allDelivered) {
