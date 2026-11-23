@@ -18,6 +18,8 @@ import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
 import { beginBatchPass, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
+import { storeTickets } from '../money/storeBridge';
+import { createTicket, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
@@ -205,11 +207,11 @@ export interface NodeRunPreview {
   inputIds: string[];
 }
 
-export function previewRun(sessionId: string, targets: string[], force = true): NodeRunPreview {
+export function previewRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): NodeRunPreview {
   const st = get();
   const graph = st.sessions[sessionId].graph;
   const context = requestContext(sessionId);
-  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context });
+  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context, ...(frozenRunIds ? { frozenRunIds } : {}) });
   const env = storeEnv();
   const inputs = new Set(run.runIds);
   const visit = (id: string) => {
@@ -264,7 +266,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
 
-export async function prepareNodeRun(sessionId: string, targets: string[], force = true): Promise<NodeRunPreview> {
+export async function prepareNodeRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): Promise<NodeRunPreview> {
   // Older materialized plans kept their identity sources only on the plan card.
   const session = get().sessions[sessionId];
   for (const n of session.graph.nodes) {
@@ -278,21 +280,30 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
     });
     if (subjects.length) patchNodeData(sessionId, n.id, { subjects });
   }
-  const preview = previewRun(sessionId, targets, force);
+  const preview = previewRun(sessionId, targets, force, frozenRunIds);
+  if (preview.errors.length) return preview;
   const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') ? [PICKABLE_VIDEO_OPS.includes(OPS[s.op].engine) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
   await Promise.all([...new Set(refs)].filter(Boolean).map(ref => ensureSchema(ref)));
-  return previewRun(sessionId, targets, force);
+  // Freeze the resolved runIds from the reviewed preview so loading schemas never expands hidden ancestors.
+  return previewRun(sessionId, targets, force, frozenRunIds ?? preview.runIds);
 }
 
 /** Revalidate the reviewed version before taking the lock or spending. */
 export async function runNodes(sessionId: string, targets: string[], approved?: NodeRunPreview, force = true,
   onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass): Promise<import('../executor').ExecResult | null> {
-  const preview = await prepareNodeRun(sessionId, targets, force);
+  const preview = await prepareNodeRun(sessionId, targets, force, approved?.runIds);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
   const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
+  storeTickets.put(createTicket({
+    id: `nr:${uid('run')}`,
+    sessionId,
+    kind: 'node_run',
+    scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
+    price: priceFromEstimate(preview.estimate),
+  }));
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
   const startGraph = get().sessions[sessionId].graph;

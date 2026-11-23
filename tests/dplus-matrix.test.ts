@@ -292,8 +292,8 @@ describe('Escenario (a): recargas p9/p9c', () => {
     expect(fake.acceptedCount('beta mug')).toBe(1);
   });
 
-  // reproduce: tras recargar con schemas vacios (mergePersistedState.ts:7-10), previewRun/freshness.ts:88 predice [n2] ($0.10) pero runNodes carga schema y graphToSteps reexpande n1 ($0.20)
-  it.fails('a4: esquemas sin cargar tras recargar no provocan expansion oculta de ancestro n1 al ejecutar n2', async () => {
+  // fixed in D+ 2b-4: prepareNodeRun/runNodes congelan frozenRunIds del preview revisado y graphToSteps nunca reexpande ancestros ocultos tras cargar esquemas
+  it('a4: esquemas sin cargar tras recargar no provocan expansion oculta de ancestro n1 al ejecutar n2', async () => {
     setupSession({
       graph: {
         nodes: [

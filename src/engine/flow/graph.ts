@@ -1,5 +1,7 @@
 import { mentionSubjects } from '../params';
 import { nodeIsCurrent, type RequestContext } from './freshness';
+import { hasActiveTicketSend, storeTickets } from '../money/storeBridge';
+import { isHeldStatus, sendStateOf, type ApprovalTicket } from '../money/ticket';
 import { uid } from '../../lib/id';
 import { refNodeText } from './refText';
 import { ignoredRunCable, resolveInputs, sessionChatText } from '../nodecore/resolver';
@@ -331,13 +333,19 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
   return !direct || byStep.createdAt >= (direct.createdAt ?? 0) ? byStep : direct;
 }
 
-export function nodeAttemptProblem(node: GraphNode, generations: Record<string, Generation>): string | undefined {
+export function nodeAttemptProblem(node: GraphNode, generations: Record<string, Generation>, tickets?: readonly ApprovalTicket[]): string | undefined {
   if (!runsGeneration(node.data)) return;
   const attempt = nodeAttempt(node, generations);
-  if (!attempt || attempt.status === 'done') return;
-  if (attempt.status === 'queued' || attempt.status === 'running') return `“${node.data.title}” is already running.`;
-  if (attempt.lostJob || attempt.remoteJob || attempt.sending != null ||
-      attempt.sends?.some(send => send.status === 'intent' || send.status === 'sent' || send.status === 'uncertain')) {
+  if (attempt && attempt.status !== 'done') {
+    if (attempt.status === 'queued' || attempt.status === 'running') return `“${node.data.title}” is already running.`;
+    if (hasActiveTicketSend(attempt)) {
+      return `The previous attempt for “${node.data.title}” may have been submitted. Check its status before running again.`;
+    }
+  }
+  const active = sendStateOf(tickets ?? storeTickets.list(), { nodeId: node.id });
+  const held = active.matches.find((s) => isHeldStatus(s.status));
+  if (held) {
+    if (held.status === 'in_flight') return `“${node.data.title}” is already running.`;
     return `The previous attempt for “${node.data.title}” may have been submitted. Check its status before running again.`;
   }
 }
@@ -395,7 +403,7 @@ export function executionOrder(graph: Graph, targets?: string[], assets?: Record
  * Build steps for running `targets`. Upstream generation nodes without a finished
  * output run too; nodes that already have output are referenced by their asset.
  */
-export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[]; assets?: Record<string, Asset> } = {}): GraphRunPlan {
+export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[]; assets?: Record<string, Asset>; frozenRunIds?: readonly string[] } = {}): GraphRunPlan {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const errors: string[] = [];
   const run = new Set<string>();
@@ -436,7 +444,23 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     checked.set(id, needsRun);
     return needsRun;
   };
-  targets.forEach(t => visit(t, options.force !== false));
+  if (options.frozenRunIds) {
+    // Frozen scope approved from preview: never re-walk or re-expand ancestors at execution time.
+    for (const id of options.frozenRunIds) {
+      const n = byId.get(id);
+      if (!n) { errors.push(`No such node: ${id}.`); continue; }
+      if (!runsGeneration(n.data)) continue;
+      const problem = nodeAttemptProblem(n, generations);
+      if (problem) {
+        if (!errors.includes(problem)) errors.push(problem);
+        continue;
+      }
+      if (n.data.sketchAssetId) errors.push(`“${n.data.title}” has a Sketch on its previous base. Reset or save the Sketch before updating this node.`);
+      run.add(id);
+    }
+  } else {
+    targets.forEach(t => visit(t, options.force !== false));
+  }
 
   /** `index`: the result the link uses (edge.outputIndex); unset = the node's chosen result. */
   const refFor = (sourceId: string, index?: number, pinned = false): string | null => {
