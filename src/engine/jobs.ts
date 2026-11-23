@@ -24,7 +24,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { shareOfEstimate } from './sendLedger';
 import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
-import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { consumeGenerationTicketStep, ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
 import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { lockAssets } from './flow/locks';
@@ -146,6 +146,7 @@ export function runGeneration(id: string, nodeLock?: () => void): Promise<string
     running.delete(id);
     controllers.delete(id);
     clearGenerationPass(id);
+    consumeGenerationTicketStep(id);
     releaseAssets();
     purgeDiscarded(id);
   });

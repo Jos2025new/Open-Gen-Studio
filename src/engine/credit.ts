@@ -14,7 +14,7 @@ import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
 import { applyEdit } from './nodecore/edit';
-import { grantGenerationTicketPass, hasActiveTicketSend } from './money/storeBridge';
+import { closeTicket, grantGenerationTicketPass, hasActiveTicketSend, reopenGenerationTicketStep } from './money/storeBridge';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -262,11 +262,13 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     try {
       applySubstitute(o, patch);
       if (pass) { grantGenerationTicketPass(genId, estimate); consumeOnce(pass, estimate); }
+      else reopenGenerationTicketStep(genId);
       await later(genId, held.release);
       if (held.node && get().generations[genId]?.status === 'done') {
         applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
       }
     } finally {
+      closeTicket(get().generations[genId]?.approvalTicketId);
       held.release();
     }
   })().catch(logged(what));

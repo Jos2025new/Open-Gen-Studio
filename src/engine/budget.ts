@@ -56,7 +56,7 @@ export function passActiveFor(pass: BudgetPass | undefined, sessionId: string, e
   if (!pass) return false;
   if (pass.kind === 'ticket') {
     const t = pass.sessionId === sessionId && pass.ticketId ? get().tickets[pass.ticketId] : undefined;
-    return Boolean(t && t.sessionId === sessionId && t.pass?.kind === 'once' && (!estimate || !budgetVerdict(estimate, { sessionId, pass }).over));
+    return Boolean(t && !t.closed && t.sessionId === sessionId && t.pass?.kind === 'once' && (!estimate || !budgetVerdict(estimate, { sessionId, pass }).over));
   }
   return Boolean(passHolds(pass, sessionId) && (!estimate || covers(activePasses.get(pass)!, estimate)));
 }

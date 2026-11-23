@@ -8,7 +8,7 @@ import { COMMAND_REVIEW_CHANGED, type RunResult } from '../commands/types';
 import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
-import { grantTicketPass, stepCapFromEstimate, storeTickets } from '../money/storeBridge';
+import { closeTicket, grantTicketPass, stepCapFromEstimate, storeTickets } from '../money/storeBridge';
 import { createTicket, isHeldStatus, priceFromEstimate, type ApprovalTicket } from '../money/ticket';
 import { FREE, sumEstimates } from '../pricing';
 import type { CommandApprovalFeedItem, Estimate } from '../types';
@@ -97,6 +97,7 @@ export function settleInterruptedCommandCards(): void {
       if (ticket && steps.some((s) => s.state === 'running')) putSteps(ticket, steps.map((s) => (s.state === 'running' ? { ...s, state: 'failed' } : s)));
       const status = steps.some((s) => !s.state) ? 'awaiting' : ticket && steps.every((s) => s.state === 'done') ? 'done' : 'error';
       updateFeedItem<CommandApprovalFeedItem>(session.id, item.id, { status, ...(status === 'error' ? { error: 'Interrupted by a page reload; already-sent steps were not re-submitted.' } : {}) });
+      if (status !== 'awaiting') closeTicket(commandTicketId(item.id));
     }
   }
 }
@@ -134,6 +135,7 @@ function finishCommandCard(sessionId: string, itemId: string, result: RunResult,
   updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, result.ok
     ? { status: 'done', error: undefined }
     : result.error.code === 'denied' ? { status: 'canceled' } : { status: 'error', error: result.error.message });
+  closeTicket(commandTicketId(itemId));
 }
 
 async function runTrackedSequence(
@@ -161,6 +163,7 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
       finishCommandCard(sessionId, itemId, result, changed);
     } catch (err) {
       updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'error', error: err instanceof Error ? err.message : String(err) }));
+      closeTicket(ticket.id);
     } finally {
       replaying.delete(itemId);
       void saveNow().catch(() => undefined);

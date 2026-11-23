@@ -105,7 +105,7 @@ export async function generateSpeech(req: GenRequest): Promise<GenResult> {
   const { url, body } = buildSpeechRequest(req);
   req.onStatus('Generating');
   req.onRequest?.({ url, body });
-  const res = await providerFetch(url, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
+  const res = await providerFetch(`${BASE}/v1/audio/speech`, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
   const type = res.headers.get('content-type') ?? '';
   if (!res.ok || type.includes('json')) {
     const json = (await res.json().catch(() => ({}))) as Loose;

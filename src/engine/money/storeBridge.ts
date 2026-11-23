@@ -6,7 +6,7 @@ import { holdsWriterLock } from '../../lib/writerLock';
 import { saveStatus } from '../../store/saveStatus';
 import { addSpend } from '../../store/spend';
 import { appendFeed, patchGeneration, saveNow, upsertTicket, useStore } from '../../store/store';
-import { OverLimitError } from '../budget';
+import { OverLimitError, releaseOwnedPasses } from '../budget';
 import { isRestart } from '../checkStatus';
 import { noAskDurable } from '../noAsk';
 import { deliverSend, shareOfEstimate } from '../sendLedger';
@@ -155,9 +155,10 @@ export function ensureGenerationTicket(g: Generation, opts: { pass?: TicketPass 
 }
 
 export function grantTicketPass(ticket: ApprovalTicket, estimate: Estimate, steps?: Record<string, number | null>): ApprovalTicket {
+  const reopened: ApprovalTicket = { ...ticket, closed: undefined };
   if (steps && Object.keys(steps).length) {
-    const merged: Record<string, number | null> = { ...(ticket.pass?.steps ?? {}) };
-    const unknownGrants: Record<string, number> = { ...(ticket.pass?.unknownGrants ?? {}) };
+    const merged: Record<string, number | null> = ticket.closed ? {} : { ...(ticket.pass?.steps ?? {}) };
+    const unknownGrants: Record<string, number> = ticket.closed ? {} : { ...(ticket.pass?.unknownGrants ?? {}) };
     for (const [key, cap] of Object.entries(steps)) {
       if (cap === null) {
         merged[key] = null;
@@ -165,12 +166,12 @@ export function grantTicketPass(ticket: ApprovalTicket, estimate: Estimate, step
         if (priorOut > 0) unknownGrants[key] = priorOut + 1;
       } else merged[key] = roundUsd(stepCommittedUsd(ticket, key) + cap);
     }
-    const updated = { ...ticket, pass: { ...ticketPassFromEstimate(estimate, merged), ...(Object.keys(unknownGrants).length ? { unknownGrants } : {}) } };
+    const updated = { ...reopened, pass: { ...ticketPassFromEstimate(estimate, merged), ...(Object.keys(unknownGrants).length ? { unknownGrants } : {}) } };
     storeTickets.put(updated);
     return updated;
   }
   const pass = ticketPassFromEstimate(estimate);
-  const updated = { ...ticket, pass: { ...pass, maxUsd: pass.maxUsd == null ? null : roundUsd(ticketCommittedUsd(ticket) + pass.maxUsd) } };
+  const updated = { ...reopened, pass: { ...pass, maxUsd: pass.maxUsd == null ? null : roundUsd(ticketCommittedUsd(ticket) + pass.maxUsd) } };
   storeTickets.put(updated);
   return updated;
 }
@@ -181,6 +182,53 @@ export function grantGenerationTicketPass(genId: string, estimate: Estimate): vo
   const ticket = ensureGenerationTicket(g), stepKey = sendStepKeyFor(g), cap = stepCapFromEstimate(estimate);
   if (stepKey && (ticket.pass?.steps || ticket.kind !== 'generation') && cap !== undefined) grantTicketPass(ticket, estimate, { [stepKey]: cap });
   else grantTicketPass(ticket, estimate);
+}
+
+export function reopenGenerationTicketStep(genId: string): void {
+  const ticket = ticketForGeneration(genId);
+  if (ticket?.closed) storeTickets.put({ ...ticket, closed: undefined, pass: undefined });
+}
+
+const liveGensFor = (ticketId: string, skip?: string) =>
+  Object.values(get().generations).filter((g) => g.id !== skip && g.approvalTicketId === ticketId && (g.status === 'running' || g.status === 'queued'));
+
+const ticketCardTerminal = (t: ApprovalTicket): boolean => {
+  if (t.kind === 'generation') return true;
+  if (t.kind !== 'commands' && t.kind !== 'plan') return false;
+  const card = get().sessions[t.sessionId]?.feed.find((f) => f.id === t.id.slice(t.kind === 'commands' ? 4 : 5));
+  return !card || ((card.type === 'commands' || card.type === 'plan') && !['awaiting', 'running'].includes(card.status));
+};
+
+const pruneSteps = (pass: TicketPass | undefined, keep: (key: string) => boolean): TicketPass | undefined => {
+  if (!pass?.steps) return pass;
+  const steps = Object.fromEntries(Object.entries(pass.steps).filter(([k]) => keep(k)));
+  return Object.keys(steps).length ? { ...pass, steps } : undefined;
+};
+
+const markTicketClosed = (ticket: ApprovalTicket): void => {
+  const pass = ticket.pass?.steps ? { ...ticket.pass, steps: {} } : ticket.pass;
+  if (!ticket.closed || pass !== ticket.pass) storeTickets.put({ ...ticket, closed: true, ...(pass ? { pass } : {}) });
+  releaseOwnedPasses(ticket.id);
+};
+
+export function closeTicket(ticketId: string | undefined): void {
+  const ticket = ticketId ? storeTickets.get(ticketId) : undefined;
+  if (!ticket) return;
+  const live = liveGensFor(ticket.id);
+  if (!live.length) return markTicketClosed(ticket);
+  const keep = new Set(live.map(sendStepKeyFor).filter((k): k is string => Boolean(k)));
+  const nextPass = pruneSteps(ticket.pass, (k) => keep.has(k));
+  if (nextPass !== ticket.pass) storeTickets.put({ ...ticket, pass: nextPass });
+}
+
+export function consumeGenerationTicketStep(genId: string): void {
+  const g = get().generations[genId], ticket = ticketForGeneration(genId);
+  if (!g || !ticket || ticket.kind === 'llm') return;
+  const live = liveGensFor(ticket.id, genId), stepKey = sendStepKeyFor(g);
+  const nextPass = stepKey && !live.some((x) => sendStepKeyFor(x) === stepKey) ? pruneSteps(ticket.pass, (k) => k !== stepKey) : ticket.pass;
+  const terminal = ticket.kind === 'generation' ? Boolean(ticket.pass || g.status !== 'error' || ticket.sends.some((s) => isSendOut(s.status))) : ticketCardTerminal(ticket);
+  if (!live.length && (terminal || (ticket.pass?.steps && !nextPass))) markTicketClosed(ticket);
+  else if (nextPass !== ticket.pass) storeTickets.put({ ...ticket, pass: nextPass });
 }
 
 export function slotPriceForGeneration(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate' | 'retryBaseEstimate' | 'retryTotal' | 'variants' | 'assetIds' | 'settings'>, items = 1, quote?: number | null): MoneyPrice {

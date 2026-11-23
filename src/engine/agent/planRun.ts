@@ -25,7 +25,7 @@ import { agentSeesImages, userMessage } from './attachments';
 import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { budgetProblem, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
-import { grantGenerationTicketPass, grantTicketPass, hasActiveTicketSend, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { closeTicket, grantGenerationTicketPass, grantTicketPass, hasActiveTicketSend, reopenGenerationTicketStep, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
@@ -177,6 +177,7 @@ async function executePlanItem(
     logEvent('agent', { event: 'plan.continuity', sessionId, planId: plan.id, groups: groups.map((g) => ({ keep: g.preserve, from: g.source, steps: g.steps })), check: errors.length ? errors : 'references used' });
     if (errors.length) {
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: errors.join(' ') });
+      closeTicket(`plan:${itemId}`);
       return;
     }
   }
@@ -227,6 +228,7 @@ async function executePlanItem(
   const failed = result.failed.length;
   const status = finalPlanStatus(result);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status, stepOutputs: Object.fromEntries(result.outputs), error: failed ? result.failed.map((f) => `${f.stepId}: ${f.error}`).join(' · ') : undefined });
+  closeTicket(`plan:${itemId}`);
   const summary = plan.steps
     .map((st) => {
       const key = st.id;
@@ -276,6 +278,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   if (reviewProblem) { toast(reviewProblem, 'error'); return; }
   if (decision === 'continue') {
     if (passActiveFor(budgetPass, sessionId, review.proposed.estimate)) grantGenerationTicketPass(generationId, review.proposed.estimate);
+    else reopenGenerationTicketStep(generationId);
     consumeOnce(budgetPass, review.proposed.estimate);
   }
   const record = priceDecision(review, generationId, decision);
@@ -357,10 +360,12 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   const recovery = planRecovery(item);
   const estimate = mode === 'retry' ? recovery?.estimate : recovery?.rest;
   const ticket = storeTickets.get('plan:' + itemId);
-  if (ticket && estimate && recovery && passActiveFor(budgetPass, sessionId, estimate)) {
-    const stepList = mode === 'retry' ? recovery.retry : recovery.retry.filter((st) => !recovery.checkable.includes(st.id));
-    const perStep = Object.fromEntries(stepList.map((st) => [st.id, recovery.perStep[st.id]]));
-    grantTicketPass(ticket, estimate, stepCapsFromMap(perStep));
+  if (ticket) {
+    if (estimate && recovery && passActiveFor(budgetPass, sessionId, estimate)) {
+      const stepList = mode === 'retry' ? recovery.retry : recovery.retry.filter((st) => !recovery.checkable.includes(st.id));
+      const perStep = Object.fromEntries(stepList.map((st) => [st.id, recovery.perStep[st.id]]));
+      grantTicketPass(ticket, estimate, stepCapsFromMap(perStep));
+    } else if (ticket.closed) storeTickets.put({ ...ticket, closed: undefined });
   }
   consumeOnce(budgetPass, estimate);
   const { chosen, off } = approvedSteps(item);
@@ -431,6 +436,7 @@ export function cancelPlan(sessionId: string, itemId: string): void {
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'canceled' });
+  closeTicket(`plan:${itemId}`);
   removeDraftNodes(sessionId, item.plan.id);
   const pending = agentOf(sessionId, owner).pending;
   if (pending?.feedItemId === itemId) {

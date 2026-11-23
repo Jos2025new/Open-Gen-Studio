@@ -17,9 +17,9 @@ import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
-import { budgetProblemForSteps, consumeOnce, passActiveFor, releaseOwnedPasses, type BudgetPass } from '../budget';
+import { budgetProblemForSteps, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
 import { deleteAssets } from '../actions';
-import { stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { closeTicket, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
@@ -347,11 +347,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     if (result.failed.length) toast(`${result.failed.length} node(s) failed: ${result.failed[0].error}`, 'error');
     return result;
   } finally {
-    if (approvalTicketId && !commandTicket) {
-      const cur = storeTickets.get(approvalTicketId);
-      if (cur) storeTickets.put({ ...cur, pass: undefined, closed: true });
-      releaseOwnedPasses(approvalTicketId);
-    }
+    if (approvalTicketId && !commandTicket) closeTicket(approvalTicketId);
     releaseAssets();
     release();
   }

@@ -37,6 +37,7 @@ const unknownUses = (sends: readonly TicketSend[], generationId?: string): numbe
 export function evaluateBudgetGate(opts: { ticket?: ApprovalTicket; price: MoneyPrice; budget: BudgetSnapshot; allTickets: readonly ApprovalTicket[]; local?: boolean; stepKey?: string; generationId?: string }): BudgetGateVerdict {
   const { ticket, price, budget, allTickets, local, stepKey, generationId } = opts;
   if (local || isFreePrice(price)) return { ok: true, free: true };
+  if (ticket?.closed) return { ok: false, free: false, code: 'PASS_EXCEEDED', reason: 'Approval ticket is closed.' };
   if (!budget.budgetOn) return { ok: true, free: false };
   const pass = ticket?.pass;
   if (budget.sessionNoAsk || pass?.kind === 'session_no_ask') return { ok: true, free: false };
@@ -47,7 +48,6 @@ export function evaluateBudgetGate(opts: { ticket?: ApprovalTicket; price: Money
   const unkMsg = price.lowerBound ? 'Price is only a lower bound without a verifiable ceiling; user confirmation is required.' : 'Price is unknown and cannot be checked against the active spending limit.';
 
   if (ticket && pass?.kind === 'once') {
-    if (ticket.closed) return block('PASS_EXCEEDED', 'Approval ticket is closed.');
     if (pass.steps) {
       if (!stepKey || !Object.prototype.hasOwnProperty.call(pass.steps, stepKey)) return block('PASS_EXCEEDED', 'Send is not part of the steps approved for this one-time pass.');
       const cap = pass.steps[stepKey];

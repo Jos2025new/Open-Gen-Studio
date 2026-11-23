@@ -62,7 +62,7 @@ export function structureProblems(files, existingCycles = new Set()) {
       problems.push(`reuse-domain-boundary · ${path}:1 · Reuse lives in the store · move it to src/engine/reuse.ts and use isVideoOpEngine()`);
     }
     if (CHOICE_CALLERS.includes(path)) {
-      if (!/\bopChoice\(/.test(text)) problems.push(`one-op-choice · ${path}:1 · does not call opChoice() · ask opChoice() (opSpec.ts) which model the operation runs with`);
+      if (!/\b(opChoice|syncOpSpec)\(/.test(text)) problems.push(`one-op-choice · ${path}:1 · does not call opChoice() · ask opChoice() (opSpec.ts) which model the operation runs with`);
       text.split('\n').forEach((line, i) => {
         const own = line.match(OWN_CHOICE);
         if (own) problems.push(`one-op-choice · ${path}:${i + 1} · own model choice (${own[1]}) · replace the chain with opChoice() from opSpec.ts`);

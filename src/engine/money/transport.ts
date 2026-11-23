@@ -123,7 +123,7 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
       getBudget: () => budgetSnapshotFor(sessionId), save: saveTicketMark, canWrite: canWriteTicket, onBookSpend: (b) => { book(b.usd, b.estimated); },
       send: async () => { const value = await chat(chatOptions), est = value.usage?.costUsd == null; return { value, costUsd: value.usage && (!est || price.kind !== 'unknown') ? computeUsd(value.usage) : null, estimated: est }; },
       signal: opts.signal, isRetryable: (err) => err instanceof HttpError && err.status === 400 && /reason|effort|think/i.test(err.message),
-    });
+    }).finally(() => { const cur = storeTickets.get(ticket.id); if (cur?.pass) storeTickets.put({ ...cur, pass: undefined }); });
     return { sendId: outcome.sendId, value: outcome.value, costUsd: outcome.settled?.ticket.sends.find((s) => s.id === sendId)?.settledUsd ?? null };
   } catch (err) { throw legacyPaidSendError(err, price); }
 }
