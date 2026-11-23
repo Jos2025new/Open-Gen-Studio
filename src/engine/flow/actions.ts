@@ -5,7 +5,7 @@ import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor } from '../catalog';
 import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
 import { isStepKind } from '../planSteps/inspect';
-import { nodeRequest, stable } from './freshness';
+import { nodeRequest, stable, toolParamAssets } from './freshness';
 import { rememberNodeRequest, requestContext } from './result';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
@@ -219,6 +219,7 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
     const subjects = n && 'subjects' in n.data ? (n.data.subjects ?? []).filter(s => !s.from.startsWith('asset:')).map(s => s.from.split('#')[0]) : [];
+    if (n?.data.kind === 'tool') for (const aid of toolParamAssets(n.data.params, st.assets)) assets.add(aid);
     const linked = n ? resolveInputs(graph, n, env).flatMap(i => {
       if (!i.from || i.broken || ignoredRunCable(i)) return [];
       if (i.value && st.assets[i.value]) assets.add(i.value);
@@ -326,7 +327,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     const asset = nodeOutputAsset(n, st.generations);
     const req = nodeRequest(st.sessions[sessionId].graph, n, st.generations, st.library, requestContext(sessionId));
     const subjects = 'subjects' in req ? req.subjects ?? [] : [];
-    return [...(asset ? [asset] : []), ...subjects.flatMap(s => [s.frontal, s.video, ...s.refs].filter((id): id is string => Boolean(id))), ...(n.data.kind === 'tool' && typeof n.data.params.mask === 'string' ? [n.data.params.mask] : [])];
+    return [...(asset ? [asset] : []), ...subjects.flatMap(s => [s.frontal, s.video, ...s.refs].filter((id): id is string => Boolean(id))), ...(n.data.kind === 'tool' ? toolParamAssets(n.data.params, st.assets) : [])];
   });
   const releaseAssets = lockAssets(assetIds);
   const library = structuredClone(get().library);

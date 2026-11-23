@@ -141,8 +141,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// reproduce: previewRun omits tool node params.mask from asset revision hashing, so editing the mask in-place keeps preview.signature identical and dispatches unreviewed mask bytes.
-it.fails('F1a: invalidates nodes.run.start review when a tool node mask asset (params.mask) is edited in-place', async () => {
+it('F1a: invalidates nodes.run.start review when a tool node mask asset (params.mask) is edited in-place', async () => {
   blobs.set('ast_src', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
   blobs.set('ast_mask', new Blob([new Uint8Array([5, 5, 5, 5])], { type: 'image/png' }));
   const toolData: ToolNodeData = {
@@ -185,8 +184,7 @@ it.fails('F1a: invalidates nodes.run.start review when a tool node mask asset (p
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: previewRun omits tool node params._refs from asset revision hashing, so editing a reference asset in-place keeps preview.signature identical and dispatches unreviewed bytes.
-it.fails('F1b: invalidates nodes.run.start review when a tool node reference asset (params._refs) is edited in-place', async () => {
+it('F1b: invalidates nodes.run.start review when a tool node reference asset (params._refs) is edited in-place', async () => {
   blobs.set('ast_src', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
   blobs.set('ast_ref', new Blob([new Uint8Array([6, 6, 6, 6])], { type: 'image/png' }));
   const toolData: ToolNodeData = {

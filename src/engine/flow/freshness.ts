@@ -11,6 +11,14 @@ export function stable(value: unknown): string {
     ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b))) : v);
 }
 
+/** Asset ids carried inside a tool node's params (mask, _refs, clips, music). */
+export function toolParamAssets(params: Record<string, unknown>, assets: Record<string, Asset> = {}): string[] {
+  const ids = Object.values(params).flatMap(v =>
+    typeof v === 'string' ? v.split(',').map(s => s.trim().replace(/^asset:/, '')).filter(id => Boolean(assets[id])) : [],
+  );
+  return [...new Set(ids)];
+}
+
 export function comparableSettings(modelRef: string, settings: GenSettings, schemas: Record<string, ModelSchema> = {}, automaticSeed = false) {
   const schema = schemas[modelRef];
   const source = { ...settings, ...(automaticSeed ? { seed: undefined } : {}) };
@@ -68,8 +76,14 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
   });
   const links = linkTarget(graph, node, generations, ctx.assets);
   const extra = links.length ? { links } : {}; // absent when empty, so results saved before this stay current
-  return d.kind === 'tool' ? { kind: d.kind, op: d.op, params: d.params, incoming, operation: ctx.operation?.(node), ...extra }
-    : 'settings' in d ? { kind: d.kind, modelRef: d.modelRef, prompt, settings: comparableSettings(d.modelRef, d.settings, ctx.schemas), incoming, subjects: mentioned, ...extra } : { kind: d.kind, incoming, ...extra };
+  if (d.kind === 'tool') {
+    const paramAssets = toolParamAssets(d.params, ctx.assets).flatMap(id => {
+      const asset = ctx.assets?.[id];
+      return asset && (asset.revisions?.length || asset.originalRevision) ? [assetRevisionIdentity(asset)] : [];
+    });
+    return { kind: d.kind, op: d.op, params: d.params, incoming, operation: ctx.operation?.(node), ...(paramAssets.length ? { assets: paramAssets } : {}), ...extra };
+  }
+  return 'settings' in d ? { kind: d.kind, modelRef: d.modelRef, prompt, settings: comparableSettings(d.modelRef, d.settings, ctx.schemas), incoming, subjects: mentioned, ...extra } : { kind: d.kind, incoming, ...extra };
 }
 
 export function nodeIsCurrent(graph: Graph, node: GraphNode, generations: Record<string, Generation>, library: Subject[] = [], ctx: RequestContext = {}): boolean {
