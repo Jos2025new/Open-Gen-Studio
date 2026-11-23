@@ -341,6 +341,11 @@ export function attachGenerationToSend(ticket: ApprovalTicket, sendId: string, g
   return updateSend(ticket, sendId, (s) => (s.generationId === generationId ? s : { ...s, generationId, updatedAt: now }));
 }
 
+export function interruptSends(ticket: ApprovalTicket, matches: (send: TicketSend) => boolean = () => true): ApprovalTicket {
+  return ticket.sends.reduce((next, send) => send.status === 'in_flight' && matches(send)
+    ? markSendUncertain(next, send.id, 'Interrupted by reload') : next, ticket);
+}
+
 export function isHeldStatus(status: TicketSendStatus): boolean {
   return status === 'in_flight' || status === 'sent' || status === 'uncertain';
 }

@@ -1,7 +1,7 @@
 import type { PlanFeedItem, StepState } from '../types';
 import { updateFeedItem, useStore } from '../../store/store';
 import { ensureUncertainChargeNotice, hasActiveTicketSend, storeTickets } from '../money/storeBridge';
-import { markSendUncertain } from '../money/ticket';
+import { interruptSends } from '../money/ticket';
 import { settleInterruptedCommandCards } from './commandCalls';
 import { recordPriceResults } from './priceNotes';
 
@@ -13,17 +13,9 @@ const get = () => useStore.getState();
  * Nothing is submitted again: steps that had not started before the reload are reported as not run (or await one-click approval for command cards).
  */
 export function settleInterruptedPlans(): void {
-  // Transition any unacknowledged in-flight LLM ticket sends from before reload to uncertain (keeping reservation).
-  for (const t of storeTickets.list()) {
-    if (t.kind !== 'llm') {
-      ensureUncertainChargeNotice(t);
-      continue;
-    }
-    let next = t;
-    for (const s of t.sends) {
-      if (s.status === 'in_flight') next = markSendUncertain(next, s.id, 'Interrupted by reload');
-    }
-    if (next !== t) storeTickets.put(next);
+  for (const ticket of storeTickets.list()) {
+    const next = ticket.kind === 'llm' ? interruptSends(ticket) : ticket;
+    storeTickets.put(next);
     ensureUncertainChargeNotice(next);
   }
   settleInterruptedCommandCards();

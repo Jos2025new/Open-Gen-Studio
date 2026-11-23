@@ -19,6 +19,7 @@ import {
   type ApprovalTicket,
   type MoneyPrice,
   type PrepareSendInput,
+  type SettleSendInput,
   type SettleSendResult,
   type TicketSend,
 } from './ticket';
@@ -277,6 +278,18 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
   }
 
   const slot = findSend(ticket, sendId);
+  const close = (latest: ApprovalTicket, input: SettleSendInput) => {
+    const settled = settleSend(latest, sendId, { ...input, now: now() });
+    opts.tickets.put(settled.ticket);
+    if (settled.bookedDeltaUsd > 0 || settled.bookedUnknown) {
+      opts.onBookSpend({
+        ticketId: latest.id, sendId, usd: settled.bookedUnknown ? null : settled.bookedDeltaUsd,
+        estimated: settled.bookedUnknown || Boolean(input.estimated),
+      });
+    }
+    void opts.save().catch(() => undefined);
+    return settled;
+  };
 
   // Free ($0 exact) or local sends never enter the paid reservation/save gate.
   if (opts.local || isFreePrice(slot.price)) {
@@ -285,18 +298,7 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
     const res = await opts.send({ sendId, onRemoteJob: () => undefined });
     if (res.costUsd != null && Number.isFinite(res.costUsd) && res.costUsd > 0) {
       const latest = opts.tickets.get(opts.ticketId) ?? ticket;
-      const inFlight = markSendInFlight(latest, sendId, now());
-      const settled = settleSend(inFlight, sendId, { costUsd: res.costUsd, estimated: Boolean(res.estimated), now: now() });
-      opts.tickets.put(settled.ticket);
-      if (!settled.alreadyBooked && settled.bookedDeltaUsd > 0) {
-        opts.onBookSpend({
-          ticketId: ticket.id,
-          sendId,
-          usd: settled.bookedDeltaUsd,
-          estimated: Boolean(res.estimated),
-        });
-      }
-      void opts.save().catch(() => undefined);
+      const settled = close(markSendInFlight(latest, sendId, now()), { costUsd: res.costUsd, estimated: res.estimated });
       return { sendId, value: res.value, free: true, settled };
     }
     return { sendId, value: res.value, free: true };
@@ -357,12 +359,10 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
     }
 
     // Transport phase: once `opts.send` is called, any unknown drop leaves the send `uncertain` with reservation held.
-    let remoteJobRecorded = false;
     try {
       const result = await opts.send({
         sendId,
         onRemoteJob: (job) => {
-          remoteJobRecorded = true;
           const latest = opts.tickets.get(opts.ticketId);
           if (!latest) return;
           opts.tickets.put(markSendSent(latest, sendId, job, now()));
@@ -372,43 +372,24 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
       const latest = opts.tickets.get(opts.ticketId) ?? ticket;
       const costUsd = result.costUsd !== undefined ? result.costUsd : current.price.usd;
       const estimated = result.estimated ?? (result.costUsd == null || current.price.kind !== 'exact');
-      const settled = settleSend(latest, sendId, { costUsd, estimated, now: now() });
-      opts.tickets.put(settled.ticket);
-      if (!settled.alreadyBooked && (settled.bookedDeltaUsd > 0 || settled.bookedUnknown)) {
-        opts.onBookSpend({
-          ticketId: ticket.id,
-          sendId,
-          usd: settled.bookedUnknown ? null : settled.bookedDeltaUsd,
-          estimated: settled.bookedUnknown ? true : estimated,
-        });
-      }
-      void opts.save().catch(() => undefined);
+      const settled = close(latest, { costUsd, estimated });
       return { sendId, value: result.value, free: false, settled };
     } catch (err) {
       const latest = opts.tickets.get(opts.ticketId);
-      if (latest) {
-        const s = latest.sends.find((x) => x.id === sendId);
-        const hasJob = remoteJobRecorded || Boolean(s?.remoteJob);
+      const send = latest?.sends.find(x => x.id === sendId);
+      if (latest && send && (send.status === 'in_flight' || send.status === 'sent' || send.status === 'uncertain')) {
         const disposition = (opts.classifyError ?? defaultClassifySendError)(err);
         const msg = err instanceof Error ? err.message : String(err);
-        if (s && s.status !== 'done' && s.status !== 'failed') {
-          if (disposition === 'keep_in_flight') {
-            // Simulated or real restart teardown: leave durable state untouched for resumeInterrupted().
-          } else if (disposition === 'job_failed') {
-            opts.tickets.put(markSendFailed(latest, sendId, msg, now()));
-            void opts.save().catch(() => undefined);
-          } else if (hasJob) {
-            // Remote job is already acknowledged at the provider: keep `sent` and reservation for polling/recovery.
-            void opts.save().catch(() => undefined);
-          } else if (disposition === 'retryable_before_charge') {
-            opts.tickets.put(rollbackSendToPending(latest, sendId, now()));
-          } else if (disposition === 'refused_before_charge') {
-            opts.tickets.put(markSendFailed(latest, sendId, msg, now()));
-            void opts.save().catch(() => undefined);
-          } else {
-            opts.tickets.put(markSendUncertain(latest, sendId, msg, now()));
-            void opts.save().catch(() => undefined);
-          }
+        if (disposition === 'job_failed') {
+          opts.tickets.put(markSendFailed(latest, sendId, msg, now()));
+        } else if (!send.remoteJob && disposition !== 'keep_in_flight') {
+          const next = disposition === 'retryable_before_charge' ? rollbackSendToPending(latest, sendId, now())
+            : disposition === 'refused_before_charge' ? markSendFailed(latest, sendId, msg, now())
+              : markSendUncertain(latest, sendId, msg, now());
+          opts.tickets.put(next);
+        }
+        if (disposition !== 'keep_in_flight' && (send.remoteJob || disposition !== 'retryable_before_charge')) {
+          void opts.save().catch(() => undefined);
         }
       }
       throw err;
