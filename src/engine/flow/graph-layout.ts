@@ -98,9 +98,10 @@ export function findFreePosition(
   return { x: desired.x, y: bottom + gapY };
 }
 
-/** Image, video, audio, 3D and tool cards open a composer panel under the card while selected (400 px wide, 12 px below, at
- *  least 190 px tall). It is not part of the card, so a neighbour placed under the card at the usual gap sat beneath it. */
-const PANEL = { width: 400, gap: 12, height: 190 };
+/** Image, video, audio, 3D and tool cards open a composer panel under the card while selected (400 px wide, 12 px below). It is
+ *  not part of the card, so a neighbour placed under the card at the usual gap sat beneath it. The height is the panel at its
+ *  tallest common size: .nt-prompt grown to its 13.75rem max (220) + padding 2×12 + border 2 + gap 10 + the model row (~44). */
+const PANEL = { width: 400, gap: 12, height: 300 };
 
 export function panelZone(data: GraphNodeData, card: NodeRect): NodeRect | null {
   if (data.kind === 'text' || data.kind === 'asset' || data.kind === 'ref') return null;

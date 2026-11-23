@@ -69,7 +69,7 @@ describe('adversarial p10: click zones in node-system.css', () => {
     // x grows to the right; the card's right edge is x = 0. The handle's right edge is at x = -right (CSS right is negative = outside).
     // Its centre is width/2 further in, and the 24 px zone extends 12 px either side of that centre.
     // The text-card rule in node-system.css shifts the zone centre: left: calc(50% + (12px / zoom - Npx)), read here at zoom 1.
-    const shift = systemCss.match(/k-text\) \.nc-next::after \{ left: calc\(50% \+ \(12px \/ var\(--rf-zoom, 1\) - (\d+)px\)\)/);
+    const shift = systemCss.match(/k-text\) \.nc-next::after \{ left: calc\(50% \+ \(12px \/ var\(--rf-hit-zoom, 1\) - (\d+)px\)\)/);
     const zoneLeft = -right - width / 2 - 12 + (shift ? 12 - Number(shift[1]) : 0);
     expect(zoneLeft).toBeGreaterThanOrEqual(0);
   });
