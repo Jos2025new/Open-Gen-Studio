@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  attachGenerationToSend,
   availableBudgetUsd,
   createTicket,
   estimatedPrice,
@@ -22,7 +21,6 @@ import {
   SendTransitionError,
   settleSend,
   sumPrices,
-  ticketBookedUsd,
   ticketCommittedUsd,
   ticketReservedUsd,
   totalReservedUsd,
@@ -80,7 +78,7 @@ describe('D+ ticket: transiciones de estado, reservas y liquidacion idempotente'
       scope: { nodeIds: ['n1', 'n2'], steps: [{ cmd: 'nodes.node.rename' }, { cmd: 'nodes.run.start' }], signature: 'sig_1' },
       price: exactPrice(0.2),
     });
-    t = prepareSend(t, { id: 'snd_1', slotKey: 'n1', price: exactPrice(0.1), nodeId: 'n1', now: 10 });
+    t = prepareSend(t, { id: 'snd_1', slotKey: 'n1', price: exactPrice(0.1), nodeId: 'n1', generationId: 'gen_1', now: 10 });
     t = prepareSend(t, { id: 'snd_2', slotKey: 'n2', price: exactPrice(0.1), nodeId: 'n2', now: 10 });
     // Idempotent re-prepare while pending:
     expect(prepareSend(t, { id: 'snd_1', slotKey: 'n1', price: exactPrice(0.1) })).toBe(t);
@@ -90,7 +88,6 @@ describe('D+ ticket: transiciones de estado, reservas y liquidacion idempotente'
     expect(ticketReservedUsd(t)).toBe(0.1);
     expect(availableBudgetUsd(0.15, 0, [t])).toBe(0.05);
 
-    t = attachGenerationToSend(t, 'snd_1', 'gen_1', 21);
     t = markSendSent(t, 'snd_1', { provider: 'atlas', id: 'j_1', meta: {} }, 25);
     expect(ticketReservedUsd(t)).toBe(0.1);
     expect(sendStateOf([t], { nodeId: 'n1' })).toMatchObject({ status: 'sent', alreadyOut: true, hasUncertain: false });
@@ -101,7 +98,7 @@ describe('D+ ticket: transiciones de estado, reservas y liquidacion idempotente'
     expect(firstSettle.bookedDeltaUsd).toBe(0.08);
     expect(firstSettle.bookedUnknown).toBe(false);
     expect(ticketReservedUsd(firstSettle.ticket)).toBe(0);
-    expect(ticketBookedUsd(firstSettle.ticket)).toBe(0.08);
+    expect(firstSettle.ticket.sends.reduce((usd, send) => usd + (send.bookedUsd ?? 0), 0)).toBe(0.08);
 
     // Calling settleSend again on the same sendId is strictly idempotent:
     const secondSettle = settleSend(firstSettle.ticket, 'snd_1', { costUsd: 0.08, estimated: false, now: 40 });
@@ -165,7 +162,7 @@ describe('D+ ticket: transiciones de estado, reservas y liquidacion idempotente'
     llmTicket = settleSend(llmTicket, 'llm_iter_1', { costUsd: 0.03 }).ticket;
     llmTicket = markSendInFlight(llmTicket, 'llm_iter_2');
 
-    expect(ticketBookedUsd(llmTicket)).toBe(0.03);
+    expect(llmTicket.sends.reduce((usd, send) => usd + (send.bookedUsd ?? 0), 0)).toBe(0.03);
     expect(ticketReservedUsd(llmTicket)).toBe(0.02);
     expect(ticketCommittedUsd(llmTicket)).toBe(0.05);
     expect(sendStateOf([llmTicket], { ticketId: 'tkt_llm' })).toMatchObject({ status: 'in_flight', alreadyOut: true });

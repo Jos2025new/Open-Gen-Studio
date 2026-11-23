@@ -37,7 +37,7 @@ import { decideCommandApproval, runCommandsTool } from '../src/engine/agent/comm
 import { settleInterruptedPlans } from '../src/engine/agent/runtime';
 import { setApprover } from '../src/engine/commands';
 import { ADAPTERS } from '../src/engine/providers/registry';
-import { sendLlmViaPaidGate } from '../src/engine/money/llmSend';
+import { sendLlmViaPaidGate } from '../src/engine/money/transport';
 import { resetActions } from '../src/engine/nodecore/action';
 import { createSession, useStore } from '../src/store/store';
 import type { CommandApprovalFeedItem, ModelSummary } from '../src/engine/types';

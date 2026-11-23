@@ -18,7 +18,7 @@ import { remainingBudget, withOncePass } from '../src/engine/budget';
 import { setApprover } from '../src/engine/commands';
 import { patchNodeData } from '../src/engine/flow/actions';
 import { createGeneration, resumeInterrupted, retryGeneration, runGeneration } from '../src/engine/jobs';
-import { reconcileLlmCharge } from '../src/engine/money/llmSend';
+import { reconcileUnknownCharge as reconcileLlmCharge } from '../src/engine/money/storeBridge';
 import { resetSendLocks } from '../src/engine/money/paidSend';
 import { reconcileUnknownCharge, sendGenerationViaPaidGate, storeTickets } from '../src/engine/money/storeBridge';
 import { compactApprovalTickets, createTicket, exactPrice } from '../src/engine/money/ticket';

@@ -498,3 +498,8 @@ export function interruptTicketOnReload(
   const maybeCharged = !job && (updated.some((s) => s.status === 'uncertain') || midLocalStore);
   return { handled: true, maybeCharged };
 }
+
+export function hasLlmPossibleCharge(runId: string | undefined): boolean {
+  const status = runId && storeTickets.get(`llm:${runId}`)?.sends.at(-1)?.status;
+  return status === 'in_flight' || status === 'uncertain';
+}

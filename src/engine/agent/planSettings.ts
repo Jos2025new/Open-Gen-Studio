@@ -6,7 +6,7 @@ import { reconcileUnknownCharge, storeTickets } from '../money/storeBridge';
 import { uid } from '../../lib/id';
 import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
-import { sendLlmViaPaidGate } from '../money/llmSend';
+import { sendLlmViaPaidGate } from '../money/transport';
 import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';

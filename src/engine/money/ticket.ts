@@ -24,7 +24,7 @@ export interface MoneyPrice {
   readonly note?: string;
 }
 
-export type TicketKind = 'generation' | 'node_run' | 'plan' | 'commands' | 'retry' | 'substitute_402' | 'llm';
+export type TicketKind = 'generation' | 'node_run' | 'plan' | 'commands' | 'llm';
 export type TicketSendStatus = 'pending' | 'in_flight' | 'sent' | 'done' | 'failed' | 'uncertain';
 
 export interface FrozenScope {
@@ -336,11 +336,6 @@ export function settleSend(ticket: ApprovalTicket, sendId: string, input: Settle
   return { ticket: next, alreadyBooked: false, bookedDeltaUsd, bookedUnknown };
 }
 
-/** Attach a `generationId` to an already-prepared send without changing its lifecycle state. */
-export function attachGenerationToSend(ticket: ApprovalTicket, sendId: string, generationId: string, now = Date.now()): ApprovalTicket {
-  return updateSend(ticket, sendId, (s) => (s.generationId === generationId ? s : { ...s, generationId, updatedAt: now }));
-}
-
 export function interruptSends(ticket: ApprovalTicket, matches: (send: TicketSend) => boolean = () => true): ApprovalTicket {
   return ticket.sends.reduce((next, send) => send.status === 'in_flight' && matches(send)
     ? markSendUncertain(next, send.id, 'Interrupted by reload') : next, ticket);
@@ -404,17 +399,8 @@ export function ticketReservedUsd(ticket: ApprovalTicket): number {
 }
 
 /** Total USD already booked on this ticket. */
-export function ticketBookedUsd(ticket: ApprovalTicket): number {
-  let sum = 0;
-  for (const s of ticket.sends) {
-    if (s.booked && s.bookedUsd != null) sum += s.bookedUsd;
-  }
-  return roundUsd(sum);
-}
-
-/** Committed USD on a ticket: booked spend + open reservations (used for cumulative pass caps). */
 export function ticketCommittedUsd(ticket: ApprovalTicket): number {
-  return roundUsd(ticketBookedUsd(ticket) + ticketReservedUsd(ticket));
+  return roundUsd(ticket.sends.reduce((sum, send) => sum + (send.bookedUsd ?? 0), ticketReservedUsd(ticket)));
 }
 
 /** Total USD reserved across all tickets in the store. */

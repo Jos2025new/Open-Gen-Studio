@@ -1,4 +1,4 @@
-import { hasLlmPossibleCharge } from '../money/llmSend';
+import { hasLlmPossibleCharge } from '../money/storeBridge';
 import { dismissAlert, pushAlert } from '../alerts';
 import { carried, confirmedSections } from './draftActions';
 import { agentAccepts } from './sendGate';

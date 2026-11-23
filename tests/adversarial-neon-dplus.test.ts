@@ -21,7 +21,7 @@ import { setBuffer } from '../src/engine/design/raster';
 import { place } from '../src/engine/design/rasterSurface';
 import { patchNodeData } from '../src/engine/flow/actions';
 import { canRecheck, createGeneration, isRunning, recheckGeneration, resumeInterrupted, retryGeneration, runGeneration } from '../src/engine/jobs';
-import { sendLlmViaPaidGate } from '../src/engine/money/llmSend';
+import { sendLlmViaPaidGate } from '../src/engine/money/transport';
 import { resetSendLocks } from '../src/engine/money/paidSend';
 import { reconcileUnknownCharge, sendGenerationViaPaidGate } from '../src/engine/money/storeBridge';
 import { createTicket, exactPrice } from '../src/engine/money/ticket';
