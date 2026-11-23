@@ -1,9 +1,7 @@
 /*
  * Durable approval ticket and send-slot state machine (D+ pilot, docs/diagnostico-dinero.md).
- * Pure types and transitions — one place answers "did this paid send already go out?",
- * tracks in-flight / uncertain reservations, and settles spend idempotently by sendId.
- * Own registry (not Generation.sends[]) so LLM calls, multi-step commands, plans and node
- * runs share the exact same model.
+ * Pure types and transitions: answers "did this paid send go out?", tracks in-flight / uncertain
+ * reservations, and settles spend idempotently by sendId. Own registry for media, commands, plans, and LLM.
  */
 import type { Estimate, Generation, Session } from '../types';
 import type { RemoteJob } from '../sendTypes';
@@ -12,13 +10,8 @@ export type PriceKind = 'exact' | 'estimated' | 'unknown';
 
 export interface MoneyPrice {
   readonly kind: PriceKind;
-  /** Published or estimated USD, or `null` when `kind === 'unknown'`. */
   readonly usd: number | null;
-  /**
-   * Verifiable upper bound checkable against an active budget limit:
-   * - `exact` or bounded `estimated` → `usd`
-   * - `unknown` or `lowerBound` (minimum-only, no ceiling) → `null`
-   */
+  /** Verifiable ceiling for active spending limits; `null` for `unknown` or `lowerBound`. */
   readonly maxVerifiableUsd: number | null;
   readonly lowerBound?: boolean;
   readonly note?: string;
@@ -28,20 +21,15 @@ export type TicketKind = 'generation' | 'node_run' | 'plan' | 'commands' | 'llm'
 export type TicketSendStatus = 'pending' | 'in_flight' | 'sent' | 'done' | 'failed' | 'uncertain';
 
 export interface FrozenScope {
-  /** Resolved node ids frozen from the approved preview (never re-expanded on execute). */
   readonly nodeIds?: readonly string[];
-  /** Full frozen sequence (including `write` steps and `$N` producers) or plan step ids. */
   readonly steps?: readonly unknown[];
-  /** Preview signature / input-pins digest for detecting edits between approve and execute. */
   readonly signature?: string;
   readonly llm?: { provider: string; model: string };
 }
 
 export interface TicketPass {
   readonly kind: 'within_limit' | 'once' | 'session_no_ask';
-  /** Cumulative USD ceiling for this pass (`null` only when `allowUnknown` is explicitly true). */
   readonly maxUsd: number | null;
-  /** True only when the user explicitly approved an unknown or lowerBound price once. */
   readonly allowUnknown?: boolean;
 }
 
@@ -51,14 +39,12 @@ export interface TicketSend {
   readonly index: number;
   readonly status: TicketSendStatus;
   readonly price: MoneyPrice;
-  /** USD held against remaining budget while `in_flight`, `sent`, or `uncertain`. */
   readonly reservedUsd: number;
   readonly generationId?: string;
   readonly nodeId?: string;
   readonly remoteJob?: RemoteJob;
   readonly settledUsd?: number | null;
   readonly settledEstimated?: boolean;
-  /** Idempotency flag: true once this `sendId` has been booked to Spending. */
   readonly booked?: boolean;
   readonly bookedUsd?: number;
   readonly bookedUnknown?: boolean;
@@ -79,76 +65,47 @@ export interface ApprovalTicket {
 }
 
 export class SendTransitionError extends Error {
-  constructor(
-    readonly sendId: string,
-    readonly from: TicketSendStatus,
-    readonly to: TicketSendStatus,
-    message?: string,
-  ) {
+  constructor(readonly sendId: string, readonly from: TicketSendStatus, readonly to: TicketSendStatus, message?: string) {
     super(message ?? `Invalid send transition for ${sendId}: ${from} -> ${to}`);
     this.name = 'SendTransitionError';
   }
 }
 
-export function roundUsd(v: number): number {
-  return Math.round(v * 10000) / 10000;
-}
-
+export const roundUsd = (v: number): number => Math.round(v * 10000) / 10000;
 export const FREE_PRICE: MoneyPrice = Object.freeze({ kind: 'exact', usd: 0, maxVerifiableUsd: 0 });
 export const UNKNOWN_PRICE: MoneyPrice = Object.freeze({ kind: 'unknown', usd: null, maxVerifiableUsd: null });
 
 /** Convert an existing engine `Estimate` into the 3-kind `MoneyPrice` with `maxVerifiableUsd`. */
 export function priceFromEstimate(e: Estimate): MoneyPrice {
-  if (e.usd == null || !Number.isFinite(e.usd)) {
-    return { kind: 'unknown', usd: null, maxVerifiableUsd: null, ...(e.note ? { note: e.note } : {}) };
-  }
+  const note = e.note ? { note: e.note } : {};
+  if (e.usd == null || !Number.isFinite(e.usd)) return { kind: 'unknown', usd: null, maxVerifiableUsd: null, ...note };
   const usd = roundUsd(Math.max(0, e.usd));
-  if (usd === 0 && !e.lowerBound) {
-    return { kind: 'exact', usd: 0, maxVerifiableUsd: 0, ...(e.note ? { note: e.note } : {}) };
-  }
-  if (e.lowerBound) {
-    return { kind: 'estimated', usd, maxVerifiableUsd: null, lowerBound: true, ...(e.note ? { note: e.note } : {}) };
-  }
-  return {
-    kind: e.approximate ? 'estimated' : 'exact',
-    usd,
-    maxVerifiableUsd: e.unbounded ? null : usd,
-    ...(e.note ? { note: e.note } : {}),
-  };
+  if (usd === 0 && !e.lowerBound) return { kind: 'exact', usd: 0, maxVerifiableUsd: 0, ...note };
+  if (e.lowerBound) return { kind: 'estimated', usd, maxVerifiableUsd: null, lowerBound: true, ...note };
+  return { kind: e.approximate ? 'estimated' : 'exact', usd, maxVerifiableUsd: e.unbounded ? null : usd, ...note };
 }
 
-export function exactPrice(usd: number, note?: string): MoneyPrice {
+export const exactPrice = (usd: number, note?: string): MoneyPrice => {
   const clean = roundUsd(Math.max(0, usd));
   return { kind: 'exact', usd: clean, maxVerifiableUsd: clean, ...(note ? { note } : {}) };
-}
+};
 
-export function estimatedPrice(usd: number, opts: { lowerBound?: boolean; note?: string } = {}): MoneyPrice {
+export const estimatedPrice = (usd: number, opts: { lowerBound?: boolean; note?: string } = {}): MoneyPrice => {
   const clean = roundUsd(Math.max(0, usd));
   return {
-    kind: 'estimated',
-    usd: clean,
-    maxVerifiableUsd: opts.lowerBound ? null : clean,
-    ...(opts.lowerBound ? { lowerBound: true } : {}),
-    ...(opts.note ? { note: opts.note } : {}),
+    kind: 'estimated', usd: clean, maxVerifiableUsd: opts.lowerBound ? null : clean,
+    ...(opts.lowerBound ? { lowerBound: true } : {}), ...(opts.note ? { note: opts.note } : {}),
   };
-}
+};
 
-export function isFreePrice(price: MoneyPrice): boolean {
-  return price.kind === 'exact' && price.usd === 0 && !price.lowerBound;
-}
+export const isFreePrice = (price: MoneyPrice): boolean => price.kind === 'exact' && price.usd === 0 && !price.lowerBound;
 
 /** Combine multiple prices, dropping `maxVerifiableUsd` whenever any part lacks a verifiable ceiling. */
 export function sumPrices(parts: readonly MoneyPrice[]): MoneyPrice {
   if (!parts.length) return FREE_PRICE;
-  let usd = 0;
-  let anyEstimated = false;
-  let anyUnbounded = false;
-  let allUnknown = true;
+  let usd = 0, anyEstimated = false, anyUnbounded = false, allUnknown = true;
   for (const p of parts) {
-    if (p.kind === 'unknown' || p.usd == null) {
-      anyUnbounded = true;
-      continue;
-    }
+    if (p.kind === 'unknown' || p.usd == null) { anyUnbounded = true; continue; }
     allUnknown = false;
     usd += p.usd;
     if (p.kind === 'estimated') anyEstimated = true;
@@ -156,13 +113,9 @@ export function sumPrices(parts: readonly MoneyPrice[]): MoneyPrice {
   }
   if (allUnknown) return UNKNOWN_PRICE;
   const total = roundUsd(usd);
-  if (!anyEstimated && !anyUnbounded) return { kind: 'exact', usd: total, maxVerifiableUsd: total };
-  return {
-    kind: 'estimated',
-    usd: total,
-    maxVerifiableUsd: anyUnbounded ? null : total,
-    ...(anyUnbounded ? { lowerBound: true } : {}),
-  };
+  return !anyEstimated && !anyUnbounded
+    ? { kind: 'exact', usd: total, maxVerifiableUsd: total }
+    : { kind: 'estimated', usd: total, maxVerifiableUsd: anyUnbounded ? null : total, ...(anyUnbounded ? { lowerBound: true } : {}) };
 }
 
 /** Amount reserved in flight/sent/uncertain: verifiable cap, or known lower-bound/estimate, else 0. */
@@ -185,14 +138,8 @@ export interface CreateTicketInput {
 
 export function createTicket(input: CreateTicketInput): ApprovalTicket {
   return {
-    id: input.id,
-    sessionId: input.sessionId,
-    kind: input.kind,
-    createdAt: input.createdAt ?? Date.now(),
-    scope: input.scope ?? {},
-    price: input.price,
-    ...(input.pass ? { pass: input.pass } : {}),
-    sends: input.sends ? [...input.sends] : [],
+    id: input.id, sessionId: input.sessionId, kind: input.kind, createdAt: input.createdAt ?? Date.now(),
+    scope: input.scope ?? {}, price: input.price, ...(input.pass ? { pass: input.pass } : {}), sends: input.sends ? [...input.sends] : [],
   };
 }
 
@@ -206,10 +153,7 @@ export interface PrepareSendInput {
   now?: number;
 }
 
-/**
- * Assign a stable `sendId` at preparation time (fits single sends, dynamic batches, and LLM loops).
- * Idempotent if a `pending` send with the same `id` already exists; throws if that `id` already left `pending`.
- */
+/** Assign a stable `sendId` at preparation time; idempotent while `pending`, throws once it left `pending`. */
 export function prepareSend(ticket: ApprovalTicket, input: PrepareSendInput): ApprovalTicket {
   const existing = ticket.sends.find((s) => s.id === input.id);
   if (existing) {
@@ -217,24 +161,13 @@ export function prepareSend(ticket: ApprovalTicket, input: PrepareSendInput): Ap
     throw new SendTransitionError(input.id, existing.status, 'pending', `Send ${input.id} already left pending (${existing.status})`);
   }
   const send: TicketSend = {
-    id: input.id,
-    slotKey: input.slotKey,
-    index: input.index ?? ticket.sends.length,
-    status: 'pending',
-    price: input.price,
-    reservedUsd: 0,
-    ...(input.nodeId ? { nodeId: input.nodeId } : {}),
-    ...(input.generationId ? { generationId: input.generationId } : {}),
-    updatedAt: input.now ?? Date.now(),
+    id: input.id, slotKey: input.slotKey, index: input.index ?? ticket.sends.length, status: 'pending', price: input.price, reservedUsd: 0,
+    ...(input.nodeId ? { nodeId: input.nodeId } : {}), ...(input.generationId ? { generationId: input.generationId } : {}), updatedAt: input.now ?? Date.now(),
   };
   return { ...ticket, sends: [...ticket.sends, send] };
 }
 
-function updateSend(
-  ticket: ApprovalTicket,
-  sendId: string,
-  fn: (current: TicketSend) => TicketSend,
-): ApprovalTicket {
+function updateSend(ticket: ApprovalTicket, sendId: string, fn: (current: TicketSend) => TicketSend): ApprovalTicket {
   const at = ticket.sends.findIndex((s) => s.id === sendId);
   if (at < 0) throw new Error(`Send ${sendId} not found on ticket ${ticket.id}`);
   const next = fn(ticket.sends[at]);
@@ -244,55 +177,36 @@ function updateSend(
   return { ...ticket, sends };
 }
 
-/** `pending -> in_flight`: reserves funds immediately before durable save and transport. */
-export function markSendInFlight(ticket: ApprovalTicket, sendId: string, now = Date.now()): ApprovalTicket {
+function transitionSend(
+  ticket: ApprovalTicket,
+  sendId: string,
+  from: readonly TicketSendStatus[],
+  to: TicketSendStatus,
+  patch: (s: TicketSend) => Partial<TicketSend>,
+  now = Date.now(),
+): ApprovalTicket {
   return updateSend(ticket, sendId, (s) => {
-    if (s.status !== 'pending') throw new SendTransitionError(sendId, s.status, 'in_flight');
-    return { ...s, status: 'in_flight', reservedUsd: reservationForPrice(s.price), error: undefined, updatedAt: now };
+    if (!from.includes(s.status)) throw new SendTransitionError(sendId, s.status, to);
+    return { ...s, status: to, ...patch(s), updatedAt: now };
   });
 }
 
-/**
- * `in_flight -> pending`: releases reservation cleanly when aborted before transport, durable save failed,
- * or provider refused before charging with a retryable error (e.g. Atlas upstream denied, LLM 400 reasoning).
- */
-export function rollbackSendToPending(ticket: ApprovalTicket, sendId: string, now = Date.now()): ApprovalTicket {
-  return updateSend(ticket, sendId, (s) => {
-    if (s.status !== 'in_flight') throw new SendTransitionError(sendId, s.status, 'pending');
-    return { ...s, status: 'pending', reservedUsd: 0, updatedAt: now };
-  });
-}
+export const markSendInFlight = (ticket: ApprovalTicket, sendId: string, now = Date.now()): ApprovalTicket =>
+  transitionSend(ticket, sendId, ['pending'], 'in_flight', (s) => ({ reservedUsd: reservationForPrice(s.price), error: undefined }), now);
 
-/** `in_flight | uncertain -> sent`: provider acknowledged and returned a remote job id; reservation stays held. */
-export function markSendSent(ticket: ApprovalTicket, sendId: string, remoteJob: RemoteJob, now = Date.now()): ApprovalTicket {
-  return updateSend(ticket, sendId, (s) => {
-    if (s.status !== 'in_flight' && s.status !== 'uncertain') throw new SendTransitionError(sendId, s.status, 'sent');
-    const reservedUsd = s.reservedUsd > 0 ? s.reservedUsd : reservationForPrice(s.price);
-    return { ...s, status: 'sent', remoteJob, reservedUsd, error: undefined, updatedAt: now };
-  });
-}
+export const rollbackSendToPending = (ticket: ApprovalTicket, sendId: string, now = Date.now()): ApprovalTicket =>
+  transitionSend(ticket, sendId, ['in_flight'], 'pending', () => ({ reservedUsd: 0 }), now);
 
-/** `in_flight -> uncertain`: connection dropped after accept and before ack/jobId; reservation stays held. */
-export function markSendUncertain(ticket: ApprovalTicket, sendId: string, error?: string, now = Date.now()): ApprovalTicket {
-  return updateSend(ticket, sendId, (s) => {
-    if (s.status !== 'in_flight') throw new SendTransitionError(sendId, s.status, 'uncertain');
-    const reservedUsd = s.reservedUsd > 0 ? s.reservedUsd : reservationForPrice(s.price);
-    return { ...s, status: 'uncertain', reservedUsd, ...(error ? { error } : {}), updatedAt: now };
-  });
-}
+export const markSendSent = (ticket: ApprovalTicket, sendId: string, remoteJob: RemoteJob, now = Date.now()): ApprovalTicket =>
+  transitionSend(ticket, sendId, ['in_flight', 'uncertain'], 'sent', (s) => ({ remoteJob, reservedUsd: s.reservedUsd > 0 ? s.reservedUsd : reservationForPrice(s.price), error: undefined }), now);
 
-/** `in_flight | sent | uncertain -> failed`: confirmed failure or explicit user resolution; releases reservation. */
-export function markSendFailed(ticket: ApprovalTicket, sendId: string, error?: string, now = Date.now()): ApprovalTicket {
-  return updateSend(ticket, sendId, (s) => {
-    if (s.status !== 'in_flight' && s.status !== 'sent' && s.status !== 'uncertain') {
-      throw new SendTransitionError(sendId, s.status, 'failed');
-    }
-    return { ...s, status: 'failed', reservedUsd: 0, ...(error ? { error } : {}), updatedAt: now };
-  });
-}
+export const markSendUncertain = (ticket: ApprovalTicket, sendId: string, error?: string, now = Date.now()): ApprovalTicket =>
+  transitionSend(ticket, sendId, ['in_flight'], 'uncertain', (s) => ({ reservedUsd: s.reservedUsd > 0 ? s.reservedUsd : reservationForPrice(s.price), ...(error ? { error } : {}) }), now);
+
+export const markSendFailed = (ticket: ApprovalTicket, sendId: string, error?: string, now = Date.now()): ApprovalTicket =>
+  transitionSend(ticket, sendId, ['in_flight', 'sent', 'uncertain'], 'failed', () => ({ reservedUsd: 0, ...(error ? { error } : {}) }), now);
 
 export interface SettleSendInput {
-  /** Final provider-reported, quoted, or estimated USD; `null`/`undefined` when price was unknown. */
   costUsd?: number | null;
   estimated?: boolean;
   now?: number;
@@ -305,49 +219,29 @@ export interface SettleSendResult {
   readonly bookedUnknown: boolean;
 }
 
-/**
- * `in_flight | sent | uncertain | done -> done`: idempotent settlement by `sendId`.
- * Releases reservation and books spend at most once; subsequent calls return `alreadyBooked: true` with 0 delta.
- */
+/** Idempotent settlement by `sendId`; releases reservation and books spend at most once. */
 export function settleSend(ticket: ApprovalTicket, sendId: string, input: SettleSendInput = {}): SettleSendResult {
   const cur = ticket.sends.find((s) => s.id === sendId);
   if (!cur) throw new Error(`Send ${sendId} not found on ticket ${ticket.id}`);
-  if (cur.status === 'done' && cur.booked) {
-    return { ticket, alreadyBooked: true, bookedDeltaUsd: 0, bookedUnknown: false };
-  }
-  if (cur.status !== 'in_flight' && cur.status !== 'sent' && cur.status !== 'uncertain' && cur.status !== 'done') {
-    throw new SendTransitionError(sendId, cur.status, 'done');
-  }
+  if (cur.status === 'done' && cur.booked) return { ticket, alreadyBooked: true, bookedDeltaUsd: 0, bookedUnknown: false };
+  if (!['in_flight', 'sent', 'uncertain', 'done'].includes(cur.status)) throw new SendTransitionError(sendId, cur.status, 'done');
   const hasUsd = input.costUsd != null && Number.isFinite(input.costUsd);
   const bookedDeltaUsd = hasUsd ? Math.round(Math.max(0, input.costUsd!) * 1_000_000) / 1_000_000 : 0;
   const bookedUnknown = !hasUsd && !isFreePrice(cur.price);
   const next = updateSend(ticket, sendId, (s) => ({
-    ...s,
-    status: 'done',
-    reservedUsd: 0,
-    settledUsd: hasUsd ? bookedDeltaUsd : null,
-    settledEstimated: Boolean(input.estimated || !hasUsd),
-    booked: true,
-    ...(hasUsd ? { bookedUsd: bookedDeltaUsd } : {}),
-    ...(bookedUnknown ? { bookedUnknown: true } : {}),
-    error: undefined,
-    updatedAt: input.now ?? Date.now(),
+    ...s, status: 'done', reservedUsd: 0, settledUsd: hasUsd ? bookedDeltaUsd : null, settledEstimated: Boolean(input.estimated || !hasUsd),
+    booked: true, ...(hasUsd ? { bookedUsd: bookedDeltaUsd } : {}), ...(bookedUnknown ? { bookedUnknown: true } : {}), error: undefined, updatedAt: input.now ?? Date.now(),
   }));
   return { ticket: next, alreadyBooked: false, bookedDeltaUsd, bookedUnknown };
 }
 
-export function interruptSends(ticket: ApprovalTicket, matches: (send: TicketSend) => boolean = () => true): ApprovalTicket {
-  return ticket.sends.reduce((next, send) => send.status === 'in_flight' && matches(send)
-    ? markSendUncertain(next, send.id, 'Interrupted by reload') : next, ticket);
-}
+export const interruptSends = (ticket: ApprovalTicket, matches: (send: TicketSend) => boolean = () => true): ApprovalTicket =>
+  ticket.sends.reduce((next, send) => (send.status === 'in_flight' && matches(send) ? markSendUncertain(next, send.id, 'Interrupted by reload') : next), ticket);
 
-export function isHeldStatus(status: TicketSendStatus): boolean {
-  return status === 'in_flight' || status === 'sent' || status === 'uncertain';
-}
-
-export function ticketsInSessions(tickets?: Record<string, ApprovalTicket>, sessions?: Record<string, unknown>): ApprovalTicket[] {
-  return Object.values(tickets ?? {}).filter(ticket => !sessions || sessions[ticket.sessionId]);
-}
+export const isHeldStatus = (status: TicketSendStatus): boolean => status === 'in_flight' || status === 'sent' || status === 'uncertain';
+export const isSendOut = (status: TicketSendStatus): boolean => isHeldStatus(status) || status === 'done';
+export const ticketsInSessions = (tickets?: Record<string, ApprovalTicket>, sessions?: Record<string, unknown>): ApprovalTicket[] =>
+  Object.values(tickets ?? {}).filter((ticket) => !sessions || sessions[ticket.sessionId]);
 
 /** Keep durable tickets only while recovery needs them. Settled media receipts live on the generation. */
 export function compactApprovalTickets(
@@ -356,17 +250,13 @@ export function compactApprovalTickets(
   sessions: Record<string, Session>,
   keepClosed = 0,
 ): Record<string, ApprovalTicket> {
-  const active = new Set(Object.values(generations)
-    .filter(g => g.status === 'queued' || g.status === 'running')
-    .map(g => g.approvalTicketId ?? 'gen:' + g.id));
+  const active = new Set(Object.values(generations).filter((g) => g.status === 'queued' || g.status === 'running').map((g) => g.approvalTicketId ?? 'gen:' + g.id));
   const retired: string[] = [];
   for (const ticket of Object.values(tickets)) {
     const legacyId = ticket.id.startsWith('gen:') ? ticket.id.slice(4) : undefined;
-    const session = sessions[ticket.sessionId];
     const cardId = ticket.kind === 'commands' ? ticket.id.slice(4) : ticket.kind === 'plan' ? ticket.id.slice(5) : undefined;
-    const card = cardId ? session?.feed.find((item) => item.id === cardId) : undefined;
-    const cardOpen = (card?.type === 'commands' || card?.type === 'plan') &&
-      (card.status === 'awaiting' || card.status === 'running' || card.status === 'review');
+    const card = cardId ? sessions[ticket.sessionId]?.feed.find((item) => item.id === cardId) : undefined;
+    const cardOpen = (card?.type === 'commands' || card?.type === 'plan') && ['awaiting', 'running', 'review'].includes(card.status);
     if (active.has(ticket.id) || cardOpen || (keepClosed && ticket.kind === 'node_run' && !ticket.closed)) continue;
     const needsTicket = ticket.sends.some((send) => {
       if (isHeldStatus(send.status)) return true;
@@ -374,8 +264,7 @@ export function compactApprovalTickets(
       const genId = send.generationId ?? legacyId;
       if (!genId) return !isFreePrice(send.price) && send.status === 'pending';
       const generation = generations[genId];
-      if (!generation) return false;
-      return send.status === 'done' && !generation.sends?.some((receipt) => receipt.id === send.id && receipt.status === 'done');
+      return Boolean(generation && send.status === 'done' && !generation.sends?.some((r) => r.id === send.id && r.status === 'done'));
     });
     if (!needsTicket) retired.push(ticket.id);
   }
@@ -385,81 +274,29 @@ export function compactApprovalTickets(
   return compacted;
 }
 
-export function isSendOut(status: TicketSendStatus): boolean {
-  return status === 'in_flight' || status === 'sent' || status === 'done' || status === 'uncertain';
-}
+export const ticketReservedUsd = (ticket: ApprovalTicket): number =>
+  roundUsd(ticket.sends.reduce((sum, s) => sum + (isHeldStatus(s.status) ? s.reservedUsd : 0), 0));
 
-/** Total USD currently reserved by this ticket (`in_flight` + `sent` + `uncertain`). */
-export function ticketReservedUsd(ticket: ApprovalTicket): number {
-  let sum = 0;
-  for (const s of ticket.sends) {
-    if (isHeldStatus(s.status)) sum += s.reservedUsd;
-  }
-  return roundUsd(sum);
-}
+export const ticketCommittedUsd = (ticket: ApprovalTicket): number =>
+  roundUsd(ticket.sends.reduce((sum, s) => sum + (s.booked ? s.bookedUsd ?? 0 : 0), ticketReservedUsd(ticket)));
 
-/** Confirmed spend plus open reservations against the approved cap. */
-export function ticketCommittedUsd(ticket: ApprovalTicket): number {
-  return roundUsd(ticket.sends.reduce((sum, send) => sum + (send.booked ? send.bookedUsd ?? 0 : 0), ticketReservedUsd(ticket)));
-}
+export const totalReservedUsd = (tickets: readonly ApprovalTicket[]): number =>
+  roundUsd(tickets.reduce((sum, t) => sum + ticketReservedUsd(t), 0));
 
-/** Total USD reserved across all tickets in the store. */
-export function totalReservedUsd(tickets: readonly ApprovalTicket[]): number {
-  let sum = 0;
-  for (const t of tickets) sum += ticketReservedUsd(t);
-  return roundUsd(sum);
-}
+export const availableBudgetUsd = (budgetUsd: number, spentUsd: number, tickets: readonly ApprovalTicket[]): number =>
+  roundUsd(budgetUsd - spentUsd - totalReservedUsd(tickets));
 
-/** Remaining budget accounting for both confirmed `spentUsd` and all open reservations. */
-export function availableBudgetUsd(budgetUsd: number, spentUsd: number, tickets: readonly ApprovalTicket[]): number {
-  return roundUsd(budgetUsd - spentUsd - totalReservedUsd(tickets));
-}
+export interface SendLookup { ticketId?: string; sendId?: string; slotKey?: string; nodeId?: string; generationId?: string }
+export interface SendLookupResult { readonly status: TicketSendStatus | 'none'; readonly alreadyOut: boolean; readonly hasUncertain: boolean; readonly matches: readonly TicketSend[] }
 
-export interface SendLookup {
-  ticketId?: string;
-  sendId?: string;
-  slotKey?: string;
-  nodeId?: string;
-  generationId?: string;
-}
-
-export interface SendLookupResult {
-  readonly status: TicketSendStatus | 'none';
-  readonly alreadyOut: boolean;
-  readonly hasUncertain: boolean;
-  readonly matches: readonly TicketSend[];
-}
-
-const STATUS_PRIORITY: Record<TicketSendStatus, number> = {
-  uncertain: 6,
-  in_flight: 5,
-  sent: 4,
-  done: 3,
-  pending: 2,
-  failed: 1,
-};
+const STATUS_PRIORITY: Record<TicketSendStatus, number> = { uncertain: 6, in_flight: 5, sent: 4, done: 3, pending: 2, failed: 1 };
 
 /** Single authoritative query: "did this paid send / slot / node / generation already go out?" */
 export function sendStateOf(tickets: readonly ApprovalTicket[], query: SendLookup): SendLookupResult {
-  const matches: TicketSend[] = [];
-  for (const t of tickets) {
-    if (query.ticketId && t.id !== query.ticketId) continue;
-    for (const s of t.sends) {
-      if (query.sendId && s.id !== query.sendId) continue;
-      if (query.slotKey && s.slotKey !== query.slotKey) continue;
-      if (query.nodeId && s.nodeId !== query.nodeId) continue;
-      if (query.generationId && s.generationId !== query.generationId) continue;
-      matches.push(s);
-    }
-  }
+  const matches = tickets.flatMap((t) => (query.ticketId && t.id !== query.ticketId ? [] : t.sends.filter((s) =>
+    (!query.sendId || s.id === query.sendId) && (!query.slotKey || s.slotKey === query.slotKey) &&
+    (!query.nodeId || s.nodeId === query.nodeId) && (!query.generationId || s.generationId === query.generationId))));
   if (!matches.length) return { status: 'none', alreadyOut: false, hasUncertain: false, matches };
-  let top = matches[0].status;
-  let alreadyOut = false;
-  let hasUncertain = false;
-  for (const s of matches) {
-    if (STATUS_PRIORITY[s.status] > STATUS_PRIORITY[top]) top = s.status;
-    if (isSendOut(s.status)) alreadyOut = true;
-    if (s.status === 'uncertain') hasUncertain = true;
-  }
-  return { status: top, alreadyOut, hasUncertain, matches };
+  const top = matches.reduce((best, s) => (STATUS_PRIORITY[s.status] > STATUS_PRIORITY[best] ? s.status : best), matches[0].status);
+  return { status: top, alreadyOut: matches.some((s) => isSendOut(s.status)), hasUncertain: matches.some((s) => s.status === 'uncertain'), matches };
 }
