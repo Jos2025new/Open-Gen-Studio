@@ -32,7 +32,7 @@ export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: 
   const price = estimateSteps(retry);
   const perStep = Object.fromEntries(retry.map((st) => {
     const g = item.stepStates[st.id] === 'error' ? gens[item.stepGenerations[st.id] ?? ''] : undefined;
-    return [st.id, g ? estimateForRetry(g) : price.perStep[st.id]];
+    return [st.id, g ? estimateForRetry(g, price.perStep[st.id]) : price.perStep[st.id]];
   }));
   // `rest`: what a check can spend (steps that run for the first time); asking about a submitted job costs nothing.
   return { checkable, retry, estimate: planRetryEstimate(retry, price.perStep, item, gens), rest: planRetryEstimate(retry.filter((st) => !checkable.includes(st.id)), price.perStep, item, gens), perStep };
