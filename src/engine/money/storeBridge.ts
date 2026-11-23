@@ -466,9 +466,10 @@ export function adoptRecoveredJobOnTicket(genId: string, job: RemoteJob): boolea
   return true;
 }
 
-/** True when `job` was already settled (`done`) on the generation's ticket. */
-export function isRemoteJobDoneOnTicket(genId: string, job: RemoteJob): boolean {
-  return findRemoteSend(ticketForGeneration(genId), genId, job)?.status === 'done';
+/** Settlement and local output delivery are separate operations. */
+export function isRemoteJobDelivered(g: Generation, job: RemoteJob): boolean {
+  const send = generationSends(g).find(s => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
+  return send?.status === 'done' && !hasUnstoredPaidResult(g, [send]);
 }
 
 /** Settle a followed remote job on the ticket and book spend idempotently by `sendId`. Returns sendId if handled. */

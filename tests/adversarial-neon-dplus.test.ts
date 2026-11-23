@@ -263,8 +263,7 @@ it.fails('N2: invalidates studio.layer.run_op review when raster layer pixel buf
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: recheckGeneration sets status='running' before followRemote exits early on isRemoteJobDoneOnTicket, trapping a generation whose local output storage failed in permanent 'running'.
-it.fails('N3: does not trap a generation permanently in running when Check status is clicked after local output storage failed on a settled remoteJob', async () => {
+it('N3: does not trap a generation permanently in running when Check status is clicked after local output storage failed on a settled remoteJob', async () => {
   idbHooks.failNextPut = true;
 
   const g = createGeneration({

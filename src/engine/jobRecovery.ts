@@ -18,7 +18,7 @@ import {
   adoptRecoveredJobOnTicket,
   failTicketRemoteJob,
   hasUncertainTicketSend,
-  isRemoteJobDoneOnTicket,
+  isRemoteJobDelivered,
   settleTicketRemoteSend,
 } from './money/storeBridge';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
@@ -126,9 +126,7 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
   if (pending) return pending;
   const g0 = get().generations[id];
   if (!g0 || g0.status === 'done') return Promise.resolve(g0?.assetIds ?? []);
-  if (isRemoteJobDoneOnTicket(id, job)) return Promise.resolve(g0.assetIds);
-  const send0 = g0.sends?.find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
-  if (send0?.status === 'done') return Promise.resolve(g0.assetIds);
+  if (isRemoteJobDelivered(g0, job)) return Promise.resolve(g0.assetIds);
 
   const controller = new AbortController();
   controllers.set(id, controller);
@@ -143,9 +141,8 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       });
       const cur = get().generations[id];
       if (!cur || cur.status === 'done') return cur?.assetIds ?? [];
-      if (isRemoteJobDoneOnTicket(id, job)) return cur.assetIds;
+      if (isRemoteJobDelivered(cur, job)) return cur.assetIds;
       const matching = cur.sends?.find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
-      if (matching?.status === 'done') return cur.assetIds;
       if (cur.kind === 'text') {
         const settledId = settleTicketRemoteSend(id, job, result.costUsd ?? cur.estimate.usd, result.costUsd == null);
         finishText(id, result.text ?? '', result.costUsd, settledId ?? matching?.id);
@@ -161,7 +158,7 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const delivery = await checkDelivery(id, assets);
       const latest = get().generations[id];
       if (!latest || latest.status === 'done') return latest?.assetIds ?? [];
-      if (isRemoteJobDoneOnTicket(id, job) || latest.sends?.some((s) => s.status === 'done' && s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider)) return latest.assetIds;
+      if (isRemoteJobDelivered(latest, job)) return latest.assetIds;
       const mergedIds = [...latest.assetIds];
       for (const a of assets) if (!mergedIds.includes(a.id)) mergedIds.push(a.id);
       const uniqueIds = [...new Set(mergedIds)];
