@@ -29,7 +29,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [media.ts](../src/lib/media.ts) | 60 | 70 |
 | [ops.ts](../src/engine/ops.ts) | 56 | 22 |
 | [id.ts](../src/lib/id.ts) | 55 | 0 |
-| [catalog.ts](../src/engine/catalog.ts) | 54 | 33 |
+| [catalog.ts](../src/engine/catalog.ts) | 54 | 34 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 50 | 72 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |

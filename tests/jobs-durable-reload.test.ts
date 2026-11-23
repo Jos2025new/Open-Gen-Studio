@@ -388,8 +388,11 @@ describe('node attempts after reload', () => {
     if (status === 'uncertain') patchGeneration(next.id, { status: 'error', lostJob: true });
     const { generations } = useStore.getState();
     expect(nodeOutputAsset(graph.nodes[0], generations)).toBe(output);
-    expect(graphToSteps(graph, [nodeId], generations)).toMatchObject({ steps: [], errors: [expect.stringContaining('already running')] });
-    expect(previewRun(sid(), [nodeId]).errors).toContain('“Reload image” is already running.');
+    const problem = status === 'running'
+      ? '“Reload image” is already running.'
+      : 'The previous attempt for “Reload image” may have been submitted. Check its status before running again.';
+    expect(graphToSteps(graph, [nodeId], generations)).toMatchObject({ steps: [], errors: [problem] });
+    expect(previewRun(sid(), [nodeId]).errors).toContain(problem);
     const generate = vi.spyOn(ADAPTERS.nanogpt, 'generate');
     await expect(runNodes(sid(), [nodeId])).resolves.toBeNull();
     expect(generate).not.toHaveBeenCalled();

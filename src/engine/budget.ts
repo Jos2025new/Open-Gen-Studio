@@ -189,7 +189,7 @@ export class OverLimitError extends Error {
 /**
  * The central check of the promise «new paid runs will ask first»: an entry that forgot to ask is stopped here.
  * Free runs and approved plan steps go through. For other runs, use the same rule as the entries (`budgetVerdict`):
- * a price that exceeds the remaining budget or is unpublished needs approval when the limit is active.
+ * a price that exceeds the remaining budget or is unknown needs approval when the limit is active.
  */
 export function assertWithinLimit(e: Estimate, sessionId: string, approvedByPlan: boolean, pass?: BudgetPass): void {
   if (approvedByPlan || e.usd === 0 || !budgetVerdict(e, { sessionId, pass }).over) return;
@@ -200,7 +200,7 @@ export function assertWithinLimit(e: Estimate, sessionId: string, approvedByPlan
 export function overLimitText(e: Estimate, choices = '“Continue once” lets only this run through; “Don\u2019t ask again” stops asking in this session. Nothing running is stopped.'): string {
   const { budgetUsd } = get().settings;
   const left = Math.max(0, remainingBudget() ?? 0);
-  if (e.usd == null) return `The price of this run is not published, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
+  if (e.usd == null) return `The price of this run is unknown, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
 

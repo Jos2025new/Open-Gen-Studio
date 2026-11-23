@@ -2,6 +2,7 @@ import { runCanvasCall } from './canvasCalls';
 import { commandCatalog } from './commandCalls';
 import { mayStartWork } from '../../lib/writerLock';
 import { isAbort } from '../../lib/http';
+import { llmCallEstimate, overLimitAccepted } from '../budget';
 import { guardLlmBudget, onAgentCredit } from '../credit';
 import { loadLlmCatalog } from '../catalog';
 import { uid } from '../../lib/id';
@@ -27,6 +28,7 @@ import { runTurnToolLoop } from './turnToolLoop';
 
 /** Direct mode asks nothing and shows no settings card, so those two tools are not offered to the model. */
 const DIRECT_HIDDEN_TOOLS = new Set(['ask_questions', 'confirm_settings']);
+const PRICE_CATALOG_WAIT_MS = 3000;
 function toolsFor(style: AgentStyle) {
   return style === 'direct' ? TOOLS.filter((t) => !DIRECT_HIDDEN_TOOLS.has(t.function.name)) : TOOLS;
 }
@@ -43,9 +45,11 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   const engine = agentEngine(sessionId, owner);
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   const runId = opts.runId ?? uid('turn');
-  const guardBudget = () => guardLlmBudget(sessionId, engine.provider, engine.model, engineLabel(sessionId, owner), () => { if (!session(sessionId)) return; if (mine().busy) { notice(sessionId, workspace, 'The agent is busy. Send again when it finishes.', 'info'); return; } void llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: true }); }, opts.budgetPass);
-  if (!guardBudget()) return;
-  void loadLlmCatalog(engine.provider);
+  const title = engineLabel(sessionId, owner);
+  const guardBudget = () => guardLlmBudget(sessionId, engine.provider, engine.model, title, () => { if (!session(sessionId)) return; if (mine().busy) { notice(sessionId, workspace, 'The agent is busy. Send again when it finishes.', 'info'); return; } void llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: true }); }, opts.budgetPass);
+  const waitForPrice = !opts.budgetPass && !overLimitAccepted(sessionId)
+    && get().catalog.llmStatus[engine.provider] !== 'ready' && llmCallEstimate(engine.provider, engine.model).usd == null;
+  if (!waitForPrice && !guardBudget()) return;
   const endLog = startTurnLog(sessionId, 'llm', opts.route, runId);
   patchAgent(sessionId, { busy: true, phase: 'working' }, owner);
   const log = activityLog(sessionId, rowCanvas(workspace), messageMeta(workspace, {}, sessionId, owner));
@@ -78,6 +82,17 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   ending.set(controller, () => guard.cancel(() => notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta())));
   guard.armSilence();
   try {
+    const catalog = loadLlmCatalog(engine.provider);
+    if (waitForPrice) {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const deadline = new Promise<void>(resolve => { timeout = setTimeout(resolve, PRICE_CATALOG_WAIT_MS); });
+        await until(Promise.race([catalog, deadline]));
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!session(sessionId) || !mayStartWork() || !guardBudget()) { guard.setOutcome('canceled'); return; }
+    }
     for (let iteration = 0; iteration < 5; iteration++) {
       if (guard.checkOverCap()) return;
       if (iteration > 0 && !guardBudget()) { guard.setOutcome('canceled'); return; }

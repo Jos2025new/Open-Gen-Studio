@@ -9,7 +9,7 @@ import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
 import { ensureSchema, modelsOf, modelSummary, preferredModel, pickComposerModel, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
-import { autoLayout, graphBounds, nodeAttemptBusy } from './flow/graph';
+import { autoLayout, graphBounds, nodeAttemptProblem } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
 import { preferredProviderLabel } from './providers/registry';
@@ -333,8 +333,9 @@ export async function regenerate(generationId: string, budgetPass?: BudgetPass):
   // Node generations update their node; everything else appears in the conversation.
   const nodes = session?.graph.nodes ?? [];
   const target = attemptNode(g, nodes);
-  if (target && nodeAttemptBusy(target, get().generations)) {
-    toast(`“${target.data.title}” is already running.`, 'info');
+  const attemptProblem = target && nodeAttemptProblem(target, get().generations);
+  if (attemptProblem) {
+    toast(attemptProblem, 'info');
     return;
   }
   const held = holdAttemptNode(g, nodes);

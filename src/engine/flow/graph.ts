@@ -331,13 +331,15 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
   return !direct || byStep.createdAt >= (direct.createdAt ?? 0) ? byStep : direct;
 }
 
-export function nodeAttemptBusy(node: GraphNode, generations: Record<string, Generation>): boolean {
-  if (!runsGeneration(node.data)) return false;
+export function nodeAttemptProblem(node: GraphNode, generations: Record<string, Generation>): string | undefined {
+  if (!runsGeneration(node.data)) return;
   const attempt = nodeAttempt(node, generations);
-  return Boolean(attempt && attempt.status !== 'done' && (
-    attempt.status === 'queued' || attempt.status === 'running' || attempt.lostJob || attempt.remoteJob || attempt.sending != null ||
-    attempt.sends?.some(send => send.status === 'intent' || send.status === 'sent' || send.status === 'uncertain')
-  ));
+  if (!attempt || attempt.status === 'done') return;
+  if (attempt.status === 'queued' || attempt.status === 'running') return `“${node.data.title}” is already running.`;
+  if (attempt.lostJob || attempt.remoteJob || attempt.sending != null ||
+      attempt.sends?.some(send => send.status === 'intent' || send.status === 'sent' || send.status === 'uncertain')) {
+    return `The previous attempt for “${node.data.title}” may have been submitted. Check its status before running again.`;
+  }
 }
 
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
@@ -415,22 +417,23 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     const effectiveForced = forced || (options.force !== false && targetSet.has(id));
     if (checked.has(id) && (!effectiveForced || checked.get(id))) return checked.get(id)!;
     if (!runsGeneration(n.data)) return false;
-    if (nodeAttemptBusy(n, generations)) {
-      const problem = `“${n.data.title}” is already running.`;
-      if (!errors.includes(problem)) errors.push(problem);
-      return false;
-    }
     visiting.add(id);
     // A subject whose source was deleted is reported by the preview as a missing input, not walked.
     const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' && byId.has(p.id) ? [p.id] : []; }) : [];
     const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id && !unusable(id).has(e.id) && e.pin == null).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
     visiting.delete(id);
     const needsRun = effectiveForced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
-    checked.set(id, needsRun);
     if (needsRun) {
+      const problem = nodeAttemptProblem(n, generations);
+      if (problem) {
+        if (!errors.includes(problem)) errors.push(problem);
+        checked.set(id, false);
+        return false;
+      }
       if (n.data.sketchAssetId) errors.push(`“${n.data.title}” has a Sketch on its previous base. Reset or save the Sketch before updating this node.`);
       run.add(id);
     }
+    checked.set(id, needsRun);
     return needsRun;
   };
   targets.forEach(t => visit(t, options.force !== false));

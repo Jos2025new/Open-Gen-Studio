@@ -74,10 +74,20 @@ function loadProvider(p: ProviderId, force = false): Promise<void> {
   return run;
 }
 
-export async function loadLlmCatalog(provider: LlmProviderId): Promise<void> {
-  const st = get().catalog.llmStatus[provider];
-  if (st === 'loading' || st === 'ready') return;
+const llmInflight = new Map<LlmProviderId, Promise<void>>();
+
+/** All callers can await the same catalog load, including one started by the app at startup. */
+export function loadLlmCatalog(provider: LlmProviderId): Promise<void> {
+  const existing = llmInflight.get(provider);
+  if (existing) return existing;
+  if (get().catalog.llmStatus[provider] === 'ready') return Promise.resolve();
+  const run = refreshLlmCatalog(provider).finally(() => llmInflight.delete(provider));
+  llmInflight.set(provider, run);
   setCatalog((c) => ({ llmStatus: { ...c.llmStatus, [provider]: 'loading' } }));
+  return run;
+}
+
+async function refreshLlmCatalog(provider: LlmProviderId): Promise<void> {
   try {
     const models = await listLlmModels(provider);
     setCatalog((c) => ({ llm: { ...c.llm, [provider]: models }, llmStatus: { ...c.llmStatus, [provider]: 'ready' } }));

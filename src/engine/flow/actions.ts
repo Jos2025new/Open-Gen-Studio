@@ -15,7 +15,7 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
-import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeAttemptBusy, nodeOutputAsset } from './graph';
+import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
 import { beginBatchPass, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
@@ -223,10 +223,9 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   for (const id of inputs) {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
-    // A node this run writes must be free; an input only must not be generating.
-    const busyGen = nodeAttemptBusy(n, st.generations);
+    // The plan checks persisted attempts for writes. In-memory write locks also protect live inputs.
     const busy = `“${n.data.title}” is already running.`;
-    if (((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) && !errors.includes(busy)) errors.push(busy);
+    if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) && !errors.includes(busy)) errors.push(busy);
     // A required field left empty stops the run before any provider is called (every operation, from its field list).
     if (n.data.kind === 'tool' && run.runIds.includes(id)) for (const f of OPS[n.data.op].fields ?? []) {
       const v = n.data.params[f.key];

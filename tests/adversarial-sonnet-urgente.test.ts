@@ -12,6 +12,7 @@ import { useStore } from '../src/store/store';
 import { beginOncePass, consumeOnce, overLimit, withOncePass } from '../src/engine/budget';
 import { graphToSteps } from '../src/engine/flow/graph';
 import { previewRun } from '../src/engine/flow/actions';
+import { lockNodes } from '../src/engine/flow/locks';
 import { useAlerts } from '../src/engine/alerts';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import type { Generation, Graph } from '../src/engine/types';
@@ -59,18 +60,38 @@ describe('nodo con intento dudoso', () => {
     return { graph, generations };
   };
 
-  // reproduce: un intento dudoso del nodo A (origen del cable) bloquea la ejecucion de B con «A is already running» aunque A conserva un resultado bueno vigente y no se va a reenviar
-  it.fails('un intento dudoso aguas arriba no bloquea a un nodo que solo usa su ultimo resultado bueno', () => {
+  it('un intento dudoso aguas arriba no bloquea a un nodo que solo usa su ultimo resultado bueno', () => {
     const { graph, generations } = setup({ lostJob: true });
-    const plan = graphToSteps(graph, ['b'], generations, { assets: { 'asset-1': { id: 'asset-1', kind: 'image' } as never } });
+    const assets = { 'asset-1': { id: 'asset-1', kind: 'image' } as never };
+    useStore.setState({ assets });
+    const plan = graphToSteps(graph, ['b'], generations, { assets });
     expect(plan.errors).toEqual([]);
-    expect(previewRun(sid(), ['b']).errors).not.toContain('“A” is already running.');
+    expect(plan.runIds).toEqual(['b']);
+    expect(plan.steps[0]).toMatchObject({ firstFrame: 'asset:asset-1' });
+    const preview = previewRun(sid(), ['b']);
+    expect(preview.errors).not.toContain('“A” is already running.');
+    expect(preview.errors).toEqual([]);
+    expect(preview.runIds).toEqual(['b']);
+    expect(preview.steps).toEqual(plan.steps);
+
+    const uncertain = 'The previous attempt for “A” may have been submitted. Check its status before running again.';
+    expect(graphToSteps(graph, ['a'], generations, { assets }).errors).toEqual([uncertain]);
+    expect(previewRun(sid(), ['a']).errors).toEqual([uncertain]);
+    expect(previewRun(sid(), ['a'], false).errors).toEqual([]);
+
+    const release = lockNodes(sid(), ['a']);
+    try {
+      expect(previewRun(sid(), ['b']).errors).toEqual(['“A” is already running.']);
+    } finally {
+      release();
+    }
+    setup({ status: 'running' });
+    expect(previewRun(sid(), ['a']).errors).toEqual(['“A” is already running.']);
   });
 });
 
 describe('modelo LLM aun sin catalogo cargado', () => {
-  // reproduce: con limite activo y catalogo LLM sin cargar, llmTurn pregunta antes de pedir el catalogo (guardLlmBudget va antes de loadLlmCatalog), incluso para un modelo de precio conocido y barato
-  it.fails('el primer turno tras abrir la app no pregunta por un modelo que el catalogo prueba barato', async () => {
+  it('el primer turno tras abrir la app no pregunta por un modelo que el catalogo prueba barato', async () => {
     const st = useStore.getState();
     const chat = vi.fn();
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -83,6 +104,7 @@ describe('modelo LLM aun sin catalogo cargado', () => {
       settings: { ...st.settings, budgetOn: true, budgetUsd: 100, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } } });
     await sendAgentMessage('hola');
     expect(useAlerts.getState().alerts).toEqual([]);
+    expect(chat.mock.calls.filter(([init]) => init?.method === 'POST' && String(init.body).includes('"model":"m"'))).toHaveLength(1);
   });
 });
 
