@@ -316,8 +316,9 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
   };
 
   if (opts.local || isFreePrice(slot.price)) {
+    const freeTicket = ticket;
     return sendFree(sendId, opts.send, opts.signal, opts.beforeTransport, (result, costUsd) => {
-      const latest = opts.tickets.get(opts.ticketId) ?? ticket;
+      const latest = opts.tickets.get(opts.ticketId) ?? freeTicket;
       return close(markSendInFlight(latest, sendId, now()), { costUsd, estimated: result.estimated });
     });
   }
