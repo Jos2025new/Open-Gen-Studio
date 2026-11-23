@@ -25,7 +25,7 @@ import { agentSeesImages, userMessage } from './attachments';
 import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { budgetProblem, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
-import { hasActiveTicketSend, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { grantGenerationTicketPass, hasActiveTicketSend, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
@@ -274,7 +274,10 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   // «Continuar» raises what this step spends above what was approved: over an active limit it needs the same pass as any other spend (PlanCard gives it with «Continue once»).
   const reviewProblem = decision === 'continue' ? budgetProblem(review.proposed.estimate, sessionId, budgetPass) : null;
   if (reviewProblem) { toast(reviewProblem, 'error'); return; }
-  if (decision === 'continue') consumeOnce(budgetPass, review.proposed.estimate);
+  if (decision === 'continue') {
+    if (passActiveFor(budgetPass, sessionId, review.proposed.estimate)) grantGenerationTicketPass(generationId, review.proposed.estimate);
+    consumeOnce(budgetPass, review.proposed.estimate);
+  }
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,

@@ -241,8 +241,7 @@ it.fails('H5: provides explicit reconciliation for an uncertain prompt-rewrite L
   expect(feedNotice, 'uncertain prompt rewrite left no feed notice with explicit reconciliation action').toBeDefined();
 });
 
-// reproduce: createGeneration skips updating approval.pass on a shared cmd ticket once pass is set, blocking the second paid studio step with PASS_EXCEEDED.
-it.fails('H6: allows a second paid studio step in a command sequence approved with "Allow this time"', async () => {
+it('H6: allows a second paid studio step in a command sequence approved with "Allow this time"', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetUsd: 0.15 } }));
   setComposer({ text: 'studio step prompt' });
   setComposerMedia('image', { modelRef });
@@ -261,8 +260,7 @@ it.fails('H6: allows a second paid studio step in a command sequence approved wi
   expect(fake.acceptedCount('studio step prompt'), 'second approved studio step was blocked by un-updated ticket pass').toBe(2);
 });
 
-// reproduce: resolveStepCostReview consumes the user's new once pass without updating plan:<id>.pass.maxUsd, causing paidSend to reject the reviewed step with PASS_EXCEEDED.
-it.fails('H7: updates plan ticket pass ceiling when user confirms a step price review with a once pass', async () => {
+it('H7: updates plan ticket pass ceiling when user confirms a step price review with a once pass', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetUsd: 0.15 } }));
   const item: PlanFeedItem = {
     id: 'plan-pr', createdAt: 1, type: 'plan', style: 'auto', workspace: 'chat', status: 'review',

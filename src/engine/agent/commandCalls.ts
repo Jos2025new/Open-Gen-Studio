@@ -7,7 +7,7 @@ import { COMMAND_REVIEW_CHANGED } from '../commands/types';
 import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
-import { storeTickets } from '../money/storeBridge';
+import { grantTicketPass, storeTickets } from '../money/storeBridge';
 import {
   createTicket,
   FREE_PRICE,
@@ -299,7 +299,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
       return false;
     }
     if (!item || item.status !== 'awaiting' || replaying.has(itemId)) return false;
-    const ticket = storeTickets.get(commandTicketId(itemId));
+    let ticket = storeTickets.get(commandTicketId(itemId));
     const steps = frozenStepsOf(ticket);
     if (!ticket || ticket.sessionId !== sessionId || !steps.length) return false;
     const remainingSpends = steps.filter((s) => {
@@ -319,6 +319,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
       const grant = beginOncePass(sessionId, remainingEstimate.usd, unknownSteps);
       budgetPass = grant.pass;
       releasePass = grant.end;
+      ticket = grantTicketPass(ticket, remainingEstimate);
     }
     replaying.add(itemId);
     updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));
@@ -342,6 +343,8 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
     const unknownSteps = entry.request.steps.filter(s => s.effect === 'spend' && (s.estimate.usd == null || s.estimate.lowerBound)).length;
     const grant = beginOncePass(sessionId, entry.request.estimate.usd, unknownSteps);
     entry.setReleasePass(grant.end);
+    const ticket = storeTickets.get(commandTicketId(itemId));
+    if (ticket) grantTicketPass(ticket, entry.request.estimate);
     budgetPass = grant.pass;
   }
   pending.delete(itemId);

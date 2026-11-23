@@ -209,18 +209,16 @@ export function ensureGenerationTicket(
   return created;
 }
 
+export function grantTicketPass(ticket: ApprovalTicket, estimate: Estimate): ApprovalTicket {
+  const pass = ticketPassFromEstimate(estimate);
+  const updated = { ...ticket, pass: { ...pass, maxUsd: pass.maxUsd == null ? null : roundUsd(ticketCommittedUsd(ticket) + pass.maxUsd) } };
+  storeTickets.put(updated);
+  return updated;
+}
+
 export function grantGenerationTicketPass(genId: string, estimate: Estimate): void {
   const g = get().generations[genId];
-  if (!g) return;
-  const existing = ticketForGeneration(genId);
-  const committed = existing ? ticketCommittedUsd(existing) : 0;
-  const unknown = estimate.usd == null || Boolean(estimate.lowerBound);
-  const pass: TicketPass = {
-    kind: 'once',
-    maxUsd: unknown ? null : roundUsd(committed + estimate.usd!),
-    ...(unknown ? { allowUnknown: true } : {}),
-  };
-  ensureGenerationTicket(g, { pass });
+  if (g) grantTicketPass(ensureGenerationTicket(g), estimate);
 }
 
 /** Compute the per-send `MoneyPrice`, respecting local/free models, explicit quotes and proportional batch estimates. */

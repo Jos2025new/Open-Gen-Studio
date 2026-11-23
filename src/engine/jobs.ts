@@ -102,7 +102,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
   upsertGeneration(g);
   if (!g.approvalTicketId && slotPriceForGeneration(g).maxVerifiableUsd !== 0) {
     ensureGenerationTicket(g, needsTicketPass ? { pass: ticketPassFromEstimate(estimate) } : {});
-  } else if (g.approvalTicketId && pass && !approval?.pass) {
+  } else if (g.approvalTicketId && approval?.kind !== 'commands' && pass && !approval?.pass) {
     grantGenerationTicketPass(g.id, estimate);
   }
   return g;
