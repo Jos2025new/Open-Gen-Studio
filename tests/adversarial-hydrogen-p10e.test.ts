@@ -36,9 +36,7 @@ const chatNode = (id: string, x: number, y: number): GraphNode => ({
 });
 
 describe('p10e rendimiento: bucle cuadratico/cubico con 200 tarjetas', () => {
-  // reproduce: findFreePosition genera ~11*N + 288 candidatos sin deduplicar y clear() escanea O(N) por cada uno.
-  // Con 200 tarjetas frescas superpuestas en settleFresh tarda ~240 ms (frente a <50 ms de presupuesto UI; escalado ~100x desde N=20).
-  it.fails('settling 200 overlapping fresh cards stays fast (< 50 ms) and scales sub-quadratically from 20 cards', () => {
+  it('settling 200 overlapping fresh cards stays fast (< 50 ms) and scales sub-quadratically from 20 cards', () => {
     const run = (count: number) => {
       const nodes: GraphNode[] = Array.from({ length: count }, (_, i) => imageNode(`n${i}`, 0, 0));
       const fresh = new Set(nodes.map((n) => n.id));
@@ -53,8 +51,7 @@ describe('p10e rendimiento: bucle cuadratico/cubico con 200 tarjetas', () => {
     expect(r200.ms, `N=20: ${r20.ms.toFixed(1)} ms, N=200: ${r200.ms.toFixed(1)} ms`).toBeLessThan(50);
   });
 
-  // reproduce: 200 soltados repetidos en el mismo punto (0,0) mediante findFreePositionFor acumulan O(N^3) comprobaciones (~325-350 ms).
-  it.fails('200 repeated drops at the same point complete without perceptible lag (< 50 ms)', () => {
+  it('200 repeated drops at the same point complete without perceptible lag (< 50 ms)', () => {
     const data = { kind: 'image', title: 'Image' } as unknown as GraphNodeData;
     const occupied: NodeRect[] = [];
     const t0 = performance.now();

@@ -49,6 +49,408 @@ export function rectsOverlap(a: NodeRect, b: NodeRect, gapX = 0, gapY = 0): bool
   return a.x < b.x + b.width + gapX && a.x + a.width + gapX > b.x && a.y < b.y + b.height + gapY && a.y + a.height + gapY > b.y;
 }
 
+const finite = (n: number) => Number.isFinite(n);
+const finiteRect = (r: NodeRect) => finite(r.x) && finite(r.y) && finite(r.width) && finite(r.height);
+
+const CELL = 512;
+const CELL_BIAS = 16384;
+const MAX_CELL_SPAN = 16;
+// 30-bit Smi key (fits in V8 31-bit Smi without HeapNumber allocation for ±8M px canvases).
+const cellKey = (cx: number, cy: number) => ((cx + CELL_BIAS) << 15) | (cy + CELL_BIAS);
+
+function listIsClear(
+  list: readonly NodeRect[],
+  x: number, y: number, rx1: number, ry1: number,
+  px0: number, py0: number, px1: number, py1: number,
+  own: NodeRect | null, ox0: number, oy0: number, ox1: number, oy1: number,
+): boolean {
+  for (let i = 0; i < list.length; i++) {
+    const o = list[i];
+    if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return false;
+    const p = o.panel;
+    if (p && x < p.x + p.width && rx1 > p.x && y < p.y + p.height && ry1 > p.y) return false;
+    if (own && ox0 < o.x + o.width && ox1 > o.x && oy0 < o.y + o.height && oy1 > o.y) return false;
+  }
+  return true;
+}
+
+interface RingHint {
+  dx0: number; dy0: number; sw: number; sh: number; gapX: number; gapY: number;
+  ownX: number; ownY: number; ownW: number; ownH: number; hasOwn: boolean;
+  minRing: number;
+  cap: number;
+  blocked: Uint8Array;
+}
+
+function makeHintBlocked(cap: number, prev?: { cap: number; blocked: Uint8Array }): Uint8Array {
+  const side = cap * 2 + 1;
+  const next = new Uint8Array(side * side);
+  if (prev) {
+    const oldSide = prev.cap * 2 + 1;
+    for (let gy = -prev.cap; gy <= prev.cap; gy++) {
+      const srcRow = (gy + prev.cap) * oldSide + prev.cap;
+      const dstRow = (gy + cap) * side + cap;
+      for (let gx = -prev.cap; gx <= prev.cap; gx++) next[dstRow + gx] = prev.blocked[srcRow + gx];
+    }
+  }
+  return next;
+}
+
+let ivLo = new Float64Array(256);
+let ivHi = new Float64Array(256);
+
+function ensureIvCap(len: number): void {
+  if (ivLo.length >= len) return;
+  const next = Math.max(len, ivLo.length * 2);
+  const nLo = new Float64Array(next);
+  const nHi = new Float64Array(next);
+  nLo.set(ivLo);
+  nHi.set(ivHi);
+  ivLo = nLo;
+  ivHi = nHi;
+}
+
+/** Exact nearest clear coordinate on a 1D line (`>= origin` and `<= origin`) given `count` open forbidden intervals in `ivLo`/`ivHi`. */
+function nearestClear1D(origin: number, count: number, maxDelta: number): [number, number] {
+  if (!count) return [origin, origin];
+  let right = origin;
+  for (let pass = 0; pass < count; pass++) {
+    let moved = false;
+    for (let i = 0; i < count; i++) {
+      if (ivLo[i] < right && ivHi[i] > right) {
+        right = ivHi[i];
+        if (right - origin > maxDelta) { right = Infinity; moved = false; break; }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  let left = origin;
+  for (let pass = 0; pass < count; pass++) {
+    let moved = false;
+    for (let i = 0; i < count; i++) {
+      if (ivLo[i] < left && ivHi[i] > left) {
+        left = ivLo[i];
+        if (origin - left > maxDelta) { left = -Infinity; moved = false; break; }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return [right, left];
+}
+
+/** Cell-hash spatial index storing cards and panels by 512 px cells so overlap and strip queries are O(1) / O(sqrt(N)). */
+class SpatialGrid {
+  private cells = new Map<number, NodeRect[]>();
+  private large: NodeRect[] = [];
+  readonly cards: NodeRect[] = [];
+  bottom = -Infinity;
+  hint: RingHint | null = null;
+
+  private addBox(o: NodeRect, x0: number, y0: number, x1: number, y1: number, skipX0 = 1, skipX1 = 0, skipY0 = 1, skipY1 = 0): void {
+    const cx0 = Math.floor(x0 / CELL), cx1 = Math.floor(x1 / CELL);
+    const cy0 = Math.floor(y0 / CELL), cy1 = Math.floor(y1 / CELL);
+    if (cx0 < -CELL_BIAS || cx1 >= CELL_BIAS || cy0 < -CELL_BIAS || cy1 >= CELL_BIAS || (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > MAX_CELL_SPAN) {
+      if (this.large[this.large.length - 1] !== o) this.large.push(o);
+      return;
+    }
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cy = cy0; cy <= cy1; cy++) {
+        if (cx >= skipX0 && cx <= skipX1 && cy >= skipY0 && cy <= skipY1) continue;
+        const k = cellKey(cx, cy);
+        const bucket = this.cells.get(k);
+        if (bucket) bucket.push(o);
+        else this.cells.set(k, [o]);
+      }
+    }
+  }
+
+  add(o: NodeRect): void {
+    if (!finiteRect(o)) return;
+    const p = o.panel && finiteRect(o.panel) ? o.panel : null;
+    const rec = p === o.panel ? o : { x: o.x, y: o.y, width: o.width, height: o.height };
+    this.cards.push(rec);
+    if (rec.y + rec.height > this.bottom) this.bottom = rec.y + rec.height;
+    const cx0 = Math.floor(rec.x / CELL), cx1 = Math.floor((rec.x + rec.width) / CELL);
+    const cy0 = Math.floor(rec.y / CELL), cy1 = Math.floor((rec.y + rec.height) / CELL);
+    const cardNormal = cx0 >= -CELL_BIAS && cx1 < CELL_BIAS && cy0 >= -CELL_BIAS && cy1 < CELL_BIAS && (cx1 - cx0 + 1) * (cy1 - cy0 + 1) <= MAX_CELL_SPAN;
+    this.addBox(rec, rec.x, rec.y, rec.x + rec.width, rec.y + rec.height);
+    if (p) {
+      if (cardNormal) this.addBox(rec, p.x, p.y, p.x + p.width, p.y + p.height, cx0, cx1, cy0, cy1);
+      else this.addBox(rec, p.x, p.y, p.x + p.width, p.y + p.height);
+    }
+  }
+
+  overlapsCard(r: NodeRect, gapX = 0, gapY = 0): boolean {
+    const px0 = r.x - gapX, px1 = r.x + r.width + gapX;
+    const py0 = r.y - gapY, py1 = r.y + r.height + gapY;
+    for (let i = 0; i < this.large.length; i++) {
+      const o = this.large[i];
+      if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return true;
+    }
+    const cx0 = Math.floor(px0 / CELL), cx1 = Math.floor(px1 / CELL);
+    const cy0 = Math.floor(py0 / CELL), cy1 = Math.floor(py1 / CELL);
+    if (cx0 < -CELL_BIAS || cx1 >= CELL_BIAS || cy0 < -CELL_BIAS || cy1 >= CELL_BIAS || (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > MAX_CELL_SPAN * 4) {
+      for (let i = 0; i < this.cards.length; i++) {
+        const o = this.cards[i];
+        if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return true;
+      }
+      return false;
+    }
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cy = cy0; cy <= cy1; cy++) {
+        const bucket = this.cells.get(cellKey(cx, cy));
+        if (!bucket) continue;
+        for (let i = 0; i < bucket.length; i++) {
+          const o = bucket[i];
+          if (px0 < o.x + o.width && px1 > o.x && py0 < o.y + o.height && py1 > o.y) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  isClear(x: number, y: number, sw: number, sh: number, gapX: number, gapY: number, own: NodeRect | null): boolean {
+    const px0 = x - gapX, px1 = x + sw + gapX;
+    const py0 = y - gapY, py1 = y + sh + gapY;
+    const rx1 = x + sw, ry1 = y + sh;
+    const ox0 = own ? x + own.x : 0, ox1 = own ? ox0 + own.width : 0;
+    const oy0 = own ? y + own.y : 0, oy1 = own ? oy0 + own.height : 0;
+    if (this.large.length && !listIsClear(this.large, x, y, rx1, ry1, px0, py0, px1, py1, own, ox0, oy0, ox1, oy1)) return false;
+    const qx0 = own && ox0 < px0 ? ox0 : px0;
+    const qy0 = own && oy0 < py0 ? oy0 : py0;
+    const qx1 = own && ox1 > px1 ? ox1 : px1;
+    const qy1 = own && oy1 > py1 ? oy1 : py1;
+    const cx0 = Math.floor(qx0 / CELL), cx1 = Math.floor(qx1 / CELL);
+    const cy0 = Math.floor(qy0 / CELL), cy1 = Math.floor(qy1 / CELL);
+    if (cx0 < -CELL_BIAS || cx1 >= CELL_BIAS || cy0 < -CELL_BIAS || cy1 >= CELL_BIAS || (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > MAX_CELL_SPAN * 4) {
+      return listIsClear(this.cards, x, y, rx1, ry1, px0, py0, px1, py1, own, ox0, oy0, ox1, oy1);
+    }
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cy = cy0; cy <= cy1; cy++) {
+        const bucket = this.cells.get(cellKey(cx, cy));
+        if (bucket && !listIsClear(bucket, x, y, rx1, ry1, px0, py0, px1, py1, own, ox0, oy0, ox1, oy1)) return false;
+      }
+    }
+    return true;
+  }
+
+  forEachInBox(x0: number, y0: number, x1: number, y1: number, visit: (o: NodeRect) => void): void {
+    for (let i = 0; i < this.large.length; i++) visit(this.large[i]);
+    const cx0 = Math.floor(x0 / CELL), cx1 = Math.floor(x1 / CELL);
+    const cy0 = Math.floor(y0 / CELL), cy1 = Math.floor(y1 / CELL);
+    if (cx0 < -CELL_BIAS || cx1 >= CELL_BIAS || cy0 < -CELL_BIAS || cy1 >= CELL_BIAS || (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > 256) {
+      for (let i = 0; i < this.cards.length; i++) visit(this.cards[i]);
+      return;
+    }
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cy = cy0; cy <= cy1; cy++) {
+        const bucket = this.cells.get(cellKey(cx, cy));
+        if (!bucket) continue;
+        for (let i = 0; i < bucket.length; i++) visit(bucket[i]);
+      }
+    }
+  }
+}
+
+interface GridCacheEntry {
+  grid: SpatialGrid;
+  len: number;
+  first: NodeRect | undefined;
+  firstX: number; firstY: number; firstW: number; firstH: number;
+  last: NodeRect | undefined;
+  lastX: number; lastY: number; lastW: number; lastH: number;
+}
+
+const gridCache = new WeakMap<readonly NodeRect[], GridCacheEntry>();
+
+function gridForOccupied(occupied: readonly NodeRect[]): SpatialGrid {
+  const len = occupied.length;
+  const cached = gridCache.get(occupied);
+  if (cached && len >= cached.len) {
+    const f = occupied[0];
+    const l = cached.len > 0 ? occupied[cached.len - 1] : undefined;
+    const sameFirst = cached.len === 0 || (f !== undefined && f === cached.first && f.x === cached.firstX && f.y === cached.firstY && f.width === cached.firstW && f.height === cached.firstH);
+    const sameLast = cached.len === 0 || (l !== undefined && l === cached.last && l.x === cached.lastX && l.y === cached.lastY && l.width === cached.lastW && l.height === cached.lastH);
+    if (sameFirst && sameLast) {
+      for (let i = cached.len; i < len; i++) cached.grid.add(occupied[i]);
+      cached.len = len;
+      if (len > 0) {
+        const nf = occupied[0], nl = occupied[len - 1];
+        cached.first = nf; cached.firstX = nf.x; cached.firstY = nf.y; cached.firstW = nf.width; cached.firstH = nf.height;
+        cached.last = nl; cached.lastX = nl.x; cached.lastY = nl.y; cached.lastW = nl.width; cached.lastH = nl.height;
+      }
+      return cached.grid;
+    }
+  }
+  const grid = new SpatialGrid();
+  for (let i = 0; i < len; i++) grid.add(occupied[i]);
+  const f = len > 0 ? occupied[0] : undefined;
+  const l = len > 0 ? occupied[len - 1] : undefined;
+  gridCache.set(occupied, {
+    grid, len,
+    first: f, firstX: f?.x ?? 0, firstY: f?.y ?? 0, firstW: f?.width ?? 0, firstH: f?.height ?? 0,
+    last: l, lastX: l?.x ?? 0, lastY: l?.y ?? 0, lastW: l?.width ?? 0, lastH: l?.height ?? 0,
+  });
+  return grid;
+}
+
+function findFreePositionInGrid(
+  desired: { x: number; y: number },
+  size: { width: number; height: number },
+  grid: SpatialGrid,
+  opts?: { gapX?: number; gapY?: number; preferRight?: boolean; panel?: NodeRect | null },
+): { x: number; y: number } {
+  const gapX = opts?.gapX ?? 48;
+  const gapY = opts?.gapY ?? 56;
+  const preferRight = Boolean(opts?.preferRight);
+  // A non-finite coordinate (an unmeasured pointer, an imported node) never reaches the result: the desired one falls to the origin, a broken rect is ignored.
+  if (!finite(desired.x) || !finite(desired.y)) desired = { x: finite(desired.x) ? desired.x : 0, y: finite(desired.y) ? desired.y : 0 };
+  if (!grid.cards.length) return desired;
+  const dx0 = desired.x, dy0 = desired.y;
+  const sw = size.width, sh = size.height;
+  const own = opts?.panel && finiteRect(opts.panel) ? opts.panel : null;
+  if (grid.isClear(dx0, dy0, sw, sh, gapX, gapY, own)) return desired;
+
+  const stepX = sw + gapX;
+  const stepY = sh + gapY;
+  const minStep = Math.min(stepX, stepY);
+  let bestDist = Infinity;
+  let bestDx = -Infinity;
+  let bestX = dx0;
+  let bestY = dy0;
+  let found = false;
+
+  // Monotonic ring hint: on an append-only grid with the same query shape, rings/cells already proved blocked stay blocked.
+  const ownX = own ? own.x : 0, ownY = own ? own.y : 0, ownW = own ? own.width : 0, ownH = own ? own.height : 0;
+  const hasOwn = own !== null;
+  const maxRing = Math.max(8, Math.ceil(Math.sqrt(grid.cards.length)) + 6);
+  let hint = grid.hint;
+  if (
+    !hint || hint.dx0 !== dx0 || hint.dy0 !== dy0 || hint.sw !== sw || hint.sh !== sh || hint.gapX !== gapX || hint.gapY !== gapY ||
+    hint.hasOwn !== hasOwn || hint.ownX !== ownX || hint.ownY !== ownY || hint.ownW !== ownW || hint.ownH !== ownH
+  ) {
+    const cap = Math.max(16, maxRing);
+    hint = { dx0, dy0, sw, sh, gapX, gapY, ownX, ownY, ownW, ownH, hasOwn, minRing: 1, cap, blocked: makeHintBlocked(cap) };
+    grid.hint = hint;
+  } else if (hint.cap < maxRing) {
+    const cap = Math.max(hint.cap * 2, maxRing);
+    hint.blocked = makeHintBlocked(cap, hint);
+    hint.cap = cap;
+  }
+  const hCap = hint.cap;
+  const hSide = hCap * 2 + 1;
+  const hBlocked = hint.blocked;
+
+  const tryRingCell = (gx: number, gy: number, x: number, y: number): boolean => {
+    const idx = (gy + hCap) * hSide + hCap + gx;
+    if (hBlocked[idx]) return false;
+    const dx = x - dx0;
+    const dy = y - dy0;
+    const dist = dx * dx + dy * dy;
+    if (dist > bestDist) return false;
+    if (dist === bestDist && (!preferRight || dx <= bestDx)) return false;
+    if (!grid.isClear(x, y, sw, sh, gapX, gapY, own)) {
+      hBlocked[idx] = 1;
+      return false;
+    }
+    bestDist = dist;
+    bestDx = dx;
+    bestX = x;
+    bestY = y;
+    found = true;
+    return true;
+  };
+
+  let nextMinRing = hint.minRing;
+  for (let r = hint.minRing; r <= maxRing; r++) {
+    if (found && r * minStep * (r * minStep) > bestDist) break;
+    const rStepX = r * stepX;
+    const rStepY = r * stepY;
+    let anyClearInRing = false;
+    if (tryRingCell(0, -r, dx0, dy0 - rStepY)) anyClearInRing = true;
+    if (tryRingCell(0, r, dx0, dy0 + rStepY)) anyClearInRing = true;
+    if (tryRingCell(r, 0, dx0 + rStepX, dy0)) anyClearInRing = true;
+    if (tryRingCell(-r, 0, dx0 - rStepX, dy0)) anyClearInRing = true;
+    for (let g = 1; g <= r; g++) {
+      const gxStep = g * stepX;
+      if (gxStep * gxStep + rStepY * rStepY <= bestDist) {
+        if (tryRingCell(g, -r, dx0 + gxStep, dy0 - rStepY)) anyClearInRing = true;
+        if (tryRingCell(-g, -r, dx0 - gxStep, dy0 - rStepY)) anyClearInRing = true;
+        if (tryRingCell(g, r, dx0 + gxStep, dy0 + rStepY)) anyClearInRing = true;
+        if (tryRingCell(-g, r, dx0 - gxStep, dy0 + rStepY)) anyClearInRing = true;
+      }
+      if (g < r) {
+        const gyStep = g * stepY;
+        if (rStepX * rStepX + gyStep * gyStep <= bestDist) {
+          if (tryRingCell(r, g, dx0 + rStepX, dy0 + gyStep)) anyClearInRing = true;
+          if (tryRingCell(-r, g, dx0 - rStepX, dy0 + gyStep)) anyClearInRing = true;
+          if (tryRingCell(r, -g, dx0 + rStepX, dy0 - gyStep)) anyClearInRing = true;
+          if (tryRingCell(-r, -g, dx0 - rStepX, dy0 - gyStep)) anyClearInRing = true;
+        }
+      }
+    }
+    if (!found && !anyClearInRing && r === nextMinRing) nextMinRing = r + 1;
+  }
+  hint.minRing = nextMinRing;
+
+  // 2. Exact 1D interval sweep along the desired horizontal and vertical strips (zero tuple allocations, zero grid.isClear calls).
+  const radius = found ? Math.sqrt(bestDist) : Infinity;
+  const stripY0 = dy0 - gapY, stripY1 = dy0 + sh + gapY;
+  const stripX0 = dx0 - gapX, stripX1 = dx0 + sw + gapX;
+  const ownY0 = own ? dy0 + own.y : stripY0, ownY1 = own ? ownY0 + own.height : stripY1;
+  const ownX0 = own ? dx0 + own.x : stripX0, ownX1 = own ? ownX0 + own.width : stripX1;
+  const bandY0 = ownY0 < stripY0 ? ownY0 : stripY0;
+  const bandY1 = ownY1 > stripY1 ? ownY1 : stripY1;
+  const bandX0 = ownX0 < stripX0 ? ownX0 : stripX0;
+  const bandX1 = ownX1 > stripX1 ? ownX1 : stripX1;
+
+  let ivCount = 0;
+  const pushIv = (lo: number, hi: number, origin: number, lim: number): void => {
+    if (hi <= origin - lim || lo >= origin + lim) return;
+    if (ivCount >= ivLo.length) ensureIvCap(ivCount + 1);
+    ivLo[ivCount] = lo;
+    ivHi[ivCount] = hi;
+    ivCount++;
+  };
+  const marginX = found ? radius + Math.max(sw + gapX, own ? own.width + Math.abs(own.x) : 0) : 1e9;
+  const marginY = found ? radius + Math.max(sh + gapY, own ? own.height + Math.abs(own.y) : 0) : 1e9;
+  grid.forEachInBox(dx0 - marginX, bandY0, dx0 + marginX, bandY1, (o) => {
+    if (o.y < stripY1 && o.y + o.height > stripY0) pushIv(o.x - sw - gapX, o.x + o.width + gapX, dx0, radius);
+    if (own && o.y < ownY1 && o.y + o.height > ownY0) pushIv(o.x - own.x - own.width, o.x + o.width - own.x, dx0, radius);
+    const p = o.panel;
+    if (p && p.y < dy0 + sh && p.y + p.height > dy0) pushIv(p.x - sw, p.x + p.width, dx0, radius);
+  });
+  const [rightX, leftX] = nearestClear1D(dx0, ivCount, radius);
+  const acceptAxis = (x: number, y: number): void => {
+    if (!finite(x) || !finite(y)) return;
+    const dx = x - dx0, dy = y - dy0;
+    const dist = dx * dx + dy * dy;
+    if (dist > bestDist) return;
+    if (dist === bestDist && (!preferRight || dx <= bestDx)) return;
+    bestDist = dist; bestDx = dx; bestX = x; bestY = y; found = true;
+  };
+  acceptAxis(rightX, dy0);
+  acceptAxis(leftX, dy0);
+
+  ivCount = 0;
+  const curRadius = found ? Math.sqrt(bestDist) : Infinity;
+  const curMarginY = found ? curRadius + Math.max(sh + gapY, own ? own.height + Math.abs(own.y) : 0) : marginY;
+  grid.forEachInBox(bandX0, dy0 - curMarginY, bandX1, dy0 + curMarginY, (o) => {
+    if (o.x < stripX1 && o.x + o.width > stripX0) pushIv(o.y - sh - gapY, o.y + o.height + gapY, dy0, curRadius);
+    if (own && o.x < ownX1 && o.x + o.width > ownX0) pushIv(o.y - own.y - own.height, o.y + o.height - own.y, dy0, curRadius);
+    const p = o.panel;
+    if (p && p.x < dx0 + sw && p.x + p.width > dx0) pushIv(p.y - sh, p.y + p.height, dy0, curRadius);
+  });
+  const [downY, upY] = nearestClear1D(dy0, ivCount, curRadius);
+  acceptAxis(dx0, downY);
+  acceptAxis(dx0, upY);
+
+  if (found) return { x: bestX, y: bestY };
+  return { x: dx0, y: Math.max(grid.bottom, dy0) + gapY };
+}
+
 /** Pick the closest non-overlapping flow position starting from `desired` (searching outward in a grid).
  *  Existing cards bring their floating composer panel (`NodeRect.panel`): the new card keeps clear of it. `opts.panel` is the new
  *  card's own panel (`panelZone` of a card at 0,0): it keeps clear of existing cards (no gap beyond the panel itself); panels never
@@ -59,58 +461,10 @@ export function findFreePosition(
   occupied: readonly NodeRect[],
   opts?: { gapX?: number; gapY?: number; preferRight?: boolean; panel?: NodeRect | null },
 ): { x: number; y: number } {
-  const gapX = opts?.gapX ?? 48;
-  const gapY = opts?.gapY ?? 56;
-  // A non-finite coordinate (an unmeasured pointer, an imported node) never reaches the result: the desired one falls to the origin, a broken rect is ignored.
-  const finite = (n: number) => Number.isFinite(n);
-  if (!finite(desired.x) || !finite(desired.y)) desired = { x: finite(desired.x) ? desired.x : 0, y: finite(desired.y) ? desired.y : 0 };
-  occupied = occupied.filter((o) => finite(o.x) && finite(o.y) && finite(o.width) && finite(o.height));
-  const panels = occupied.flatMap((o) => (o.panel ? [o.panel] : [])).filter((p) => finite(p.x) && finite(p.y) && finite(p.width) && finite(p.height));
-  const own = opts?.panel ?? null;
-  const clear = (x: number, y: number) => {
-    const r: NodeRect = { x, y, width: size.width, height: size.height };
-    if (occupied.some((o) => rectsOverlap(r, o, gapX, gapY)) || panels.some((p) => rectsOverlap(r, p))) return false;
-    return !own || !occupied.some((o) => rectsOverlap({ ...own, x: x + own.x, y: y + own.y }, o));
-  };
-  if (clear(desired.x, desired.y)) return desired;
-  const stepX = size.width + gapX;
-  const stepY = size.height + gapY;
-  // Candidates: the slots right against each obstacle's edges (a hole just under a composer panel is found even when it is not a
-  // whole grid step away), then ordered rings around desired; the nearest clear one wins.
-  const offsets: Array<{ dx: number; dy: number; dist: number }> = [];
-  const push = (x: number, y: number) => { const dx = x - desired.x; const dy = y - desired.y; offsets.push({ dx, dy, dist: dx * dx + dy * dy }); };
-  for (const o of occupied) {
-    const xs = [o.x + o.width + gapX, o.x - size.width - gapX];
-    const ys = [o.y + o.height + gapY, o.y - size.height - gapY];
-    if (own) { xs.push(o.x + o.width - own.x, o.x - own.x - own.width); ys.push(o.y - own.y - own.height); }
-    for (const x of xs) push(x, desired.y);
-    for (const y of ys) push(desired.x, y);
+  if (!occupied.length) {
+    return { x: finite(desired.x) ? desired.x : 0, y: finite(desired.y) ? desired.y : 0 };
   }
-  for (const p of panels) {
-    push(desired.x, p.y + p.height);
-    push(p.x + p.width, desired.y);
-    push(p.x - size.width, desired.y);
-    push(desired.x, p.y - size.height);
-  }
-  const maxRing = 8;
-  for (let r = 1; r <= maxRing; r++) {
-    for (let gx = -r; gx <= r; gx++) {
-      for (let gy = -r; gy <= r; gy++) {
-        if (Math.max(Math.abs(gx), Math.abs(gy)) !== r) continue;
-        const dx = gx * stepX;
-        const dy = gy * stepY;
-        offsets.push({ dx, dy, dist: dx * dx + dy * dy });
-      }
-    }
-  }
-  offsets.sort((a, b) => a.dist - b.dist || (opts?.preferRight ? b.dx - a.dx : 0));
-  for (const { dx, dy } of offsets) {
-    const x = desired.x + dx;
-    const y = desired.y + dy;
-    if (clear(x, y)) return { x, y };
-  }
-  const bottom = occupied.reduce((m, o) => Math.max(m, o.y + o.height), desired.y);
-  return { x: desired.x, y: bottom + gapY };
+  return findFreePositionInGrid(desired, size, gridForOccupied(occupied), opts);
 }
 
 /** Image, video, audio, 3D and tool cards open a composer panel under the card while selected (400 px wide, 12 px below). It is
@@ -141,16 +495,17 @@ export function findFreePositionFor(
  *  `fresh`: ids measured for the first time. Returns new positions for those that overlap; the rest stay put. */
 export function settleFresh(nodes: readonly GraphNode[], fresh: ReadonlySet<string>, measured: Map<string, { width: number; height: number }>): Map<string, { x: number; y: number }> {
   const moves = new Map<string, { x: number; y: number }>();
-  const occupied: NodeRect[] = nodes.filter((n) => !fresh.has(n.id)).map((n) => nodeRect(n, measured));
+  const grid = new SpatialGrid();
+  for (const n of nodes) if (!fresh.has(n.id)) grid.add(nodeRect(n, measured));
   for (const n of nodes) {
     if (!fresh.has(n.id)) continue;
     const r = nodeRect(n, measured);
-    if (occupied.some((o) => rectsOverlap(r, o, 48, 56))) {
-      const at = findFreePosition(n.position, { width: r.width, height: r.height }, occupied, { gapX: 48, gapY: 56 });
+    if (grid.overlapsCard(r, 48, 56)) {
+      const at = findFreePositionInGrid(n.position, { width: r.width, height: r.height }, grid, { gapX: 48, gapY: 56 });
       moves.set(n.id, at);
-      occupied.push({ ...r, x: at.x, y: at.y });
+      grid.add({ ...r, x: at.x, y: at.y });
     } else {
-      occupied.push(r);
+      grid.add(r);
     }
   }
   return moves;
