@@ -29,6 +29,7 @@
 - [Propuesta: el agente, el chat y los espacios como nodos](propuesta-nodo-agente.md) (2026-11-14, lista para aprobar): reconciliación de «todo es un nodo», acople de modelos/proveedores, metadatos de chat, Spaces en el omnilienzo, ejecución acotada con traza y comparación medida de dos arquitecturas.
 - [Contratos de puertos de Nodes](propuesta-contratos-puertos.md) (2026-11-17): efecto y prueba de cada puerto data/ref/control, integridad de referencias y errores ajenos que evitamos.
 - [Diagnóstico: cada pieza de cada espacio como nodo](diagnostico-piezas-nodos.md) (2026-11-17, lectura de código sin ejecutar): qué es nodo, qué es espejo y qué falta.
+- [Diagnóstico: por qué el dinero abre un frente nuevo con cada arreglo](diagnostico-dinero.md) (2026-11-22, lectura de código e historial, sin proveedor): tres causas raíz, decisiones fijadas y dos arquitecturas a medir.
 - [Propuesta: puerta externa de comandos](propuesta-puerta-externa.md) (2026-11-14, sin implementar): seguridad para CLI externo y MCP.
 - [Propuesta: conocimiento del agente en archivos y vistas guardadas](propuesta-conocimiento-y-vistas.md): vistas de filtros, reglas del agente en `.md` al estilo OKF y carga por partes (2026-10-27, sin implementar).
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
