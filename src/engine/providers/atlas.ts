@@ -2,7 +2,7 @@ import { extractErrorMessage, fetchJsonWithRelay, isAbort, JobFailedError, reque
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { GenSettings, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, resolveBody, splitSource, structuredInputs } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, resolveBody, splitSource, structuredInputsSync } from './shared';
 import type { GenBuildRequest, GenOutput, GenRequest, GenResult, MediaInput, PreparedRequest, ProviderAdapter, RequestEncoder, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -254,7 +254,7 @@ export const atlas: ProviderAdapter = {
       if (req.video && schema.slots.video) body[schema.slots.video.key] = enc.video(req.video);
     }
     if (req.keyframes?.length || req.clips?.length || req.audio || req.refAudios?.length || req.elements?.length || req.mask) {
-      Object.assign(body, structuredInputs(schema.slots, req, (i) => enc.image(i, 'url'), (v) => enc.video(v)));
+      Object.assign(body, structuredInputsSync(schema.slots, req, (i) => enc.image(i, 'url'), (v) => enc.video(v)));
     }
     const endpoint = req.kind === 'image' || req.kind === 'model3d' ? 'generateImage' : req.kind === 'audio' ? 'generateAudio' : 'generateVideo';
     return { url: `${BASE}/api/v1/model/${endpoint}`, body };

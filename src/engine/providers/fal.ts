@@ -2,7 +2,7 @@ import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, promptExpansion, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, resolveBody, splitSource, structuredInputs } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, resolveBody, splitSource, structuredInputsSync } from './shared';
 import type { GenBuildRequest, GenOutput, GenRequest, GenResult, MediaInput, PreparedRequest, ProviderAdapter, RequestEncoder, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -175,7 +175,7 @@ export const fal: ProviderAdapter = {
       if (schema.slots.refVideos && req.refVideos?.length) body[schema.slots.refVideos.key] = req.refVideos.slice(0, schema.slots.refVideos.max).map((v) => enc.video(v));
       if (req.video && schema.slots.video) body[schema.slots.video.key] = enc.video(req.video);
     }
-    Object.assign(body, structuredInputs(schema.slots, req, (i) => enc.image(i, 'data-url'), (v) => enc.video(v)));
+    Object.assign(body, structuredInputsSync(schema.slots, req, (i) => enc.image(i, 'data-url'), (v) => enc.video(v)));
     return { url: `${QUEUE}/${req.model.id}`, body };
   },
 

@@ -48,9 +48,9 @@ export async function resolveBody<T>(v: T): Promise<T> {
 
 /**
  * Keyframe and trimmed-clip lists (FLUX 3 `keyframes`, `video_clips`) and audio inputs, built from the slot's
- * field names. `image`/`video` encode one input (sync token in dry-run, Promise of URL/data URL when sending).
+ * field names. Synchronous variant for dry-run / `buildRequest` where `resolveBody` runs afterwards.
  */
-export function structuredInputs(
+export function structuredInputsSync(
   slots: InputSlots,
   req: {
     keyframes?: Array<{ input: MediaInput; frame: number }>;
@@ -86,6 +86,16 @@ export function structuredInputs(
   const cl = slots.clips;
   if (cl && req.clips?.length) out[cl.key] = req.clips.slice(0, cl.max).map((c) => ({ url: video(c.input), start: c.start, ends: c.end, ...(cl.fps ? { [cl.fps.key]: cl.fps.value } : {}) }));
   return out;
+}
+
+/** Async wrapper resolving encoded image/video promises for direct callers. */
+export async function structuredInputs(
+  slots: InputSlots,
+  req: Parameters<typeof structuredInputsSync>[1],
+  image: (m: MediaInput) => unknown,
+  video: (m: MediaInput) => unknown,
+): Promise<Record<string, unknown>> {
+  return resolveBody(structuredInputsSync(slots, req, image, video));
 }
 
 /** Encode a source video: an uploaded URL when the provider needs one, else a data URL (no re-encoding). */
