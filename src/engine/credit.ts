@@ -15,6 +15,7 @@ import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
 import { applyEdit } from './nodecore/edit';
+import { grantGenerationTicketPass, hasActiveTicketSend } from './money/storeBridge';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -212,7 +213,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
   markEmpty(cur.provider);
-  if (g.remoteJob || g.lostJob || g.sends?.some((s) => s.status === 'uncertain' || s.status === 'intent' || Boolean(s.remoteJob))) return false;
+  if (hasActiveTicketSend(g)) return false;
   const empty = PROVIDER_LABELS[cur.provider];
   const nodes = () => get().sessions[g.sessionId]?.graph.nodes ?? [];
   const nodeId = attemptNode(g, nodes())?.id;
@@ -265,6 +266,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     if (!held) return;
     try {
       applySubstitute(o, patch);
+      if (pass) grantGenerationTicketPass(genId, estimate);
       bindRetryQuoteApproval(genId, estimate, pass);
       await later(genId, held.release);
       if (held.node && get().generations[genId]?.status === 'done') {
@@ -337,6 +339,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
           if (!held) { run = Promise.resolve(false); return; }
           pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
           applySubstitute(auto, patch);
+          if (pass) grantGenerationTicketPass(genId, est);
           bindRetryQuoteApproval(genId, est, pass);
           try {
             run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);

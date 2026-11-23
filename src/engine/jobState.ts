@@ -11,6 +11,7 @@ import { videoOpSeconds } from './opSpec';
 import { partialRetryCharge } from './retryPartial';
 import { markSendsDone } from './sendMark';
 import { bookDelivered, deliverSend, ledgerCost, usesLedger } from './sendLedger';
+import { generationTicketId, hasActiveTicketSend } from './money/storeBridge';
 import type { Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, RemoteJob } from './types';
 
 const get = useStore.getState;
@@ -144,11 +145,7 @@ function spendEntry(g: Generation, estimated: boolean) {
 
 /** Keep a discarded generation while it still has an active remote job or unsettled send trail. */
 function hasPendingSendTrail(g: Generation): boolean {
-  return Boolean(
-    g.remoteJob ||
-    g.lostJob ||
-    g.sends?.some((s) => (s.status === 'sent' && Boolean(s.remoteJob)) || (s.status === 'uncertain' && g.status !== 'done') || s.status === 'intent'),
-  );
+  return g.status !== 'done' && hasActiveTicketSend(g);
 }
 
 /** An ended generation of a deleted session: already charged, so remove it and its results. */
@@ -161,9 +158,11 @@ export function purgeDiscarded(id: string): void {
   useStore.setState((cur) => {
     const generations = { ...cur.generations };
     delete generations[id];
+    const tickets = { ...cur.tickets };
+    delete tickets[generationTicketId(id)];
     const assets = { ...cur.assets };
     ids.forEach((a) => delete assets[a]);
-    return { generations, assets };
+    return { generations, tickets, assets };
   });
   // Loaded only when there is something to delete.
   if (ids.length) void import('../lib/idb').then((m) => m.deleteAssetBlobs(ids));

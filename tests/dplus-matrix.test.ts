@@ -259,8 +259,8 @@ describe('Escenario (a): recargas p9/p9c', () => {
     expect(fake.acceptedCount('beta mug')).toBe(1);
   });
 
-  // reproduce: jobRecovery.ts:178 (followRemote) no enlaza generationId al nodo ni guarda nodeRequest; tras promocion edit twin (jobs.ts:179), freshness.ts:71,98 marca n1 obsoleto y correr n2 reenvia n1
-  it.fails('a3: followRemote con modelo de edicion (edit twin) enlaza n1 y correr n2 no reenvia n1', async () => {
+  // fixed in D+ 2b-2: flow/freshness.ts reconoce edit twin (sentModelRef) al evaluar nodeIsCurrent y linkCompletedNode congela nodeRequest
+  it('a3: followRemote con modelo de edicion (edit twin) enlaza n1 y correr n2 no reenvia n1', async () => {
     setupSession({
       graph: {
         nodes: [
@@ -393,8 +393,8 @@ describe('Escenario (b): Allow this time con subida de precio', () => {
 });
 
 describe('Escenario (c): Retry de un dudoso y lote parcial', () => {
-  // reproduce: jobs.ts:448 (retryGeneration) no impide reenviar un envio uncertain sin confirmacion y budget.ts:21 (remainingBudget) no retiene reserva por envios dudosos
-  it.fails('c1: corte tras aceptar retiene reserva en remainingBudget e impide retry automatico sin confirmacion', async () => {
+  // fixed in D+ 2b-2: paidSend marca el envio uncertain reteniendo reservedUsd en tickets y remainingBudget descuenta la reserva
+  it('c1: corte tras aceptar retiene reserva en remainingBudget e impide retry automatico sin confirmacion', async () => {
     setupSession({ spentUsd: 0, budgetUsd: 0.15, budgetOn: true });
     fake.onNext('uncertain shot', 'cut-after-accept');
 
@@ -411,8 +411,8 @@ describe('Escenario (c): Retry de un dudoso y lote parcial', () => {
     expect(remainingBudget()!).toBeLessThanOrEqual(0.05 + 1e-6);
   });
 
-  // reproduce: lote parcial (count=4, perRequest=1): tras entregar 1/4 ($0.10) y cortar el 2o POST tras aceptar (uncertain), retryGeneration en jobs.ts:403,448 reenvia 3 POSTs mas (5 cobrados para count=4)
-  it.fails('c2: lote parcial count=4 con corte post-aceptacion en 2o POST no cobra 5 envios ni rebasa el limite', async () => {
+  // fixed in D+ 2b-2: el 2o POST uncertain retiene su reserva en tickets y holdRetry frena retryGeneration bajo el limite
+  it('c2: lote parcial count=4 con corte post-aceptacion en 2o POST no cobra 5 envios ni rebasa el limite', async () => {
     setupSession({ spentUsd: 0, budgetUsd: 0.45, budgetOn: true });
     const g = createGeneration({
       sessionId: sid, origin: 'composer', kind: 'image', prompt: 'batch shot',
@@ -470,8 +470,8 @@ describe('Escenario (d): reintento de Atlas y 402 bajo limite', () => {
 });
 
 describe('Escenario (e): dos envios simultaneos junto al tope', () => {
-  // reproduce: budget.ts:21-24 (remainingBudget) no reserva el importe de envios en vuelo; dos envios de $0.10 lanzados a la vez con tope $0.15 pasan ambos y cobran $0.20 sin preguntar
-  it.fails('e1: dos envios concurrentes de $0.10 con tope $0.15 solo dejan salir uno y nunca superan el limite', async () => {
+  // fixed in D+ 2b-2: paidSend reserva sincronamente antes de save/transporte y remainingBudget frena el 2o envio concurrente
+  it('e1: dos envios concurrentes de $0.10 con tope $0.15 solo dejan salir uno y nunca superan el limite', async () => {
     setupSession({ spentUsd: 0, budgetUsd: 0.15, budgetOn: true, graph: twoImageGraph(false) });
     const heldFirst = fake.holdNext('alpha mug');
     const firstRun = runNodes(sid, ['n1']);

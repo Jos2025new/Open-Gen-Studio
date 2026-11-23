@@ -2,6 +2,7 @@ import { incomingOf, resolveInputs, storeEnv } from '../nodecore/resolver';
 import { composePrompt } from '../nodecore/evaluate';
 import { descriptorOf } from '../nodecore/registry';
 import { normalizeAssetRevisions } from '../assetRevisions';
+import { sentModelRef } from '../catalog';
 import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
 
@@ -95,7 +96,10 @@ export function nodeIsCurrent(graph: Graph, node: GraphNode, generations: Record
   const ownPrompt = 'prompt' in request ? request.prompt : '';
   // With a prompt cable that does not affect the result, the text it brought is not compared: the node's own prompt must still be in it.
   const promptSame = g.prompt === ownPrompt || (descriptorOf(d.kind)?.affects.prompt === false && typeof g.prompt === 'string' && g.prompt.includes(composePrompt(d, undefined)));
-  if (g.modelRef !== d.modelRef || !promptSame || stable(comparableSettings(d.modelRef, settings, ctx.schemas)) !== stable(comparableSettings(d.modelRef, d.settings, ctx.schemas))) return false;
+  const hasImageInput = request.incoming.some(e => (e.port === 'ref' || e.port === 'first') && e.value != null);
+  const modelMatches = g.modelRef === d.modelRef
+    || (hasImageInput && (d.kind === 'image' || d.kind === 'video') && g.modelRef === sentModelRef(d.modelRef, d.kind, true));
+  if (!modelMatches || !promptSame || stable(comparableSettings(d.modelRef, settings, ctx.schemas)) !== stable(comparableSettings(d.modelRef, d.settings, ctx.schemas))) return false;
   const refs = request.incoming.filter(e => ['ref', 'clip', 'refVideo', 'audio'].includes(e.port)).map(e => e.value);
   return stable(refs) === stable(g.inputs.refs) && (request.incoming.find(e => e.port === 'first')?.value ?? undefined) === g.inputs.firstFrame
     && (request.incoming.find(e => e.port === 'last')?.value ?? undefined) === g.inputs.lastFrame;

@@ -13,13 +13,21 @@ import { addAssets, patchGeneration, useStore } from '../store/store';
 import { addSpend } from '../store/spend';
 import { checkDelivery, controllers, finish, finishText, keptJob, purgeDiscarded, running } from './jobState';
 import { flushSendSave, markRemoteJobFailed, markSendsDone } from './sendMark';
+import {
+  activeTicketRemoteJob,
+  adoptRecoveredJobOnTicket,
+  failTicketRemoteJob,
+  hasUncertainTicketSend,
+  isRemoteJobDoneOnTicket,
+  settleTicketRemoteSend,
+} from './money/storeBridge';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 
 const get = useStore.getState;
 
-/** Active remote job from top-level field or per-request ledger. */
+/** Active remote job from ticket first, then top-level field or legacy per-request ledger. */
 export function activeRemoteJob(g: Generation): RemoteJob | undefined {
-  return g.remoteJob ?? g.sends?.find((s) => s.status === 'sent' && s.remoteJob)?.remoteJob;
+  return activeTicketRemoteJob(g);
 }
 
 /**
@@ -37,14 +45,18 @@ export function canRecheck(g: Generation): boolean {
 
 function canRecover(g: Generation): boolean {
   const parsed = parseModelRef(g.modelRef);
-  const uncertain = Boolean(g.lostJob || g.sends?.some((s) => s.status === 'uncertain'));
+  const uncertain = hasUncertainTicketSend(g);
   return Boolean(parsed && parsed.provider !== 'local' && ADAPTERS[parsed.provider]?.recover && (g.kind === 'video' || g.kind === 'model3d') && uncertain && g.startedAt && (g.settings.count ?? 1) <= 1 && !g.op?.id.startsWith('transcribe'));
 }
 
 /** Look the lost job up at the provider; adopt it (then it is followed like any job) or say it never arrived. */
 async function recoverJob(g: Generation): Promise<RemoteJob | null> {
   const parsed = parseModelRef(g.modelRef)!;
-  const taken = new Set(Object.values(get().generations).flatMap((x) => [x.jobId, x.remoteJob?.id, ...(x.sends?.map((s) => s.remoteJob?.id) ?? [])].filter((v): v is string => Boolean(v))));
+  const st = get();
+  const taken = new Set([
+    ...Object.values(st.tickets).flatMap((t) => t.sends.map((s) => s.remoteJob?.id)),
+    ...Object.values(st.generations).flatMap((x) => [x.jobId, x.remoteJob?.id, ...(x.sends?.map((s) => s.remoteJob?.id) ?? [])]),
+  ].filter((v): v is string => Boolean(v)));
   return ADAPTERS[parsed.provider].recover!({ modelId: parsed.id, apiKey: apiKeyFor(parsed.provider), since: g.startedAt!, until: g.finishedAt ?? Date.now(), taken });
 }
 
@@ -93,11 +105,15 @@ function recoverThenFollow(id: string): Promise<string[]> {
       patchGeneration(id, { status: 'error', error: `${PROVIDER_LABELS[provider]} has no recent job for this request from that time: it most likely never arrived. Retry runs it again.`, statusText: undefined, finishedAt: Date.now() });
       return [];
     }
-    // The adopted job is the uncertain request's answer: tie it to that record, so the ledger books it once.
-    const cur = get().generations[id];
-    const open = cur?.sends?.findIndex((s) => !s.remoteJob && (s.status === 'uncertain' || s.status === 'intent')) ?? -1;
-    const sends = open >= 0 ? cur!.sends!.map((s, i) => (i === open ? { ...s, status: 'sent' as const, remoteJob: job! } : s)) : undefined;
-    patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking', ...(sends ? { sends } : {}) });
+    // The adopted job is the uncertain request's answer: tie it to that ticket send so settlement books it once.
+    if (adoptRecoveredJobOnTicket(id, job)) {
+      patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking' });
+    } else {
+      const cur = get().generations[id];
+      const open = cur?.sends?.findIndex((s) => !s.remoteJob && (s.status === 'uncertain' || s.status === 'intent')) ?? -1;
+      const sends = open >= 0 ? cur!.sends!.map((s, i) => (i === open ? { ...s, status: 'sent' as const, remoteJob: job! } : s)) : undefined;
+      patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking', ...(sends ? { sends } : {}) });
+    }
     await flushSendSave();
     return followRemote(id, job);
   })();
@@ -110,6 +126,7 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
   if (pending) return pending;
   const g0 = get().generations[id];
   if (!g0 || g0.status === 'done') return Promise.resolve(g0?.assetIds ?? []);
+  if (isRemoteJobDoneOnTicket(id, job)) return Promise.resolve(g0.assetIds);
   const send0 = g0.sends?.find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
   if (send0?.status === 'done') return Promise.resolve(g0.assetIds);
 
@@ -126,10 +143,12 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       });
       const cur = get().generations[id];
       if (!cur || cur.status === 'done') return cur?.assetIds ?? [];
+      if (isRemoteJobDoneOnTicket(id, job)) return cur.assetIds;
       const matching = cur.sends?.find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
       if (matching?.status === 'done') return cur.assetIds;
       if (cur.kind === 'text') {
-        finishText(id, result.text ?? '', result.costUsd, matching?.id);
+        const settledId = settleTicketRemoteSend(id, job, result.costUsd ?? cur.estimate.usd, result.costUsd == null);
+        finishText(id, result.text ?? '', result.costUsd, settledId ?? matching?.id);
         await flushSendSave();
         return [];
       }
@@ -142,20 +161,22 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const delivery = await checkDelivery(id, assets);
       const latest = get().generations[id];
       if (!latest || latest.status === 'done') return latest?.assetIds ?? [];
-      if (latest.sends?.some((s) => s.status === 'done' && s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider)) return latest.assetIds;
+      if (isRemoteJobDoneOnTicket(id, job) || latest.sends?.some((s) => s.status === 'done' && s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider)) return latest.assetIds;
       const mergedIds = [...latest.assetIds];
       for (const a of assets) if (!mergedIds.includes(a.id)) mergedIds.push(a.id);
       const uniqueIds = [...new Set(mergedIds)];
       const remainingVariants = latest.variants ? latest.variants.slice(assets.length) : undefined;
       const expectedTotal = latest.variants ? latest.assetIds.length + latest.variants.length : (latest.retryTotal ?? latest.settings.count);
       const batchIncomplete = remainingVariants ? remainingVariants.length > 0 : uniqueIds.length < expectedTotal;
-      // Ledger: this job's record carries its cost and is booked now, once; older data keeps the old path.
-      const ledger = usesLedger(latest);
+      // Settle on the ticket first (idempotent by sendId); pre-D+ generations fall back to legacy sendLedger.
       const cost = result.costUsd ?? shareOfEstimate(latest, assets.length);
+      const settledId = settleTicketRemoteSend(id, job, cost, result.costUsd == null);
+      const ledger = !settledId && usesLedger(latest);
       if (ledger) deliverSend(id, matching?.id, latest.sends!.length, cost, result.costUsd == null);
       if (batchIncomplete) {
-        const sends = ledger ? get().generations[id]?.sends : markSendsDone(latest.sends, matching?.id);
-        if (!ledger) {
+        const afterSettle = get().generations[id] ?? latest;
+        const sends = settledId || ledger ? afterSettle.sends : markSendsDone(latest.sends, matching?.id);
+        if (!settledId && !ledger) {
           if (cost == null || cost > 0) addSpend(cost, { category: latest.kind, provider: latest.modelRef.split('::')[0], model: latest.modelRef, sessionId: latest.sessionId, estimated: result.costUsd == null });
         }
         const remaining = remainingVariants ? remainingVariants.length : Math.max(1, expectedTotal - uniqueIds.length);
@@ -169,21 +190,22 @@ export function followRemote(id: string, job: RemoteJob): Promise<string[]> {
           finishedAt: Date.now(),
           remoteJob: undefined,
           sending: undefined,
-          lostJob: Boolean(latest.sends?.some((s) => s.status === 'uncertain')),
+          lostJob: hasUncertainTicketSend(afterSettle),
           ...(sends ? { sends } : {}),
         });
         await flushSendSave();
         return assets.map((a) => a.id);
       }
-      finish(id, uniqueIds, result.costUsd, delivery, result.costUsd, matching?.id);
+      finish(id, uniqueIds, result.costUsd, delivery, result.costUsd, settledId ?? matching?.id);
       await flushSendSave();
       return assets.map((a) => a.id);
     } catch (err) {
       if (isRestart(controller.signal.reason)) return [];
       const remoteJob = keptJob(err, job);
       const cur = get().generations[id];
-      const sends = err instanceof JobFailedError ? markRemoteJobFailed(cur?.sends, job) : cur?.sends;
-      const sendsPatch = err instanceof JobFailedError && sends ? { sends } : {};
+      const ticketFailed = err instanceof JobFailedError && failTicketRemoteJob(id, job, (err as Error).message);
+      const sends = !ticketFailed && err instanceof JobFailedError ? markRemoteJobFailed(cur?.sends, job) : undefined;
+      const sendsPatch = sends ? { sends } : {};
       if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, ...sendsPatch });
       else {
         patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, ...sendsPatch });
