@@ -33,7 +33,7 @@ beforeEach(() => {
   const st = useStore.getState();
   const sid = st.activeSessionId;
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
     sessions: {
       ...st.sessions,

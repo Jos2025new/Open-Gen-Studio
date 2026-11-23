@@ -144,7 +144,7 @@ describe('pase de turno: aislamiento y alcance', () => {
       await llmTurn(sid(), 'chat', { route: 'new', agentNodeId: 'main' });
       expect(posts).toHaveLength(0);
       expect(overLimitAccepted(sid(), pass)).toBe(true); // sigue vivo para su dueno
-    });
+    }, 0.1);
     expect(overLimitAccepted(sid())).toBe(false);
   });
 

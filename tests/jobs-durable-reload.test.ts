@@ -25,13 +25,15 @@ vi.mock('../src/lib/media', async (original) => ({
   probeMedia: async () => ({ width: 512, height: 512 }),
 }));
 
-import { saveNow, useStore } from '../src/store/store';
+import { patchGeneration, saveNow, useStore } from '../src/store/store';
 import { canRecheck, createGeneration, recheckGeneration, resumeInterrupted, runGeneration } from '../src/engine/jobs';
 import { running } from '../src/engine/jobState';
+import { previewRun, runNodes } from '../src/engine/flow/actions';
+import { graphToSteps, nodeOutputAsset } from '../src/engine/flow/graph';
 import { onGenerationCredit } from '../src/engine/credit';
 import { RECRAFT_STYLE_REF } from '../src/engine/catalog';
 import { ADAPTERS } from '../src/engine/providers/registry';
-import type { ModelSummary } from '../src/engine/types';
+import type { Graph, ModelSummary } from '../src/engine/types';
 import { mainThread } from './helpers/threads';
 
 const REF = 'nanogpt::seed';
@@ -356,5 +358,64 @@ describe('per-request recovery, reentry preservation, and idempotent rehydration
     expect(switched).toBe(false);
     expect(rerun).not.toHaveBeenCalled();
     expect(atlasSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('node attempts after reload', () => {
+  const nodeId = 'reload-node';
+  const output = 'last-output';
+  const setupNode = () => {
+    const spec = { sessionId: sid(), origin: 'node', stepId: nodeId, kind: 'image', prompt: 'a', modelRef: REF, settings: { count: 1, advanced: {} } } as const;
+    const previous = createGeneration(spec);
+    const next = createGeneration(spec);
+    const graph: Graph = { edges: [], nodes: [{ id: nodeId, position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Reload image', prompt: spec.prompt, modelRef: REF, settings: spec.settings, outputIndex: 0, generationId: previous.id } }] };
+    useStore.setState((s) => ({
+      generations: { ...s.generations, [previous.id]: { ...previous, status: 'done', assetIds: [output] }, [next.id]: { ...next, status: 'running', createdAt: previous.createdAt + 1 } },
+      sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], graph } },
+    }));
+    return { graph, next };
+  };
+  const graphNow = () => useStore.getState().sessions[sid()].graph;
+  const expectLinked = (id: string) => {
+    const st = useStore.getState();
+    expect(st.generations[id]).toMatchObject({ status: 'done', nodeRequest: expect.any(String) });
+    expect(graphNow().nodes[0].data).toMatchObject({ generationId: id });
+    expect(nodeOutputAsset(graphNow().nodes[0], st.generations)).toBe(st.generations[id].assetIds[0]);
+  };
+
+  it.each(['running', 'uncertain'] as const)('blocks a %s attempt while keeping the last node output visible', async (status) => {
+    const { graph, next } = setupNode();
+    if (status === 'uncertain') patchGeneration(next.id, { status: 'error', lostJob: true });
+    const { generations } = useStore.getState();
+    expect(nodeOutputAsset(graph.nodes[0], generations)).toBe(output);
+    const problem = status === 'running'
+      ? '“Reload image” is already running.'
+      : 'The previous attempt for “Reload image” may have been submitted. Check its status before running again.';
+    expect(graphToSteps(graph, [nodeId], generations)).toMatchObject({ steps: [], errors: [problem] });
+    expect(previewRun(sid(), [nodeId]).errors).toContain(problem);
+    const generate = vi.spyOn(ADAPTERS.nanogpt, 'generate');
+    await expect(runNodes(sid(), [nodeId])).resolves.toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('links a remotely recovered node result and saves its request', async () => {
+    const { next } = setupNode();
+    patchGeneration(next.id, { remoteJob: { provider: 'nanogpt', id: 'node-job', meta: {} } });
+    const resume = vi.spyOn(ADAPTERS.nanogpt, 'resume').mockResolvedValue({
+      outputs: [{ blob: new Blob(['node'], { type: 'image/png' }), mime: 'image/png' }],
+      costUsd: 0.1,
+    });
+    await resumeInterrupted();
+    await running.get(next.id);
+    expect(resume).toHaveBeenCalledTimes(1);
+    expectLinked(next.id);
+    expect(savedGeneration(next.id)?.nodeRequest).toEqual(useStore.getState().generations[next.id].nodeRequest);
+  });
+
+  it('links an already delivered node result and saves its request', async () => {
+    const { next } = setupNode();
+    patchGeneration(next.id, { assetIds: ['delivered-output'], actualUsd: 0.1 });
+    await resumeInterrupted();
+    expectLinked(next.id);
   });
 });

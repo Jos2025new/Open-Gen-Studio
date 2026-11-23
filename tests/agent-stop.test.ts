@@ -49,7 +49,7 @@ beforeEach(() => {
   const st = useStore.getState();
   const id = st.activeSessionId;
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
     catalog: { ...st.catalog, models: { ...st.catalog.models, [REF]: { ref: REF, id: 'x', provider: 'atlas', name: 'Grok Imagine Video 1.5 Lite', kind: 'video' } as never } },
     sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: {} }) } },

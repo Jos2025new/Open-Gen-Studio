@@ -2,11 +2,11 @@ import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http
 import { fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, resolveBody } from './shared';
 import { fitBody, NANOGPT_BODY_LIMIT } from './bodyBudget';
-import type { GenOutput, GenRequest, GenResult, ProviderAdapter, RecoverQuery, ResumeContext } from './types';
+import type { GenBuildRequest, GenOutput, GenRequest, GenResult, PreparedRequest, ProviderAdapter, RecoverQuery, RequestEncoder, ResumeContext } from './types';
 import { modelRef } from './types';
-import { generateSpeech, isSpeechModel, listTranscribers, nanoHeaders, pollTranscription, speechSchema, speechSummaries, transcribe } from './nanogptAudio';
+import { buildSpeechRequest, buildTranscribeRequest, generateSpeech, isSpeechModel, listTranscribers, nanoHeaders, pollTranscription, speechSchema, speechSummaries, transcribe } from './nanogptAudio';
 
 // api.nano-gpt.com serves an outdated catalog (no GPT-6, Opus 5.5, Seedream 5 Flash...); the root host is current.
 export const NANO_BASE = 'https://nano-gpt.com/api';
@@ -451,86 +451,61 @@ export const nanogpt: ProviderAdapter = {
     return videoSchema(model, raw);
   },
 
-  async generate(req: GenRequest): Promise<GenResult> {
-    if (req.kind === 'audio' && isSpeechModel(req.model.id)) return generateSpeech(req);
+  buildRequest(req: GenBuildRequest, enc: RequestEncoder): PreparedRequest {
+    if (req.kind === 'audio' && isSpeechModel(req.model.id)) return buildSpeechRequest(req);
     const body: Record<string, unknown> = { model: req.model.id, ...wireParams(req.schema, req.settings, req.count) };
     if (req.prompt) body.prompt = req.prompt;
-
+    const { slots } = req.schema;
     if (req.kind === 'image') {
-      if (req.refs.length && req.schema.slots.images) {
-        body[req.schema.slots.images.key] = await Promise.all(req.refs.slice(0, req.schema.slots.images.max).map((r) => encodeImage(r, 'data-url')));
+      if (req.refs.length && slots.images) body[slots.images.key] = req.refs.slice(0, slots.images.max).map((r) => enc.image(r, 'data-url'));
+      return { url: `${BASE}/v1/images`, body };
+    }
+    if (req.kind === 'model3d') {
+      if (req.refs.length && slots.images) {
+        const urls = req.refs.slice(0, slots.images.max).map((r) => enc.image(r, 'data-url'));
+        body.imageDataUrl = urls[0];
+        if (slots.images.multiple) body[slots.images.key] = urls;
       }
-      req.onStatus('Generating');
-      await fitBody(body, NANOGPT_BODY_LIMIT);
-      req.onRequest?.({ url: `${BASE}/v1/images`, body });
-      const res = await requestJson<Loose>(`${BASE}/v1/images`, {
-        method: 'POST',
-        headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },
-        body: JSON.stringify(body),
-        signal: req.signal,
-      });
+      return { url: `${BASE}/generate-video`, body };
+    }
+    if (req.firstFrame && slots.firstFrame) body[slots.firstFrame.key] = enc.image(req.firstFrame, 'data-url');
+    if (req.lastFrame && slots.lastFrame) body[slots.lastFrame.key] = enc.image(req.lastFrame, 'data-url');
+    if (req.refs.length && slots.images) body[slots.images.key] = req.refs.slice(0, slots.images.max).map((r) => enc.image(r, 'data-url'));
+    if (req.refVideos?.length && slots.refVideos) body[slots.refVideos.key] = req.refVideos.slice(0, slots.refVideos.max).map((v) => enc.video(v));
+    if (req.audio && slots.audio) body[slots.audio.key] = enc.video(req.audio);
+    if (req.video && slots.video) body[slots.video.key] = enc.video(req.video);
+    if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto' && !(req.model.id === 'minimax/h3-max' && body.aspect_ratio === 'adaptive')) delete body.aspect_ratio;
+    return { url: `${BASE}/generate-video`, body };
+  },
+
+  async generate(req: GenRequest): Promise<GenResult> {
+    if (req.kind === 'audio' && isSpeechModel(req.model.id)) return generateSpeech(req);
+    if (req.audio && req.schema.slots.audio && req.model.id === 'bytedance/seedance-2.5/talking-avatar' && req.audio.blob.size > NANOGPT_BODY_LIMIT) {
+      throw new Error(`This audio exceeds the app request-body budget of 4 MB (this file is ${(req.audio.blob.size / 1_000_000).toFixed(1)} MB). Trim the audio before submitting. Nothing was sent or charged.`);
+    }
+    if (req.video && req.schema.slots.video && req.video.blob.size > MAX_VIDEO_DATA_URL_BYTES) {
+      throw new Error(`NanoGPT accepts source videos up to 4 MB (this one is ${(req.video.blob.size / 1048576).toFixed(1)} MB). Trim it or use Atlas Cloud.`);
+    }
+    const raw = nanogpt.buildRequest!(req, { image: (m, fmt) => encodeImage(m, fmt), video: (m) => encodeVideo(m) });
+    const body = await resolveBody(raw.body);
+    req.onStatus(req.kind === 'image' ? 'Generating' : 'Submitting');
+    await fitBody(body, NANOGPT_BODY_LIMIT);
+    req.onRequest?.({ url: raw.url, body });
+    const res = await requestJson<Loose>(raw.url, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
+    if (req.kind === 'image') {
       const outputs = await materialize(extractOutputs(res, 'image'), req.signal);
       if (!outputs.length) throw new Error('NanoGPT returned no images');
       return { outputs, costUsd: num(res.cost) };
     }
-
-    const { slots } = req.schema;
-    if (req.kind === 'model3d') {
-      if (req.refs.length && slots.images) {
-        const urls = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
-        body.imageDataUrl = urls[0];
-        if (slots.images.multiple) body[slots.images.key] = urls;
-      }
-      req.onStatus('Submitting');
-      await fitBody(body, NANOGPT_BODY_LIMIT);
-      req.onRequest?.({ url: `${BASE}/generate-video`, body });
-      const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
-        method: 'POST',
-        headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },
-        body: JSON.stringify(body),
-        signal: req.signal,
-      });
-      const id = String(submit.runId ?? submit.id ?? submit.requestId ?? '');
-      if (!id) throw new Error('NanoGPT did not return a job id');
-      const job: RemoteJob = { provider: 'nanogpt', id, meta: { submitCost: String(submit.cost ?? '') } };
-      req.onRemoteJob(job);
-      return pollVideo(job, { kind: 'model3d', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
-    }
-    if (req.firstFrame && slots.firstFrame) body[slots.firstFrame.key] = await encodeImage(req.firstFrame, 'data-url');
-    if (req.lastFrame && slots.lastFrame) body[slots.lastFrame.key] = await encodeImage(req.lastFrame, 'data-url');
-    if (req.refs.length && slots.images) body[slots.images.key] = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
-    if (req.refVideos?.length && slots.refVideos) body[slots.refVideos.key] = await Promise.all(req.refVideos.slice(0, slots.refVideos.max).map((v) => encodeVideo(v)));
-    if (req.audio && slots.audio) {
-      // App request-body budget (NANOGPT_BODY_LIMIT), not a documented model audio limit.
-      if (req.model.id === 'bytedance/seedance-2.5/talking-avatar' && req.audio.blob.size > NANOGPT_BODY_LIMIT) {
-        throw new Error(`This audio exceeds the app request-body budget of 4 MB (this file is ${(req.audio.blob.size / 1_000_000).toFixed(1)} MB). Trim the audio before submitting. Nothing was sent or charged.`);
-      }
-      body[slots.audio.key] = await encodeVideo(req.audio);
-    }
-    if (req.video && slots.video) {
-      if (req.video.blob.size > MAX_VIDEO_DATA_URL_BYTES) throw new Error(`NanoGPT accepts source videos up to 4 MB (this one is ${(req.video.blob.size / 1048576).toFixed(1)} MB). Trim it or use Atlas Cloud.`);
-      body[slots.video.key] = await encodeVideo(req.video);
-    }
-    // H3 Max documents `adaptive` as a valid aspect_ratio: https://nano-gpt.com/api/v1/video-models?detailed=true
-    if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto' && !(req.model.id === 'minimax/h3-max' && body.aspect_ratio === 'adaptive')) delete body.aspect_ratio;
-    req.onStatus('Submitting');
-    await fitBody(body, NANOGPT_BODY_LIMIT);
-    req.onRequest?.({ url: `${BASE}/generate-video`, body });
-    const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
-      method: 'POST',
-      headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },
-      body: JSON.stringify(body),
-      signal: req.signal,
-    });
-    const id = String(submit.runId ?? submit.id ?? submit.requestId ?? '');
+    const id = String(res.runId ?? res.id ?? res.requestId ?? '');
     if (!id) throw new Error('NanoGPT did not return a job id');
-    const job: RemoteJob = { provider: 'nanogpt', id, meta: { submitCost: String(submit.cost ?? '') } };
+    const job: RemoteJob = { provider: 'nanogpt', id, meta: { submitCost: String(res.cost ?? '') } };
     req.onRemoteJob(job);
-    return pollVideo(job, { kind: 'video', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+    return pollVideo(job, { kind: req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
 
   listTranscribers,
-
+  buildTranscribeRequest,
   transcribe,
 
   async balance(apiKey, signal) {

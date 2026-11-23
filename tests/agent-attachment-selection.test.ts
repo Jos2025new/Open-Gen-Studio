@@ -101,7 +101,7 @@ it.each([true, false])('a request with only a 3D attachment respects agent visio
   const thumbnailUrl = 'data:image/jpeg;base64,Y3VycmVudA==';
   useStore.setState({
     assets: { hero: { ...image('hero', 'Heroine'), sessionId: sid, kind: 'model3d', mime: 'model/gltf-binary', viewImageId: 'current', thumbnailUrl }, current: { ...image('current', 'Current view'), sessionId: sid, origin: 'view3d' } },
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'fixture' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'fixture' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'fixture' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [{ id: 'fixture', name: 'Fixture', tools: true, vision }] } },
     ui: { ...st.ui, workspace: 'chat' },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ busy: false, history: [], questionRound: 0, notes: [] }) } },

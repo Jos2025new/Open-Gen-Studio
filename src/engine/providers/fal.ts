@@ -2,8 +2,8 @@ import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, promptExpansion, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
-import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, resolveBody, splitSource, structuredInputsSync } from './shared';
+import type { GenBuildRequest, GenOutput, GenRequest, GenResult, MediaInput, PreparedRequest, ProviderAdapter, RequestEncoder, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
 
@@ -154,46 +154,41 @@ export const fal: ProviderAdapter = {
     return { ...schema, price: price ?? schema.price };
   },
 
-  async generate(req: GenRequest): Promise<GenResult> {
+  buildRequest(req: GenBuildRequest, enc: RequestEncoder): PreparedRequest {
     const { schema } = req;
     const body: Record<string, unknown> = wireParams(schema, req.settings, req.count);
     if (req.prompt && schema.slots.prompt) body[schema.slots.prompt] = req.prompt;
     Object.assign(body, promptExpansion(schema, req.settings, req.prompt));
-    const put = async (slot: { key: string; multiple?: boolean; max?: number } | undefined, inputs: MediaInput[]) => {
+    const put = (slot: { key: string; multiple?: boolean; max?: number } | undefined, inputs: MediaInput[]) => {
       if (!slot || !inputs.length) return;
-      const encoded = await Promise.all(inputs.slice(0, slot.max ?? 1).map((i) => encodeImage(i, 'data-url')));
+      const encoded = inputs.slice(0, slot.max ?? 1).map((i) => enc.image(i, 'data-url'));
       body[slot.key] = slot.multiple ? encoded : encoded[0];
     };
     if (req.kind === 'image') {
       const { source, refs } = splitSource(schema.slots, req.refs);
-      if (source && schema.slots.source) body[schema.slots.source.key] = await encodeImage(source, 'data-url');
-      await put(schema.slots.images, refs);
+      if (source && schema.slots.source) body[schema.slots.source.key] = enc.image(source, 'data-url');
+      put(schema.slots.images, refs);
+    } else {
+      put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
+      put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
+      put(schema.slots.images, req.refs);
+      if (schema.slots.refVideos && req.refVideos?.length) body[schema.slots.refVideos.key] = req.refVideos.slice(0, schema.slots.refVideos.max).map((v) => enc.video(v));
+      if (req.video && schema.slots.video) body[schema.slots.video.key] = enc.video(req.video);
     }
-    else {
-      await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
-      await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
-      await put(schema.slots.images, req.refs);
-      if (schema.slots.refVideos && req.refVideos?.length) {
-        body[schema.slots.refVideos.key] = await Promise.all(req.refVideos.slice(0, schema.slots.refVideos.max).map((v) => encodeVideo(v)));
-      }
-      // fal accepts data URIs for file inputs; a storage upload would be needed for very large clips.
-      if (req.video && schema.slots.video) body[schema.slots.video.key] = await encodeVideo(req.video);
-    }
-    Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'data-url'), (v) => encodeVideo(v)));
+    Object.assign(body, structuredInputsSync(schema.slots, req, (i) => enc.image(i, 'data-url'), (v) => enc.video(v)));
+    return { url: `${QUEUE}/${req.model.id}`, body };
+  },
+
+  async generate(req: GenRequest): Promise<GenResult> {
+    const raw = fal.buildRequest!(req, { image: (i, fmt) => encodeImage(i, fmt), video: (v) => encodeVideo(v) });
+    const body = await resolveBody(raw.body);
     req.onStatus('Submitting');
-    req.onRequest?.({ url: `${QUEUE}/${req.model.id}`, body });
-    const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${req.model.id}`, {
-      method: 'POST',
-      headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) },
-      body: JSON.stringify(body),
-      signal: req.signal,
+    req.onRequest?.({ url: raw.url, body });
+    const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(raw.url, {
+      method: 'POST', headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal,
     });
     const base = `${QUEUE}/${req.model.id.split('/').slice(0, 2).join('/')}/requests/${submit.request_id}`;
-    const job: RemoteJob = {
-      provider: 'fal',
-      id: submit.request_id,
-      meta: { status_url: submit.status_url ?? `${base}/status`, response_url: submit.response_url ?? base },
-    };
+    const job: RemoteJob = { provider: 'fal', id: submit.request_id, meta: { status_url: submit.status_url ?? `${base}/status`, response_url: submit.response_url ?? base } };
     req.onRemoteJob(job);
     return poll(job, { kind: req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
@@ -202,38 +197,31 @@ export const fal: ProviderAdapter = {
     return poll(job, ctx);
   },
 
+  buildCreateStyleRequest(req, enc) {
+    return { url: `${QUEUE}/fal-ai/recraft/v4/create-style`, body: { image_urls: req.images.slice(0, 10).map((i) => enc.image(i, 'data-url')) } };
+  },
   async createStyle(req) {
-    // Recraft V4 custom style from 1–10 reference images; the style_id works with the V4 style models.
-    const endpoint = 'fal-ai/recraft/v4/create-style';
-    req.onStatus('Uploading references');
-    const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${endpoint}`, {
-      method: 'POST',
-      headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) },
-      body: JSON.stringify({ image_urls: await Promise.all(req.images.slice(0, 10).map((i) => encodeImage(i, 'data-url'))) }),
-      signal: req.signal,
-    });
-    const base = `${QUEUE}/fal-ai/recraft/requests/${submit.request_id}`;
-    const job: RemoteJob = { provider: 'fal', id: submit.request_id, meta: { status_url: submit.status_url ?? `${base}/status`, response_url: submit.response_url ?? base } };
-    req.onRemoteJob(job);
-    return poll(job, { kind: 'text', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+    return submitFalText(fal.buildCreateStyleRequest!(req, falEnc), 'fal-ai/recraft', 'Uploading references', req);
   },
 
+  buildCreateVoiceRequest(req, enc) {
+    return { url: `${QUEUE}/fal-ai/kling-video/create-voice`, body: { voice_url: enc.video(req.input) } };
+  },
   async createVoice(req) {
-    // Kling custom voice from 5–30 s of clean speech; the result is the voice_id to bind to a subject.
-    const endpoint = 'fal-ai/kling-video/create-voice';
-    req.onStatus('Uploading voice');
-    const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${endpoint}`, {
-      method: 'POST',
-      headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) },
-      body: JSON.stringify({ voice_url: await encodeVideo(req.input) }),
-      signal: req.signal,
-    });
-    const base = `${QUEUE}/fal-ai/kling-video/requests/${submit.request_id}`;
-    const job: RemoteJob = { provider: 'fal', id: submit.request_id, meta: { status_url: submit.status_url ?? `${base}/status`, response_url: submit.response_url ?? base } };
-    req.onRemoteJob(job);
-    return poll(job, { kind: 'text', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+    return submitFalText(fal.buildCreateVoiceRequest!(req, falEnc), 'fal-ai/kling-video', 'Uploading voice', req);
   },
 };
+
+const falEnc: RequestEncoder = { image: (i, fmt) => encodeImage(i, fmt), video: (v) => encodeVideo(v) };
+async function submitFalText(raw: PreparedRequest, prefix: string, status: string, req: { apiKey: string; signal: AbortSignal; onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }) {
+  req.onStatus(status);
+  const body = await resolveBody(raw.body);
+  const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(raw.url, { method: 'POST', headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
+  const base = `${QUEUE}/${prefix}/requests/${submit.request_id}`;
+  const job: RemoteJob = { provider: 'fal', id: submit.request_id, meta: { status_url: submit.status_url ?? `${base}/status`, response_url: submit.response_url ?? base } };
+  req.onRemoteJob(job);
+  return poll(job, { kind: 'text', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+}
 
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const kind = ctx.kind === 'text' ? 'image' : ctx.kind;

@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import type { BudgetPass } from '../budget';
+import { stable } from '../flow/freshness';
+import { ticketBudgetPass, type BudgetPass } from '../budget';
 import { FREE, UNKNOWN, sumEstimates } from '../pricing';
 import type { Estimate } from '../types';
 import { echo } from './echo';
 import { Transactions, takeStateSnapshot } from './history';
 import { command, missingTarget } from './registry';
-import { CommandError, type AnyCommand, type Caller, type CommandContext, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
+import { COMMAND_REVIEW_CHANGED, CommandError, type AnyCommand, type Caller, type CommandContext, type CommandReview, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
 
 /*
  * The two ways in (ADR 0030).
@@ -14,6 +15,16 @@ import { CommandError, type AnyCommand, type Caller, type CommandContext, type C
  *    once, never throws, and runs one call or a sequence where `"$1"` is the result of step 1.
  * Both go through the same commands, the same undo transactions and the same echo.
  */
+
+/** Paid commands supply their resolved send review; fallback signs args, target and estimate. */
+export function commandReview(spec: AnyCommand, ctx: CommandContext, args: unknown): CommandReview {
+  if (spec.review) return spec.review(ctx, args);
+  return { signature: stable({ args, on: ctx.on, estimate: previewEstimate(spec, ctx, args) }), details: [] };
+}
+
+export function previewEstimate(spec: AnyCommand, ctx: CommandContext, args: unknown): Estimate {
+  try { return spec.estimate?.(ctx, args) ?? UNKNOWN; } catch { return UNKNOWN; }
+}
 
 const thenable = (value: unknown): value is PromiseLike<unknown> => typeof (value as PromiseLike<unknown> | null)?.then === 'function';
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -109,13 +120,21 @@ export interface ApprovalStep {
   args: unknown;
   on: Target;
   estimate: Estimate;
+  review?: CommandReview;
+}
+/** Complete frozen step stored on a durable D+ command ticket (includes write/read steps and `$N` producers). */
+export interface FrozenCommandStep {
+  step: number; cmd: string; title: string; effect: Effect;
+  rawArgs: unknown; rawOn: Target; args: unknown; on: Target;
+  ready: boolean; onReady: boolean;
+  state?: 'running' | 'done' | 'failed'; result?: unknown; estimate?: Estimate; review?: CommandReview;
 }
 export interface ApprovalRequest {
-  caller: Caller;
-  steps: ApprovalStep[];
-  estimate: Estimate;
+  caller: Caller; steps: ApprovalStep[]; estimate: Estimate;
+  /** Full frozen sequence (including write/read steps and `$N` producers/pre-results). */
+  sequence?: FrozenCommandStep[];
 }
-export type ApprovalOutcome = boolean | { approved: boolean; budgetPass?: BudgetPass };
+export type ApprovalOutcome = boolean | { approved: boolean; budgetPass?: BudgetPass; approvalTicketId?: string };
 /** Shows the user what is about to happen and answers yes or no. One question per sequence, never one per step. */
 export type Approver = (request: ApprovalRequest) => ApprovalOutcome | Promise<ApprovalOutcome>;
 
@@ -226,6 +245,17 @@ export interface RunOptions {
   caller: Exclude<Caller, 'ui'>;
   signal?: AbortSignal;
   approver?: Approver;
+  /** Invoked when a post-approval step begins executing (1-based step index). */
+  onStepStart?: (step: number) => void;
+  /** Invoked when a post-approval step finishes executing (1-based step index). */
+  onStepEnd?: (step: number, ok: boolean, result?: unknown, error?: string) => void;
+  onReviewChanged?: (current: Pick<FrozenCommandStep, 'args' | 'on' | 'review' | 'estimate'>) => void;
+  /** Durable replay options for resuming an already-approved frozen sequence after reload. */
+  resume?: {
+    steps: readonly FrozenCommandStep[];
+    approvalTicketId: string;
+    budgetPass?: BudgetPass;
+  };
 }
 
 let sequences = 0;
@@ -282,14 +312,25 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   }
 
   const activeApprover = options.approver ?? approver;
-  const lastAskIndex = steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
+  const lastAskIndex = options.resume ? -1 : steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
   if (lastAskIndex >= 0 && !activeApprover) {
     const firstAsk = steps.findIndex(({ spec }) => needsApproval(spec.effect, options.caller));
     return fail(new CommandError('denied', "This needs the user's approval and nothing here can ask for it.", firstAsk + 1));
   }
 
   const seq = steps.length > 1 ? ++sequences : undefined;
-  let budgetPass: BudgetPass | undefined;
+  let budgetPass: BudgetPass | undefined = options.resume?.budgetPass;
+  let approvalTicketId = options.resume?.approvalTicketId;
+  const reviews: Record<number, CommandReview> = {};
+  for (const frozen of options.resume?.steps ?? []) {
+    const step = steps[frozen.step - 1];
+    if (!step) continue;
+    if (frozen.state) step.ran = true;
+    if (frozen.state === 'done') results[frozen.step - 1] = frozen.result;
+    if (frozen.review) reviews[frozen.step] = frozen.review;
+    if (frozen.ready) { step.args = frozen.args; step.ready = true; }
+    if (frozen.onReady) { step.on = frozen.on; step.onReady = true; }
+  }
   const runStep = (i: number, bufferedEchoes?: (() => void)[]): Promise<void> | void => {
     const step = steps[i];
     const { spec } = step;
@@ -297,6 +338,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     const t0 = performance.now();
     let args = step.args;
     let on = step.on;
+    const track = !bufferedEchoes;
     const said = (error?: unknown) => {
       const entry = () =>
         echo({ cmd: spec.id, args, on, caller: options.caller, ok: error === undefined, ms: performance.now() - t0, at, ...(error === undefined ? {} : { error: message(error) }), ...(seq ? { seq } : {}) });
@@ -317,9 +359,21 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         step.args = args;
         step.ready = true;
       }
-      const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
+      const stepPass = budgetPass ?? (approvalTicketId && on.session ? ticketBudgetPass(on.session, approvalTicketId, `cmd:${i + 1}`) : undefined);
+      const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(stepPass ? { budgetPass: stepPass } : {}) };
+      const reviewed = reviews[i + 1];
+      if (spec.effect === 'spend' && needsApproval(spec.effect, options.caller)) {
+        const current = commandReview(spec, ctx, args);
+        if (reviewed?.signature !== current.signature) {
+          options.onReviewChanged?.({ args, on, review: current, estimate: previewEstimate(spec, ctx, args) });
+          throw new Error(COMMAND_REVIEW_CHANGED);
+        }
+        ctx.reviewed = current;
+      } else if (reviewed) ctx.reviewed = reviewed;
+      if (approvalTicketId) ctx.approvalTicketId = approvalTicketId;
       check(spec, ctx, args);
       openHistories(spec, on, args, txs);
+      if (track) options.onStepStart?.(i + 1);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
       const out: unknown = spec.run(ctx, args);
       if (thenable(out)) {
@@ -327,9 +381,11 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
           (val) => {
             results[i] = val ?? null;
             step.ran = true;
+            if (track) options.onStepEnd?.(i + 1, true, results[i]);
             said();
           },
           (error: unknown) => {
+            if (track) options.onStepEnd?.(i + 1, false, undefined, message(error ?? new Error('failed')));
             said(error ?? new Error('failed'));
             throw { error, step: i + 1 };
           },
@@ -337,8 +393,10 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       }
       results[i] = out ?? null;
       step.ran = true;
+      if (track) options.onStepEnd?.(i + 1, true, results[i]);
       said();
     } catch (error) {
+      if (track) options.onStepEnd?.(i + 1, false, undefined, message(error ?? new Error('failed')));
       said(error ?? new Error('failed'));
       throw { error, step: i + 1 };
     }
@@ -383,15 +441,12 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         }
         const previewOn = step.onReady ? step.on : (partialRefs(step.rawOn, i + 1, results, ran) as Target);
         const previewArgs = step.ready ? step.args : partialRefs(step.rawArgs, i + 1, results, ran);
-        let estimate: Estimate = FREE;
-        if (step.spec.effect === 'spend') {
-          try {
-            estimate = step.spec.estimate ? step.spec.estimate({ on: previewOn, caller: options.caller, signal: options.signal }, previewArgs) : UNKNOWN;
-          } catch {
-            estimate = UNKNOWN;
-          }
-        }
-        asks.push({ step: i + 1, cmd: step.spec.id, title: step.spec.title, effect: step.spec.effect, args: previewArgs, on: previewOn, estimate });
+        const ctx = { on: previewOn, caller: options.caller, signal: options.signal };
+        const spends = step.spec.effect === 'spend';
+        const estimate = spends ? previewEstimate(step.spec, ctx, previewArgs) : FREE;
+        const review = spends && step.ready && step.onReady ? commandReview(step.spec, ctx, previewArgs) : undefined;
+        if (review) reviews[i + 1] = review;
+        asks.push({ review, step: i + 1, cmd: step.spec.id, title: step.spec.title, effect: step.spec.effect, args: previewArgs, on: previewOn, estimate });
       }
     } catch (error) {
       for (const s of steps) s.ran = false;
@@ -402,11 +457,23 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
 
     const spendEstimates = asks.filter((a) => a.effect === 'spend').map((a) => a.estimate);
     const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
+    const sequence: FrozenCommandStep[] = steps.map((s, i) => {
+      const ask = asks.find((a) => a.step === i + 1);
+      return {
+        step: i + 1, cmd: s.spec.id, title: s.spec.title, effect: s.spec.effect,
+        rawArgs: s.rawArgs, rawOn: s.rawOn, args: s.args, on: s.on, ready: s.ready, onReady: s.onReady,
+        ...(s.ran ? { state: 'done', result: results[i] } : {}),
+        ...(ask ? { estimate: ask.estimate, review: ask.review } : {}),
+      };
+    });
     let yes = false;
     try {
-      const outcome = await activeApprover({ caller: options.caller, steps: asks, estimate });
+      const outcome = await activeApprover({ caller: options.caller, steps: asks, estimate, sequence });
       yes = typeof outcome === 'boolean' ? outcome : outcome.approved;
-      if (typeof outcome === 'object' && outcome.approved) budgetPass = outcome.budgetPass;
+      if (typeof outcome === 'object' && outcome.approved) {
+        budgetPass = outcome.budgetPass;
+        approvalTicketId = outcome.approvalTicketId;
+      }
     } catch (error) {
       for (const s of steps) s.ran = false;
       const out = fail(error, asks[0].step);

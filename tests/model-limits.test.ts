@@ -37,7 +37,7 @@ function setup(withLong = true) {
   const list = [video(SEED, 'Seedance 2.0 Mini', ['5', '6', '7', '8', '9', '10', '11', '12'], ['720p', '1080p']), ...(withLong ? [video(LONG, 'Kling 3.0 Long', ['30', '60'], ['480p'])] : [])];
   const s = useStore.getState();
   useStore.setState({
-    settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k' } },
+    settings: { ...s.settings, budgetOn: false, keys: { ...s.settings.keys, nanogpt: 'k' } },
     catalog: { ...s.catalog, status: { ...s.catalog.status, nanogpt: 'ready' }, models: { ...s.catalog.models, ...Object.fromEntries(list.map(([m]) => [m.ref, m])) }, schemas: { ...s.catalog.schemas, ...Object.fromEntries(list.map(([m, sc]) => [m.ref, sc])) } },
   });
 }

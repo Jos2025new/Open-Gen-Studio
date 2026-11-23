@@ -127,11 +127,6 @@ export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta
   return meta;
 }
 
-export function hasLlmCatalogPrice(provider: LlmProviderId, model: string): boolean {
-  const m = get().catalog.llm[provider]?.find((x) => x.id === model);
-  return m?.inputPrice != null || m?.outputPrice != null;
-}
-
 export function notice(
   sessionId: string,
   workspace: Workspace,
@@ -372,7 +367,7 @@ export async function presentPlan(
     materializeNodes(sessionId, plan);
     const targets = plan.steps.filter(s => !isStepKind(s, 'text')).map(s => `${plan.id}_${s.id}`);
     prepared = await prepareNodeRun(sessionId, targets);
-    nodeRun = { targets, force: true, signature: prepared.signature };
+    nodeRun = { targets, force: true, signature: prepared.signature, runIds: prepared.runIds };
   }
   const item: PlanFeedItem = {
     ...feedBase(workspace),

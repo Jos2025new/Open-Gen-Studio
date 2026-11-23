@@ -18,7 +18,9 @@ export function deliverGenerated(src: GraphNode, edge: Pick<GraphEdge, 'outputIn
   const data = src.data;
   const gen = 'generationId' in data && data.generationId ? env.generations[data.generationId] : undefined;
   const value = gen?.text ?? ('outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[edge.outputIndex ?? data.outputIndex] : null);
-  return delivered(value, value && gen ? `${gen.id}:${value}` : null);
+  const rev = value && env.assets?.[value] ? normalizeAssetRevisions(env.assets[value]) : undefined;
+  const edited = rev && rev.versions.length > 1 ? true : undefined;
+  return delivered(value, value && gen ? `${gen.id}:${value}${edited ? `@${rev!.index}/${rev!.versions.length}` : ''}` : null, edited);
 }
 
 /** An asset node: its Sketch or file, revised as `id@index/versions`; more than one version marks it edited. */

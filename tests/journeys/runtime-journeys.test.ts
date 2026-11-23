@@ -47,7 +47,7 @@ function setup() {
   const st = useStore.getState();
   sessionId = st.activeSessionId;
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test-model' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test-model' } },
     composer: { ...st.composer, agentStyle: 'direct', attachments: [], userPicked: {} },
     sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });

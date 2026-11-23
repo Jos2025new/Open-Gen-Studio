@@ -2,30 +2,25 @@ import { z } from 'zod';
 import { defineCommand } from './commands/types';
 import { useStore } from '../store/store';
 import { estimateOp } from './costs';
-import { opChoice, opSpecForModel } from './opSpec';
+import { bufferVersion } from './design/raster';
+import { buildDirectSpec } from './directModel';
+import { syncOpSpec } from './opSpec';
 import { OP_IDS, OPS } from './ops';
+import { resolveSendPlan, sendFingerprint, stable } from './sendInputs';
 import { MEDIA_KINDS, type AdvancedValue, type OpId } from './types';
+import { hasActiveTicketSend } from './money/storeBridge';
 import * as A from './actions';
 
-function estimateStudioOp(
-  opId: OpId,
-  opParams: Record<string, AdvancedValue>,
-  opts: { sourceAssetId?: string; sourceDims?: { width: number; height: number }; modelRef?: string; origin: 'op' | 'designer'; sessionId?: string },
-) {
-  const st = useStore.getState();
-  const engine = OPS[opId].engine;
-  const src = opts.sourceAssetId ? st.assets[opts.sourceAssetId] : opts.sourceDims;
-  if (['local', 'transcribe', 'voice'].includes(engine)) return estimateOp(opId, opParams, src, st.composer.video.settings, opts.modelRef);
-  const choice = opChoice({ op: opId, params: opParams, sourceAssetId: opts.sourceAssetId ?? '', modelRef: opts.modelRef });
-  if (!choice.ref) return estimateOp(opId, opParams, src, st.composer.video.settings, opts.modelRef);
-  const spec = opSpecForModel(
-    { sessionId: opts.sessionId ?? '', origin: opts.origin, op: opId, params: opParams, sourceAssetId: opts.sourceAssetId ?? '', sourceDims: opts.sourceDims, modelRef: opts.modelRef },
-    choice.ref,
-    choice.viaEdit,
-    st.catalog.schemas[choice.ref],
-  );
-  return spec.estimate ?? estimateOp(opId, opParams, src, spec.settings, choice.ref);
+function studioOpSpec(opId: OpId, opParams: Record<string, AdvancedValue>, opts: { sourceAssetId?: string; sourceDims?: { width: number; height: number }; modelRef?: string; origin: 'op' | 'designer'; sessionId?: string }) {
+  const st = useStore.getState(), src = opts.sourceAssetId ? st.assets[opts.sourceAssetId] : opts.sourceDims;
+  const spec = syncOpSpec({ sessionId: opts.sessionId ?? '', origin: opts.origin, op: opId, params: opParams, sourceAssetId: opts.sourceAssetId ?? '', sourceDims: opts.sourceDims, modelRef: opts.modelRef });
+  if (spec) return { spec: { ...spec, inputs: spec.inputs ?? { refs: [] } }, estimate: spec.estimate ?? estimateOp(opId, opParams, src, spec.settings, spec.modelRef) };
+  return {
+    spec: { kind: 'image' as const, prompt: OPS[opId].label, modelRef: '', settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: opId, params: opParams, sourceAssetId: opts.sourceAssetId ?? '' } },
+    estimate: estimateOp(opId, opParams, src, st.composer.video.settings, opts.modelRef),
+  };
 }
+const estimateStudioOp = (...args: Parameters<typeof studioOpSpec>) => studioOpSpec(...args).estimate;
 
 const id = z.string().min(1);
 const kind = z.enum(MEDIA_KINDS);
@@ -231,8 +226,16 @@ export const commands = [
     needs: ['session'],
     available: (ctx) => onScreen(ctx),
     estimate: (_ctx, args) => A.checkDirect(args.kind).estimate,
+    review: ({ on }, args) => {
+      const st = useStore.getState();
+      const check = A.checkDirect(args.kind);
+      const spec = buildDirectSpec(args.kind, on.session!, check.estimate);
+      const plan = resolveSendPlan({ ...spec, inputs: spec.inputs ?? { refs: [] } }, st);
+      const send = sendFingerprint(plan, st);
+      return { signature: stable({ send, estimate: check.estimate, workspace: st.ui.workspace, target: st.composer.designerTarget }), details: spec.prompt ? [spec.prompt] : [], sendFingerprint: sendFingerprint(plan, st, { ignoreSeed: true }) };
+    },
     debt: 'Reads the active session, composer and screen; the action reports some failures only as notices.',
-    run: async ({ on, budgetPass }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session, budgetPass); if (problem) throw new Error(problem); await A.generateDirect(args.kind, budgetPass); },
+    run: async ({ on, budgetPass, approvalTicketId, reviewed }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session, budgetPass); if (problem) throw new Error(problem); await A.generateDirect(args.kind, budgetPass, approvalTicketId, reviewed?.sendFingerprint); },
   }),
   defineCommand({
     id: 'studio.generation.regenerate',
@@ -243,8 +246,14 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
     estimate: (_ctx, args) => A.regenerateEstimate(args.generationId) ?? useStore.getState().generations[args.generationId]?.estimate ?? { usd: null, approximate: true },
+    review: (_ctx, args) => {
+      const st = useStore.getState(), g = st.generations[args.generationId];
+      const estimate = A.regenerateEstimate(args.generationId) ?? g?.estimate;
+      const send = g ? sendFingerprint(resolveSendPlan(g, st), st, { ignoreSeed: true }) : undefined;
+      return { signature: stable({ generationId: args.generationId, send: send ?? null, estimate }), details: g?.prompt.trim() ? [g.prompt] : [], ...(send ? { sendFingerprint: send } : {}) };
+    },
     debt: 'The action reports some failures only as notices.',
-    run: async ({ budgetPass }, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass); },
+    run: async ({ budgetPass, approvalTicketId, reviewed }, args) => { const g = useStore.getState().generations[args.generationId]; if (g && g.status !== 'done' && hasActiveTicketSend(g)) throw new Error('The previous attempt may have been submitted. Check its status before regenerating.'); const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, g.sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass, approvalTicketId, reviewed?.sendFingerprint); },
   }),
   defineCommand({
     id: 'studio.asset.run_op',
@@ -255,8 +264,14 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
     estimate: ({ on }, args) => estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }),
+    review: ({ on }, args) => {
+      const st = useStore.getState();
+      const { spec, estimate } = studioOpSpec(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session });
+      const plan = resolveSendPlan(spec, st);
+      return { signature: stable({ send: sendFingerprint(plan, st), estimate }), details: spec.prompt ? [spec.prompt] : [], sendFingerprint: sendFingerprint(plan, st, { ignoreSeed: true }) };
+    },
     debt: 'Reads the active session and screen; failures can be reported only as notices.',
-    run: async ({ on, budgetPass }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode, budgetPass); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
+    run: async ({ on, budgetPass, approvalTicketId, reviewed }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode, budgetPass, approvalTicketId, reviewed?.sendFingerprint); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
   }),
   defineCommand({
     id: 'studio.layer.run_op',
@@ -267,8 +282,15 @@ export const commands = [
     needs: ['session'],
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : layer(ctx, args),
     estimate: ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); return estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); },
+    review: ({ on }, args) => {
+      const st = useStore.getState();
+      const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId);
+      const { spec, estimate } = studioOpSpec(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session });
+      const plan = resolveSendPlan(spec, st);
+      return { signature: stable({ send: sendFingerprint(plan, st), layer: l, raster: bufferVersion(args.layerId), estimate }), details: spec.prompt ? [spec.prompt] : [], sendFingerprint: sendFingerprint(plan, st, { ignoreSeed: true }) };
+    },
     debt: 'The action catches failures and reports them only as notices.',
-    run: async ({ on, budgetPass }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params, budgetPass); },
+    run: async ({ on, budgetPass, approvalTicketId, reviewed }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params, budgetPass, approvalTicketId, reviewed?.sendFingerprint); },
   }),
   defineCommand({
     id: 'studio.generation.delete',

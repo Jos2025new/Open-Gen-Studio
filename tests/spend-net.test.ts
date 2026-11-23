@@ -42,12 +42,12 @@ describe('(a) a new entry that never asked is stopped at the send', () => {
     const unpriced = spec({ estimate: { usd: null, approximate: true } });
     expect(() => createGeneration(unpriced)).toThrow(OverLimitError);
     expect(count()).toBe(0);
-    withOncePass(sid, (pass) => createGeneration({ ...unpriced, budgetPass: pass }));
+    withOncePass(sid, (pass) => createGeneration({ ...unpriced, budgetPass: pass }), null);
     expect(count()).toBe(1);
     expect(() => createGeneration(unpriced)).toThrow(OverLimitError);
   });
   it('another session\'s pass does not cover it', () => {
-    withOncePass('other', (pass) => expect(() => createGeneration(spec({ budgetPass: pass }))).toThrow(OverLimitError));
+    withOncePass('other', (pass) => expect(() => createGeneration(spec({ budgetPass: pass }))).toThrow(OverLimitError), paid.usd);
   });
   it('free runs, runs within the limit and runs with no limit are not touched', () => {
     createGeneration(spec({ estimate: { usd: 0, approximate: false } }));
@@ -60,12 +60,12 @@ describe('(a) a new entry that never asked is stopped at the send', () => {
 
 describe('(b) what an entry already approved keeps going without a second question', () => {
   it('Continue once (and a user Retry or Regenerate, which run inside it) creates the generation, and the pass dies with the action', async () => {
-    await withOncePass(sid, async (pass) => { createGeneration(spec({ budgetPass: pass })); });
+    await withOncePass(sid, async (pass) => { createGeneration(spec({ budgetPass: pass })); }, paid.usd);
     expect(count()).toBe(1);
     expect(() => createGeneration(spec())).toThrow(OverLimitError);
   });
   it('"Allow this time" covers every send of its sequence until it ends', () => {
-    const grant = beginOncePass(sid);
+    const grant = beginOncePass(sid, paid.usd * 2);
     createGeneration(spec({ budgetPass: grant.pass }));
     createGeneration(spec({ budgetPass: grant.pass }));
     grant.end();
@@ -120,7 +120,7 @@ describe('(b) what an entry already approved keeps going without a second questi
       expect(count()).toBe(0);
 
       // Direct Nodes run (Run / Run all) confirmed once: both steps run.
-      const res = await withOncePass(sid, (pass) => runNodes(sid, ['b'], undefined, true, undefined, pass));
+      const res = await withOncePass(sid, (pass) => runNodes(sid, ['b'], undefined, true, undefined, pass), null);
       expect(res?.failed).toEqual([]);
       expect(res?.outputs.size).toBe(2);
       expect(gen).toHaveBeenCalledTimes(2);
@@ -133,7 +133,7 @@ describe('(b) what an entry already approved keeps going without a second questi
       useStore.setState((s) => ({ generations: {}, sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], graph, feed: [] } } }));
       const card = await presentNodeRun(sid, ['b'], null, undefined, 'main');
       expect(card.errors).toEqual([]);
-      await withOncePass(sid, (pass) => approvePlan(sid, card.itemId!, pass));
+      await withOncePass(sid, (pass) => approvePlan(sid, card.itemId!, pass), null);
       const feedItem = useStore.getState().sessions[sid].feed.find((f) => f.id === card.itemId) as PlanFeedItem;
       expect(feedItem.status).toBe('done');
       expect(gen).toHaveBeenCalledTimes(2);

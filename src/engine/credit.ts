@@ -1,7 +1,6 @@
 import { logged } from '../lib/log';
-import { HttpError } from '../lib/http';
 import { formatUsd } from '../lib/format';
-import { apiKeyFor, isConnected, modelSummary } from './catalog';
+import { apiKeyFor, ensureSchema, isConnected, modelSummary } from './catalog';
 import { pushAlert, dismissAlert } from './alerts';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
@@ -15,6 +14,8 @@ import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
 import { applyEdit } from './nodecore/edit';
+import { closeTicket, grantGenerationTicketPass, hasActiveTicketSend, reopenGenerationTicketStep } from './money/storeBridge';
+import { rebindSubstituteFingerprint } from './sendInputs';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -24,11 +25,7 @@ import { applyEdit } from './nodecore/edit';
 
 const get = useStore.getState;
 
-/** A failure because the account has no credit (HTTP 402, or the provider's own words). */
-export function isCreditError(err: unknown): boolean {
-  if (err instanceof HttpError && err.status === 402) return true;
-  return /insufficient (credits?|balance|funds)|not enough (credits?|balance)|out of credits/i.test(String((err as Error)?.message ?? err));
-}
+export { isCreditError } from './money/paidSend';
 
 const cache = new Map<ProviderId, { at: number; usd: number | undefined }>();
 
@@ -166,7 +163,7 @@ function confirmOverLimit(
     level: 'warn',
     text: `${title}: ${verdict.text}`,
     actions: [
-      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, (once) => proceed(once)); } },
+      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, (once) => proceed(once), e.usd, e.lowerBound); } },
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
@@ -212,7 +209,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   const cur = g ? modelSummary(g.modelRef) : undefined;
   if (!g || !cur) return false;
   markEmpty(cur.provider);
-  if (g.remoteJob || g.lostJob || g.sends?.some((s) => s.status === 'uncertain' || s.status === 'intent' || Boolean(s.remoteJob))) return false;
+  if (hasActiveTicketSend(g)) return false;
   const empty = PROVIDER_LABELS[cur.provider];
   const nodes = () => get().sessions[g.sessionId]?.graph.nodes ?? [];
   const nodeId = attemptNode(g, nodes())?.id;
@@ -232,7 +229,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       : o.ratio === undefined ? 'price not comparable' : `about ${Math.round(o.ratio * 10) / 10}× the price`;
     const note = `${empty} had no credit, so this switched to ${PROVIDER_LABELS[patch.provider]} (${model}, ${price}).`;
     const notes = [...(get().generations[genId]?.notes ?? []), note];
-    patchGeneration(genId, { ...patch, notes });
+    patchGeneration(genId, { ...patch, notes, ...(g.approvedFingerprint ? { approvedFingerprint: rebindSubstituteFingerprint(g, patch) } : {}) });
   };
   const superseded = () => {
     const now = get().generations[genId];
@@ -252,17 +249,28 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const retry = estimateForRetry({ ...g, ...patch });
     return retry.lowerBound ? { ...retry, usd: null } : retry;
   };
-  const sendLater = (o: CreditOption, patch: ReturnType<typeof substitute>, what: string) => () => (async () => {
+  const retryChoices = '“Continue once” runs only this generation on that model.';
+  const sendLater = (o: CreditOption, what: string): ((pass?: BudgetPass) => Promise<void>) => (pass) => (async () => {
     if (stale()) return;
+    const patch = substitute(o);
+    const estimate = retryEstimateFor(patch);
+    if (budgetVerdict(estimate, { sessionId: g.sessionId, pass }).over) {
+      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), estimate, retryChoices, sendLater(o, what), pass);
+      return;
+    }
     const held = holdAttemptNode(g, nodes());
     if (!held) return;
     try {
+      if (g.approvedFingerprint) await ensureSchema(patch.modelRef).catch(() => undefined);
       applySubstitute(o, patch);
+      if (pass) { grantGenerationTicketPass(genId, estimate); consumeOnce(pass, estimate); }
+      else reopenGenerationTicketStep(genId);
       await later(genId, held.release);
       if (held.node && get().generations[genId]?.status === 'done') {
         applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
       }
     } finally {
+      closeTicket(get().generations[genId]?.approvalTicketId);
       held.release();
     }
   })().catch(logged(what));
@@ -281,7 +289,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const est = retryEstimateFor(patch);
     const subPass = useSubPass ? takeGenerationPass(genId, est) : undefined;
     try {
-      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what), subPass);
+      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, retryChoices, sendLater(o, what), subPass);
     } finally {
       consumeOnce(subPass);
     }
@@ -303,6 +311,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   }
   if (auto && mode === 'always') {
     if (superseded()) return false;
+    if (g.approvedFingerprint) await ensureSchema(auto.model.ref).catch(() => undefined);
     const patch = substitute(auto);
     const est = retryEstimateFor(patch);
     let immediate = true;
@@ -314,8 +323,8 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
         g.sessionId,
         label(auto.model, undefined, auto.usd),
         est,
-        '\u201cContinue once\u201d runs only this generation on that model.',
-        () => {
+        retryChoices,
+        (pass) => {
           if (!immediate) {
             if (stale()) return;
             if (g.planId) {
@@ -323,12 +332,13 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
               pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
               return;
             }
-            return sendLater(auto, patch, 'switch provider after no credit')();
+            return sendLater(auto, 'switch provider after no credit')(pass);
           }
           const held = holdAttemptNode(g, nodes(), nodeLock);
           if (!held) { run = Promise.resolve(false); return; }
           pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
           applySubstitute(auto, patch);
+          if (pass) { grantGenerationTicketPass(genId, est); consumeOnce(pass, est); }
           try {
             run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
           } catch (err) {
@@ -398,11 +408,16 @@ export async function onAgentCredit(sessionId: string = get().activeSessionId): 
   const switchTo = (c: (typeof choices)[number]) => {
     useStore.setState((s) => ({ settings: { ...s.settings, agent: { ...s.settings.agent, provider: c.p, model: c.m.id, modelPinned: true } } }));
   };
+  // Check nominal estimate (ignoring LLM output unboundedness, which the LLM send guard still enforces) so exhausted budgets still confirm before switching.
+  const switchEstimate = (c: (typeof choices)[number]): Estimate => {
+    const e = llmCallEstimate(c.p, c.m.id);
+    return e.unbounded ? { ...e, unbounded: undefined } : e;
+  };
   const pick = (c: (typeof choices)[number], remember = false) =>
     confirmOverLimit(
       sessionId,
       `${c.m.name} · ${PROVIDER_LABELS[c.p]}`,
-      llmCallEstimate(c.p, c.m.id),
+      switchEstimate(c),
       '\u201cContinue once\u201d switches the agent to this model.',
       () => {
         if (remember) setSettings({ autoSwitchProvider: 'always' });
@@ -423,7 +438,7 @@ export async function onAgentCredit(sessionId: string = get().activeSessionId): 
     return false;
   }
   if (auto && mode === 'always') {
-    if (budgetVerdict(llmCallEstimate(auto.p, auto.m.id), { sessionId }).over) {
+    if (budgetVerdict(switchEstimate(auto), { sessionId }).over) {
       pick(auto);
       return false;
     }

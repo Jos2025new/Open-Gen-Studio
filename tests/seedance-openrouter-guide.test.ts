@@ -24,7 +24,7 @@ describe('OpenRouter Seedance prompt writer guide (F1.7)', () => {
     } as unknown as PlanFeedItem;
     const state = useStore.getState();
     useStore.setState({
-      settings: { ...state.settings, keys: { ...state.settings.keys, openrouter: 'test-key' }, agent: { ...state.settings.agent, provider: 'openrouter', model: 'test-model' } },
+      settings: { ...state.settings, budgetOn: false, keys: { ...state.settings.keys, openrouter: 'test-key' }, agent: { ...state.settings.agent, provider: 'openrouter', model: 'test-model' } },
       catalog: { ...state.catalog, models: { ...state.catalog.models, [ref]: model }, schemas: { ...state.catalog.schemas, [ref]: schema } },
       sessions: { ...state.sessions, [sessionId()]: { ...session(), feed: [plan as FeedItem] } },
     });

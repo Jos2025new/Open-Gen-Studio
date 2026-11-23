@@ -1,5 +1,3 @@
-import { videoOpSettings } from '../jobs';
-import { opChoice } from '../opSpec';
 import { parseRef } from '../planRef';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
@@ -7,18 +5,23 @@ import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModel
 import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
 import { isStepKind } from '../planSteps/inspect';
 import { nodeRequest, stable } from './freshness';
+import { dynamicSendFingerprint, resolveSendPlan, sendFingerprint } from '../sendInputs';
+import { stepSendSpec } from '../planSteps/sendSpec';
+import { rememberNodeRequest, requestContext } from './result';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
 import { placeFor } from '../place';
 import { uid } from '../../lib/id';
 import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
-import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
+import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
-import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
+import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
-import { beginBatchPass, type BudgetPass } from '../budget';
-import { budgetProblem, deleteAssets } from '../actions';
+import { budgetProblemForSteps, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
+import { deleteAssets } from '../actions';
+import { closeTicket, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
@@ -191,25 +194,6 @@ export function runnableIds(nodes: GraphNode[]): string[] {
   return nodes.filter((n) => runsGeneration(n.data)).map((n) => n.id);
 }
 
-function requestContext(sessionId: string) {
-  const st = get(), graph = st.sessions[sessionId].graph;
-  const env = storeEnv();
-  return { schemas: st.catalog.schemas, assets: st.assets, operation: (n: GraphNode) => {
-    if (n.data.kind !== 'tool') return undefined;
-    const engine = OPS[n.data.op].engine;
-    if (['local', 'voice'].includes(engine)) return undefined;
-    const input = resolveInputs(graph, n, env).find(i => i.port === 'input' && i.from && i.status !== 'invalid' && !i.incompatible);
-    const edge = input && graph.edges.find(e => e.id === input.edgeId);
-    const sourceNode = input && graph.nodes.find(src => src.id === input.from);
-    const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations, edge?.outputIndex) : null;
-    const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
-    // A step from a confirmed plan carries the model the user approved (and the estimate priced): opChoice puts it before the source's model.
-    const { ref, viaEdit } = opChoice({ op: n.data.op, params: n.data.params, sourceAssetId: source && st.assets[source] ? source : '', upstreamModelRef: sourceRef });
-    const choice = { ref, viaEdit };
-    return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : isVideoOpEngine(engine) ? { settings: videoOpSettings(engine, st.catalog.schemas[choice.ref], n.data.params) } : {}) };
-  } };
-}
-
 /** The model and settings each tool node runs with: what the confirmation prices and what the send uses. */
 function nodeOperationsOf(context: ReturnType<typeof requestContext>, graph: import('../types').Graph, ids: string[]) {
   return Object.fromEntries(ids.map(id => [id, context.operation(graph.nodes.find(n => n.id === id)!)]));
@@ -217,25 +201,28 @@ function nodeOperationsOf(context: ReturnType<typeof requestContext>, graph: imp
 
 export interface NodeRunPreview {
   estimate: Estimate;
+  perStep?: Record<string, Estimate>;
   count: number;
   errors: string[];
   runIds: string[];
   steps: import('../types').PlanStep[];
   signature: string;
   inputIds: string[];
+  sendAssets?: string[];
+  stepFingerprints?: Record<string, string>;
 }
 
-export function previewRun(sessionId: string, targets: string[], force = true): NodeRunPreview {
+export function previewRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): NodeRunPreview {
   const st = get();
   const graph = st.sessions[sessionId].graph;
   const context = requestContext(sessionId);
-  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context });
+  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context, ...(frozenRunIds ? { frozenRunIds } : {}) });
   const env = storeEnv();
   const inputs = new Set(run.runIds);
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
     const subjects = n && 'subjects' in n.data ? (n.data.subjects ?? []).filter(s => !s.from.startsWith('asset:')).map(s => s.from.split('#')[0]) : [];
-    const linked = n ? resolveInputs(graph, n, env).flatMap(i => i.from && !i.broken && !ignoredRunCable(i) ? [i.from] : []) : [];
+    const linked = n ? resolveInputs(graph, n, env).flatMap(i => (!i.from || i.broken || ignoredRunCable(i) ? [] : [i.from])) : [];
     for (const source of [...linked, ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
   };
   run.runIds.forEach(visit);
@@ -243,9 +230,9 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   for (const id of inputs) {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
-    // A node this run writes must be free; an input only must not be generating.
-    const busyGen = runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status);
-    if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) errors.push(`“${n.data.title}” is already running.`);
+    // The plan checks persisted attempts for writes. In-memory write locks also protect live inputs.
+    const busy = `“${n.data.title}” is already running.`;
+    if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) && !errors.includes(busy)) errors.push(busy);
     // A required field left empty stops the run before any provider is called (every operation, from its field list).
     if (n.data.kind === 'tool' && run.runIds.includes(id)) for (const f of OPS[n.data.op].fields ?? []) {
       const v = n.data.params[f.key];
@@ -275,16 +262,26 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     if (problem) errors.push(`${step.title}: ${problem}`);
   }
   errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
-  const { total } = estimateSteps(run.steps, nodeOperationsOf(context, graph, run.runIds));
+  const nodeOperations = nodeOperationsOf(context, graph, run.runIds);
+  const { total, perStep } = estimateSteps(run.steps, nodeOperations);
+  const sendFingerprints: Record<string, string> = {}, stepFingerprints: Record<string, string> = {}, sendAssets = new Set<string>();
+  for (const step of run.steps) {
+    const { spec, dynamic } = stepSendSpec(step, run.steps, nodeOperations, st);
+    if (!spec) { sendFingerprints[step.id] = stable(isStepKind(step, 'text') ? { kind: 'text', text: step.text } : step); continue; }
+    const plan = resolveSendPlan(spec, st);
+    sendFingerprints[step.id] = sendFingerprint(plan, st);
+    stepFingerprints[step.id] = dynamic ? dynamicSendFingerprint(plan, st) : sendFingerprint(plan, st, { ignoreSeed: true });
+    plan.assetIds.forEach((id) => sendAssets.add(id));
+  }
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) return [id, 'missing']; // already reported as an error above
     return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
   });
-  return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
+  return { estimate: total, perStep, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], sendAssets: [...sendAssets].sort(), stepFingerprints, signature: stable({ requests, send: sendFingerprints, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
 
-export async function prepareNodeRun(sessionId: string, targets: string[], force = true): Promise<NodeRunPreview> {
+export async function prepareNodeRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): Promise<NodeRunPreview> {
   // Older materialized plans kept their identity sources only on the plan card.
   const session = get().sessions[sessionId];
   for (const n of session.graph.nodes) {
@@ -298,58 +295,63 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
     });
     if (subjects.length) patchNodeData(sessionId, n.id, { subjects });
   }
-  const preview = previewRun(sessionId, targets, force);
+  const preview = previewRun(sessionId, targets, force, frozenRunIds);
+  if (preview.errors.length) return preview;
   const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') ? [PICKABLE_VIDEO_OPS.includes(OPS[s.op].engine) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
   await Promise.all([...new Set(refs)].filter(Boolean).map(ref => ensureSchema(ref)));
-  return previewRun(sessionId, targets, force);
+  // Freeze the resolved runIds from the reviewed preview so loading schemas never expands hidden ancestors.
+  return previewRun(sessionId, targets, force, frozenRunIds ?? preview.runIds);
 }
 
 /** Revalidate the reviewed version before taking the lock or spending. */
 export async function runNodes(sessionId: string, targets: string[], approved?: NodeRunPreview, force = true,
-  onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass): Promise<import('../executor').ExecResult | null> {
-  const preview = await prepareNodeRun(sessionId, targets, force);
+  onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass, commandTicketId?: string): Promise<import('../executor').ExecResult | null> {
+  const preview = await prepareNodeRun(sessionId, targets, force, approved?.runIds.length ? approved.runIds : undefined);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
-  const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
+  const passPrefix = budgetPass?.kind === 'ticket' && budgetPass.stepKey ? `${budgetPass.stepKey}:` : '';
+  const problem = budgetProblemForSteps(preview.estimate, preview.perStep, sessionId, budgetPass, passPrefix);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
+  const hadPass = passActiveFor(budgetPass, sessionId, preview.estimate);
+  consumeOnce(budgetPass, preview.estimate);
+  const price = priceFromEstimate(preview.estimate);
+  const commandTicket = commandTicketId ? storeTickets.get(commandTicketId) : undefined;
+  const approvalTicketId = isFreePrice(price) ? undefined : commandTicket?.id ?? `nr:${uid('run')}`;
+  if (approvalTicketId) {
+    storeTickets.put(commandTicket ? {
+      ...commandTicket,
+      scope: { ...commandTicket.scope, nodeIds: [...new Set([...commandTicket.scope.nodeIds ?? [], ...preview.runIds])] },
+    } : createTicket({
+      id: approvalTicketId, sessionId, kind: 'node_run',
+      scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
+      price, pass: hadPass ? ticketPassFromEstimate(preview.estimate, stepCapsFromMap(preview.perStep, 'node:')) : undefined,
+    }));
+  }
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
   const startGraph = get().sessions[sessionId].graph;
-  const assetIds = preview.inputIds.flatMap(id => {
-    const st = get(), n = st.sessions[sessionId].graph.nodes.find(n => n.id === id)!;
-    const asset = nodeOutputAsset(n, st.generations);
-    const req = nodeRequest(st.sessions[sessionId].graph, n, st.generations, st.library, requestContext(sessionId));
-    const subjects = 'subjects' in req ? req.subjects ?? [] : [];
-    return [...(asset ? [asset] : []), ...subjects.flatMap(s => [s.frontal, s.video, ...s.refs].filter((id): id is string => Boolean(id))), ...(n.data.kind === 'tool' && typeof n.data.params.mask === 'string' ? [n.data.params.mask] : [])];
-  });
-  const releaseAssets = lockAssets(assetIds);
-  const pending = new Map<string, string>();
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
-  const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
-  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id), budgetPass);
+  const nodeOperations = nodeOperationsOf(context, startGraph, preview.runIds);
+  const releaseAssets = lockAssets(preview.sendAssets ?? []);
   try {
     const result = await executeSteps(preview.steps, {
-      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLock: release, nodeLibrary: library, nodeOperations,
+      sessionId, workspace: 'node', origin: 'node', approvalTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
+      stepFingerprints: preview.stepFingerprints,
+      ...(passPrefix ? { passStepPrefix: passPrefix } : {}),
       onState: (stepId, state, info) => {
-        if (info?.generationId) pending.set(stepId, info.generationId);
-        const generationId = pending.get(stepId);
-        if (state === 'done' && generationId) {
-          const st = get(), graph = startGraph;
-          const node = graph.nodes.find(n => n.id === stepId)!;
-          const completed = { ...node, data: { ...node.data, generationId } } as GraphNode;
-          const snapshot = { ...graph, nodes: graph.nodes.map(n => n.id === stepId ? completed : n) };
-          patchGeneration(generationId, { nodeRequest: stable(nodeRequest(snapshot, completed, st.generations, library, { ...context, schemas: st.catalog.schemas })) });
-          // Keep what the user edited meanwhile; only the result changes.
-          applyEdit({ session: sessionId, op: { op: 'set', node: stepId, patch: { generationId } as Partial<GraphNodeData> } });
-        }
+        if (info?.generationId) rememberNodeRequest(info.generationId, startGraph, library, context);
         onState?.(stepId, state, info);
       },
     });
     if (result.failed.length) toast(`${result.failed.length} node(s) failed: ${result.failed[0].error}`, 'error');
     return result;
-  } finally { batch.end(); releaseAssets(); release(); }
+  } finally {
+    if (approvalTicketId && !commandTicket) closeTicket(approvalTicketId);
+    releaseAssets();
+    release();
+  }
 }
 
 export interface DeletedNodes { nodes: GraphNode[]; edges: import('../types').GraphEdge[] }

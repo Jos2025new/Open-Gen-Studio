@@ -48,7 +48,7 @@ beforeEach(() => {
   });
   const st = useStore.getState();
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, attachments: [] },
     sessions: {
       ...st.sessions,

@@ -1,5 +1,7 @@
 import { mentionSubjects } from '../params';
 import { nodeIsCurrent, type RequestContext } from './freshness';
+import { hasActiveTicketSend, storeTickets } from '../money/storeBridge';
+import { isHeldStatus, sendStateOf, type ApprovalTicket } from '../money/ticket';
 import { uid } from '../../lib/id';
 import { refNodeText } from './refText';
 import { ignoredRunCable, resolveInputs, sessionChatText } from '../nodecore/resolver';
@@ -316,7 +318,7 @@ function latestAttemptByStep(generations: Record<string, Generation>): Map<strin
   for (const g of Object.values(generations)) {
     if (!g.stepId) continue;
     const prev = index.get(g.stepId);
-    if (!prev || g.createdAt > (prev.createdAt ?? 0)) index.set(g.stepId, g);
+    if (!prev || g.createdAt >= (prev.createdAt ?? 0)) index.set(g.stepId, g);
   }
   attemptByStep.set(generations, index);
   return index;
@@ -328,7 +330,24 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
   const direct = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
   const byStep = latestAttemptByStep(generations).get(node.id);
   if (!byStep) return direct;
-  return !direct || byStep.createdAt > (direct.createdAt ?? 0) ? byStep : direct;
+  return !direct || byStep.createdAt >= (direct.createdAt ?? 0) ? byStep : direct;
+}
+
+export function nodeAttemptProblem(node: GraphNode, generations: Record<string, Generation>, tickets?: readonly ApprovalTicket[]): string | undefined {
+  if (!runsGeneration(node.data)) return;
+  const attempt = nodeAttempt(node, generations);
+  if (attempt && attempt.status !== 'done') {
+    if (attempt.status === 'queued' || attempt.status === 'running') return `“${node.data.title}” is already running.`;
+    if (hasActiveTicketSend(attempt)) {
+      return `The previous attempt for “${node.data.title}” may have been submitted. Check its status before running again.`;
+    }
+  }
+  const active = sendStateOf(tickets ?? storeTickets.list(), { nodeId: node.id });
+  const held = active.matches.find((s) => isHeldStatus(s.status));
+  if (held) {
+    if (held.status === 'in_flight') return `“${node.data.title}” is already running.`;
+    return `The previous attempt for “${node.data.title}” may have been submitted. Check its status before running again.`;
+  }
 }
 
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
@@ -384,7 +403,7 @@ export function executionOrder(graph: Graph, targets?: string[], assets?: Record
  * Build steps for running `targets`. Upstream generation nodes without a finished
  * output run too; nodes that already have output are referenced by their asset.
  */
-export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[]; assets?: Record<string, Asset> } = {}): GraphRunPlan {
+export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[]; assets?: Record<string, Asset>; frozenRunIds?: readonly string[] } = {}): GraphRunPlan {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const errors: string[] = [];
   const run = new Set<string>();
@@ -412,14 +431,36 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     const upstream = [...graph.edges.filter(e => (e.kind ?? 'data') === 'data' && e.target === id && !unusable(id).has(e.id) && e.pin == null).map(e => e.source), ...subjectIds].map(uid => visit(uid, false)).some(Boolean);
     visiting.delete(id);
     const needsRun = effectiveForced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
-    checked.set(id, needsRun);
     if (needsRun) {
+      const problem = nodeAttemptProblem(n, generations);
+      if (problem) {
+        if (!errors.includes(problem)) errors.push(problem);
+        checked.set(id, false);
+        return false;
+      }
       if (n.data.sketchAssetId) errors.push(`“${n.data.title}” has a Sketch on its previous base. Reset or save the Sketch before updating this node.`);
       run.add(id);
     }
+    checked.set(id, needsRun);
     return needsRun;
   };
-  targets.forEach(t => visit(t, options.force !== false));
+  if (options.frozenRunIds) {
+    // Frozen scope approved from preview: never re-walk or re-expand ancestors at execution time.
+    for (const id of options.frozenRunIds) {
+      const n = byId.get(id);
+      if (!n) { errors.push(`No such node: ${id}.`); continue; }
+      if (!runsGeneration(n.data)) continue;
+      const problem = nodeAttemptProblem(n, generations);
+      if (problem) {
+        if (!errors.includes(problem)) errors.push(problem);
+        continue;
+      }
+      if (n.data.sketchAssetId) errors.push(`“${n.data.title}” has a Sketch on its previous base. Reset or save the Sketch before updating this node.`);
+      run.add(id);
+    }
+  } else {
+    targets.forEach(t => visit(t, options.force !== false));
+  }
 
   /** `index`: the result the link uses (edge.outputIndex); unset = the node's chosen result. */
   const refFor = (sourceId: string, index?: number, pinned = false): string | null => {

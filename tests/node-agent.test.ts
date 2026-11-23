@@ -30,7 +30,17 @@ describe('agent actions on existing nodes',()=>{
     const delta=tool ? {tool_calls:[{index:0,id:`call-${replies.length}`,function:{name:tool.name,arguments:JSON.stringify(tool.args)}}]} : {content:'ok'};
     return new Response(`data: ${JSON.stringify({choices:[{delta}]})}\n\ndata: [DONE]\n\n`,{headers:{'Content-Type':'text/event-stream'}});
   });
-  const st=useStore.getState();useStore.setState({ui:{...st.ui,workspace:'node'},settings:{...st.settings,keys:{...st.settings.keys,nanogpt:'test'},agent:{...st.settings.agent,provider:'nanogpt',model:'test'}},composer:{...st.composer,agentStyle:'auto',attachments:[]}});
+  const st=useStore.getState();
+  useStore.setState({
+    catalog: {
+      ...st.catalog,
+      llm: { ...st.catalog.llm, nanogpt: [{ id: 'test', name: 'Mock model', tools: true, inputPrice: 0, outputPrice: 0 }] },
+      llmStatus: { ...st.catalog.llmStatus, nanogpt: 'ready' },
+    },
+    ui: { ...st.ui, workspace: 'node' },
+    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test' } },
+    composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
+  });
   await sendAgentMessage('Cambia el prompt del keyframe 2 y actualiza el vídeo final');
   const card=session().feed.find(f=>f.type==='plan') as PlanFeedItem;
   expect(card?.status).toBe('awaiting');expect(card.nodeRun?.targets).toEqual(['final']);expect(card.plan.steps.map(s=>s.id)).toEqual(['key2','final']);

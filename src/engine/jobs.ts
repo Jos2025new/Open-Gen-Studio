@@ -1,8 +1,9 @@
+import { sendMediaViaPaidGate } from './money/transport';
 import { isRestart } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired, stepApproved } from './priceAuthorization';
 import { uid } from '../lib/id';
-import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
+import { AbortedError, isAbort, NetworkError, sleep } from '../lib/http';
 import { estimateMedia } from './costs';
 import { randomSeed } from '../lib/rng';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
@@ -13,25 +14,26 @@ import { variantRoute } from './variants';
 import { withVariation } from './sentPrompt';
 import { isCreditError, onGenerationCredit } from './credit';
 import { OPS, operationFactor } from './ops';
-import { maxCountPerRequest, paramByRole } from './params';
+import { maxCountPerRequest } from './params';
 import { ADAPTERS } from './providers/registry';
 import { resolveSendable, SchemaUnavailableError } from './schemaGuard';
 import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
-import { opRealism, negFor } from './realism';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
-import { deliverSend, shareOfEstimate } from './sendLedger';
-import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
-import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, startGenerationPass, type BudgetPass } from './budget';
+import { shareOfEstimate } from './sendLedger';
+import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
+import { consumeGenerationTicketStep, ensureGenerationTicket, flushFreeSendSave, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
+import { lockAssets } from './flow/locks';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
 import { chargePartial, checkDelivery, controllers, estimateSpec, finish, finishText, keptJob, purgeDiscarded, requestEstimate, running, type GenerationSpec } from './jobState';
 import { runLocalOp } from './localOps';
 import { runCreateStyle, runCreateVoice, runTranscribe } from './specialSends';
-import { promptShape, slotInputs, structuredSlots, subjectInputs } from './sendInputs';
+import { bindDynamicFingerprint, materializeSendInputs, resolveSendPlan } from './sendInputs';
 
 // Moved out of this file (Opus #4); kept here so every caller and mock keeps its path.
 export { adoptRemoteAssets, storeModelOutputs } from './assetIO';
@@ -52,10 +54,15 @@ export function modelName(ref: string): string {
 export function createGeneration(spec: GenerationSpec): Generation {
   const estimate = spec.estimate ?? estimateSpec(spec);
   // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
-  const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || batchStepApproved(spec.sessionId, spec.batchToken, spec.stepId);
+  const approval = spec.approvalTicketId ? storeTickets.get(spec.approvalTicketId) : undefined;
+  const nodeRunApproved = Boolean(
+    approval && (approval.kind === 'node_run' || approval.kind === 'commands') && approval.sessionId === spec.sessionId && spec.stepId && approval.scope.nodeIds?.includes(spec.stepId),
+  );
+  const nodeRunHadPass = Boolean(nodeRunApproved && approval?.pass);
+  const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || nodeRunApproved;
   assertWithinLimit(estimate, spec.sessionId, approved, spec.budgetPass);
-  const hadPass = passActiveFor(spec.budgetPass, spec.sessionId) || batchStepHadPass(spec.sessionId, spec.batchToken, spec.stepId);
-  consumeOnce(spec.budgetPass);
+  const pass = passActiveFor(spec.budgetPass, spec.sessionId, estimate) ? spec.budgetPass : undefined;
+  const passOwner = pass ?? (nodeRunHadPass ? spec.approvalTicketId : undefined);
   const parsed = parseModelRef(spec.modelRef);
   const g: Generation = {
     id: uid('gen'),
@@ -74,17 +81,39 @@ export function createGeneration(spec: GenerationSpec): Generation {
     status: 'queued',
     assetIds: [],
     estimate,
+    ...(approval?.sessionId === spec.sessionId ? { approvalTicketId: approval.id } : {}),
+    ...(spec.approvedFingerprint ? { approvedFingerprint: spec.approvedFingerprint } : {}),
+    ...(spec.passStepKey ? { passStepKey: spec.passStepKey } : {}),
     retryBaseEstimate: estimate,
     retryTotal: spec.variants?.length ?? spec.settings.count,
     parentId: spec.parentId,
     operationId: spec.operationId,
     planId: spec.planId,
     stepId: spec.stepId,
+    ...(spec.nodeRequest ? { nodeRequest: spec.nodeRequest } : {}),
     ...(spec.variants?.length ? { variants: spec.variants } : {}),
     createdAt: Date.now(),
   };
+  if (g.approvedFingerprint) g.approvedFingerprint = bindDynamicFingerprint(g.approvedFingerprint, g);
+  const rem = remainingBudget();
+  const needsTicketPass = Boolean(
+    passOwner ||
+    (stepApproved(spec.sessionId, spec.planId, spec.stepId) &&
+      (estimate.usd == null || estimate.lowerBound || (rem != null && estimate.usd > rem + 1e-9))),
+  );
+  const stepKey = sendStepKeyFor(g);
+  const ticketStepCap = approval?.pass?.kind === 'once' && approval.pass.steps && stepKey && Object.prototype.hasOwnProperty.call(approval.pass.steps, stepKey)
+    ? approval.pass.steps[stepKey]
+    : undefined;
+  const approvedUsd = ticketStepCap !== undefined ? ticketStepCap : (estimate.lowerBound ? null : estimate.usd);
+  if (passOwner && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, approvedUsd, passOwner);
+  consumeOnce(spec.budgetPass, estimate);
   upsertGeneration(g);
-  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, spec.budgetPass ?? spec.batchToken);
+  if (!g.approvalTicketId && slotPriceForGeneration(g).maxVerifiableUsd !== 0) {
+    ensureGenerationTicket(g, needsTicketPass ? { pass: ticketPassFromEstimate(estimate) } : {});
+  } else if (g.approvalTicketId && approval?.kind !== 'commands' && pass && pass.kind !== 'ticket' && !approval?.pass) {
+    grantGenerationTicketPass(g.id, estimate);
+  }
   return g;
 }
 
@@ -113,10 +142,13 @@ export function runGeneration(id: string, nodeLock?: () => void): Promise<string
     return Promise.reject(new PriceReviewRequired('Necesita revisión'));
   }
   startGenerationPass(id);
+  const releaseAssets = generation ? lockAssets(resolveSendPlan(generation).assetIds) : () => {};
   const p = attempt(id, nodeLock).finally(() => {
     running.delete(id);
     controllers.delete(id);
     clearGenerationPass(id);
+    consumeGenerationTicketStep(id);
+    releaseAssets();
     purgeDiscarded(id);
   });
   running.set(id, p);
@@ -128,7 +160,8 @@ async function attempt(id: string, nodeLock?: () => void): Promise<string[]> {
   try {
     return await execute(id);
   } catch (err) {
-    if (isCreditError(err)) {
+    const failed = get().generations[id];
+    if (isCreditError(err) && !(failed && hasUncertainTicketSend(failed))) {
       let rerun: Promise<string[]> | undefined;
       await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration, requestEstimate, nodeLock);
       if (rerun) return rerun;
@@ -151,6 +184,7 @@ async function execute(id: string): Promise<string[]> {
   let localPostSend = false;
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
+      await flushFreeSendSave();
       const assetIds = await runLocalOp(g, signal);
       finish(id, assetIds, 0);
       return assetIds;
@@ -188,6 +222,8 @@ async function execute(id: string): Promise<string[]> {
       throw new Error(parsed && !isConnected(parsed.provider) ? `Connect ${prov} in Settings to use ${g.modelName}.` : `Model ${g.modelName} is not available.`);
     }
     const { model, schema } = resolved;
+    const bound = bindDynamicFingerprint(g.approvedFingerprint, g);
+    if (bound !== g.approvedFingerprint) { patchGeneration(g.id, { approvedFingerprint: bound }); g = get().generations[g.id]; }
     if (g.kind === 'text' && !model.textOutput) throw new Error(`${model.name} makes ${model.kind}, not text.`);
     // What the provider is asked for: a text-output model (lyrics) runs as its media kind.
     const kind: MediaKind = g.kind === 'text' ? model.kind : g.kind;
@@ -196,22 +232,14 @@ async function execute(id: string): Promise<string[]> {
     if (model.provider !== 'local' && !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
     const adapter = ADAPTERS[model.provider];
 
-    // Inputs
-    const slots = await slotInputs(g, model, schema, kind);
-    const subjects = await subjectInputs(g, model, schema, slots);
-    const shaped = promptShape(g, model, schema, kind, slots, subjects);
-    const { firstFrame, lastFrame, video, mask, audio, refAudios } = slots;
-    const { elements } = subjects;
-    const { prompt } = shaped;
-    const { keyframes, clips, refs, refVideos, genSettings: shapedSettings } = structuredSlots(g, schema, subjects, slots, shaped.genSettings);
-    let genSettings = shapedSettings;
+    // Inputs resolved by the same send-plan builder used for approval fingerprinting.
+    const built = await materializeSendInputs(g, model, schema, kind);
+    const { prompt: shown, genSettings, refs, refVideos, keyframes, clips, audio, refAudios, elements, mask, firstFrame, lastFrame, video } = built;
 
     const { variants, priorCount, total, progressTotal, perRequest } = batchPlan(g, schema);
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), operationFactor(g.op)) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
-    const shown = opRealism(g, kind, prompt, model.id);
-    genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [...g.assetIds];
     const delivered: Asset[] = [];
@@ -220,87 +248,91 @@ async function execute(id: string): Promise<string[]> {
     let providerReportedCost = 0;
     let providerReportedCostKnown = true;
     let done = 0;
-    let batchIndex = 0;
+    let chunkIndex = 0;
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     let activeReqId: string | undefined;
-    let inTransport = false;
-    let requestDelivered = false;
-    try {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
+      const reqChunk = chunkIndex++;
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // A quote is not a provider-reported charge in the agent notice.
       const quote = await requestQuote(g.modelRef, schema, settings, n);
-      const reqIndex = batchIndex++;
+      const reqIndex = priorCount + done;
       activeReqId = undefined;
-      inTransport = false;
-      requestDelivered = false;
       localPostSend = false;
-      const send = async () => {
-        const committed = await commitPaidSend({
-          g,
-          index: reqIndex,
-          reqId: activeReqId,
-          quote,
-          signal,
-          authorize: proposed ? () => checkStepAuthorization(g, proposed) : undefined,
-        });
-        freeSend = committed.freeSend;
-        activeReqId = committed.reqId;
-        inTransport = true;
-        return adapter.generate({
-        kind,
-        model,
-        schema,
-        prompt: withVariation(shown, variants?.[done]),
-        settings,
-        count: n,
-        refs,
-        refVideos,
-        keyframes,
-        clips,
-        audio,
-        refAudios,
-        elements,
-        mask,
-        firstFrame,
-        lastFrame,
-        video,
-        op: g.op ? { id: g.op.id, params: g.op.params } : undefined,
-        apiKey,
+      const send = (retry: number) => sendMediaViaPaidGate({
+        g,
+        provider: model.provider,
+        adapter,
+        chunkIndex: reqChunk,
+        index: reqIndex,
+        items: n,
+        quote,
         signal,
-        onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
-        onRemoteJob: (job) => {
-          submitted = true;
-          recordRemoteJob(id, activeReqId, job);
+        beforeTransport: proposed ? () => checkStepAuthorization(g, proposed) : undefined,
+        isRetryable: (err) => {
+          const policy = adapter.retry;
+          const wait = policy?.waits[retry];
+          return Boolean(policy && wait != null && !submitted && !signal.aborted && !(err instanceof NetworkError) && policy.matches((err as Error).message));
         },
-        // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
-        onRequest: (info) => {
-          requests += 1;
-          // Trace only in tests and the sandbox: the real app builds nothing here, so a send can never fail on it.
-          if (journeyActive()) try {
-          const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame), false, g.prompt.length);
-          const approval = approvalEstimateForPlan(g.planId);
-          recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } }); } catch { /* diagnostics never block a send */ }
-          patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
+        request: (onRemoteJob) => ({ method: 'generate', input: {
+            kind,
+            model,
+            schema,
+            prompt: withVariation(shown, variants?.[done]),
+            settings,
+            count: n,
+            refs,
+            refVideos,
+            keyframes,
+            clips,
+            audio,
+            refAudios,
+            elements,
+            mask,
+            firstFrame,
+            lastFrame,
+            video,
+            op: g.op ? { id: g.op.id, params: g.op.params } : undefined,
+            apiKey,
+            signal,
+            onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
+            onRemoteJob: (job) => {
+              submitted = true;
+              onRemoteJob(job);
+            },
+            // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
+            onRequest: (info) => {
+              requests += 1;
+              // Trace only in tests and the sandbox: the real app builds nothing here, so a send can never fail on it.
+              if (journeyActive()) try {
+              const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame), false, g.prompt.length);
+              const approval = approvalEstimateForPlan(g.planId);
+              recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } }); } catch { /* diagnostics never block a send */ }
+              patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
+            },
+        } }),
+        settlement: (value) => {
+          const countDelivered = g.kind === 'text' ? 1 : Math.max(1, Math.min(n, value.outputs.length));
+          const knownCost = g.kind === 'text' ? (value.costUsd ?? g.estimate.usd) : (value.costUsd ?? quote);
+          const costUsd = knownCost ?? shareOfEstimate(get().generations[id] ?? g, countDelivered) ?? null;
+          return { costUsd, estimated: knownCost == null };
         },
       });
-      };
       const serial = adapter.serialKey?.(model) ?? null;
-      const once = () => (serial ? oneAtATime(serial, send) : send());
+      const once = (retry: number) => (serial ? oneAtATime(serial, () => send(retry)) : send(retry));
       // ProviderAdapter.retry: only the refused request is retried, spaced out; finished images are kept.
-      let result: Awaited<ReturnType<typeof send>> | undefined;
+      let outcome: Awaited<ReturnType<typeof send>> | undefined;
       for (let retry = 0; ; retry++) {
         try {
-          result = await once();
+          outcome = await once(retry);
           submitted = false;
-          inTransport = false;
           break;
         } catch (err) {
           const policy = adapter.retry;
           const wait = policy?.waits[retry];
-          if (!policy || wait == null || submitted || signal.aborted || err instanceof NetworkError || !policy.matches((err as Error).message)) throw err;
+          if (!policy || wait == null || submitted || signal.aborted || err instanceof NetworkError || err instanceof SendNotCommittedError || !policy.matches((err as Error).message)) throw err;
           const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
           const refused = `${policy.label} refused access`;
           patchGeneration(id, {
@@ -308,12 +340,12 @@ async function execute(id: string): Promise<string[]> {
             notes: [...(get().generations[id]?.notes ?? []).filter((x) => !x.startsWith(refused)), `${refused} ("${policy.reason}")${which}; it was tried again on its own.`],
           });
           logEvent('retry', { generation: id, model: g.modelName, reason: policy.reason.toLowerCase(), waitMs: wait, attempt: retry + 2, image: done + 1 });
-          rollbackSendIntent(id, activeReqId);
-          activeReqId = undefined;
-          inTransport = false;
           await sleep(wait, signal);
         }
       }
+      freeSend = outcome.free;
+      activeReqId = outcome.sendId;
+      const result = outcome.value;
       const reqCost = result.costUsd ?? quote;
       if (reqCost != null) cost += reqCost;
       else costKnown = false;
@@ -325,11 +357,10 @@ async function execute(id: string): Promise<string[]> {
         return [];
       }
       const items = Math.max(1, Math.min(n, result.outputs.length));
-      // This request delivered: record and book its cost before local storage so a local failure never erases a paid reply.
-      const before = get().generations[id];
-      if (before && (activeReqId || before.sends || (reqCost != null && reqCost > 0))) deliverSend(id, activeReqId, reqIndex, reqCost ?? shareOfEstimate(before, items), reqCost == null);
-      requestDelivered = true;
+      // paidSend already settled and booked this send idempotently before local storage;
+      // keep `sending` set while blobs are written so a reload before `assetIds` lands warns the user.
       localPostSend = !freeSend || (reqCost != null && reqCost > 0);
+      if (localPostSend) patchGeneration(id, { sending: Date.now() });
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       delivered.push(...assets);
@@ -351,18 +382,6 @@ async function execute(id: string): Promise<string[]> {
     finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined, activeReqId);
     await flushSendSave();
     return assetIds;
-    } catch (innerErr) {
-      const cur = get().generations[id];
-      const hasJob = Boolean(keptJob(innerErr, cur?.remoteJob));
-      const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-      const abortedInFlight = inTransport && (isAbort(innerErr) || signal.aborted);
-      const uncertain = !free && !hasJob && (innerErr instanceof NetworkError || (submitted && isCreditError(innerErr)) || abortedInFlight);
-      if (!requestDelivered && activeReqId && !(innerErr instanceof SendNotCommittedError) && !isRestart(signal.reason)) {
-        const sends = settleFailedSend(cur?.sends, activeReqId, uncertain, innerErr instanceof JobFailedError);
-        if (cur?.sends) patchGeneration(id, { sends });
-      }
-      throw innerErr;
-    }
   } catch (err) {
     if (err instanceof PriceReviewRequired) {
       patchGeneration(id, { sending: undefined });
@@ -370,7 +389,7 @@ async function execute(id: string): Promise<string[]> {
     }
     const cur = get().generations[id];
     if (err instanceof SendNotCommittedError) {
-      const keepLost = Boolean(cur && !wasFreeSend(cur) && (cur.lostJob || cur.sends?.some((s) => s.status === 'uncertain')));
+      const keepLost = Boolean(cur && !wasFreeSend(cur) && hasUncertainTicketSend(cur));
       patchGeneration(id, { status: 'error', error: err.message, statusText: undefined, finishedAt: Date.now(), lostJob: keepLost, sending: undefined });
       toast(err.message, 'error', 9000, cur?.planId || keepLost ? undefined : { label: 'Retry', run: () => { void retryGeneration(id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); }); } });
       throw err;
@@ -378,7 +397,7 @@ async function execute(id: string): Promise<string[]> {
     if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      const uncertain = Boolean((localPostSend && !remoteJob) || (cur && !wasFreeSend(cur, freeSend) && !remoteJob && cur.sends?.some((s) => s.status === 'uncertain')));
+      const uncertain = Boolean((localPostSend && !remoteJob) || (cur && !wasFreeSend(cur, freeSend) && !remoteJob && hasUncertainTicketSend(cur)));
       patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob, ...(uncertain ? { lostJob: true } : {}), sending: undefined });
       if (cur?.assetIds.length) chargePartial(cur);
       if (localPostSend) await flushSendSave();
@@ -386,7 +405,7 @@ async function execute(id: string): Promise<string[]> {
     }
     // The connection failed before any job id came back: the request may still have reached the provider.
     const free = cur ? wasFreeSend(cur, freeSend) : freeSend;
-    const lostJob = (!free && !remoteJob && (Boolean(cur?.lostJob) || err instanceof NetworkError || (submitted && isCreditError(err)))) || (localPostSend && !remoteJob);
+    const lostJob = (!free && !remoteJob && (Boolean(cur && hasUncertainTicketSend(cur)) || err instanceof NetworkError || (submitted && isCreditError(err)))) || (localPostSend && !remoteJob);
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob, sending: undefined });
     if (localPostSend) await flushSendSave();
     // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
@@ -424,11 +443,12 @@ export function isRunning(id: string): boolean {
 /** After a reload: resume polling remote jobs; mark other in-flight generations as interrupted. */
 export async function resumeInterrupted(): Promise<void> {
   const gens = Object.values(get().generations).filter((g) => g.status === 'running' || g.status === 'queued');
+  let markedInterrupted = false;
   for (const g of gens) {
     if (running.has(g.id)) continue;
     const job = activeRemoteJob(g);
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
-      const hasOpenSend = Boolean(g.sending != null || g.sends?.some((s) => s.status === 'intent' || s.status === 'uncertain'));
+      const hasOpenSend = hasOpenInFlightSend(g);
       const expectedTotal = g.variants ? g.assetIds.length + g.variants.length : (g.retryTotal ?? g.settings.count);
       const allDelivered = g.status === 'running' && g.kind !== 'text' && !job && !hasOpenSend && g.assetIds.length > 0 && (g.variants ? g.variants.length === 0 : g.assetIds.length >= expectedTotal);
       if (allDelivered) {
@@ -437,26 +457,29 @@ export async function resumeInterrupted(): Promise<void> {
         continue;
       }
       patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
+      markedInterrupted = true;
       purgeDiscarded(g.id);
       continue;
     }
     patchGeneration(g.id, { statusText: 'Resuming', remoteJob: job });
     followRemote(g.id, job);
   }
+  if (markedInterrupted) void flushSendSave();
 }
 
-export function retryGeneration(id: string, planItemId?: string, budgetPass?: BudgetPass): Promise<string[]> {
+export function retryGeneration(id: string, planItemId?: string, budgetPass?: BudgetPass, confirmedCharge = false): Promise<string[]> {
   const ongoing = retrying.get(id);
   if (ongoing) return ongoing;
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
+  if (!confirmedCharge && (g.lostJob || hasOpenInFlightSend(g) || activeRemoteJob(g))) return Promise.resolve(g.assetIds);
   const held = holdRetry(g, planItemId, budgetPass);
   if (held instanceof SchemaUnavailableError) return Promise.reject(held);
   if (!held) return Promise.resolve(g.assetIds);
   try {
     clearGenerationPass(id, true);
     // New Generation: another attempt of the same operation.
-    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), budgetPass });
+    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), nodeRequest: g.nodeRequest, budgetPass, approvalTicketId: planItemId ? `plan:${planItemId}` : undefined });
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
     // The failed attempt's card now shows this one, so the retry's result is seen.
     relinkAttempt(g.id, newG.id);

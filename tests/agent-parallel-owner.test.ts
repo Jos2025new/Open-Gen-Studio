@@ -37,7 +37,7 @@ beforeEach(() => {
   const st = useStore.getState();
   useStore.setState({
     activeSessionId: HOME,
-    settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'default/model' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'default/model' } },
     sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }), agentLane: undefined} },
   });
   // A waits to be released (it is the slow one); B answers at once.

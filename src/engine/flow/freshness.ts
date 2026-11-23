@@ -1,14 +1,13 @@
 import { incomingOf, resolveInputs, storeEnv } from '../nodecore/resolver';
 import { composePrompt } from '../nodecore/evaluate';
 import { descriptorOf } from '../nodecore/registry';
-import { normalizeAssetRevisions } from '../assetRevisions';
+import { assetRevisionIdentity, normalizeAssetRevisions } from '../assetRevisions';
+import { sentModelRef } from '../catalog';
+import { resolveSendPlan, stable } from '../sendInputs';
 import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
 
-export function stable(value: unknown): string {
-  return JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v)
-    ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b))) : v);
-}
+export { stable };
 
 export function comparableSettings(modelRef: string, settings: GenSettings, schemas: Record<string, ModelSchema> = {}, automaticSeed = false) {
   const schema = schemas[modelRef];
@@ -56,14 +55,28 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
     if (index < 0) locals.push(subject); else locals[index] = subject;
   }
   const subjects = [...locals, ...library.filter(s => !locals.some(l => l.name.toLowerCase() === s.name.toLowerCase()))];
-  const mentioned = mentionSubjects(prompt, subjects).ids.map(id => {
+  const shots = 'settings' in d ? d.settings.shots ?? [] : [];
+  const mentioned = mentionSubjects([prompt, ...shots.map(shot => shot.prompt)].join('\n'), subjects).ids.map(id => {
     const s = subjects.find(x => x.id === id)!;
-    return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: s.refAssetIds, video: s.videoAssetId, voice: s.voiceId };
+    const assets = [s.frontalAssetId, ...s.refAssetIds, s.videoAssetId].flatMap(id => {
+      const asset = id ? ctx.assets?.[id] : undefined;
+      return asset && (asset.revisions?.length || asset.originalRevision) ? [assetRevisionIdentity(asset)] : [];
+    });
+    return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: s.refAssetIds, video: s.videoAssetId, voice: s.voiceId, ...(assets.length ? { assets } : {}) };
   });
   const links = linkTarget(graph, node, generations, ctx.assets);
   const extra = links.length ? { links } : {}; // absent when empty, so results saved before this stay current
-  return d.kind === 'tool' ? { kind: d.kind, op: d.op, params: d.params, incoming, operation: ctx.operation?.(node), ...extra }
-    : 'settings' in d ? { kind: d.kind, modelRef: d.modelRef, prompt, settings: comparableSettings(d.modelRef, d.settings, ctx.schemas), incoming, subjects: mentioned, ...extra } : { kind: d.kind, incoming, ...extra };
+  if (d.kind === 'tool') {
+    const paramAssets = resolveSendPlan(
+      { kind: 'image', modelRef: '', prompt: '', settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: d.op, params: d.params, sourceAssetId: '' } },
+      { assets: ctx.assets ?? {}, library: [], catalog: { models: {}, schemas: {} } },
+    ).assetIds.flatMap(id => {
+      const asset = ctx.assets?.[id];
+      return asset && (asset.revisions?.length || asset.originalRevision) ? [assetRevisionIdentity(asset)] : [];
+    });
+    return { kind: d.kind, op: d.op, params: d.params, incoming, operation: ctx.operation?.(node), ...(paramAssets.length ? { assets: paramAssets } : {}), ...extra };
+  }
+  return 'settings' in d ? { kind: d.kind, modelRef: d.modelRef, prompt, settings: comparableSettings(d.modelRef, d.settings, ctx.schemas), incoming, subjects: mentioned, ...extra } : { kind: d.kind, incoming, ...extra };
 }
 
 export function nodeIsCurrent(graph: Graph, node: GraphNode, generations: Record<string, Generation>, library: Subject[] = [], ctx: RequestContext = {}): boolean {
@@ -95,7 +108,10 @@ export function nodeIsCurrent(graph: Graph, node: GraphNode, generations: Record
   const ownPrompt = 'prompt' in request ? request.prompt : '';
   // With a prompt cable that does not affect the result, the text it brought is not compared: the node's own prompt must still be in it.
   const promptSame = g.prompt === ownPrompt || (descriptorOf(d.kind)?.affects.prompt === false && typeof g.prompt === 'string' && g.prompt.includes(composePrompt(d, undefined)));
-  if (g.modelRef !== d.modelRef || !promptSame || stable(comparableSettings(d.modelRef, settings, ctx.schemas)) !== stable(comparableSettings(d.modelRef, d.settings, ctx.schemas))) return false;
+  const hasImageInput = request.incoming.some(e => (e.port === 'ref' || e.port === 'first') && e.value != null);
+  const modelMatches = g.modelRef === d.modelRef
+    || (hasImageInput && (d.kind === 'image' || d.kind === 'video') && g.modelRef === sentModelRef(d.modelRef, d.kind, true));
+  if (!modelMatches || !promptSame || stable(comparableSettings(d.modelRef, settings, ctx.schemas)) !== stable(comparableSettings(d.modelRef, d.settings, ctx.schemas))) return false;
   const refs = request.incoming.filter(e => ['ref', 'clip', 'refVideo', 'audio'].includes(e.port)).map(e => e.value);
   return stable(refs) === stable(g.inputs.refs) && (request.incoming.find(e => e.port === 'first')?.value ?? undefined) === g.inputs.firstFrame
     && (request.incoming.find(e => e.port === 'last')?.value ?? undefined) === g.inputs.lastFrame;

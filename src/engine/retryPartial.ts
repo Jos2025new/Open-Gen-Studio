@@ -2,15 +2,16 @@ import { sumEstimates } from './pricing';
 import type { Estimate, Generation, PlanFeedItem, PlanStep } from './types';
 
 /** Retry price is proportional to outputs still owed; a scaled full-run quote becomes an estimate. */
-export function retryEstimate(estimate: Estimate, total: number, delivered: number): Estimate {
+export function retryEstimate(estimate: Estimate | undefined, total: number, delivered: number): Estimate {
+  if (!estimate) return { usd: null, approximate: true };
   const remaining = Math.max(0, total - delivered);
   if (estimate.usd == null || total <= 0) return estimate;
   return { ...estimate, usd: estimate.usd * remaining / total, approximate: estimate.approximate || remaining !== total, exact: remaining === total ? estimate.exact : false };
 }
 
-export function estimateForRetry(g: Generation): Estimate {
+export function estimateForRetry(g: Generation, fallback?: Estimate): Estimate {
   const total = g.retryTotal ?? (g.variants ? g.assetIds.length + g.variants.length : g.settings.count);
-  return retryEstimate(g.retryBaseEstimate ?? g.estimate, total, g.assetIds.length);
+  return retryEstimate(g.retryBaseEstimate ?? g.estimate ?? fallback, total, g.assetIds.length);
 }
 
 export function retrySpec(g: Generation) {
@@ -37,7 +38,7 @@ export function planRetryEstimate(steps: PlanStep[], perStep: Record<string, Est
 export function partialRetryCharge(g: Generation, parent?: Generation): number | undefined {
   const delivered = Math.max(0, g.assetIds.length - (parent?.assetIds.length ?? 0));
   if (!delivered) return 0;
-  const base = (g.retryBaseEstimate ?? g.estimate).usd;
+  const base = (g.retryBaseEstimate ?? g.estimate)?.usd;
   if (base == null) return undefined;
   const total = Math.max(1, g.retryTotal ?? g.settings.count);
   return base * delivered / total;

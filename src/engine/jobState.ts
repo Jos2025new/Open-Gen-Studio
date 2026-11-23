@@ -3,6 +3,7 @@ import { getAssetBlob } from '../lib/idb';
 import { patchGeneration, saveNow, useStore } from '../store/store';
 import { addSpend } from '../store/spend';
 import { noteExcess, type BudgetPass } from './budget';
+import { linkCompletedNode } from './flow/result';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { deliveryNotes } from './delivery';
 import { isVideoOpEngine, OPS } from './ops';
@@ -10,6 +11,7 @@ import { videoOpSeconds } from './opSpec';
 import { partialRetryCharge } from './retryPartial';
 import { markSendsDone } from './sendMark';
 import { bookDelivered, deliverSend, ledgerCost, usesLedger } from './sendLedger';
+import { generationTicketId, hasActiveTicketSend } from './money/storeBridge';
 import type { Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, RemoteJob } from './types';
 
 const get = useStore.getState;
@@ -32,8 +34,13 @@ export interface GenerationSpec {
   operationId?: string;
   planId?: string;
   stepId?: string;
-  /** Runtime token covering the steps of an approved Nodes run; never persisted. */
-  batchToken?: symbol;
+  nodeRequest?: string;
+  /** Durable approval ticket covering this generation. */
+  approvalTicketId?: string;
+  /** Frozen fingerprint of the resolved send payload approved by the user. */
+  approvedFingerprint?: string;
+  /** Per-step pass key on a shared ticket (`cmd:2`, `cmd:1:node:n1`, etc.). */
+  passStepKey?: string;
   /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
   budgetPass?: BudgetPass;
   estimate?: Estimate;
@@ -81,6 +88,7 @@ export function finishText(id: string, text: string, actualUsd: number | undefin
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
   if (!usesLedger(g)) addSpend(cost, spendEntry(g, actualUsd == null));
   noteExcess(id);
+  linkCompletedNode(id);
   void saveNow().catch(() => undefined);
 }
 
@@ -117,6 +125,7 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
   });
   if (!ledger) addSpend(actualUsd ?? g.estimate.usd, spendEntry(g, actualUsd == null));
   noteExcess(id);
+  linkCompletedNode(id);
   void saveNow().catch(() => undefined);
 }
 
@@ -140,11 +149,7 @@ function spendEntry(g: Generation, estimated: boolean) {
 
 /** Keep a discarded generation while it still has an active remote job or unsettled send trail. */
 function hasPendingSendTrail(g: Generation): boolean {
-  return Boolean(
-    g.remoteJob ||
-    g.lostJob ||
-    g.sends?.some((s) => (s.status === 'sent' && Boolean(s.remoteJob)) || (s.status === 'uncertain' && g.status !== 'done') || s.status === 'intent'),
-  );
+  return g.status !== 'done' && hasActiveTicketSend(g);
 }
 
 /** An ended generation of a deleted session: already charged, so remove it and its results. */
@@ -157,9 +162,11 @@ export function purgeDiscarded(id: string): void {
   useStore.setState((cur) => {
     const generations = { ...cur.generations };
     delete generations[id];
+    const tickets = { ...cur.tickets };
+    delete tickets[generationTicketId(id)];
     const assets = { ...cur.assets };
     ids.forEach((a) => delete assets[a]);
-    return { generations, assets };
+    return { generations, tickets, assets };
   });
   // Loaded only when there is something to delete.
   if (ids.length) void import('../lib/idb').then((m) => m.deleteAssetBlobs(ids));

@@ -1,10 +1,11 @@
+import { compactApprovalTickets } from '../engine/money/ticket';
 import type { Session, Subject } from '../engine/types';
 import { keptDrafts } from './homeDrafts';
 import { sanitizeUi, type PersistedUi } from './persistUi';
 import type { AppState } from './store';
 import type { ComposerState, Settings } from './storeTypes';
 
-export type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
+export type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'tickets' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
   ui: PersistedUi;
 };
@@ -21,6 +22,7 @@ export function mergePersistedState(
   const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, loadedSession(s)]));
   const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] && !sessions[p.activeSessionId].hidden ? p.activeSessionId : Object.keys(sessions).find((id) => !sessions[id].hidden) ?? Object.keys(sessions)[0];
   const assets = p.assets ?? {};
+  const generations = p.generations ?? {};
   const ui = sanitizeUi({ ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) });
   // Home and a Space never show together; a missing tool input is dropped.
   if (ui.home && ui.space) ui.home = false;
@@ -39,7 +41,8 @@ export function mergePersistedState(
     spendLog: p.spendLog ?? [],
     sessions,
     activeSessionId,
-    generations: p.generations ?? {},
+    generations,
+    tickets: compactApprovalTickets(p.tickets ?? {}, generations, sessions),
     assets,
     library: p.library ?? legacySubjects(restored),
     composer: { ...current.composer, ...p.composer, editing: null },

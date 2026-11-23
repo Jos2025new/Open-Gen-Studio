@@ -121,6 +121,7 @@ describe('agent turn prefix stability across calls', () => {
     useStore.setState({
       settings: {
         ...st.settings,
+        budgetOn: false,
         keys: { ...st.settings.keys, openrouter: 'k' },
         agent: { ...st.settings.agent, provider: 'openrouter', model: 'anthropic/claude-haiku-5.5', showThinking: false },
       },

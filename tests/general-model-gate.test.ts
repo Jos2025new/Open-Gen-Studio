@@ -53,6 +53,13 @@ beforeEach(() => {
   });
   const st = useStore.getState();
   useStore.setState({
+    catalog: {
+      ...st.catalog,
+      llmStatus: { ...st.catalog.llmStatus, nanogpt: 'ready' },
+      llm: { ...st.catalog.llm, nanogpt: [
+        { id: 'm', name: 'Fixture LLM', contextLength: 32_000, vision: true, tools: true, reasoning: false, inputPrice: 0, outputPrice: 0 },
+      ] },
+    },
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
     sessions: {

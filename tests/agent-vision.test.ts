@@ -41,7 +41,7 @@ function setup(vision: boolean | undefined) {
   blobs.set('img1', new Blob(['png'], { type: 'image/png' }));
   useStore.setState({
     assets: { img1: { id: 'img1', kind: 'image', mime: 'image/png', width: 2000, height: 1000, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 0 } },
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     catalog: { ...st.catalog, llm: { nanogpt: [{ id: 'm', name: 'm', tools: true, ...(vision === undefined ? {} : { vision }) } as never] } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },

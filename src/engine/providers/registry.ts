@@ -1,18 +1,7 @@
 import type { ProviderId, RemoteProviderId } from '../types';
-import { atlas } from './atlas';
-import { local } from './demo';
-import { fal } from './fal';
-import { nanogpt } from './nanogpt';
-import { openrouter } from './openrouter';
-import { PROVIDER_LABELS, type ProviderAdapter } from './types';
+import { PROVIDER_LABELS } from './types';
 
-export const ADAPTERS: Record<ProviderId, ProviderAdapter> = {
-  local,
-  openrouter,
-  fal,
-  nanogpt,
-  atlas,
-};
+export { ADAPTERS } from '../money/transport';
 
 export const REMOTE_PROVIDERS = ['openrouter', 'fal', 'nanogpt', 'atlas'] as const;
 

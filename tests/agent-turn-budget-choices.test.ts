@@ -23,6 +23,7 @@ import { createSession, setSettings, useStore } from '../src/store/store';
 import { askAgain, budgetVerdict, dontAskAgain, llmCallEstimate, overLimitText, withOncePass } from '../src/engine/budget';
 import { approvePlan } from '../src/engine/agent/planRun';
 import { llmTurn } from '../src/engine/agent/llmTurn';
+import { loadLlmCatalog } from '../src/engine/catalog';
 import { useAlerts } from '../src/engine/alerts';
 import { ADAPTERS } from '../src/engine/providers/registry';
 import type { ModelSummary, PlanFeedItem } from '../src/engine/types';
@@ -162,6 +163,84 @@ afterEach(() => {
 });
 
 describe('Part 3b: agent turn over-limit choices and plan wrap-up budget guard', () => {
+  it.each(['ready', 'timed out'] as const)('prices a first turn while the startup catalog is loading (%s)', async (outcome) => {
+    setup({ budgetUsd: 1 });
+    useStore.setState((s) => ({ catalog: { ...s.catalog, llm: {}, llmStatus: {} } }));
+    vi.useFakeTimers();
+    let finishCatalog!: (response: Response) => void;
+    const catalog = new Promise<Response>(resolve => { finishCatalog = resolve; });
+    const fetchCatalog = vi.fn(() => catalog);
+    const send = vi.fn(() => sse('Agent reply.'));
+    vi.stubGlobal('fetch', async (url: unknown, init?: RequestInit) => {
+      if (String(url).includes('/models')) return fetchCatalog();
+      if (isLlmPost(url, init)) return send();
+      return new Response('{}');
+    });
+    const startup = loadLlmCatalog('nanogpt');
+    const turn = llmTurn(sidA, 'chat', { route: 'new', agentNodeId: 'main' });
+    const catalogResponse = { data: [{ id: 'paid-model', pricing: { prompt: '0', completion: '0' }, capabilities: { tool_calling: true } }] };
+    try {
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(fetchCatalog).toHaveBeenCalledTimes(1);
+      expect(send).not.toHaveBeenCalled();
+      expect(alerts()).toEqual([]);
+      if (outcome === 'ready') {
+        finishCatalog(Response.json(catalogResponse));
+        await turn;
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(alerts()).toEqual([]);
+      } else {
+        await vi.advanceTimersByTimeAsync(1);
+        await turn;
+        expect(alerts()).toHaveLength(1);
+        expect(alerts()[0].text).toContain('The price of this run is unknown');
+        expect(actionOf('Continue once')).toBeDefined();
+        finishCatalog(Response.json(catalogResponse));
+        await startup;
+        expect(send).not.toHaveBeenCalled();
+      }
+    } finally {
+      finishCatalog(Response.json(catalogResponse));
+      await startup;
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['limit off', 'explicitly free'] as const)('sends immediately with a pending catalog (%s)', async (mode) => {
+    setup({ budgetUsd: 1, spentUsd: 2 });
+    useStore.setState((s) => ({
+      settings: { ...s.settings, budgetOn: mode === 'explicitly free' },
+      catalog: {
+        ...s.catalog,
+        llmStatus: {},
+        llm: mode === 'limit off' ? {} : {
+          nanogpt: s.catalog.llm.nanogpt!.map(m => ({ ...m, inputPrice: 0, outputPrice: 0 })),
+        },
+      },
+    }));
+    vi.useFakeTimers();
+    let finishCatalog!: (response: Response) => void;
+    const catalog = new Promise<Response>(resolve => { finishCatalog = resolve; });
+    const send = vi.fn(() => sse('Agent reply.'));
+    vi.stubGlobal('fetch', async (url: unknown, init?: RequestInit) => {
+      if (String(url).includes('/models')) return catalog;
+      if (isLlmPost(url, init)) return send();
+      return Response.json({});
+    });
+    const startup = loadLlmCatalog('nanogpt');
+    const turn = llmTurn(sidA, 'chat', { route: 'new', agentNodeId: 'main' });
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(alerts()).toEqual([]);
+    } finally {
+      finishCatalog(Response.json({ data: [] }));
+      await startup;
+      await turn;
+      vi.useRealTimers();
+    }
+  });
+
   it('guardLlmBudget uses the same overLimitText copy and Continue once / Don’t ask again / Cancel buttons as other dialogs', async () => {
     setup({ budgetUsd: 0.05, spentUsd: 0.05 });
     const posts = mockLlmFetch(() => sse('Agent reply.'));
@@ -208,7 +287,7 @@ describe('Part 3b: agent turn over-limit choices and plan wrap-up budget guard',
     const card = attachPlan(sidA);
 
     expect(budgetVerdict(card.estimate, { sessionId: sidA }).over).toBe(true);
-    await withOncePass(sidA, (pass) => approvePlan(sidA, card.id, pass));
+    await withOncePass(sidA, (pass) => approvePlan(sidA, card.id, pass), card.estimate.usd, card.estimate.lowerBound);
 
     // Plan executed and passed the limit, so wrap-up llmTurn MUST ask again (0 LLM POSTs so far).
     expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(1);

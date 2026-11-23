@@ -73,7 +73,7 @@ beforeEach(() => {
         ],
       },
     },
-    settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'model/b' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'model/b' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
     sessions: {
       ...st.sessions,
@@ -375,7 +375,7 @@ describe('ataques que pasan (verificación de correcciones existentes)', () => {
     const errNotice = S().feed.find((f) => f.type === 'notice' && f.retry)!;
     await sendAgentMessage('hello B', { agentNodeId: 'agentB', chatNodeId: 'chat2' });
 
-    await retryAgentTurn(HOME, errNotice.id);
+    await retryAgentTurn(HOME, errNotice.id, true);
 
     expect(asText(laneState(HOME, 'agentA')!.history)).toContain('A recovered');
     expect(asText(laneState(HOME, 'agentB')!.history)).not.toContain('A recovered');

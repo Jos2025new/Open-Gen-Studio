@@ -33,10 +33,10 @@ describe('over-limit notice and the lasting no-ask rules', () => {
   it('a one-off pass does not silence it: the next run asks', async () => {
     const { withOncePass, beginOncePass } = await import('../src/engine/budget');
     const id = setup({});
-    withOncePass(id, () => addSpend(2, { sessionId: id } as never));
+    withOncePass(id, () => addSpend(2, { sessionId: id } as never), 2);
     expect(passed()).toBe(true);
     setup({});
-    const grant = beginOncePass(id);
+    const grant = beginOncePass(id, 2);
     addSpend(2, { sessionId: id } as never);
     grant.end();
     expect(passed()).toBe(true);

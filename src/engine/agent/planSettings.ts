@@ -1,13 +1,16 @@
 import { isVisualStep as isGen, isStepKind, stepInfo } from '../planSteps/inspect';
 import { create } from 'zustand';
+import { dismissAlert, pushAlert } from '../alerts';
+import { guardLlmBudget } from '../credit';
+import { reconcileUnknownCharge, storeTickets } from '../money/storeBridge';
+import { uid } from '../../lib/id';
 import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
-import { chat } from '../providers/llm';
+import { sendLlmViaPaidGate } from '../money/transport';
 import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';
 import { updateFeedItem, useStore } from '../../store/store';
-import { addSpend } from '../../store/spend';
 import { laneOfItem, laneState, patchLane } from './lanes';
 import { feedOfAgentIn } from './threads';
 import { VISUAL_MEDIA_KINDS, type FeedItem, type PlanFeedItem, type PlanStep, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type VisualMediaKind } from '../types';
@@ -171,7 +174,7 @@ function stepInputs(s: GenStep): string {
  * Rewrite the prompts of one kind for the card as it is now: its model (and prompting guide), duration, aspect and the
  * images each step sends, with the agent's video rules. The agent is told that the card's writer wrote them, not it.
  */
-export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[]): Promise<void> {
+export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[], approval?: { budgetPass?: boolean; confirmedCharge?: boolean }): Promise<void> {
   // The card's writer is the agent that raised the card: its model, its notes, whoever is on screen.
   const owner = laneOfItem(sessionId, itemId);
   const engine = agentEngine(sessionId, owner);
@@ -180,31 +183,64 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   if (engine.kind !== 'llm' || !item || !steps.length) return;
   const ref = steps[0].modelRef;
   const name = modelSummary(ref)?.name ?? ref;
+  const ticketPrefix = `llm:rewrite:${itemId}:`;
+  const prior = storeTickets.list().filter((ticket) => ticket.sessionId === sessionId && ticket.id.startsWith(ticketPrefix));
+  if (usePlanRewrite.getState().busy[itemId] || prior.some((ticket) => ticket.sends.some((send) => send.status === 'in_flight'))) return;
+  const uncertain = prior.filter((ticket) => ticket.sends.some((send) => send.status === 'uncertain'));
+  const possibleCharge = uncertain.length > 0;
+  if (possibleCharge && !approval?.confirmedCharge) {
+    const id = pushAlert({ level: 'warn', text: 'The previous prompt rewrite may have been charged. Sending again may charge you again.', actions: [
+      { label: 'Resend anyway', run: () => {
+        dismissAlert(id);
+        void rewritePrompts(sessionId, itemId, kind, groupModelRef, stepIds, { ...approval, confirmedCharge: true });
+      } },
+      { label: 'Cancel', run: () => dismissAlert(id) },
+    ] });
+    return;
+  }
+  if (approval?.confirmedCharge) for (const ticket of uncertain) reconcileUnknownCharge(sessionId, ticket.id);
+  const ticketId = uid(ticketPrefix);
+  const askBudget = () => guardLlmBudget(sessionId, engine.provider, engine.model, `Rewrite prompts for ${name}`, () =>
+    rewritePrompts(sessionId, itemId, kind, groupModelRef, stepIds, { ...approval, budgetPass: true }), approval?.budgetPass);
   const guardBlock = (): string | null => {
     if (!mayStartWork()) return 'Open Gen Studio is open in another tab';
     const est = llmCallEstimate(engine.provider, engine.model);
-    return budgetProblem(est, sessionId);
+    return approval?.budgetPass ? null : budgetProblem(est, sessionId);
   };
   const run = (runs.get(itemId) ?? 0) + 1;
   runs.set(itemId, run);
   const blocked = guardBlock();
-  if (blocked) return setRewrite(itemId, false, `The prompt was not rewritten for ${name}: ${blocked}`);
+  if (blocked) {
+    if (mayStartWork()) askBudget();
+    return setRewrite(itemId, false, `The prompt was not rewritten for ${name}: ${blocked}`);
+  }
   setRewrite(itemId, true);
   const guide = guideForModel(ref.split('::')[1] ?? '');
   const text = guide ? readGuide(`model:${guide.id}`) : undefined;
   const style = item.plan.style ? ` The app appends this style block to every prompt; never repeat or restate it: "${item.plan.style}".` : '';
   const system = `You are the plan card's prompt writer. The user changed the card; rewrite each prompt for ${name} and the step's settings and inputs listed with it${text ? ', following the prompting guide below' : ''}. Keep the content and intent: subjects, @names, the role of each image, actions, the style. Rules: English, except quoted dialogue and on-screen text, which stay as written. At most ${MAX_PROMPT} characters each; shorter is better. Fit the beats to the duration: drop beats rather than compress them, whole seconds only.${style}${kind === 'video' ? ` ${VIDEO_DIRECTION_POLICY}` : ''} The images of each step are attached after its line: look at them. Answer only a JSON object {"<step id>": "<new prompt>"}, nothing else.${text ? `\n\n---\nPrompting guide of ${name}:\n${text}` : ''}`;
   const lines = steps.map((s) => `${s.id} (${stepInputs(s)}) "${s.title}":\n${s.prompt}`).join('\n\n');
-  const parts = agentSeesImages(sessionId, owner) ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
   let tooLong = '';
   try {
+    const parts = agentSeesImages(sessionId, owner) ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
     for (let attempt = 0; attempt < 2; attempt++) {
       if (runs.get(itemId) !== run) return;
       const why = guardBlock();
-      if (why) throw new Error(why);
+      if (why) { if (mayStartWork()) askBudget(); throw new Error(why); }
       const content = attempt ? `${lines}\n\nYour last answer had a prompt over ${MAX_PROMPT} characters (${tooLong}). Write them shorter.` : lines;
-      const result = await chat({ provider: engine.provider, apiKey: engine.key, model: engine.model, system, messages: [userMessage(content, parts)], tools: [], signal: new AbortController().signal });
-      addSpend(llmCallUsd(engine.provider, engine.model, result.usage), { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
+      const { value: result } = await sendLlmViaPaidGate({
+        ticketId,
+        budgetPass: approval?.budgetPass,
+        sessionId,
+        provider: engine.provider,
+        apiKey: engine.key,
+        model: engine.model,
+        system,
+        messages: [userMessage(content, parts)],
+        tools: [],
+        signal: new AbortController().signal,
+        computeUsd: (u) => llmCallUsd(engine.provider, engine.model, u),
+      });
       if (runs.get(itemId) !== run) return;
       const out = JSON.parse(fenced(result.text)) as Record<string, unknown>;
       const long = steps.filter((s) => typeof out[s.id] === 'string' && (out[s.id] as string).trim().length > MAX_PROMPT);

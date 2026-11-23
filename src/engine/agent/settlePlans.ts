@@ -1,15 +1,24 @@
 import type { PlanFeedItem, StepState } from '../types';
 import { updateFeedItem, useStore } from '../../store/store';
+import { ensureUncertainChargeNotice, hasActiveTicketSend, storeTickets } from '../money/storeBridge';
+import { interruptSends } from '../money/ticket';
+import { settleInterruptedCommandCards } from './commandCalls';
 import { recordPriceResults } from './priceNotes';
 
 const get = () => useStore.getState();
 
 /**
- * After a reload, plans that were running have lost their executor. Their generations are resumed by
+ * After a reload, plans and command cards that were running have lost their executor. Their generations are resumed by
  * `resumeInterrupted`; follow them and close each card with its real outcome instead of "Running" forever.
- * Nothing is submitted again: steps that had not started before the reload are reported as not run.
+ * Nothing is submitted again: steps that had not started before the reload are reported as not run (or await one-click approval for command cards).
  */
 export function settleInterruptedPlans(): void {
+  for (const ticket of storeTickets.list()) {
+    const next = ticket.kind === 'llm' ? interruptSends(ticket) : ticket;
+    storeTickets.put(next);
+    ensureUncertainChargeNotice(next);
+  }
+  settleInterruptedCommandCards();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan') recordPriceResults(s.id, f.id);
   const open = new Set<string>();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan' && f.status === 'running') open.add(`${s.id}|${f.id}`);
@@ -23,14 +32,31 @@ export function settleInterruptedPlans(): void {
         open.delete(key);
         continue;
       }
+      const selected = item.plan.steps.filter((step) => !item.skipped?.includes(step.id) && !item.canceledSteps?.includes(step.id));
+      if (item.plan.workspace !== 'node' && selected.length && selected.every((step) =>
+        !item.stepGenerations[step.id] && (item.stepStates[step.id] === 'pending' || !item.stepStates[step.id]),
+      ) && !storeTickets.get(`plan:${item.id}`)?.sends.some((send) => send.status !== 'pending')) {
+        open.delete(key);
+        updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'awaiting', error: undefined });
+        continue;
+      }
       const states: Record<string, StepState> = { ...item.stepStates };
       let pending = false;
       const review = Object.values(states).includes('review');
       for (const st of item.plan.steps) {
         const gid = item.stepGenerations[st.id];
         const g = gid ? gens[gid] : undefined;
-        if (g) states[st.id] = g.status === 'review' ? 'review' : g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : ((pending = true), 'running');
-        else if (!review && states[st.id] !== 'done') states[st.id] = 'skipped';
+        if (g) {
+          states[st.id] = g.status === 'review'
+            ? 'review'
+            : g.status === 'done'
+              ? 'done'
+              : g.status === 'error' || g.status === 'canceled'
+                ? 'error'
+                : hasActiveTicketSend(g) || g.status === 'running' || g.status === 'queued'
+                  ? ((pending = true), 'running')
+                  : 'error';
+        } else if (!review && states[st.id] !== 'done') states[st.id] = 'skipped';
       }
       if (pending) continue;
       open.delete(key);

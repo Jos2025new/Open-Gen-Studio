@@ -2,8 +2,8 @@ import { extractErrorMessage, fetchJsonWithRelay, isAbort, JobFailedError, reque
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { GenSettings, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
-import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, resolveBody, splitSource, structuredInputsSync } from './shared';
+import type { GenBuildRequest, GenOutput, GenRequest, GenResult, MediaInput, PreparedRequest, ProviderAdapter, RequestEncoder, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
 import { modelMime } from '../../lib/model3d';
@@ -225,61 +225,48 @@ export const atlas: ProviderAdapter = {
     return { ...schema, price: model.price ?? schema.price };
   },
 
-  async generate(req: GenRequest): Promise<GenResult> {
+  buildRequest(req: GenBuildRequest, enc: RequestEncoder): PreparedRequest {
     const { schema } = req;
     const body: Record<string, unknown> = { model: req.model.id, ...wireParams(schema, req.settings, req.count) };
     if (req.prompt && schema.slots.prompt) body[schema.slots.prompt] = req.prompt;
-    const upload = (blob: Blob) => uploadMedia(blob, req.apiKey, req.signal);
-    const put = async (slot: { key: string; multiple?: boolean; max?: number } | undefined, inputs: MediaInput[]) => {
+    const put = (slot: { key: string; multiple?: boolean; max?: number } | undefined, inputs: MediaInput[]) => {
       if (!slot || !inputs.length) return;
-      req.onStatus('Uploading inputs');
-      const urls = await Promise.all(inputs.slice(0, slot.max ?? 1).map((i) => encodeImage(i, 'url', upload)));
+      const urls = inputs.slice(0, slot.max ?? 1).map((i) => enc.image(i, 'url'));
       body[slot.key] = slot.multiple ? urls : urls[0];
     };
     if (req.kind === 'model3d') {
-      await put(schema.slots.images, req.refs);
-      // Seed3D: ask for GLB inside its ZIP (the only format the preview reads) and plain URLs, not base64.
+      put(schema.slots.images, req.refs);
       if ('file_format' in body || /seed3d/.test(req.model.id)) body.file_format ??= 'glb';
     } else if (req.kind === 'image') {
       const { source, refs } = splitSource(schema.slots, req.refs);
-      if (source && schema.slots.source) body[schema.slots.source.key] = await encodeImage(source, 'url', upload);
-      await put(schema.slots.images, refs);
+      if (source && schema.slots.source) body[schema.slots.source.key] = enc.image(source, 'url');
+      put(schema.slots.images, refs);
     } else {
-      await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
-      await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
-      await put(schema.slots.images, req.refs);
+      put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
+      put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
+      put(schema.slots.images, req.refs);
       const refVideos = req.refVideos ?? [];
-      if (schema.slots.refVideos && refVideos.length) {
-        req.onStatus('Uploading references');
-        body[schema.slots.refVideos.key] = await Promise.all(refVideos.slice(0, schema.slots.refVideos.max).map((v) => encodeVideo(v, upload)));
-      }
+      if (schema.slots.refVideos && refVideos.length) body[schema.slots.refVideos.key] = refVideos.slice(0, schema.slots.refVideos.max).map((v) => enc.video(v));
       if (schema.slots.mixedRefs) {
-        // `refers`: one list of { url, type } for images and videos.
-        const items = [
-          ...req.refs.map((input) => ({ input, type: 'image' as const })),
-          ...refVideos.map((input) => ({ input, type: 'video' as const })),
-          ...(req.refAudios ?? []).map((input) => ({ input, type: 'audio' as const })),
-        ];
-        if (items.length) {
-          req.onStatus('Uploading references');
-          body[schema.slots.mixedRefs.key] = await Promise.all(
-            items.slice(0, schema.slots.mixedRefs.max).map(async ({ input, type }) => ({ url: type === 'image' ? await encodeImage(input, 'url', upload) : await encodeVideo(input, upload), type })),
-          );
-        }
+        const items = [...req.refs.map((input) => ({ input, type: 'image' as const })), ...refVideos.map((input) => ({ input, type: 'video' as const })), ...(req.refAudios ?? []).map((input) => ({ input, type: 'audio' as const }))];
+        if (items.length) body[schema.slots.mixedRefs.key] = items.slice(0, schema.slots.mixedRefs.max).map(({ input, type }) => ({ url: type === 'image' ? enc.image(input, 'url') : enc.video(input), type }));
       }
-      if (req.video && schema.slots.video) {
-        req.onStatus('Uploading video');
-        body[schema.slots.video.key] = await encodeVideo(req.video, upload);
-      }
+      if (req.video && schema.slots.video) body[schema.slots.video.key] = enc.video(req.video);
     }
     if (req.keyframes?.length || req.clips?.length || req.audio || req.refAudios?.length || req.elements?.length || req.mask) {
-      req.onStatus('Uploading inputs');
-      Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'url', upload), (v) => encodeVideo(v, upload)));
+      Object.assign(body, structuredInputsSync(schema.slots, req, (i) => enc.image(i, 'url'), (v) => enc.video(v)));
     }
-    req.onStatus('Submitting');
     const endpoint = req.kind === 'image' || req.kind === 'model3d' ? 'generateImage' : req.kind === 'audio' ? 'generateAudio' : 'generateVideo';
-    req.onRequest?.({ url: `${BASE}/api/v1/model/${endpoint}`, body });
-    const submit = await requestJson<{ data?: { id?: string; urls?: { get?: string } } }>(`${BASE}/api/v1/model/${endpoint}`, {
+    return { url: `${BASE}/api/v1/model/${endpoint}`, body };
+  },
+
+  async generate(req: GenRequest): Promise<GenResult> {
+    const upload = (blob: Blob) => { req.onStatus('Uploading inputs'); return uploadMedia(blob, req.apiKey, req.signal); };
+    const raw = atlas.buildRequest!(req, { image: (i, fmt) => encodeImage(i, fmt, upload), video: (v) => encodeVideo(v, upload) });
+    const body = await resolveBody(raw.body);
+    req.onStatus('Submitting');
+    req.onRequest?.({ url: raw.url, body });
+    const submit = await requestJson<{ data?: { id?: string; urls?: { get?: string } } }>(raw.url, {
       method: 'POST',
       headers: { ...JSON_HEADERS, Authorization: `Bearer ${req.apiKey}` },
       body: JSON.stringify(body),
@@ -287,7 +274,6 @@ export const atlas: ProviderAdapter = {
     });
     const id = submit.data?.id;
     if (!id) throw new Error('Atlas Cloud did not return a prediction id');
-    // Poll where Atlas says (OmniHuman answers at /model/result/{id}, most models at /model/prediction/{id}).
     const get = submit.data?.urls?.get;
     const pollUrl = get?.startsWith(`${BASE}/`) ? get : /seed3d/.test(req.model.id) ? `${BASE}/api/v1/model/result/${encodeURIComponent(id)}` : undefined;
     const job: RemoteJob = { provider: 'atlas', id, meta: pollUrl ? { pollUrl } : {} };

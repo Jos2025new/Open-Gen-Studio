@@ -135,12 +135,16 @@ describe('1. llmTurn budget limit guard', () => {
   });
 
   it('crossing the limit mid-turn stops before the second paid POST and resumes on "Continue once"', async () => {
-    // Remaining budget ($0.02) covers iteration 0's estimate ($0.0105), then iteration 0 spends $0.05 -> over limit.
+    // Start with the limit off, then turn it on during the first request. Its $0.05 crosses the $0.02 left.
     setupAgent({ budgetUsd: 10, spentUsd: 9.98, model: 'paid-model', inputPrice: 3, outputPrice: 15 });
+    useStore.setState((s) => ({ settings: { ...s.settings, budgetOn: false } }));
     let n = 0;
     const posts = mockLlmFetch(() => {
       n++;
-      if (n === 1) return sse([toolChunk('read_guide', { id: 'workflow:story' }, { prompt_tokens: 1000, completion_tokens: 500, cost: 0.05 })]);
+      if (n === 1) {
+        useStore.setState((s) => ({ settings: { ...s.settings, budgetOn: true } }));
+        return sse([toolChunk('read_guide', { id: 'workflow:story' }, { prompt_tokens: 1000, completion_tokens: 500, cost: 0.05 })]);
+      }
       return sse([textChunk('Finished after guide.')]);
     });
 

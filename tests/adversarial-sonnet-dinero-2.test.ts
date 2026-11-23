@@ -153,7 +153,7 @@ describe('verificacion 2: guardLlmBudget / llmTurn', () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     let acceptedAfter = true;
-    const gen = withOncePass(id, async (pass) => { await gate; acceptedAfter = overLimitAccepted(id, pass); });
+    const gen = withOncePass(id, async (pass) => { await gate; acceptedAfter = overLimitAccepted(id, pass); }, 0.1);
     await llmTurn(id, 'chat', { route: 'new', agentNodeId: 'main' });
     release();
     await gen;

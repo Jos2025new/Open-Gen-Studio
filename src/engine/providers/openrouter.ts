@@ -2,8 +2,8 @@ import { HttpError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { roleForKey, humanizeKey, wireParams } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, peekCached } from './shared';
-import type { GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
+import { cachedJson, encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, peekCached, resolveBody } from './shared';
+import type { GenBuildRequest, GenRequest, GenResult, PreparedRequest, ProviderAdapter, RequestEncoder, ResumeContext } from './types';
 import { modelRef } from './types';
 import { commonImageParameters, imageProviderOptions } from './openrouterOptions';
 import type { SupportedParam } from './openrouterOptions';
@@ -299,67 +299,54 @@ export const openrouter: ProviderAdapter = {
     };
   },
 
-  async generate(req: GenRequest): Promise<GenResult> {
+  buildRequest(req: GenBuildRequest, enc: RequestEncoder): PreparedRequest {
     const { schema } = req;
     const body: Record<string, unknown> = { model: req.model.id };
     if (req.prompt) body.prompt = req.prompt;
     Object.assign(body, wireParams(schema, req.settings, req.count));
-
     if (req.kind === 'image') {
-      // Image reference format and provider.options shape: https://openrouter.ai/docs/features/multimodal/image-generation
       if (req.refs.length && schema.slots.images) {
-        body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
+        body.input_references = req.refs.slice(0, schema.slots.images.max).map((r) => enc.image(r, 'content-part'));
       }
       const endpointOptions = imageProviderOptions(imageEndpointsRaw.get(req.model.id) ?? [], passthroughSettings(req.settings));
       if (endpointOptions) body.provider = endpointOptions;
-      req.onStatus('Generating');
-      req.onRequest?.({ url: `${BASE}/images`, body });
-      const res = await requestJson<Record<string, unknown>>(`${BASE}/images`, {
-        method: 'POST',
-        headers: { ...JSON_HEADERS, ...orHeaders(req.apiKey) },
-        body: JSON.stringify(body),
-        signal: req.signal,
-      });
-      const outputs = extractOutputs(res, 'image');
-      if (!outputs.length) throw new Error('OpenRouter returned no images');
-      const usage = res.usage as Record<string, unknown> | undefined;
-      return { outputs, costUsd: numberOrUndefined(usage?.cost) };
+      return { url: `${BASE}/images`, body };
     }
-
     const frames: unknown[] = [];
-    if (req.firstFrame && schema.slots.firstFrame) {
-      frames.push({ ...((await encodeImage(req.firstFrame, 'content-part')) as object), frame_type: 'first_frame' });
-    }
-    if (req.lastFrame && schema.slots.lastFrame) {
-      frames.push({ ...((await encodeImage(req.lastFrame, 'content-part')) as object), frame_type: 'last_frame' });
-    }
+    if (req.firstFrame && schema.slots.firstFrame) frames.push({ type: 'image_url', image_url: { url: enc.image(req.firstFrame, 'data-url') }, frame_type: 'first_frame' });
+    if (req.lastFrame && schema.slots.lastFrame) frames.push({ type: 'image_url', image_url: { url: enc.image(req.lastFrame, 'data-url') }, frame_type: 'last_frame' });
     if (frames.length) body.frame_images = frames;
-    // POST /videos input_references: https://openrouter.ai/docs/api/api-reference/video-generation/submit-a-video-generation-request
-    if (schema.slots.images && req.refs.length) {
-      body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
-    }
+    if (schema.slots.images && req.refs.length) body.input_references = req.refs.slice(0, schema.slots.images.max).map((r) => enc.image(r, 'content-part'));
     if (schema.slots.refVideos && req.refVideos?.length) {
-      body.input_references = [...(Array.isArray(body.input_references) ? body.input_references : []), ...await Promise.all(req.refVideos.map(async (v) => ({ type: 'video_url', video_url: { url: await encodeVideo(v) } })))];
+      body.input_references = [...(Array.isArray(body.input_references) ? body.input_references : []), ...req.refVideos.map((v) => ({ type: 'video_url', video_url: { url: enc.video(v) } }))];
     }
     if (schema.slots.refAudios && req.refAudios?.length) {
-      body.input_references = [...(Array.isArray(body.input_references) ? body.input_references : []), ...await Promise.all(req.refAudios.map(async (a) => ({ type: 'audio_url', audio_url: { url: await encodeVideo(a) } })))];
+      body.input_references = [...(Array.isArray(body.input_references) ? body.input_references : []), ...req.refAudios.map((a) => ({ type: 'audio_url', audio_url: { url: enc.video(a) } }))];
     }
-    // Cookbook's documented provider slug and nested parameters: https://openrouter.ai/docs/cookbook/video-generation/provider-specific-video-options
     if (/^google\/veo-/.test(req.model.id)) {
       const keys = rawVideoOptions(req.model.id, videoRaw.get(req.model.id)?.allowed_passthrough_parameters);
       const values = passthroughSettings(req.settings);
       const parameters = Object.fromEntries(keys.filter((key) => Object.hasOwn(values, key)).map((key) => [key, values[key]]));
       if (Object.keys(parameters).length) body.provider = { options: { 'google-vertex': { parameters } } };
     }
+    return { url: `${BASE}/videos`, body };
+  },
+
+  async generate(req: GenRequest): Promise<GenResult> {
+    const raw = openrouter.buildRequest!(req, { image: (m, fmt) => encodeImage(m, fmt), video: (m) => encodeVideo(m) });
+    const body = await resolveBody(raw.body);
+    if (req.kind === 'image') {
+      req.onStatus('Generating');
+      req.onRequest?.({ url: raw.url, body });
+      const res = await requestJson<Record<string, unknown>>(raw.url, { method: 'POST', headers: { ...JSON_HEADERS, ...orHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
+      const outputs = extractOutputs(res, 'image');
+      if (!outputs.length) throw new Error('OpenRouter returned no images');
+      const usage = res.usage as Record<string, unknown> | undefined;
+      return { outputs, costUsd: numberOrUndefined(usage?.cost) };
+    }
     req.onStatus('Submitting');
-    req.onRequest?.({ url: `${BASE}/videos`, body });
-    const submit = await requestJson<{ id: string; polling_url?: string; status: string }>(`${BASE}/videos`, {
-      method: 'POST',
-      headers: { ...JSON_HEADERS, ...orHeaders(req.apiKey) },
-      body: JSON.stringify(body),
-      signal: req.signal,
-    });
-    // polling_url may be relative; resolution matches the cookbook's status polling example.
+    req.onRequest?.({ url: raw.url, body });
+    const submit = await requestJson<{ id: string; polling_url?: string; status: string }>(raw.url, { method: 'POST', headers: { ...JSON_HEADERS, ...orHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
     const job: RemoteJob = { provider: 'openrouter', id: submit.id, meta: { polling_url: submit.polling_url ? new URL(submit.polling_url, 'https://openrouter.ai').href : `${BASE}/videos/${submit.id}` } };
     req.onRemoteJob(job);
     return pollVideo(job, { kind: 'video', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });

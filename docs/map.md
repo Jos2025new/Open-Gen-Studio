@@ -20,26 +20,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 460 | 373 |
-| [store.ts](../src/store/store.ts) | 307 | 368 |
+| [types.ts](../src/engine/types.ts) | 466 | 387 |
+| [store.ts](../src/store/store.ts) | 311 | 383 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 68 | 5 |
-| [media.ts](../src/lib/media.ts) | 60 | 70 |
-| [ops.ts](../src/engine/ops.ts) | 55 | 22 |
-| [id.ts](../src/lib/id.ts) | 55 | 0 |
-| [catalog.ts](../src/engine/catalog.ts) | 54 | 33 |
+| [media.ts](../src/lib/media.ts) | 60 | 83 |
+| [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
+| [ops.ts](../src/engine/ops.ts) | 57 | 22 |
+| [id.ts](../src/lib/id.ts) | 57 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
-| [doc.ts](../src/engine/design/doc.ts) | 50 | 72 |
+| [doc.ts](../src/engine/design/doc.ts) | 50 | 73 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |
-| [raster.ts](../src/engine/design/raster.ts) | 43 | 38 |
+| [raster.ts](../src/engine/design/raster.ts) | 44 | 40 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 40 | 0 |
-| [actions.ts](../src/engine/actions.ts) | 38 | 38 |
-| [types.ts](../src/engine/providers/types.ts) | 38 | 10 |
+| [types.ts](../src/engine/providers/types.ts) | 39 | 10 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
+| [actions.ts](../src/engine/actions.ts) | 36 | 39 |
+| [budget.ts](../src/engine/budget.ts) | 35 | 33 |
 | [render.ts](../src/engine/design/render.ts) | 35 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 33 | 25 |
 
 ## Por área
 
@@ -54,26 +54,27 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 32 | 37 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 36 |
-| `src/components/space` | 10 | 8 |
+| `src/components/space` | 10 | 9 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 25 | 21 |
-| `src/engine` | 89 | 443 |
-| `src/engine/agent` | 71 | 164 |
-| `src/engine/commands` | 7 | 27 |
-| `src/engine/design` | 163 | 215 |
-| `src/engine/flow` | 21 | 91 |
+| `src/engine` | 89 | 458 |
+| `src/engine/agent` | 71 | 177 |
+| `src/engine/commands` | 7 | 38 |
+| `src/engine/design` | 163 | 217 |
+| `src/engine/flow` | 22 | 99 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/nodecore` | 23 | 43 |
+| `src/engine/money` | 4 | 12 |
+| `src/engine/nodecore` | 23 | 51 |
 | `src/engine/nodes` | 8 | 36 |
 | `src/engine/params` | 9 | 21 |
-| `src/engine/planSteps` | 18 | 2 |
-| `src/engine/providers` | 15 | 93 |
+| `src/engine/planSteps` | 19 | 2 |
+| `src/engine/providers` | 15 | 99 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 467 |
-| `src/store` | 19 | 370 |
+| `src/lib` | 38 | 481 |
+| `src/store` | 19 | 385 |
 
-282 de 801 módulos no tienen ningún test que los importe directamente.
+283 de 807 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

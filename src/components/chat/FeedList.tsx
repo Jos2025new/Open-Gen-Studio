@@ -1,3 +1,4 @@
+import { reconcileUnknownCharge } from '../../engine/money/storeBridge';
 import { memo, useState } from 'react';
 import { resolveOwner } from '../../engine/agent/lanes';
 import { feedOwner, firstAgentId } from '../../engine/agent/threads';
@@ -149,6 +150,9 @@ export function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionI
     return false;
   });
   const busy = useThread(sessionId, owner, (a) => a.busy, false);
+  const ticketId = item.uncertainTicketId ?? item.uncertainLlmTicketId ?? (item.meta?.runId ? `llm:${item.meta.runId}` : undefined);
+  const uncertain = useStore((s) => Boolean(ticketId && s.tickets[ticketId]?.sends.some((send) => send.status === 'uncertain') &&
+    (item.uncertainTicketId || item.uncertainLlmTicketId || !s.sessions[sessionId]?.feed.some((f) => f.type === 'notice' && f.uncertainTicketId === ticketId))));
   return (
     <div className={`notice notice-${item.level}`}>
       {item.level === 'error' ? <CircleAlert size={14} /> : <Info size={14} />}
@@ -164,6 +168,11 @@ export function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionI
           <button type="button" className="notice-retry" onClick={openBudgetSettings}>Review limit</button>
           <button type="button" className="notice-retry" onClick={() => ignoreExcess(sessionId, item.id)}>Ignore</button>
         </>
+      ) : null}
+      {uncertain && ticketId ? (
+        <button type="button" className="notice-retry" title="Release the reservation and keep the charge recorded as unknown" onClick={() => reconcileUnknownCharge(sessionId, ticketId)}>
+          Record unknown charge
+        </button>
       ) : null}
       {item.retry && isLast ? (
         <button type="button" className="notice-retry" disabled={busy} onClick={() => void retryAgentTurn(sessionId, item.id)}>

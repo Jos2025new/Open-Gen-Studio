@@ -1,5 +1,6 @@
+import { hasActiveTicketSend } from './money/storeBridge';
 import { wrongRef } from './wrongRef';
-import { directModelRef } from './directModel';
+import { buildDirectSpec, directModelRef } from './directModel';
 import { refsLimit } from './officialLimits';
 import { opSessionId } from './opSession';
 import { model3dProblem } from './modelRules';
@@ -9,12 +10,12 @@ import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
 import { ensureSchema, modelsOf, modelSummary, preferredModel, pickComposerModel, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
-import { autoLayout, graphBounds } from './flow/graph';
+import { autoLayout, graphBounds, nodeAttemptProblem } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
 import { preferredProviderLabel } from './providers/registry';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
-import { holdAttemptNode } from './flow/locks';
+import { attemptNode, holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { sendSessionId, ensureSendSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
@@ -37,6 +38,8 @@ import {
 import { keptDrafts } from '../store/homeDrafts';
 import { applyEdit, editCompound } from './nodecore/edit';
 import { deleteAssets } from './assetActions';
+import { COMMAND_REVIEW_CHANGED } from './commands/types';
+import { resolveSendPlan, sendFingerprint } from './sendInputs';
 
 export {
   SUBJECT_KINDS,
@@ -148,13 +151,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   return { ok: true, estimate, overLimit: budgetProblem(estimate, sendSessionId(st)) !== null };
 }
 
-/** The entries of `map` for these ids, or undefined when there are none. */
-function pick<T>(map: Record<string, T> | undefined, ids: string[]): Record<string, T> | undefined {
-  const out = Object.fromEntries(ids.filter((id) => map?.[id] !== undefined).map((id) => [id, map![id]]));
-  return Object.keys(out).length ? out : undefined;
-}
-
-export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass): Promise<void> {
+export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const check = checkDirect(kind);
   if (!check.ok) {
     toast(check.reason ?? 'Cannot generate yet', 'error');
@@ -163,41 +160,14 @@ export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass): 
   const st = get();
   const workspace = st.ui.workspace;
   const sessionId = ensureSendSession();
-  const { settings } = st.composer[kind];
   const text = st.composer.text.trim();
-  const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
-  const modelRef = directModelRef(kind, st.composer[kind].modelRef, attachments.length > 0);
-  const videoAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'video');
-  const audioAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'audio');
-  // Video: the first image is the start frame when the model has one; the rest are references.
-  const slots = st.catalog.schemas[modelRef]?.slots ?? {};
-  const routed = routeVideoInputs(slots, attachments, videoAttachments);
-  const parentId = st.composer.editing?.generationId;
   const spec: GenerationSpec = {
-    sessionId,
-    // A lyrics model answers with text.
-    kind: kind === 'audio' && st.catalog.models[modelRef]?.textOutput ? 'text' : kind,
-    prompt: text,
-    modelRef,
-    // Editing a result keeps its seed, so the edited prompt is the only change (PLAN_PROMPTING.md §4).
-    settings: { ...settings, seed: parentId ? settings.seed : undefined },
-    inputs: {
-      ...(kind === 'image'
-        ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] }
-        : kind === 'audio'
-          ? { refs: audioAttachments }
-          : kind === 'model3d'
-            ? { refs: attachments }
-          : { refs: [...routed.images, ...routed.videos, ...audioAttachments], firstFrame: routed.firstFrame }),
-      times: pick(st.composer.times, attachments),
-      trims: pick(st.composer.trims, videoAttachments),
-    },
-    origin: workspace === 'node' ? 'node' : workspace === 'designer' ? 'designer' : 'composer',
+    ...buildDirectSpec(kind, sessionId, check.estimate),
     place: placeFor(st.ui, workspace),
-    mode: kind,
-    parentId,
-    estimate: check.estimate,
     budgetPass,
+    approvalTicketId,
+    ...(approvedFingerprint ? { approvedFingerprint } : {}),
+    ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}),
   };
   autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
@@ -319,9 +289,13 @@ export function regenerateEstimate(generationId: string): Estimate | null {
 }
 
 /** Run the same request again with a new seed. Call after the user confirmed the cost. */
-export async function regenerate(generationId: string, budgetPass?: BudgetPass): Promise<void> {
+export async function regenerate(generationId: string, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
+  if (g.status !== 'done' && hasActiveTicketSend(g)) {
+    toast('The previous request may have been charged. Use Retry on the failed result to confirm a new request.', 'info');
+    return;
+  }
   const estimate = regenerateEstimate(generationId) ?? g.estimate;
   const problem = budgetProblem(estimate, g.sessionId, budgetPass);
   if (problem) {
@@ -331,13 +305,22 @@ export async function regenerate(generationId: string, budgetPass?: BudgetPass):
   const spec = specFrom(g);
   const session = get().sessions[g.sessionId];
   // Node generations update their node; everything else appears in the conversation.
-  const held = holdAttemptNode(g, session?.graph.nodes ?? []);
+  const nodes = session?.graph.nodes ?? [];
+  const target = attemptNode(g, nodes);
+  const attemptProblem = target && nodeAttemptProblem(target, get().generations);
+  if (attemptProblem) {
+    toast(attemptProblem, 'info');
+    return;
+  }
+  const held = holdAttemptNode(g, nodes);
   if (!held) return;
   const node = held.node;
-  const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass });
+  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass, approvalTicketId, ...(approvedFingerprint ? { approvedFingerprint } : {}), ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   if (node) {
-    if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
-    applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { generationId: next.id, sketchAssetId: undefined } as Partial<GraphNode['data']> } });
+    if ('sketchAssetId' in node.data && node.data.sketchAssetId) {
+      deleteAssets([node.data.sketchAssetId]);
+      applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { sketchAssetId: undefined } } });
+    }
   } else {
     appendFeed(g.sessionId, { ...feedBase('chat'), type: 'generation', generationId: next.id });
   }
@@ -406,7 +389,7 @@ export async function opEstimate(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
-export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass): Promise<string[]> {
+export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<string[]> {
   const st = get();
   const asset = st.assets[assetId];
   if (!asset) return [];
@@ -422,7 +405,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(problem, 'error');
     return [];
   }
-  const g = createGeneration({ ...spec, budgetPass });
+  const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(approvedFingerprint ? { approvedFingerprint } : {}), ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     return await runGeneration(g.id);
@@ -433,7 +416,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Designer: run an image operation on a raster layer; the result is a new layer above it (the original is kept). */
-export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass): Promise<void> {
+export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const def = OPS[op];
   if (def.input !== 'image' || def.output !== 'image') {
     toast(`${def.label} does not produce an image for a layer.`, 'error');
@@ -442,12 +425,18 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
   try {
     const source = await layerToAsset(sessionId, docId, layerId);
     const spec = await opSpec({ sessionId, sourceAssetId: source.id, op, params, origin: 'designer', place: 'designer', mode: 'image' });
+    let fp = approvedFingerprint;
+    if (fp) {
+      const checkSpec = { ...spec, inputs: spec.inputs ?? { refs: [] }, ...(spec.op ? { op: { ...spec.op, sourceAssetId: '' } } : {}) };
+      if (sendFingerprint(resolveSendPlan(checkSpec), get(), { ignoreSeed: true }) !== fp) throw new Error(COMMAND_REVIEW_CHANGED);
+      fp = sendFingerprint(resolveSendPlan({ ...spec, inputs: spec.inputs ?? { refs: [] } }), get(), { ignoreSeed: true });
+    }
     const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId, budgetPass);
     if (problem) {
       toast(problem, 'error');
       return;
     }
-    const g = createGeneration({ ...spec, budgetPass });
+    const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(fp ? { approvedFingerprint: fp } : {}), ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
     // Its card in the Designer's conversation, like any generation (also in Generations and Assets).
     appendFeed(sessionId, { ...feedBase('designer'), type: 'generation', generationId: g.id });
     const ids = await runGeneration(g.id);

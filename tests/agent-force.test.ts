@@ -15,7 +15,7 @@ vi.mock('../src/lib/idb', () => ({
 
 import { gateOps, steerNote } from '../src/engine/agent/force';
 import { offlinePlan } from '../src/engine/agent/offline';
-import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { sendAgentMessage, stopSession } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 
 import { mainThread } from './helpers/threads';
@@ -129,12 +129,14 @@ async function request(text: string, attachments: string[], proposed?: unknown[]
   });
   const st = useStore.getState();
   const sid = st.activeSessionId;
+  stopSession(sid);
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
   await sendAgentMessage(text);
+  stopSession(sid);
   vi.unstubAllGlobals();
   return calls;
 }

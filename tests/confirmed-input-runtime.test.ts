@@ -33,7 +33,7 @@ it('publishes the plan after confirming Edit through the real runtime and record
   const card = { id: 'settings-card', type: 'settings', workspace: 'chat', createdAt: Date.now(), status: 'pending', toolCallId: 'settings-call', sections: [{ kind: 'image', count: 1, recommended: choice, alternatives: [] }] } as SettingsFeedItem;
   useStore.setState({
     ui: { ...before.ui, workspace: 'chat' },
-    settings: { ...before.settings, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
+    settings: { ...before.settings, budgetOn: false, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     composer: { ...before.composer, agentStyle: 'auto', attachments: [] },
     catalog: { ...before.catalog, models: Object.fromEntries(models.map(m => [m.ref, m])), schemas },
     sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [card], agents: mainThread({ busy: false, questionRound: 0, notes: [], history: [{ role: 'assistant', content: '', tool_calls: [{ id: 'settings-call', type: 'function', function: { name: 'confirm_settings', arguments: '{"parts":[{"kind":"image","refs":1}]}' } }] }], pending: { kind: 'settings', toolCallId: 'settings-call', feedItemId: card.id } }) } },

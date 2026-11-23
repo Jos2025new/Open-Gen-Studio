@@ -5,12 +5,13 @@ vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: a
 const ctl = vi.hoisted(() => ({ calls: [] as Array<{ count: number; seed?: number; prompt: string }>, failAt: 0 }));
 vi.mock('../src/engine/providers/registry', async (orig) => {
   const real = await orig<typeof import('../src/engine/providers/registry')>();
+  const { JobFailedError } = await import('../src/lib/http');
   return { ...real, ADAPTERS: { ...real.ADAPTERS, atlas: { ...real.ADAPTERS.atlas,
     quote: async () => null,
     loadSchema: async (m: { ref: string }) => ({ ref: m.ref, params: [], slots: { prompt: 'prompt' }, source: 'openapi' }),
     generate: async (req: { count: number; settings: { seed?: number }; prompt: string }) => {
       ctl.calls.push({ count: req.count, seed: req.settings.seed, prompt: req.prompt });
-      if (ctl.calls.length === ctl.failAt) throw new Error('mock second request failed');
+      if (ctl.calls.length === ctl.failAt) throw new JobFailedError('mock second request failed');
       return { outputs: Array.from({ length: req.count }, (_, i) => ({ blob: new Blob([`${ctl.calls.length}-${i}`], { type: 'image/png' }), mime: 'image/png' })) };
     },
   } } };

@@ -18,7 +18,7 @@ export default [{
   sides: [
     ['src/engine/flow/graph.ts', 'export function cablePortProblem'],
     ['src/engine/nodecore/deps.ts', 'compatibleDataEdges(graph, assets)'],
-    ['src/engine/flow/actions.ts', "i.port === 'input' && i.from && i.status !== 'invalid'"],
+    ['src/engine/flow/result.ts', "i.port === 'input' && i.from && i.status !== 'invalid'"],
     ['src/engine/flow/graph.ts', 'filter(ignoredRunCable)'],
     ['src/engine/nodecore/resolver.ts', 'export function resolveCableInput'],
     ['src/engine/flow/notices.ts', 'export function graphNotices'],
@@ -99,8 +99,23 @@ export default [{
     ['src/engine/flow/actions.ts', '...runProblems(graph, run.runIds'],
     ['src/engine/graphTypes.ts', 'export interface BrokenLink'],
     ['src/engine/nodecore/action.ts', 'export function runAction'],
+    ['src/engine/nodecore/commands.ts', 'snapshotById(args.approval)?.preview.estimate ?? UNKNOWN'],
   ],
-  tests: ['tests/nodecore-core.test.ts', 'tests/nodecore-strip1.test.ts'],
+  tests: ['tests/nodecore-core.test.ts', 'tests/nodecore-strip1.test.ts', 'tests/nodes-commands.test.ts'],
+}, {
+  id: 'node-attempt-result',
+  what: 'Nodes conserva el último resultado al iniciar otro intento. El plan bloquea un intento activo o incierto si el nodo se ejecutaría. La vista previa comparte ese plan y conserva los bloqueos de escritura activos. Al terminar, la ejecución normal y la recuperación enlazan el resultado antes de guardar y conservan la petición usada para calcular su vigencia.',
+  sides: [
+    ['src/engine/flow/graph.ts', 'const problem = nodeAttemptProblem(n, generations)'],
+    ['src/engine/flow/actions.ts', '...run.errors, ...runProblems(graph, run.runIds'],
+    ['src/engine/flow/actions.ts', 'rememberNodeRequest(info.generationId, startGraph, library, context)'],
+    ['src/engine/flow/result.ts', 'export function linkCompletedNode('],
+    ['src/engine/jobState.ts', 'linkCompletedNode(id)'],
+    ['src/engine/jobRecovery.ts', 'finish(id, uniqueIds'],
+    ['src/engine/jobs.ts', 'finish(g.id, g.assetIds'],
+    ['src/engine/actions.ts', 'nodeAttemptProblem(target, get().generations)'],
+  ],
+  tests: ['tests/adversarial-sonnet-urgente.test.ts', 'tests/jobs-durable-reload.test.ts', 'tests/regenerate-node-lock.test.ts'],
 }, {
   id: 'agent-recipient',
   what: 'ADR 0031 tira 2: el chat escribe a un agente explícito; cada agente tiene su historial, tarjetas y LLM.',

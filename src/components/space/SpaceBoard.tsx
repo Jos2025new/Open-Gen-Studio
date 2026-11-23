@@ -2,8 +2,10 @@ import { ReuseButton } from '../assets/ReuseButton';
 import { TextTile } from '../assets/TextTile';
 import { useEta } from '../ui/useEta';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, ListFilter, Eye, EyeOff, Star } from '../ui/icons';
-import { setUi, useStore } from '../../store/store';
+import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, RotateCw, ListFilter, Eye, EyeOff, Star } from '../ui/icons';
+import { setUi, toast, useStore } from '../../store/store';
+import { isAbort } from '../../lib/http';
+import { retryGeneration } from '../../engine/jobs';
 import type { AssetKind, Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
 import { OP_ICONS, QUICK_LABEL } from '../assets/AssetActions';
@@ -12,11 +14,11 @@ import type { OpId } from '../../engine/types';
 import { KindBackdrop } from '../ui/KindBackdrop';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
-import { Chip, IconButton, Segmented } from '../ui/primitives';
+import { Button, Chip, IconButton, Segmented } from '../ui/primitives';
 import { InlineSlider } from '../designer/InlineControls';
 import { TILE_DEFAULT, TILE_MAX, TILE_MIN } from '../../store/persistUi';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
-import { batchCells, batchStart, doneMode, keepBatch, splitBoard, suggestedOps, targetAsset } from './boardModel';
+import { batchCells, batchStart, doneMode, isFreeGeneration, isReloadInterrupted, keepBatch, retriedGenerationIds, splitBoard, suggestedOps, targetAsset } from './boardModel';
 import { nounOf } from './actionRoute';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { goWithAction } from './actionGo';
@@ -42,6 +44,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   const view = usePopover();
 
   const rows = useMemo(() => splitBoard(generations, assets, { kind, status: 'all', q: '', sort, starred, showFailed, place: place ?? 'workspace', scope: scope === 'all' ? 'all' : { sessionId } }), [generations, assets, kind, sort, starred, showFailed, place, scope, sessionId]);
+  const retriedIds = useMemo(() => retriedGenerationIds(generations), [generations]);
   const doneAssets = rows.done.flatMap((c) => (c.type === 'asset' ? [c.assetId] : []));
   const kind_ = activeKind;
   const target = targetAsset(rows, selected, assets, kind_);
@@ -141,9 +144,20 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
       {mode === 'batch' && shown.length > 0 && shown.length < rows.done.length ? <button type="button" className="space-show-all" onClick={() => setUserDone(true)}>Show all {rows.done.length}</button> : null}
     </div>
 
-    {showFailed ? <div className="space-failed" aria-label="Failed">
+    {showFailed || rows.failed.length > 0 ? <div className="space-failed" aria-label="Failed">
       <div className="space-sub">Failed</div>
-      {rows.failed.length ? <div className="space-failed-row">{rows.failed.map((g) => <div key={g.id} className="space-fail" title={g.error}><CircleAlert size={14} /><span className="space-run-title">{generationTitle(g)}</span><span className="faint">{STATUS_LABEL[g.status]}</span></div>)}</div> : <p className="space-empty">Nothing failed.</p>}
+      {rows.failed.length ? <div className="space-failed-row">{rows.failed.map((g) => {
+        const interrupted = isReloadInterrupted(g);
+        const freeRetry = isFreeGeneration(g) && !g.planId && !retriedIds.has(g.id);
+        return <div key={g.id} className="space-fail" title={g.error}>
+          <CircleAlert size={14} />
+          <div className="space-fail-body">
+            <span className="space-run-title">{generationTitle(g)}</span>
+            <span className="faint">{interrupted ? 'Interrupted' : STATUS_LABEL[g.status]}</span>
+          </div>
+          {freeRetry ? <Button size="sm" variant="secondary" icon={RotateCw} onClick={() => void retryGeneration(g.id).catch((e) => { if (!isAbort(e)) toast((e as Error).message, 'error'); })}>Retry · Free</Button> : null}
+        </div>;
+      })}</div> : <p className="space-empty">Nothing failed.</p>}
     </div> : null}
 
     {studio && !rows.ongoing.length ? null : <div className="space-lower">

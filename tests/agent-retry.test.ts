@@ -38,7 +38,7 @@ beforeEach(() => {
   const st = useStore.getState();
   const sid = st.activeSessionId;
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
@@ -67,9 +67,14 @@ describe('retry after a dropped connection', () => {
     expect(feed.some((f) => f.type === 'assistant' && f.text.includes('y acerc'))).toBe(true);
 
     await retryAgentTurn(sid, note.id);
+    expect(calls).toHaveLength(2);
+    await retryAgentTurn(sid, note.id, true);
     feed = useStore.getState().sessions[sid].feed;
-    // The half answer and the error are gone; the finished answer is there once.
-    expect(feed.some((f) => f.type === 'notice')).toBe(false);
+    // The half answer and Retry error are gone. The original charge still needs reconciliation.
+    expect(feed.filter((f) => f.type === 'notice')).toEqual([
+      expect.objectContaining({ uncertainTicketId: `llm:${note.meta?.runId}` }),
+    ]);
+    expect(feed.find(f => f.id === note.id)).toBeUndefined();
     expect(feed.filter((f) => f.type === 'assistant').map((f) => f.type === 'assistant' && f.text)).toEqual(['¡Buena elección! Aquí va la idea completa.']);
     // The guide read before the failure stays in the history: the retry sends the same messages as the failed call.
     expect(calls).toHaveLength(3);
@@ -115,10 +120,13 @@ describe('an answer with nothing in it', () => {
     expect(note.text).toMatch(/output budget/i);
     expect(note.text).toMatch(/reasoning/i);
     expect(note.retry).toBeDefined();
-    // Retrying works: the same turn runs again and the answer is used.
+    expect(note.retry?.possibleCharge).toBe(true);
+    // After confirming the possible second charge, the same turn runs again and the answer is used.
     let sent: { messages: Array<{ role: string; content: unknown }> } | undefined;
     vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => { sent = JSON.parse(String(init?.body)); return sse([text('Aquí va la propuesta.')]); });
     await retryAgentTurn(sid, note.id);
+    expect(sent).toBeUndefined();
+    await retryAgentTurn(sid, note.id, true);
     // The retry ends with the user's request, not with the empty answer.
     expect(sent!.messages.at(-1)!.role).toBe('user');
     const feed = useStore.getState().sessions[sid].feed;
@@ -261,13 +269,26 @@ describe("the user's own messages", () => {
 
   it('edit: the old answer and what followed are dropped, the edited text is answered again', async () => {
     let n = 0;
-    vi.stubGlobal('fetch', async () => sse([text(`answer ${++n}`)]));
+    let finishEdit!: (reply: Response) => void;
+    const editedReply = new Promise<Response>(resolve => { finishEdit = resolve; });
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      if (!init?.body) return Response.json({ data: [] });
+      return ++n === 3 ? editedReply : sse([text(`answer ${n}`)]);
+    });
     const sid = useStore.getState().activeSessionId;
     await sendAgentMessage('uno');
     await sendAgentMessage('dos');
     const msg = useStore.getState().sessions[sid].feed.find((f) => f.type === 'user' && f.text === 'uno')!;
     const { editUserMessage } = await import('../src/engine/agent/runtime');
-    await editUserMessage(sid, msg.id, 'uno, corregido');
+    const edited = editUserMessage(sid, msg.id, 'uno, corregido');
+    try {
+      const feed = useStore.getState().sessions[sid].feed;
+      expect(feed.filter((f) => f.type === 'user').map((f) => f.type === 'user' && f.text)).toEqual(['uno, corregido']);
+      expect(feed.some((f) => f.type === 'assistant')).toBe(false);
+    } finally {
+      finishEdit(sse([text('answer 3')]));
+      await edited;
+    }
     const s = useStore.getState().sessions[sid];
     expect(said(sid)).toEqual(['uno, corregido']);
     expect(s.feed.filter((f) => f.type === 'user').map((f) => f.type === 'user' && f.text)).toEqual(['uno, corregido']);

@@ -45,6 +45,19 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Regenerate on a node', () => {
+  it('keeps the last result attached until Regenerate finishes, then links the new result', async () => {
+    const old = Object.keys(useStore.getState().generations)[0];
+    const linked = () => useStore.getState().sessions[sid()].graph.nodes[0].data;
+    await regenerate(old);
+    await vi.waitFor(() => expect(sends).toBe(1));
+    const next = Object.keys(useStore.getState().generations).find(id => id !== old)!;
+    const during = linked();
+    release();
+    await vi.waitFor(() => expect(useStore.getState().generations[next].status).toBe('done'));
+    expect(during).toMatchObject({ generationId: old });
+    expect(linked()).toMatchObject({ generationId: next });
+  });
+
   it('two clicks while the first attempt runs send once', async () => {
     const gid = Object.keys(useStore.getState().generations)[0];
     const first = regenerate(gid);

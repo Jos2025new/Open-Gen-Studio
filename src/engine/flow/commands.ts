@@ -1,3 +1,4 @@
+import { COMMAND_REVIEW_CHANGED } from '../commands/types';
 import { z } from 'zod';
 import { defineCommand } from '../commands/types';
 import { useStore } from '../../store/store';
@@ -5,7 +6,8 @@ import { cleanFileName } from '../../lib/media';
 import { OP_IDS } from '../ops';
 import { BASE_NODE_KINDS, BASE_SYSTEM_NODE_TYPES, LINK_KINDS, MODEL_ATTACH_MODES } from '../graphTypes';
 import { MEDIA_KINDS, MODEL_MEDIA_KINDS, type GenSettings, type GraphEdge, type GraphNode, type GraphNodeData, type OpId } from '../types';
-import { budgetProblem } from '../actions';
+import { budgetProblemForSteps } from '../budget';
+import { stepCapsFromMap } from '../money/storeBridge';
 import * as A from './actions';
 import { applyEdit } from '../nodecore/edit';
 import { prepareAction, runAction } from '../nodecore/action';
@@ -379,14 +381,27 @@ export const commands = [
     args: z.object({ targets: ids, force: z.boolean().optional() }).strict(),
     effect: 'spend',
     estimate: (on, args) => A.previewRun(on.session, args.targets, args.force ?? true).estimate,
+    review: (ctx, args) => {
+      const preview = A.previewRun(ctx.on.session!, args.targets, args.force ?? true);
+      const stepCaps = stepCapsFromMap(preview.perStep, 'node:');
+      return {
+        signature: preview.signature,
+        details: preview.steps.map((step) => 'prompt' in step ? `${step.title} · ${step.prompt}` : step.title),
+        ...(stepCaps ? { stepCaps } : {}),
+      };
+    },
     run: async (on, args, ctx) => {
       // The same registry as nodes.action.*: one approval, one send, and the inspector can tell which run made which result.
       const prepared = await prepareAction(on.session, args.targets, args.force ?? true);
       if (!prepared.ok) throw new Error(prepared.errors[0]);
-      const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session, ctx.budgetPass);
+      if (ctx.caller !== 'ui' && ctx.reviewed?.signature !== prepared.snapshot.preview.signature) {
+        throw new Error(COMMAND_REVIEW_CHANGED);
+      }
+      const prefix = ctx.budgetPass?.stepKey ? `${ctx.budgetPass.stepKey}:` : '';
+      const problem = budgetProblemForSteps(prepared.snapshot.preview.estimate, prepared.snapshot.preview.perStep, on.session, ctx.budgetPass, prefix);
       if (problem) throw new Error(problem);
-      const started = (await runAction(prepared.snapshot, undefined, undefined, ctx.budgetPass)).result;
-      if (!started) throw new Error('The graph changed after it was reviewed; review it again.');
+      const started = (await runAction(prepared.snapshot, undefined, undefined, ctx.budgetPass, ctx.approvalTicketId)).result;
+      if (!started) throw new Error(COMMAND_REVIEW_CHANGED);
       return { outputs: Object.fromEntries(started.outputs), failed: started.failed, skipped: started.skipped, waiting: started.waiting, ...(started.stopped ? { stopped: true } : {}) };
     },
   }),

@@ -1,6 +1,10 @@
 import { isAbort, isTransient } from '../../lib/http';
+import { OverLimitError } from '../budget';
 import { isCreditError } from '../credit';
-import { chat, LLM_LABELS, type ChatResult, type ToolSpec } from '../providers/llm';
+import { storeTickets } from '../money/storeBridge';
+import { hasLlmPossibleCharge } from '../money/storeBridge';
+import { sendLlmViaPaidGate } from '../money/transport';
+import { LLM_LABELS, type ChatResult, type ToolSpec } from '../providers/llm';
 import type { ChatMessageMeta } from '../feedMeta';
 import type { AgentState, FeedItem, LlmMessage, LlmProviderId, NoticeFeedItem, Session, Workspace } from '../types';
 import { appendFeed, removeFeedItem, updateFeedItem, type useStore } from '../../store/store';
@@ -23,10 +27,10 @@ export interface TurnModelCallDeps {
   messageMeta: (workspace: Workspace, extra: Partial<ChatMessageMeta>, sessionId: string, owner: string) => ChatMessageMeta;
   feedBase: (workspace: Workspace) => { id: string; createdAt: number; workspace: Workspace };
   engineLabel: (sessionId: string, owner: string) => string;
-  hasLlmCatalogPrice: (provider: LlmProviderId, model: string) => boolean;
   llmCallUsd: (provider: LlmProviderId, model: string, usage: ChatResult['usage']) => number;
   onAgentCredit: (sessionId: string) => Promise<boolean>;
   retryWithCredit: () => Promise<void>;
+  onBudgetBlocked?: () => void;
 }
 
 export type TurnModelCallResult =
@@ -41,6 +45,7 @@ export async function runTurnModelCall(opts: {
   runId: string;
   wrapUp: boolean;
   creditRetried?: boolean;
+  budgetPass?: boolean;
   engine: { provider: LlmProviderId; model: string; key: string };
   system: string;
   tools: ToolSpec[];
@@ -55,20 +60,24 @@ export async function runTurnModelCall(opts: {
   usage: TurnUsageTracker;
   deps: TurnModelCallDeps;
 }): Promise<TurnModelCallResult> {
-  const { sessionId, owner, workspace, runId, wrapUp, creditRetried, engine, system, tools, showThinking, signal, until, log, clockElapsed, firstOutput, turnMeta, guard, usage, deps } = opts;
+  const { sessionId, owner, workspace, runId, wrapUp, creditRetried, budgetPass, engine, system, tools, showThinking, signal, until, log, clockElapsed, firstOutput, turnMeta, guard, usage, deps } = opts;
 
   let textItemId: string | null = null;
   let textItemMeta: ChatMessageMeta | undefined;
   const hasTextBubble = () => Boolean(textItemId && deps.session(sessionId).feed.some((f) => f.id === textItemId));
 
+  const outcomeWasPaid = () => Boolean(storeTickets.get(`llm:${runId}`)?.sends.at(-1)?.status === 'done');
   let result: ChatResult;
+  let llmUsd: number | null;
   try {
     if (deps.mine().phase !== 'working') deps.patchAgent(sessionId, { phase: 'working' }, owner);
     drainAgentNotes(sessionId, owner);
     const hurry = guard.takeHurryNote();
     if (hurry) deps.pushHistory(sessionId, { role: 'user', content: hurry }, owner);
 
-    result = await until(chat({
+    const outcome = await until(sendLlmViaPaidGate({
+      ticketId: `llm:${runId}`,
+      sessionId,
       provider: engine.provider,
       apiKey: engine.key,
       model: engine.model,
@@ -77,6 +86,8 @@ export async function runTurnModelCall(opts: {
       tools,
       effort: deps.get().settings.agent.effort,
       showReasoning: showThinking,
+      budgetPass,
+      computeUsd: (u) => deps.llmCallUsd(engine.provider, engine.model, u),
       onNotice: (text) => !guard.isDone() && deps.notice(sessionId, workspace, text, 'info', undefined, turnMeta()),
       onReasoning: showThinking ? (_d, full) => !guard.isDone() && (guard.armSilence(), log.thinking(full)) : undefined,
       signal,
@@ -100,15 +111,23 @@ export async function runTurnModelCall(opts: {
         }
       },
     }));
+    result = outcome.value;
+    llmUsd = outcome.costUsd;
   } catch (err) {
     if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false });
+    if (err instanceof OverLimitError) {
+      guard.setOutcome('canceled');
+      deps.onBudgetBlocked?.();
+      return { stop: true };
+    }
     if (isAbort(err)) {
       guard.handleAbort(() => deps.notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta()));
       return { stop: true };
     }
+    const possibleCharge = hasLlmPossibleCharge(runId);
     // No credit for the agent's model: the same model elsewhere (same price or less) takes over and the call runs
     // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
-    if (isCreditError(err) && !creditRetried) {
+    if (!possibleCharge && isCreditError(err) && !creditRetried) {
       if (textItemId) removeFeedItem(sessionId, textItemId);
       if (await until(deps.onAgentCredit(sessionId))) {
         guard.setOutcome('error');
@@ -116,7 +135,9 @@ export async function runTurnModelCall(opts: {
       }
     }
     // History only grows with completed calls, so a retry repeats just the call that failed.
-    const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
+    const retry = possibleCharge || isTransient(err) || isCreditError(err)
+      ? { ...(textItemId ? { partialItemId: textItemId } : {}), ...(possibleCharge ? { possibleCharge: true } : {}) }
+      : undefined;
     // The call happened and cost time: it is a call in the metrics even though it produced nothing (T2).
     recordMetric(sessionId, { type: 'failedCall', error: (err as Error).message, ms: clockElapsed() });
     guard.setOutcome('error');
@@ -148,7 +169,7 @@ export async function runTurnModelCall(opts: {
       type: 'notice',
       level: 'error',
       text: 'The model wrote its action as text the app cannot read, so nothing ran.',
-      retry: textItemId ? { partialItemId: textItemId } : {},
+      retry: { ...(textItemId ? { partialItemId: textItemId } : {}), possibleCharge: outcomeWasPaid() },
       ...(textItemId ? { garbledItemId: textItemId } : {}),
       meta: usage.takePendingMeta(turnMeta(), hasTextBubble()),
     });
@@ -158,18 +179,17 @@ export async function runTurnModelCall(opts: {
 
   if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
 
-  const llmUsd = deps.llmCallUsd(engine.provider, engine.model, result.usage);
   usage.recordCallUsage({
     sessionId,
     provider: engine.provider,
     model: engine.model,
     result,
     llmUsd,
-    hasCatalogPrice: deps.hasLlmCatalogPrice(engine.provider, engine.model),
     wrapUp,
     textItemId,
     hasBubble: hasTextBubble(),
     bubbleMeta: textItemMeta ?? turnMeta(),
+    bookedByGate: true,
   });
 
   // An empty answer stays out of the history: a Retry would otherwise end the request with an empty assistant message.
@@ -187,12 +207,14 @@ export async function runTurnModelCall(opts: {
     if (!result.text.trim()) {
       guard.setOutcome('empty');
       const cut = result.finishReason === 'length';
+      const possibleCharge = outcomeWasPaid();
+      const reason = cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.';
       deps.notice(
         sessionId,
         workspace,
-        cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.',
+        possibleCharge ? reason + ' This request may have been charged. Retrying may charge you again.' : reason,
         'error',
-        {},
+        { possibleCharge },
         usage.takePendingMeta(turnMeta(), hasTextBubble()),
       );
     }

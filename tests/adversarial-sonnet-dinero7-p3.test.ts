@@ -71,6 +71,7 @@ beforeEach(() => {
   askAgain(sid);
   useAlerts.setState({ alerts: [] });
   forgetBalances();
+  vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(null);
   const schema = { params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' };
   useStore.setState({
     generations: {},
@@ -116,7 +117,7 @@ describe('Attack 3a: passes that outlive their action', () => {
   // after the approved action ended, if it is never run (deleted, aborted before runGeneration, session closed).
   it('a pass bound to a generation that never ran (aborted or deleted before runGeneration) is dead once the approving action has ended', async () => {
     let genId = '';
-    await withOncePass(sid, async (pass) => { genId = createGeneration(spec({ budgetPass: pass })).id; });
+    await withOncePass(sid, async (pass) => { genId = createGeneration(spec({ budgetPass: pass })).id; }, paid.usd);
     const leaked = takeGenerationPass(genId, paid);
     expect(leaked ? passActiveFor(leaked, sid) : false).toBe(false);
     // and it cannot pay for another over-limit run
@@ -128,18 +129,18 @@ describe('Attack 3a: passes that outlive their action', () => {
       const g = createGeneration(spec({ budgetPass: pass }));
       cancelGeneration(g.id);
       expect(takeGenerationPass(g.id, paid)).toBeUndefined();
-    });
+    }, paid.usd);
     withOncePass(sid, (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       deleteGeneration(g.id);
       expect(takeGenerationPass(g.id, paid)).toBeUndefined();
-    });
+    }, paid.usd);
     const doomed = sid;
     withOncePass(doomed, (pass) => {
       const g = createGeneration(spec({ sessionId: doomed, budgetPass: pass }));
       deleteSession(doomed);
       expect(takeGenerationPass(g.id, paid)).toBeUndefined();
-    });
+    }, paid.usd);
   });
 
   it('onGenerationCredit retires the taken substitute pass in finally even if rerun throws synchronously before consumeOnce', async () => {
@@ -153,7 +154,7 @@ describe('Attack 3a: passes that outlive their action', () => {
       const throwingRerun = () => { throw new Error('sync boom before consumeOnce'); };
       await expect(onGenerationCredit(g.id, throwingRerun as never)).rejects.toThrow('sync boom before consumeOnce');
       takenDuring = takeGenerationPass(g.id, paid);
-    });
+    }, paid.usd);
     expect(takenDuring).toBeUndefined();
     expect(takeGenerationPass(genId, paid)).toBeUndefined();
     expect(budgetVerdict(paid, { sessionId: sid }).over).toBe(true);
@@ -198,7 +199,7 @@ describe('Re-attack 3b: deferred 402 substitute pass in ask mode', () => {
     await withOncePass(sid, async (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       await runGeneration(g.id).catch(() => undefined);
-    });
+    }, paid.usd);
     const offer = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
     quoteOverride.ref = ATLAS;
     quoteOverride.usd = 0.5;
@@ -227,7 +228,7 @@ describe('Re-attack 3b: deferred 402 substitute pass in ask mode', () => {
         const g = createGeneration(spec({ budgetPass: pass }));
         genId = g.id;
         await runGeneration(g.id).catch(() => undefined);
-      });
+      }, paid.usd);
     } finally { quoteOverride.usd = undefined; }
     expect(atlasCalls).toBe(0);
     const prompt = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Continue once'));
@@ -253,7 +254,7 @@ describe('Re-attack 3b: deferred 402 substitute pass in ask mode', () => {
       await withOncePass(sid, async (pass) => {
         const g = createGeneration(spec({ budgetPass: pass }));
         await runGeneration(g.id).catch(() => undefined);
-      });
+      }, paid.usd);
       if (mode === 'ask') {
         const offer = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
         quoteOverride.usd = null;

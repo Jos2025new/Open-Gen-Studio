@@ -238,6 +238,8 @@ export interface Estimate {
   approximate: boolean;
   /** true when some parts are unknown and `usd` only covers the known ones. */
   lowerBound?: boolean;
+  /** Nominal estimate whose maximum cannot be verified. */
+  unbounded?: boolean;
   note?: string;
   /** The provider's own price for this exact request (Atlas quote), not an estimate from catalog prices. */
   exact?: boolean;
@@ -301,6 +303,12 @@ export interface Generation {
   discard?: boolean;
   /** One variation per result, appended to the prompt of its own request (candidates that differ). */
   variants?: string[];
+  /** The shared approval ticket for this generation, if it came from a larger action. */
+  approvalTicketId?: string;
+  /** Frozen fingerprint of the resolved send payload approved by the user; re-checked before transport. */
+  approvedFingerprint?: string;
+  /** Approved per-step pass key on a shared command/node ticket (e.g. `cmd:2` or `cmd:1:node:n1`). */
+  passStepKey?: string;
   /** Logical node request at execution time; provider transformations do not affect freshness. */
   nodeRequest?: string;
   id: string;

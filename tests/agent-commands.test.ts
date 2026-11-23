@@ -97,7 +97,8 @@ describe('run_commands', () => {
       return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: call ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
     });
     const st = useStore.getState();
-    useStore.setState({ ui: { ...st.ui, workspace: 'chat' }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
+    useStore.setState({ catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [{ id: 'm', name: 'Mock model', tools: true, inputPrice: 0, outputPrice: 0 }] }, llmStatus: { ...st.catalog.llmStatus, nanogpt: 'ready' } },
+      ui: { ...st.ui, workspace: 'chat' }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
     await sendAgentMessage('Pon un nodo de texto');
     expect(sent).toHaveLength(2);
     expect(sent[1]).toContain('Done, 3 steps.');
@@ -339,7 +340,8 @@ describe('what the model reads', () => {
       return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: call ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
     });
     const st = useStore.getState();
-    useStore.setState({ ui: { ...st.ui, workspace: 'node' }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
+    useStore.setState({ catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [{ id: 'm', name: 'Mock model', tools: true, inputPrice: 0, outputPrice: 0 }] }, llmStatus: { ...st.catalog.llmStatus, nanogpt: 'ready' } },
+      ui: { ...st.ui, workspace: 'node' }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
     await sendAgentMessage('Añade dos nodos al lienzo de nodos y conéctalos entre sí.');
     expect(systems).toHaveLength(2);
     expect(systems[0]).toBe(systems[1]);
@@ -348,4 +350,29 @@ describe('what the model reads', () => {
     expect(graph().edges).toMatchObject([{ source: graph().nodes[0].id, target: graph().nodes[1].id, sourceHandle: 'out', targetHandle: 'prompt' }]);
     expect(graphHistory(sid, 'undo')).toHaveLength(1);
   });
+});
+
+it('Allow this time stops before the command that would exceed the displayed sequence total', async () => {
+  const st = useStore.getState();
+  useStore.setState({ spentUsd: 1, settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: null, budgetNoAsk: false } });
+  let secondUsd = 0.05;
+  const spent: string[] = [];
+  const cmd = 'nodes.test.capped_sequence';
+  const price = (part: string) => ({ usd: part === 'first' ? 0.05 : secondUsd, approximate: false });
+  register(defineCommand({
+    id: cmd, title: 'Capped stand-in', args: z.object({ part: z.string() }).strict(), effect: 'spend',
+    estimate: (_, { part }) => price(part),
+    run: (ctx, { part }) => {
+      const problem = budgetProblem(price(part), sid, ctx.budgetPass);
+      if (problem) throw new Error(problem);
+      spent.push(part);
+    },
+  }));
+  const pending = runCommandsTool(sid, { seq: ['first', 'second'].map(part => ({ cmd, args: { part } })) });
+  const card = useStore.getState().sessions[sid].feed.findLast((f): f is CommandApprovalFeedItem => f.type === 'commands')!;
+  expect(card.estimate.usd).toBe(0.1);
+  secondUsd = 0.08;
+  expect(decideCommandApproval(sid, card.id, 'once')).toBe(true);
+  expect((await pending).text).toContain('Goes over');
+  expect(spent).toEqual(['first']);
 });

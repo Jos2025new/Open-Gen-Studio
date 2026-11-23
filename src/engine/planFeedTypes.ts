@@ -271,8 +271,8 @@ export interface StepCostReview {
 }
 
 export interface PlanFeedItem extends FeedBase {
-  /** Approval of existing node IDs; never materialized again. */
-  nodeRun?: { targets: string[]; force: boolean; signature: string };
+  /** Approval of existing node IDs; never materialized again. `runIds` freezes the reviewed preview scope. */
+  nodeRun?: { targets: string[]; force: boolean; signature: string; runIds?: string[] };
   type: 'plan';
   comparisonKinds?: Array<'image' | 'video'>;
   plan: Plan;
@@ -309,7 +309,11 @@ export interface NoticeFeedItem extends FeedBase {
   level: 'info' | 'error';
   text: string;
   /** A transient agent failure (connection lost, provider busy): Retry reruns the turn. */
-  retry?: { partialItemId?: string };
+  retry?: { partialItemId?: string; possibleCharge?: boolean };
+  /** Durable ticket for an interrupted provider request whose charge is unknown. */
+  uncertainTicketId?: string;
+  /** LLM ticket field supported by existing saved notices. */
+  uncertainLlmTicketId?: string;
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;
   /** Real cost of an unpriced run passed the limit. */
@@ -336,6 +340,7 @@ export interface CommandApprovalStep {
   effect: 'read' | 'write' | 'spend' | 'delete';
   args: unknown;
   estimate: Estimate;
+  details?: string[];
 }
 
 export interface CommandApprovalFeedItem extends FeedBase {

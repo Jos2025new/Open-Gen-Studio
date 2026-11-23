@@ -24,7 +24,9 @@ import { editPairParts, WRAPUP_COMPARE_RULE } from './wrapUpPairs';
 import { agentSeesImages, userMessage } from './attachments';
 import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
-import { budgetProblem, consumeOnce, type BudgetPass } from '../budget';
+import { budgetProblem, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
+import { closeTicket, grantGenerationTicketPass, grantTicketPass, hasActiveTicketSend, reopenGenerationTicketStep, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
 import { failedStepSummary } from './failureContext';
@@ -62,7 +64,7 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
   const chosen = pruned.steps;
   if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
-  const { total, authorizations } = estimateSteps(chosen);
+  const { total, perStep, authorizations } = estimateSteps(chosen);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approval_attempted', reason: 'approval requested; budget check pending', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: item.status, stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd } });
   // Over an active limit, the card asks first ("Continue once"); approving without that stops here.
   const problem = budgetProblem(total, sessionId, budgetPass);
@@ -70,7 +72,16 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
     toast(problem, 'error');
     return;
   }
-  consumeOnce(budgetPass);
+  const hadPass = passActiveFor(budgetPass, sessionId, total);
+  consumeOnce(budgetPass, total);
+  if (!isFreePrice(priceFromEstimate(total))) storeTickets.put(createTicket({
+    id: `plan:${item.id}`,
+    sessionId,
+    kind: 'plan',
+    scope: { steps: chosen.map((s) => s.id) },
+    price: priceFromEstimate(total),
+    ...(hadPass ? { pass: ticketPassFromEstimate(total, stepCapsFromMap(perStep)) } : {}),
+  }));
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === itemId;
@@ -102,7 +113,7 @@ export async function presentNodeRun(sessionId: string, targets: string[], toolC
   if (preview.errors.length) return { errors: preview.errors };
   const item: PlanFeedItem = {
     ...feedBase('node'), type: 'plan', style: get().composer.agentStyle, status: 'awaiting',
-    nodeRun: { targets, force: true, signature: preview.signature },
+    nodeRun: { targets, force: true, signature: preview.signature, runIds: preview.runIds },
     plan: { id: uid('pln'), title: 'Run existing nodes', summary: 'Existing node IDs and required upstream updates. No new flow is created.', workspace: 'node', steps: preview.steps, adjustments: [] },
     estimate: preview.estimate, stepStates: {}, stepGenerations: {},
     meta: meta ?? messageMeta('node', {}, sessionId, owner),
@@ -166,6 +177,7 @@ async function executePlanItem(
     logEvent('agent', { event: 'plan.continuity', sessionId, planId: plan.id, groups: groups.map((g) => ({ keep: g.preserve, from: g.source, steps: g.steps })), check: errors.length ? errors : 'references used' });
     if (errors.length) {
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: errors.join(' ') });
+      closeTicket(`plan:${itemId}`);
       return;
     }
   }
@@ -174,6 +186,7 @@ async function executePlanItem(
     canceled: new Set(item.canceledSteps ?? []),
     sessionId,
     planId: plan.id,
+    approvalTicketId: `plan:${itemId}`,
     workspace,
     origin: 'agent',
     docId,
@@ -215,6 +228,7 @@ async function executePlanItem(
   const failed = result.failed.length;
   const status = finalPlanStatus(result);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status, stepOutputs: Object.fromEntries(result.outputs), error: failed ? result.failed.map((f) => `${f.stepId}: ${f.error}`).join(' · ') : undefined });
+  closeTicket(`plan:${itemId}`);
   const summary = plan.steps
     .map((st) => {
       const key = st.id;
@@ -262,7 +276,11 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   // «Continuar» raises what this step spends above what was approved: over an active limit it needs the same pass as any other spend (PlanCard gives it with «Continue once»).
   const reviewProblem = decision === 'continue' ? budgetProblem(review.proposed.estimate, sessionId, budgetPass) : null;
   if (reviewProblem) { toast(reviewProblem, 'error'); return; }
-  if (decision === 'continue') consumeOnce(budgetPass);
+  if (decision === 'continue') {
+    if (passActiveFor(budgetPass, sessionId, review.proposed.estimate)) grantGenerationTicketPass(generationId, review.proposed.estimate);
+    else reopenGenerationTicketStep(generationId);
+    consumeOnce(budgetPass, review.proposed.estimate);
+  }
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
@@ -288,7 +306,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
     if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
     else if (gen?.status === 'review') waiting.add(st.id);
     else if (gen?.status === 'queued' || (gen?.status === 'running' && isRunning(gen.id))) reuseGenerations[st.id] = gen.id;
-    else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
+    else if (gen && (gen.status === 'running' || hasActiveTicketSend(gen))) blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
     else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({ ...it, status: 'running', stepStates: { ...it.stepStates, ...Object.fromEntries([...blocked.keys()].map(id => [id, 'error' as StepState])) } }));
@@ -339,7 +357,17 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   if (!item || item.type !== 'plan') return 'No such plan.';
   const problem = planRecoveryProblem(item, mode, sessionId, budgetPass);
   if (problem) return problem;
-  consumeOnce(budgetPass);
+  const recovery = planRecovery(item);
+  const estimate = mode === 'retry' ? recovery?.estimate : recovery?.rest;
+  const ticket = storeTickets.get('plan:' + itemId);
+  if (ticket) {
+    if (estimate && recovery && passActiveFor(budgetPass, sessionId, estimate)) {
+      const stepList = mode === 'retry' ? recovery.retry : recovery.retry.filter((st) => !recovery.checkable.includes(st.id));
+      const perStep = Object.fromEntries(stepList.map((st) => [st.id, recovery.perStep[st.id]]));
+      grantTicketPass(ticket, estimate, stepCapsFromMap(perStep));
+    } else if (ticket.closed || ticket.pass) storeTickets.put({ ...ticket, closed: undefined, pass: undefined });
+  }
+  consumeOnce(budgetPass, estimate);
   const { chosen, off } = approvedSteps(item);
   const failedIds = chosen.filter((st) => item.stepStates[st.id] === 'error').map((st) => st.id);
   const genOf = (id: string) => get().generations[item.stepGenerations[id] ?? ''];
@@ -366,7 +394,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         return;
       }
       // A step that fails again rejects here; its card shows the error, the plan must still settle.
-      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id, itemId)).catch(() => undefined);
+      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id, itemId, undefined, userConfirmed)).catch(() => undefined);
       // A retry creates a new attempt and relinks the plan's step → generation mapping itself (jobs.ts relinkAttempt).
       // The latest attempt of the same operation is the one whose status counts.
       const opId = g.operationId ?? g.id;
@@ -408,6 +436,7 @@ export function cancelPlan(sessionId: string, itemId: string): void {
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'canceled' });
+  closeTicket(`plan:${itemId}`);
   removeDraftNodes(sessionId, item.plan.id);
   const pending = agentOf(sessionId, owner).pending;
   if (pending?.feedItemId === itemId) {
