@@ -317,7 +317,7 @@ export function settleSend(ticket: ApprovalTicket, sendId: string, input: Settle
     throw new SendTransitionError(sendId, cur.status, 'done');
   }
   const hasUsd = input.costUsd != null && Number.isFinite(input.costUsd);
-  const bookedDeltaUsd = hasUsd ? roundUsd(Math.max(0, input.costUsd!)) : 0;
+  const bookedDeltaUsd = hasUsd ? Math.round(Math.max(0, input.costUsd!) * 1_000_000) / 1_000_000 : 0;
   const bookedUnknown = !hasUsd && !isFreePrice(cur.price);
   const next = updateSend(ticket, sendId, (s) => ({
     ...s,

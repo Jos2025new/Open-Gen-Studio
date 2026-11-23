@@ -1,6 +1,8 @@
 import { isAbort, isTransient } from '../../lib/http';
+import { OverLimitError } from '../budget';
 import { isCreditError } from '../credit';
-import { chat, LLM_LABELS, type ChatResult, type ToolSpec } from '../providers/llm';
+import { sendLlmViaPaidGate } from '../money/llmSend';
+import { LLM_LABELS, type ChatResult, type ToolSpec } from '../providers/llm';
 import type { ChatMessageMeta } from '../feedMeta';
 import type { AgentState, FeedItem, LlmMessage, LlmProviderId, NoticeFeedItem, Session, Workspace } from '../types';
 import { appendFeed, removeFeedItem, updateFeedItem, type useStore } from '../../store/store';
@@ -27,6 +29,7 @@ export interface TurnModelCallDeps {
   llmCallUsd: (provider: LlmProviderId, model: string, usage: ChatResult['usage']) => number;
   onAgentCredit: (sessionId: string) => Promise<boolean>;
   retryWithCredit: () => Promise<void>;
+  onBudgetBlocked?: () => void;
 }
 
 export type TurnModelCallResult =
@@ -41,6 +44,7 @@ export async function runTurnModelCall(opts: {
   runId: string;
   wrapUp: boolean;
   creditRetried?: boolean;
+  budgetPass?: boolean;
   engine: { provider: LlmProviderId; model: string; key: string };
   system: string;
   tools: ToolSpec[];
@@ -55,7 +59,7 @@ export async function runTurnModelCall(opts: {
   usage: TurnUsageTracker;
   deps: TurnModelCallDeps;
 }): Promise<TurnModelCallResult> {
-  const { sessionId, owner, workspace, runId, wrapUp, creditRetried, engine, system, tools, showThinking, signal, until, log, clockElapsed, firstOutput, turnMeta, guard, usage, deps } = opts;
+  const { sessionId, owner, workspace, runId, wrapUp, creditRetried, budgetPass, engine, system, tools, showThinking, signal, until, log, clockElapsed, firstOutput, turnMeta, guard, usage, deps } = opts;
 
   let textItemId: string | null = null;
   let textItemMeta: ChatMessageMeta | undefined;
@@ -68,7 +72,9 @@ export async function runTurnModelCall(opts: {
     const hurry = guard.takeHurryNote();
     if (hurry) deps.pushHistory(sessionId, { role: 'user', content: hurry }, owner);
 
-    result = await until(chat({
+    const outcome = await until(sendLlmViaPaidGate({
+      ticketId: `llm:${runId}`,
+      sessionId,
       provider: engine.provider,
       apiKey: engine.key,
       model: engine.model,
@@ -77,6 +83,8 @@ export async function runTurnModelCall(opts: {
       tools,
       effort: deps.get().settings.agent.effort,
       showReasoning: showThinking,
+      budgetPass,
+      computeUsd: (u) => deps.llmCallUsd(engine.provider, engine.model, u),
       onNotice: (text) => !guard.isDone() && deps.notice(sessionId, workspace, text, 'info', undefined, turnMeta()),
       onReasoning: showThinking ? (_d, full) => !guard.isDone() && (guard.armSilence(), log.thinking(full)) : undefined,
       signal,
@@ -100,8 +108,14 @@ export async function runTurnModelCall(opts: {
         }
       },
     }));
+    result = outcome.value;
   } catch (err) {
     if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false });
+    if (err instanceof OverLimitError) {
+      guard.setOutcome('canceled');
+      deps.onBudgetBlocked?.();
+      return { stop: true };
+    }
     if (isAbort(err)) {
       guard.handleAbort(() => deps.notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta()));
       return { stop: true };
@@ -170,6 +184,7 @@ export async function runTurnModelCall(opts: {
     textItemId,
     hasBubble: hasTextBubble(),
     bubbleMeta: textItemMeta ?? turnMeta(),
+    bookedByGate: true,
   });
 
   // An empty answer stays out of the history: a Retry would otherwise end the request with an empty assistant message.

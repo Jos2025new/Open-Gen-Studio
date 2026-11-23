@@ -2,12 +2,11 @@ import { isVisualStep as isGen, isStepKind, stepInfo } from '../planSteps/inspec
 import { create } from 'zustand';
 import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
-import { chat } from '../providers/llm';
+import { sendLlmViaPaidGate } from '../money/llmSend';
 import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';
 import { updateFeedItem, useStore } from '../../store/store';
-import { addSpend } from '../../store/spend';
 import { laneOfItem, laneState, patchLane } from './lanes';
 import { feedOfAgentIn } from './threads';
 import { VISUAL_MEDIA_KINDS, type FeedItem, type PlanFeedItem, type PlanStep, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type VisualMediaKind } from '../types';
@@ -203,8 +202,18 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
       const why = guardBlock();
       if (why) throw new Error(why);
       const content = attempt ? `${lines}\n\nYour last answer had a prompt over ${MAX_PROMPT} characters (${tooLong}). Write them shorter.` : lines;
-      const result = await chat({ provider: engine.provider, apiKey: engine.key, model: engine.model, system, messages: [userMessage(content, parts)], tools: [], signal: new AbortController().signal });
-      addSpend(llmCallUsd(engine.provider, engine.model, result.usage), { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
+      const { value: result } = await sendLlmViaPaidGate({
+        ticketId: `llm:rewrite:${itemId}:${run}`,
+        sessionId,
+        provider: engine.provider,
+        apiKey: engine.key,
+        model: engine.model,
+        system,
+        messages: [userMessage(content, parts)],
+        tools: [],
+        signal: new AbortController().signal,
+        computeUsd: (u) => llmCallUsd(engine.provider, engine.model, u),
+      });
       if (runs.get(itemId) !== run) return;
       const out = JSON.parse(fenced(result.text)) as Record<string, unknown>;
       const long = steps.filter((s) => typeof out[s.id] === 'string' && (out[s.id] as string).trim().length > MAX_PROMPT);

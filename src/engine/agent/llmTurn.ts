@@ -103,6 +103,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
         runId,
         wrapUp: opts.route === 'wrap-up',
         creditRetried: opts.creditRetried,
+        budgetPass: opts.budgetPass,
         engine,
         system: agentSystem(),
         tools: toolsFor(get().composer.agentStyle),
@@ -131,6 +132,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           llmCallUsd,
           onAgentCredit,
           retryWithCredit: () => llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }),
+          onBudgetBlocked: () => { guardBudget(); },
         },
       });
       if (callOutcome.stop) {

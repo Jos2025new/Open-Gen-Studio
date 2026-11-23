@@ -520,8 +520,8 @@ describe('Escenario (f): LLM en streaming', () => {
     expect(fake.acceptedCount('/chat/completions')).toBe(0);
   });
 
-  // reproduce: turnModelCall.ts:71 y planSettings.ts:206 llaman chat() sin reserva en vuelo ni marca durable; con limite $0.05 y 1 llamada LLM en vuelo (~$0.04), rewritePrompts lanza una segunda llamada simultanea
-  it.fails('f3: llmTurn en vuelo reserva presupuesto y frena rewritePrompts concurrente que pasaria el tope', async () => {
+  // fixed in D+ 2b-3: llmSend enruta llmTurn y rewritePrompts por paidSend reservando presupuesto en vuelo y liquidando idempotentemente por sendId
+  it('f3: llmTurn en vuelo reserva presupuesto y frena rewritePrompts concurrente que pasaria el tope', async () => {
     setupSession({
       spentUsd: 0, budgetUsd: 0.05, budgetOn: true,
       llmCatalog: [{ id: LLM_MODEL, name: 'Pricey LLM', inputPrice: 20, outputPrice: 40, tools: true, vision: false }],

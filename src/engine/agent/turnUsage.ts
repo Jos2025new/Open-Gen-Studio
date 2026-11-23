@@ -20,6 +20,7 @@ export interface TurnUsageTracker {
     textItemId: string | null;
     hasBubble: boolean;
     bubbleMeta: ChatMessageMeta;
+    bookedByGate?: boolean;
   }) => void;
 }
 
@@ -63,6 +64,7 @@ export function createTurnUsageTracker(): TurnUsageTracker {
     textItemId,
     hasBubble,
     bubbleMeta,
+    bookedByGate,
   }) => {
     // Every tier counts: the provider's reported cost, else tokens × the catalog price (marked estimated). Never blocks.
     recordMetric(sessionId, {
@@ -73,7 +75,7 @@ export function createTurnUsageTracker(): TurnUsageTracker {
       wrapUp,
       timing: { ...result.timing, reasoningTokens: result.usage?.reasoningTokens, cachedTokens: result.usage?.cachedTokens },
     });
-    addSpend(llmUsd, { category: 'agent', provider, model, sessionId, estimated: result.usage?.costUsd == null });
+    if (!bookedByGate) addSpend(llmUsd, { category: 'agent', provider, model, sessionId, estimated: result.usage?.costUsd == null });
     if (result.usage) {
       const u = result.usage;
       patchSession(sessionId, (s) => ({
