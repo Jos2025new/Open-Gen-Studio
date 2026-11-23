@@ -145,22 +145,24 @@ describe('p10e posiciones lejanas sin motivo con tarjetas de distinto tamano', (
 });
 
 describe('p10e zoom extremo (0.05 y 4)', () => {
-  // reproduce: a zoom 0.05 (--rf-hit-zoom=0.05) las zonas .port::after y .nc-next::after miden 480x480 px de flujo.
-  // 80a0927a desplazo solo .k-text .nc-next::after; en Image/Video/Audio/3D/Tool, .port::after ([0,240]) y .nc-next::after ([43,260])
-  // cubren el 100 % del cuerpo de 260 px y se solapan en [43,240], dejando el cuerpo inalcanzable al clic.
-  it.fails('at zoom 0.05 on an Image card, handle hit zones do not cover 100% of the card body', () => {
+  it('at zoom 0.05 on an Image card, handle hit zones do not cover 100% of the card body', () => {
     const cssSystem = readFileSync('src/styles/node-system.css', 'utf8');
     const cssNode = readFileSync('src/styles/node.css', 'utf8');
     const hz = hitZoom(0.05);
     const zoneW = 24 / hz;
-    const portRight = zoneW / 2;
+    const portLeftShift = cssSystem.match(/\.react-flow__handle-left\.port::after\s*\{\s*left:\s*calc\(50% - (\d+(?:\.\d+)?)px \/ var\(--rf-hit-zoom, 1\)\)/);
+    expect(portLeftShift).not.toBeNull();
+    const portRight = zoneW / 2 - Number(portLeftShift![1]) / hz;
     const nextRight = Number(cssNode.match(/\.nc-next\.react-flow__handle \{[^}]*right: (-?\d+)px/)?.[1]);
     const nextWidth = Number(cssNode.match(/\.nc-next\.react-flow__handle \{[^}]*width: (\d+)px/)?.[1]);
     expect(nextRight).toBe(-34);
     expect(nextWidth).toBe(22);
-    expect(/(?<!k-text\) )\.nc-next::after\s*\{[^}]*left:/.test(cssSystem)).toBe(false);
-    const nextCenter = NODE_WIDTH - nextRight - nextWidth / 2;
+    const nextShift = cssSystem.match(/(?<!k-text\) )\.nc-next::after\s*\{\s*left:\s*calc\(50% \+ max\(0px, (\d+(?:\.\d+)?)px \/ var\(--rf-hit-zoom, 1\) - (\d+(?:\.\d+)?)px\)\)/);
+    expect(nextShift).not.toBeNull();
+    const nextCenter = NODE_WIDTH - nextRight - nextWidth / 2 + Math.max(0, Number(nextShift![1]) / hz - Number(nextShift![2]));
     const nextLeft = nextCenter - zoneW / 2;
+    expect(portRight).toBeLessThanOrEqual(0);
+    expect(nextLeft).toBeGreaterThanOrEqual(NODE_WIDTH);
     expect(portRight).toBeLessThan(nextLeft);
   });
 
