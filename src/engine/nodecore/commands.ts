@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { budgetProblem } from '../actions';
+import { budgetProblemForSteps } from '../budget';
+import { stepCapsFromMap } from '../money/storeBridge';
 import { nodeCommand, nodeRef } from '../flow/commandKit';
 import { LINK_KINDS } from '../graphTypes';
 import { UNKNOWN } from '../pricing';
@@ -73,11 +74,16 @@ export const commands = [
     args: z.object({ approval: z.string().min(1).max(80), runId: z.string().min(1).max(80).optional() }).strict(),
     effect: 'spend',
     estimate: (_on, args) => snapshotById(args.approval)?.preview.estimate ?? UNKNOWN,
-    review: (_ctx, args) => ({ signature: snapshotById(args.approval)?.preview.signature ?? '', details: [] }),
+    review: (_ctx, args) => {
+      const preview = snapshotById(args.approval)?.preview;
+      const stepCaps = stepCapsFromMap(preview?.perStep, 'node:');
+      return { signature: preview?.signature ?? '', details: [], ...(stepCaps ? { stepCaps } : {}) };
+    },
     run: async (on, args, ctx) => {
       const snapshot = snapshotById(args.approval);
       if (!snapshot || snapshot.session !== on.session) throw new Error('This approval is unknown or belongs to another session; prepare the action again.');
-      const problem = budgetProblem(snapshot.preview.estimate, on.session, ctx.budgetPass);
+      const prefix = ctx.budgetPass?.stepKey ? `${ctx.budgetPass.stepKey}:` : '';
+      const problem = budgetProblemForSteps(snapshot.preview.estimate, snapshot.preview.perStep, on.session, ctx.budgetPass, prefix);
       if (problem) throw new Error(problem);
       const record = await runAction(snapshot, args.runId, undefined, ctx.budgetPass, ctx.approvalTicketId);
       if (record.status === 'stale' || (record.status === 'failed' && !record.result)) throw new Error(record.error ?? 'The action did not run.');

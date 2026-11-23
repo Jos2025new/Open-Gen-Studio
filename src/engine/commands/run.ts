@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { stable } from '../flow/freshness';
-import { withSequenceStepPass, type BudgetPass } from '../budget';
+import { ticketBudgetPass, type BudgetPass } from '../budget';
 import { FREE, UNKNOWN, sumEstimates } from '../pricing';
 import type { Estimate } from '../types';
 import { echo } from './echo';
@@ -322,14 +322,12 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   let budgetPass: BudgetPass | undefined = options.resume?.budgetPass;
   let approvalTicketId = options.resume?.approvalTicketId;
   const reviews: Record<number, CommandReview> = {};
-  const reviewedSpends = new Map<number, Estimate>();
   for (const frozen of options.resume?.steps ?? []) {
     const step = steps[frozen.step - 1];
     if (!step) continue;
     if (frozen.state) step.ran = true;
     if (frozen.state === 'done') results[frozen.step - 1] = frozen.result;
     if (frozen.review) reviews[frozen.step] = frozen.review;
-    if (frozen.estimate) reviewedSpends.set(frozen.step, frozen.estimate);
     if (frozen.ready) { step.args = frozen.args; step.ready = true; }
     if (frozen.onReady) { step.on = frozen.on; step.onReady = true; }
   }
@@ -361,7 +359,8 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         step.args = args;
         step.ready = true;
       }
-      const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
+      const stepPass = budgetPass ?? (approvalTicketId && on.session ? ticketBudgetPass(on.session, approvalTicketId, `cmd:${i + 1}`) : undefined);
+      const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(stepPass ? { budgetPass: stepPass } : {}) };
       const reviewed = reviews[i + 1];
       if (spec.effect === 'spend' && needsApproval(spec.effect, options.caller)) {
         const current = commandReview(spec, ctx, args);
@@ -376,10 +375,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       openHistories(spec, on, args, txs);
       if (track) options.onStepStart?.(i + 1);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
-      const out: unknown = spec.effect === 'spend' && budgetPass?.kind === 'sequence'
-        ? withSequenceStepPass(budgetPass, on.session ?? budgetPass.sessionId, spec.estimate?.(ctx, args) ?? UNKNOWN, reviewedSpends.get(i + 1),
-          stepPass => spec.run({ ...ctx, budgetPass: stepPass }, args))
-        : spec.run(ctx, args);
+      const out: unknown = spec.run(ctx, args);
       if (thenable(out)) {
         return settle(out, txs).then(
           (val) => {
@@ -460,7 +456,6 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     }
 
     const spendEstimates = asks.filter((a) => a.effect === 'spend').map((a) => a.estimate);
-    for (const ask of asks) if (ask.effect === 'spend') reviewedSpends.set(ask.step, ask.estimate);
     const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
     const sequence: FrozenCommandStep[] = steps.map((s, i) => {
       const ask = asks.find((a) => a.step === i + 1);

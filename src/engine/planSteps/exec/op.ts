@@ -31,7 +31,7 @@ export const runOp: RunStep<'op'> = async (s, { ctx, base, requireAsset, resolve
     params = { ...params, _refs: got.map((g) => g.asset).join(','), _refRoles: JSON.stringify(got) };
   }
   const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
-  const g = createGeneration({ ...spec, ...(base.approvalTicketId ? { approvalTicketId: base.approvalTicketId } : {}), ...(base.approvedFingerprint ? { approvedFingerprint: base.approvedFingerprint } : {}) });
+  const g = createGeneration({ ...spec, ...(base.approvalTicketId ? { approvalTicketId: base.approvalTicketId } : {}), ...(base.approvedFingerprint ? { approvedFingerprint: base.approvedFingerprint } : {}), ...(base.passStepKey ? { passStepKey: base.passStepKey } : {}) });
   ctx.onState(s.id, 'running', { generationId: g.id });
   const out = stepOutputs(g.id, await runSettled(g.id));
   // Text results (Transcribe) feed later prompts through prompt_from.

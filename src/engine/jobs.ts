@@ -25,8 +25,8 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { shareOfEstimate } from './sendLedger';
 import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
-import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
-import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
+import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -83,6 +83,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     estimate,
     ...(approval?.sessionId === spec.sessionId ? { approvalTicketId: approval.id } : {}),
     ...(spec.approvedFingerprint ? { approvedFingerprint: spec.approvedFingerprint } : {}),
+    ...(spec.passStepKey ? { passStepKey: spec.passStepKey } : {}),
     retryBaseEstimate: estimate,
     retryTotal: spec.variants?.length ?? spec.settings.count,
     parentId: spec.parentId,
@@ -99,12 +100,17 @@ export function createGeneration(spec: GenerationSpec): Generation {
     (stepApproved(spec.sessionId, spec.planId, spec.stepId) &&
       (estimate.usd == null || estimate.lowerBound || (rem != null && estimate.usd > rem + 1e-9))),
   );
-  if (passOwner && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, passOwner);
+  const stepKey = sendStepKeyFor(g);
+  const ticketStepCap = approval?.pass?.kind === 'once' && approval.pass.steps && stepKey && Object.prototype.hasOwnProperty.call(approval.pass.steps, stepKey)
+    ? approval.pass.steps[stepKey]
+    : undefined;
+  const approvedUsd = ticketStepCap !== undefined ? ticketStepCap : (estimate.lowerBound ? null : estimate.usd);
+  if (passOwner && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, approvedUsd, passOwner);
   consumeOnce(spec.budgetPass, estimate);
   upsertGeneration(g);
   if (!g.approvalTicketId && slotPriceForGeneration(g).maxVerifiableUsd !== 0) {
     ensureGenerationTicket(g, needsTicketPass ? { pass: ticketPassFromEstimate(estimate) } : {});
-  } else if (g.approvalTicketId && approval?.kind !== 'commands' && pass && !approval?.pass) {
+  } else if (g.approvalTicketId && approval?.kind !== 'commands' && pass && pass.kind !== 'ticket' && !approval?.pass) {
     grantGenerationTicketPass(g.id, estimate);
   }
   return g;
@@ -164,7 +170,6 @@ async function attempt(id: string, nodeLock?: () => void): Promise<string[]> {
 async function execute(id: string): Promise<string[]> {
   const g0 = get().generations[id];
   if (!g0) throw new Error('Generation not found');
-  const checkQuote = generationQuoteGuard(id);
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
@@ -258,7 +263,6 @@ async function execute(id: string): Promise<string[]> {
           if (g.approvedFingerprint && sendFingerprint(resolveSendPlan(g, get(), { model, schema, kind }), get(), { ignoreSeed: true }) !== g.approvedFingerprint) {
             throw new Error(COMMAND_REVIEW_CHANGED);
           }
-          checkQuote(quote);
           if (proposed) checkStepAuthorization(g, proposed);
         },
         isRetryable: (err) => {

@@ -39,6 +39,8 @@ export interface GenerationSpec {
   approvalTicketId?: string;
   /** Frozen fingerprint of the resolved send payload approved by the user. */
   approvedFingerprint?: string;
+  /** Per-step pass key on a shared ticket (`cmd:2`, `cmd:1:node:n1`, etc.). */
+  passStepKey?: string;
   /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
   budgetPass?: BudgetPass;
   estimate?: Estimate;

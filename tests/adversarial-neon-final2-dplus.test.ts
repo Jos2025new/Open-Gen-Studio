@@ -240,8 +240,7 @@ it('R1b: invalidates nodes.run.start review when an upstream model3d node viewIm
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: evaluateBudgetGate (paidSend.ts:86) returns ok immediately when pass.allowUnknown is true, ignoring pass.maxUsd ($0.10) and letting a $5.00 quote pass on a known-price step in a mixed plan.
-it.fails('R2a: blocks a known-price step in a mixed plan approved with once+allowUnknown when quote jumps above the approved cap', async () => {
+it('R2a: blocks a known-price step in a mixed plan approved with once+allowUnknown when quote jumps above the approved cap', async () => {
   // Atlas calculate endpoint returns $5.00 live quote while catalog published $0.10 for s1.
   installModels(5.0);
   useStore.setState((state) => ({
@@ -269,8 +268,7 @@ it.fails('R2a: blocks a known-price step in a mixed plan approved with once+allo
   expect(fake.acceptedCount('known priced atlas step'), 'once+allowUnknown let a $5.00 quote pass on a plan step approved at $0.10').toBe(0);
 });
 
-// reproduce: in a mixed nodes.run.start approved with once+allowUnknown (maxUsd $0.10), evaluateBudgetGate (paidSend.ts:86) ignores pass.maxUsd and createGeneration re-estimates with the live $5.00 quote, dispatching $5.00 on a node reviewed at $0.10.
-it.fails('R2b: blocks a known-price node in a mixed nodes.run.start approved with once+allowUnknown when quote jumps above the approved cap', async () => {
+it('R2b: blocks a known-price node in a mixed nodes.run.start approved with once+allowUnknown when quote jumps above the approved cap', async () => {
   // Atlas calculate endpoint returns $5.00 live quote while user reviewed and approved $0.10 + unpriced.
   installModels(5.0);
   useStore.setState((state) => ({
@@ -303,8 +301,7 @@ it.fails('R2b: blocks a known-price node in a mixed nodes.run.start approved wit
   expect(fake.acceptedCount('known node atlas mixed'), 'once+allowUnknown let a $5.00 quote pass on a node approved at $0.10').toBe(0);
 });
 
-// reproduce: evaluateBudgetGate (paidSend.ts:86) bypasses cumulative ticketCommittedUsd/pass.maxUsd checks whenever pass.allowUnknown is true and command tickets never clear pass on completion, allowing unlimited extra sends on a spent once pass.
-it.fails('R2c: rejects an extra paid send on a once+allowUnknown command ticket after its approved sends already ran', async () => {
+it('R2c: rejects an extra paid send on a once+allowUnknown command ticket after its approved sends already ran', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetOn: true, budgetUsd: 0.05 } }));
 
   const pending = runCommandsTool(sid, {

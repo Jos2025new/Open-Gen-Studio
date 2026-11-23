@@ -115,7 +115,7 @@ export async function createRecraftStyle(sessionId: string, name: string, budget
     toast('Attach 1–10 reference images first.', 'error');
     return;
   }
-  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: estimateRecraftStyle(), budgetPass, approvalTicketId });
+  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: estimateRecraftStyle(), budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     await runGeneration(g.id);
@@ -140,7 +140,7 @@ export async function createSubjectVoice(sessionId: string, subjectId: string, b
   }
   try {
     const spec = await opSpec({ sessionId, sourceAssetId: audio, op: 'create_voice', params: {}, origin: 'op' });
-    const g = createGeneration({ ...spec, budgetPass, approvalTicketId });
+    const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
     appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
     await runGeneration(g.id);
     const voiceId = get().generations[g.id]?.text;

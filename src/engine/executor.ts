@@ -40,6 +40,8 @@ export interface ExecContext {
   nodeOperations?: Record<string, OpSpecInput['nodeChoice']>;
   /** Frozen per-step send fingerprints approved from the preview; re-checked before transport. */
   stepFingerprints?: Record<string, string>;
+  /** Command step prefix for node-run per-step ticket pass keys (`cmd:1:`). */
+  passStepPrefix?: string;
   /** Resuming a plan: steps already done (their outputs are reused, they do not run again). */
   prior?: Map<string, StepOutput>;
   /** Resuming a plan: steps that failed again and stay failed (their dependents are skipped). */
@@ -181,6 +183,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id,
       ...(ctx.approvalTicketId ? { approvalTicketId: ctx.approvalTicketId } : {}),
       ...(ctx.stepFingerprints?.[s.id] ? { approvedFingerprint: ctx.stepFingerprints[s.id] } : {}),
+      ...(ctx.passStepPrefix ? { passStepKey: `${ctx.passStepPrefix}node:${s.id}` } : {}),
     };
     return (RUN_STEP[s.kind] as RunStep<typeof s.kind>)(s as never, { ...runEnv, base, inputsFor });
   };

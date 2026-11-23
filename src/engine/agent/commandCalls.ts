@@ -2,13 +2,13 @@ import { commandReview, previewEstimate, type RunOptions } from '../commands/run
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
 import { appendFeed, removeTicket, saveNow, updateFeedItem, useStore } from '../../store/store';
-import { beginOncePass, budgetProblem, dontAskAgain, dontAskUntilNextSession, type BudgetPass } from '../budget';
+import { budgetProblem, dontAskAgain, dontAskUntilNextSession } from '../budget';
 import { allCommands, command, findCommands, getApprover, run, type ApprovalRequest, type Approver } from '../commands';
 import { COMMAND_REVIEW_CHANGED, type RunResult } from '../commands/types';
 import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
-import { grantTicketPass, storeTickets } from '../money/storeBridge';
+import { grantTicketPass, stepCapFromEstimate, storeTickets } from '../money/storeBridge';
 import { createTicket, isHeldStatus, priceFromEstimate, type ApprovalTicket } from '../money/ticket';
 import { FREE, sumEstimates } from '../pricing';
 import type { CommandApprovalFeedItem, Estimate } from '../types';
@@ -67,8 +67,7 @@ export type CommandApprovalDecision = 'approve' | 'once' | 'session' | 'until-ne
 
 interface PendingCommandApproval {
   sessionId: string;
-  resolve: (outcome: boolean | { approved: boolean; budgetPass?: BudgetPass; approvalTicketId?: string }) => void;
-  setReleasePass: (fn: () => void) => void;
+  resolve: (outcome: boolean | { approved: boolean; approvalTicketId?: string }) => void;
 }
 
 const pending = new Map<string, PendingCommandApproval>();
@@ -153,21 +152,34 @@ async function runTrackedSequence(
   return { result, changed };
 }
 
-function replayCommandTicket(sessionId: string, itemId: string, ticket: ApprovalTicket, budgetPass?: BudgetPass, releasePass?: () => void): void {
+function replayCommandTicket(sessionId: string, itemId: string, ticket: ApprovalTicket): void {
   const steps = frozenStepsOf(ticket);
   const seq = steps.map((s) => ({ cmd: s.cmd, ...(s.rawArgs !== undefined ? { args: s.rawArgs } : {}), ...(s.rawOn && Object.keys(s.rawOn).length ? { on: s.rawOn } : {}) }));
   void (async () => {
     try {
-      const { result, changed } = await runTrackedSequence({ seq, on: { session: sessionId } }, () => itemId, { resume: { steps, budgetPass, approvalTicketId: ticket.id } });
+      const { result, changed } = await runTrackedSequence({ seq, on: { session: sessionId } }, () => itemId, { resume: { steps, approvalTicketId: ticket.id } });
       finishCommandCard(sessionId, itemId, result, changed);
     } catch (err) {
       updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'error', error: err instanceof Error ? err.message : String(err) }));
     } finally {
-      releasePass?.();
       replaying.delete(itemId);
       void saveNow().catch(() => undefined);
     }
   })();
+}
+
+/** Build per-step ceilings for every remaining paid command/node in the approved sequence. */
+function commandStepCaps(spends: readonly FrozenCommandStep[]): Record<string, number | null> {
+  const caps: Record<string, number | null> = {};
+  for (const step of spends) {
+    if (step.review?.stepCaps && Object.keys(step.review.stepCaps).length) {
+      for (const [k, v] of Object.entries(step.review.stepCaps)) caps[`cmd:${step.step}:${k}`] = v;
+    } else {
+      const cap = stepCapFromEstimate(step.estimate ?? FREE);
+      if (cap !== undefined) caps[`cmd:${step.step}`] = cap;
+    }
+  }
+  return caps;
 }
 
 /**
@@ -196,22 +208,16 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
   if (decision === 'approve' && spends.length && budgetProblem(estimate, sessionId)) return false;
 
   let approvedTicket = ticket;
-  let grant: ReturnType<typeof beginOncePass> | undefined;
   if (decision === 'session') dontAskAgain(sessionId);
   else if (decision === 'until-next-session') dontAskUntilNextSession();
-  else if (decision === 'once') {
-    const unknown = spends.filter(({ estimate }) => estimate?.usd == null || estimate.lowerBound).length;
-    grant = beginOncePass(sessionId, estimate.usd, unknown);
-    approvedTicket = grantTicketPass(ticket, estimate);
-  }
+  else if (decision === 'once') approvedTicket = grantTicketPass(ticket, estimate, commandStepCaps(spends));
   updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, { status: 'running' });
   if (entry) {
     pending.delete(itemId);
-    if (grant) entry.setReleasePass(grant.end);
-    entry.resolve({ approved: true, budgetPass: grant?.pass, approvalTicketId: ticket.id });
+    entry.resolve({ approved: true, approvalTicketId: ticket.id });
   } else {
     replaying.add(itemId);
-    replayCommandTicket(sessionId, itemId, approvedTicket, grant?.pass, grant?.end);
+    replayCommandTicket(sessionId, itemId, approvedTicket);
   }
   return true;
 }
@@ -254,7 +260,6 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   }
   const doc = activeDoc(sessionId);
   let approvalItemId: string | null = null;
-  const passes: (() => void)[] = [];
   const sessionApprover: Approver | undefined = !getApprover() && useStore.getState().sessions[sessionId]
     ? (request) => new Promise<Awaited<ReturnType<Approver>>>((resolve) => {
       if (signal?.aborted) return resolve(false);
@@ -271,22 +276,15 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
       pending.set(itemId, {
         sessionId,
         resolve: (ok) => { signal?.removeEventListener('abort', onAbort); resolve(ok); },
-        setReleasePass: (fn) => { passes.push(fn); },
       });
     })
     : undefined;
 
-  let result: RunResult;
-  let changed: ChangedReview | undefined;
-  try {
-    ({ result, changed } = await runTrackedSequence(
-      { seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } },
-      () => approvalItemId,
-      { signal, approver: sessionApprover },
-    ));
-  } finally {
-    for (const release of passes) release();
-  }
+  const { result, changed } = await runTrackedSequence(
+    { seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } },
+    () => approvalItemId,
+    { signal, approver: sessionApprover },
+  );
   const reoffered = approvalItemId ? finishCommandCard(sessionId, approvalItemId, result, changed) : undefined;
   const ran = result.results.length;
   if (!result.ok) {

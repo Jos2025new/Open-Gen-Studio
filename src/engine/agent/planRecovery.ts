@@ -1,7 +1,7 @@
 import { pruneJoins } from '../plan';
 import { estimateSteps } from '../executor';
 import { canRecheck } from '../jobs';
-import { planRetryEstimate } from '../retryPartial';
+import { estimateForRetry, planRetryEstimate } from '../retryPartial';
 import { budgetProblem, type BudgetPass } from '../budget';
 import { get } from './runtimeShared';
 import type { Estimate, PlanFeedItem, PlanStep } from '../types';
@@ -19,7 +19,7 @@ export function approvedSteps(item: PlanFeedItem): { chosen: PlanStep[]; off: Se
 }
 
 /** Failed plan recovery options and the remaining retry price. */
-export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: PlanStep[]; estimate: Estimate; rest: Estimate } | null {
+export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: PlanStep[]; estimate: Estimate; rest: Estimate; perStep: Record<string, Estimate> } | null {
   if ((item.status !== 'error' && item.status !== 'partial') || item.plan.workspace === 'node') return null;
   const gens = get().generations;
   const { chosen } = approvedSteps(item);
@@ -30,8 +30,12 @@ export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: 
     return item.stepStates[st.id] === 'error' && g && canRecheck(g);
   }).map((st) => st.id);
   const price = estimateSteps(retry);
+  const perStep = Object.fromEntries(retry.map((st) => {
+    const g = item.stepStates[st.id] === 'error' ? gens[item.stepGenerations[st.id] ?? ''] : undefined;
+    return [st.id, g ? estimateForRetry(g) : price.perStep[st.id]];
+  }));
   // `rest`: what a check can spend (steps that run for the first time); asking about a submitted job costs nothing.
-  return { checkable, retry, estimate: planRetryEstimate(retry, price.perStep, item, gens), rest: planRetryEstimate(retry.filter((st) => !checkable.includes(st.id)), price.perStep, item, gens) };
+  return { checkable, retry, estimate: planRetryEstimate(retry, price.perStep, item, gens), rest: planRetryEstimate(retry.filter((st) => !checkable.includes(st.id)), price.perStep, item, gens), perStep };
 }
 
 /** Why a recovery cannot start, in words for the user or the agent; null when it can. */

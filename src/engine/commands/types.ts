@@ -29,6 +29,8 @@ export const COMMAND_REVIEW_CHANGED = 'The approved request changed. Review and 
 export interface CommandReview {
   signature: string;
   details: string[];
+  /** Per-step price ceilings approved by the user for multi-node commands (`node:<id>` -> USD or null). */
+  stepCaps?: Record<string, number | null>;
 }
 
 export interface CommandContext {

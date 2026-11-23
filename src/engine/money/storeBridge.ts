@@ -1,8 +1,4 @@
-/*
- * Store adapter for D+ approval tickets and paidSend (docs/diagnostico-dinero.md).
- * `useStore.tickets` is authoritative; writes project a read-only derived view onto `Generation`
- * so existing UI, legacy recovery, and pre-D+ tests stay in sync without a second decision engine.
- */
+/* Store adapter for D+ approval tickets and paidSend (docs/diagnostico-dinero.md). */
 import { AbortedError } from '../../lib/http';
 import { uid } from '../../lib/id';
 import { guard } from '../../lib/saveGuard';
@@ -15,14 +11,11 @@ import { isRestart } from '../checkStatus';
 import { noAskDurable } from '../noAsk';
 import { deliverSend, shareOfEstimate } from '../sendLedger';
 import type { Estimate, Generation, RemoteJob, SendRecord, Workspace } from '../types';
-import {
-  paidSend, sendFree, PaidSendBlockedError,
-  type BudgetSnapshot, type PaidSendOutcome, type PaidSendTransportResult, type SpendBooking, type TicketAccess,
-} from './paidSend';
+import { paidSend, sendFree, PaidSendBlockedError, type BudgetSnapshot, type PaidSendOutcome, type PaidSendTransportResult, type SpendBooking, type TicketAccess } from './paidSend';
 import {
   createTicket, estimatedPrice, exactPrice, FREE_PRICE, isFreePrice, isHeldStatus, isSendOut,
   markSendFailed, markSendSent, interruptSends, priceFromEstimate, roundUsd, settleSend,
-  ticketCommittedUsd, ticketsInSessions, UNKNOWN_PRICE,
+  stepCommittedUsd, ticketCommittedUsd, ticketsInSessions, UNKNOWN_PRICE,
   type ApprovalTicket, type MoneyPrice, type TicketPass, type TicketSend,
 } from './ticket';
 
@@ -31,74 +24,55 @@ const NOT_SENT_MESSAGE = 'Not sent: could not save before sending. Nothing was c
 const PARTIAL_NOT_SENT_MESSAGE = 'Next request not sent: could not save before sending. Earlier items in this batch were already sent; retry to continue with the rest.';
 const PRIOR_UNCERTAIN_NOT_SENT_MESSAGE = 'Not sent: could not save before sending. A previous request for this generation may have been charged; check before retrying.';
 
-/** Thrown when pre-send persistence or lock/discard guards fail before calling a provider. */
 export class SendNotCommittedError extends Error {
-  constructor(message = NOT_SENT_MESSAGE) {
-    super(message);
-    this.name = 'SendNotCommittedError';
-  }
+  constructor(message = NOT_SENT_MESSAGE) { super(message); this.name = 'SendNotCommittedError'; }
 }
 
 export const generationTicketId = (genId: string): string => `gen:${genId}`;
-const generationIdFromTicket = (ticketId: string): string | undefined => (ticketId.startsWith('gen:') ? ticketId.slice(4) : undefined);
+const generationIdFromTicket = (id: string): string | undefined => (id.startsWith('gen:') ? id.slice(4) : undefined);
 
-function toLegacySend(s: TicketSend): SendRecord {
-  return {
-    id: s.id, index: s.index, status: s.status === 'in_flight' || s.status === 'pending' ? 'intent' : s.status,
-    ...(s.remoteJob ? { remoteJob: s.remoteJob } : {}), ...(s.settledUsd != null ? { costUsd: s.settledUsd } : {}),
-    ...(s.settledEstimated != null ? { estimated: s.settledEstimated } : {}), ...(s.bookedUsd != null ? { bookedUsd: s.bookedUsd } : {}),
-    ...(s.bookedUnknown ? { bookedUnknown: true } : {}),
-  };
-}
+const toLegacySend = (s: TicketSend): SendRecord => ({
+  id: s.id, index: s.index, status: s.status === 'in_flight' || s.status === 'pending' ? 'intent' : s.status,
+  ...(s.remoteJob ? { remoteJob: s.remoteJob } : {}), ...(s.settledUsd != null ? { costUsd: s.settledUsd } : {}),
+  ...(s.settledEstimated != null ? { estimated: s.settledEstimated } : {}), ...(s.bookedUsd != null ? { bookedUsd: s.bookedUsd } : {}),
+  ...(s.bookedUnknown ? { bookedUnknown: true } : {}),
+});
 
-/** One-way derived projection from `ApprovalTicket` onto `Generation`. */
 function projectTicketToGeneration(genId: string, sends: readonly TicketSend[]): void {
   const cur = sends.length ? get().generations[genId] : undefined;
   if (!cur) return;
   const ids = new Set(sends.map((s) => s.id));
   const visible = [...(cur.sends?.filter((s) => !ids.has(s.id)) ?? []), ...sends.filter((s) => s.status !== 'pending').map(toLegacySend)];
-  const inFlight = sends.find((s) => s.status === 'in_flight');
   const activeSent = sends.find((s) => s.status === 'sent' && s.remoteJob);
-  const patch: Partial<Generation> = { sends: visible.length ? visible : undefined, sending: inFlight?.updatedAt };
+  const patch: Partial<Generation> = { sends: visible.length ? visible : undefined, sending: sends.find((s) => s.status === 'in_flight')?.updatedAt };
   if (activeSent?.remoteJob) {
-    patch.remoteJob = activeSent.remoteJob;
-    patch.jobId = activeSent.remoteJob.id;
-    patch.lostJob = undefined;
+    patch.remoteJob = activeSent.remoteJob; patch.jobId = activeSent.remoteJob.id; patch.lostJob = undefined;
     if (cur.sent) patch.sent = { ...cur.sent, jobId: activeSent.remoteJob.id };
   } else if (cur.status !== 'done' && sends.some((s) => s.status === 'uncertain')) patch.lostJob = true;
   patchGeneration(genId, patch);
 }
 
-/** Authoritative `TicketAccess` backed by `useStore.tickets` with one-way projection onto `Generation`. */
 export const storeTickets: TicketAccess = {
-  get: (ticketId) => get().tickets[ticketId],
+  get: (id) => get().tickets[id],
   list: () => { const { tickets, sessions } = get(); return ticketsInSessions(tickets, sessions); },
   put: (ticket) => {
-    const previous = get().tickets[ticket.id];
-    if (previous === ticket) return;
+    const prev = get().tickets[ticket.id];
+    if (prev === ticket) return;
     upsertTicket(ticket);
     const legacyId = generationIdFromTicket(ticket.id);
-    const changed = new Set(ticket.sends.flatMap((s, i) => {
-      const genId = s.generationId ?? legacyId;
-      return genId && s !== previous?.sends[i] ? [genId] : [];
-    }));
-    for (const genId of changed) projectTicketToGeneration(genId, sendsForGeneration(ticket, genId));
-    if (ticket.sends.some((s, i) => s.status === 'uncertain' && s !== previous?.sends[i])) ensureUncertainChargeNotice(ticket);
+    const changed = new Set(ticket.sends.flatMap((s, i) => { const gId = s.generationId ?? legacyId; return gId && s !== prev?.sends[i] ? [gId] : []; }));
+    for (const gId of changed) projectTicketToGeneration(gId, sendsForGeneration(ticket, gId));
+    if (ticket.sends.some((s, i) => s.status === 'uncertain' && s !== prev?.sends[i])) ensureUncertainChargeNotice(ticket);
   },
 };
 
-const isUncertainCharge = (ticket: ApprovalTicket, send: TicketSend): boolean =>
-  send.status === 'uncertain' && (ticket.kind !== 'commands' || send.generationId != null);
+const isUncertainCharge = (t: ApprovalTicket, s: TicketSend) => s.status === 'uncertain' && (t.kind !== 'commands' || s.generationId != null);
 
-/** Keep a durable way to release an uncertain reservation even after Retry or reload. */
 export function ensureUncertainChargeNotice(ticket: ApprovalTicket): void {
   const send = ticket.sends.find((slot) => isUncertainCharge(ticket, slot));
-  if (!send) return;
-  const feed = get().sessions[ticket.sessionId]?.feed;
-  if (!feed || feed.some((item) => item.type === 'notice' &&
-    (item.uncertainTicketId === ticket.id || item.uncertainLlmTicketId === ticket.id || (item.meta?.runId && `llm:${item.meta.runId}` === ticket.id)))) return;
-  const genId = send.generationId ?? generationIdFromTicket(ticket.id);
-  const origin = genId ? get().generations[genId]?.origin : undefined;
+  const feed = send && get().sessions[ticket.sessionId]?.feed;
+  if (!send || !feed || feed.some((it) => it.type === 'notice' && (it.uncertainTicketId === ticket.id || it.uncertainLlmTicketId === ticket.id || (it.meta?.runId && `llm:${it.meta.runId}` === ticket.id)))) return;
+  const origin = get().generations[send.generationId ?? generationIdFromTicket(ticket.id) ?? '']?.origin;
   const workspace: Workspace = origin === 'node' || origin === 'designer' ? origin : 'chat';
   appendFeed(ticket.sessionId, {
     id: uid('fd'), createdAt: Date.now(), workspace, type: 'notice', level: 'info', uncertainTicketId: ticket.id,
@@ -110,15 +84,14 @@ export function ensureUncertainChargeNotice(ticket: ApprovalTicket): void {
 export function reconcileUnknownCharge(sessionId: string, ticketId: string): boolean {
   const existing = storeTickets.get(ticketId);
   if (existing?.sessionId !== sessionId || !canWriteTicket()) return false;
-  const uncertain = existing.sends.filter((send) => isUncertainCharge(existing, send));
+  const uncertain = existing.sends.filter((s) => isUncertainCharge(existing, s));
   if (!uncertain.length) return false;
   let ticket = existing;
   for (const send of uncertain) {
     const settlement = settleSend(ticket, send.id, { costUsd: null, estimated: true });
     ticket = settlement.ticket;
     if (!settlement.bookedUnknown) continue;
-    const genId = send.generationId ?? generationIdFromTicket(ticket.id);
-    const g = genId ? get().generations[genId] : undefined;
+    const g = get().generations[send.generationId ?? generationIdFromTicket(ticket.id) ?? ''];
     if (g) bookGenerationSpend(g, { ticketId, sendId: send.id, usd: null, estimated: true });
     else addSpend(null, { category: 'agent', provider: ticket.scope.llm?.provider ?? 'Unknown provider', model: ticket.scope.llm?.model ?? 'Unknown model', sessionId, estimated: true, sendId: send.id });
   }
@@ -127,43 +100,52 @@ export function reconcileUnknownCharge(sessionId: string, ticketId: string): boo
   return true;
 }
 
-function ticketForGeneration(genId: string): ApprovalTicket | undefined {
+const ticketForGeneration = (genId: string): ApprovalTicket | undefined => {
   const { tickets, generations } = get();
   const approval = generations[genId]?.approvalTicketId;
   return (approval ? tickets[approval] : undefined) ?? tickets[generationTicketId(genId)];
-}
-
-function sendsForGeneration(ticket: ApprovalTicket | undefined, genId: string): readonly TicketSend[] {
-  if (!ticket) return [];
-  return ticket.id === generationTicketId(genId) ? ticket.sends : ticket.sends.filter((s) => s.generationId === genId);
-}
+};
+const sendsForGeneration = (t: ApprovalTicket | undefined, genId: string): readonly TicketSend[] =>
+  !t ? [] : t.id === generationTicketId(genId) ? t.sends : t.sends.filter((s) => s.generationId === genId);
 
 export const canWriteTicket = (): boolean => holdsWriterLock() && !guard.discarding;
-
-/** Persist the store and confirm the version written before `saveNow()` actually landed while locked and not discarding. */
 export async function saveTicketMark(): Promise<void> {
-  const targetVersion = saveStatus.getState().version;
+  const v = saveStatus.getState().version;
   await saveNow();
-  if (!holdsWriterLock() || guard.discarding || saveStatus.getState().confirmed < targetVersion) throw new Error('save not confirmed');
+  if (!holdsWriterLock() || guard.discarding || saveStatus.getState().confirmed < v) throw new Error('save not confirmed');
 }
-
-export function budgetSnapshotFor(sessionId: string): BudgetSnapshot {
+export const budgetSnapshotFor = (sessionId: string): BudgetSnapshot => {
   const st = get();
   return { budgetOn: st.settings.budgetOn, budgetUsd: st.settings.budgetUsd, spentUsd: st.spentUsd, sessionNoAsk: noAskDurable(st, sessionId) };
-}
+};
 
-export function ticketPassFromEstimate(estimate: Estimate): TicketPass {
+export const sendStepKeyFor = (g: Pick<Generation, 'passStepKey' | 'planId' | 'origin' | 'stepId'>): string | undefined =>
+  g.passStepKey ?? (g.planId && g.stepId ? g.stepId : g.origin === 'node' && g.stepId ? `node:${g.stepId}` : undefined);
+
+export const stepCapFromEstimate = (estimate: Estimate): number | null | undefined => {
   const price = priceFromEstimate(estimate);
-  return { kind: 'once', maxUsd: price.maxVerifiableUsd ?? price.usd, ...(price.maxVerifiableUsd == null ? { allowUnknown: true } : {}) };
+  return isFreePrice(price) ? undefined : price.maxVerifiableUsd;
+};
+
+export function stepCapsFromMap(perStep: Record<string, Estimate> | undefined, prefix = ''): Record<string, number | null> | undefined {
+  if (!perStep) return undefined;
+  const out: Record<string, number | null> = {};
+  for (const [id, est] of Object.entries(perStep)) { const cap = stepCapFromEstimate(est); if (cap !== undefined) out[`${prefix}${id}`] = cap; }
+  return Object.keys(out).length ? out : undefined;
 }
 
-/** Ensure a generation has an authoritative ticket in `useStore.tickets` without touching legacy `g.sends`. */
+export function ticketPassFromEstimate(estimate: Estimate, steps?: Record<string, number | null>): TicketPass {
+  const price = priceFromEstimate(estimate), vals = steps ? Object.values(steps) : [], hasSteps = vals.length > 0;
+  const allowUnknown = hasSteps ? vals.some((v) => v === null) : price.maxVerifiableUsd == null;
+  const maxUsd = hasSteps ? (vals.some((v) => v !== null) ? roundUsd(vals.reduce<number>((s, v) => s + (v ?? 0), 0)) : null) : (price.maxVerifiableUsd ?? price.usd);
+  return { kind: 'once', maxUsd, ...(allowUnknown ? { allowUnknown: true } : {}), ...(hasSteps ? { steps: { ...steps } } : {}) };
+}
+
 export function ensureGenerationTicket(g: Generation, opts: { pass?: TicketPass } = {}): ApprovalTicket {
-  const id = generationTicketId(g.id);
-  const existing = ticketForGeneration(g.id);
+  const id = generationTicketId(g.id), existing = ticketForGeneration(g.id);
   if (existing) {
     if (opts.pass === undefined) return existing;
-    const updated: ApprovalTicket = { ...existing, ...(existing.id === id ? { price: priceFromEstimate(g.estimate) } : {}), pass: opts.pass };
+    const updated = { ...existing, ...(existing.id === id ? { price: priceFromEstimate(g.estimate) } : {}), pass: opts.pass };
     upsertTicket(updated);
     return updated;
   }
@@ -172,7 +154,21 @@ export function ensureGenerationTicket(g: Generation, opts: { pass?: TicketPass 
   return created;
 }
 
-export function grantTicketPass(ticket: ApprovalTicket, estimate: Estimate): ApprovalTicket {
+export function grantTicketPass(ticket: ApprovalTicket, estimate: Estimate, steps?: Record<string, number | null>): ApprovalTicket {
+  if (steps && Object.keys(steps).length) {
+    const merged: Record<string, number | null> = { ...(ticket.pass?.steps ?? {}) };
+    const unknownGrants: Record<string, number> = { ...(ticket.pass?.unknownGrants ?? {}) };
+    for (const [key, cap] of Object.entries(steps)) {
+      if (cap === null) {
+        merged[key] = null;
+        const priorOut = new Set(ticket.sends.filter((s) => s.stepKey === key && isSendOut(s.status)).map((s) => s.generationId ?? s.id)).size;
+        if (priorOut > 0) unknownGrants[key] = priorOut + 1;
+      } else merged[key] = roundUsd(stepCommittedUsd(ticket, key) + cap);
+    }
+    const updated = { ...ticket, pass: { ...ticketPassFromEstimate(estimate, merged), ...(Object.keys(unknownGrants).length ? { unknownGrants } : {}) } };
+    storeTickets.put(updated);
+    return updated;
+  }
   const pass = ticketPassFromEstimate(estimate);
   const updated = { ...ticket, pass: { ...pass, maxUsd: pass.maxUsd == null ? null : roundUsd(ticketCommittedUsd(ticket) + pass.maxUsd) } };
   storeTickets.put(updated);
@@ -181,15 +177,13 @@ export function grantTicketPass(ticket: ApprovalTicket, estimate: Estimate): App
 
 export function grantGenerationTicketPass(genId: string, estimate: Estimate): void {
   const g = get().generations[genId];
-  if (g) grantTicketPass(ensureGenerationTicket(g), estimate);
+  if (!g) return;
+  const ticket = ensureGenerationTicket(g), stepKey = sendStepKeyFor(g), cap = stepCapFromEstimate(estimate);
+  if (stepKey && (ticket.pass?.steps || ticket.kind !== 'generation') && cap !== undefined) grantTicketPass(ticket, estimate, { [stepKey]: cap });
+  else grantTicketPass(ticket, estimate);
 }
 
-/** Compute the per-send `MoneyPrice`, respecting local/free models, explicit quotes and proportional batch estimates. */
-export function slotPriceForGeneration(
-  g: Pick<Generation, 'provider' | 'modelRef' | 'estimate' | 'retryBaseEstimate' | 'retryTotal' | 'variants' | 'assetIds' | 'settings'>,
-  items = 1,
-  quote?: number | null,
-): MoneyPrice {
+export function slotPriceForGeneration(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate' | 'retryBaseEstimate' | 'retryTotal' | 'variants' | 'assetIds' | 'settings'>, items = 1, quote?: number | null): MoneyPrice {
   if (g.provider === 'local' || g.modelRef.startsWith('local::')) return FREE_PRICE;
   if (quote != null && Number.isFinite(quote) && quote >= 0) return exactPrice(quote);
   if (g.estimate?.usd === 0 && !g.estimate.lowerBound && (quote == null || quote === 0)) return FREE_PRICE;
@@ -201,58 +195,33 @@ export function slotPriceForGeneration(
 function notSentMessage(g: Generation | undefined, reqId?: string): string {
   if (!g) return NOT_SENT_MESSAGE;
   const sends = generationSends(g);
-  if ((g.assetIds.length > 0 && !g.parentId) || sends.some((s) => s.id !== reqId && (s.status === 'done' || s.status === 'sent' || s.status === 'failed'))) {
-    return PARTIAL_NOT_SENT_MESSAGE;
-  }
-  return g.lostJob || g.remoteJob || sends.some((s) => s.id !== reqId && (s.status === 'uncertain' || s.remoteJob))
-    ? PRIOR_UNCERTAIN_NOT_SENT_MESSAGE : NOT_SENT_MESSAGE;
+  if ((g.assetIds.length > 0 && !g.parentId) || sends.some((s) => s.id !== reqId && (s.status === 'done' || s.status === 'sent' || s.status === 'failed'))) return PARTIAL_NOT_SENT_MESSAGE;
+  return g.lostJob || g.remoteJob || sends.some((s) => s.id !== reqId && (s.status === 'uncertain' || s.remoteJob)) ? PRIOR_UNCERTAIN_NOT_SENT_MESSAGE : NOT_SENT_MESSAGE;
 }
 
-function bookGenerationSpend(g: Generation, booking: SpendBooking): void {
-  addSpend(booking.usd, { category: g.kind, provider: g.modelRef.split('::')[0], model: g.modelRef, sessionId: g.sessionId, estimated: booking.estimated, sendId: booking.sendId });
-}
+const bookGenerationSpend = (g: Generation, b: SpendBooking) => addSpend(b.usd, { category: g.kind, provider: g.modelRef.split('::')[0], model: g.modelRef, sessionId: g.sessionId, estimated: b.estimated, sendId: b.sendId });
 
 export interface GenerationPaidSendOpts<T> {
-  readonly g: Generation;
-  readonly index: number;
-  readonly items?: number;
-  readonly quote?: number | null;
-  readonly signal: AbortSignal;
-  readonly beforeTransport?: () => void;
-  readonly isRetryable?: (err: unknown) => boolean;
+  readonly g: Generation; readonly index: number; readonly items?: number; readonly quote?: number | null;
+  readonly signal: AbortSignal; readonly beforeTransport?: () => void; readonly isRetryable?: (err: unknown) => boolean;
   readonly send: (ctx: { sendId: string; onRemoteJob: (job: RemoteJob) => void }) => Promise<PaidSendTransportResult<T>>;
 }
 
-/** Execute one transport call for a generation through `paidSend`. */
 export async function sendGenerationViaPaidGate<T>(opts: GenerationPaidSendOpts<T>): Promise<PaidSendOutcome<T>> {
   const { g, index, items = 1, quote, signal, beforeTransport, isRetryable, send } = opts;
-  const price = slotPriceForGeneration(g, items, quote);
-  const sendId = uid('req');
-  const existing = ticketForGeneration(g.id);
-  const accepted = sendsForGeneration(existing, g.id).some((slot) => slot.index === index && isSendOut(slot.status))
-    || (get().generations[g.id] ?? g).sends?.some((slot) => slot.index === index && slot.status !== 'failed');
+  const price = slotPriceForGeneration(g, items, quote), sendId = uid('req'), existing = ticketForGeneration(g.id);
+  const accepted = sendsForGeneration(existing, g.id).some((s) => s.index === index && isSendOut(s.status)) || (get().generations[g.id] ?? g).sends?.some((s) => s.index === index && s.status !== 'failed');
   if (accepted) throw new PaidSendBlockedError('ALREADY_SENT', 'This request may already have been charged.', { ticketId: existing?.id ?? generationTicketId(g.id), sendId });
   try {
     if (isFreePrice(price)) {
       void saveNow().catch(() => undefined);
-      return await sendFree(sendId, send, signal, beforeTransport, (result, cost) => { deliverSend(g.id, sendId, index, cost, Boolean(result.estimated)); });
+      return await sendFree(sendId, send, signal, beforeTransport, (r, cost) => { deliverSend(g.id, sendId, index, cost, Boolean(r.estimated)); });
     }
-    const ticket = ensureGenerationTicket(g);
-    const slotKey = g.id + ':' + index;
+    const ticket = ensureGenerationTicket(g), slotKey = g.id + ':' + index, stepKey = sendStepKeyFor(g);
     return await paidSend<T>({
-      ticketId: ticket.id,
-      prepare: { id: sendId, slotKey, index, price, generationId: g.id, ...(g.origin === 'node' && g.stepId ? { nodeId: g.stepId } : {}) },
-      tickets: storeTickets,
-      lockKeys: [slotKey],
-      getBudget: () => budgetSnapshotFor(g.sessionId),
-      save: saveTicketMark,
-      canWrite: canWriteTicket,
-      onBookSpend: (booking) => { bookGenerationSpend(get().generations[g.id] ?? g, booking); },
-      beforeTransport,
-      send,
-      signal,
-      restart: () => isRestart(signal.reason),
-      isRetryable,
+      ticketId: ticket.id, prepare: { id: sendId, slotKey, ...(stepKey ? { stepKey } : {}), index, price, generationId: g.id, ...(g.origin === 'node' && g.stepId ? { nodeId: g.stepId } : {}) },
+      tickets: storeTickets, lockKeys: [slotKey], getBudget: () => budgetSnapshotFor(g.sessionId), save: saveTicketMark, canWrite: canWriteTicket,
+      onBookSpend: (b) => { bookGenerationSpend(get().generations[g.id] ?? g, b); }, beforeTransport, send, signal, restart: () => isRestart(signal.reason), isRetryable,
     });
   } catch (err) {
     throw legacyPaidSendError(err, price, () => notSentMessage(get().generations[g.id] ?? g, sendId));
@@ -271,78 +240,53 @@ export function legacyPaidSendError(err: unknown, price: MoneyPrice, saveError?:
 }
 
 type GenerationSendState = Pick<Generation, 'id' | 'sends'>;
-const generationSends = (g: GenerationSendState) => { const sends = sendsForGeneration(ticketForGeneration(g.id), g.id); return sends.length ? sends : g.sends ?? []; };
-const unacknowledged = (send: { status: string }) => send.status === 'in_flight' || send.status === 'intent' || send.status === 'uncertain';
+const generationSends = (g: GenerationSendState) => { const s = sendsForGeneration(ticketForGeneration(g.id), g.id); return s.length ? s : g.sends ?? []; };
+const unacknowledged = (s: { status: string }) => s.status === 'in_flight' || s.status === 'intent' || s.status === 'uncertain';
+const findRemoteSend = (t: ApprovalTicket | undefined, genId: string, job: RemoteJob) => sendsForGeneration(t, genId).find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
 
-export function hasActiveTicketSend(g: Generation): boolean {
-  const sends = sendsForGeneration(ticketForGeneration(g.id), g.id);
-  return Boolean(g.lostJob || (sends.length ? sends.some((s) => isHeldStatus(s.status)) : g.remoteJob || g.sending != null || g.sends?.some((s) => unacknowledged(s) || s.status === 'sent')));
-}
-
-export function hasUncertainTicketSend(g: Generation): boolean {
-  const sends = sendsForGeneration(ticketForGeneration(g.id), g.id);
-  return sends.length ? sends.some((s) => s.status === 'uncertain') : Boolean(g.lostJob || g.sends?.some((s) => s.status === 'uncertain'));
-}
-
-export const hasUnstoredPaidResult = (g: Pick<Generation, 'kind' | 'status' | 'assetIds' | 'text'>, sends: readonly { status: string; index: number }[]): boolean =>
-  g.status !== 'done' && sends.some((s) => s.status === 'done' && (g.kind === 'text' ? g.text === undefined : s.index >= g.assetIds.length));
-
-export function hasOpenInFlightSend(g: Generation): boolean {
-  const sends = sendsForGeneration(ticketForGeneration(g.id), g.id);
-  return sends.length ? sends.some(unacknowledged) : g.sending != null || Boolean(g.sends?.some(unacknowledged));
-}
-
-export function wasFreeTicketSend(g: GenerationSendState & Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, freeAtSend = false): boolean {
-  if (generationSends(g).some((s) => unacknowledged(s) && (!('price' in s) || !isFreePrice(s.price)))) return false;
-  return freeAtSend || g.provider === 'local' || g.modelRef.startsWith('local::') || (g.estimate?.usd === 0 && !g.estimate.lowerBound);
-}
-
+export const hasActiveTicketSend = (g: Generation): boolean => { const s = sendsForGeneration(ticketForGeneration(g.id), g.id); return Boolean(g.lostJob || (s.length ? s.some((x) => isHeldStatus(x.status)) : g.remoteJob || g.sending != null || g.sends?.some((x) => unacknowledged(x) || x.status === 'sent'))); };
+export const hasUncertainTicketSend = (g: Generation): boolean => { const s = sendsForGeneration(ticketForGeneration(g.id), g.id); return s.length ? s.some((x) => x.status === 'uncertain') : Boolean(g.lostJob || g.sends?.some((x) => x.status === 'uncertain')); };
+export const hasUnstoredPaidResult = (g: Pick<Generation, 'kind' | 'status' | 'assetIds' | 'text'>, sends: readonly { status: string; index: number }[]): boolean => g.status !== 'done' && sends.some((s) => s.status === 'done' && (g.kind === 'text' ? g.text === undefined : s.index >= g.assetIds.length));
+export const hasOpenInFlightSend = (g: Generation): boolean => { const s = sendsForGeneration(ticketForGeneration(g.id), g.id); return s.length ? s.some(unacknowledged) : g.sending != null || Boolean(g.sends?.some(unacknowledged)); };
+export const wasFreeTicketSend = (g: GenerationSendState & Pick<Generation, 'provider' | 'modelRef' | 'estimate'>, freeAtSend = false): boolean =>
+  generationSends(g).some((s) => unacknowledged(s) && (!('price' in s) || !isFreePrice(s.price))) ? false : freeAtSend || g.provider === 'local' || g.modelRef.startsWith('local::') || (g.estimate?.usd === 0 && !g.estimate.lowerBound);
 export const activeTicketRemoteJob = (g: Generation): RemoteJob | undefined =>
-  sendsForGeneration(ticketForGeneration(g.id), g.id).find((s) => s.status === 'sent' && s.remoteJob)?.remoteJob
-    ?? g.remoteJob ?? g.sends?.find((s) => s.status === 'sent' && s.remoteJob)?.remoteJob;
-
-const findRemoteSend = (ticket: ApprovalTicket | undefined, genId: string, job: RemoteJob) =>
-  sendsForGeneration(ticket, genId).find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
+  sendsForGeneration(ticketForGeneration(g.id), g.id).find((s) => s.status === 'sent' && s.remoteJob)?.remoteJob ?? g.remoteJob ?? g.sends?.find((s) => s.status === 'sent' && s.remoteJob)?.remoteJob;
 
 export function adoptRecoveredJobOnTicket(genId: string, job: RemoteJob): boolean {
-  const ticket = ticketForGeneration(genId);
-  const open = sendsForGeneration(ticket, genId).find((s) => !s.remoteJob && (s.status === 'uncertain' || s.status === 'in_flight'));
-  if (!ticket || !open) return false;
-  storeTickets.put(markSendSent(ticket, open.id, job));
+  const t = ticketForGeneration(genId), open = sendsForGeneration(t, genId).find((s) => !s.remoteJob && (s.status === 'uncertain' || s.status === 'in_flight'));
+  if (!t || !open) return false;
+  storeTickets.put(markSendSent(t, open.id, job));
   return true;
 }
 
-export function isRemoteJobDelivered(g: Generation, job: RemoteJob): boolean {
+export const isRemoteJobDelivered = (g: Generation, job: RemoteJob): boolean => {
   const send = generationSends(g).find((s) => s.remoteJob?.id === job.id && s.remoteJob?.provider === job.provider);
-  return send?.status === 'done' && !hasUnstoredPaidResult(g, [send]);
-}
+  return Boolean(send?.status === 'done' && !hasUnstoredPaidResult(g, [send]));
+};
 
 export function settleTicketRemoteSend(genId: string, job: RemoteJob, costUsd: number | null | undefined, estimated: boolean): string | undefined {
-  const ticket = ticketForGeneration(genId);
-  const g = get().generations[genId];
-  const match = findRemoteSend(ticket, genId, job);
-  if (!ticket || !g || !match) return undefined;
-  const settled = settleSend(ticket, match.id, { costUsd, estimated });
+  const t = ticketForGeneration(genId), g = get().generations[genId], match = findRemoteSend(t, genId, job);
+  if (!t || !g || !match) return undefined;
+  const settled = settleSend(t, match.id, { costUsd, estimated });
   storeTickets.put(settled.ticket);
   if (!settled.alreadyBooked && (settled.bookedDeltaUsd > 0 || settled.bookedUnknown)) {
-    bookGenerationSpend(g, { ticketId: ticket.id, sendId: match.id, usd: settled.bookedUnknown ? null : settled.bookedDeltaUsd, estimated: settled.bookedUnknown ? true : estimated });
+    bookGenerationSpend(g, { ticketId: t.id, sendId: match.id, usd: settled.bookedUnknown ? null : settled.bookedDeltaUsd, estimated: settled.bookedUnknown ? true : estimated });
   }
   return match.id;
 }
 
 export function failTicketRemoteJob(genId: string, job: RemoteJob, error?: string): boolean {
-  const ticket = ticketForGeneration(genId);
-  const match = findRemoteSend(ticket, genId, job);
-  if (!ticket || !match || match.status === 'done' || match.status === 'failed') return false;
-  storeTickets.put(markSendFailed(ticket, match.id, error));
+  const t = ticketForGeneration(genId), match = findRemoteSend(t, genId, job);
+  if (!t || !match || match.status === 'done' || match.status === 'failed') return false;
+  storeTickets.put(markSendFailed(t, match.id, error));
   return true;
 }
 
 export function interruptTicketOnReload(g: Generation, job: RemoteJob | undefined): { handled: boolean; maybeCharged: boolean } {
-  const ticket = ticketForGeneration(g.id);
-  const sends = sendsForGeneration(ticket, g.id);
-  if (!ticket || !sends.length) return { handled: false, maybeCharged: false };
-  const next = job ? ticket : interruptSends(ticket, (s) => sends.includes(s) && !s.remoteJob);
+  const t = ticketForGeneration(g.id), sends = sendsForGeneration(t, g.id);
+  if (!t || !sends.length) return { handled: false, maybeCharged: false };
+  const next = job ? t : interruptSends(t, (s) => sends.includes(s) && !s.remoteJob);
   storeTickets.put(next);
   const updated = sendsForGeneration(next, g.id);
   const midLocalStore = !job && !wasFreeTicketSend(g) && ((g.sending != null && g.assetIds.length === 0) || hasUnstoredPaidResult(g, updated));

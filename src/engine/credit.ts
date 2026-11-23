@@ -9,7 +9,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { bindRetryQuoteApproval, budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, dontAskAgain, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
+import { budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, dontAskAgain, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -261,8 +261,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     if (!held) return;
     try {
       applySubstitute(o, patch);
-      if (pass) grantGenerationTicketPass(genId, estimate);
-      bindRetryQuoteApproval(genId, estimate, pass);
+      if (pass) { grantGenerationTicketPass(genId, estimate); consumeOnce(pass, estimate); }
       await later(genId, held.release);
       if (held.node && get().generations[genId]?.status === 'done') {
         applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
@@ -334,8 +333,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
           if (!held) { run = Promise.resolve(false); return; }
           pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
           applySubstitute(auto, patch);
-          if (pass) grantGenerationTicketPass(genId, est);
-          bindRetryQuoteApproval(genId, est, pass);
+          if (pass) { grantGenerationTicketPass(genId, est); consumeOnce(pass, est); }
           try {
             run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
           } catch (err) {

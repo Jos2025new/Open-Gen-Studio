@@ -25,7 +25,7 @@ import { agentSeesImages, userMessage } from './attachments';
 import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { budgetProblem, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
-import { grantGenerationTicketPass, grantTicketPass, hasActiveTicketSend, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { grantGenerationTicketPass, grantTicketPass, hasActiveTicketSend, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
@@ -64,7 +64,7 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
   const chosen = pruned.steps;
   if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
-  const { total, authorizations } = estimateSteps(chosen);
+  const { total, perStep, authorizations } = estimateSteps(chosen);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approval_attempted', reason: 'approval requested; budget check pending', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: item.status, stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd } });
   // Over an active limit, the card asks first ("Continue once"); approving without that stops here.
   const problem = budgetProblem(total, sessionId, budgetPass);
@@ -80,7 +80,7 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
     kind: 'plan',
     scope: { steps: chosen.map((s) => s.id) },
     price: priceFromEstimate(total),
-    ...(hadPass ? { pass: ticketPassFromEstimate(total) } : {}),
+    ...(hadPass ? { pass: ticketPassFromEstimate(total, stepCapsFromMap(perStep)) } : {}),
   }));
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = agentOf(sessionId, owner).pending;
@@ -357,7 +357,11 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   const recovery = planRecovery(item);
   const estimate = mode === 'retry' ? recovery?.estimate : recovery?.rest;
   const ticket = storeTickets.get('plan:' + itemId);
-  if (ticket && estimate && passActiveFor(budgetPass, sessionId, estimate)) grantTicketPass(ticket, estimate);
+  if (ticket && estimate && recovery && passActiveFor(budgetPass, sessionId, estimate)) {
+    const stepList = mode === 'retry' ? recovery.retry : recovery.retry.filter((st) => !recovery.checkable.includes(st.id));
+    const perStep = Object.fromEntries(stepList.map((st) => [st.id, recovery.perStep[st.id]]));
+    grantTicketPass(ticket, estimate, stepCapsFromMap(perStep));
+  }
   consumeOnce(budgetPass, estimate);
   const { chosen, off } = approvedSteps(item);
   const failedIds = chosen.filter((st) => item.stepStates[st.id] === 'error').map((st) => st.id);

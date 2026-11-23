@@ -20,26 +20,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 464 | 382 |
-| [store.ts](../src/store/store.ts) | 310 | 378 |
+| [types.ts](../src/engine/types.ts) | 465 | 382 |
+| [store.ts](../src/store/store.ts) | 309 | 378 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 68 | 5 |
 | [media.ts](../src/lib/media.ts) | 60 | 78 |
+| [catalog.ts](../src/engine/catalog.ts) | 58 | 34 |
 | [id.ts](../src/lib/id.ts) | 57 | 0 |
 | [ops.ts](../src/engine/ops.ts) | 56 | 22 |
-| [catalog.ts](../src/engine/catalog.ts) | 55 | 34 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
 | [index.ts](../src/engine/params/index.ts) | 51 | 21 |
 | [doc.ts](../src/engine/design/doc.ts) | 50 | 73 |
 | [raster.ts](../src/engine/design/raster.ts) | 44 | 39 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 40 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 39 | 10 |
-| [actions.ts](../src/engine/actions.ts) | 38 | 39 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
+| [actions.ts](../src/engine/actions.ts) | 36 | 39 |
+| [budget.ts](../src/engine/budget.ts) | 35 | 29 |
 | [render.ts](../src/engine/design/render.ts) | 35 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 34 | 28 |
 
 ## Por área
 

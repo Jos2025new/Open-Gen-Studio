@@ -17,9 +17,9 @@ import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
-import { consumeOnce, passActiveFor, releaseOwnedPasses, type BudgetPass } from '../budget';
-import { budgetProblem, deleteAssets } from '../actions';
-import { storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { budgetProblemForSteps, consumeOnce, passActiveFor, releaseOwnedPasses, type BudgetPass } from '../budget';
+import { deleteAssets } from '../actions';
+import { stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
@@ -300,7 +300,8 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const preview = await prepareNodeRun(sessionId, targets, force, approved?.runIds.length ? approved.runIds : undefined);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
-  const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
+  const passPrefix = budgetPass?.kind === 'ticket' && budgetPass.stepKey ? `${budgetPass.stepKey}:` : '';
+  const problem = budgetProblemForSteps(preview.estimate, preview.perStep, sessionId, budgetPass, passPrefix);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
   const hadPass = passActiveFor(budgetPass, sessionId, preview.estimate);
@@ -315,7 +316,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     } : createTicket({
       id: approvalTicketId, sessionId, kind: 'node_run',
       scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
-      price, pass: hadPass ? ticketPassFromEstimate(preview.estimate) : undefined,
+      price, pass: hadPass ? ticketPassFromEstimate(preview.estimate, stepCapsFromMap(preview.perStep, 'node:')) : undefined,
     }));
   }
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
@@ -329,6 +330,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     const result = await executeSteps(preview.steps, {
       sessionId, workspace: 'node', origin: 'node', approvalTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
       stepFingerprints: preview.stepFingerprints,
+      ...(passPrefix ? { passStepPrefix: passPrefix } : {}),
       onState: (stepId, state, info) => {
         if (info?.generationId) rememberNodeRequest(info.generationId, startGraph, library, context);
         onState?.(stepId, state, info);

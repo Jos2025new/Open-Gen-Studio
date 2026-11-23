@@ -164,6 +164,7 @@ export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, a
     place: placeFor(st.ui, workspace),
     budgetPass,
     approvalTicketId,
+    ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}),
   };
   autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
@@ -311,7 +312,7 @@ export async function regenerate(generationId: string, budgetPass?: BudgetPass, 
   const held = holdAttemptNode(g, nodes);
   if (!held) return;
   const node = held.node;
-  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass, approvalTicketId });
+  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) {
       deleteAssets([node.data.sketchAssetId]);
@@ -401,7 +402,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(problem, 'error');
     return [];
   }
-  const g = createGeneration({ ...spec, budgetPass, approvalTicketId });
+  const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     return await runGeneration(g.id);
@@ -426,7 +427,7 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
       toast(problem, 'error');
       return;
     }
-    const g = createGeneration({ ...spec, budgetPass, approvalTicketId });
+    const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
     // Its card in the Designer's conversation, like any generation (also in Generations and Assets).
     appendFeed(sessionId, { ...feedBase('designer'), type: 'generation', generationId: g.id });
     const ids = await runGeneration(g.id);
