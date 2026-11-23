@@ -70,8 +70,11 @@ describe('retry after a dropped connection', () => {
     expect(calls).toHaveLength(2);
     await retryAgentTurn(sid, note.id, true);
     feed = useStore.getState().sessions[sid].feed;
-    // The half answer and the error are gone; the finished answer is there once.
-    expect(feed.some((f) => f.type === 'notice')).toBe(false);
+    // The half answer and Retry error are gone. The original charge still needs reconciliation.
+    expect(feed.filter((f) => f.type === 'notice')).toEqual([
+      expect.objectContaining({ uncertainTicketId: `llm:${note.meta?.runId}` }),
+    ]);
+    expect(feed.find(f => f.id === note.id)).toBeUndefined();
     expect(feed.filter((f) => f.type === 'assistant').map((f) => f.type === 'assistant' && f.text)).toEqual(['¡Buena elección! Aquí va la idea completa.']);
     // The guide read before the failure stays in the history: the retry sends the same messages as the failed call.
     expect(calls).toHaveLength(3);
@@ -117,10 +120,13 @@ describe('an answer with nothing in it', () => {
     expect(note.text).toMatch(/output budget/i);
     expect(note.text).toMatch(/reasoning/i);
     expect(note.retry).toBeDefined();
-    // Retrying works: the same turn runs again and the answer is used.
+    expect(note.retry?.possibleCharge).toBe(true);
+    // After confirming the possible second charge, the same turn runs again and the answer is used.
     let sent: { messages: Array<{ role: string; content: unknown }> } | undefined;
     vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => { sent = JSON.parse(String(init?.body)); return sse([text('Aquí va la propuesta.')]); });
     await retryAgentTurn(sid, note.id);
+    expect(sent).toBeUndefined();
+    await retryAgentTurn(sid, note.id, true);
     // The retry ends with the user's request, not with the empty answer.
     expect(sent!.messages.at(-1)!.role).toBe('user');
     const feed = useStore.getState().sessions[sid].feed;
