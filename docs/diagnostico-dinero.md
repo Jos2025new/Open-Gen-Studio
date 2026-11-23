@@ -64,9 +64,9 @@ Cada parche añade otra deducción local en la capa donde apareció el fallo: `w
 - Auto-cambio de proveedor por saldo: preguntar, siempre o nunca; con `always`, solo mismo modelo y precio igual o menor (historia 070, ADR 0025).
 - Crítico = promesa rota: nunca gastar más de lo mostrado, una alerta nunca dice algo falso (pendientes.md:5).
 
-## Dos arquitecturas candidatas
+## Arquitecturas candidatas
 
-Las dos cierran la causa 2 con una única puerta de envío de pago y una regla de comprobación que impide llamar al transporte de pago desde otro sitio. Se diferencian en dónde vive la identidad de lo aprobado (causa 1).
+A y B cierran la causa 2 con una única puerta de envío de pago y una regla de comprobación que impide llamar al transporte de pago desde otro sitio. Se diferencian en dónde vive la identidad de lo aprobado (causa 1).
 
 ### A. Ticket de aprobación durable
 
@@ -89,9 +89,36 @@ Se mantiene la aprobación por flujo, pero:
 
 Coste: menor y más gradual. Queda la aprobación por flujo (causa 1 a medias): la tarjeta y el plan siguen guardando qué pasos aprobaron y hay que mapearlos a generaciones.
 
+### C. El ticket de A, guardado en SQLite y aplicado en el proxy del servidor
+
+Dos hechos del código hacen posible esta variante:
+
+- **Todo envío de pago ya cruza el servidor local.** `providerFetch` (providerFetch.ts:26) va a `/x/store/proxy` (server/local-store.js:229 → server/provider-proxy.js), que añade la clave.
+- **El servidor ya tiene SQLite** (server/store-sqlite.js, server/sqlite/; adoptado en `task/sqlite-adopt`, historia 067). Tiene transacciones y tablas `spend`, `gen_history` y `event_journal`. Falta migrar los datos reales, que necesita tu aprobación (pendientes.md:28).
+
+Diseño:
+
+- Tabla `paid_sends` (ticket, hueco, estado, precio aprobado y cobrado), con clave única por hueco.
+- El cliente manda el id del hueco en una cabecera, como ya hace con `X-OGS-Target`. El proxy, en una transacción, solo reenvía si el hueco está `pendiente` y lo pasa a `enviado` antes de contactar al proveedor. Un segundo POST con el mismo hueco se rechaza (409) aunque el cliente tenga un fallo.
+- La reserva de presupuesto vive en la misma transacción.
+
+Qué gana frente a A:
+
+- La red final es independiente del código del cliente: ninguna ruta nueva puede saltársela.
+- La marca es atómica y no depende de la espera de 8 s de IndexedDB.
+- Recargar no la borra.
+
+Qué cuesta:
+
+- Exige que los datos reales estén en SQLite, o una tabla propia que no dependa de esa migración. Hay que decidirlo contigo.
+- Toca la persistencia protegida (regla 1 de AGENTS.md).
+- En móvil y escritorio sin servidor local, la puerta tendría que vivir en la capa nativa equivalente.
+
+SQLite resuelve la parte de **registro y persistencia** (causa 1 y la mitad de la 3: precio y reserva persistidos), pero no por sí solo la causa 2. Las rutas del cliente siguen teniendo que crear tickets en vez de decidir cada una, aunque la puerta del proxy convierte cualquier olvido en un rechazo y no en un doble cobro.
+
 ## Siguiente paso propuesto: prototipo medido (memoria design-before-patching)
 
-Implementar A y B, en ramas separadas, solo sobre el caso más difícil conocido: tarjeta de comandos con `n1 → n2`, recarga en vuelo y doble aprobación (p9 H1/H2), más un Retry de un dudoso. Medir en cada una:
+Implementar A, B y C (C con una tabla propia, sin migrar datos reales), en ramas separadas, solo sobre el caso más difícil conocido: tarjeta de comandos con `n1 → n2`, recarga en vuelo y doble aprobación (p9 H1/H2), más un Retry de un dudoso. Medir en cada una:
 
 1. los tests adversariales de p9 (haiku, neon, p9-replay-pending) y los de dinero (adversarial-envios, sonnet-dinero, sonnet-dinero-2) en verde, sin cambiar sus aserciones;
 2. los campos de estado de «ya salió» que quedan (hoy, 5 registros);
