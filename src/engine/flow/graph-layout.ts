@@ -80,6 +80,10 @@ interface RingHint {
   minRing: number;
   cap: number;
   blocked: Uint8Array;
+  rightX: number;
+  leftX: number;
+  downY: number;
+  upY: number;
 }
 
 function makeHintBlocked(cap: number, prev?: { cap: number; blocked: Uint8Array }): Uint8Array {
@@ -110,34 +114,38 @@ function ensureIvCap(len: number): void {
   ivHi = nHi;
 }
 
-/** Exact nearest clear coordinate on a 1D line (`>= origin` and `<= origin`) given `count` open forbidden intervals in `ivLo`/`ivHi`. */
-function nearestClear1D(origin: number, count: number, maxDelta: number): [number, number] {
-  if (!count) return [origin, origin];
-  let right = origin;
+/** Advance `start` in the positive direction past any overlapping open intervals `[lo, hi]` in `ivLo`/`ivHi`. */
+function advanceClearRight(start: number, count: number, limit: number): number {
+  let cur = start;
   for (let pass = 0; pass < count; pass++) {
     let moved = false;
     for (let i = 0; i < count; i++) {
-      if (ivLo[i] < right && ivHi[i] > right) {
-        right = ivHi[i];
-        if (right - origin > maxDelta) { right = Infinity; moved = false; break; }
+      if (ivLo[i] < cur && ivHi[i] > cur) {
+        cur = ivHi[i];
+        if (cur > limit) return cur;
         moved = true;
       }
     }
     if (!moved) break;
   }
-  let left = origin;
+  return cur;
+}
+
+/** Retreat `start` in the negative direction past any overlapping open intervals `[lo, hi]` in `ivLo`/`ivHi`. */
+function advanceClearLeft(start: number, count: number, limit: number): number {
+  let cur = start;
   for (let pass = 0; pass < count; pass++) {
     let moved = false;
     for (let i = 0; i < count; i++) {
-      if (ivLo[i] < left && ivHi[i] > left) {
-        left = ivLo[i];
-        if (origin - left > maxDelta) { left = -Infinity; moved = false; break; }
+      if (ivLo[i] < cur && ivHi[i] > cur) {
+        cur = ivLo[i];
+        if (cur < limit) return cur;
         moved = true;
       }
     }
     if (!moved) break;
   }
-  return [right, left];
+  return cur;
 }
 
 /** Cell-hash spatial index storing cards and panels by 512 px cells so overlap and strip queries are O(1) / O(sqrt(N)). */
@@ -303,7 +311,11 @@ function findFreePositionInGrid(
     hint.hasOwn !== hasOwn || hint.ownX !== ownX || hint.ownY !== ownY || hint.ownW !== ownW || hint.ownH !== ownH
   ) {
     const cap = Math.max(16, maxRing);
-    hint = { dx0, dy0, sw, sh, gapX, gapY, ownX, ownY, ownW, ownH, hasOwn, minRing: 1, cap, blocked: makeHintBlocked(cap) };
+    hint = {
+      dx0, dy0, sw, sh, gapX, gapY, ownX, ownY, ownW, ownH, hasOwn,
+      minRing: 1, cap, blocked: makeHintBlocked(cap),
+      rightX: dx0, leftX: dx0, downY: dy0, upY: dy0,
+    };
     grid.hint = hint;
   } else if (hint.cap < maxRing) {
     const cap = Math.max(hint.cap * 2, maxRing);
@@ -366,8 +378,7 @@ function findFreePositionInGrid(
   }
   hint.minRing = nextMinRing;
 
-  // 2. Exact 1D interval sweep along the desired horizontal and vertical strips (zero tuple allocations, zero grid.isClear calls).
-  const radius = found ? Math.sqrt(bestDist) : Infinity;
+  // 2. Monotonic 1D interval sweep along the desired horizontal and vertical strips: each cursor only advances outward.
   const stripY0 = dy0 - gapY, stripY1 = dy0 + sh + gapY;
   const stripX0 = dx0 - gapX, stripX1 = dx0 + sw + gapX;
   const ownY0 = own ? dy0 + own.y : stripY0, ownY1 = own ? ownY0 + own.height : stripY1;
@@ -376,24 +387,9 @@ function findFreePositionInGrid(
   const bandY1 = ownY1 > stripY1 ? ownY1 : stripY1;
   const bandX0 = ownX0 < stripX0 ? ownX0 : stripX0;
   const bandX1 = ownX1 > stripX1 ? ownX1 : stripX1;
+  const padX = Math.max(sw + gapX, own ? own.width + Math.abs(own.x) : 0);
+  const padY = Math.max(sh + gapY, own ? own.height + Math.abs(own.y) : 0);
 
-  let ivCount = 0;
-  const pushIv = (lo: number, hi: number, origin: number, lim: number): void => {
-    if (hi <= origin - lim || lo >= origin + lim) return;
-    if (ivCount >= ivLo.length) ensureIvCap(ivCount + 1);
-    ivLo[ivCount] = lo;
-    ivHi[ivCount] = hi;
-    ivCount++;
-  };
-  const marginX = found ? radius + Math.max(sw + gapX, own ? own.width + Math.abs(own.x) : 0) : 1e9;
-  const marginY = found ? radius + Math.max(sh + gapY, own ? own.height + Math.abs(own.y) : 0) : 1e9;
-  grid.forEachInBox(dx0 - marginX, bandY0, dx0 + marginX, bandY1, (o) => {
-    if (o.y < stripY1 && o.y + o.height > stripY0) pushIv(o.x - sw - gapX, o.x + o.width + gapX, dx0, radius);
-    if (own && o.y < ownY1 && o.y + o.height > ownY0) pushIv(o.x - own.x - own.width, o.x + o.width - own.x, dx0, radius);
-    const p = o.panel;
-    if (p && p.y < dy0 + sh && p.y + p.height > dy0) pushIv(p.x - sw, p.x + p.width, dx0, radius);
-  });
-  const [rightX, leftX] = nearestClear1D(dx0, ivCount, radius);
   const acceptAxis = (x: number, y: number): void => {
     if (!finite(x) || !finite(y)) return;
     const dx = x - dx0, dy = y - dy0;
@@ -402,21 +398,115 @@ function findFreePositionInGrid(
     if (dist === bestDist && (!preferRight || dx <= bestDx)) return;
     bestDist = dist; bestDx = dx; bestX = x; bestY = y; found = true;
   };
-  acceptAxis(rightX, dy0);
-  acceptAxis(leftX, dy0);
 
-  ivCount = 0;
-  const curRadius = found ? Math.sqrt(bestDist) : Infinity;
-  const curMarginY = found ? curRadius + Math.max(sh + gapY, own ? own.height + Math.abs(own.y) : 0) : marginY;
-  grid.forEachInBox(bandX0, dy0 - curMarginY, bandX1, dy0 + curMarginY, (o) => {
-    if (o.x < stripX1 && o.x + o.width > stripX0) pushIv(o.y - sh - gapY, o.y + o.height + gapY, dy0, curRadius);
-    if (own && o.x < ownX1 && o.x + o.width > ownX0) pushIv(o.y - own.y - own.height, o.y + o.height - own.y, dy0, curRadius);
-    const p = o.panel;
-    if (p && p.x < dx0 + sw && p.x + p.width > dx0) pushIv(p.y - sh, p.y + p.height, dy0, curRadius);
-  });
-  const [downY, upY] = nearestClear1D(dy0, ivCount, curRadius);
-  acceptAxis(dx0, downY);
-  acceptAxis(dx0, upY);
+  let ivCount = 0;
+  const pushIv = (lo: number, hi: number): void => {
+    if (ivCount >= ivLo.length) ensureIvCap(ivCount + 1);
+    ivLo[ivCount] = lo;
+    ivHi[ivCount] = hi;
+    ivCount++;
+  };
+  const collectX = (x0: number, x1: number): void => {
+    ivCount = 0;
+    grid.forEachInBox(x0 - padX, bandY0, x1 + padX, bandY1, (o) => {
+      if (o.y < stripY1 && o.y + o.height > stripY0) pushIv(o.x - sw - gapX, o.x + o.width + gapX);
+      if (own && o.y < ownY1 && o.y + o.height > ownY0) pushIv(o.x - own.x - own.width, o.x + o.width - own.x);
+      const p = o.panel;
+      if (p && p.y < dy0 + sh && p.y + p.height > dy0) pushIv(p.x - sw, p.x + p.width);
+    });
+  };
+  const collectY = (y0: number, y1: number): void => {
+    ivCount = 0;
+    grid.forEachInBox(bandX0, y0 - padY, bandX1, y1 + padY, (o) => {
+      if (o.x < stripX1 && o.x + o.width > stripX0) pushIv(o.y - sh - gapY, o.y + o.height + gapY);
+      if (own && o.x < ownX1 && o.x + o.width > ownX0) pushIv(o.y - own.y - own.height, o.y + o.height - own.y);
+      const p = o.panel;
+      if (p && p.x < dx0 + sw && p.x + p.width > dx0) pushIv(p.y - sh, p.y + p.height);
+    });
+  };
+
+  let radius = found ? Math.sqrt(bestDist) : Infinity;
+  if (hint.rightX - dx0 <= radius) {
+    if (grid.isClear(hint.rightX, dy0, sw, sh, gapX, gapY, own)) acceptAxis(hint.rightX, dy0);
+    else {
+      const lim = found ? dx0 + radius : 1e9;
+      collectX(hint.rightX, lim);
+      hint.rightX = advanceClearRight(hint.rightX, ivCount, lim);
+      if (hint.rightX - dx0 <= radius && grid.isClear(hint.rightX, dy0, sw, sh, gapX, gapY, own)) acceptAxis(hint.rightX, dy0);
+    }
+  }
+  radius = found ? Math.sqrt(bestDist) : Infinity;
+  if (dx0 - hint.leftX <= radius) {
+    if (grid.isClear(hint.leftX, dy0, sw, sh, gapX, gapY, own)) acceptAxis(hint.leftX, dy0);
+    else {
+      const lim = found ? dx0 - radius : -1e9;
+      collectX(lim, hint.leftX);
+      hint.leftX = advanceClearLeft(hint.leftX, ivCount, lim);
+      if (dx0 - hint.leftX <= radius && grid.isClear(hint.leftX, dy0, sw, sh, gapX, gapY, own)) acceptAxis(hint.leftX, dy0);
+    }
+  }
+  radius = found ? Math.sqrt(bestDist) : Infinity;
+  if (hint.downY - dy0 <= radius) {
+    if (grid.isClear(dx0, hint.downY, sw, sh, gapX, gapY, own)) acceptAxis(dx0, hint.downY);
+    else {
+      const lim = found ? dy0 + radius : 1e9;
+      collectY(hint.downY, lim);
+      hint.downY = advanceClearRight(hint.downY, ivCount, lim);
+      if (hint.downY - dy0 <= radius && grid.isClear(dx0, hint.downY, sw, sh, gapX, gapY, own)) acceptAxis(dx0, hint.downY);
+    }
+  }
+  radius = found ? Math.sqrt(bestDist) : Infinity;
+  if (dy0 - hint.upY <= radius) {
+    if (grid.isClear(dx0, hint.upY, sw, sh, gapX, gapY, own)) acceptAxis(dx0, hint.upY);
+    else {
+      const lim = found ? dy0 - radius : -1e9;
+      collectY(lim, hint.upY);
+      hint.upY = advanceClearLeft(hint.upY, ivCount, lim);
+      if (dy0 - hint.upY <= radius && grid.isClear(dx0, hint.upY, sw, sh, gapX, gapY, own)) acceptAxis(dx0, hint.upY);
+    }
+  }
+
+  // 3. Corner slots flush with nearby mixed-size obstacles (e.g. a text card tucking into the free corner next to a tall chat card).
+  // Skipped when the inner ring is already packed with uniform cards, or pruned in O(1) via the blocked ring bitmap and bestDist.
+  if (hint.minRing <= 2 || grid.cards.length <= 64) {
+    const rCorner = found ? Math.sqrt(bestDist) : Math.max(stepX, stepY) * 3;
+    const invX = 1 / stepX, invY = 1 / stepY;
+    let seenCorner: Set<number> | null = null;
+    const tryCorner = (x: number, y: number): void => {
+      const dx = x - dx0, dy = y - dy0;
+      const dist = dx * dx + dy * dy;
+      if (dist > bestDist) return;
+      if (dist === bestDist && (!preferRight || dx <= bestDx)) return;
+      const gx = dx * invX, gy = dy * invY;
+      const rgx = Math.round(gx), rgy = Math.round(gy);
+      if (Math.abs(gx - rgx) < 1e-6 && Math.abs(gy - rgy) < 1e-6 && rgx >= -hCap && rgx <= hCap && rgy >= -hCap && rgy <= hCap) {
+        if (hBlocked[(rgy + hCap) * hSide + hCap + rgx]) return;
+      }
+      const qx = Math.round(x * 2), qy = Math.round(y * 2);
+      if (qx >= -CELL_BIAS && qx < CELL_BIAS && qy >= -CELL_BIAS && qy < CELL_BIAS) {
+        const k = ((qx + CELL_BIAS) << 15) | (qy + CELL_BIAS);
+        if (!seenCorner) seenCorner = new Set();
+        else if (seenCorner.has(k)) return;
+        seenCorner.add(k);
+      }
+      if (!grid.isClear(x, y, sw, sh, gapX, gapY, own)) return;
+      bestDist = dist; bestDx = dx; bestX = x; bestY = y; found = true;
+    };
+    const visitCorners = (o: NodeRect): void => {
+      const xR = o.x + o.width + gapX, xL = o.x - sw - gapX;
+      const yB = o.y + o.height + gapY, yT = o.y - sh - gapY;
+      tryCorner(xR, o.y);
+      tryCorner(xL, o.y);
+      tryCorner(xR, o.y + o.height - sh);
+      tryCorner(xL, o.y + o.height - sh);
+      tryCorner(o.x, yB);
+      tryCorner(o.x, yT);
+      tryCorner(o.x + o.width - sw, yB);
+      tryCorner(o.x + o.width - sw, yT);
+    };
+    grid.forEachInBox(dx0 - rCorner - padX, bandY0, dx0 + rCorner + padX, bandY1, visitCorners);
+    grid.forEachInBox(bandX0, dy0 - rCorner - padY, bandX1, dy0 + rCorner + padY, visitCorners);
+  }
 
   if (found) return { x: bestX, y: bestY };
   return { x: dx0, y: Math.max(grid.bottom, dy0) + gapY };

@@ -126,9 +126,7 @@ describe('p10e solapes: settleFresh con paneles de composer', () => {
 });
 
 describe('p10e posiciones lejanas sin motivo con tarjetas de distinto tamano', () => {
-  // reproduce: tarjeta chat (440x560) en (0,0) rodeada en los 4 ejes por tarjetas de texto. Al soltar en (100,100),
-  // findFreePosition salta el hueco libre en esquina (308,-226) a 387 px y coloca la tarjeta en (408,-352) a 547 px.
-  it.fails('places a text card at the nearest free corner instead of jumping past the outer row', () => {
+  it('places a text card at the nearest free corner instead of jumping past the outer row', () => {
     const occupied = [
       chatNode('chat', 0, 0),
       textNode('top', 0, -226),
