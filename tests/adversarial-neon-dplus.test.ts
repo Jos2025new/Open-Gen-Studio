@@ -433,8 +433,7 @@ it('N8: deleting a failed generation with an uncertain charge keeps its reservat
   expect(useStore.getState().spendLog).toHaveLength(0);
 });
 
-// reproduce: check-paid-send does not restrict src/lib/http requestJson/fetchJsonWithRelay outside provider modules, allowing direct paid POSTs via providerFetch.
-it.fails('N9a: check-paid-send flags importing requestJson from src/lib/http outside provider modules', () => {
+it('N9a: check-paid-send flags importing requestJson from src/lib/http outside provider modules', () => {
   const diagnostics = scanFixture('src/engine/rogueHttp.ts', [
     "import { requestJson } from '../lib/http';",
     "export const send = () => requestJson('https://nano-gpt.com/api/v1/images', { method: 'POST', body: '{}' });",
@@ -442,8 +441,7 @@ it.fails('N9a: check-paid-send flags importing requestJson from src/lib/http out
   expect(diagnostics.join('\n')).toMatch(/rogueHttp\.ts:.*paidSend/);
 });
 
-// reproduce: check-paid-send reads source?.value and misses static TemplateLiteral dynamic imports such as import(`./providers/llm`).
-it.fails('N9b: check-paid-send flags dynamic import() using a static template literal for a raw provider module', () => {
+it('N9b: check-paid-send flags dynamic import() using a static template literal for a raw provider module', () => {
   const diagnostics = scanFixture('src/engine/rogueTplImport.ts', [
     'export async function send(input: unknown) {',
     '  const { chat } = await import(`./providers/llm`);',
@@ -453,8 +451,7 @@ it.fails('N9b: check-paid-send flags dynamic import() using a static template li
   expect(diagnostics.join('\n')).toMatch(/rogueTplImport\.ts:.*paidSend/);
 });
 
-// reproduce: check-paid-send misses constant string concatenation in dynamic import() and aliased require() calls targeting raw provider modules.
-it.fails('N9c: check-paid-send flags dynamic import() with constant string concatenation or aliased require() of raw providers', () => {
+it('N9c: check-paid-send flags dynamic import() with constant string concatenation or aliased require() of raw providers', () => {
   const diagnostics = scanFixture('src/engine/rogueConcatImport.ts', [
     "export const a = () => import('./providers/' + 'llm');",
     "const req = require;",

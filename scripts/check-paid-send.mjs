@@ -13,6 +13,11 @@ const raw = new Map([
   [providers + 'openrouter', { exports: ['openrouter'], hint: '.generate() and other adapter methods require paidSend.' }],
   [providers + 'nanogptAudio', { exports: ['generateSpeech', 'transcribe'], internal: [providers + 'nanogpt.ts'], hint: 'Use the media transport through paidSend.' }],
   [providers + 'llm', { exports: ['chat'], hint: 'Use sendLlmViaPaidGate to send through paidSend.' }],
+  ['src/lib/http', {
+    exports: ['requestJson', 'fetchJsonWithRelay'],
+    internal: ['atlas', 'fal', 'llm', 'nanogpt', 'nanogptAudio', 'openrouter'].map(name => providers + name + '.ts'),
+    hint: 'Use the provider transport through paidSend.',
+  }],
   ['src/lib/providerFetch', {
     exports: ['providerFetch'],
     internal: ['src/lib/http.ts', 'src/lib/media.ts', providers + 'llm.ts', providers + 'nanogptAudio.ts'],
@@ -29,13 +34,25 @@ export function check(root = '.') {
   return scan(root, {
     allowed: new Set(),
     what: 'paidSend imports',
-    rules: ({ rel }) => ({
+    rules: ({ rel }) => {
+      const ancestors = [];
+      return {
       enter(node, report) {
+        const parent = ancestors.at(-1);
+        ancestors.push(node);
         const declaration = ['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(node.type);
-        const required = node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'require';
-        if (!declaration && !required && node.type !== 'ImportExpression') return;
-        if (node.importKind === 'type' || node.exportKind === 'type') return;
-        const source = required ? node.arguments[0] : node.source;
+        const runtimeLoad = node.type === 'ImportExpression';
+        if (node.type === 'Identifier' && node.name === 'require' &&
+          !((parent?.key === node || parent?.property === node) && !parent.computed && !parent.shorthand)) {
+          report(node, 'Use static imports so paidSend can check the module boundary.');
+          return;
+        }
+        if ((!declaration && !runtimeLoad) || node.importKind === 'type' || node.exportKind === 'type') return;
+        const source = node.source;
+        if (runtimeLoad && source?.type !== 'Literal') {
+          report(node, 'Use a string literal with import() so paidSend can check the module boundary.');
+          return;
+        }
         const rule = raw.get(resolveTarget(rel, source?.value));
         if (!rule) return;
         const names = node.specifiers?.filter(spec => spec.importKind !== 'type' && spec.exportKind !== 'type')
@@ -44,7 +61,9 @@ export function check(root = '.') {
         if (node.type === 'ImportDeclaration' && (rel === transport || rule.internal?.includes(rel))) return;
         report(node, `Raw provider import outside the paidSend transport. ${rule.hint}`);
       },
-    }),
+      leave() { ancestors.pop(); },
+      };
+    },
   });
 }
 
