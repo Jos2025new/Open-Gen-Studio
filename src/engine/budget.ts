@@ -21,18 +21,8 @@ export { noAskEverywhere };
 const get = useStore.getState;
 
 /** Money left under the limit (after confirmed spend and open ticket reservations), or null when there is no limit. */
-export function remainingBudget(
-  state: {
-    settings: { budgetOn: boolean; budgetUsd: number };
-    spentUsd: number;
-    tickets?: Record<string, ApprovalTicket>;
-    generations?: Record<string, unknown>;
-    sessions?: Record<string, unknown>;
-  } = get(),
-): number | null {
-  const { settings, spentUsd, tickets, sessions } = state;
-  if (!settings.budgetOn) return null;
-  return availableBudgetUsd(settings.budgetUsd, spentUsd, ticketsInSessions(tickets, sessions));
+export function remainingBudget(state: { settings: { budgetOn: boolean; budgetUsd: number }; spentUsd: number; tickets?: Record<string, ApprovalTicket>; generations?: Record<string, unknown>; sessions?: Record<string, unknown> } = get()): number | null {
+  return state.settings.budgetOn ? availableBudgetUsd(state.settings.budgetUsd, state.spentUsd, ticketsInSessions(state.tickets, state.sessions)) : null;
 }
 
 /**
@@ -170,21 +160,14 @@ export function consumeOnce(pass?: BudgetPass, estimate?: Estimate): void {
  * The single spending-limit rule. Free runs ($0) never go over; an unknown price cannot be checked against an active
  * limit, so it asks too. A `pass` applies only to the action carrying it and only for its own session.
  */
-export function budgetVerdict(
-  e: Estimate,
-  opts: { sessionId?: string; pass?: BudgetPass; choices?: string } = {},
-): BudgetVerdict {
+export function budgetVerdict(e: Estimate, opts: { sessionId?: string; pass?: BudgetPass; choices?: string } = {}): BudgetVerdict {
   const { settings, spentUsd, sessions, tickets, activeSessionId } = get();
   const price = priceFromEstimate(e);
   const sid = opts.sessionId ?? activeSessionId;
   const allTickets = ticketsInSessions(tickets, sessions);
-  const budget = { ...settings, spentUsd, sessionNoAsk: noAskDurable(get(), sid) || passActiveFor(opts.pass, sid, e) };
-  const verdict = evaluateBudgetGate({ price, budget, allTickets });
+  const verdict = evaluateBudgetGate({ price, budget: { ...settings, spentUsd, sessionNoAsk: noAskDurable(get(), sid) || passActiveFor(opts.pass, sid, e) }, allTickets });
   const remaining = settings.budgetOn ? verdict.remainingUsd ?? availableBudgetUsd(settings.budgetUsd, spentUsd, allTickets) : null;
-  const { ok } = verdict;
-  const over = !ok;
-  const unknownPrice = price.maxVerifiableUsd == null;
-  return { over, remaining, unknownPrice, ...(over ? { text: overLimitText(e, opts.choices) } : {}) };
+  return { over: !verdict.ok, remaining, unknownPrice: price.maxVerifiableUsd == null, ...(!verdict.ok ? { text: overLimitText(e, opts.choices) } : {}) };
 }
 
 /** This run would go over an active limit nobody agreed to go past. Delegates to `budgetVerdict`. */
@@ -267,22 +250,10 @@ export function withSequenceStepPass<T>(
 }
 
 /** Bind a one-shot in-memory entitlement to `generationId` so a 402 substitute within the approved amount can proceed. */
-export function bindGenerationPass(
-  generationId: string,
-  sessionId: string,
-  approvedUsd: number | null,
-  owner?: BudgetPass | string,
-): void {
+export function bindGenerationPass(generationId: string, sessionId: string, approvedUsd: number | null, owner?: BudgetPass | string): void {
   const amount = approvedUsd != null && Number.isFinite(approvedUsd) ? approvedUsd : null;
   const once = typeof owner === 'object' && owner.kind === 'once' ? activePasses.get(owner) : undefined;
-  substitutePasses.set(generationId, {
-    sessionId,
-    budgetUsd: get().settings.budgetUsd,
-    approvedUsd: amount,
-    quoteApprovedUsd: amount == null ? null : once?.remainingUsd ?? amount,
-    started: false,
-    owner,
-  });
+  substitutePasses.set(generationId, { sessionId, budgetUsd: get().settings.budgetUsd, approvedUsd: amount, quoteApprovedUsd: amount == null ? null : once?.remainingUsd ?? amount, started: false, owner });
 }
 
 /** Mark `generationId` as having started running so its 402 substitute entitlement outlives a fire-and-forget approving action. */
@@ -298,7 +269,7 @@ export function generationQuoteGuard(generationId: string): (usd: number | null)
     if (!entry || usd == null) return;
     const sends = get().generations[generationId]?.sends;
     const prior = entry.priorSendIds;
-    const booked = ledgerCost({ sends: prior ? sends?.filter(send => !prior.has(send.id)) : sends });
+    const booked = ledgerCost({ sends: prior ? sends?.filter((s) => !prior.has(s.id)) : sends });
     const covered = entry.quoteApprovedUsd != null && !booked.hasUnknown && usd <= entry.quoteApprovedUsd - booked.usd + 1e-9;
     assertWithinLimit({ usd, approximate: false, exact: true }, entry.sessionId, covered);
   };
@@ -308,59 +279,44 @@ export function generationQuoteGuard(generationId: string): (usd: number | null)
 export function bindRetryQuoteApproval(generationId: string, estimate: Estimate, pass?: BudgetPass): void {
   const g = get().generations[generationId];
   if (!g || !pass || !passActiveFor(pass, g.sessionId, estimate)) return;
-  const known = !hasUnknownPrice(estimate);
   const remaining = pass.kind === 'once' ? activePasses.get(pass)!.remainingUsd : estimate.usd;
   substitutePasses.set(generationId, {
-    sessionId: g.sessionId,
-    budgetUsd: get().settings.budgetUsd,
-    approvedUsd: null,
-    quoteApprovedUsd: known ? remaining : null,
-    priorSendIds: new Set(g.sends?.filter(send => send.status === 'done').map(send => send.id)),
-    started: true,
+    sessionId: g.sessionId, budgetUsd: get().settings.budgetUsd, approvedUsd: null,
+    quoteApprovedUsd: hasUnknownPrice(estimate) ? null : remaining,
+    priorSendIds: new Set(g.sends?.filter((s) => s.status === 'done').map((s) => s.id)), started: true,
   });
   consumeOnce(pass, estimate);
 }
 
-/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, activating it only while the generation and session live under the same limit and `estimate` is known and within the approved amount. */
+/** Take (and detach) the one-shot 402 substitute pass bound to `generationId`. */
 export function takeGenerationPass(generationId: string, estimate: Estimate): BudgetPass | undefined {
   const entry = substitutePasses.get(generationId);
   if (!entry) return undefined;
   substitutePasses.delete(generationId);
-  const st = get();
-  const g = st.generations[generationId];
+  const st = get(), g = st.generations[generationId];
   if (!g || g.status === 'canceled' || !st.sessions[entry.sessionId]) return undefined;
   if (st.settings.budgetOn && st.settings.budgetUsd !== entry.budgetUsd) return undefined;
   if (entry.approvedUsd == null || estimate.usd == null || estimate.lowerBound || !Number.isFinite(estimate.usd)) return undefined;
   const booked = g.sends?.some((s) => s.status === 'done') ? ledgerCost(g) : undefined;
-  if (booked?.hasUnknown) return undefined;
-  if (estimate.usd > entry.approvedUsd - (booked?.usd ?? 0) + 1e-9) return undefined;
+  if (booked?.hasUnknown || estimate.usd > entry.approvedUsd - (booked?.usd ?? 0) + 1e-9) return undefined;
   const pass: BudgetPass = Object.freeze({ sessionId: entry.sessionId, kind: 'once' });
   activePasses.set(pass, { remainingUsd: estimate.usd, unknownRemaining: 0 });
   return pass;
 }
 
-/** Keep `generationId`'s 402 substitute entitlement past `runGeneration.finally` while a same-price `ask` alert awaits the user's reply. */
 export function deferGenerationPass(generationId: string): void {
   const entry = substitutePasses.get(generationId);
   if (entry) entry.deferred = true;
 }
 
-/** Retire any unused 402 substitute entitlement when `generationId` finishes, cancels or is deleted. */
 export function clearGenerationPass(generationId: string, force = false): void {
   const entry = substitutePasses.get(generationId);
-  if (!entry) return;
-  if (!force && entry.deferred) return;
-  substitutePasses.delete(generationId);
+  if (entry && (force || !entry.deferred)) substitutePasses.delete(generationId);
 }
 
-/** Clear all in-memory passes and 402 substitute entitlements for `sessionId` (session closed/deleted or reset). */
 export function clearSessionPasses(sessionId: string): void {
-  for (const pass of activePasses.keys()) {
-    if (pass.sessionId === sessionId) activePasses.delete(pass);
-  }
-  for (const [genId, entry] of substitutePasses) {
-    if (entry.sessionId === sessionId) substitutePasses.delete(genId);
-  }
+  for (const pass of activePasses.keys()) if (pass.sessionId === sessionId) activePasses.delete(pass);
+  for (const [genId, entry] of substitutePasses) if (entry.sessionId === sessionId) substitutePasses.delete(genId);
 }
 
 /** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */

@@ -21,10 +21,8 @@ import { COMMAND_REVIEW_CHANGED, CommandError, type AnyCommand, type Caller, typ
  * Both go through the same commands, the same undo transactions and the same echo.
  */
 
-function stringsIn(value: unknown): string[] {
-  if (typeof value === 'string') return [value];
-  return value && typeof value === 'object' ? Object.values(value).flatMap(stringsIn) : [];
-}
+const stringsIn = (value: unknown): string[] =>
+  typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(stringsIn) : [];
 
 /** Paid commands share the same review/before-run check. Graph commands supply their resolved preview. */
 export function commandReview(spec: AnyCommand, ctx: CommandContext, args: unknown): CommandReview {
@@ -33,39 +31,29 @@ export function commandReview(spec: AnyCommand, ctx: CommandContext, args: unkno
   const { mode, text, attachments, times, trims, editing, image, video, audio, model3d, designerTarget } = state.composer;
   const composer = { mode, text, attachments, times, trims, editing, image, video, audio, model3d, designerTarget };
   const refs = stringsIn([args, ctx.on, editing]);
-  const session = state.sessions[ctx.on.session ?? ''];
-  const doc = session?.docs.find(d => refs.includes(d.id));
-  const layers = doc?.layers.filter(l => refs.includes(l.id));
-  const generations = refs.flatMap(id => {
+  const layers = state.sessions[ctx.on.session ?? '']?.docs.find((d) => refs.includes(d.id))?.layers.filter((l) => refs.includes(l.id));
+  const generations = refs.flatMap((id) => {
     const g = state.generations[id];
     return g ? [{ kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, inputs: g.inputs, settings: g.settings, op: g.op, variants: g.variants }] : [];
   });
   const inputs = stringsIn([args, composer, layers, generations]);
-  const mentioned = new Set(inputs.flatMap(text => text.includes('@') ? mentionSubjects(text, state.library).ids : []));
-  const subjects = state.library.filter(subject => mentioned.has(subject.id) || refs.includes(subject.id));
-  const assetIds = new Set([...inputs.flatMap(s => s.split(',').map(id => id.trim().replace(/^asset:/, ''))), ...stringsIn(subjects)]);
-  const assets = [...assetIds].filter(id => state.assets[id]).sort().map(id => {
-    const asset = state.assets[id];
-    return [assetRevisionIdentity(asset), state.generations[asset.generationId ?? '']?.modelRef];
-  });
-  const ops = state.settings.ops;
-  const hasImage = attachments.some(id => state.assets[id]?.kind === 'image');
-  const modelRefs = new Set([...inputs, ...Object.values(ops), directModelRef('image', image.modelRef, hasImage), directModelRef('video', video.modelRef, hasImage)].filter((ref): ref is string => Boolean(ref && state.catalog.models[ref])));
-  const models = [...modelRefs].sort().map(ref => [ref, state.catalog.models[ref], state.catalog.schemas[ref]]);
+  const mentioned = new Set(inputs.flatMap((t) => (t.includes('@') ? mentionSubjects(t, state.library).ids : [])));
+  const subjects = state.library.filter((s) => mentioned.has(s.id) || refs.includes(s.id));
+  const assets = [...new Set([...inputs.flatMap((s) => s.split(',').map((id) => id.trim().replace(/^asset:/, ''))), ...stringsIn(subjects)])]
+    .filter((id) => state.assets[id]).sort().map((id) => [assetRevisionIdentity(state.assets[id]), state.generations[state.assets[id].generationId ?? '']?.modelRef]);
+  const hasImage = attachments.some((id) => state.assets[id]?.kind === 'image');
+  const models = [...new Set([...inputs, ...Object.values(state.settings.ops), directModelRef('image', image.modelRef, hasImage), directModelRef('video', video.modelRef, hasImage)]
+    .filter((ref): ref is string => Boolean(ref && state.catalog.models[ref])))].sort().map((ref) => [ref, state.catalog.models[ref], state.catalog.schemas[ref]]);
   const estimate = previewEstimate(spec, ctx, args);
   const prompt = generations[0]?.prompt ?? text;
   return {
-    signature: stable({ args, on: ctx.on, composer, layers, raster: layers?.map(layer => bufferVersion(layer.id)), generations, subjects, assets, models, ops, estimate, workspace: state.ui.workspace, space: state.ui.space }),
+    signature: stable({ args, on: ctx.on, composer, layers, raster: layers?.map((l) => bufferVersion(l.id)), generations, subjects, assets, models, ops: state.settings.ops, estimate, workspace: state.ui.workspace, space: state.ui.space }),
     details: prompt.trim() ? [prompt] : [],
   };
 }
 
 export function previewEstimate(spec: AnyCommand, ctx: CommandContext, args: unknown): Estimate {
-  try {
-    return spec.estimate?.(ctx, args) ?? UNKNOWN;
-  } catch {
-    return UNKNOWN;
-  }
+  try { return spec.estimate?.(ctx, args) ?? UNKNOWN; } catch { return UNKNOWN; }
 }
 
 const thenable = (value: unknown): value is PromiseLike<unknown> => typeof (value as PromiseLike<unknown> | null)?.then === 'function';
@@ -166,26 +154,13 @@ export interface ApprovalStep {
 }
 /** Complete frozen step stored on a durable D+ command ticket (includes write/read steps and `$N` producers). */
 export interface FrozenCommandStep {
-  /** 1-based. */
-  step: number;
-  cmd: string;
-  title: string;
-  effect: Effect;
-  rawArgs: unknown;
-  rawOn: Target;
-  args: unknown;
-  on: Target;
-  ready: boolean;
-  onReady: boolean;
-  state?: 'running' | 'done' | 'failed';
-  result?: unknown;
-  estimate?: Estimate;
-  review?: CommandReview;
+  step: number; cmd: string; title: string; effect: Effect;
+  rawArgs: unknown; rawOn: Target; args: unknown; on: Target;
+  ready: boolean; onReady: boolean;
+  state?: 'running' | 'done' | 'failed'; result?: unknown; estimate?: Estimate; review?: CommandReview;
 }
 export interface ApprovalRequest {
-  caller: Caller;
-  steps: ApprovalStep[];
-  estimate: Estimate;
+  caller: Caller; steps: ApprovalStep[]; estimate: Estimate;
   /** Full frozen sequence (including write/read steps and `$N` producers/pre-results). */
   sequence?: FrozenCommandStep[];
 }
@@ -518,19 +493,10 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     for (const ask of asks) if (ask.effect === 'spend') reviewedSpends.set(ask.step, ask.estimate);
     const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
     const sequence: FrozenCommandStep[] = steps.map((s, i) => {
-      const stepNum = i + 1;
-      const ask = asks.find((a) => a.step === stepNum);
+      const ask = asks.find((a) => a.step === i + 1);
       return {
-        step: stepNum,
-        cmd: s.spec.id,
-        title: s.spec.title,
-        effect: s.spec.effect,
-        rawArgs: s.rawArgs,
-        rawOn: s.rawOn,
-        args: s.args,
-        on: s.on,
-        ready: s.ready,
-        onReady: s.onReady,
+        step: i + 1, cmd: s.spec.id, title: s.spec.title, effect: s.spec.effect,
+        rawArgs: s.rawArgs, rawOn: s.rawOn, args: s.args, on: s.on, ready: s.ready, onReady: s.onReady,
         ...(s.ran ? { state: 'done', result: results[i] } : {}),
         ...(ask ? { estimate: ask.estimate, review: ask.review } : {}),
       };
