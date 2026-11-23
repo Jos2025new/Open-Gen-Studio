@@ -462,8 +462,7 @@ describe('Escenario (d): reintento de Atlas y 402 bajo limite', () => {
     expect(useStore.getState().spentUsd).toBeCloseTo(0.1, 6);
   });
 
-  // reproduce: budget.ts:144-155 (budgetVerdict) ignora Estimate.lowerBound (precio minimo sin techo verificable); bajo limite activo permite pasar sin preguntar al usuario
-  it.fails('d2b: precio lowerBound sin techo verificable exige confirmacion bajo limite activo', () => {
+  it('d2b: precio lowerBound sin techo verificable exige confirmacion bajo limite activo', () => {
     setupSession({ spentUsd: 0, budgetUsd: 0.15, budgetOn: true });
     const verdict = budgetVerdict({ usd: 0.08, approximate: true, lowerBound: true }, { sessionId: sid });
     expect(verdict.over).toBe(true);

@@ -6,8 +6,11 @@ import {
   estimatedPrice,
   exactPrice,
   FREE_PRICE,
+  markSendInFlight,
+  markSendUncertain,
   prepareSend,
   sendStateOf,
+  settleSend,
   ticketReservedUsd,
   UNKNOWN_PRICE,
   type ApprovalTicket,
@@ -25,6 +28,7 @@ import {
 } from '../src/engine/money/paidSend';
 import { removeTicket, upsertTicket, useStore } from '../src/store/store';
 import { addSpend } from '../src/store/spend';
+import { budgetVerdict, remainingBudget, withOncePass } from '../src/engine/budget';
 import { createFakeProvider, simulateReload, snapshotStore, sseResponse, type FakeProvider } from './helpers/fakeProvider';
 
 function createMemoryHarness(initialBudget = { budgetOn: true, budgetUsd: 1.0, spentUsd: 0 }) {
@@ -491,6 +495,42 @@ describe('D+ store & spend: tickets persistidos y addSpend idempotente por sendI
     addSpend(0.05, base);
     addSpend(0.05, base);
     expect(useStore.getState().spentUsd).toBe(0.2);
+  });
+
+  it('remainingBudget descuenta reservas in_flight/uncertain de tickets y budgetVerdict exige confirmacion ante lowerBound', () => {
+    const sid = useStore.getState().activeSessionId;
+    const st = useStore.getState();
+    useStore.setState({
+      tickets: {},
+      spentUsd: 0,
+      spendLog: [],
+      settings: { ...st.settings, budgetOn: true, budgetUsd: 0.15, budgetNoAsk: false, budgetAccepted: null },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], noAskOverLimit: false } },
+    });
+
+    let t = createTicket({ id: 'tkt_res', sessionId: sid, kind: 'generation', price: exactPrice(0.1) });
+    t = prepareSend(t, { id: 'snd_res', slotKey: 'n1', price: exactPrice(0.1) });
+    t = markSendInFlight(t, 'snd_res');
+    upsertTicket(t);
+    expect(remainingBudget()).toBe(0.05);
+    expect(budgetVerdict({ usd: 0.1, approximate: false }, { sessionId: sid }).over).toBe(true);
+
+    // Reservation stays held while uncertain and releases on settle:
+    upsertTicket(markSendUncertain(t, 'snd_res', 'cut after accept'));
+    expect(remainingBudget()).toBe(0.05);
+    upsertTicket(settleSend(useStore.getState().tickets.tkt_res, 'snd_res', { costUsd: 0.1 }).ticket);
+    expect(remainingBudget()).toBe(0.15);
+
+    // lowerBound without ceiling asks with truthful copy, and passes when explicitly approved with once pass:
+    const lb = { usd: 0.08, approximate: true, lowerBound: true };
+    const v = budgetVerdict(lb, { sessionId: sid });
+    expect(v.over).toBe(true);
+    expect(v.unknownPrice).toBe(true);
+    expect(v.text).toMatch(/Only a minimum price/i);
+    const approved = withOncePass(sid, (pass) => budgetVerdict(lb, { sessionId: sid, pass }), lb.usd, true);
+    expect(approved.over).toBe(false);
+
+    removeTicket('tkt_res');
   });
 });
 

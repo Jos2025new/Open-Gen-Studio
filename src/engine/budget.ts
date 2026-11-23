@@ -7,6 +7,7 @@ import type { Estimate, LlmProviderId, NoticeFeedItem } from './types';
 import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
 import { ledgerCost } from './sendLedger';
 import { formatSpendAmount } from './spending';
+import { priceFromEstimate, roundUsd, totalReservedUsd, type ApprovalTicket } from './money/ticket';
 
 export { noAskEverywhere };
 
@@ -17,10 +18,14 @@ export { noAskEverywhere };
 
 const get = useStore.getState;
 
-/** Money left under the limit, or null when there is no limit. */
-export function remainingBudget(state: { settings: { budgetOn: boolean; budgetUsd: number }; spentUsd: number } = get()): number | null {
-  const { settings, spentUsd } = state;
-  return settings.budgetOn ? settings.budgetUsd - spentUsd : null;
+/** Money left under the limit (after confirmed spend and open ticket reservations), or null when there is no limit. */
+export function remainingBudget(
+  state: { settings: { budgetOn: boolean; budgetUsd: number }; spentUsd: number; tickets?: Record<string, ApprovalTicket> } = get(),
+): number | null {
+  const { settings, spentUsd, tickets } = state;
+  if (!settings.budgetOn) return null;
+  const reserved = tickets ? totalReservedUsd(Object.values(tickets)) : 0;
+  return roundUsd(settings.budgetUsd - spentUsd - reserved);
 }
 
 /**
@@ -160,11 +165,12 @@ export function budgetVerdict(
   opts: { sessionId?: string; pass?: BudgetPass; choices?: string } = {},
 ): BudgetVerdict {
   const remaining = remainingBudget();
-  const unknownPrice = e.usd == null;
-  if (e.usd === 0) return { over: false, remaining, unknownPrice: false };
+  const price = priceFromEstimate(e);
+  if (price.kind === 'exact' && price.usd === 0) return { over: false, remaining, unknownPrice: false };
+  const unknownPrice = price.maxVerifiableUsd == null;
   const sid = opts.sessionId ?? get().activeSessionId;
   const accepted = overLimitAccepted(sid) || passActiveFor(opts.pass, sid, e);
-  const over = remaining != null && !accepted && (unknownPrice || e.usd! > remaining + 1e-9);
+  const over = remaining != null && !accepted && (unknownPrice || price.maxVerifiableUsd! > remaining + 1e-9);
   return { over, remaining, unknownPrice, ...(over ? { text: overLimitText(e, opts.choices) } : {}) };
 }
 
@@ -192,7 +198,7 @@ export class OverLimitError extends Error {
  * a price that exceeds the remaining budget or is unknown needs approval when the limit is active.
  */
 export function assertWithinLimit(e: Estimate, sessionId: string, approvedByPlan: boolean, pass?: BudgetPass): void {
-  if (approvedByPlan || e.usd === 0 || !budgetVerdict(e, { sessionId, pass }).over) return;
+  if (approvedByPlan || (e.usd === 0 && !e.lowerBound) || !budgetVerdict(e, { sessionId, pass }).over) return;
   throw new OverLimitError(e);
 }
 
@@ -201,6 +207,7 @@ export function overLimitText(e: Estimate, choices = '“Continue once” lets o
   const { budgetUsd } = get().settings;
   const left = Math.max(0, remainingBudget() ?? 0);
   if (e.usd == null) return `The price of this run is unknown, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
+  if (e.lowerBound && e.usd <= left + 1e-9) return `Only a minimum price (${formatUsd(e.usd)}) is published, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
 
