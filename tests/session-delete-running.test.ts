@@ -32,6 +32,7 @@ vi.mock('../src/lib/media', async (orig) => ({
 }));
 vi.mock('../src/engine/providers/registry', async (orig) => {
   const real = await orig<typeof import('../src/engine/providers/registry')>();
+  const { JobFailedError } = await import('../src/lib/http');
   return {
     ...real,
     ADAPTERS: {
@@ -40,7 +41,7 @@ vi.mock('../src/engine/providers/registry', async (orig) => {
         ...real.ADAPTERS.atlas,
         generate: async () => {
           const outcome = await gate.wait;
-          if (outcome === 'fail') throw new Error('Atlas Cloud: failed');
+          if (outcome === 'fail') throw new JobFailedError('Atlas Cloud: failed');
           return { outputs: [{ blob: new Blob(['x'], { type: 'image/png' }), mime: 'image/png' }], costUsd: 0.05 };
         },
       },
