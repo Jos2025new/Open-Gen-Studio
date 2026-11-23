@@ -11,8 +11,10 @@ import { withOncePass } from '../src/engine/budget';
 import { setApprover } from '../src/engine/commands';
 import { COMMAND_REVIEW_CHANGED } from '../src/engine/commands/types';
 import { createGeneration, runGeneration } from '../src/engine/jobs';
-import { resetSendLocks } from '../src/engine/money/paidSend';
-import { storeTickets } from '../src/engine/money/storeBridge';
+import { paidSend, resetSendLocks } from '../src/engine/money/paidSend';
+import { budgetSnapshotFor, storeTickets } from '../src/engine/money/storeBridge';
+import { exactPrice } from '../src/engine/money/ticket';
+import { sendLlmViaPaidGate } from '../src/engine/money/transport';
 import { resetActions } from '../src/engine/nodecore/action';
 import type {
   CommandApprovalFeedItem,
@@ -43,6 +45,8 @@ vi.mock('../src/lib/media', async (original) => ({
 }));
 
 const paidRef = 'nanogpt::paid-img';
+const paidBatchRef = 'nanogpt::batch-img';
+const atlasPricedRef = 'atlas::priced-img';
 const atlasSameRef = 'atlas::paid-img';
 const atlasInpaintRef = 'atlas::inpaint-img';
 const atlasLbVidRef = 'atlas::lb-vid';
@@ -63,6 +67,14 @@ function installModels(defaultImageCost = 0.1) {
   const paidModel = {
     ref: paidRef, provider: 'nanogpt', id: 'paid-img', name: 'Paid image', kind: 'image',
     acceptsText: true, acceptsImage: true, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] },
+  } as unknown as ModelSummary;
+  const paidBatchModel = {
+    ref: paidBatchRef, provider: 'nanogpt', id: 'batch-img', name: 'Batch image', kind: 'image',
+    acceptsText: true, acceptsImage: true, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] },
+  } as unknown as ModelSummary;
+  const atlasPricedModel = {
+    ref: atlasPricedRef, provider: 'atlas', id: 'priced-img', name: 'Atlas priced', kind: 'image',
+    acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'output', usd: 0.1 }] },
   } as unknown as ModelSummary;
   const atlasSameModel = {
     ref: atlasSameRef, provider: 'atlas', id: 'paid-img', name: 'Paid image', kind: 'image',
@@ -104,12 +116,21 @@ function installModels(defaultImageCost = 0.1) {
       ...state.catalog,
       models: {
         [paidRef]: paidModel,
+        [paidBatchRef]: paidBatchModel,
+        [atlasPricedRef]: atlasPricedModel,
         [atlasSameRef]: atlasSameModel,
         [atlasInpaintRef]: atlasInpaintModel,
         [atlasLbVidRef]: atlasLbVidModel,
       },
       schemas: {
         [paidRef]: paidSchema,
+        [paidBatchRef]: {
+          ref: paidBatchRef,
+          params: [{ key: 'n', label: 'Count', role: 'count', type: 'integer', min: 1, max: 4, default: 1 }],
+          source: 'catalog',
+          slots: { prompt: 'prompt', promptRequired: true },
+        },
+        [atlasPricedRef]: { ref: atlasPricedRef, params: [], source: 'catalog', slots: { prompt: 'prompt', promptRequired: true } },
         [atlasSameRef]: { ...paidSchema, ref: atlasSameRef, slots: { prompt: 'prompt', promptRequired: true, images: { key: 'images', min: 0, max: 4, multiple: true, format: 'url' } } },
         [atlasInpaintRef]: {
           ref: atlasInpaintRef, params: [], source: 'catalog',
@@ -303,3 +324,264 @@ it.fails('H4b: Continue once on standalone lowerBound generation blocks when liv
   expect(fake.acceptedCount('atlas lowerbound video'), 'Continue once on lowerBound generation capped maxUsd at minimum $0.10 and deadlocked at quote $0.25').toBe(1);
   expect(useStore.getState().generations[g.id]?.status).toBe('done');
 });
+
+// ============================================================================
+// CONTROLS ("Sin hallazgo (comprobado)")
+// ============================================================================
+
+it('control: library.style.create blocks transport when attached image is edited in-place between review and send', async () => {
+  blobs.set('ast_style', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
+  let stylePosts = 0;
+  const origFetch = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('recraft/v4/create-style')) {
+      stylePosts++;
+      return jsonResponse({ request_id: 'fal_sty_1' });
+    }
+    return origFetch(input, init);
+  }));
+
+  useStore.setState((state) => ({
+    assets: {
+      ...state.assets,
+      ast_style: { id: 'ast_style', kind: 'image', mime: 'image/png', width: 64, height: 64, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 },
+    },
+    composer: { ...state.composer, attachments: ['ast_style'] },
+  }));
+
+  const pending = runCommandsTool(sid, { seq: [{ cmd: 'library.style.create', args: { name: 'Neon Look' } }] });
+  const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
+  await vi.waitFor(() => expect(commandCard()?.status).toBe('awaiting'));
+  const card = commandCard();
+
+  expect(await saveAssetEdit('ast_style', new Blob([new Uint8Array([9, 9, 9, 9])], { type: 'image/png' }), 'original')).not.toBeNull();
+  expect(decideCommandApproval(sid, card.id, 'once')).toBe(true);
+  await pending;
+
+  expect(stylePosts).toBe(0);
+  expect(commandCard().status).toBe('awaiting');
+});
+
+it('control: studio.generation.regenerate blocks transport when referenced image is edited in-place between review and quote', async () => {
+  blobs.set('ast_ref', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
+  const origFetch = globalThis.fetch;
+  let editedDuringQuote = false;
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('/api/v1/model/calculate') && !editedDuringQuote) {
+      editedDuringQuote = true;
+      await saveAssetEdit('ast_ref', new Blob([new Uint8Array([7, 7, 7, 7])], { type: 'image/png' }), 'original');
+    }
+    return origFetch(input, init);
+  }));
+
+  useStore.setState((state) => ({
+    assets: {
+      ...state.assets,
+      ast_ref: { id: 'ast_ref', kind: 'image', mime: 'image/png', width: 64, height: 64, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 },
+    },
+    generations: {
+      g_orig: {
+        id: 'g_orig', sessionId: sid, kind: 'image', prompt: 'regen edited ref', modelRef: atlasSameRef, modelName: 'Paid image',
+        provider: 'atlas', settings: { count: 1, advanced: {}, seed: 42 }, inputs: { refs: ['ast_ref'] },
+        origin: 'composer', status: 'done', assetIds: ['ast_out'], estimate: { usd: 0.1, approximate: false }, createdAt: 1,
+      },
+    },
+  }));
+
+  const pending = runCommandsTool(sid, { seq: [{ cmd: 'studio.generation.regenerate', args: { generationId: 'g_orig' } }] });
+  const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
+  await vi.waitFor(() => expect(commandCard()?.status).toBe('awaiting'));
+
+  expect(decideCommandApproval(sid, commandCard().id, 'approve')).toBe(true);
+  await pending;
+
+  await vi.waitFor(() => {
+    const gens = Object.values(useStore.getState().generations).filter((g) => g.id !== 'g_orig');
+    expect(gens.length === 1 && (gens[0].status === 'done' || gens[0].status === 'error')).toBe(true);
+  });
+  expect(editedDuringQuote).toBe(true);
+  expect(fake.acceptedCount('regen edited ref')).toBe(0);
+});
+
+it('control: multi-item batch (count=2, perRequest=2) matches approvedFingerprint without false-positive block', async () => {
+  useStore.setState((state) => ({
+    sessions: {
+      ...state.sessions,
+      [sid]: {
+        ...state.sessions[sid],
+        graph: {
+          nodes: [
+            { id: 'n_batch2', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Batch 2', prompt: 'batch count two', modelRef: paidBatchRef, settings: { count: 2, advanced: {} }, outputIndex: 0 } },
+          ],
+          edges: [],
+        },
+      },
+    },
+  }));
+
+  const pending = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n_batch2'], force: true } }] });
+  const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
+  await vi.waitFor(() => expect(commandCard()?.status).toBe('awaiting'));
+
+  expect(decideCommandApproval(sid, commandCard().id, 'approve')).toBe(true);
+  await pending;
+
+  expect(commandCard().status).toBe('done');
+  expect(fake.acceptedCount('batch count two')).toBe(1);
+});
+
+it('control: multi-step commands once ticket closes step 1 while step 2 runs and closes ticket on completion', async () => {
+  useStore.setState((state) => ({
+    settings: { ...state.settings, budgetOn: true, budgetUsd: 0.05 },
+    sessions: {
+      ...state.sessions,
+      [sid]: {
+        ...state.sessions[sid],
+        graph: {
+          nodes: [
+            { id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Node 1', prompt: 'seq step one', modelRef: paidRef, settings: { count: 1, advanced: {} }, outputIndex: 0 } },
+            { id: 'n2', position: { x: 200, y: 0 }, data: { kind: 'image', title: 'Node 2', prompt: 'seq step two', modelRef: paidRef, settings: { count: 1, advanced: {} }, outputIndex: 0 } },
+          ],
+          edges: [],
+        },
+      },
+    },
+  }));
+
+  const holdTwo = fake.holdNext('seq step two');
+  const pending = runCommandsTool(sid, {
+    seq: [
+      { cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } },
+      { cmd: 'nodes.run.start', args: { targets: ['n2'], force: true } },
+    ],
+  });
+  const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
+  await vi.waitFor(() => expect(commandCard()?.status).toBe('awaiting'));
+  const card = commandCard();
+
+  expect(decideCommandApproval(sid, card.id, 'once')).toBe(true);
+  await holdTwo.arrived;
+
+  // Step 1 finished while step 2 is in-flight: step 1 pass key is already pruned, blocking reuse:
+  const ticketId = `cmd:${card.id}`;
+  expect(storeTickets.get(ticketId)?.closed).toBeUndefined();
+  expect(storeTickets.get(ticketId)?.pass?.steps).not.toHaveProperty('cmd:1:node:n1');
+  await expect(
+    paidSend({
+      ticketId,
+      prepare: { id: 'snd_reuse_s1', slotKey: 'reuse:1', stepKey: 'cmd:1:node:n1', price: exactPrice(0.1) },
+      tickets: storeTickets,
+      getBudget: () => budgetSnapshotFor(sid),
+      save: async () => undefined,
+      onBookSpend: () => undefined,
+      send: async () => ({ value: 'nope', costUsd: 0.1 }),
+    }),
+  ).rejects.toMatchObject({ code: 'PASS_EXCEEDED' });
+
+  holdTwo.resolve();
+  await pending;
+
+  expect(commandCard().status).toBe('done');
+  expect(storeTickets.get(ticketId)?.closed).toBe(true);
+  expect(storeTickets.get(ticketId)?.pass?.steps).toEqual({});
+});
+
+it('control: 402 ask on step 2 of a once commands ticket reopens only step 2 and keeps step 1 closed and cap enforced', async () => {
+  useStore.setState((state) => ({
+    settings: { ...state.settings, budgetOn: true, budgetUsd: 0.05, autoSwitchProvider: 'ask' },
+    sessions: {
+      ...state.sessions,
+      [sid]: {
+        ...state.sessions[sid],
+        graph: {
+          nodes: [
+            { id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Node 1', prompt: 'cmd1 atlas ok', modelRef: atlasPricedRef, settings: { count: 1, advanced: {} }, outputIndex: 0 } },
+            { id: 'n2', position: { x: 200, y: 0 }, data: { kind: 'image', title: 'Node 2', prompt: 'cmd2 nano 402', modelRef: paidRef, settings: { count: 1, advanced: {} }, outputIndex: 0 } },
+          ],
+          edges: [],
+        },
+      },
+    },
+  }));
+  fake.onNext('cmd2 nano 402', 'http-402');
+
+  const pending = runCommandsTool(sid, {
+    seq: [
+      { cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } },
+      { cmd: 'nodes.run.start', args: { targets: ['n2'], force: true } },
+    ],
+  });
+  const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
+  await vi.waitFor(() => expect(commandCard()?.status).toBe('awaiting'));
+  const card = commandCard();
+
+  expect(decideCommandApproval(sid, card.id, 'once')).toBe(true);
+  await pending;
+
+  const ticketId = `cmd:${card.id}`;
+  expect(storeTickets.get(ticketId)?.closed).toBe(true);
+
+  const alert = useAlerts.getState().alerts.find((a) => a.actions?.some((act) => act.label === 'Yes, this time'));
+  expect(alert).toBeDefined();
+  alert!.actions!.find((act) => act.label === 'Yes, this time')!.run();
+
+  await vi.waitFor(() => expect(fake.acceptedCount('cmd2 nano 402')).toBe(1), { timeout: 3000 });
+  await vi.waitFor(() => expect(storeTickets.get(ticketId)?.closed).toBe(true));
+
+  // Neither step 1 nor step 2 can be reused after completion:
+  await expect(
+    paidSend({
+      ticketId,
+      prepare: { id: 'snd_after_402', slotKey: 'extra:2', stepKey: 'cmd:2:node:n2', price: exactPrice(0.1) },
+      tickets: storeTickets,
+      getBudget: () => budgetSnapshotFor(sid),
+      save: async () => undefined,
+      onBookSpend: () => undefined,
+      send: async () => ({ value: 'nope', costUsd: 0.1 }),
+    }),
+  ).rejects.toMatchObject({ code: 'PASS_EXCEEDED' });
+});
+
+it('control: sendLlmViaPaidGate clears ticket.pass in finally and blocks cross-session or extra direct paidSend', async () => {
+  useStore.setState((state) => ({
+    settings: { ...state.settings, budgetOn: true, budgetUsd: 0.0001 },
+    catalog: {
+      ...state.catalog,
+      llm: {
+        ...state.catalog.llm,
+        openrouter: [{ id: 'paid-llm', name: 'Paid LLM', inputPrice: 1, outputPrice: 2, contextLength: 8192, tools: true, vision: false, reasoning: false }],
+      },
+    },
+  }));
+
+  const first = await sendLlmViaPaidGate({
+    ticketId: 'llm:turn-control',
+    sessionId: sid,
+    provider: 'openrouter',
+    apiKey: 'test-only',
+    model: 'paid-llm',
+    system: 'sys',
+    messages: [{ role: 'user', content: 'hi' }],
+    tools: [],
+    signal: new AbortController().signal,
+    budgetPass: true,
+    computeUsd: () => 0.01,
+  });
+  expect(first.value.text).toBe('Done.');
+  expect(storeTickets.get('llm:turn-control')?.pass).toBeUndefined();
+
+  await expect(
+    paidSend({
+      ticketId: 'llm:turn-control',
+      prepare: { id: 'snd_llm_extra', slotKey: 'llm:turn-control:extra', stepKey: 'snd_llm_extra', price: exactPrice(0.01) },
+      tickets: storeTickets,
+      getBudget: () => budgetSnapshotFor(sid2),
+      save: async () => undefined,
+      onBookSpend: () => undefined,
+      send: async () => ({ value: 'nope', costUsd: 0.01 }),
+    }),
+  ).rejects.toMatchObject({ code: 'OVER_LIMIT' });
+});
+
