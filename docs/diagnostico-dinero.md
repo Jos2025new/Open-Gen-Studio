@@ -165,3 +165,19 @@ Informes en el bus: `20261122-sol-critica-neon.md` y `20261122-neon-critica-sol.
 - **Fuera:** el proxy, la interfaz, `data/` y la persistencia protegida.
 
 **Matiz pendiente.** Sol deja el LLM, los lotes y los reintentos para una segunda fase; Neon pide que el piloto los cubra desde el principio. El piloto incluye la matriz completa de 6 escenarios de Neon.
+
+## Veredicto sobre D+ y versión final (2026-11-22)
+
+Informes: `20261122-opus-propuesta-dplus.md` (la propuesta), `20261122-neon-veredicto-dplus.md` y `20261122-sol-veredicto-dplus.md`.
+
+- **Neon:** de acuerdo con los 6 puntos. No aporta razones ni evidencia, así que cuenta como conformidad y no como comprobación.
+- **Sol:** de acuerdo con 2, 4 y 5. En desacuerdo con 1, 3 y 6, con citas que se comprobaron en el código.
+
+**Decisión de Opus, punto por punto:**
+
+1. **Se defiende, con una aclaración.** El punto solo quita a `stepStates`/`stepGenerations` el papel de fuente de «ya salió». Siguen siendo el enlace a las salidas de un plan para reanudarlo (planRun.ts:385), y las generaciones antiguas sin `sends` siguen leyéndose por el camino heredado de sendLedger. Requisito explícito del piloto: ninguna salida ya entregada de un plan guardado se pierde. No hay dos registros de «ya salió».
+2. **Sin cambios:** no hay interfaz enchufable hasta que exista un segundo backend.
+3. **Se acepta la objeción.** La regla («se envía exactamente la vista previa aprobada; no se recalculan ancestros») no basta sola. El ticket guarda además la **secuencia completa**, incluidos los pasos `write` y los productores de `$N` (run.ts:134, 371; commandCalls.ts:164), como ya habían acordado Neon y Sol.
+4. **Sin cambios:** un implementador, ataque del otro, matriz de 6 escenarios en verde y menos estado que hoy, o se para.
+5. **Sin cambios:** prueba final con proveedor real y coste máximo aprobado por el usuario.
+6. **Se acepta la objeción y se rehace el cuarto arreglo urgente.** Escribir `generationId` al empezar una regeneración oculta el resultado anterior si el intento falla (jobs.ts:74, graph.ts:334, flow/actions.ts:338). Lo nuevo: `generationId` sigue siendo el último resultado terminado. El intento en curso queda ligado aparte (la generación conoce su nodo) y lo enlaza también la recuperación (followRemote, allDelivered). `previewRun`/`graphToSteps` tratan como ocupado un nodo con un intento en curso o dudoso y no lo reenvían. Los otros tres urgentes no cambian.
