@@ -7,7 +7,9 @@ import type { Estimate, LlmProviderId, NoticeFeedItem } from './types';
 import { noAskDurable, noAskEverywhere, setUntilNextGrant, untilNextGrant, untilNextHolds, type UntilNextGrant } from './noAsk';
 import { ledgerCost } from './sendLedger';
 import { formatSpendAmount } from './spending';
-import { priceFromEstimate, roundUsd, ticketsInSessions, totalReservedUsd, type ApprovalTicket } from './money/ticket';
+import { availableBudgetUsd, priceFromEstimate, ticketsInSessions, type ApprovalTicket } from './money/ticket';
+
+import { evaluateBudgetGate } from './money/paidSend';
 
 export { noAskEverywhere };
 
@@ -30,8 +32,7 @@ export function remainingBudget(
 ): number | null {
   const { settings, spentUsd, tickets, sessions } = state;
   if (!settings.budgetOn) return null;
-  const reserved = totalReservedUsd(ticketsInSessions(tickets, sessions));
-  return roundUsd(settings.budgetUsd - spentUsd - reserved);
+  return availableBudgetUsd(settings.budgetUsd, spentUsd, ticketsInSessions(tickets, sessions));
 }
 
 /**
@@ -173,13 +174,16 @@ export function budgetVerdict(
   e: Estimate,
   opts: { sessionId?: string; pass?: BudgetPass; choices?: string } = {},
 ): BudgetVerdict {
-  const remaining = remainingBudget();
+  const { settings, spentUsd, sessions, tickets, activeSessionId } = get();
   const price = priceFromEstimate(e);
-  if (price.kind === 'exact' && price.usd === 0) return { over: false, remaining, unknownPrice: false };
+  const sid = opts.sessionId ?? activeSessionId;
+  const allTickets = ticketsInSessions(tickets, sessions);
+  const budget = { ...settings, spentUsd, sessionNoAsk: noAskDurable(get(), sid) || passActiveFor(opts.pass, sid, e) };
+  const verdict = evaluateBudgetGate({ price, budget, allTickets });
+  const remaining = settings.budgetOn ? verdict.remainingUsd ?? availableBudgetUsd(settings.budgetUsd, spentUsd, allTickets) : null;
+  const { ok } = verdict;
+  const over = !ok;
   const unknownPrice = price.maxVerifiableUsd == null;
-  const sid = opts.sessionId ?? get().activeSessionId;
-  const accepted = overLimitAccepted(sid) || passActiveFor(opts.pass, sid, e);
-  const over = remaining != null && !accepted && (unknownPrice || price.maxVerifiableUsd! > remaining + 1e-9);
   return { over, remaining, unknownPrice, ...(over ? { text: overLimitText(e, opts.choices) } : {}) };
 }
 

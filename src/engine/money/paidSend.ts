@@ -97,7 +97,7 @@ export interface BudgetGateVerdict {
  * `maxVerifiableUsd` (rejects unknown and lowerBound without explicit approval), and cumulative pass cap.
  */
 export function evaluateBudgetGate(opts: {
-  ticket: ApprovalTicket;
+  ticket?: ApprovalTicket;
   price: MoneyPrice;
   budget: BudgetSnapshot;
   allTickets: readonly ApprovalTicket[];
@@ -106,7 +106,7 @@ export function evaluateBudgetGate(opts: {
   const { ticket, price, budget, allTickets, local } = opts;
   if (local || isFreePrice(price)) return { ok: true, free: true };
   if (!budget.budgetOn) return { ok: true, free: false };
-  const pass = ticket.pass;
+  const pass = ticket?.pass;
   if (budget.sessionNoAsk || pass?.kind === 'session_no_ask') return { ok: true, free: false };
 
   const verifiable = price.maxVerifiableUsd;
@@ -125,7 +125,7 @@ export function evaluateBudgetGate(opts: {
     };
   }
 
-  if (pass?.kind === 'once') {
+  if (ticket && pass?.kind === 'once') {
     const committed = ticketCommittedUsd(ticket);
     if (pass.maxUsd == null || committed + verifiable > pass.maxUsd + 1e-9) {
       return {
