@@ -5,7 +5,7 @@
  * `Generation` (`sends`, `sending`, `remoteJob`, `jobId`, `lostJob`) so untouched UI components,
  * legacy recovery paths and existing tests keep working without maintaining a second decision engine.
  */
-import { AbortedError, HttpError, isAbort, JobFailedError, NetworkError } from '../../lib/http';
+import { AbortedError } from '../../lib/http';
 import { uid } from '../../lib/id';
 import { guard } from '../../lib/saveGuard';
 import { holdsWriterLock } from '../../lib/writerLock';
@@ -23,7 +23,6 @@ import {
   type BudgetSnapshot,
   type PaidSendOutcome,
   type PaidSendTransportResult,
-  type SendErrorDisposition,
   type SpendBooking,
   type TicketAccess,
 } from './paidSend';
@@ -304,26 +303,6 @@ function bookGenerationSpend(g: Generation, booking: SpendBooking): void {
   });
 }
 
-function classifyGenerationError(
-  err: unknown,
-  signal: AbortSignal,
-  isRetryable?: (err: unknown) => boolean,
-): SendErrorDisposition {
-  if (isRestart(signal.reason)) return 'keep_in_flight';
-  if (err instanceof JobFailedError) return 'job_failed';
-  if (err instanceof NetworkError || isAbort(err) || signal.aborted) return 'uncertain';
-  if (isRetryable?.(err)) return 'retryable_before_charge';
-  if (err instanceof HttpError && (err.status >= 500 || err.status === 408)) return 'uncertain';
-  if (err instanceof HttpError) return 'refused_before_charge';
-  if (err && typeof err === 'object') {
-    const e = err as { status?: number; message?: string };
-    if (e.status === 402 || /insufficient (credits?|balance|funds)|not enough (credits?|balance)|out of credits/i.test(e.message ?? '')) {
-      return 'refused_before_charge';
-    }
-  }
-  return 'uncertain';
-}
-
 export interface GenerationPaidSendOpts<T> {
   readonly g: Generation;
   readonly index: number;
@@ -382,22 +361,22 @@ export async function sendGenerationViaPaidGate<T>(opts: GenerationPaidSendOpts<
       beforeTransport,
       send,
       signal,
-      classifyError: (err) => classifyGenerationError(err, signal, isRetryable),
+      restart: () => isRestart(signal.reason),
+      isRetryable,
     });
   } catch (err) {
-    if (err instanceof PaidSendBlockedError) {
-      if (err.code === 'SAVE_FAILED') throw new SendNotCommittedError(notSentMessage(get().generations[g.id] ?? g, sendId));
-      if (err.code === 'ABORTED') throw new AbortedError();
-      if (err.code === 'OVER_LIMIT' || err.code === 'UNKNOWN_PRICE' || err.code === 'PASS_EXCEEDED') {
-        throw new OverLimitError({
-          usd: price.usd,
-          approximate: price.kind !== 'exact',
-          ...(price.lowerBound ? { lowerBound: true } : {}),
-        });
-      }
-    }
-    throw err;
+    throw legacyPaidSendError(err, price, () => notSentMessage(get().generations[g.id] ?? g, sendId));
   }
+}
+
+export function legacyPaidSendError(err: unknown, price: MoneyPrice, saveError?: () => string): unknown {
+  if (!(err instanceof PaidSendBlockedError)) return err;
+  if (err.code === 'SAVE_FAILED') return new SendNotCommittedError(saveError?.());
+  if (err.code === 'ABORTED') return new AbortedError();
+  if (err.code === 'OVER_LIMIT' || err.code === 'UNKNOWN_PRICE' || err.code === 'PASS_EXCEEDED') {
+    return new OverLimitError({ usd: price.usd, approximate: price.kind !== 'exact', ...(price.lowerBound ? { lowerBound: true } : {}) });
+  }
+  return err;
 }
 
 type GenerationSendState = Pick<Generation, 'id' | 'sends'>;

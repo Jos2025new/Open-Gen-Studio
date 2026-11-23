@@ -1,7 +1,7 @@
-import { AbortedError, HttpError, isAbort, NetworkError } from '../../lib/http';
+import { HttpError } from '../../lib/http';
 import { uid } from '../../lib/id';
 import { addSpend } from '../../store/spend';
-import { llmCallEstimate, OverLimitError } from '../budget';
+import { llmCallEstimate } from '../budget';
 import { chat, type ChatResult, type ReasoningEffort, type ToolSpec } from '../providers/llm';
 import type { LlmMessage, LlmProviderId, ProviderId, RemoteJob } from '../types';
 import { atlas } from '../providers/atlas';
@@ -10,25 +10,23 @@ import { fal } from '../providers/fal';
 import { nanogpt } from '../providers/nanogpt';
 import { openrouter } from '../providers/openrouter';
 import type { GenResult, ProviderAdapter } from '../providers/types';
-import { isCreditError, paidSend, PaidSendBlockedError, type SendErrorDisposition } from './paidSend';
+import { paidSend, PaidSendBlockedError } from './paidSend';
 import {
   budgetSnapshotFor,
   canWriteTicket,
   saveTicketMark,
   sendGenerationViaPaidGate,
   type GenerationPaidSendOpts,
-  SendNotCommittedError,
+  grantTicketPass,
+  legacyPaidSendError,
   storeTickets,
 } from './storeBridge';
 import {
   createTicket,
   isFreePrice,
   priceFromEstimate,
-  roundUsd,
-  ticketCommittedUsd,
   type ApprovalTicket,
   type MoneyPrice,
-  type TicketPass,
 } from './ticket';
 
 type PaidMethod = 'generate' | 'transcribe' | 'createStyle' | 'createVoice';
@@ -121,24 +119,13 @@ export interface LlmPaidSendOutcome {
   readonly costUsd: number | null;
 }
 
-function classifyLlmError(err: unknown, signal: AbortSignal): SendErrorDisposition {
-  if (err instanceof NetworkError || isAbort(err) || signal.aborted) return 'uncertain';
-  if (err instanceof HttpError && (err.status >= 500 || err.status === 408)) return 'uncertain';
-  if (isCreditError(err)) return 'refused_before_charge';
-  if (err instanceof HttpError) {
-    if (err.status === 400 && /reason|effort|think/i.test(err.message)) return 'retryable_before_charge';
-    if (err.status >= 400 && err.status < 500 && err.status !== 408) return 'refused_before_charge';
-  }
-  return 'uncertain';
-}
-
 function ensureLlmTicket(opts: {
   ticketId: string;
   sessionId: string;
   provider: LlmProviderId;
   model: string;
   budgetPass?: boolean;
-}, price: MoneyPrice): ApprovalTicket {
+}, price: MoneyPrice, estimate: ReturnType<typeof llmCallEstimate>): ApprovalTicket {
   const existing = storeTickets.get(opts.ticketId);
   let ticket = existing ?? createTicket({
     id: opts.ticketId,
@@ -148,12 +135,7 @@ function ensureLlmTicket(opts: {
     price,
   });
   if (opts.budgetPass) {
-    const committed = ticketCommittedUsd(ticket);
-    const pass: TicketPass = price.maxVerifiableUsd == null
-      ? { kind: 'once', maxUsd: null, allowUnknown: true }
-      : { kind: 'once', maxUsd: roundUsd(committed + price.maxVerifiableUsd) };
-    ticket = { ...ticket, price, pass };
-    storeTickets.put(ticket);
+    return grantTicketPass({ ...ticket, price }, estimate);
   } else if (!existing || ticket.pass) {
     ticket = { ...ticket, pass: undefined };
     storeTickets.put(ticket);
@@ -166,7 +148,8 @@ function ensureLlmTicket(opts: {
  * persists the durable mark, streams `chat()`, and settles actual usage cost idempotently by `sendId`.
  */
 export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaidSendOutcome> {
-  const price = priceFromEstimate(llmCallEstimate(opts.provider, opts.model));
+  const estimate = llmCallEstimate(opts.provider, opts.model);
+  const price = priceFromEstimate(estimate);
   const sendId = uid('llm');
   const chatOptions = {
     provider: opts.provider,
@@ -196,7 +179,7 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
   if (prior?.sends.some((send) => send.status === 'uncertain' || send.status === 'in_flight')) {
     throw new PaidSendBlockedError('ALREADY_SENT', 'This model request may already have been charged.', { ticketId: opts.ticketId });
   }
-  const ticket = ensureLlmTicket(opts, price);
+  const ticket = ensureLlmTicket(opts, price, estimate);
   try {
     const outcome = await paidSend<ChatResult>({
       ticketId: ticket.id,
@@ -226,21 +209,10 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
         return { value, costUsd, estimated };
       },
       signal: opts.signal,
-      classifyError: (err) => classifyLlmError(err, opts.signal),
+      isRetryable: err => err instanceof HttpError && err.status === 400 && /reason|effort|think/i.test(err.message),
     });
     return { sendId: outcome.sendId, value: outcome.value, costUsd: outcome.settled?.ticket.sends.find((send) => send.id === sendId)?.settledUsd ?? null };
   } catch (err) {
-    if (err instanceof PaidSendBlockedError) {
-      if (err.code === 'ABORTED') throw new AbortedError();
-      if (err.code === 'SAVE_FAILED') throw new SendNotCommittedError();
-      if (err.code === 'OVER_LIMIT' || err.code === 'UNKNOWN_PRICE' || err.code === 'PASS_EXCEEDED') {
-        throw new OverLimitError({
-          usd: price.usd,
-          approximate: price.kind !== 'exact',
-          ...(price.usd != null && price.maxVerifiableUsd == null ? { unbounded: true } : {}),
-        });
-      }
-    }
-    throw err;
+    throw legacyPaidSendError(err, price);
   }
 }

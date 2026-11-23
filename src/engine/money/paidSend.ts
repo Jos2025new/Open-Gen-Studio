@@ -4,7 +4,7 @@
  * in-flight & uncertain reservations, cumulative pass cap, durable pre-send mark (8 s cap),
  * and idempotent settlement by sendId. No store coupling and no pluggable store interface (KISS).
  */
-import { HttpError } from '../../lib/http';
+import { HttpError, isAbort, JobFailedError, NetworkError } from '../../lib/http';
 import type { RemoteJob } from '../sendTypes';
 import {
   availableBudgetUsd,
@@ -164,17 +164,13 @@ export function isCreditError(err: unknown): boolean {
   return /insufficient (credits?|balance|funds)|not enough (credits?|balance)|out of credits/i.test(String((err as Error)?.message ?? err));
 }
 
-/** Default provider-neutral error classifier: HTTP 402/400 refused before billing; network/abort after send is uncertain. */
-export function defaultClassifySendError(err: unknown): SendErrorDisposition {
-  if (!err || typeof err !== 'object') return 'uncertain';
-  const e = err as { name?: string; status?: number; message?: string };
-  if (e.name === 'JobFailedError') return 'job_failed';
-  if (e.status === 402 || /insufficient (credits?|balance|funds)|out of credits/i.test(e.message ?? '')) {
-    return 'refused_before_charge';
-  }
-  if (e.status === 400 && /reason|effort|think/i.test(e.message ?? '')) return 'retryable_before_charge';
-  if (/upstream access denied/i.test(e.message ?? '')) return 'retryable_before_charge';
-  return 'uncertain';
+function classifySendError(err: unknown, opts: PaidSendOptions<unknown>): SendErrorDisposition {
+  if (opts.restart?.()) return 'keep_in_flight';
+  if (err instanceof JobFailedError) return 'job_failed';
+  if (err instanceof NetworkError || isAbort(err) || opts.signal?.aborted) return 'uncertain';
+  if (opts.isRetryable?.(err)) return 'retryable_before_charge';
+  if (err instanceof HttpError) return err.status >= 500 || err.status === 408 ? 'uncertain' : 'refused_before_charge';
+  return isCreditError(err) ? 'refused_before_charge' : 'uncertain';
 }
 
 export interface TicketAccess {
@@ -220,6 +216,8 @@ export interface PaidSendOptions<T> {
   readonly local?: boolean;
   readonly saveTimeoutMs?: number;
   readonly classifyError?: (err: unknown) => SendErrorDisposition;
+  readonly restart?: () => boolean;
+  readonly isRetryable?: (err: unknown) => boolean;
   readonly now?: () => number;
 }
 
@@ -385,7 +383,7 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
       const latest = opts.tickets.get(opts.ticketId);
       const send = latest?.sends.find(x => x.id === sendId);
       if (latest && send && (send.status === 'in_flight' || send.status === 'sent' || send.status === 'uncertain')) {
-        const disposition = (opts.classifyError ?? defaultClassifySendError)(err);
+        const disposition = opts.classifyError?.(err) ?? classifySendError(err, opts);
         const msg = err instanceof Error ? err.message : String(err);
         if (disposition === 'job_failed') {
           opts.tickets.put(markSendFailed(latest, sendId, msg, now()));
