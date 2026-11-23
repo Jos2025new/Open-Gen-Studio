@@ -11,7 +11,6 @@ import { storeTickets } from '../money/storeBridge';
 import {
   createTicket,
   FREE_PRICE,
-  isFreePrice,
   isSendOut,
   markSendFailed,
   markSendInFlight,
@@ -111,7 +110,6 @@ function extractNodeIds(sequence: readonly FrozenCommandStep[] | undefined): str
 }
 
 function createCommandTicket(sessionId: string, itemId: string, request: ApprovalRequest): void {
-  if (isFreePrice(priceFromEstimate(request.estimate)) && !request.steps.some((step) => step.effect === 'delete')) return;
   const sequence = (request.sequence ?? []).map((s) => ({
     ...s,
     ...(s.preRan ? { preResult: cloneSafe(s.preResult) } : {}),

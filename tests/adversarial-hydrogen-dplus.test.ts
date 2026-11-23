@@ -151,8 +151,7 @@ it.fails('H2: requires re-review when live composer changes before approving a r
   expect(fake.acceptedCount('unreviewed edited composer prompt'), 'restored studio.generate.start sent an unreviewed prompt').toBe(0);
 });
 
-// reproduce: createCommandTicket skips creating a ticket for free/local command cards, leaving restored cards permanently unapprovable after reload.
-it.fails('H3a: allows approving a restored free/local command card after reload', async () => {
+it('H3a: allows approving a restored free/local command card after reload', async () => {
   patchNodeData(sid, 'n1', { modelRef: localRef, prompt: 'local reviewed' });
   const pending = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } }] });
   const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
@@ -168,8 +167,7 @@ it.fails('H3a: allows approving a restored free/local command card after reload'
   await vi.waitFor(() => expect(commandCard().status).toBe('done'));
 });
 
-// reproduce: refreshCommandReview returns false when no command ticket exists, putting a free/local card edited to a paid model into error instead of re-offering review.
-it.fails('H3b: re-offers a live free/local command card for review when the node is edited to a paid model before approval', async () => {
+it('H3b: re-offers a live free/local command card for review when the node is edited to a paid model before approval', async () => {
   patchNodeData(sid, 'n1', { modelRef: localRef, prompt: 'local initial' });
   const pending = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } }] });
   const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
