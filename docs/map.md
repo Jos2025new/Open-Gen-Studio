@@ -20,7 +20,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 460 | 377 |
+| [types.ts](../src/engine/types.ts) | 460 | 378 |
 | [store.ts](../src/store/store.ts) | 307 | 370 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
@@ -39,7 +39,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 38 | 10 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
 | [render.ts](../src/engine/design/render.ts) | 35 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 33 | 29 |
+| [graph.ts](../src/engine/flow/graph.ts) | 33 | 30 |
 
 ## Por área
 
@@ -57,11 +57,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 25 | 21 |
-| `src/engine` | 89 | 447 |
+| `src/engine` | 89 | 448 |
 | `src/engine/agent` | 71 | 164 |
 | `src/engine/commands` | 7 | 27 |
 | `src/engine/design` | 163 | 215 |
-| `src/engine/flow` | 21 | 95 |
+| `src/engine/flow` | 21 | 96 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 23 | 43 |
