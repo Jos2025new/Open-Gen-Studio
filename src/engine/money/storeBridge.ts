@@ -137,7 +137,7 @@ export function stepCapsFromMap(perStep: Record<string, Estimate> | undefined, p
 export function ticketPassFromEstimate(estimate: Estimate, steps?: Record<string, number | null>): TicketPass {
   const price = priceFromEstimate(estimate), vals = steps ? Object.values(steps) : [], hasSteps = vals.length > 0;
   const allowUnknown = hasSteps ? vals.some((v) => v === null) : price.maxVerifiableUsd == null;
-  const maxUsd = hasSteps ? (vals.some((v) => v !== null) ? roundUsd(vals.reduce<number>((s, v) => s + (v ?? 0), 0)) : null) : (price.maxVerifiableUsd ?? price.usd);
+  const maxUsd = hasSteps ? (vals.some((v) => v !== null) ? roundUsd(vals.reduce<number>((s, v) => s + (v ?? 0), 0)) : null) : price.maxVerifiableUsd;
   return { kind: 'once', maxUsd, ...(allowUnknown ? { allowUnknown: true } : {}), ...(hasSteps ? { steps: { ...steps } } : {}) };
 }
 

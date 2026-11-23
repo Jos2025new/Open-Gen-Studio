@@ -65,6 +65,9 @@ export function evaluateBudgetGate(opts: { ticket?: ApprovalTicket; price: Money
     }
     if (pass.maxUsd == null) {
       if (!pass.allowUnknown) return block(verifiable == null ? 'UNKNOWN_PRICE' : 'PASS_EXCEEDED', unkMsg);
+      if (ticket.price.lowerBound && verifiable != null && verifiable > remainingUsd + 1e-9 && (ticket.price.usd == null || ticketCommittedUsd(ticket) + verifiable > ticket.price.usd + 1e-9)) {
+        return block('OVER_LIMIT', `Send ($${verifiable.toFixed(4)}) exceeds remaining budget ($${Math.max(0, remainingUsd).toFixed(4)} after reservations).`);
+      }
       return unknownUses(ticket.sends.filter((s) => isSendOut(s.status)), generationId) >= 1
         ? block('PASS_EXCEEDED', 'One-time approval was already used.')
         : { ok: true, free: false, remainingUsd };

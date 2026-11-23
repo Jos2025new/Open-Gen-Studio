@@ -307,7 +307,7 @@ it('H4a: resumePlan(retry) within budget after an initial Continue once plan sta
 });
 
 // reproduce: ticketPassFromEstimate (storeBridge.ts:140) sets maxUsd = price.usd for lowerBound standalone gen tickets, blocking real quotes above the minimum even within budget.
-it.fails('H4b: Continue once on standalone lowerBound generation blocks when live quote exceeds minimum price even within budget', async () => {
+it('H4b: Continue once on standalone lowerBound generation blocks when live quote exceeds minimum price even within budget', async () => {
   installModels(0.25);
   useStore.setState((state) => ({
     settings: { ...state.settings, budgetOn: true, budgetUsd: 0.5 },
