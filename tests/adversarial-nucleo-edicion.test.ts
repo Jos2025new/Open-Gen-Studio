@@ -17,6 +17,7 @@ vi.mock('../src/engine/executor', async (original) => ({
 }));
 
 import { command, invoke, run } from '../src/engine/commands';
+import { finish } from '../src/engine/jobState';
 import { patchNodeData, prepareNodeRun, tryConnect } from '../src/engine/flow/actions';
 import { copyNodes, pasteNodes } from '../src/engine/flow/arrange';
 import { resetActions, runApproved } from '../src/engine/nodecore/action';
@@ -101,10 +102,12 @@ describe('public graph editing and inspector boundaries', () => {
 
   it('keeps the last result attached to its producing run after a newer approval goes stale', async () => {
     arrange({ nodes: [image('gen')], edges: [] });
-    const generation = { id: 'result', sessionId: session, kind: 'image', status: 'done', assetIds: ['simulated-image'], settings, inputs: { refs: [] } } as unknown as Generation;
+    const generation = { id: 'result', sessionId: session, kind: 'image', origin: 'node', stepId: 'gen', status: 'running',
+      modelRef: 'local::image', assetIds: [], createdAt: Date.now(), settings, inputs: { refs: [] }, estimate: { usd: 0, approximate: false } } as unknown as Generation;
     execute.mockImplementationOnce(async (_steps, context) => {
       useStore.setState({ generations: { [generation.id]: generation } });
       context.onState('gen', 'running', { generationId: generation.id });
+      finish(generation.id, ['simulated-image'], 0);
       context.onState('gen', 'done');
       return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
     });

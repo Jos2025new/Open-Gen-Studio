@@ -18,6 +18,7 @@ vi.mock('../src/engine/executor', async (original) => ({
 }));
 
 import { command, invoke, run } from '../src/engine/commands';
+import { finish } from '../src/engine/jobState';
 import { patchNodeData, prepareNodeRun } from '../src/engine/flow/actions';
 import { resetActions, runApproved } from '../src/engine/nodecore/action';
 import { sourceValue, storeEnv } from '../src/engine/nodecore/resolver';
@@ -32,6 +33,18 @@ const imageNode = (id: string, extra: Record<string, unknown> = {}) => ({
   data: { kind: 'image' as const, title: id, prompt: 'local prompt', modelRef: 'local::image', settings, outputIndex: 0, ...extra },
 });
 const completed = () => ({ outputs: new Map(), failed: [], skipped: [], waiting: [] });
+
+function deliverNodeResult(ctx: Parameters<typeof execute>[1], stepId: string, result: Generation) {
+  useStore.setState((st) => ({
+    generations: { ...st.generations, [result.id]: {
+      ...result, origin: 'node', stepId, status: 'running', assetIds: [], createdAt: Date.now(),
+      modelRef: 'local::image', estimate: { usd: 0, approximate: false },
+    } },
+  }));
+  ctx.onState(stepId, 'running', { generationId: result.id });
+  finish(result.id, result.assetIds, 0);
+  ctx.onState(stepId, 'done');
+}
 
 let sid: string;
 const install = (g: Graph, extra: Record<string, unknown> = {}) => {
@@ -143,9 +156,7 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
 
     const g1 = { id: 'g-first', sessionId: sid, kind: 'image', status: 'done', assetIds: ['a1'], settings, inputs: { refs: [] } } as unknown as Generation;
     execute.mockImplementationOnce(async (_steps, ctx) => {
-      useStore.setState((st) => ({ generations: { ...st.generations, [g1.id]: g1 } }));
-      ctx.onState('gen', 'running', { generationId: g1.id });
-      ctx.onState('gen', 'done');
+      deliverNodeResult(ctx, 'gen', g1);
       return completed();
     });
     const prep = await run({ cmd: 'nodes.action.prepare', args: { targets: ['gen'] }, on: { session: sid } }, opts);
@@ -154,9 +165,7 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
 
     const g2 = { id: 'g-second', sessionId: sid, kind: 'image', status: 'done', assetIds: ['a2'], settings, inputs: { refs: [] } } as unknown as Generation;
     execute.mockImplementationOnce(async (_steps, ctx) => {
-      useStore.setState((st) => ({ generations: { ...st.generations, [g2.id]: g2 } }));
-      ctx.onState('gen', 'running', { generationId: g2.id });
-      ctx.onState('gen', 'done');
+      deliverNodeResult(ctx, 'gen', g2);
       return completed();
     });
     expect((await run({ cmd: 'nodes.run.start', args: { targets: ['gen'] }, on: { session: sid } }, opts)).ok).toBe(true);
@@ -175,9 +184,8 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
 
     const gA1 = { id: 'gA1', sessionId: sid, kind: 'image', status: 'done', prompt: 'v1', modelRef: 'local::image', assetIds: ['a1'], settings, inputs: { refs: [] } } as unknown as Generation;
     execute.mockImplementationOnce(async (_steps, ctx) => {
-      useStore.setState((st) => ({ generations: { ...st.generations, [gA1.id]: gA1 }, assets: { ...st.assets, a1: { id: 'a1', kind: 'image', name: 'a1' } as never } }));
-      ctx.onState('imgA', 'running', { generationId: gA1.id });
-      ctx.onState('imgA', 'done');
+      useStore.setState((st) => ({ assets: { ...st.assets, a1: { id: 'a1', kind: 'image', name: 'a1' } as never } }));
+      deliverNodeResult(ctx, 'imgA', gA1);
       return completed();
     });
     const p1 = await run({ cmd: 'nodes.action.prepare', args: { targets: ['imgA'] }, on: { session: sid } }, opts);
@@ -189,13 +197,10 @@ describe('money, approvals and inspector attribution (neon adversarial)', () => 
     const gB2 = { id: 'gB2', sessionId: sid, kind: 'image', status: 'done', prompt: 'use A', modelRef: 'local::image', assetIds: ['b2'], settings, inputs: { refs: ['a2'] } } as unknown as Generation;
     execute.mockImplementationOnce(async (_steps, ctx) => {
       useStore.setState((st) => ({
-        generations: { ...st.generations, [gA2.id]: gA2, [gB2.id]: gB2 },
         assets: { ...st.assets, a2: { id: 'a2', kind: 'image', name: 'a2' } as never, b2: { id: 'b2', kind: 'image', name: 'b2' } as never },
       }));
-      ctx.onState('imgA', 'running', { generationId: gA2.id });
-      ctx.onState('imgA', 'done');
-      ctx.onState('imgB', 'running', { generationId: gB2.id });
-      ctx.onState('imgB', 'done');
+      deliverNodeResult(ctx, 'imgA', gA2);
+      deliverNodeResult(ctx, 'imgB', gB2);
       return completed();
     });
     const p2 = await run({ cmd: 'nodes.action.prepare', args: { targets: ['imgB'] }, on: { session: sid } }, opts);
