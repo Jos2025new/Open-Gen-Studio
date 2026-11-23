@@ -10,7 +10,7 @@ import { fal } from '../providers/fal';
 import { nanogpt } from '../providers/nanogpt';
 import { openrouter } from '../providers/openrouter';
 import type { GenResult, ProviderAdapter } from '../providers/types';
-import { paidSend, PaidSendBlockedError } from './paidSend';
+import { paidSend, PaidSendBlockedError, sendFree } from './paidSend';
 import {
   budgetSnapshotFor,
   canWriteTicket,
@@ -166,21 +166,22 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
     onToolCall: opts.onToolCall,
     onNotice: opts.onNotice,
   };
-  if (isFreePrice(price)) {
-    const value = await chat(chatOptions);
-    const costUsd = value.usage?.costUsd ?? 0;
-    if (costUsd > 0) addSpend(costUsd, {
-      category: 'agent', provider: opts.provider, model: opts.model,
-      sessionId: opts.sessionId, estimated: false, sendId,
-    });
-    return { sendId, value, costUsd };
-  }
   const prior = storeTickets.get(opts.ticketId);
   if (prior?.sends.some((send) => send.status === 'uncertain' || send.status === 'in_flight')) {
     throw new PaidSendBlockedError('ALREADY_SENT', 'This model request may already have been charged.', { ticketId: opts.ticketId });
   }
-  const ticket = ensureLlmTicket(opts, price, estimate);
+  const book = (usd: number | null, estimated: boolean) => addSpend(usd, {
+    category: 'agent', provider: opts.provider, model: opts.model, sessionId: opts.sessionId, estimated, sendId,
+  });
   try {
+    if (isFreePrice(price)) {
+      const outcome = await sendFree(sendId, async () => {
+        const value = await chat(chatOptions);
+        return { value, costUsd: value.usage?.costUsd ?? 0 };
+      }, opts.signal, undefined, (_, usd) => { book(usd, false); });
+      return { ...outcome, costUsd: outcome.value.usage?.costUsd ?? 0 };
+    }
+    const ticket = ensureLlmTicket(opts, price, estimate);
     const outcome = await paidSend<ChatResult>({
       ticketId: ticket.id,
       prepare: {
@@ -192,16 +193,7 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
       getBudget: () => budgetSnapshotFor(opts.sessionId),
       save: saveTicketMark,
       canWrite: canWriteTicket,
-      onBookSpend: (booking) => {
-        addSpend(booking.usd, {
-          category: 'agent',
-          provider: opts.provider,
-          model: opts.model,
-          sessionId: opts.sessionId,
-          estimated: booking.estimated,
-          sendId: booking.sendId,
-        });
-      },
+      onBookSpend: booking => { book(booking.usd, booking.estimated); },
       send: async () => {
         const value = await chat(chatOptions);
         const estimated = value.usage?.costUsd == null;

@@ -19,6 +19,7 @@ import { deliverSend, shareOfEstimate } from '../sendLedger';
 import type { Estimate, Generation, RemoteJob, SendRecord, Workspace } from '../types';
 import {
   paidSend,
+  sendFree,
   PaidSendBlockedError,
   type BudgetSnapshot,
   type PaidSendOutcome,
@@ -326,19 +327,14 @@ export async function sendGenerationViaPaidGate<T>(opts: GenerationPaidSendOpts<
   const accepted = sendsForGeneration(existing, g.id).some((slot) => slot.index === index && isSendOut(slot.status))
     || (get().generations[g.id] ?? g).sends?.some((slot) => slot.index === index && slot.status !== 'failed');
   if (accepted) throw new PaidSendBlockedError('ALREADY_SENT', 'This request may already have been charged.', { ticketId: existing?.id ?? generationTicketId(g.id), sendId });
-  if (isFreePrice(price)) {
-    if (signal.aborted) throw new AbortedError();
-    void saveNow().catch(() => undefined);
-    beforeTransport?.();
-    const result = await send({ sendId, onRemoteJob: () => undefined });
-    if (result.costUsd != null && result.costUsd > 0) {
-      deliverSend(g.id, sendId, index, result.costUsd, Boolean(result.estimated));
-    }
-    return { sendId, value: result.value, free: true };
-  }
-  const ticket = ensureGenerationTicket(g);
-  const slotKey = `${g.id}:${index}`;
   try {
+    if (isFreePrice(price)) {
+      return await sendFree(sendId, send, signal, beforeTransport, (result, cost) => {
+        deliverSend(g.id, sendId, index, cost, Boolean(result.estimated));
+      });
+    }
+    const ticket = ensureGenerationTicket(g);
+    const slotKey = g.id + ':' + index;
     return await paidSend<T>({
       ticketId: ticket.id,
       prepare: {

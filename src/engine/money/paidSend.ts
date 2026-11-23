@@ -257,6 +257,22 @@ function findSend(ticket: ApprovalTicket, sendId: string): TicketSend {
   return s;
 }
 
+/** Run a free request without reserving funds; book any unexpected provider charge. */
+export async function sendFree<T>(
+  sendId: string,
+  send: PaidSendOptions<T>['send'],
+  signal?: AbortSignal,
+  beforeTransport?: () => void,
+  book?: (result: PaidSendTransportResult<T>, costUsd: number) => SettleSendResult | void,
+): Promise<PaidSendOutcome<T>> {
+  if (signal?.aborted) throw new PaidSendBlockedError('ABORTED', 'Send aborted before start.', { sendId });
+  beforeTransport?.();
+  const result = await send({ sendId, onRemoteJob: () => undefined });
+  const cost = result.costUsd;
+  const settled = cost != null && Number.isFinite(cost) && cost > 0 ? book?.(result, cost) : undefined;
+  return { sendId, value: result.value, free: true, ...(settled ? { settled } : {}) };
+}
+
 /**
  * Single client-side gate for every paid send (media, special ops, 402 substitutes, and LLM).
  * Claims locks, verifies slot state + budget/reservations + pass cap, and reserves funds
@@ -299,17 +315,11 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
     return settled;
   };
 
-  // Free ($0 exact) or local sends never enter the paid reservation/save gate.
   if (opts.local || isFreePrice(slot.price)) {
-    if (opts.signal?.aborted) throw new PaidSendBlockedError('ABORTED', 'Send aborted before start.', { ticketId: ticket.id, sendId });
-    opts.beforeTransport?.();
-    const res = await opts.send({ sendId, onRemoteJob: () => undefined });
-    if (res.costUsd != null && Number.isFinite(res.costUsd) && res.costUsd > 0) {
+    return sendFree(sendId, opts.send, opts.signal, opts.beforeTransport, (result, costUsd) => {
       const latest = opts.tickets.get(opts.ticketId) ?? ticket;
-      const settled = close(markSendInFlight(latest, sendId, now()), { costUsd: res.costUsd, estimated: res.estimated });
-      return { sendId, value: res.value, free: true, settled };
-    }
-    return { sendId, value: res.value, free: true };
+      return close(markSendInFlight(latest, sendId, now()), { costUsd, estimated: result.estimated });
+    });
   }
 
   // Acquire locks synchronously before checking state and budget.
