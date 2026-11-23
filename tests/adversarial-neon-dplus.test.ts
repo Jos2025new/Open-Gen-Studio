@@ -192,7 +192,7 @@ it.fails('N1: invalidates nodes.run.start review when an upstream generated node
       ...state.assets,
       asset_up: {
         id: 'asset_up', kind: 'image', mime: 'image/png', width: 64, height: 64,
-        sessionId: sid, origin: 'composer', stored: true, favorite: false, createdAt: 1,
+        sessionId: sid, origin: 'generated', stored: true, favorite: false, createdAt: 1,
       },
     },
     generations: {
