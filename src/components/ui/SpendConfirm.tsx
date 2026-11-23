@@ -84,7 +84,7 @@ export function SpendConfirm({
           icon={Zap}
           disabled={Boolean(blocked)}
           onClick={() => {
-            void (over ? withOncePass(resolveSessionId?.() ?? sid, (pass) => onConfirm(pass)) : onConfirm());
+            void (over ? withOncePass(resolveSessionId?.() ?? sid, (pass) => onConfirm(pass), estimate.usd, estimate.lowerBound) : onConfirm());
           }}
           autoFocus
         >

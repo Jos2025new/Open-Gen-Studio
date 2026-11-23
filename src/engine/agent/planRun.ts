@@ -70,7 +70,7 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
     toast(problem, 'error');
     return;
   }
-  consumeOnce(budgetPass);
+  consumeOnce(budgetPass, total);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === itemId;
@@ -262,7 +262,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   // «Continuar» raises what this step spends above what was approved: over an active limit it needs the same pass as any other spend (PlanCard gives it with «Continue once»).
   const reviewProblem = decision === 'continue' ? budgetProblem(review.proposed.estimate, sessionId, budgetPass) : null;
   if (reviewProblem) { toast(reviewProblem, 'error'); return; }
-  if (decision === 'continue') consumeOnce(budgetPass);
+  if (decision === 'continue') consumeOnce(budgetPass, review.proposed.estimate);
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
@@ -339,7 +339,8 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   if (!item || item.type !== 'plan') return 'No such plan.';
   const problem = planRecoveryProblem(item, mode, sessionId, budgetPass);
   if (problem) return problem;
-  consumeOnce(budgetPass);
+  const recovery = planRecovery(item);
+  consumeOnce(budgetPass, mode === 'retry' ? recovery?.estimate : recovery?.rest);
   const { chosen, off } = approvedSteps(item);
   const failedIds = chosen.filter((st) => item.stepStates[st.id] === 'error').map((st) => st.id);
   const genOf = (id: string) => get().generations[item.stepGenerations[id] ?? ''];

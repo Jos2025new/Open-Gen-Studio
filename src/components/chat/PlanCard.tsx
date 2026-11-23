@@ -289,8 +289,9 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   <span className="step-script">
                     <p>{item.stepCostReviews[s.id].message}</p>
                     {(() => {
-                      const stepVerdict = readBudgetVerdict(item.stepCostReviews[s.id].proposed.estimate, sessionId);
-                      return <Button size="sm" variant="primary" data-tip={stepVerdict.over ? stepVerdict.text : undefined} onClick={() => { void (stepVerdict.over ? withOncePass(sessionId, (pass) => resolveStepCostReview(sessionId, item.id, s.id, 'continue', pass)) : resolveStepCostReview(sessionId, item.id, s.id, 'continue')); }}>{stepVerdict.over ? 'Continuar una vez' : 'Continuar'}</Button>;
+                      const estimate = item.stepCostReviews[s.id].proposed.estimate;
+                      const stepVerdict = readBudgetVerdict(estimate, sessionId);
+                      return <Button size="sm" variant="primary" data-tip={stepVerdict.over ? stepVerdict.text : undefined} onClick={() => { void (stepVerdict.over ? withOncePass(sessionId, (pass) => resolveStepCostReview(sessionId, item.id, s.id, 'continue', pass), estimate.usd, estimate.lowerBound) : resolveStepCostReview(sessionId, item.id, s.id, 'continue')); }}>{stepVerdict.over ? 'Continuar una vez' : 'Continuar'}</Button>;
                     })()}
                     <Button size="sm" variant="ghost" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'cancel'); }}>Cancelar paso</Button>
                   </span>
@@ -352,7 +353,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               className="cc-approve"
               disabled={revising || rewriting || Boolean(rewriteFailed) || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
-                void (over ? withOncePass(sessionId, (pass) => approvePlan(sessionId, item.id, pass)) : approvePlan(sessionId, item.id));
+                void (over ? withOncePass(sessionId, (pass) => approvePlan(sessionId, item.id, pass), total.usd, total.lowerBound) : approvePlan(sessionId, item.id));
               }}
               data-tip={over ? verdict.text : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}
             >

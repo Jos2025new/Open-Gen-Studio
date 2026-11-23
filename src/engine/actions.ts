@@ -9,12 +9,12 @@ import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
 import { ensureSchema, modelsOf, modelSummary, preferredModel, pickComposerModel, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
-import { autoLayout, graphBounds } from './flow/graph';
+import { autoLayout, graphBounds, nodeAttemptBusy } from './flow/graph';
 import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
 import { preferredProviderLabel } from './providers/registry';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
-import { holdAttemptNode } from './flow/locks';
+import { attemptNode, holdAttemptNode } from './flow/locks';
 import { modeFor, placeFor } from './place';
 import { sendSessionId, ensureSendSession } from '../store/spaceSession';
 import type { Mode, Place } from './placeTypes';
@@ -331,13 +331,21 @@ export async function regenerate(generationId: string, budgetPass?: BudgetPass):
   const spec = specFrom(g);
   const session = get().sessions[g.sessionId];
   // Node generations update their node; everything else appears in the conversation.
-  const held = holdAttemptNode(g, session?.graph.nodes ?? []);
+  const nodes = session?.graph.nodes ?? [];
+  const target = attemptNode(g, nodes);
+  if (target && nodeAttemptBusy(target, get().generations)) {
+    toast(`“${target.data.title}” is already running.`, 'info');
+    return;
+  }
+  const held = holdAttemptNode(g, nodes);
   if (!held) return;
   const node = held.node;
-  const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass });
+  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass });
   if (node) {
-    if ('sketchAssetId' in node.data && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
-    applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { generationId: next.id, sketchAssetId: undefined } as Partial<GraphNode['data']> } });
+    if ('sketchAssetId' in node.data && node.data.sketchAssetId) {
+      deleteAssets([node.data.sketchAssetId]);
+      applyEdit({ session: g.sessionId, op: { op: 'set', node: node.id, patch: { sketchAssetId: undefined } } });
+    }
   } else {
     appendFeed(g.sessionId, { ...feedBase('chat'), type: 'generation', generationId: next.id });
   }

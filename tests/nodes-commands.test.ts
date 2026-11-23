@@ -134,3 +134,12 @@ describe('a sequence on the node graph', () => {
     expect(graph().edges).toEqual([]);
   });
 });
+
+it('prices a missing Nodes action snapshot as unknown in its approval', async () => {
+  const approve = vi.fn(() => false);
+  await run({ cmd: 'nodes.action.run', on: { session: sid }, args: { approval: 'evicted-snapshot' } }, { caller: 'agent', approver: approve });
+  expect(approve).toHaveBeenCalledWith(expect.objectContaining({
+    estimate: expect.objectContaining({ usd: null }),
+    steps: [expect.objectContaining({ estimate: expect.objectContaining({ usd: null }) })],
+  }));
+});

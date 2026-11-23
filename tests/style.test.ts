@@ -84,7 +84,7 @@ describe('Recraft style creation', () => {
       throw new Error(`unexpected ${url}`);
     });
     const sessionId = 's';
-    const g = withOncePass(sessionId, (pass) => createGeneration({ sessionId, kind: 'text', prompt: 'Create Recraft style', modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: ['a', 'b'] }, origin: 'composer', estimate: { usd: null, approximate: true }, budgetPass: pass }));
+    const g = withOncePass(sessionId, (pass) => createGeneration({ sessionId, kind: 'text', prompt: 'Create Recraft style', modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: ['a', 'b'] }, origin: 'composer', estimate: { usd: null, approximate: true }, budgetPass: pass }), null);
     await runGeneration(g.id);
     expect(useStore.getState().generations[g.id]).toMatchObject({ status: 'done', text: '0f1e2d3c-aaaa-bbbb-cccc-111122223333' });
   });

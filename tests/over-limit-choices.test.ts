@@ -28,7 +28,7 @@ describe('over the limit: Continue once, Don\u2019t ask again, app switch (2026-
       for (let i = 0; i < 5; i++) expect(overLimit(known, 'A', pass)).toBe(false); // evaluating while painting
       consumeOnce(pass); // the approved action creates its first generation
       expect(overLimit(known, 'A', pass)).toBe(true);
-    });
+    }, known.usd);
     expect(overLimit(known, 'A')).toBe(true);
     expect(useStore.getState().sessions.A.noAskOverLimit).toBeFalsy();
   });
@@ -36,9 +36,9 @@ describe('over the limit: Continue once, Don\u2019t ask again, app switch (2026-
   it('another session does not inherit the pass, and its generation does not spend it', () => {
     withOncePass('A', (passA) => {
       expect(overLimit(known, 'B', passA)).toBe(true);
-      withOncePass('B', (passB) => { consumeOnce(passB); });
+      withOncePass('B', (passB) => { consumeOnce(passB); }, known.usd);
       expect(overLimit(known, 'A', passA)).toBe(false); // B starting a run does not spend A's pass
-    });
+    }, known.usd);
     expect(overLimit(known, 'A')).toBe(true);
   });
 
@@ -48,7 +48,7 @@ describe('over the limit: Continue once, Don\u2019t ask again, app switch (2026-
       expect(overLimit({ usd: 3, approximate: false }, 'A', pass)).toBe(false);
       consumeOnce(pass); // first node's generation created; the rest of the batch was already approved
       expect(overLimit({ usd: 3, approximate: false }, 'A', pass)).toBe(true);
-    });
+    }, 3);
   });
 
   it('Don\u2019t ask again stops asking in that session only, and Ask again brings it back', () => {

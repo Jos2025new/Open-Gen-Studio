@@ -24,7 +24,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { deliverSend, shareOfEstimate } from './sendLedger';
 import { commitPaidSend, flushSendSave, interruptedByReload, wasFreeSend, recordRemoteJob, rollbackSendIntent, SendNotCommittedError, settleFailedSend } from './sendMark';
-import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, startGenerationPass, type BudgetPass } from './budget';
+import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -54,8 +54,8 @@ export function createGeneration(spec: GenerationSpec): Generation {
   // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
   const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || batchStepApproved(spec.sessionId, spec.batchToken, spec.stepId);
   assertWithinLimit(estimate, spec.sessionId, approved, spec.budgetPass);
-  const hadPass = passActiveFor(spec.budgetPass, spec.sessionId) || batchStepHadPass(spec.sessionId, spec.batchToken, spec.stepId);
-  consumeOnce(spec.budgetPass);
+  const pass = passActiveFor(spec.budgetPass, spec.sessionId, estimate) ? spec.budgetPass : undefined;
+  const passOwner = pass ?? (batchStepHadPass(spec.sessionId, spec.batchToken, spec.stepId) ? spec.batchToken : undefined);
   const parsed = parseModelRef(spec.modelRef);
   const g: Generation = {
     id: uid('gen'),
@@ -80,11 +80,13 @@ export function createGeneration(spec: GenerationSpec): Generation {
     operationId: spec.operationId,
     planId: spec.planId,
     stepId: spec.stepId,
+    ...(spec.nodeRequest ? { nodeRequest: spec.nodeRequest } : {}),
     ...(spec.variants?.length ? { variants: spec.variants } : {}),
     createdAt: Date.now(),
   };
+  if (passOwner && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, passOwner);
+  consumeOnce(spec.budgetPass, estimate);
   upsertGeneration(g);
-  if (hadPass && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, spec.budgetPass ?? spec.batchToken);
   return g;
 }
 
@@ -141,6 +143,7 @@ async function attempt(id: string, nodeLock?: () => void): Promise<string[]> {
 async function execute(id: string): Promise<string[]> {
   const g0 = get().generations[id];
   if (!g0) throw new Error('Generation not found');
+  const checkQuote = generationQuoteGuard(id);
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
@@ -244,7 +247,10 @@ async function execute(id: string): Promise<string[]> {
           reqId: activeReqId,
           quote,
           signal,
-          authorize: proposed ? () => checkStepAuthorization(g, proposed) : undefined,
+          authorize: () => {
+            checkQuote(quote);
+            if (proposed) checkStepAuthorization(g, proposed);
+          },
         });
         freeSend = committed.freeSend;
         activeReqId = committed.reqId;
@@ -456,7 +462,7 @@ export function retryGeneration(id: string, planItemId?: string, budgetPass?: Bu
   try {
     clearGenerationPass(id, true);
     // New Generation: another attempt of the same operation.
-    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), budgetPass });
+    const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g), nodeRequest: g.nodeRequest, budgetPass });
     patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
     // The failed attempt's card now shows this one, so the retry's result is seen.
     relinkAttempt(g.id, newG.id);

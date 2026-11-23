@@ -60,13 +60,21 @@ export default [
   },
   {
     id: 'budget-verdict-boundary',
-    what: 'budgetVerdict es la única regla del tope; los pases Continue once pertenecen a la acción en memoria (nunca a la sesión) y solo budget.ts, credit.ts y useBudgetVerdict.ts importan overLimit/budgetVerdict.',
+    what: 'budgetVerdict aplica el límite. Cada pase queda en memoria, con el importe mostrado y el gasto acumulado de su secuencia. Un paso solo recibe permiso para un precio desconocido si se mostró así en la aprobación.',
     sides: [
       ['src/engine/budget.ts', 'export function budgetVerdict('],
+      ['src/engine/budget.ts', 'export function llmCallEstimate('],
+      ['src/engine/jobs.ts', 'const checkQuote = generationQuoteGuard(id)'],
+      ['src/engine/commands/run.ts', 'withSequenceStepPass(budgetPass,'],
+      ['src/engine/agent/commandCalls.ts', 'beginOncePass(sessionId, entry.request.estimate.usd, unknownSteps)'],
+      ['src/components/ui/SpendConfirm.tsx', 'estimate.usd, estimate.lowerBound'],
+      ['src/components/chat/PlanCard.tsx', 'total.usd, total.lowerBound'],
+      ['src/components/chat/RecoveryActions.tsx', 'estimate.usd, estimate.lowerBound'],
       ['src/engine/credit.ts', 'budgetVerdict('],
+      ['src/engine/credit.ts', 'bindRetryQuoteApproval(genId, estimate, pass)'],
       ['src/components/ui/useBudgetVerdict.ts', 'export function useBudgetVerdict('],
       ['scripts/check-budget-verdict.mjs', 'export function check('],
     ],
-    tests: ['tests/budget-action-pass.test.ts', 'tests/check-budget-verdict.test.ts'],
+    tests: ['tests/budget-action-pass.test.ts', 'tests/check-budget-verdict.test.ts', 'tests/once-pass.test.ts', 'tests/agent-commands.test.ts'],
   },
 ];

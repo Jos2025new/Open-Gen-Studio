@@ -1,5 +1,3 @@
-import { videoOpSettings } from '../jobs';
-import { opChoice } from '../opSpec';
 import { parseRef } from '../planRef';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
@@ -7,16 +5,17 @@ import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModel
 import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
 import { isStepKind } from '../planSteps/inspect';
 import { nodeRequest, stable } from './freshness';
+import { rememberNodeRequest, requestContext } from './result';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
 import { placeFor } from '../place';
 import { uid } from '../../lib/id';
 import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
-import { defaultOpParams, isVideoOpEngine, OPS } from '../ops';
+import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
-import { appendFeed, updateFeedItem, patchGeneration, toast, useStore } from '../../store/store';
-import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
+import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
+import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeAttemptBusy, nodeOutputAsset } from './graph';
 import { beginBatchPass, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { findCycle } from '../nodecore/deps';
@@ -191,25 +190,6 @@ export function runnableIds(nodes: GraphNode[]): string[] {
   return nodes.filter((n) => runsGeneration(n.data)).map((n) => n.id);
 }
 
-function requestContext(sessionId: string) {
-  const st = get(), graph = st.sessions[sessionId].graph;
-  const env = storeEnv();
-  return { schemas: st.catalog.schemas, assets: st.assets, operation: (n: GraphNode) => {
-    if (n.data.kind !== 'tool') return undefined;
-    const engine = OPS[n.data.op].engine;
-    if (['local', 'voice'].includes(engine)) return undefined;
-    const input = resolveInputs(graph, n, env).find(i => i.port === 'input' && i.from && i.status !== 'invalid' && !i.incompatible);
-    const edge = input && graph.edges.find(e => e.id === input.edgeId);
-    const sourceNode = input && graph.nodes.find(src => src.id === input.from);
-    const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations, edge?.outputIndex) : null;
-    const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
-    // A step from a confirmed plan carries the model the user approved (and the estimate priced): opChoice puts it before the source's model.
-    const { ref, viaEdit } = opChoice({ op: n.data.op, params: n.data.params, sourceAssetId: source && st.assets[source] ? source : '', upstreamModelRef: sourceRef });
-    const choice = { ref, viaEdit };
-    return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : isVideoOpEngine(engine) ? { settings: videoOpSettings(engine, st.catalog.schemas[choice.ref], n.data.params) } : {}) };
-  } };
-}
-
 /** The model and settings each tool node runs with: what the confirmation prices and what the send uses. */
 function nodeOperationsOf(context: ReturnType<typeof requestContext>, graph: import('../types').Graph, ids: string[]) {
   return Object.fromEntries(ids.map(id => [id, context.operation(graph.nodes.find(n => n.id === id)!)]));
@@ -244,8 +224,9 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
     // A node this run writes must be free; an input only must not be generating.
-    const busyGen = runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status);
-    if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) errors.push(`“${n.data.title}” is already running.`);
+    const busyGen = nodeAttemptBusy(n, st.generations);
+    const busy = `“${n.data.title}” is already running.`;
+    if (((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) && !errors.includes(busy)) errors.push(busy);
     // A required field left empty stops the run before any provider is called (every operation, from its field list).
     if (n.data.kind === 'tool' && run.runIds.includes(id)) for (const f of OPS[n.data.op].fields ?? []) {
       const v = n.data.params[f.key];
@@ -324,26 +305,15 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     return [...(asset ? [asset] : []), ...subjects.flatMap(s => [s.frontal, s.video, ...s.refs].filter((id): id is string => Boolean(id))), ...(n.data.kind === 'tool' && typeof n.data.params.mask === 'string' ? [n.data.params.mask] : [])];
   });
   const releaseAssets = lockAssets(assetIds);
-  const pending = new Map<string, string>();
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
   const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
-  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id), budgetPass);
+  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id), preview.estimate, budgetPass);
   try {
     const result = await executeSteps(preview.steps, {
       sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLock: release, nodeLibrary: library, nodeOperations,
       onState: (stepId, state, info) => {
-        if (info?.generationId) pending.set(stepId, info.generationId);
-        const generationId = pending.get(stepId);
-        if (state === 'done' && generationId) {
-          const st = get(), graph = startGraph;
-          const node = graph.nodes.find(n => n.id === stepId)!;
-          const completed = { ...node, data: { ...node.data, generationId } } as GraphNode;
-          const snapshot = { ...graph, nodes: graph.nodes.map(n => n.id === stepId ? completed : n) };
-          patchGeneration(generationId, { nodeRequest: stable(nodeRequest(snapshot, completed, st.generations, library, { ...context, schemas: st.catalog.schemas })) });
-          // Keep what the user edited meanwhile; only the result changes.
-          applyEdit({ session: sessionId, op: { op: 'set', node: stepId, patch: { generationId } as Partial<GraphNodeData> } });
-        }
+        if (info?.generationId) rememberNodeRequest(info.generationId, startGraph, library, context);
         onState?.(stepId, state, info);
       },
     });

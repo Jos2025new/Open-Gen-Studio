@@ -208,7 +208,7 @@ describe('Part 3b: agent turn over-limit choices and plan wrap-up budget guard',
     const card = attachPlan(sidA);
 
     expect(budgetVerdict(card.estimate, { sessionId: sidA }).over).toBe(true);
-    await withOncePass(sidA, (pass) => approvePlan(sidA, card.id, pass));
+    await withOncePass(sidA, (pass) => approvePlan(sidA, card.id, pass), card.estimate.usd, card.estimate.lowerBound);
 
     // Plan executed and passed the limit, so wrap-up llmTurn MUST ask again (0 LLM POSTs so far).
     expect(ADAPTERS.nanogpt.generate).toHaveBeenCalledTimes(1);

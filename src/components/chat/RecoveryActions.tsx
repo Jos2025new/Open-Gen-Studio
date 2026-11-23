@@ -37,7 +37,8 @@ export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item
       }
       return pass ? resumePlan(sessionId, item.id, mode, true, pass) : resumePlan(sessionId, item.id, mode, true);
     };
-    void (readBudgetVerdict(mode === 'retry' ? r.estimate : r.rest, sessionId).over ? withOncePass(sessionId, go) : go());
+    const estimate = mode === 'retry' ? r.estimate : r.rest;
+    void (readBudgetVerdict(estimate, sessionId).over ? withOncePass(sessionId, go, estimate.usd, estimate.lowerBound) : go());
   };
   const quiet = (mode: PlanRecoveryMode) => { dontAskAgain(sessionId); run(mode); };
   const confirmAndRetry = () => {
@@ -92,7 +93,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
       void retryGeneration(g.id);
       return;
     }
-    void (over ? withOncePass(g.sessionId, (pass) => retryGeneration(g.id, undefined, pass)) : retryGeneration(g.id));
+    void (over ? withOncePass(g.sessionId, (pass) => retryGeneration(g.id, undefined, pass), estimate.usd, estimate.lowerBound) : retryGeneration(g.id));
   };
   return (
     <div className="recover-chips">

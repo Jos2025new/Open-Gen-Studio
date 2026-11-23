@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { budgetProblem } from '../actions';
 import { nodeCommand, nodeRef } from '../flow/commandKit';
 import { LINK_KINDS } from '../graphTypes';
+import { UNKNOWN } from '../pricing';
 import { applyEdit } from './edit';
 import { prepareAction, runAction, snapshotById } from './action';
 import { inspectNode } from './inspect';
@@ -71,7 +72,7 @@ export const commands = [
     description: 'Runs a prepared snapshot under a run id. One approval pays for one send: the same run id again returns the running or finished run (failed included) and never sends twice; another id with a used approval is refused. After a failure, or after a reload (approvals are not kept), prepare and approve again. Spends money.',
     args: z.object({ approval: z.string().min(1).max(80), runId: z.string().min(1).max(80).optional() }).strict(),
     effect: 'spend',
-    estimate: (_on, args) => snapshotById(args.approval)?.preview.estimate ?? { usd: 0 } as never,
+    estimate: (_on, args) => snapshotById(args.approval)?.preview.estimate ?? UNKNOWN,
     run: async (on, args, ctx) => {
       const snapshot = snapshotById(args.approval);
       if (!snapshot || snapshot.session !== on.session) throw new Error('This approval is unknown or belongs to another session; prepare the action again.');

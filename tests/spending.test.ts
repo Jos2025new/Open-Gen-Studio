@@ -59,7 +59,7 @@ describe('the limit warns, it does not block (G2)', () => {
       expect(budgetProblem(run, undefined, pass)).toBeNull();
       consumeOnce(pass);
       expect(overLimit(run, undefined, pass)).toBe(true);
-    });
+    }, run.usd);
     expect(overLimit(run)).toBe(true);
     askAgain();
     vi.useRealTimers();

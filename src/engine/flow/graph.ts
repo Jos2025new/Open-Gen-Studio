@@ -316,7 +316,7 @@ function latestAttemptByStep(generations: Record<string, Generation>): Map<strin
   for (const g of Object.values(generations)) {
     if (!g.stepId) continue;
     const prev = index.get(g.stepId);
-    if (!prev || g.createdAt > (prev.createdAt ?? 0)) index.set(g.stepId, g);
+    if (!prev || g.createdAt >= (prev.createdAt ?? 0)) index.set(g.stepId, g);
   }
   attemptByStep.set(generations, index);
   return index;
@@ -328,7 +328,16 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
   const direct = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
   const byStep = latestAttemptByStep(generations).get(node.id);
   if (!byStep) return direct;
-  return !direct || byStep.createdAt > (direct.createdAt ?? 0) ? byStep : direct;
+  return !direct || byStep.createdAt >= (direct.createdAt ?? 0) ? byStep : direct;
+}
+
+export function nodeAttemptBusy(node: GraphNode, generations: Record<string, Generation>): boolean {
+  if (!runsGeneration(node.data)) return false;
+  const attempt = nodeAttempt(node, generations);
+  return Boolean(attempt && attempt.status !== 'done' && (
+    attempt.status === 'queued' || attempt.status === 'running' || attempt.lostJob || attempt.remoteJob || attempt.sending != null ||
+    attempt.sends?.some(send => send.status === 'intent' || send.status === 'sent' || send.status === 'uncertain')
+  ));
 }
 
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
@@ -406,6 +415,11 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     const effectiveForced = forced || (options.force !== false && targetSet.has(id));
     if (checked.has(id) && (!effectiveForced || checked.get(id))) return checked.get(id)!;
     if (!runsGeneration(n.data)) return false;
+    if (nodeAttemptBusy(n, generations)) {
+      const problem = `“${n.data.title}” is already running.`;
+      if (!errors.includes(problem)) errors.push(problem);
+      return false;
+    }
     visiting.add(id);
     // A subject whose source was deleted is reported by the preview as a missing input, not walked.
     const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' && byId.has(p.id) ? [p.id] : []; }) : [];

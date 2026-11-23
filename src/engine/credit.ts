@@ -10,7 +10,7 @@ import { estimateMedia } from './costs';
 import type { Estimate, GenSettings, Generation, LlmProviderId, ModelSummary, ProviderId } from './types';
 import { patchGeneration, setSettings, useStore } from '../store/store';
 import { autoSwitchMode } from './notices';
-import { budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, dontAskAgain, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
+import { bindRetryQuoteApproval, budgetVerdict, clearGenerationPass, consumeOnce, deferGenerationPass, dontAskAgain, llmCallEstimate, takeGenerationPass, withOncePass, type BudgetPass } from './budget';
 import { attemptNode, holdAttemptNode } from './flow/locks';
 import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
@@ -166,7 +166,7 @@ function confirmOverLimit(
     level: 'warn',
     text: `${title}: ${verdict.text}`,
     actions: [
-      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, (once) => proceed(once)); } },
+      { label: 'Continue once', run: () => { dismissAlert(id); void withOncePass(sessionId, (once) => proceed(once), e.usd, e.lowerBound); } },
       { label: 'Cancel', run: () => dismissAlert(id) },
     ],
   });
@@ -252,12 +252,20 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const retry = estimateForRetry({ ...g, ...patch });
     return retry.lowerBound ? { ...retry, usd: null } : retry;
   };
-  const sendLater = (o: CreditOption, patch: ReturnType<typeof substitute>, what: string) => () => (async () => {
+  const retryChoices = '“Continue once” runs only this generation on that model.';
+  const sendLater = (o: CreditOption, what: string): ((pass?: BudgetPass) => Promise<void>) => (pass) => (async () => {
     if (stale()) return;
+    const patch = substitute(o);
+    const estimate = retryEstimateFor(patch);
+    if (budgetVerdict(estimate, { sessionId: g.sessionId, pass }).over) {
+      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), estimate, retryChoices, sendLater(o, what), pass);
+      return;
+    }
     const held = holdAttemptNode(g, nodes());
     if (!held) return;
     try {
       applySubstitute(o, patch);
+      bindRetryQuoteApproval(genId, estimate, pass);
       await later(genId, held.release);
       if (held.node && get().generations[genId]?.status === 'done') {
         applyEdit({ session: g.sessionId, op: { op: 'set', node: held.node.id, patch: { generationId: genId } } });
@@ -281,7 +289,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const est = retryEstimateFor(patch);
     const subPass = useSubPass ? takeGenerationPass(genId, est) : undefined;
     try {
-      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, '\u201cContinue once\u201d runs only this generation on that model.', sendLater(o, patch, what), subPass);
+      confirmOverLimit(g.sessionId, label(o.model, o.ratio, o.usd), est, retryChoices, sendLater(o, what), subPass);
     } finally {
       consumeOnce(subPass);
     }
@@ -314,8 +322,8 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
         g.sessionId,
         label(auto.model, undefined, auto.usd),
         est,
-        '\u201cContinue once\u201d runs only this generation on that model.',
-        () => {
+        retryChoices,
+        (pass) => {
           if (!immediate) {
             if (stale()) return;
             if (g.planId) {
@@ -323,12 +331,13 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
               pushAlert({ level: 'info', text: `${cur.name} will run on ${label(auto.model, auto.ratio, auto.usd)}. Review the updated price on the plan before choosing Retry.` });
               return;
             }
-            return sendLater(auto, patch, 'switch provider after no credit')();
+            return sendLater(auto, 'switch provider after no credit')(pass);
           }
           const held = holdAttemptNode(g, nodes(), nodeLock);
           if (!held) { run = Promise.resolve(false); return; }
           pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
           applySubstitute(auto, patch);
+          bindRetryQuoteApproval(genId, est, pass);
           try {
             run = Promise.resolve(rerun(genId)).then(() => true).finally(held.release);
           } catch (err) {

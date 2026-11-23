@@ -3,6 +3,7 @@ import { getAssetBlob } from '../lib/idb';
 import { patchGeneration, saveNow, useStore } from '../store/store';
 import { addSpend } from '../store/spend';
 import { noteExcess, type BudgetPass } from './budget';
+import { linkCompletedNode } from './flow/result';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { deliveryNotes } from './delivery';
 import { isVideoOpEngine, OPS } from './ops';
@@ -32,6 +33,7 @@ export interface GenerationSpec {
   operationId?: string;
   planId?: string;
   stepId?: string;
+  nodeRequest?: string;
   /** Runtime token covering the steps of an approved Nodes run; never persisted. */
   batchToken?: symbol;
   /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
@@ -81,6 +83,7 @@ export function finishText(id: string, text: string, actualUsd: number | undefin
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined, sending: undefined, ...(sends ? { sends } : {}) });
   if (!usesLedger(g)) addSpend(cost, spendEntry(g, actualUsd == null));
   noteExcess(id);
+  linkCompletedNode(id);
   void saveNow().catch(() => undefined);
 }
 
@@ -117,6 +120,7 @@ export function finish(id: string, assetIds: string[], actualUsd: number | undef
   });
   if (!ledger) addSpend(actualUsd ?? g.estimate.usd, spendEntry(g, actualUsd == null));
   noteExcess(id);
+  linkCompletedNode(id);
   void saveNow().catch(() => undefined);
 }
 

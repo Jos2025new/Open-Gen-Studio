@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BudgetPass } from '../budget';
+import { withSequenceStepPass, type BudgetPass } from '../budget';
 import { FREE, UNKNOWN, sumEstimates } from '../pricing';
 import type { Estimate } from '../types';
 import { echo } from './echo';
@@ -290,6 +290,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
 
   const seq = steps.length > 1 ? ++sequences : undefined;
   let budgetPass: BudgetPass | undefined;
+  const reviewedSpends = new Map<number, Estimate>();
   const runStep = (i: number, bufferedEchoes?: (() => void)[]): Promise<void> | void => {
     const step = steps[i];
     const { spec } = step;
@@ -321,7 +322,10 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       check(spec, ctx, args);
       openHistories(spec, on, args, txs);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
-      const out: unknown = spec.run(ctx, args);
+      const out: unknown = spec.effect === 'spend' && budgetPass?.kind === 'sequence'
+        ? withSequenceStepPass(budgetPass, on.session ?? budgetPass.sessionId, spec.estimate?.(ctx, args) ?? UNKNOWN, reviewedSpends.get(i + 1),
+          stepPass => spec.run({ ...ctx, budgetPass: stepPass }, args))
+        : spec.run(ctx, args);
       if (thenable(out)) {
         return settle(out, txs).then(
           (val) => {
@@ -401,6 +405,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     }
 
     const spendEstimates = asks.filter((a) => a.effect === 'spend').map((a) => a.estimate);
+    for (const ask of asks) if (ask.effect === 'spend') reviewedSpends.set(ask.step, ask.estimate);
     const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
     let yes = false;
     try {

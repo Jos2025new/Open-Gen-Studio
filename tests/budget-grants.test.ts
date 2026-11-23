@@ -8,8 +8,8 @@ describe('budget grants', () => {
   it('keeps overlapping approved sequences valid until each finishes', () => {
     const a = createSession('a'), b = createSession('b');
     useStore.setState((s) => ({ sessions: { ...s.sessions, [a.id]: a, [b.id]: b }, activeSessionId: a.id, settings: { ...s.settings, budgetOn: true, budgetUsd: 10, budgetAccepted: undefined, budgetNoAsk: false } }));
-    const grantA = beginOncePass(a.id);
-    const grantB = beginOncePass(b.id);
+    const grantA = beginOncePass(a.id, 0.1);
+    const grantB = beginOncePass(b.id, 0.1);
     try {
       expect(overLimitAccepted(a.id, grantA.pass)).toBe(true);
       expect(overLimitAccepted(b.id, grantB.pass)).toBe(true);
@@ -40,9 +40,9 @@ describe('budget grants', () => {
       settings: { ...s.settings, budgetOn: true, budgetUsd: 10, budgetAccepted: undefined, budgetNoAsk: false },
     }));
 
-    const grantA1 = beginOncePass(a.id);
-    const grantA2 = beginOncePass(a.id);
-    const grantB = beginOncePass(b.id);
+    const grantA1 = beginOncePass(a.id, 0.1);
+    const grantA2 = beginOncePass(a.id, 0.1);
+    const grantB = beginOncePass(b.id, 0.1);
     try {
       consumeOnce(grantA1.pass); // sequence passes survive spend steps
       expect(overLimitAccepted(a.id, grantA1.pass)).toBe(true);
@@ -68,9 +68,9 @@ describe('budget grants', () => {
         consumeOnce(passB);
         expect(overLimitAccepted(b.id, passB)).toBe(false);
         expect(overLimitAccepted(a.id, passA)).toBe(true);
-      });
+      }, 0.1);
       expect(overLimitAccepted(a.id, passA)).toBe(true);
-    });
+    }, 0.1);
     expect(overLimitAccepted(a.id)).toBe(false);
   });
 });

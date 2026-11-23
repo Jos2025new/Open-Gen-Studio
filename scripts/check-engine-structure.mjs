@@ -7,7 +7,7 @@ import { parseSync } from 'rolldown/utils';
 // 1. jobs.ts is provider-neutral: a provider's quirks are optional capabilities of its ProviderAdapter.
 // 2. Providers reach the IndexedDB cache only through cachedJson / peekCached in providers/shared.ts.
 // 4. The model an operation runs with is chosen in one place, opChoice() (opSpec.ts): the send, the estimate
-//    (planSteps/exec/op.ts) and the Nodes preview (flow/actions.ts) call it and keep no chain of their own.
+//    (planSteps/exec/op.ts) and the Nodes request context (flow/result.ts) call it and keep no chain of their own.
 // 3. jobs.ts holds the send, not the operation specs (opSpec.ts) or the remote-job recovery (jobRecovery.ts).
 const RULES = { neutral: true, split: true };
 const NAMED_PROVIDER = /\b(atlas|fal|nanogpt|openrouter)\b|\bOP_PROVIDERS\b/i;
@@ -16,7 +16,7 @@ const NEUTRAL_FILES = new Set(['jobs.ts', 'quotes.ts', 'costs.ts', 'opSpec.ts', 
 const MOVED_OUT = /^(?:export\s+)?(?:async\s+)?function\s+(opSpec\w*|videoOp\w*|inputKindOf|recover\w*|resumeRemote\w*)\b/;
 
 const OWN_CHOICE = /\b(opModelForAsset|opModelFromRef|reusedOpChoice)\(/;
-const CHOICE_CALLERS = ['src/engine/planSteps/exec/op.ts', 'src/engine/flow/actions.ts', 'src/engine/actions.commands.ts'];
+const CHOICE_CALLERS = ['src/engine/planSteps/exec/op.ts', 'src/engine/flow/result.ts', 'src/engine/actions.commands.ts'];
 
 function isTypeOnlyDecl(node) {
   if (node.importKind === 'type' || node.exportKind === 'type') return true;

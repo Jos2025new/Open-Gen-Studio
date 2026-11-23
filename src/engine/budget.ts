@@ -52,13 +52,16 @@ type GenerationPassEntry = {
   sessionId: string;
   budgetUsd: number;
   approvedUsd: number | null;
+  quoteApprovedUsd: number | null;
+  priorSendIds?: ReadonlySet<string>;
   started: boolean;
   owner?: BudgetPass | symbol;
   deferred?: boolean;
 };
 
 /** Active passes keyed by object identity so forged objects are rejected and reload clears everything. */
-const activePasses = new Map<BudgetPass, { sessionId: string; kind: 'once' | 'sequence' }>();
+type PassEntry = { remainingUsd: number; unknownRemaining: number };
+const activePasses = new Map<BudgetPass, PassEntry>();
 /** One-shot in-memory entitlement for a same-price 402 substitute of a generation approved with a pass (not in activePasses until taken). */
 const substitutePasses = new Map<string, GenerationPassEntry>();
 /** Approved multi-step batches (Nodes runs): scoped to one run's steps so unrelated sends still ask. */
@@ -71,9 +74,15 @@ function releaseUnstartedOwned(owner: BudgetPass | symbol): void {
 }
 
 function passHolds(pass: BudgetPass | undefined, sessionId: string): boolean {
-  if (!pass) return false;
-  const entry = activePasses.get(pass);
-  return Boolean(entry && entry.sessionId === sessionId);
+  return Boolean(pass && pass.sessionId === sessionId && activePasses.has(pass));
+}
+
+const hasUnknownPrice = (estimate: Estimate) => estimate.usd == null || Boolean(estimate.lowerBound);
+
+function covers(entry: PassEntry, estimate: Estimate): boolean {
+  const usd = estimate.usd ?? 0;
+  return (!hasUnknownPrice(estimate) || entry.unknownRemaining > 0)
+    && Number.isFinite(usd) && usd >= 0 && usd <= entry.remainingUsd + 1e-9;
 }
 
 function runWithPass<T>(end: () => void, action: () => T): T {
@@ -126,15 +135,20 @@ export function overLimitAccepted(sessionId?: string, pass?: BudgetPass): boolea
 }
 
 /** True when `pass` is currently active for `sessionId`. */
-export function passActiveFor(pass: BudgetPass | undefined, sessionId: string): boolean {
-  return passHolds(pass, sessionId);
+export function passActiveFor(pass: BudgetPass | undefined, sessionId: string, estimate?: Estimate): boolean {
+  return Boolean(pass && passHolds(pass, sessionId) && (!estimate || covers(activePasses.get(pass)!, estimate)));
 }
 
-/** The approved action started spending: retire its own once-pass (sequence passes stay alive until ended). */
-export function consumeOnce(pass?: BudgetPass): void {
+/** Reserve the cost at execution. Price previews only read the pass. */
+export function consumeOnce(pass?: BudgetPass, estimate?: Estimate): void {
   if (!pass) return;
   const entry = activePasses.get(pass);
-  if (entry && entry.kind === 'once') activePasses.delete(pass);
+  if (!entry) return;
+  if (pass.kind === 'once') activePasses.delete(pass);
+  else if (estimate && covers(entry, estimate)) {
+    entry.remainingUsd -= estimate.usd ?? 0;
+    if (hasUnknownPrice(estimate)) entry.unknownRemaining--;
+  }
 }
 
 /**
@@ -149,7 +163,7 @@ export function budgetVerdict(
   const unknownPrice = e.usd == null;
   if (e.usd === 0) return { over: false, remaining, unknownPrice: false };
   const sid = opts.sessionId ?? get().activeSessionId;
-  const accepted = overLimitAccepted(sid, opts.pass);
+  const accepted = overLimitAccepted(sid) || passActiveFor(opts.pass, sid, e);
   const over = remaining != null && !accepted && (unknownPrice || e.usd! > remaining + 1e-9);
   return { over, remaining, unknownPrice, ...(over ? { text: overLimitText(e, opts.choices) } : {}) };
 }
@@ -194,9 +208,9 @@ export function overLimitText(e: Estimate, choices = '“Continue once” lets o
  * "Continue once": run the approved action with its own pass, and retire the pass when the action ends, finishes
  * or fails, whether or not it created a generation. Unrelated actions in the same session never see it.
  */
-export function withOncePass<T>(sessionId: string, action: (pass: BudgetPass) => T): T {
+export function withOncePass<T>(sessionId: string, action: (pass: BudgetPass) => T, approvedUsd: number | null, lowerBound = false): T {
   const pass: BudgetPass = Object.freeze({ sessionId, kind: 'once' });
-  activePasses.set(pass, { sessionId, kind: 'once' });
+  activePasses.set(pass, { remainingUsd: approvedUsd ?? 0, unknownRemaining: approvedUsd == null || lowerBound ? 1 : 0 });
   return runWithPass(() => {
     activePasses.delete(pass);
     releaseUnstartedOwned(pass);
@@ -207,9 +221,9 @@ export function withOncePass<T>(sessionId: string, action: (pass: BudgetPass) =>
  * "Allow this time": grants a sequence-level pass for `sessionId` until `end()` is called. Only steps carrying
  * the returned `pass` see it; unrelated actions in the same session still ask.
  */
-export function beginOncePass(sessionId: string): BudgetPassHandle {
+export function beginOncePass(sessionId: string, approvedUsd: number | null, unknownSteps = approvedUsd == null ? 1 : 0): BudgetPassHandle {
   const pass: BudgetPass = Object.freeze({ sessionId, kind: 'sequence' });
-  activePasses.set(pass, { sessionId, kind: 'sequence' });
+  activePasses.set(pass, { remainingUsd: approvedUsd ?? 0, unknownRemaining: unknownSteps });
   return {
     pass,
     end: () => {
@@ -219,6 +233,18 @@ export function beginOncePass(sessionId: string): BudgetPassHandle {
   };
 }
 
+/** Allocate part of a sequence's approval to one command. Unknown prices must have been shown for that step. */
+export function withSequenceStepPass<T>(
+  pass: BudgetPass, sessionId: string, estimate: Estimate, reviewed: Estimate | undefined, action: (stepPass?: BudgetPass) => T,
+): T {
+  if (passActiveFor(pass, sessionId, estimate) && (!hasUnknownPrice(estimate) || (reviewed && hasUnknownPrice(reviewed)))) {
+    consumeOnce(pass, estimate);
+    return withOncePass(sessionId, action, estimate.usd, estimate.lowerBound);
+  }
+  assertWithinLimit(estimate, sessionId, false);
+  return action();
+}
+
 /** Bind a one-shot in-memory entitlement to `generationId` so a 402 substitute within the approved amount can proceed. */
 export function bindGenerationPass(
   generationId: string,
@@ -226,10 +252,13 @@ export function bindGenerationPass(
   approvedUsd: number | null,
   owner?: BudgetPass | symbol,
 ): void {
+  const amount = approvedUsd != null && Number.isFinite(approvedUsd) ? approvedUsd : null;
+  const once = typeof owner === 'object' && owner.kind === 'once' ? activePasses.get(owner) : undefined;
   substitutePasses.set(generationId, {
     sessionId,
     budgetUsd: get().settings.budgetUsd,
-    approvedUsd: approvedUsd != null && Number.isFinite(approvedUsd) ? approvedUsd : null,
+    approvedUsd: amount,
+    quoteApprovedUsd: amount == null ? null : once?.remainingUsd ?? amount,
     started: false,
     owner,
   });
@@ -239,6 +268,36 @@ export function bindGenerationPass(
 export function startGenerationPass(generationId: string): void {
   const entry = substitutePasses.get(generationId);
   if (entry) entry.started = true;
+}
+
+/** Retain the claimed approval while asynchronous preparation fetches a final quote. */
+export function generationQuoteGuard(generationId: string): (usd: number | null) => void {
+  const entry = substitutePasses.get(generationId);
+  return (usd) => {
+    if (!entry || usd == null) return;
+    const sends = get().generations[generationId]?.sends;
+    const prior = entry.priorSendIds;
+    const booked = ledgerCost({ sends: prior ? sends?.filter(send => !prior.has(send.id)) : sends });
+    const covered = entry.quoteApprovedUsd != null && !booked.hasUnknown && usd <= entry.quoteApprovedUsd - booked.usd + 1e-9;
+    assertWithinLimit({ usd, approximate: false, exact: true }, entry.sessionId, covered);
+  };
+}
+
+/** Carry an approved substitute's remaining amount to the final quote without granting another substitute. */
+export function bindRetryQuoteApproval(generationId: string, estimate: Estimate, pass?: BudgetPass): void {
+  const g = get().generations[generationId];
+  if (!g || !pass || !passActiveFor(pass, g.sessionId, estimate)) return;
+  const known = !hasUnknownPrice(estimate);
+  const remaining = pass.kind === 'once' ? activePasses.get(pass)!.remainingUsd : estimate.usd;
+  substitutePasses.set(generationId, {
+    sessionId: g.sessionId,
+    budgetUsd: get().settings.budgetUsd,
+    approvedUsd: null,
+    quoteApprovedUsd: known ? remaining : null,
+    priorSendIds: new Set(g.sends?.filter(send => send.status === 'done').map(send => send.id)),
+    started: true,
+  });
+  consumeOnce(pass, estimate);
 }
 
 /** Take (and detach) the one-shot 402 substitute pass bound to `generationId`, activating it only while the generation and session live under the same limit and `estimate` is known and within the approved amount. */
@@ -255,7 +314,7 @@ export function takeGenerationPass(generationId: string, estimate: Estimate): Bu
   if (booked?.hasUnknown) return undefined;
   if (estimate.usd > entry.approvedUsd - (booked?.usd ?? 0) + 1e-9) return undefined;
   const pass: BudgetPass = Object.freeze({ sessionId: entry.sessionId, kind: 'once' });
-  activePasses.set(pass, { sessionId: entry.sessionId, kind: 'once' });
+  activePasses.set(pass, { remainingUsd: estimate.usd, unknownRemaining: 0 });
   return pass;
 }
 
@@ -275,8 +334,8 @@ export function clearGenerationPass(generationId: string, force = false): void {
 
 /** Clear all in-memory passes and 402 substitute entitlements for `sessionId` (session closed/deleted or reset). */
 export function clearSessionPasses(sessionId: string): void {
-  for (const [pass, entry] of activePasses) {
-    if (entry.sessionId === sessionId) activePasses.delete(pass);
+  for (const pass of activePasses.keys()) {
+    if (pass.sessionId === sessionId) activePasses.delete(pass);
   }
   for (const [genId, entry] of substitutePasses) {
     if (entry.sessionId === sessionId) substitutePasses.delete(genId);
@@ -287,9 +346,9 @@ export function clearSessionPasses(sessionId: string): void {
  * Cover every step of an approved multi-step Nodes run. Spends the action's once-pass immediately so
  * unrelated runs in the same session still ask while this batch is executing.
  */
-export function beginBatchPass(sessionId: string, stepIds: Iterable<string>, pass?: BudgetPass): { token: symbol; end: () => void } {
-  const hadPass = passHolds(pass, sessionId);
-  consumeOnce(pass);
+export function beginBatchPass(sessionId: string, stepIds: Iterable<string>, estimate: Estimate, pass?: BudgetPass): { token: symbol; end: () => void } {
+  const hadPass = passActiveFor(pass, sessionId, estimate);
+  consumeOnce(pass, estimate);
   const token = Symbol('batch');
   approvedBatches.set(token, { sessionId, steps: new Set(stepIds), hadPass });
   return {
@@ -382,7 +441,8 @@ export function rerunNote(e: Estimate, sessionId?: string): string {
 /** Nominal cost estimate for one LLM call so `budgetVerdict` can guard LLM entries before tokens are known. */
 export function llmCallEstimate(provider: LlmProviderId, model: string): Estimate {
   const m = get().catalog.llm[provider]?.find((x) => x.id === model);
-  if (m && m.inputPrice === 0 && m.outputPrice === 0) return { usd: 0, approximate: false };
-  const raw = ((m?.inputPrice ?? 0) * 1000 + (m?.outputPrice ?? 0) * 500) / 1_000_000;
+  if (m?.inputPrice == null || m.outputPrice == null || !Number.isFinite(m.inputPrice) || !Number.isFinite(m.outputPrice)) return { usd: null, approximate: true };
+  if (m.inputPrice === 0 && m.outputPrice === 0) return { usd: 0, approximate: false };
+  const raw = (m.inputPrice * 1000 + m.outputPrice * 500) / 1_000_000;
   return { usd: Math.max(0.0001, Math.round(raw * 10000) / 10000), approximate: true };
 }

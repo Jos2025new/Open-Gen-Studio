@@ -62,6 +62,7 @@ beforeEach(() => {
   askAgain(sid);
   useAlerts.setState({ alerts: [] });
   forgetBalances();
+  vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(null);
   const schema = { params: [], slots: { prompt: 'prompt', promptRequired: true }, source: 'catalog' };
   useStore.setState({
     generations: {},
@@ -96,6 +97,47 @@ afterEach(() => {
 });
 
 describe('per-action budget pass and single budgetVerdict', () => {
+  it.each([false, true])('refuses a $0.40 quote after a $0.10 approval (reset while waiting: %s)', async (reset) => {
+    vi.spyOn(ADAPTERS.atlas, 'quote').mockImplementation(async () => {
+      if (reset) askAgain(sid);
+      return 0.4;
+    });
+    const send = vi.spyOn(ADAPTERS.atlas, 'generate').mockResolvedValue({
+      outputs: [{ blob: new Blob(['result'], { type: 'image/png' }), mime: 'image/png' }],
+      costUsd: 0.4,
+    });
+    const run = withOncePass(sid, pass => {
+      const g = createGeneration(spec({ modelRef: ATLAS, budgetPass: pass }));
+      return runGeneration(g.id);
+    }, paid.usd);
+    await expect(run).rejects.toBeInstanceOf(OverLimitError);
+    expect(send).not.toHaveBeenCalled();
+    expect(useStore.getState().spendLog).toEqual([]);
+  });
+
+  it('rechecks the final quote of a 402 substitute covered by a one-time approval', async () => {
+    useStore.setState((s) => ({ settings: { ...s.settings, autoSwitchProvider: 'ask' } }));
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(5);
+    vi.spyOn(ADAPTERS.atlas, 'quote').mockResolvedValue(0.4);
+    vi.spyOn(ADAPTERS.nanogpt, 'generate').mockRejectedValue(new HttpError(402, 'Insufficient credits', null));
+    const send = vi.spyOn(ADAPTERS.atlas, 'generate').mockResolvedValue({
+      outputs: [{ blob: new Blob(['result'], { type: 'image/png' }), mime: 'image/png' }],
+      costUsd: 0.4,
+    });
+    let id = '';
+    await withOncePass(sid, async pass => {
+      id = createGeneration(spec({ budgetPass: pass })).id;
+      await expect(runGeneration(id)).rejects.toThrow('Insufficient credits');
+    }, paid.usd);
+    const offer = useAlerts.getState().alerts.flatMap(alert => alert.actions ?? []).find(action => action.label === 'Yes, this time');
+    expect(offer).toBeDefined();
+    offer!.run();
+    await vi.waitFor(() => expect(useStore.getState().generations[id].status).not.toBe('running'));
+    expect(send).not.toHaveBeenCalled();
+    expect(useStore.getState().spendLog).toEqual([]);
+    expect(useStore.getState().generations[id].error).toContain('this costs $0.4)');
+  });
+
   it('two actions in the same session: one has Continue once, the other still asks and cannot steal it', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
@@ -109,7 +151,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
       await gate;
       const g = createGeneration(spec({ budgetPass: pass }));
       action1CreatedId = g.id;
-    });
+    }, paid.usd);
 
     // Action 2 starts in the SAME session while action 1 is suspended at await with its Continue once pass.
     otherOverDuring = overLimit(paid, sid);
@@ -131,7 +173,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
   });
 
   it('sequence pass (beginOncePass) belongs to its sequence, not to unrelated actions in the same session', () => {
-    const grant = beginOncePass(sid);
+    const grant = beginOncePass(sid, paid.usd);
     try {
       expect(overLimit(paid, sid)).toBe(true);
       expect(budgetProblem(paid, sid)).not.toBeNull();
@@ -180,7 +222,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
         if (err instanceof OverLimitError) reusedPassBlocked = true;
       }
       await runGeneration(g.id);
-    });
+    }, paid.usd);
 
     expect(nanoCalls).toBe(1);
     expect(atlasCalls).toBe(1);
@@ -203,7 +245,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
       const serialized = JSON.stringify(useStore.getState().sessions[sid]);
       expect(serialized).not.toContain('oncePass');
       expect(serialized).not.toContain('budgetPass');
-    });
+    }, paid.usd);
   });
 
   it('402 substitute in ask mode after Continue once: "Yes, this time" does not ask a second time for the same limit', async () => {
@@ -221,7 +263,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
       const g = createGeneration(spec({ budgetPass: pass }));
       genId = g.id;
       await runGeneration(g.id).catch(() => undefined);
-    });
+    }, paid.usd);
 
     const offer = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'));
     expect(offer).toBeDefined();
@@ -253,7 +295,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
     await withOncePass(sid, async (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       await runGeneration(g.id).catch(() => undefined);
-    });
+    }, paid.usd);
     const offer1 = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
     useStore.setState((s) => ({ settings: { ...s.settings, budgetUsd: 0.5 } }));
     offer1.actions!.find((x) => x.label === 'Yes, this time')!.run();
@@ -267,7 +309,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
     await withOncePass(sid, async (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       await runGeneration(g.id).catch(() => undefined);
-    });
+    }, paid.usd);
     const offer2 = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label === 'Yes, this time'))!;
     askAgain(sid);
     offer2.actions!.find((x) => x.label === 'Yes, this time')!.run();
@@ -281,7 +323,7 @@ describe('per-action budget pass and single budgetVerdict', () => {
     await withOncePass(sid, async (pass) => {
       const g = createGeneration(spec({ budgetPass: pass }));
       await runGeneration(g.id).catch(() => undefined);
-    });
+    }, paid.usd);
     const offer3 = useAlerts.getState().alerts.find((a) => a.actions?.some((x) => x.label.includes('Atlas')))!;
     offer3.actions!.find((x) => x.label.includes('Atlas'))!.run();
     await new Promise((r) => setTimeout(r, 20));

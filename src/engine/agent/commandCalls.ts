@@ -96,7 +96,8 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
   if (decision === 'session') dontAskAgain(sessionId);
   else if (decision === 'until-next-session') dontAskUntilNextSession();
   else if (decision === 'once') {
-    const grant = beginOncePass(sessionId);
+    const unknownSteps = entry.request.steps.filter(s => s.effect === 'spend' && (s.estimate.usd == null || s.estimate.lowerBound)).length;
+    const grant = beginOncePass(sessionId, entry.request.estimate.usd, unknownSteps);
     entry.setReleasePass(grant.end);
     budgetPass = grant.pass;
   }
