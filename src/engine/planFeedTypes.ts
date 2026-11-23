@@ -309,7 +309,7 @@ export interface NoticeFeedItem extends FeedBase {
   level: 'info' | 'error';
   text: string;
   /** A transient agent failure (connection lost, provider busy): Retry reruns the turn. */
-  retry?: { partialItemId?: string };
+  retry?: { partialItemId?: string; possibleCharge?: boolean };
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;
   /** Real cost of an unpriced run passed the limit. */
@@ -336,6 +336,7 @@ export interface CommandApprovalStep {
   effect: 'read' | 'write' | 'spend' | 'delete';
   args: unknown;
   estimate: Estimate;
+  details?: string[];
 }
 
 export interface CommandApprovalFeedItem extends FeedBase {

@@ -143,7 +143,8 @@ async function attempt(id: string, nodeLock?: () => void): Promise<string[]> {
   try {
     return await execute(id);
   } catch (err) {
-    if (isCreditError(err)) {
+    const failed = get().generations[id];
+    if (isCreditError(err) && !(failed && hasUncertainTicketSend(failed))) {
       let rerun: Promise<string[]> | undefined;
       await onGenerationCredit(id, (gid) => (rerun = execute(gid)), runGeneration, requestEstimate, nodeLock);
       if (rerun) return rerun;
@@ -236,7 +237,6 @@ async function execute(id: string): Promise<string[]> {
     let providerReportedCost = 0;
     let providerReportedCostKnown = true;
     let done = 0;
-    let batchIndex = 0;
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     let activeReqId: string | undefined;
@@ -245,7 +245,7 @@ async function execute(id: string): Promise<string[]> {
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // A quote is not a provider-reported charge in the agent notice.
       const quote = await requestQuote(g.modelRef, schema, settings, n);
-      const reqIndex = batchIndex++;
+      const reqIndex = priorCount + done;
       activeReqId = undefined;
       localPostSend = false;
       const send = (retry: number) => sendGenerationViaPaidGate({
@@ -451,11 +451,12 @@ export async function resumeInterrupted(): Promise<void> {
   }
 }
 
-export function retryGeneration(id: string, planItemId?: string, budgetPass?: BudgetPass): Promise<string[]> {
+export function retryGeneration(id: string, planItemId?: string, budgetPass?: BudgetPass, confirmedCharge = false): Promise<string[]> {
   const ongoing = retrying.get(id);
   if (ongoing) return ongoing;
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
+  if (!confirmedCharge && (g.lostJob || hasOpenInFlightSend(g) || activeRemoteJob(g))) return Promise.resolve(g.assetIds);
   const held = holdRetry(g, planItemId, budgetPass);
   if (held instanceof SchemaUnavailableError) return Promise.reject(held);
   if (!held) return Promise.resolve(g.assetIds);

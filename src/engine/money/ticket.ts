@@ -110,7 +110,7 @@ export function priceFromEstimate(e: Estimate): MoneyPrice {
   return {
     kind: e.approximate ? 'estimated' : 'exact',
     usd,
-    maxVerifiableUsd: usd,
+    maxVerifiableUsd: e.unbounded ? null : usd,
     ...(e.note ? { note: e.note } : {}),
   };
 }
@@ -341,6 +341,10 @@ export function attachGenerationToSend(ticket: ApprovalTicket, sendId: string, g
 
 export function isHeldStatus(status: TicketSendStatus): boolean {
   return status === 'in_flight' || status === 'sent' || status === 'uncertain';
+}
+
+export function isClosedLlmTicket(ticket: ApprovalTicket): boolean {
+  return ticket.kind === 'llm' && ticket.sends.every((send) => send.status === 'done' || send.status === 'failed');
 }
 
 export function isSendOut(status: TicketSendStatus): boolean {

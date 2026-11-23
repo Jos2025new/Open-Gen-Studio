@@ -5,7 +5,7 @@ import type { Estimate } from '../types';
 import { echo } from './echo';
 import { Transactions, takeStateSnapshot } from './history';
 import { command, missingTarget } from './registry';
-import { CommandError, type AnyCommand, type Caller, type CommandContext, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
+import { CommandError, type AnyCommand, type Caller, type CommandContext, type CommandReview, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
 
 /*
  * The two ways in (ADR 0030).
@@ -109,6 +109,7 @@ export interface ApprovalStep {
   args: unknown;
   on: Target;
   estimate: Estimate;
+  review?: CommandReview;
 }
 /** Complete frozen step stored on a durable D+ command ticket (includes write/read steps and `$N` producers). */
 export interface FrozenCommandStep {
@@ -126,6 +127,7 @@ export interface FrozenCommandStep {
   preRan?: boolean;
   preResult?: unknown;
   estimate?: Estimate;
+  review?: CommandReview;
 }
 export interface ApprovalRequest {
   caller: Caller;
@@ -253,6 +255,7 @@ export interface RunOptions {
   resume?: {
     skipSteps?: ReadonlySet<number>;
     priorResults?: Readonly<Record<number, unknown>>;
+    reviews?: Readonly<Record<number, CommandReview>>;
     reviewedSpends?: Readonly<Record<number, Estimate>>;
     budgetPass?: BudgetPass;
     skipApproval?: boolean;
@@ -322,6 +325,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
 
   const seq = steps.length > 1 ? ++sequences : undefined;
   let budgetPass: BudgetPass | undefined = options.resume?.budgetPass;
+  const reviews = { ...options.resume?.reviews };
   const reviewedSpends = new Map<number, Estimate>();
   if (options.resume?.reviewedSpends) {
     for (const [k, est] of Object.entries(options.resume.reviewedSpends)) reviewedSpends.set(Number(k), est);
@@ -367,6 +371,8 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         step.ready = true;
       }
       const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
+      const reviewed = reviews[i + 1];
+      if (reviewed) ctx.reviewed = reviewed;
       check(spec, ctx, args);
       openHistories(spec, on, args, txs);
       if (track) options.onStepStart?.(i + 1);
@@ -448,7 +454,11 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
             estimate = UNKNOWN;
           }
         }
-        asks.push({ step: i + 1, cmd: step.spec.id, title: step.spec.title, effect: step.spec.effect, args: previewArgs, on: previewOn, estimate });
+        const review = step.spec.review && step.ready && step.onReady
+          ? step.spec.review({ on: previewOn, caller: options.caller }, previewArgs)
+          : undefined;
+        if (review) reviews[i + 1] = review;
+        asks.push({ review, step: i + 1, cmd: step.spec.id, title: step.spec.title, effect: step.spec.effect, args: previewArgs, on: previewOn, estimate });
       }
     } catch (error) {
       for (const s of steps) s.ran = false;
@@ -475,7 +485,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         ready: s.ready,
         onReady: s.onReady,
         ...(s.ran ? { preRan: true, preResult: results[i] } : {}),
-        ...(ask ? { estimate: ask.estimate } : {}),
+        ...(ask ? { estimate: ask.estimate, review: ask.review } : {}),
       };
     });
     let yes = false;

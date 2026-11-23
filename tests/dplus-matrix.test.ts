@@ -505,7 +505,7 @@ describe('Escenario (f): LLM en streaming', () => {
       ]),
     );
 
-    await llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main' });
+    await llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main', budgetPass: true });
     expect(fake.attemptCount('/chat/completions')).toBe(3);
     expect(fake.acceptedCount('/chat/completions')).toBe(2);
     expect(useStore.getState().spentUsd).toBeCloseTo(0.1, 6);
@@ -527,7 +527,7 @@ describe('Escenario (f): LLM en streaming', () => {
       llmCatalog: [{ id: LLM_MODEL, name: 'Pricey LLM', inputPrice: 20, outputPrice: 40, tools: true, vision: false }],
     });
     const heldTurn = fake.holdNext('/chat/completions');
-    const turnPromise = llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main' });
+    const turnPromise = llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main', budgetPass: true });
     await heldTurn.arrived;
     expect(fake.acceptedCount('/chat/completions')).toBe(1);
 

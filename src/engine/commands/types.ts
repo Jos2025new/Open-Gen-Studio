@@ -24,12 +24,20 @@ export interface Target {
 }
 export type TargetKey = keyof Target;
 
+export const COMMAND_REVIEW_CHANGED = 'The approved request changed. Review and approve it again.';
+
+export interface CommandReview {
+  signature: string;
+  details: string[];
+}
+
 export interface CommandContext {
   on: Target;
   caller: Caller;
   signal?: AbortSignal;
   /** Per-sequence budget pass granted by "Allow this time"; never visible to other actions. */
   budgetPass?: BudgetPass;
+  reviewed?: CommandReview;
 }
 
 /** `true`, or the reason it cannot run now ("no layer is selected"): the agent reads it, the interface shows it. */
@@ -57,6 +65,7 @@ export interface CommandSpec<A = unknown, R = unknown> {
   available?: (ctx: CommandContext, args?: Partial<A>) => Availability;
   /** Estimated USD cost for `spend` commands, evaluated after earlier steps and `$n` references resolve. */
   estimate?: (ctx: CommandContext, args: A) => Estimate;
+  review?: (ctx: CommandContext, args: A) => CommandReview;
   /** What still keeps this command from the contract (it reads something "active" by itself). The check lists it. */
   debt?: string;
   /** The result must be data that survives JSON: a later step of a sequence, the agent or a CLI reads it. */

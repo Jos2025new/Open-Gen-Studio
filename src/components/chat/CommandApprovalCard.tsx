@@ -55,6 +55,7 @@ export function CommandApprovalCard({ item, sessionId }: { item: CommandApproval
                 <span className="step-detail faint">{[s.cmd, summary].filter(Boolean).join(' · ')}</span>
                 <span className="step-cost faint num">{s.effect === 'spend' ? costLabel(s.estimate) : 'Delete'}</span>
               </span>
+              {s.details?.map((detail, index) => <small key={index} className="step-detail faint">{detail}</small>)}
             </li>
           );
         })}

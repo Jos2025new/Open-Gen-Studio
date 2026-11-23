@@ -3,6 +3,7 @@ import { uid } from '../../lib/id';
 import { appendFeed, removeTicket, saveNow, updateFeedItem, useStore } from '../../store/store';
 import { beginOncePass, budgetProblem, dontAskAgain, dontAskUntilNextSession, type BudgetPass } from '../budget';
 import { allCommands, command, findCommands, getApprover, run, type ApprovalRequest, type Approver } from '../commands';
+import { COMMAND_REVIEW_CHANGED } from '../commands/types';
 import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
@@ -17,6 +18,7 @@ import {
   prepareSend,
   priceFromEstimate,
   settleSend,
+  rollbackSendToPending,
   type ApprovalTicket,
 } from '../money/ticket';
 import { FREE, sumEstimates } from '../pricing';
@@ -148,6 +150,10 @@ function markCommandStepEnd(itemId: string, step: number, ok: boolean, val?: unk
   const sid = stepSendId(itemId, step);
   const slot = ticket.sends.find((s) => s.id === sid);
   let next = ticket;
+  if (error === COMMAND_REVIEW_CHANGED) {
+    if (slot?.status === 'in_flight') storeTickets.put(rollbackSendToPending(ticket, sid));
+    return;
+  }
   if (slot && (slot.status === 'in_flight' || slot.status === 'pending')) {
     const base = slot.status === 'pending' ? markSendInFlight(next, sid) : next;
     next = ok ? settleSend(base, sid, { costUsd: 0 }).ticket : markSendFailed(base, sid, error);
@@ -196,11 +202,40 @@ export function settleInterruptedCommandCards(): void {
   }
 }
 
+function refreshCommandReview(sessionId: string, itemId: string, stepNumber: number | undefined): boolean {
+  const ticket = storeTickets.get(commandTicketId(itemId));
+  const steps = frozenStepsOf(ticket);
+  const stale = steps.find((step) => step.step === stepNumber);
+  const spec = stale && command(stale.cmd);
+  if (!ticket || !stale?.ready || !stale.onReady || !spec?.review) return false;
+  try {
+    const ctx = { on: stale.on, caller: 'agent' as const };
+    const review = spec.review(ctx, stale.args);
+    const estimate = spec.estimate?.(ctx, stale.args) ?? stale.estimate ?? FREE;
+    const revised = steps.map((step) => step === stale ? { ...step, review, estimate } : step);
+    const remaining = revised.filter((step) => !step.preRan && step.estimate && !ticket.sends.some(
+      (send) => send.id === stepSendId(itemId, step.step) && isSendOut(send.status),
+    ));
+    storeTickets.put({ ...ticket, scope: { ...ticket.scope, steps: revised } });
+    updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, {
+      status: 'awaiting', error: COMMAND_REVIEW_CHANGED, estimate: sumEstimates(remaining.map((step) => step.estimate!)),
+      steps: remaining.map((step) => ({
+        step: step.step, cmd: step.cmd, title: step.title, effect: step.effect,
+        args: step.args, estimate: step.estimate!, details: step.review?.details,
+      })),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function replayCommandTicket(sessionId: string, itemId: string, ticket: ApprovalTicket, budgetPass?: BudgetPass, releasePass?: () => void): void {
   const steps = frozenStepsOf(ticket);
   const skipSteps = new Set<number>();
   const priorResults: Record<number, unknown> = {};
   const reviewedSpends: Record<number, Estimate> = {};
+  const reviews = Object.fromEntries(steps.flatMap((step) => step.review ? [[step.step, step.review]] : []));
   for (const s of steps) {
     const slot = ticket.sends.find((x) => x.id === stepSendId(itemId, s.step));
     if (s.preRan || (slot && isSendOut(slot.status))) {
@@ -222,9 +257,10 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
           caller: 'agent',
           onStepStart: (step) => markCommandStepStart(itemId, step),
           onStepEnd: (step, ok, val, err) => markCommandStepEnd(itemId, step, ok, val, err),
-          resume: { skipSteps, priorResults, reviewedSpends, budgetPass, skipApproval: true },
+          resume: { skipSteps, priorResults, reviewedSpends, reviews, budgetPass, skipApproval: true },
         },
       );
+      if (!result.ok && result.error.message === COMMAND_REVIEW_CHANGED && refreshCommandReview(sessionId, itemId, result.error.step)) return;
       updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) =>
         result.ok
           ? { ...it, status: 'done', error: undefined }
@@ -370,7 +406,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
               workspace: useStore.getState().ui.workspace,
               type: 'commands',
               status: 'awaiting',
-              steps: request.steps.map((s) => ({ step: s.step, cmd: s.cmd, title: s.title, effect: s.effect, args: s.args, estimate: s.estimate })),
+              steps: request.steps.map((s) => ({ step: s.step, cmd: s.cmd, title: s.title, effect: s.effect, args: s.args, estimate: s.estimate, details: s.review?.details })),
               totalSteps: v.data.seq.length,
               estimate: request.estimate,
               ...(meta ? { meta } : {}),
@@ -409,7 +445,9 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   } finally {
     for (const release of passes) release();
   }
-  if (approvalItemId) {
+  const reoffered = approvalItemId && !result.ok && result.error.message === COMMAND_REVIEW_CHANGED
+    && refreshCommandReview(sessionId, approvalItemId, result.error.step);
+  if (approvalItemId && !reoffered) {
     updateFeedItem<CommandApprovalFeedItem>(sessionId, approvalItemId, (it) =>
       result.ok
         ? { ...it, status: 'done' }

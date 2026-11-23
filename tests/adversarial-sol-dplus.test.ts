@@ -93,7 +93,7 @@ function sendLlm(id: string) {
   return sendLlmViaPaidGate({
     ticketId: id, sessionId: sid, provider: 'nanogpt', apiKey: 'test-only', model: llmModel,
     system: 'Test', messages: [{ role: 'user', content: 'Hello' }], tools: [],
-    signal: new AbortController().signal, computeUsd: (usage) => llmCallUsd('nanogpt', llmModel, usage),
+    signal: new AbortController().signal, budgetPass: true, computeUsd: (usage) => llmCallUsd('nanogpt', llmModel, usage),
   });
 }
 
@@ -116,8 +116,7 @@ function scanFixture(file: string, content: string): string[] {
   }
 }
 
-// reproduce: a second approved dispatch for the same generation and batch index allocates a second sendId while the first is in flight.
-it.fails('rejects a second dispatch for the same logical paid slot', async () => {
+it('rejects a second dispatch for the same logical paid slot', async () => {
   const g = createImage();
   let arrive!: () => void;
   let release!: () => void;
@@ -137,8 +136,7 @@ it.fails('rejects a second dispatch for the same logical paid slot', async () =>
   expect(send, 'the same logical slot reached transport twice').toHaveBeenCalledTimes(1);
 });
 
-// reproduce: a media response lost to HTTP 500 is classified as a confirmed refusal after the provider accepts the POST.
-it.fails('keeps a media HTTP 500 uncertain and retains its reservation', async () => {
+it('keeps a media HTTP 500 uncertain and retains its reservation', async () => {
   const g = createImage();
   fake.onNext('test image', () => jsonResponse({ error: 'Gateway lost upstream response' }, 500));
   await expect(runGeneration(g.id)).rejects.toThrow();
@@ -147,10 +145,9 @@ it.fails('keeps a media HTTP 500 uncertain and retains its reservation', async (
   expect({ status: slot.status, reservedUsd: slot.reservedUsd }).toEqual({ status: 'uncertain', reservedUsd: 0.1 });
 });
 
-// reproduce: the ordinary Retry attached to a dropped, accepted LLM stream sends the same history again without a charge confirmation.
-it.fails('requires charge confirmation before repeating an uncertain LLM turn', async () => {
+it('requires charge confirmation before repeating an uncertain LLM turn', async () => {
   fake.onNext('/chat/completions', 'cut-after-accept');
-  await llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main' });
+  await llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main', budgetPass: true });
   expect(fake.acceptedCount('/chat/completions')).toBe(1);
   const ticket = Object.values(useStore.getState().tickets).find((entry) => entry.kind === 'llm');
   expect(ticket?.sends[0]?.status).toBe('uncertain');
@@ -185,8 +182,7 @@ it.fails('records a completed billable LLM call with missing usage as unknown', 
   expect(useStore.getState().spendLog.find((entry) => entry.sendId === sent.sendId)?.usd).toBeNull();
 });
 
-// reproduce: commands keep target IDs but recompile the edited live graph when the user approves the restored card.
-it.fails('requires a new review before sending a changed node from a restored command card', async () => {
+it('requires a new review before sending a changed node from a restored command card', async () => {
   const pending = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } }] });
   const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;
   await vi.waitFor(() => expect(commandCard()?.status).toBe('awaiting'));
@@ -238,8 +234,7 @@ it.fails('runs local generation without creating a paid ticket or paid slot', as
   expect(useStore.getState().tickets[`gen:${g.id}`]).toBeUndefined();
 });
 
-// reproduce: every new LLM send synchronously serializes unrelated completed tickets again before invoking fetch.
-it.fails('keeps terminal ticket history out of the synchronous pre-send serialization', async () => {
+it('keeps terminal ticket history out of the synchronous pre-send serialization', async () => {
   for (let i = 0; i < 8; i++) await sendLlm(`llm:closed-${i}`);
   const getSerializations = vi.fn();
   const prior = useStore.getState().tickets['llm:closed-0'];
@@ -297,8 +292,7 @@ it.fails('flags an ungated namespace chat call inside llmSend', () => {
   expect(diagnostics.join('\n')).toMatch(/llmSend\.ts:2:.*paidSend/);
 });
 
-// reproduce: the durable ticket can be booked while the output is still unstored, then reload treats the completed send as safe to regenerate.
-it.fails('does not replay a booked media send when reload precedes local output storage', async () => {
+it('does not replay a booked media send when reload precedes local output storage', async () => {
   const image = createImage();
   let saved: unknown;
   idb.onSave = () => {
@@ -319,8 +313,7 @@ it.fails('does not replay a booked media send when reload precedes local output 
   expect(fake.acceptedCount('test image'), 'ordinary Retry posted again after durable settlement').toBe(1);
 });
 
-// reproduce: a nominal LLM quote is used as a verified ceiling even though completion tokens can exceed the quantity estimated.
-it.fails('does not treat a nominal LLM estimate as a guaranteed ceiling under the active limit', async () => {
+it('does not treat a nominal LLM estimate as a guaranteed ceiling under the active limit', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetUsd: 0.05 } }));
   fake.onNext('/chat/completions', () =>
     sseResponse([

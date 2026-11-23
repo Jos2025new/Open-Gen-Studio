@@ -263,6 +263,7 @@ function classifyGenerationError(
   if (err instanceof JobFailedError) return 'job_failed';
   if (err instanceof NetworkError || isAbort(err) || signal.aborted) return 'uncertain';
   if (isRetryable?.(err)) return 'retryable_before_charge';
+  if (err instanceof HttpError && (err.status >= 500 || err.status === 408)) return 'uncertain';
   if (err instanceof HttpError) return 'refused_before_charge';
   if (err && typeof err === 'object') {
     const e = err as { status?: number; message?: string };
@@ -295,18 +296,23 @@ export async function sendGenerationViaPaidGate<T>(opts: GenerationPaidSendOpts<
   const local = g.provider === 'local' || g.modelRef.startsWith('local::');
   if (local || isFreePrice(price)) void saveNow().catch(() => undefined);
   const sendId = uid('req');
+  const slotKey = `${g.id}:${index}`;
+  const accepted = ticket.sends.some((slot) => slot.index === index &&
+    (slot.status === 'in_flight' || slot.status === 'sent' || slot.status === 'uncertain' || slot.status === 'done'));
+  if (accepted) throw new PaidSendBlockedError('ALREADY_SENT', 'This request may already have been charged.', { ticketId: ticket.id, sendId });
   try {
     return await paidSend<T>({
       ticketId: ticket.id,
       prepare: {
         id: sendId,
-        slotKey: `${g.id}:${index}:${sendId}`,
+        slotKey,
         index,
         price,
         generationId: g.id,
         ...(g.origin === 'node' && g.stepId ? { nodeId: g.stepId } : {}),
       },
       tickets: storeTickets,
+      lockKeys: [slotKey],
       getBudget: () => budgetSnapshotFor(g.sessionId),
       save: saveTicketMark,
       canWrite: canWriteTicket,
@@ -454,7 +460,11 @@ export function interruptTicketOnReload(
     }
   }
   if (next !== ticket) storeTickets.put(next);
-  const midLocalStore = !job && g.sending != null && g.assetIds.length === 0 && !wasFreeTicketSend(g);
+  const midLocalStore = !job && !wasFreeTicketSend(g) && (
+    (g.sending != null && g.assetIds.length === 0) ||
+    next.sends.filter((s) => s.status === 'done').length > g.assetIds.length ||
+    (g.kind === 'text' && next.sends.some((s) => s.status === 'done') && g.status !== 'done')
+  );
   const maybeCharged = !job && (next.sends.some((s) => s.status === 'uncertain') || midLocalStore);
   return { handled: true, maybeCharged };
 }

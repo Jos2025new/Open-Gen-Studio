@@ -23,7 +23,7 @@ import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import type { ShapeSpec, StrokeStyle } from '../engine/types';
-import type { ApprovalTicket } from '../engine/money/ticket';
+import { isClosedLlmTicket, type ApprovalTicket } from '../engine/money/ticket';
 import type {
   Asset,
   DesignDoc,
@@ -374,7 +374,7 @@ export const useStore = create<AppState>()(
       sessions: s.sessions,
       activeSessionId: s.activeSessionId,
       generations: s.generations,
-      tickets: s.tickets,
+      tickets: Object.fromEntries(Object.entries(s.tickets).filter(([, ticket]) => !isClosedLlmTicket(ticket))),
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,

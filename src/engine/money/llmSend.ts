@@ -55,8 +55,14 @@ export interface LlmPaidSendOutcome {
   readonly costUsd: number;
 }
 
+export function hasLlmPossibleCharge(runId: string | undefined): boolean {
+  const status = runId && storeTickets.get(`llm:${runId}`)?.sends.at(-1)?.status;
+  return status === 'in_flight' || status === 'uncertain';
+}
+
 function classifyLlmError(err: unknown, signal: AbortSignal): SendErrorDisposition {
   if (err instanceof NetworkError || isAbort(err) || signal.aborted) return 'uncertain';
+  if (err instanceof HttpError && (err.status >= 500 || err.status === 408)) return 'uncertain';
   if (isCreditError(err)) return 'refused_before_charge';
   if (err instanceof HttpError) {
     if (err.status === 400 && /reason|effort|think/i.test(err.message)) return 'retryable_before_charge';
@@ -159,7 +165,7 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
         throw new OverLimitError({
           usd: price.usd,
           approximate: price.kind !== 'exact',
-          ...(price.lowerBound ? { lowerBound: true } : {}),
+          ...(price.usd != null && price.maxVerifiableUsd == null ? { unbounded: true } : {}),
         });
       }
     }

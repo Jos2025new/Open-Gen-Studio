@@ -158,6 +158,7 @@ describe('D+ 2b-3/2b-4: llmSend and $N command replay across reload', () => {
         messages: [{ role: 'user', content: 'hi' }],
         tools: [],
         signal: new AbortController().signal,
+        budgetPass: true,
         computeUsd: (u) => u?.costUsd ?? 0,
       }),
     ).rejects.toThrow(/Insufficient credits/i);
@@ -179,6 +180,7 @@ describe('D+ 2b-3/2b-4: llmSend and $N command replay across reload', () => {
       messages: [{ role: 'user', content: 'hi' }],
       tools: [],
       signal: new AbortController().signal,
+      budgetPass: true,
       computeUsd: (u) => u?.costUsd ?? 0,
     });
     expect(out.costUsd).toBeCloseTo(0.00003, 6);

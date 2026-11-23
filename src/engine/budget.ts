@@ -98,7 +98,7 @@ function passHolds(pass: BudgetPass | undefined, sessionId: string): boolean {
   return Boolean(pass && pass.sessionId === sessionId && activePasses.has(pass));
 }
 
-const hasUnknownPrice = (estimate: Estimate) => estimate.usd == null || Boolean(estimate.lowerBound);
+const hasUnknownPrice = (estimate: Estimate) => estimate.usd == null || Boolean(estimate.lowerBound || estimate.unbounded);
 
 function covers(entry: PassEntry, estimate: Estimate): boolean {
   const usd = estimate.usd ?? 0;
@@ -223,6 +223,7 @@ export function overLimitText(e: Estimate, choices = '“Continue once” lets o
   const { budgetUsd } = get().settings;
   const left = Math.max(0, remainingBudget() ?? 0);
   if (e.usd == null) return `The price of this run is unknown, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
+  if (e.unbounded) return `This run is estimated at ${formatUsd(e.usd)} without a verifiable maximum. It can pass your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). ${choices}`;
   if (e.lowerBound && e.usd <= left + 1e-9) return `Only a minimum price (${formatUsd(e.usd)}) is published, so it cannot be checked against your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left). The real cost can pass it. ${choices}`;
   return `Goes over your ${formatUsd(budgetUsd)} limit (${formatUsd(left)} left, this costs ${formatUsd(e.usd)}). ${choices}`;
 }
@@ -435,5 +436,5 @@ export function llmCallEstimate(provider: LlmProviderId, model: string): Estimat
   if (m?.inputPrice == null || m.outputPrice == null || !Number.isFinite(m.inputPrice) || !Number.isFinite(m.outputPrice)) return { usd: null, approximate: true };
   if (m.inputPrice === 0 && m.outputPrice === 0) return { usd: 0, approximate: false };
   const raw = (m.inputPrice * 1000 + m.outputPrice * 500) / 1_000_000;
-  return { usd: Math.max(0.0001, Math.round(raw * 10000) / 10000), approximate: true };
+  return { usd: Math.max(0.0001, Math.round(raw * 10000) / 10000), approximate: true, unbounded: true };
 }

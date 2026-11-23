@@ -1,7 +1,8 @@
 import { isAbort, isTransient } from '../../lib/http';
 import { OverLimitError } from '../budget';
 import { isCreditError } from '../credit';
-import { sendLlmViaPaidGate } from '../money/llmSend';
+import { storeTickets } from '../money/storeBridge';
+import { hasLlmPossibleCharge, sendLlmViaPaidGate } from '../money/llmSend';
 import { LLM_LABELS, type ChatResult, type ToolSpec } from '../providers/llm';
 import type { ChatMessageMeta } from '../feedMeta';
 import type { AgentState, FeedItem, LlmMessage, LlmProviderId, NoticeFeedItem, Session, Workspace } from '../types';
@@ -65,6 +66,7 @@ export async function runTurnModelCall(opts: {
   let textItemMeta: ChatMessageMeta | undefined;
   const hasTextBubble = () => Boolean(textItemId && deps.session(sessionId).feed.some((f) => f.id === textItemId));
 
+  const outcomeWasPaid = () => Boolean(storeTickets.get(`llm:${runId}`)?.sends.at(-1)?.status === 'done');
   let result: ChatResult;
   try {
     if (deps.mine().phase !== 'working') deps.patchAgent(sessionId, { phase: 'working' }, owner);
@@ -120,9 +122,10 @@ export async function runTurnModelCall(opts: {
       guard.handleAbort(() => deps.notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta()));
       return { stop: true };
     }
+    const possibleCharge = hasLlmPossibleCharge(runId);
     // No credit for the agent's model: the same model elsewhere (same price or less) takes over and the call runs
     // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
-    if (isCreditError(err) && !creditRetried) {
+    if (!possibleCharge && isCreditError(err) && !creditRetried) {
       if (textItemId) removeFeedItem(sessionId, textItemId);
       if (await until(deps.onAgentCredit(sessionId))) {
         guard.setOutcome('error');
@@ -130,7 +133,9 @@ export async function runTurnModelCall(opts: {
       }
     }
     // History only grows with completed calls, so a retry repeats just the call that failed.
-    const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
+    const retry = possibleCharge || isTransient(err) || isCreditError(err)
+      ? { ...(textItemId ? { partialItemId: textItemId } : {}), ...(possibleCharge ? { possibleCharge: true } : {}) }
+      : undefined;
     // The call happened and cost time: it is a call in the metrics even though it produced nothing (T2).
     recordMetric(sessionId, { type: 'failedCall', error: (err as Error).message, ms: clockElapsed() });
     guard.setOutcome('error');
@@ -162,7 +167,7 @@ export async function runTurnModelCall(opts: {
       type: 'notice',
       level: 'error',
       text: 'The model wrote its action as text the app cannot read, so nothing ran.',
-      retry: textItemId ? { partialItemId: textItemId } : {},
+      retry: { ...(textItemId ? { partialItemId: textItemId } : {}), possibleCharge: outcomeWasPaid() },
       ...(textItemId ? { garbledItemId: textItemId } : {}),
       meta: usage.takePendingMeta(turnMeta(), hasTextBubble()),
     });

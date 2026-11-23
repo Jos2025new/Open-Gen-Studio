@@ -17,7 +17,7 @@ import { readBudgetVerdict, useBudgetVerdict } from '../ui/useBudgetVerdict';
 
 const NO_JOB_TIP = 'The provider gave no job id to ask about (NanoGPT returns images in the same request). Retry runs it again.';
 
-const isUncertain = (g: Generation | undefined) => Boolean(g && (g.lostJob || g.sends?.some((s) => s.status === 'uncertain' || s.status === 'intent')));
+const isUncertain = (g: Generation | undefined) => Boolean(g && (g.lostJob || g.remoteJob || g.sends?.some((s) => s.status === 'uncertain' || s.status === 'intent' || s.status === 'sent')));
 
 /** Suggestions under a failed plan: Check status (steps with a job id) and Retry failed (with its price). */
 export function PlanRecoveryChips({ sessionId, item }: { sessionId: string; item: PlanFeedItem }) {
@@ -90,10 +90,10 @@ export function GenerationRecovery({ g }: { g: Generation }) {
     setConfirmUncertain(null);
     if (mode === 'quiet') {
       dontAskAgain(g.sessionId);
-      void retryGeneration(g.id);
+      void retryGeneration(g.id, undefined, undefined, true);
       return;
     }
-    void (over ? withOncePass(g.sessionId, (pass) => retryGeneration(g.id, undefined, pass), estimate.usd, estimate.lowerBound) : retryGeneration(g.id));
+    void (over ? withOncePass(g.sessionId, (pass) => retryGeneration(g.id, undefined, pass, mode !== null), estimate.usd, estimate.lowerBound) : retryGeneration(g.id, undefined, undefined, mode !== null));
   };
   return (
     <div className="recover-chips">

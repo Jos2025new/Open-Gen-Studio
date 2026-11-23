@@ -1,3 +1,5 @@
+import { hasLlmPossibleCharge } from '../money/llmSend';
+import { dismissAlert, pushAlert } from '../alerts';
 import { carried, confirmedSections } from './draftActions';
 import { agentAccepts } from './sendGate';
 import { beginJourney, journeyIdFor, recordJourneyEvent } from '../../lib/journeyTrace';
@@ -303,13 +305,20 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
  * resumed mid-way, so the failed call runs again with the same history: steps that had finished (a guide read,
  * a model search) are kept and not repeated. The half-written answer and the error notice are removed.
  */
-export async function retryAgentTurn(sessionId: string, noticeId: string): Promise<void> {
+export async function retryAgentTurn(sessionId: string, noticeId: string, confirmedCharge = false): Promise<void> {
   claimLaneOfItem(sessionId, noticeId);
   const owner = laneOfItem(sessionId, noticeId);
   toCanvasOfItem(sessionId, noticeId);
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === noticeId);
   if (!s || agentOf(sessionId, owner).busy || item?.type !== 'notice' || !item.retry || agentEngine(sessionId, owner).kind !== 'llm') return;
+  if ((item.retry.possibleCharge || hasLlmPossibleCharge(item.meta?.runId)) && !confirmedCharge) {
+    const id = pushAlert({ level: 'warn', text: 'The previous request may have been charged. Sending again may charge you again.', actions: [
+      { label: 'Resend anyway', run: () => { dismissAlert(id); void retryAgentTurn(sessionId, noticeId, true); } },
+      { label: 'Cancel', run: () => dismissAlert(id) },
+    ] });
+    return;
+  }
   if (item.retry.partialItemId) removeFeedItem(sessionId, item.retry.partialItemId);
   removeFeedItem(sessionId, noticeId);
   await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'retry', agentNodeId: owner });
