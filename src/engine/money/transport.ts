@@ -42,7 +42,7 @@ export function buildDryRequest(provider: ProviderId, req: DryMediaRequest, asse
   return adapter.buildCreateVoiceRequest?.(req.input, enc) ?? null;
 }
 
-export interface ParsedFingerprint { requests?: unknown[]; dynamic?: boolean; staticAssets?: Record<string, string> }
+export interface ParsedFingerprint { requests?: unknown[]; dynamic?: boolean; staticAssets?: Record<string, unknown> }
 export function parseFingerprint(fp: string): ParsedFingerprint | null {
   try {
     const parsed = JSON.parse(fp);
@@ -52,8 +52,8 @@ export function parseFingerprint(fp: string): ParsedFingerprint | null {
   return null;
 }
 
-export const staticAssetsMatch = (staticAssets: Record<string, string> | undefined, assets: Record<string, Asset>): boolean =>
-  !staticAssets || Object.entries(staticAssets).every(([id, rev]) => assetRevisionIdentity(assets[id]) === rev);
+export const staticAssetsMatch = (staticAssets: Record<string, unknown> | undefined, assets: Record<string, Asset>): boolean =>
+  !staticAssets || Object.entries(staticAssets).every(([id, rev]) => stable(assetRevisionIdentity(assets[id])) === stable(rev));
 
 function assertApprovedRequest(provider: ProviderId, req: MediaRequest, approvedFingerprint: string, chunkIndex: number): void {
   const assets = useStore.getState().assets;
