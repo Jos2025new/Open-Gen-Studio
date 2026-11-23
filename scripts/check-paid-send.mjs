@@ -22,7 +22,10 @@ const FETCH_ALLOWED = new Set([
   'src/lib/http.ts',
   'src/lib/media.ts',
 ]);
-const GATE_CALLEES = new Set(['paidSend', 'sendGenerationViaPaidGate', 'runSpecialSend']);
+const GATE_IMPORTS = new Map([
+  ['src/engine/money/paidSend', 'paidSend'],
+  ['src/engine/money/storeBridge', 'sendGenerationViaPaidGate'],
+]);
 
 const LLM_HINT = 'Route billable LLM calls through `sendLlmViaPaidGate` (`src/engine/money/llmSend.ts`) so they pass through `paidSend`.';
 const ADAPTER_HINT = 'Route billable provider calls through `sendGenerationViaPaidGate` (`src/engine/money/storeBridge.ts`) or `paidSend` (`src/engine/money/paidSend.ts`).';
@@ -46,12 +49,23 @@ function unwrap(node) {
   return cur;
 }
 
-function calleeName(callNode) {
-  const c = unwrap(callNode?.callee);
-  if (!c) return undefined;
-  if (c.type === 'Identifier') return c.name;
-  if (c.type === 'MemberExpression') return keyName(c.property);
-  return undefined;
+function isFunction(node) {
+  return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
+}
+
+/** Only the function body registered as the transport can run after the gate. */
+function inTransport(ancestors, gates, rel) {
+  const i = ancestors.findLastIndex(isFunction);
+  const fn = ancestors[i];
+  if (!fn) return false;
+  const parent = ancestors[i - 1];
+  if (rel === 'src/engine/specialSends.ts' && parent?.type === 'CallExpression' &&
+      unwrap(parent.callee)?.name === 'runSpecialSend' && unwrap(parent.arguments[2]) === fn) return true;
+  if (parent?.type !== 'Property' || keyName(parent.key) !== 'send' || parent.value !== fn) return false;
+  const object = ancestors[i - 2];
+  const gate = ancestors.slice(0, i - 2).findLast((node) => node.type === 'CallExpression');
+  return object?.type === 'ObjectExpression' && gate?.type === 'CallExpression'
+    && unwrap(gate.arguments[0]) === object && gates.has(unwrap(gate.callee)?.name);
 }
 
 function isProviderImpl(rel) {
@@ -68,11 +82,17 @@ export function check(root = '.') {
       const chatLocals = new Set();
       const fetchNamespaces = new Set();
       const fetchLocals = new Set();
-      let gateDepth = 0;
+      const ancestors = [];
+      const gates = new Set();
 
       for (const d of program.body) {
         if (d.type !== 'ImportDeclaration' || d.importKind === 'type') continue;
         const target = resolveTarget(rel, d.source?.value);
+        for (const sp of d.specifiers ?? []) {
+          if (sp.type === 'ImportSpecifier' && sp.importKind !== 'type' && GATE_IMPORTS.get(target) === keyName(sp.imported)) {
+            gates.add(sp.local.name);
+          }
+        }
         if (target === 'src/engine/providers/llm') {
           for (const sp of d.specifiers ?? []) {
             if (sp.importKind === 'type') continue;
@@ -106,101 +126,110 @@ export function check(root = '.') {
         }
       };
 
+      const isChat = (node) => {
+        const c = unwrap(node);
+        return (c?.type === 'Identifier' && chatLocals.has(c.name))
+          || (c?.type === 'MemberExpression' && keyName(c.property) === 'chat' &&
+            ((c.object?.type === 'Identifier' && llmNamespaces.has(c.object.name)) || isDynamicTo(c.object, 'src/engine/providers/llm')));
+      };
+
       return {
         enter: (node, report) => {
-          if (node.type === 'CallExpression' && GATE_CALLEES.has(calleeName(node))) {
-            gateDepth++;
-          }
-
-          // 1. Disallow importing/re-exporting LLM `chat` outside llmSend.ts and llm.ts.
-          if ((node.type === 'ImportDeclaration' || node.type === 'ExportNamedDeclaration') && rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) {
-            const target = resolveTarget(rel, node.source?.value);
-            if (target === 'src/engine/providers/llm' && node.importKind !== 'type' && node.exportKind !== 'type') {
-              for (const sp of node.specifiers ?? []) {
-                if (sp.importKind === 'type' || sp.exportKind === 'type') continue;
-                if (keyName(sp.imported ?? sp.local) === 'chat') {
-                  report(sp, `imports/exports billable LLM \`chat\` outside \`${LLM_SEND_FILE}\`. ${LLM_HINT}`);
-                }
-              }
-            }
-            // 3. Disallow importing/re-exporting `providerFetch` outside allowed transport/provider layer.
-            if (target === 'src/lib/providerFetch' && !FETCH_ALLOWED.has(rel) && !isProviderImpl(rel) && node.importKind !== 'type' && node.exportKind !== 'type') {
-              for (const sp of node.specifiers ?? []) {
-                if (sp.importKind === 'type' || sp.exportKind === 'type') continue;
-                if (keyName(sp.imported ?? sp.local) === 'providerFetch') {
-                  report(sp, `imports/exports \`providerFetch\` outside the provider transport layer. ${FETCH_HINT}`);
-                }
-              }
-            }
-          }
-
-          if (node.type === 'ExportAllDeclaration') {
-            const target = resolveTarget(rel, node.source?.value);
-            if (target === 'src/engine/providers/llm' && rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) {
-              report(node, `re-exports all of providers/llm (including billable \`chat\`). ${LLM_HINT}`);
-            }
-            if (target === 'src/lib/providerFetch' && !FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) {
-              report(node, `re-exports all of providerFetch outside the provider transport layer. ${FETCH_HINT}`);
-            }
-          }
-
-          if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
-            if (isDynamicTo(node.init, 'src/engine/providers/llm')) llmNamespaces.add(node.id.name);
-            if (isDynamicTo(node.init, 'src/lib/providerFetch')) fetchNamespaces.add(node.id.name);
-          }
-
-          if (node.type === 'VariableDeclarator') {
-            if (rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) checkPattern(node.id, node.init, report, 'src/engine/providers/llm', 'chat', LLM_HINT);
-            if (!FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) checkPattern(node.id, node.init, report, 'src/lib/providerFetch', 'providerFetch', FETCH_HINT);
-          }
-          if (node.type === 'AssignmentExpression') {
-            if (rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) checkPattern(node.left, node.right, report, 'src/engine/providers/llm', 'chat', LLM_HINT);
-            if (!FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) checkPattern(node.left, node.right, report, 'src/lib/providerFetch', 'providerFetch', FETCH_HINT);
-          }
-
-          if (node.type === 'MemberExpression') {
-            const prop = keyName(node.property);
-            if (prop === 'chat' && rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) {
-              if ((node.object?.type === 'Identifier' && llmNamespaces.has(node.object.name)) || isDynamicTo(node.object, 'src/engine/providers/llm')) {
-                report(node, `accesses billable LLM \`chat\` outside \`${LLM_SEND_FILE}\`. ${LLM_HINT}`);
-              }
-            }
-            if (prop === 'providerFetch' && !FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) {
-              if ((node.object?.type === 'Identifier' && fetchNamespaces.has(node.object.name)) || isDynamicTo(node.object, 'src/lib/providerFetch')) {
-                report(node, `accesses \`providerFetch\` outside the provider transport layer. ${FETCH_HINT}`);
-              }
-            }
-          }
-
-          // 1b. Inside llmSend.ts, every `chat(...)` call must sit inside `paidSend(...)`.
-          if (node.type === 'CallExpression') {
-            const callee = unwrap(node.callee);
-            if (rel === LLM_SEND_FILE && callee?.type === 'Identifier' && chatLocals.has(callee.name) && gateDepth === 0) {
-              report(node, `calls billable LLM \`chat()\` outside \`paidSend()\`. ${LLM_HINT}`);
-            }
-            // 2. Billable adapter methods: forbidden outside providers/, and inside jobs.ts / specialSends.ts must sit inside the gate.
-            if (!isProviderImpl(rel) && callee?.type === 'MemberExpression') {
-              const prop = keyName(callee.property);
-              if (BILLABLE_ADAPTER_METHODS.has(prop)) {
-                if (!ADAPTER_GATE_FILES.has(rel)) {
-                  report(node, `calls billable provider method \`.${prop}()\` outside \`paidSend\` gate. ${ADAPTER_HINT}`);
-                } else if (gateDepth === 0) {
-                  report(node, `calls billable provider method \`.${prop}()\` in \`${rel}\` outside \`sendGenerationViaPaidGate\`/\`runSpecialSend\`/\`paidSend\`. ${ADAPTER_HINT}`);
-                }
-              }
-            }
-            // 3b. Direct `providerFetch(...)` call outside allowed layer (catches aliases too).
-            if (!FETCH_ALLOWED.has(rel) && !isProviderImpl(rel) && callee?.type === 'Identifier' && fetchLocals.has(callee.name)) {
-              report(node, `calls \`providerFetch()\` outside the provider transport layer. ${FETCH_HINT}`);
-            }
-          }
+          const inGate = () => inTransport(ancestors, gates, rel);
+          inspect(node, report, inGate);
+          ancestors.push(node);
         },
-        leave: (node) => {
-          if (node.type === 'CallExpression' && GATE_CALLEES.has(calleeName(node))) {
-            gateDepth--;
-          }
-        },
+        leave: () => { ancestors.pop(); },
       };
+
+      function inspect(node, report, inGate) {
+
+      // 1. Disallow importing/re-exporting LLM `chat` outside llmSend.ts and llm.ts.
+      if ((node.type === 'ImportDeclaration' || node.type === 'ExportNamedDeclaration') && rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) {
+        const target = resolveTarget(rel, node.source?.value);
+        if (target === 'src/engine/providers/llm' && node.importKind !== 'type' && node.exportKind !== 'type') {
+          for (const sp of node.specifiers ?? []) {
+            if (sp.importKind === 'type' || sp.exportKind === 'type') continue;
+            if (keyName(sp.imported ?? sp.local) === 'chat') {
+              report(sp, `imports/exports billable LLM \`chat\` outside \`${LLM_SEND_FILE}\`. ${LLM_HINT}`);
+            }
+          }
+        }
+        // 3. Disallow importing/re-exporting `providerFetch` outside allowed transport/provider layer.
+        if (target === 'src/lib/providerFetch' && !FETCH_ALLOWED.has(rel) && !isProviderImpl(rel) && node.importKind !== 'type' && node.exportKind !== 'type') {
+          for (const sp of node.specifiers ?? []) {
+            if (sp.importKind === 'type' || sp.exportKind === 'type') continue;
+            if (keyName(sp.imported ?? sp.local) === 'providerFetch') {
+              report(sp, `imports/exports \`providerFetch\` outside the provider transport layer. ${FETCH_HINT}`);
+            }
+          }
+        }
+      }
+
+      if (node.type === 'ExportAllDeclaration') {
+        const target = resolveTarget(rel, node.source?.value);
+        if (target === 'src/engine/providers/llm' && rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) {
+          report(node, `re-exports all of providers/llm (including billable \`chat\`). ${LLM_HINT}`);
+        }
+        if (target === 'src/lib/providerFetch' && !FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) {
+          report(node, `re-exports all of providerFetch outside the provider transport layer. ${FETCH_HINT}`);
+        }
+      }
+
+      if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
+        if (isDynamicTo(node.init, 'src/engine/providers/llm')) llmNamespaces.add(node.id.name);
+        if (isDynamicTo(node.init, 'src/lib/providerFetch')) fetchNamespaces.add(node.id.name);
+      }
+
+      if (node.type === 'VariableDeclarator') {
+        if (rel !== LLM_PROVIDER_FILE && (rel !== LLM_SEND_FILE || !inGate())) checkPattern(node.id, node.init, report, 'src/engine/providers/llm', 'chat', LLM_HINT);
+        if (!FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) checkPattern(node.id, node.init, report, 'src/lib/providerFetch', 'providerFetch', FETCH_HINT);
+      }
+      if (node.type === 'AssignmentExpression') {
+        if (rel !== LLM_PROVIDER_FILE && (rel !== LLM_SEND_FILE || !inGate())) checkPattern(node.left, node.right, report, 'src/engine/providers/llm', 'chat', LLM_HINT);
+        if (!FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) checkPattern(node.left, node.right, report, 'src/lib/providerFetch', 'providerFetch', FETCH_HINT);
+      }
+
+      if (node.type === 'MemberExpression') {
+        const prop = keyName(node.property);
+        if (prop === 'chat' && rel !== LLM_SEND_FILE && rel !== LLM_PROVIDER_FILE) {
+          if ((node.object?.type === 'Identifier' && llmNamespaces.has(node.object.name)) || isDynamicTo(node.object, 'src/engine/providers/llm')) {
+            report(node, `accesses billable LLM \`chat\` outside \`${LLM_SEND_FILE}\`. ${LLM_HINT}`);
+          }
+        }
+        if (prop === 'providerFetch' && !FETCH_ALLOWED.has(rel) && !isProviderImpl(rel)) {
+          if ((node.object?.type === 'Identifier' && fetchNamespaces.has(node.object.name)) || isDynamicTo(node.object, 'src/lib/providerFetch')) {
+            report(node, `accesses \`providerFetch\` outside the provider transport layer. ${FETCH_HINT}`);
+          }
+        }
+      }
+
+      // 1b. Inside llmSend.ts, every `chat(...)` call must sit inside `paidSend(...)`.
+      if (node.type === 'CallExpression') {
+        const callee = unwrap(node.callee);
+        const indirect = callee?.type === 'MemberExpression' && ['bind', 'call', 'apply'].includes(keyName(callee.property))
+          ? unwrap(callee.object) : undefined;
+        if (rel === LLM_SEND_FILE && (isChat(callee) || isChat(indirect)) && !inGate()) {
+          report(node, `calls billable LLM \`chat()\` outside \`paidSend()\`. ${LLM_HINT}`);
+        }
+        // 2. Billable adapter methods: forbidden outside providers/, and inside jobs.ts / specialSends.ts must sit inside the gate.
+        const adapterMethod = indirect ?? callee;
+        if (!isProviderImpl(rel) && adapterMethod?.type === 'MemberExpression') {
+          const prop = keyName(adapterMethod.property);
+          if (BILLABLE_ADAPTER_METHODS.has(prop)) {
+            if (!ADAPTER_GATE_FILES.has(rel)) {
+              report(node, `calls billable provider method \`.${prop}()\` outside \`paidSend\` gate. ${ADAPTER_HINT}`);
+            } else if (!inGate()) {
+              report(node, `calls billable provider method \`.${prop}()\` in \`${rel}\` outside \`sendGenerationViaPaidGate\`/\`runSpecialSend\`/\`paidSend\`. ${ADAPTER_HINT}`);
+            }
+          }
+        }
+        // 3b. Direct `providerFetch(...)` call outside allowed layer (catches aliases too).
+        if (!FETCH_ALLOWED.has(rel) && !isProviderImpl(rel) && callee?.type === 'Identifier' && fetchLocals.has(callee.name)) {
+          report(node, `calls \`providerFetch()\` outside the provider transport layer. ${FETCH_HINT}`);
+        }
+      }
+      }
     },
   });
 }

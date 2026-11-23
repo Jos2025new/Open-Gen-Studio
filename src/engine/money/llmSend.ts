@@ -22,6 +22,7 @@ import {
   createTicket,
   priceFromEstimate,
   roundUsd,
+  settleSend,
   ticketCommittedUsd,
   type ApprovalTicket,
   type TicketPass,
@@ -60,6 +61,28 @@ export function hasLlmPossibleCharge(runId: string | undefined): boolean {
   return status === 'in_flight' || status === 'uncertain';
 }
 
+/** Close the original reservation only after an explicit decision to record its charge as unknown. */
+export function reconcileLlmCharge(sessionId: string, ticketId: string): boolean {
+  let ticket = storeTickets.get(ticketId);
+  if (ticket?.kind !== 'llm' || ticket.sessionId !== sessionId) return false;
+  const source = ticket.scope.llm;
+  const uncertain = ticket.sends.filter((send) => send.status === 'uncertain');
+  for (const send of uncertain) {
+    const settlement = settleSend(ticket, send.id, { costUsd: null, estimated: true });
+    ticket = settlement.ticket;
+    if (settlement.bookedUnknown) {
+      addSpend(null, {
+        category: 'agent', provider: source?.provider ?? 'Unknown provider', model: source?.model ?? 'Unknown model',
+        sessionId, estimated: true, sendId: send.id,
+      });
+    }
+  }
+  if (!uncertain.length) return false;
+  storeTickets.put(ticket);
+  void saveTicketMark().catch(() => undefined);
+  return true;
+}
+
 function classifyLlmError(err: unknown, signal: AbortSignal): SendErrorDisposition {
   if (err instanceof NetworkError || isAbort(err) || signal.aborted) return 'uncertain';
   if (err instanceof HttpError && (err.status >= 500 || err.status === 408)) return 'uncertain';
@@ -86,6 +109,7 @@ function ensureLlmTicket(opts: {
       id: opts.ticketId,
       sessionId: opts.sessionId,
       kind: 'llm',
+      scope: { llm: { provider: opts.provider, model: opts.model } },
       price,
     });
   }
@@ -123,7 +147,6 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
       save: saveTicketMark,
       canWrite: canWriteTicket,
       onBookSpend: (booking) => {
-        if (booking.usd == null || booking.usd <= 0) return;
         addSpend(booking.usd, {
           category: 'agent',
           provider: opts.provider,
@@ -149,9 +172,10 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
           onToolCall: opts.onToolCall,
           onNotice: opts.onNotice,
         });
-        reportedUsd = opts.computeUsd(value.usage);
         const estimated = value.usage?.costUsd == null;
-        return { value, costUsd: reportedUsd, estimated };
+        const costUsd = value.usage && (!estimated || price.kind !== 'unknown') ? opts.computeUsd(value.usage) : null;
+        reportedUsd = costUsd ?? 0;
+        return { value, costUsd, estimated };
       },
       signal: opts.signal,
       classifyError: (err) => classifyLlmError(err, opts.signal),

@@ -1,8 +1,9 @@
 import type { PlanFeedItem, StepState } from '../types';
-import { updateFeedItem, useStore } from '../../store/store';
+import { appendFeed, updateFeedItem, useStore } from '../../store/store';
 import { hasActiveTicketSend, storeTickets } from '../money/storeBridge';
 import { markSendUncertain } from '../money/ticket';
 import { settleInterruptedCommandCards } from './commandCalls';
+import { feedBase } from './runtimeShared';
 import { recordPriceResults } from './priceNotes';
 
 const get = () => useStore.getState();
@@ -21,6 +22,14 @@ export function settleInterruptedPlans(): void {
       if (s.status === 'in_flight') next = markSendUncertain(next, s.id, 'Interrupted by reload');
     }
     if (next !== t) storeTickets.put(next);
+    if (!next.sends.some((send) => send.status === 'uncertain')) continue;
+    const feed = get().sessions[t.sessionId]?.feed;
+    if (!feed || feed.some((item) => item.type === 'notice' &&
+      (item.uncertainLlmTicketId === t.id || (item.meta?.runId && `llm:${item.meta.runId}` === t.id)))) continue;
+    appendFeed(t.sessionId, {
+      ...feedBase('chat'), type: 'notice', level: 'info', uncertainLlmTicketId: t.id,
+      text: 'An interrupted model request may have been charged. Its amount is unknown.',
+    });
   }
   settleInterruptedCommandCards();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan') recordPriceResults(s.id, f.id);
@@ -34,6 +43,14 @@ export function settleInterruptedPlans(): void {
       const item = get().sessions[sessionId]?.feed.find((f) => f.id === itemId);
       if (!item || item.type !== 'plan' || item.status !== 'running') {
         open.delete(key);
+        continue;
+      }
+      const selected = item.plan.steps.filter((step) => !item.skipped?.includes(step.id) && !item.canceledSteps?.includes(step.id));
+      if (item.plan.workspace !== 'node' && selected.length && selected.every((step) =>
+        !item.stepGenerations[step.id] && (item.stepStates[step.id] === 'pending' || !item.stepStates[step.id]),
+      ) && !storeTickets.get(`plan:${item.id}`)?.sends.some((send) => send.status !== 'pending')) {
+        open.delete(key);
+        updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'awaiting', error: undefined });
         continue;
       }
       const states: Record<string, StepState> = { ...item.stepStates };

@@ -30,10 +30,10 @@ export type SpendCategory = 'agent' | MediaKind | 'text';
 
 export interface SpendEntry {
   at: number;
-  usd: number;
-  /** True when the provider did not report the cost and it comes from published prices. */
+  usd: number | null;
+  /** True when the provider did not report the cost. */
   estimated: boolean;
-  /** True when neither provider nor catalog had a price (`usd` is 0 as a placeholder, never a confirmed $0 charge). */
+  /** True when the charge could not be priced. Older entries can have a zero placeholder. */
   unknownPrice?: boolean;
   category: SpendCategory;
   provider: string;

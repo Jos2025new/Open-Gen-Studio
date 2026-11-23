@@ -419,7 +419,7 @@ export async function chat(opts: {
     }
     if (chunk.error) throw new HttpError(500, extractErrorMessage(chunk, 'Model error'), chunk);
     const u = chunk.usage as Loose | undefined;
-    if (u) {
+    if (u && (typeof u.cost === 'number' || (typeof u.prompt_tokens === 'number' && typeof u.completion_tokens === 'number'))) {
       const out = u.completion_tokens_details as Loose | undefined;
       usage = {
         inputTokens: Number(u.prompt_tokens ?? 0),

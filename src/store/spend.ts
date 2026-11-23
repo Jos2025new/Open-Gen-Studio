@@ -19,7 +19,7 @@ export function addSpend(usd: number | null | undefined, entry?: Omit<SpendEntry
     useStore.setState((st) => {
       if (sendId && st.spendLog.some((e) => e.sendId === sendId)) return {};
       return {
-        spendLog: [...st.spendLog, { ...entry, at: Date.now(), usd: 0, estimated: true, unknownPrice: true }].slice(-MAX_SPEND_LOG),
+        spendLog: [...st.spendLog, { ...entry, at: Date.now(), usd: null, estimated: true, unknownPrice: true }].slice(-MAX_SPEND_LOG),
       };
     });
     return;

@@ -116,7 +116,7 @@ export function SpendingPanel() {
               <table className="spend-table">
                 <thead><tr><th scope="col">Date</th><th scope="col">Model</th><th scope="col">Type</th><th scope="col">Amount</th></tr></thead>
                 <tbody>
-                {[...sum.recent].sort((a, b) => (chargeSort.asc ? 1 : -1) * (chargeSort.by === 'date' ? a.at - b.at : chargeSort.by === 'amount' ? a.usd - b.usd : modelName(a.model).localeCompare(modelName(b.model), undefined, { numeric: true, sensitivity: 'base' }))).map((e, i) => (
+                {[...sum.recent].sort((a, b) => (chargeSort.asc ? 1 : -1) * (chargeSort.by === 'date' ? a.at - b.at : chargeSort.by === 'amount' ? (a.usd ?? 0) - (b.usd ?? 0) : modelName(a.model).localeCompare(modelName(b.model), undefined, { numeric: true, sensitivity: 'base' }))).map((e, i) => (
                   <tr key={`${e.at}-${i}`}>
                     <td className="faint num">{new Date(e.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td>{modelName(e.model)}</td>
@@ -133,14 +133,14 @@ export function SpendingPanel() {
           <p className="faint spend-empty">Nothing spent in this period.</p>
         )}
         <p className="faint spend-foot">≈ marks amounts estimated from published prices when the provider does not report the actual cost.</p>
-        {spent > log.reduce((s, e) => s + e.usd, 0) + 0.005 ? <p className="faint spend-foot">Spending from before itemized tracking is counted in the total but not listed here.</p> : null}
+        {spent > log.reduce((s, e) => s + (e.usd ?? 0), 0) + 0.005 ? <p className="faint spend-foot">Spending from before itemized tracking is counted in the total but not listed here.</p> : null}
       </div>
     </div>
   );
 }
 
-function spendUsd(usd: number, estimated = false, unknown = false): string {
-  return formatSpendAmount(usd, { estimated, unknown, fixed: true });
+function spendUsd(usd: number | null, estimated = false, unknown = false): string {
+  return formatSpendAmount(usd ?? 0, { estimated, unknown: unknown || usd === null, fixed: true });
 }
 
 function Tile({ label, usd, unknown = false, note }: { label: string; usd: number; unknown?: boolean; note?: string }) {

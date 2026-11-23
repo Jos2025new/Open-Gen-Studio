@@ -34,6 +34,7 @@ export interface FrozenScope {
   readonly steps?: readonly unknown[];
   /** Preview signature / input-pins digest for detecting edits between approve and execute. */
   readonly signature?: string;
+  readonly llm?: { provider: string; model: string };
 }
 
 export interface TicketPass {

@@ -68,7 +68,7 @@ function group(entries: SpendEntry[], key: (e: SpendEntry) => string): SpendRow[
     const k = key(e);
     const r = rows.get(k) ?? { key: k, usd: 0, count: 0, lastAt: 0, estimated: false, unknownCount: 0 };
     r.lastAt = Math.max(r.lastAt, e.at);
-    r.usd += e.usd;
+    r.usd += e.usd ?? 0;
     r.count += 1;
     r.estimated ||= e.estimated;
     if (e.unknownPrice) r.unknownCount += 1;
@@ -79,8 +79,8 @@ function group(entries: SpendEntry[], key: (e: SpendEntry) => string): SpendRow[
 
 export function summarizeSpend(log: SpendEntry[], since: number, recent = 30): SpendSummary {
   const entries = log.filter((e) => e.at >= since);
-  const total = entries.reduce((s, e) => s + e.usd, 0);
-  const agent = entries.filter((e) => e.category === 'agent').reduce((s, e) => s + e.usd, 0);
+  const total = entries.reduce((s, e) => s + (e.usd ?? 0), 0);
+  const agent = entries.filter((e) => e.category === 'agent').reduce((s, e) => s + (e.usd ?? 0), 0);
   const unknownCount = entries.filter((e) => e.unknownPrice).length;
   const unknownAgent = entries.filter((e) => e.category === 'agent' && e.unknownPrice).length;
   return {

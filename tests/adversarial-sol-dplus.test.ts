@@ -16,7 +16,7 @@ import { remainingBudget } from '../src/engine/budget';
 import { setApprover } from '../src/engine/commands';
 import { patchNodeData } from '../src/engine/flow/actions';
 import { createGeneration, resumeInterrupted, retryGeneration, runGeneration } from '../src/engine/jobs';
-import { sendLlmViaPaidGate } from '../src/engine/money/llmSend';
+import { reconcileLlmCharge, sendLlmViaPaidGate } from '../src/engine/money/llmSend';
 import { paidSend, type TicketAccess } from '../src/engine/money/paidSend';
 import { sendGenerationViaPaidGate } from '../src/engine/money/storeBridge';
 import { createTicket, exactPrice, type ApprovalTicket } from '../src/engine/money/ticket';
@@ -156,8 +156,7 @@ it('requires charge confirmation before repeating an uncertain LLM turn', async 
   expect(fake.acceptedCount('/chat/completions'), 'plain Retry replayed a potentially charged call').toBe(1);
 });
 
-// reproduce: a disconnected LLM's reservation remains after reload and a later successful retry, since they have independent sendIds.
-it.fails('gives a completed LLM retry a way to reconcile the original reservation', async () => {
+it('gives a completed LLM retry a way to reconcile the original reservation', async () => {
   fake.onNext('/chat/completions', 'cut-after-accept');
   await expect(sendLlm('llm:lost')).rejects.toThrow();
   const saved = snapshotStore();
@@ -167,11 +166,12 @@ it.fails('gives a completed LLM retry a way to reconcile the original reservatio
   expect(remainingBudget()).toBeCloseTo(0.96, 6);
   await sendLlm('llm:later');
   expect(fake.acceptedCount('/chat/completions')).toBe(2);
+  expect(reconcileLlmCharge(sid, 'llm:lost')).toBe(true);
+  expect(useStore.getState().spendLog.filter((entry) => entry.unknownPrice)).toHaveLength(1);
   expect(remainingBudget(), 'the old $0.04 reservation still reduces the usable budget').toBeCloseTo(1 - useStore.getState().spentUsd, 6);
 });
 
-// reproduce: a completed stream without usage is settled as zero and never gets an unknown-cost spend entry.
-it.fails('records a completed billable LLM call with missing usage as unknown', async () => {
+it('records a completed billable LLM call with missing usage as unknown', async () => {
   fake.onNext('/chat/completions', () =>
     sseResponse([{ choices: [{ delta: { content: 'Done' }, finish_reason: 'stop' }] }]),
   );
@@ -199,8 +199,7 @@ it('requires a new review before sending a changed node from a restored command 
   expect(fake.acceptedCount('different prompt'), 'the restored approval dispatched an unreviewed prompt').toBe(0);
 });
 
-// reproduce: reload converts a running plan with only untouched work to error and requires Retry failed, since Check needs an existing job.
-it.fails('offers one-click approval for a plan whose next step was still pending', async () => {
+it('offers one-click approval for a plan whose next step was still pending', async () => {
   const item: PlanFeedItem = {
     id: 'plan-card', createdAt: 1, type: 'plan', style: 'auto', workspace: 'chat', status: 'running',
     plan: {
@@ -259,8 +258,7 @@ it.fails('compacts terminal LLM tickets while keeping their settled spend', asyn
   expect(Object.values(useStore.getState().tickets).filter((ticket) => ticket.kind === 'llm'), 'all 12 finished turns remain as full tickets').toHaveLength(0);
 });
 
-// reproduce: check-paid-send only checks member calls and misses a bound adapter method invoked through a local variable.
-it.fails('flags an adapter generate method passed around as a bound function', () => {
+it('flags an adapter generate method passed around as a bound function', () => {
   const file = 'src/engine/mediaCaller.ts';
   const diagnostics = scanFixture(file, [
     'export function send(adapter: { generate(input: unknown): unknown }, input: unknown) {',
@@ -271,8 +269,7 @@ it.fails('flags an adapter generate method passed around as a bound function', (
   expect(diagnostics.join('\n')).toMatch(/mediaCaller\.ts:[23]:.*paidSend/);
 });
 
-// reproduce: check-paid-send treats any descendant of a call named paidSend as guarded, including eagerly evaluated arguments.
-it.fails('flags an eager chat call made before paidSend can reserve or persist', () => {
+it('flags an eager chat call made before paidSend can reserve or persist', () => {
   const file = 'src/engine/money/llmSend.ts';
   const diagnostics = scanFixture(file, [
     "import { chat } from '../providers/llm';",
@@ -282,8 +279,7 @@ it.fails('flags an eager chat call made before paidSend can reserve or persist',
   expect(diagnostics.join('\n')).toMatch(/llmSend\.ts:3:.*paidSend/);
 });
 
-// reproduce: check-paid-send permits a namespace chat call outside the gate inside the approved LLM file.
-it.fails('flags an ungated namespace chat call inside llmSend', () => {
+it('flags an ungated namespace chat call inside llmSend', () => {
   const file = 'src/engine/money/llmSend.ts';
   const diagnostics = scanFixture(file, [
     "import * as llm from '../providers/llm';",
