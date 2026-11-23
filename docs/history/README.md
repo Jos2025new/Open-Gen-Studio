@@ -75,6 +75,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [072: arrastre con 200 nodos y registro durable de envíos (ramas `task/drag200` y `task/envios-durables`, 2026-11-21)](072-2026-11-W47-master-arrastre-envios.md).
 - [073: posición al recargar, vista por espacio y diseño del subnet (ramas `task/posicion-recarga` y `task/vista-espacio`, 2026-11-21)](073-2026-11-W47-master-posicion-vista-subnet.md).
 - [074: listas cerradas, una vía de cableado y núcleo del dinero (rama `task/listas-cerradas`, 2026-11-21/22)](074-2026-11-W47-master-listas-dinero.md).
+- [075: dinero crítico, checks de disciplina, recarga y lienzo (rama `task/integra-7`, 2026-11-22)](075-2026-11-W47-master-dinero-checks.md).
 - [066: visor, historial de versiones y fusión (2026-11-16)](066-2026-11-W47-visor-historial-fusion.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
