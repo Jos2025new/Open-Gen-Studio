@@ -53,7 +53,7 @@ function setup(style: 'guided' | 'direct' = 'guided') {
   });
   const s = useStore.getState();
   useStore.setState({
-    settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
+    settings: { ...s.settings, budgetOn: false, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...s.composer, agentStyle: style, attachments: [], image: { ...s.composer.image, modelRef: FLUX } },
     catalog: { ...s.catalog, models: { ...s.catalog.models, ...models }, schemas: { ...s.catalog.schemas, ...schemas } },
     sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } } }) } },

@@ -37,7 +37,7 @@ it('captures actual runtime requests offline with complete tools and stable pref
     const captured: Array<Record<string, any>> = [];
     useStore.setState({
       assets: {}, generations: {}, library: [], quotes: {},
-      settings: { ...st.settings, keys: { atlas: '', fal: '', openrouter: '', nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: MODEL, effort: 'low', showThinking: false } },
+      settings: { ...st.settings, budgetOn: false, keys: { atlas: '', fal: '', openrouter: '', nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: MODEL, effort: 'low', showThinking: false } },
       composer: { ...st.composer, attachments: [], agentStyle: 'guided', skillId: null, workflowId: null },
       sessions: { [sid]: { ...st.sessions[sid], title: 'Sandbox pilot fixture', feed: [], subjects: [], agentMetrics: [],
         agents: mainThread({ history: [], notes: !c.continuation && arm === 'notice' ? [note] : [], busy: false, questionRound: 0 }) } },

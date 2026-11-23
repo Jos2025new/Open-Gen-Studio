@@ -67,7 +67,7 @@ describe('activity block of a turn (L3–L4)', () => {
     const st = useStore.getState();
     const sid = st.activeSessionId;
     useStore.setState({
-      settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', effort: 'low', showThinking: true } },
+      settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', effort: 'low', showThinking: true } },
       composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
       sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
     });

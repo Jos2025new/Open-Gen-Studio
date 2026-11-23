@@ -38,7 +38,7 @@ beforeEach(() => {
   const st = useStore.getState();
   const sid = st.activeSessionId;
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm', showThinking: false } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
   });
@@ -261,13 +261,26 @@ describe("the user's own messages", () => {
 
   it('edit: the old answer and what followed are dropped, the edited text is answered again', async () => {
     let n = 0;
-    vi.stubGlobal('fetch', async () => sse([text(`answer ${++n}`)]));
+    let finishEdit!: (reply: Response) => void;
+    const editedReply = new Promise<Response>(resolve => { finishEdit = resolve; });
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      if (!init?.body) return Response.json({ data: [] });
+      return ++n === 3 ? editedReply : sse([text(`answer ${n}`)]);
+    });
     const sid = useStore.getState().activeSessionId;
     await sendAgentMessage('uno');
     await sendAgentMessage('dos');
     const msg = useStore.getState().sessions[sid].feed.find((f) => f.type === 'user' && f.text === 'uno')!;
     const { editUserMessage } = await import('../src/engine/agent/runtime');
-    await editUserMessage(sid, msg.id, 'uno, corregido');
+    const edited = editUserMessage(sid, msg.id, 'uno, corregido');
+    try {
+      const feed = useStore.getState().sessions[sid].feed;
+      expect(feed.filter((f) => f.type === 'user').map((f) => f.type === 'user' && f.text)).toEqual(['uno, corregido']);
+      expect(feed.some((f) => f.type === 'assistant')).toBe(false);
+    } finally {
+      finishEdit(sse([text('answer 3')]));
+      await edited;
+    }
     const s = useStore.getState().sessions[sid];
     expect(said(sid)).toEqual(['uno, corregido']);
     expect(s.feed.filter((f) => f.type === 'user').map((f) => f.type === 'user' && f.text)).toEqual(['uno, corregido']);

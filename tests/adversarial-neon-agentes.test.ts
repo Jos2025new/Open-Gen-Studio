@@ -72,7 +72,7 @@ beforeEach(() => {
   const st = useStore.getState();
   useStore.setState({
     activeSessionId: HOME,
-    settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'model-a' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'model-a' } },
     catalog: {
       ...st.catalog,
       llmStatus: { ...st.catalog.llmStatus, openrouter: 'ready' },

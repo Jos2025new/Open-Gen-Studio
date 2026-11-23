@@ -36,7 +36,7 @@ async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: bo
   const schemas = Object.fromEntries(await Promise.all(models.filter((m) => [NANO, SEEDREAM].includes(m.ref)).map(async (m) => [m.ref, await atlas.loadSchema(m, undefined)])));
   const sid = before.activeSessionId;
   useStore.setState({
-    settings: { ...before.settings, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
+    settings: { ...before.settings, budgetOn: false, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     composer: { ...before.composer, agentStyle: opts.style, attachments: [], image: { ...before.composer.image, modelRef: NANO }, userPicked: { ...(before.composer.userPicked ?? {}), image: opts.userPicked } },
     catalog: { ...before.catalog, models: Object.fromEntries(models.map((m) => [m.ref, m])), schemas },
     sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [], agents: mainThread({ busy: false, questionRound: 0, notes: [], history: [], ...(opts.confirmed ? { settings: { image: { modelRef: opts.confirmed, needsImage: false, resolution: '1k', aspect: '1:1', count: 1 } } } : {}) }) } },

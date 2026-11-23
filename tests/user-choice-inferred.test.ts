@@ -38,7 +38,7 @@ beforeEach(() => {
     return sse(replies.shift() ?? 'Listo.');
   });
   useStore.setState({
-    settings: { ...initial.settings, keys: { ...initial.settings.keys, nanogpt: 'fixture', atlas: 'fixture' }, agent: { ...initial.settings.agent, provider: 'nanogpt', model: 'fixture' } },
+    settings: { ...initial.settings, budgetOn: false, keys: { ...initial.settings.keys, nanogpt: 'fixture', atlas: 'fixture' }, agent: { ...initial.settings.agent, provider: 'nanogpt', model: 'fixture' } },
     composer: { ...initial.composer, agentStyle: 'auto', attachments: [], image: { ...initial.composer.image, modelRef: Y } },
     catalog: { ...initial.catalog, models: { ...initial.catalog.models, ...models }, schemas: { ...initial.catalog.schemas, ...schemas } },
     sessions: { ...initial.sessions, [initial.activeSessionId]: { ...initial.sessions[initial.activeSessionId], feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: Y, needsImage: false, count: 1, aspect: '1:1' } } }) } },

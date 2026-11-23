@@ -76,6 +76,13 @@ beforeEach(() => {
   const st = useStore.getState();
   const sid = st.activeSessionId;
   useStore.setState({
+    catalog: {
+      ...st.catalog,
+      llmStatus: { ...st.catalog.llmStatus, nanogpt: 'ready' },
+      llm: { ...st.catalog.llm, nanogpt: [
+        { id: 'm', name: 'Fixture LLM', contextLength: 32_000, vision: true, tools: true, reasoning: false, inputPrice: 0, outputPrice: 0 },
+      ] },
+    },
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },
@@ -157,7 +164,6 @@ describe('recovering a failed plan', () => {
     useStore.setState((st) => ({
       spentUsd: 5,
       settings: { ...st.settings, budgetOn: true, budgetUsd: 1, budgetAccepted: undefined, budgetNoAsk: false },
-      catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [{ id: 'm', name: 'm', tools: true, vision: true, inputPrice: 0, outputPrice: 0 }] as never } },
     }));
     const before = runs.length;
     replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'ok'];

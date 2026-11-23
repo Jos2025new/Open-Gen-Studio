@@ -129,7 +129,7 @@ describe('agent Nodes → Chat action', () => {
     const st = useStore.getState();
     useStore.setState({
       ui: { ...st.ui, workspace: 'node' },
-      settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test' } },
+      settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'test' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test' } },
       composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
     });
 

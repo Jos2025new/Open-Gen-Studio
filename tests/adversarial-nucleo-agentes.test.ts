@@ -26,7 +26,7 @@ beforeEach(() => {
   const st = useStore.getState();
   useStore.setState({
     activeSessionId: HOME,
-    settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'vision' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'vision' } },
     catalog: { ...st.catalog, llmStatus: { ...st.catalog.llmStatus, openrouter: 'ready' }, llm: { ...st.catalog.llm, openrouter: [{ id: 'vision', name: 'Vision', tools: true, vision: true }, { id: 'blind', name: 'Blind', tools: true, vision: false }] } },
     assets: { ...st.assets, picture: { id: 'picture', kind: 'image', name: 'picture', width: 10, height: 10 } as never },
     sessions: { ...st.sessions, [HOME]: { ...st.sessions[HOME], graph: graph(), feed: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }), agentLane: undefined} },

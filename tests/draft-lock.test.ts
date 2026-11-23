@@ -52,7 +52,7 @@ beforeEach(() => {
   const base = st.catalog.schemas[REF] ?? ({ slots: {}, params: [] } as unknown as ModelSchema);
   const schema = { ...base, ref: REF, params: [{ key: 'resolution', label: 'Resolution', role: 'resolution', type: 'enum', options: ['480p', '720p', '1080p'], default: '720p' }] } as unknown as ModelSchema;
   useStore.setState({
-    settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
     catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [REF]: schema } },
     sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agents: mainThread({ history: [], questionRound: 0, notes: [], busy: false }) } },

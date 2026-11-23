@@ -38,6 +38,7 @@ function resetStore(opts: { provider?: 'openrouter' | 'offline'; model?: string 
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
     catalog: {
       ...st.catalog,
+      llmStatus: { ...st.catalog.llmStatus, openrouter: 'ready' },
       llm: {
         ...st.catalog.llm,
         openrouter: [
@@ -48,6 +49,7 @@ function resetStore(opts: { provider?: 'openrouter' | 'offline'; model?: string 
     },
     settings: {
       ...st.settings,
+      budgetOn: false,
       keys: { ...st.settings.keys, openrouter: provider === 'openrouter' ? 'sk-test' : '' },
       agent: {
         ...st.settings.agent,

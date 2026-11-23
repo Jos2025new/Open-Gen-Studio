@@ -35,7 +35,7 @@ function script(calls: Array<{ name: string; args: object }>) {
 }
 const goLive = (workspace: 'chat' | 'node') => {
   const st = useStore.getState();
-  useStore.setState({ ui: { ...st.ui, workspace }, settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
+  useStore.setState({ ui: { ...st.ui, workspace }, settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, nanogpt: 'test' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test' } }, composer: { ...st.composer, agentStyle: 'auto', attachments: [] } });
 };
 
 beforeEach(() => {
