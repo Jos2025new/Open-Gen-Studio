@@ -1,6 +1,6 @@
 import { logged } from '../lib/log';
 import { formatUsd } from '../lib/format';
-import { apiKeyFor, isConnected, modelSummary } from './catalog';
+import { apiKeyFor, ensureSchema, isConnected, modelSummary } from './catalog';
 import { pushAlert, dismissAlert } from './alerts';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
@@ -15,6 +15,7 @@ import { estimateForRetry } from './retryPartial';
 import { newerAttempt } from './relinkAttempt';
 import { applyEdit } from './nodecore/edit';
 import { closeTicket, grantGenerationTicketPass, hasActiveTicketSend, reopenGenerationTicketStep } from './money/storeBridge';
+import { rebindSubstituteFingerprint } from './sendInputs';
 
 /*
  * A provider with no credit: switch to the same model at another provider that has credit and costs the same or
@@ -228,7 +229,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       : o.ratio === undefined ? 'price not comparable' : `about ${Math.round(o.ratio * 10) / 10}× the price`;
     const note = `${empty} had no credit, so this switched to ${PROVIDER_LABELS[patch.provider]} (${model}, ${price}).`;
     const notes = [...(get().generations[genId]?.notes ?? []), note];
-    patchGeneration(genId, { ...patch, notes, approvedFingerprint: undefined });
+    patchGeneration(genId, { ...patch, notes, ...(g.approvedFingerprint ? { approvedFingerprint: rebindSubstituteFingerprint(g, patch) } : {}) });
   };
   const superseded = () => {
     const now = get().generations[genId];
@@ -260,6 +261,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const held = holdAttemptNode(g, nodes());
     if (!held) return;
     try {
+      if (g.approvedFingerprint) await ensureSchema(patch.modelRef).catch(() => undefined);
       applySubstitute(o, patch);
       if (pass) { grantGenerationTicketPass(genId, estimate); consumeOnce(pass, estimate); }
       else reopenGenerationTicketStep(genId);
@@ -309,6 +311,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   }
   if (auto && mode === 'always') {
     if (superseded()) return false;
+    if (g.approvedFingerprint) await ensureSchema(auto.model.ref).catch(() => undefined);
     const patch = substitute(auto);
     const est = retryEstimateFor(patch);
     let immediate = true;

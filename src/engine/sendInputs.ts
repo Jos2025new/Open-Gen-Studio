@@ -4,7 +4,7 @@ import { assetRevisionIdentity } from './assetRevisions';
 import { RECRAFT_STYLE_REF, sentModelRef } from './catalog';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
-import { buildDryRequest, dryMedia, parseFingerprint, stable } from './money/transport';
+import { buildDryRequest, dryMedia, parseFingerprint, stable, staticAssetsMatch } from './money/transport';
 import { refsLimit } from './officialLimits';
 import { syncOpSpec, type OpSpecInput } from './opSpec';
 import { OPS, isVideoOpEngine } from './ops';
@@ -202,6 +202,15 @@ export function bindDynamicFingerprint(fp: string | undefined, spec: SendSpec, s
     : engine === 'local' ? false : Boolean(state.catalog.models[plan.modelRef] && state.catalog.schemas[plan.modelRef]);
   if (!ready) return fp;
   return stable({ requests: JSON.parse(sendFingerprint(plan, state, { ignoreSeed: true })), staticAssets: parsed.staticAssets });
+}
+
+export function rebindSubstituteFingerprint(g: Generation, patch: Pick<Generation, 'modelRef' | 'provider'>, state: SendState = get()): string | undefined {
+  const parsed = g.approvedFingerprint ? parseFingerprint(g.approvedFingerprint) : null;
+  if (!parsed?.requests || !staticAssetsMatch(parsed.staticAssets, state.assets)) return g.approvedFingerprint;
+  const cur = JSON.parse(sendFingerprint(resolveSendPlan(g, state), state, { ignoreSeed: true }));
+  if (!Array.isArray(cur) || !cur.length || cur.length > parsed.requests.length || stable(parsed.requests.slice(-cur.length)) !== stable(cur)) return g.approvedFingerprint;
+  const next = JSON.parse(sendFingerprint(resolveSendPlan({ ...g, ...patch }, state), state, { ignoreSeed: true }));
+  return parsed.staticAssets ? stable({ requests: next, staticAssets: parsed.staticAssets }) : stable(next);
 }
 
 /** Build the dry-run SendSpec for a PlanStep using the same opSpec/lyrics rules as execution. */

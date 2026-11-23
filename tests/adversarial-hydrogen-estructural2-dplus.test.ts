@@ -171,7 +171,7 @@ afterEach(() => {
 });
 
 // reproduce: 402 provider switch (credit.ts:231) clears approvedFingerprint: undefined instead of preserving/re-checking it on the substitute send.
-it.fails('H3a: 402 provider switch clears approvedFingerprint and sends edited asset bytes without re-review', async () => {
+it('H3a: 402 provider switch clears approvedFingerprint and sends edited asset bytes without re-review', async () => {
   blobs.set('ast_ref', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
   fake.onNext('402 fp bypass', 'http-402');
 
