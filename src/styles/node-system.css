@@ -53,3 +53,16 @@
 .node-canvas.is-omni .react-flow__node .port.port-link-control::before { --pf: var(--type-audio); border: 0; border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .node-canvas.is-omni .react-flow__node .port.port-link-data::before { border-radius: 50%; }
 .node-canvas.is-omni .react-flow__node .port.port-quiet::before { pointer-events: none; }
+
+/* Hit zone of every connection handle: an invisible, centred 24 px square on screen (the handle's look and size do not change).
+   ::before already draws the omnicanvas shape, so the zone is ::after. Guarded by tests/node-handle-hit-zone.test.ts. */
+.node-canvas .port::after, .node-canvas .nc-next::after, .node-canvas .nc-result::after { content: ''; position: absolute; left: 50%; top: 50%; width: calc(24px / var(--rf-hit-zoom, 1)); height: calc(24px / var(--rf-hit-zoom, 1)); transform: translate(-50%, -50%); background: transparent; pointer-events: auto; }
+/* A hidden or disabled handle has no click zone either: .port-quiet is opacity 0 + pointer-events none, and the ::after above would otherwise win with pointer-events:auto. */
+.node-canvas .react-flow__handle:not(.connectable)::after, .node-canvas .port.port-quiet::after { pointer-events: none; }
+/* Outward hit-zone offsets using --rf-hit-zoom so the 24 px-on-screen zones extend outside the card and never cover its body at low zoom (e.g. 0.05). */
+.node-canvas .react-flow__handle-left.port::after { left: calc(50% - 12px / var(--rf-hit-zoom, 1)); }
+.node-canvas .react-flow__handle-right.port::after { left: calc(50% + 12px / var(--rf-hit-zoom, 1)); }
+.node-canvas .nc-next::after { left: calc(50% + max(0px, 12px / var(--rf-hit-zoom, 1) - 23px)); }
+.node-canvas .nc-result::after { left: calc(50% + max(0px, 12px / var(--rf-hit-zoom, 1) - 22.5px)); }
+/* Text cards sit their + handle 4 px over the card edge: the zone moves out so its inner edge is the card edge (12 px on screen from it) and never covers the body; it uses the zone's own --rf-hit-zoom so offset and size agree at every zoom. */
+.node-canvas .react-flow__node:has(.nc.k-text) .nc-next::after { left: calc(50% + (12px / var(--rf-hit-zoom, 1) - 7px)); }

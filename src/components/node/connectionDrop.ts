@@ -33,14 +33,21 @@ export function reportRefusedDrop(state: Parameters<OnConnectEnd>[1], graph: Gra
 /** Below this zoom ports stop growing: the enlarged hit area is capped at 12 px / 0.25 = 48 px (never larger than a card). */
 export const PORT_MIN_ZOOM = 0.25;
 export const portZoom = (zoom: number): number => Math.max(PORT_MIN_ZOOM, zoom);
+/** The 24 px click zone (--rf-hit-zoom) is clamped only at the canvas' real minimum zoom (NODE_MIN_ZOOM, pinned by tests), so it measures 24 px on screen over the whole range. */
+export const HIT_MIN_ZOOM = 0.05;
+export const hitZoom = (zoom: number): number => Math.max(HIT_MIN_ZOOM, zoom);
 
-/** The omnicanvas can sit far below 100 %: ports keep a minimum on-screen size through --rf-zoom (no re-render per frame).
+/** Ports keep a minimum on-screen size through --rf-zoom on both canvases (no re-render per frame; the omnicanvas can sit far below 100 %, the plain one scales the 24 px click zone with it).
  * Only the ::before of .port scales (node-system.css): the port box React Flow measures for cable anchors never changes. */
-export function usePortZoom(omni: boolean, canvas: RefObject<HTMLElement | null>) {
+export function usePortZoom(canvas: RefObject<HTMLElement | null>) {
   const rf = useReactFlow();
-  const onChange = useCallback((v: { zoom: number }) => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(portZoom(v.zoom))); }, [omni, canvas]);
+  const apply = useCallback((zoom: number) => {
+    canvas.current?.style.setProperty('--rf-zoom', String(portZoom(zoom)));
+    canvas.current?.style.setProperty('--rf-hit-zoom', String(hitZoom(zoom)));
+  }, [canvas]);
+  const onChange = useCallback((v: { zoom: number }) => apply(v.zoom), [apply]);
   useOnViewportChange({ onChange });
-  useEffect(() => { if (omni) canvas.current?.style.setProperty('--rf-zoom', String(portZoom(rf.getZoom()))); }, [omni, canvas, rf]);
+  useEffect(() => { apply(rf.getZoom()); }, [apply, rf]);
 }
 
 /** Only an output released on this canvas's empty pane opens the connected-node picker. */

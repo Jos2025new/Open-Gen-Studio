@@ -48,7 +48,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
           ),
       );
     },
-    useReactFlow: () => ({ fitView: vi.fn(), screenToFlowPosition: (p: { x: number; y: number }) => p, zoomIn: vi.fn(), zoomOut: vi.fn(), zoomTo: vi.fn() }),
+    useReactFlow: () => ({ fitView: vi.fn(), getZoom: () => 1, screenToFlowPosition: (p: { x: number; y: number }) => p, zoomIn: vi.fn(), zoomOut: vi.fn(), zoomTo: vi.fn() }),
     useViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     useConnection: () => false,
     useUpdateNodeInternals: () => () => {},

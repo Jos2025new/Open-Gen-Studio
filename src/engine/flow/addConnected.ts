@@ -3,7 +3,7 @@ import { useStore } from '../../store/store';
 import { applyEdit } from '../nodecore/edit';
 import { isAutoOption, matchInputOption, nearestAspect, paramByRole } from '../params';
 import type { GraphNode, GraphNodeData } from '../types';
-import { estimatedHeight, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, portFits } from './graph';
+import { estimatedHeight, findFreePositionFor, inputPorts, NODE_WIDTH, nodeOutputAsset, nodeRect, outputPort, portFits } from './graph';
 
 const get = useStore.getState;
 
@@ -35,7 +35,9 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
   const id = uid('nd');
   // The picker is one action through the editing layer: a rejected connection leaves no orphan, and Undo removes node and cable together.
-  const node: GraphNode = { id, data, position: at ?? { x: from.position.x + NODE_WIDTH + 100, y } };
+  // Without a drop point the card goes to the right of the source, or to the nearest free slot (preferring the right) when that spot is taken.
+  const position = at ?? findFreePositionFor(data, { x: from.position.x + NODE_WIDTH + 100, y }, graph.nodes.map((n) => nodeRect(n)), { preferRight: true });
+  const node: GraphNode = { id, data, position };
   const done = applyEdit({ session: sessionId, op: { op: 'add', node, connect: { source: fromId, targetHandle: port.id, sourceHandle } } });
   if (!done.ok) return null;
   return id;

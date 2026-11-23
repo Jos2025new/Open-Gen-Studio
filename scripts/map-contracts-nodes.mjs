@@ -134,7 +134,7 @@ export default [{
   sides: [
     ['src/styles/node-system.css', '.node-canvas.is-omni .react-flow__node .port::before'],
     ['src/components/node/connectionDrop.ts', 'export const portZoom'],
-    ['src/components/node/NodeWorkspace.tsx', 'usePortZoom(omni, canvasRef)'],
+    ['src/components/node/NodeWorkspace.tsx', 'usePortZoom(canvasRef)'],
   ],
   tests: ['tests/friction-omnicanvas.test.ts'],
 }, {

@@ -39,7 +39,7 @@ vi.mock('@xyflow/react', async importOriginal => {
           positionAbsoluteX: n.position.x, positionAbsoluteY: n.position.y,
         })));
     },
-    useReactFlow: () => ({ fitView: flow.fitView }),
+    useReactFlow: () => ({ fitView: flow.fitView, getZoom: () => 1 }),
     Background: () => null,
     NodeToolbar: ({ isVisible, children }: { isVisible?: boolean; children: ReactNode }) => isVisible ? children : null,
   };

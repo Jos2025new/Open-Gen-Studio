@@ -14,7 +14,7 @@ import {
 import { setUi, toast, useStore } from '../../store/store';
 import { ensureOmniNodes } from '../../engine/nodes/omni';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, estimatedHeight, findFreePosition, nodeRect, nodeWidth, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
+import { connectionError, estimatedHeight, findFreePosition, findFreePositionFor, nodeRect, nodeWidth, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { focusNodes, setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -137,7 +137,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   rfRef.current = rf;
   const view = useViewMemory(sessionId, omni, !embedded);
   useOmniFraming(omni, sessionId, rf, Boolean(view.saved));
-  usePortZoom(omni, canvasRef);
+  usePortZoom(canvasRef);
   // Nodes the agent just added: frame them once they are measured.
   const focusTick = useNodeFocus((s) => s.tick);
   useEffect(() => {
@@ -262,8 +262,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   }, [sessionId]);
 
   const freePos = useCallback((desired: { x: number; y: number }, data: GraphNodeData) => {
-    const width = omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data);
-    return findFreePosition(desired, { width, height: estimatedHeight(data) }, liveOccupied(), { gapX: 48, gapY: 56 });
+    return findFreePositionFor(data, desired, liveOccupied(), { width: omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data) });
   }, [omni, liveOccupied]);
 
   const addAtCenter = (data: GraphNodeData) => {
