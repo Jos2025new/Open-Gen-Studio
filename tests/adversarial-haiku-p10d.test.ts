@@ -8,9 +8,9 @@ type Node = { id: string; data: GraphNodeData; position: { x: number; y: number 
 const image = (id: string, x: number, y: number): Node => ({ id, data: { kind: 'image' } as unknown as GraphNodeData, position: { x, y } });
 
 describe('reataque p10d: colocacion con el panel del composer de 300 px', () => {
-  // reproduce: soltar desde el menu en (0,250), dentro del panel de una tarjeta de imagen seleccionada (panel y 232..532).
+  // fixed (p10d, huecos junto a los bordes de lo ocupado): soltar desde el menu en (0,250), dentro del panel de una tarjeta de imagen seleccionada (panel y 232..532).
   // Con 190 px la nueva tarjeta cae en (0,526). Con 300 cae en (0,802), 552 px del punto. Hay hueco libre en (0,532), 282 px.
-  it.fails('a card dropped under an image card lands no farther than the free slot below its composer panel', () => {
+  it('a card dropped under an image card lands no farther than the free slot below its composer panel', () => {
     const P = image('P', 0, 0);
     const at = findFreePositionFor(P.data, { x: 0, y: 250 }, [nodeRect(P as never)]);
     expect(at.y).toBeLessThanOrEqual(532);

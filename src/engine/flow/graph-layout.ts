@@ -75,8 +75,23 @@ export function findFreePosition(
   if (clear(desired.x, desired.y)) return desired;
   const stepX = size.width + gapX;
   const stepY = size.height + gapY;
-  // Ordered rings around desired so the node lands at the nearest clear slot without covering headers or composers.
+  // Candidates: the slots right against each obstacle's edges (a hole just under a composer panel is found even when it is not a
+  // whole grid step away), then ordered rings around desired; the nearest clear one wins.
   const offsets: Array<{ dx: number; dy: number; dist: number }> = [];
+  const push = (x: number, y: number) => { const dx = x - desired.x; const dy = y - desired.y; offsets.push({ dx, dy, dist: dx * dx + dy * dy }); };
+  for (const o of occupied) {
+    const xs = [o.x + o.width + gapX, o.x - size.width - gapX];
+    const ys = [o.y + o.height + gapY, o.y - size.height - gapY];
+    if (own) { xs.push(o.x + o.width - own.x, o.x - own.x - own.width); ys.push(o.y - own.y - own.height); }
+    for (const x of xs) push(x, desired.y);
+    for (const y of ys) push(desired.x, y);
+  }
+  for (const p of panels) {
+    push(desired.x, p.y + p.height);
+    push(p.x + p.width, desired.y);
+    push(p.x - size.width, desired.y);
+    push(desired.x, p.y - size.height);
+  }
   const maxRing = 8;
   for (let r = 1; r <= maxRing; r++) {
     for (let gx = -r; gx <= r; gx++) {
