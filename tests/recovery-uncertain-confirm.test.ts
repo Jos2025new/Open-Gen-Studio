@@ -74,7 +74,7 @@ describe('uncertain send recovery requires explicit resend confirmation', () => 
     act(() => buttons().find((b) => /Retry/.test(b.textContent ?? ''))!.click());
     act(() => buttons().find((b) => /Resend anyway/.test(b.textContent ?? ''))!.click());
     expect(retryMock).toHaveBeenCalledTimes(1);
-    expect(retryMock).toHaveBeenCalledWith('g_uncertain');
+    expect(retryMock).toHaveBeenCalledWith('g_uncertain', undefined, undefined, true);
   });
 
   it('over-limit Don’t ask again on an uncertain generation still requires explicit confirmation before mutating session or resending', () => {
@@ -120,6 +120,6 @@ describe('uncertain send recovery requires explicit resend confirmation', () => 
     act(() => buttons().find((b) => /Resend anyway/.test(b.textContent ?? ''))!.click());
     expect(useStore.getState().sessions[sid].noAskOverLimit).toBe(true);
     expect(retryMock).toHaveBeenCalledTimes(1);
-    expect(retryMock).toHaveBeenCalledWith('g_uncertain_over');
+    expect(retryMock).toHaveBeenCalledWith('g_uncertain_over', undefined, undefined, true);
   });
 });
