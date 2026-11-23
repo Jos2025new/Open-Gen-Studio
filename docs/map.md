@@ -20,13 +20,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 461 | 374 |
-| [store.ts](../src/store/store.ts) | 308 | 369 |
+| [types.ts](../src/engine/types.ts) | 461 | 375 |
+| [store.ts](../src/store/store.ts) | 308 | 370 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 68 | 5 |
-| [media.ts](../src/lib/media.ts) | 60 | 70 |
+| [media.ts](../src/lib/media.ts) | 60 | 71 |
 | [ops.ts](../src/engine/ops.ts) | 56 | 22 |
 | [id.ts](../src/lib/id.ts) | 55 | 0 |
 | [catalog.ts](../src/engine/catalog.ts) | 54 | 34 |
@@ -35,11 +35,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 43 | 38 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 40 | 0 |
-| [actions.ts](../src/engine/actions.ts) | 38 | 38 |
+| [actions.ts](../src/engine/actions.ts) | 38 | 39 |
 | [types.ts](../src/engine/providers/types.ts) | 38 | 10 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
 | [render.ts](../src/engine/design/render.ts) | 35 | 10 |
-| [graph.ts](../src/engine/flow/graph.ts) | 34 | 27 |
+| [graph.ts](../src/engine/flow/graph.ts) | 34 | 28 |
 
 ## Por área
 
@@ -57,21 +57,21 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 8 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 25 | 21 |
-| `src/engine` | 89 | 444 |
-| `src/engine/agent` | 71 | 165 |
+| `src/engine` | 89 | 445 |
+| `src/engine/agent` | 71 | 166 |
 | `src/engine/commands` | 7 | 27 |
 | `src/engine/design` | 163 | 215 |
-| `src/engine/flow` | 22 | 93 |
+| `src/engine/flow` | 22 | 94 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/nodecore` | 23 | 43 |
 | `src/engine/nodes` | 8 | 36 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 18 | 2 |
-| `src/engine/providers` | 15 | 94 |
+| `src/engine/providers` | 15 | 95 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 468 |
-| `src/store` | 19 | 371 |
+| `src/lib` | 38 | 469 |
+| `src/store` | 19 | 372 |
 
 283 de 802 módulos no tienen ningún test que los importe directamente.
 
