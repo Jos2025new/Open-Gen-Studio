@@ -299,8 +299,18 @@ describe('3. confirmOverLimit en always: Continue once tardio', () => {
     expect(atlasSpy).not.toHaveBeenCalled();
     expect(alert).toBeDefined();
     const go = alert!.actions!.find((x) => x.label === 'Continue once')!;
+    // Delivery publishes done before the final save and node lock cleanup.
+    let releaseFinalSave!: () => void;
+    const finalSave = new Promise<void>((resolve) => { releaseFinalSave = resolve; });
+    disk.onSet = () => genOf(g.id).status === 'done' ? finalSave : undefined;
     go.run(); go.run();
-    await vi.waitFor(() => expect(genOf(g.id).status).toBe('done'));
+    const retryRun = running.get(g.id);
+    try {
+      await vi.waitFor(() => expect(genOf(g.id).status).toBe('done'));
+    } finally {
+      releaseFinalSave();
+    }
+    await retryRun;
     expect(atlasSpy).toHaveBeenCalledTimes(1);
     expect(locked()).toBe(true);
     expect(lockedNodes(sid()).has('n1')).toBe(false);
