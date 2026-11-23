@@ -145,3 +145,23 @@ Informes completos en el bus de workers: `20261122-neon-opina-dinero.md` (Neon, 
   - `nodes.action.run` sin snapshot estima `usd: 0` (nodecore/commands.ts:74);
   - `generationId` del nodo solo se escribe al terminar (flow/actions.ts:345), y la recuperación no lo enlaza.
 - **Prueba de elección:** la matriz de 6 escenarios de Neon sustituye a la de 4 medidas. Cubre recargas p9/p9c, «Allow this time» con subida de precio, Retry de un dudoso y lote parcial, reintento de Atlas más 402, dos envíos junto al tope, y LLM en streaming.
+
+## Revisión cruzada y convergencia (2026-11-22)
+
+Informes en el bus: `20261122-sol-critica-neon.md` y `20261122-neon-critica-sol.md`.
+
+- **Sol pasa de C a D** después de comprobar en el código los hechos de Neon. Retira el segundo `.sqlite`, porque quedaría fuera de `/export` y sin transacción común con `spentUsd`.
+- **Neon mantiene D y la amplía a D+** con cuatro aportes de Sol:
+  - un precio con tres tipos (exacto, estimado y desconocido) y un máximo verificable; un estimado que es solo un mínimo (`lowerBound`) no cabe en el límite sin decisión del usuario, y hoy `budgetVerdict` lo ignora (budget.ts:144-155);
+  - una reserva retenida mientras un envío esté `dudoso`, con liquidación idempotente: `addSpend` no deduplica hoy (store/spend.ts:13);
+  - una interfaz única `PaidSendStore`, en cliente e IndexedDB hoy, enchufable mañana a `ogs.sqlite` o al lado nativo;
+  - un simulador con corte después de que el proveedor acepte y antes de devolver el id, y con dos aprobaciones que compiten por el mismo saldo.
+
+**Plan común (D+):**
+- **Ticket durable.** Congela al aprobar la secuencia completa (incluidos `write` y `$N`), los nodos resueltos y el máximo.
+- **Id de cada envío.** Se asigna al prepararlo, de modo que caben lotes y LLM.
+- **Puerta `paidSend` en el cliente.** Sale de `commitPaidSend` y del `Generation.sends[]` actual. Lleva reserva en vuelo, tope en todo pase y candado único. Una regla de comprobación (`check-paid-send`) impide pagar fuera de ella.
+- **Nodo ligado antes de enviar**, con su solicitud.
+- **Fuera:** el proxy, la interfaz, `data/` y la persistencia protegida.
+
+**Matiz pendiente.** Sol deja el LLM, los lotes y los reintentos para una segunda fase; Neon pide que el piloto los cubra desde el principio. El piloto incluye la matriz completa de 6 escenarios de Neon.
