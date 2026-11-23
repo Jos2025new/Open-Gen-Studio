@@ -20,20 +20,20 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 466 | 386 |
-| [store.ts](../src/store/store.ts) | 311 | 382 |
+| [types.ts](../src/engine/types.ts) | 466 | 387 |
+| [store.ts](../src/store/store.ts) | 311 | 383 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 80 | 47 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 68 | 5 |
-| [media.ts](../src/lib/media.ts) | 60 | 82 |
+| [media.ts](../src/lib/media.ts) | 60 | 83 |
 | [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 57 | 22 |
 | [id.ts](../src/lib/id.ts) | 57 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
 | [doc.ts](../src/engine/design/doc.ts) | 50 | 73 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |
-| [raster.ts](../src/engine/design/raster.ts) | 44 | 39 |
+| [raster.ts](../src/engine/design/raster.ts) | 44 | 40 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 40 | 0 |
 | [types.ts](../src/engine/providers/types.ts) | 39 | 10 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
@@ -54,13 +54,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 32 | 37 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 36 |
-| `src/components/space` | 10 | 8 |
+| `src/components/space` | 10 | 9 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 25 | 21 |
-| `src/engine` | 89 | 457 |
+| `src/engine` | 89 | 458 |
 | `src/engine/agent` | 71 | 177 |
 | `src/engine/commands` | 7 | 38 |
-| `src/engine/design` | 163 | 216 |
+| `src/engine/design` | 163 | 217 |
 | `src/engine/flow` | 22 | 99 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
@@ -69,10 +69,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/nodes` | 8 | 36 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 19 | 2 |
-| `src/engine/providers` | 15 | 98 |
+| `src/engine/providers` | 15 | 99 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 480 |
-| `src/store` | 19 | 384 |
+| `src/lib` | 38 | 481 |
+| `src/store` | 19 | 385 |
 
 283 de 807 módulos no tienen ningún test que los importe directamente.
 
