@@ -1,5 +1,4 @@
 import { logged } from '../lib/log';
-import { HttpError } from '../lib/http';
 import { formatUsd } from '../lib/format';
 import { apiKeyFor, isConnected, modelSummary } from './catalog';
 import { pushAlert, dismissAlert } from './alerts';
@@ -25,11 +24,7 @@ import { grantGenerationTicketPass, hasActiveTicketSend } from './money/storeBri
 
 const get = useStore.getState;
 
-/** A failure because the account has no credit (HTTP 402, or the provider's own words). */
-export function isCreditError(err: unknown): boolean {
-  if (err instanceof HttpError && err.status === 402) return true;
-  return /insufficient (credits?|balance|funds)|not enough (credits?|balance)|out of credits/i.test(String((err as Error)?.message ?? err));
-}
+export { isCreditError } from './money/paidSend';
 
 const cache = new Map<ProviderId, { at: number; usd: number | undefined }>();
 

@@ -2,7 +2,6 @@ import { AbortedError, HttpError, isAbort, NetworkError } from '../../lib/http';
 import { uid } from '../../lib/id';
 import { addSpend } from '../../store/spend';
 import { llmCallEstimate, OverLimitError } from '../budget';
-import { isCreditError } from '../credit';
 import { chat, type ChatResult, type ReasoningEffort, type ToolSpec } from '../providers/llm';
 import type { LlmMessage, LlmProviderId, ProviderId, RemoteJob } from '../types';
 import { atlas } from '../providers/atlas';
@@ -11,7 +10,7 @@ import { fal } from '../providers/fal';
 import { nanogpt } from '../providers/nanogpt';
 import { openrouter } from '../providers/openrouter';
 import type { GenResult, ProviderAdapter } from '../providers/types';
-import { paidSend, PaidSendBlockedError, type SendErrorDisposition } from './paidSend';
+import { isCreditError, paidSend, PaidSendBlockedError, type SendErrorDisposition } from './paidSend';
 import {
   budgetSnapshotFor,
   canWriteTicket,

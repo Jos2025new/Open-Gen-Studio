@@ -4,6 +4,7 @@
  * in-flight & uncertain reservations, cumulative pass cap, durable pre-send mark (8 s cap),
  * and idempotent settlement by sendId. No store coupling and no pluggable store interface (KISS).
  */
+import { HttpError } from '../../lib/http';
 import type { RemoteJob } from '../sendTypes';
 import {
   availableBudgetUsd,
@@ -156,6 +157,12 @@ export type SendErrorDisposition =
   | 'job_failed'
   | 'keep_in_flight'
   | 'uncertain';
+
+/** A failure because the account has no credit (HTTP 402, or the provider's own words). */
+export function isCreditError(err: unknown): boolean {
+  if (err instanceof HttpError && err.status === 402) return true;
+  return /insufficient (credits?|balance|funds)|not enough (credits?|balance)|out of credits/i.test(String((err as Error)?.message ?? err));
+}
 
 /** Default provider-neutral error classifier: HTTP 402/400 refused before billing; network/abort after send is uncertain. */
 export function defaultClassifySendError(err: unknown): SendErrorDisposition {
