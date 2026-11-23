@@ -307,13 +307,9 @@ export interface RunOptions {
   onReviewChanged?: (current: Pick<FrozenCommandStep, 'args' | 'on' | 'review' | 'estimate'>) => void;
   /** Durable replay options for resuming an already-approved frozen sequence after reload. */
   resume?: {
-    skipSteps?: ReadonlySet<number>;
-    priorResults?: Readonly<Record<number, unknown>>;
-    approvalTicketId?: string;
-    reviews?: Readonly<Record<number, CommandReview>>;
-    reviewedSpends?: Readonly<Record<number, Estimate>>;
+    steps: readonly FrozenCommandStep[];
+    approvalTicketId: string;
     budgetPass?: BudgetPass;
-    skipApproval?: boolean;
   };
 }
 
@@ -371,8 +367,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   }
 
   const activeApprover = options.approver ?? approver;
-  const skipApproval = Boolean(options.resume?.skipApproval);
-  const lastAskIndex = skipApproval ? -1 : steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
+  const lastAskIndex = options.resume ? -1 : steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
   if (lastAskIndex >= 0 && !activeApprover) {
     const firstAsk = steps.findIndex(({ spec }) => needsApproval(spec.effect, options.caller));
     return fail(new CommandError('denied', "This needs the user's approval and nothing here can ask for it.", firstAsk + 1));
@@ -381,22 +376,17 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   const seq = steps.length > 1 ? ++sequences : undefined;
   let budgetPass: BudgetPass | undefined = options.resume?.budgetPass;
   let approvalTicketId = options.resume?.approvalTicketId;
-  const reviews = { ...options.resume?.reviews };
+  const reviews: Record<number, CommandReview> = {};
   const reviewedSpends = new Map<number, Estimate>();
-  if (options.resume?.reviewedSpends) {
-    for (const [k, est] of Object.entries(options.resume.reviewedSpends)) reviewedSpends.set(Number(k), est);
-  }
-  if (options.resume?.priorResults) {
-    for (const [k, val] of Object.entries(options.resume.priorResults)) {
-      const idx = Number(k) - 1;
-      if (idx >= 0 && idx < steps.length) results[idx] = val;
-    }
-  }
-  if (options.resume?.skipSteps) {
-    for (const stepNum of options.resume.skipSteps) {
-      const idx = stepNum - 1;
-      if (idx >= 0 && idx < steps.length) steps[idx].ran = true;
-    }
+  for (const frozen of options.resume?.steps ?? []) {
+    const step = steps[frozen.step - 1];
+    if (!step) continue;
+    if (frozen.state) step.ran = true;
+    if (frozen.state === 'done') results[frozen.step - 1] = frozen.result;
+    if (frozen.review) reviews[frozen.step] = frozen.review;
+    if (frozen.estimate) reviewedSpends.set(frozen.step, frozen.estimate);
+    if (frozen.ready) { step.args = frozen.args; step.ready = true; }
+    if (frozen.onReady) { step.on = frozen.on; step.onReady = true; }
   }
   const runStep = (i: number, bufferedEchoes?: (() => void)[]): Promise<void> | void => {
     const step = steps[i];

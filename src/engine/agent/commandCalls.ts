@@ -123,7 +123,11 @@ export function settleInterruptedCommandCards(): void {
   }
 }
 
-function closeCommandCard(sessionId: string, itemId: string, result: RunResult): void {
+function finishCommandCard(sessionId: string, itemId: string, result: RunResult, changed?: ChangedReview): Estimate | undefined {
+  if (!result.ok && result.error.message === COMMAND_REVIEW_CHANGED) {
+    const estimate = refreshCommandReview(sessionId, itemId, result.error.step, changed);
+    if (estimate) return estimate;
+  }
   updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, result.ok
     ? { status: 'done', error: undefined }
     : result.error.code === 'denied' ? { status: 'canceled' } : { status: 'error', error: result.error.message });
@@ -159,17 +163,6 @@ function refreshCommandReview(sessionId: string, itemId: string, stepNumber: num
 
 function replayCommandTicket(sessionId: string, itemId: string, ticket: ApprovalTicket, budgetPass?: BudgetPass, releasePass?: () => void): void {
   const steps = frozenStepsOf(ticket);
-  const skipSteps = new Set<number>();
-  const priorResults: Record<number, unknown> = {};
-  const reviewedSpends: Record<number, Estimate> = {};
-  const reviews = Object.fromEntries(steps.flatMap((step) => step.review ? [[step.step, step.review]] : []));
-  for (const s of steps) {
-    if (s.state) {
-      skipSteps.add(s.step);
-      if (s.state === 'done') priorResults[s.step] = s.result;
-    }
-    if (s.effect === 'spend' && s.estimate) reviewedSpends[s.step] = s.estimate;
-  }
   const seq = steps.map((s) => ({
     cmd: s.cmd,
     ...(s.rawArgs !== undefined ? { args: s.rawArgs } : {}),
@@ -185,11 +178,10 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
           onReviewChanged: current => { changed = current; },
           onStepStart: step => trackCommand(itemId, step, 'running'),
           onStepEnd: (step, ok, val, err) => trackCommand(itemId, step, ok ? 'done' : err === COMMAND_REVIEW_CHANGED ? undefined : 'failed', val),
-          resume: { skipSteps, priorResults, reviewedSpends, reviews, budgetPass, approvalTicketId: ticket.id, skipApproval: true },
+          resume: { steps, budgetPass, approvalTicketId: ticket.id },
         },
       );
-      if (!result.ok && result.error.message === COMMAND_REVIEW_CHANGED && refreshCommandReview(sessionId, itemId, result.error.step, changed)) return;
-      closeCommandCard(sessionId, itemId, result);
+      finishCommandCard(sessionId, itemId, result, changed);
     } catch (err) {
       updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({
         ...it,
@@ -344,9 +336,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   } finally {
     for (const release of passes) release();
   }
-  const reoffered = approvalItemId && !result.ok && result.error.message === COMMAND_REVIEW_CHANGED
-    && refreshCommandReview(sessionId, approvalItemId, result.error.step, changed);
-  if (approvalItemId && !reoffered) closeCommandCard(sessionId, approvalItemId, result);
+  const reoffered = approvalItemId ? finishCommandCard(sessionId, approvalItemId, result, changed) : undefined;
   const ran = result.results.length;
   if (!result.ok) {
     const kept = ran === 0 ? 'Nothing ran.'
