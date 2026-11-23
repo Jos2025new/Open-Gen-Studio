@@ -1,15 +1,28 @@
 import type { PlanFeedItem, StepState } from '../types';
 import { updateFeedItem, useStore } from '../../store/store';
+import { hasActiveTicketSend, storeTickets } from '../money/storeBridge';
+import { markSendUncertain } from '../money/ticket';
+import { settleInterruptedCommandCards } from './commandCalls';
 import { recordPriceResults } from './priceNotes';
 
 const get = () => useStore.getState();
 
 /**
- * After a reload, plans that were running have lost their executor. Their generations are resumed by
+ * After a reload, plans and command cards that were running have lost their executor. Their generations are resumed by
  * `resumeInterrupted`; follow them and close each card with its real outcome instead of "Running" forever.
- * Nothing is submitted again: steps that had not started before the reload are reported as not run.
+ * Nothing is submitted again: steps that had not started before the reload are reported as not run (or await one-click approval for command cards).
  */
 export function settleInterruptedPlans(): void {
+  // Transition any unacknowledged in-flight LLM ticket sends from before reload to uncertain (keeping reservation).
+  for (const t of storeTickets.list()) {
+    if (t.kind !== 'llm') continue;
+    let next = t;
+    for (const s of t.sends) {
+      if (s.status === 'in_flight') next = markSendUncertain(next, s.id, 'Interrupted by reload');
+    }
+    if (next !== t) storeTickets.put(next);
+  }
+  settleInterruptedCommandCards();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan') recordPriceResults(s.id, f.id);
   const open = new Set<string>();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan' && f.status === 'running') open.add(`${s.id}|${f.id}`);
@@ -29,8 +42,17 @@ export function settleInterruptedPlans(): void {
       for (const st of item.plan.steps) {
         const gid = item.stepGenerations[st.id];
         const g = gid ? gens[gid] : undefined;
-        if (g) states[st.id] = g.status === 'review' ? 'review' : g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : ((pending = true), 'running');
-        else if (!review && states[st.id] !== 'done') states[st.id] = 'skipped';
+        if (g) {
+          states[st.id] = g.status === 'review'
+            ? 'review'
+            : g.status === 'done'
+              ? 'done'
+              : g.status === 'error' || g.status === 'canceled'
+                ? 'error'
+                : hasActiveTicketSend(g) || g.status === 'running' || g.status === 'queued'
+                  ? ((pending = true), 'running')
+                  : 'error';
+        } else if (!review && states[st.id] !== 'done') states[st.id] = 'skipped';
       }
       if (pending) continue;
       open.delete(key);

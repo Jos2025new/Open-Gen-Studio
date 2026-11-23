@@ -35,8 +35,8 @@ export interface GenerationSpec {
   planId?: string;
   stepId?: string;
   nodeRequest?: string;
-  /** Runtime token covering the steps of an approved Nodes run; never persisted. */
-  batchToken?: symbol;
+  /** Durable D+ node-run approval ticket id covering the frozen preview scope. */
+  nodeRunTicketId?: string;
   /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
   budgetPass?: BudgetPass;
   estimate?: Estimate;

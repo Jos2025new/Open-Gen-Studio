@@ -203,8 +203,8 @@ afterEach(() => {
 });
 
 describe('Escenario (a): recargas p9/p9c', () => {
-  // reproduce: commandCalls.ts:70 guarda pending solo en RAM y flow/actions.ts:345 solo enlaza generationId al terminar; tras recargar n1->n2 en vuelo no reanuda con un clic y runNodes(n2) reenvia n1
-  it.fails('a1: n1->n2 con recarga en vuelo y doble aprobacion no reenvia n1', async () => {
+  // fixed in D+ 2b-4: ticket durable cmd:<itemId> congela la secuencia, settleInterruptedPlans pasa a awaiting tras recarga (sin reenvio automatico), decideCommandApproval reanuda con un clic y bloqueo sincrono de doble clic, y nodeAttemptProblem/ticket impide reenviar n1
+  it('a1: n1->n2 con recarga en vuelo y doble aprobacion no reenvia n1', async () => {
     setupSession({ graph: twoImageGraph(true) });
     const held = fake.holdNext('alpha mug');
     const oldRun = runCommandsTool(sid, {
@@ -347,8 +347,8 @@ describe('Escenario (a): recargas p9/p9c', () => {
     expect(fake.acceptedCount('alpha mug')).toBe(1);
   });
 
-  // reproduce: commands/run.ts:134,371 omite pasos write de ApprovalRequest.steps y commandCalls.ts:70,164 no persiste la secuencia completa ni reanuda tras recargar; un paso write tras spend se pierde
-  it.fails('a6: secuencia con paso write posterior al spend conserva el alcance congelado tras recargar', async () => {
+  // fixed in D+ 2b-4: commands/run.ts expone la secuencia completa (con pasos write y productores $N) en ApprovalRequest.sequence y commandCalls.ts la congela en el ticket cmd:<itemId> para reanudarla tras recargar
+  it('a6: secuencia con paso write posterior al spend conserva el alcance congelado tras recargar', async () => {
     setupSession({ graph: twoImageGraph(false) });
     const oldRun = runCommandsTool(sid, {
       seq: [

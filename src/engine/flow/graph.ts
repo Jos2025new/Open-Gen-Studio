@@ -342,7 +342,8 @@ export function nodeAttemptProblem(node: GraphNode, generations: Record<string, 
       return `The previous attempt for “${node.data.title}” may have been submitted. Check its status before running again.`;
     }
   }
-  const active = sendStateOf(tickets ?? storeTickets.list(), { nodeId: node.id });
+  const leafTickets = (tickets ?? storeTickets.list()).filter((t) => t.kind !== 'commands');
+  const active = sendStateOf(leafTickets, { nodeId: node.id });
   const held = active.matches.find((s) => isHeldStatus(s.status));
   if (held) {
     if (held.status === 'in_flight') return `“${node.data.title}” is already running.`;

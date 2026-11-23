@@ -110,10 +110,29 @@ export interface ApprovalStep {
   on: Target;
   estimate: Estimate;
 }
+/** Complete frozen step stored on a durable D+ command ticket (includes write/read steps and `$N` producers). */
+export interface FrozenCommandStep {
+  /** 1-based. */
+  step: number;
+  cmd: string;
+  title: string;
+  effect: Effect;
+  rawArgs: unknown;
+  rawOn: Target;
+  args: unknown;
+  on: Target;
+  ready: boolean;
+  onReady: boolean;
+  preRan?: boolean;
+  preResult?: unknown;
+  estimate?: Estimate;
+}
 export interface ApprovalRequest {
   caller: Caller;
   steps: ApprovalStep[];
   estimate: Estimate;
+  /** Full frozen sequence (including write/read steps and `$N` producers/pre-results). */
+  sequence?: FrozenCommandStep[];
 }
 export type ApprovalOutcome = boolean | { approved: boolean; budgetPass?: BudgetPass };
 /** Shows the user what is about to happen and answers yes or no. One question per sequence, never one per step. */
@@ -226,6 +245,18 @@ export interface RunOptions {
   caller: Exclude<Caller, 'ui'>;
   signal?: AbortSignal;
   approver?: Approver;
+  /** Invoked when a post-approval step begins executing (1-based step index). */
+  onStepStart?: (step: number) => void;
+  /** Invoked when a post-approval step finishes executing (1-based step index). */
+  onStepEnd?: (step: number, ok: boolean, result?: unknown, error?: string) => void;
+  /** Durable replay options for resuming an already-approved frozen sequence after reload. */
+  resume?: {
+    skipSteps?: ReadonlySet<number>;
+    priorResults?: Readonly<Record<number, unknown>>;
+    reviewedSpends?: Readonly<Record<number, Estimate>>;
+    budgetPass?: BudgetPass;
+    skipApproval?: boolean;
+  };
 }
 
 let sequences = 0;
@@ -282,15 +313,31 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
   }
 
   const activeApprover = options.approver ?? approver;
-  const lastAskIndex = steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
+  const skipApproval = Boolean(options.resume?.skipApproval);
+  const lastAskIndex = skipApproval ? -1 : steps.reduce((last, { spec }, i) => (needsApproval(spec.effect, options.caller) ? i : last), -1);
   if (lastAskIndex >= 0 && !activeApprover) {
     const firstAsk = steps.findIndex(({ spec }) => needsApproval(spec.effect, options.caller));
     return fail(new CommandError('denied', "This needs the user's approval and nothing here can ask for it.", firstAsk + 1));
   }
 
   const seq = steps.length > 1 ? ++sequences : undefined;
-  let budgetPass: BudgetPass | undefined;
+  let budgetPass: BudgetPass | undefined = options.resume?.budgetPass;
   const reviewedSpends = new Map<number, Estimate>();
+  if (options.resume?.reviewedSpends) {
+    for (const [k, est] of Object.entries(options.resume.reviewedSpends)) reviewedSpends.set(Number(k), est);
+  }
+  if (options.resume?.priorResults) {
+    for (const [k, val] of Object.entries(options.resume.priorResults)) {
+      const idx = Number(k) - 1;
+      if (idx >= 0 && idx < steps.length) results[idx] = val;
+    }
+  }
+  if (options.resume?.skipSteps) {
+    for (const stepNum of options.resume.skipSteps) {
+      const idx = stepNum - 1;
+      if (idx >= 0 && idx < steps.length) steps[idx].ran = true;
+    }
+  }
   const runStep = (i: number, bufferedEchoes?: (() => void)[]): Promise<void> | void => {
     const step = steps[i];
     const { spec } = step;
@@ -298,6 +345,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     const t0 = performance.now();
     let args = step.args;
     let on = step.on;
+    const track = !bufferedEchoes;
     const said = (error?: unknown) => {
       const entry = () =>
         echo({ cmd: spec.id, args, on, caller: options.caller, ok: error === undefined, ms: performance.now() - t0, at, ...(error === undefined ? {} : { error: message(error) }), ...(seq ? { seq } : {}) });
@@ -321,6 +369,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
       check(spec, ctx, args);
       openHistories(spec, on, args, txs);
+      if (track) options.onStepStart?.(i + 1);
       // A synchronous step is not awaited: between two of them nothing else can run, the user's edits included.
       const out: unknown = spec.effect === 'spend' && budgetPass?.kind === 'sequence'
         ? withSequenceStepPass(budgetPass, on.session ?? budgetPass.sessionId, spec.estimate?.(ctx, args) ?? UNKNOWN, reviewedSpends.get(i + 1),
@@ -331,9 +380,11 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
           (val) => {
             results[i] = val ?? null;
             step.ran = true;
+            if (track) options.onStepEnd?.(i + 1, true, results[i]);
             said();
           },
           (error: unknown) => {
+            if (track) options.onStepEnd?.(i + 1, false, undefined, message(error ?? new Error('failed')));
             said(error ?? new Error('failed'));
             throw { error, step: i + 1 };
           },
@@ -341,8 +392,10 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       }
       results[i] = out ?? null;
       step.ran = true;
+      if (track) options.onStepEnd?.(i + 1, true, results[i]);
       said();
     } catch (error) {
+      if (track) options.onStepEnd?.(i + 1, false, undefined, message(error ?? new Error('failed')));
       said(error ?? new Error('failed'));
       throw { error, step: i + 1 };
     }
@@ -407,9 +460,27 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     const spendEstimates = asks.filter((a) => a.effect === 'spend').map((a) => a.estimate);
     for (const ask of asks) if (ask.effect === 'spend') reviewedSpends.set(ask.step, ask.estimate);
     const estimate = spendEstimates.length ? sumEstimates(spendEstimates) : FREE;
+    const sequence: FrozenCommandStep[] = steps.map((s, i) => {
+      const stepNum = i + 1;
+      const ask = asks.find((a) => a.step === stepNum);
+      return {
+        step: stepNum,
+        cmd: s.spec.id,
+        title: s.spec.title,
+        effect: s.spec.effect,
+        rawArgs: s.rawArgs,
+        rawOn: s.rawOn,
+        args: s.args,
+        on: s.on,
+        ready: s.ready,
+        onReady: s.onReady,
+        ...(s.ran ? { preRan: true, preResult: results[i] } : {}),
+        ...(ask ? { estimate: ask.estimate } : {}),
+      };
+    });
     let yes = false;
     try {
-      const outcome = await activeApprover({ caller: options.caller, steps: asks, estimate });
+      const outcome = await activeApprover({ caller: options.caller, steps: asks, estimate, sequence });
       yes = typeof outcome === 'boolean' ? outcome : outcome.approved;
       if (typeof outcome === 'object' && outcome.approved) budgetPass = outcome.budgetPass;
     } catch (error) {

@@ -73,7 +73,7 @@ type GenerationPassEntry = {
   quoteApprovedUsd: number | null;
   priorSendIds?: ReadonlySet<string>;
   started: boolean;
-  owner?: BudgetPass | symbol;
+  owner?: BudgetPass | string;
   deferred?: boolean;
 };
 
@@ -82,13 +82,16 @@ type PassEntry = { remainingUsd: number; unknownRemaining: number };
 const activePasses = new Map<BudgetPass, PassEntry>();
 /** One-shot in-memory entitlement for a same-price 402 substitute of a generation approved with a pass (not in activePasses until taken). */
 const substitutePasses = new Map<string, GenerationPassEntry>();
-/** Approved multi-step batches (Nodes runs): scoped to one run's steps so unrelated sends still ask. */
-const approvedBatches = new Map<symbol, { sessionId: string; steps: Set<string>; hadPass: boolean }>();
 
-function releaseUnstartedOwned(owner: BudgetPass | symbol): void {
+function releaseUnstartedOwned(owner: BudgetPass | string): void {
   for (const [genId, entry] of substitutePasses) {
     if (entry.owner === owner && !entry.started) substitutePasses.delete(genId);
   }
+}
+
+/** Retire unstarted 402 substitute passes owned by a finished node-run ticket. */
+export function releaseOwnedPasses(owner: string): void {
+  releaseUnstartedOwned(owner);
 }
 
 function passHolds(pass: BudgetPass | undefined, sessionId: string): boolean {
@@ -270,7 +273,7 @@ export function bindGenerationPass(
   generationId: string,
   sessionId: string,
   approvedUsd: number | null,
-  owner?: BudgetPass | symbol,
+  owner?: BudgetPass | string,
 ): void {
   const amount = approvedUsd != null && Number.isFinite(approvedUsd) ? approvedUsd : null;
   const once = typeof owner === 'object' && owner.kind === 'once' ? activePasses.get(owner) : undefined;
@@ -360,38 +363,6 @@ export function clearSessionPasses(sessionId: string): void {
   for (const [genId, entry] of substitutePasses) {
     if (entry.sessionId === sessionId) substitutePasses.delete(genId);
   }
-}
-
-/**
- * Cover every step of an approved multi-step Nodes run. Spends the action's once-pass immediately so
- * unrelated runs in the same session still ask while this batch is executing.
- */
-export function beginBatchPass(sessionId: string, stepIds: Iterable<string>, estimate: Estimate, pass?: BudgetPass): { token: symbol; end: () => void } {
-  const hadPass = passActiveFor(pass, sessionId, estimate);
-  consumeOnce(pass, estimate);
-  const token = Symbol('batch');
-  approvedBatches.set(token, { sessionId, steps: new Set(stepIds), hadPass });
-  return {
-    token,
-    end: () => {
-      approvedBatches.delete(token);
-      releaseUnstartedOwned(token);
-    },
-  };
-}
-
-/** True while `stepId` belongs to a running approved batch for `sessionId`. */
-export function batchStepApproved(sessionId: string, token: symbol | undefined, stepId: string | undefined): boolean {
-  if (!token || !stepId) return false;
-  const batch = approvedBatches.get(token);
-  return Boolean(batch && batch.sessionId === sessionId && batch.steps.has(stepId));
-}
-
-/** True when the approved batch covering `stepId` was started with a once-pass. */
-export function batchStepHadPass(sessionId: string, token: symbol | undefined, stepId: string | undefined): boolean {
-  if (!token || !stepId) return false;
-  const batch = approvedBatches.get(token);
-  return Boolean(batch && batch.sessionId === sessionId && batch.steps.has(stepId) && batch.hadPass);
 }
 
 /** "Don't ask again" / "Allow for the whole session": this run goes ahead and so do the rest of this session's. Other sessions still ask. */

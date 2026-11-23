@@ -271,8 +271,8 @@ export interface StepCostReview {
 }
 
 export interface PlanFeedItem extends FeedBase {
-  /** Approval of existing node IDs; never materialized again. */
-  nodeRun?: { targets: string[]; force: boolean; signature: string };
+  /** Approval of existing node IDs; never materialized again. `runIds` freezes the reviewed preview scope. */
+  nodeRun?: { targets: string[]; force: boolean; signature: string; runIds?: string[] };
   type: 'plan';
   comparisonKinds?: Array<'image' | 'video'>;
   plan: Plan;

@@ -26,10 +26,10 @@ export function approveNodeRun(sessionId: string, item: PlanFeedItem, budgetPass
 async function approveNodeRunNow(sessionId: string, item: PlanFeedItem, budgetPass?: BudgetPass): Promise<void> {
   const owner = resolveOwner(sessionId, item.meta?.agentNodeId);
   const request = item.nodeRun!;
-  const preview = await prepareNodeRun(sessionId, request.targets, request.force);
+  const preview = await prepareNodeRun(sessionId, request.targets, request.force, request.runIds);
   if (preview.signature !== request.signature || preview.errors.length) {
     updateFeedItem<PlanFeedItem>(sessionId, item.id, {
-      status: 'awaiting', nodeRun: { ...request, signature: preview.signature }, plan: { ...item.plan, steps: preview.steps }, estimate: preview.estimate,
+      status: 'awaiting', nodeRun: { ...request, signature: preview.signature, runIds: preview.runIds }, plan: { ...item.plan, steps: preview.steps }, estimate: preview.estimate,
       error: preview.errors.join(' ') || 'The execution changed. Review this version and approve again.',
     });
     return;

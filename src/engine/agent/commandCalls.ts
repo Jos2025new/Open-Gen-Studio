@@ -1,11 +1,26 @@
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
-import { appendFeed, updateFeedItem, useStore } from '../../store/store';
+import { appendFeed, removeTicket, saveNow, updateFeedItem, useStore } from '../../store/store';
 import { beginOncePass, budgetProblem, dontAskAgain, dontAskUntilNextSession, type BudgetPass } from '../budget';
 import { allCommands, command, findCommands, getApprover, run, type ApprovalRequest, type Approver } from '../commands';
+import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
-import type { CommandApprovalFeedItem } from '../types';
+import { storeTickets } from '../money/storeBridge';
+import {
+  createTicket,
+  FREE_PRICE,
+  isSendOut,
+  markSendFailed,
+  markSendInFlight,
+  markSendUncertain,
+  prepareSend,
+  priceFromEstimate,
+  settleSend,
+  type ApprovalTicket,
+} from '../money/ticket';
+import { FREE, sumEstimates } from '../pricing';
+import type { CommandApprovalFeedItem, Estimate } from '../types';
 import { findCommandsSchema, runCommandsSchema } from './commandTools';
 
 /* Runs find_commands and run_commands. The text is the tool result the agent reads. */
@@ -68,9 +83,171 @@ interface PendingCommandApproval {
 }
 
 const pending = new Map<string, PendingCommandApproval>();
+const replaying = new Set<string>();
+
+const commandTicketId = (itemId: string) => `cmd:${itemId}`;
+const stepSendId = (itemId: string, step: number) => `${itemId}:s${step}`;
+
+function cloneSafe(val: unknown): unknown {
+  if (val === undefined) return null;
+  try { return JSON.parse(JSON.stringify(val)); } catch { return null; }
+}
+
+function frozenStepsOf(ticket: ApprovalTicket | undefined): FrozenCommandStep[] {
+  return Array.isArray(ticket?.scope.steps) ? (ticket.scope.steps as FrozenCommandStep[]) : [];
+}
+
+function extractNodeIds(sequence: readonly FrozenCommandStep[] | undefined): string[] {
+  const ids = new Set<string>();
+  for (const s of sequence ?? []) {
+    const a = s.args as { targets?: unknown; node?: unknown } | undefined;
+    if (Array.isArray(a?.targets)) for (const t of a.targets) if (typeof t === 'string') ids.add(t);
+    if (typeof a?.node === 'string') ids.add(a.node);
+  }
+  return [...ids];
+}
+
+function createCommandTicket(sessionId: string, itemId: string, request: ApprovalRequest): ApprovalTicket {
+  const sequence = (request.sequence ?? []).map((s) => ({
+    ...s,
+    ...(s.preRan ? { preResult: cloneSafe(s.preResult) } : {}),
+  }));
+  let ticket = createTicket({
+    id: commandTicketId(itemId),
+    sessionId,
+    kind: 'commands',
+    scope: { steps: sequence, nodeIds: extractNodeIds(sequence) },
+    price: priceFromEstimate(request.estimate),
+  });
+  for (const s of sequence) {
+    if (s.preRan) continue;
+    // Parent orchestration slot holds FREE_PRICE and no nodeId so monetary reservation and node-busy state live exclusively on leaf paidSend tickets.
+    ticket = prepareSend(ticket, {
+      id: stepSendId(itemId, s.step),
+      slotKey: `step:${s.step}`,
+      index: s.step - 1,
+      price: FREE_PRICE,
+    });
+  }
+  storeTickets.put(ticket);
+  return ticket;
+}
+
+function markCommandStepStart(itemId: string, step: number): void {
+  const ticket = storeTickets.get(commandTicketId(itemId));
+  if (!ticket) return;
+  const sid = stepSendId(itemId, step);
+  const slot = ticket.sends.find((s) => s.id === sid);
+  if (!slot || slot.status !== 'pending') return;
+  storeTickets.put(markSendInFlight(ticket, sid));
+}
+
+function markCommandStepEnd(itemId: string, step: number, ok: boolean, val?: unknown, error?: string): void {
+  const ticket = storeTickets.get(commandTicketId(itemId));
+  if (!ticket) return;
+  const sid = stepSendId(itemId, step);
+  const slot = ticket.sends.find((s) => s.id === sid);
+  let next = ticket;
+  if (slot && (slot.status === 'in_flight' || slot.status === 'pending')) {
+    const base = slot.status === 'pending' ? markSendInFlight(next, sid) : next;
+    next = ok ? settleSend(base, sid, { costUsd: 0 }).ticket : markSendFailed(base, sid, error);
+  }
+  if (ok) {
+    const steps = frozenStepsOf(next).map((s) => (s.step === step ? { ...s, preRan: true, preResult: cloneSafe(val) } : s));
+    next = { ...next, scope: { ...next.scope, steps } };
+  }
+  storeTickets.put(next);
+}
 
 /**
- * Resolves an awaiting command sequence approval card.
+ * After a reload, command cards left `running` transition any `in_flight` step slots to `uncertain`
+ * (never auto-sending anything). If pending steps remain, the card returns to `awaiting` for one-click resume.
+ */
+export function settleInterruptedCommandCards(): void {
+  for (const s of Object.values(useStore.getState().sessions)) {
+    for (const f of s.feed) {
+      if (f.type !== 'commands' || f.status !== 'running') continue;
+      if (pending.has(f.id) || replaying.has(f.id)) continue;
+      const ticket = storeTickets.get(commandTicketId(f.id));
+      if (!ticket) {
+        updateFeedItem<CommandApprovalFeedItem>(s.id, f.id, { status: 'error', error: 'Interrupted by a page reload.' });
+        continue;
+      }
+      let next = ticket;
+      for (const send of ticket.sends) {
+        if (send.status === 'in_flight') next = markSendUncertain(next, send.id, 'Interrupted by reload');
+      }
+      if (next !== ticket) storeTickets.put(next);
+      const hasPending = frozenStepsOf(next).some((step) => {
+        if (step.preRan) return false;
+        const slot = next.sends.find((x) => x.id === stepSendId(f.id, step.step));
+        return !slot || slot.status === 'pending';
+      });
+      if (hasPending) {
+        updateFeedItem<CommandApprovalFeedItem>(s.id, f.id, { status: 'awaiting' });
+      } else {
+        const hadProblem = next.sends.some((x) => x.status === 'uncertain' || x.status === 'failed');
+        updateFeedItem<CommandApprovalFeedItem>(s.id, f.id, {
+          status: hadProblem ? 'error' : 'done',
+          ...(hadProblem ? { error: 'Interrupted by a page reload; already-sent steps were not re-submitted.' } : {}),
+        });
+      }
+    }
+  }
+}
+
+function replayCommandTicket(sessionId: string, itemId: string, ticket: ApprovalTicket, budgetPass?: BudgetPass, releasePass?: () => void): void {
+  const steps = frozenStepsOf(ticket);
+  const skipSteps = new Set<number>();
+  const priorResults: Record<number, unknown> = {};
+  const reviewedSpends: Record<number, Estimate> = {};
+  for (const s of steps) {
+    const slot = ticket.sends.find((x) => x.id === stepSendId(itemId, s.step));
+    if (s.preRan || (slot && isSendOut(slot.status))) {
+      skipSteps.add(s.step);
+      if (s.preResult !== undefined) priorResults[s.step] = s.preResult;
+    }
+    if (s.effect === 'spend' && s.estimate) reviewedSpends[s.step] = s.estimate;
+  }
+  const seq = steps.map((s) => ({
+    cmd: s.cmd,
+    ...(s.rawArgs !== undefined ? { args: s.rawArgs } : {}),
+    ...(s.rawOn && Object.keys(s.rawOn).length ? { on: s.rawOn } : {}),
+  }));
+  void (async () => {
+    try {
+      const result = await run(
+        { seq, on: { session: sessionId } },
+        {
+          caller: 'agent',
+          onStepStart: (step) => markCommandStepStart(itemId, step),
+          onStepEnd: (step, ok, val, err) => markCommandStepEnd(itemId, step, ok, val, err),
+          resume: { skipSteps, priorResults, reviewedSpends, budgetPass, skipApproval: true },
+        },
+      );
+      updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) =>
+        result.ok
+          ? { ...it, status: 'done', error: undefined }
+          : result.error.code === 'denied'
+            ? { ...it, status: 'canceled' }
+            : { ...it, status: 'error', error: result.error.message },
+      );
+    } catch (err) {
+      updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({
+        ...it,
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      releasePass?.();
+      replaying.delete(itemId);
+      void saveNow().catch(() => undefined);
+    }
+  })();
+}
+
+/**
+ * Resolves an awaiting command sequence approval card (both live in-memory and reloaded durable tickets).
  * Under the spending limit, `'approve'` runs the sequence.
  * At/over the spending limit, requests are held unless the user picks `'once'` ("Allow this time"),
  * `'session'` ("Allow for the whole session"), `'until-next-session'` ("Don't ask again until next session"), or `'cancel'`.
@@ -78,13 +255,44 @@ const pending = new Map<string, PendingCommandApproval>();
 export function decideCommandApproval(sessionId: string, itemId: string, decision: CommandApprovalDecision): boolean {
   const entry = pending.get(itemId);
   if (!entry || entry.sessionId !== sessionId) {
+    const item = useStore.getState().sessions[sessionId]?.feed.find((f): f is CommandApprovalFeedItem => f.id === itemId && f.type === 'commands');
     if (decision === 'cancel') {
-      updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => (it.status === 'awaiting' ? { ...it, status: 'canceled' } : it));
+      if (item?.status === 'awaiting') {
+        updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => (it.status === 'awaiting' ? { ...it, status: 'canceled' } : it));
+        removeTicket(commandTicketId(itemId));
+      }
+      return false;
     }
-    return false;
+    if (!item || item.status !== 'awaiting' || replaying.has(itemId)) return false;
+    const ticket = storeTickets.get(commandTicketId(itemId));
+    const steps = frozenStepsOf(ticket);
+    if (!ticket || ticket.sessionId !== sessionId || !steps.length) return false;
+    const remainingSpends = steps.filter((s) => {
+      if (s.effect !== 'spend' || s.preRan) return false;
+      const slot = ticket.sends.find((x) => x.id === stepSendId(itemId, s.step));
+      return !slot || !isSendOut(slot.status);
+    });
+    const remainingEstimate = remainingSpends.length ? sumEstimates(remainingSpends.map((s) => s.estimate ?? FREE)) : FREE;
+    const heldAtLimit = remainingSpends.length > 0 && budgetProblem(remainingEstimate, sessionId) !== null;
+    if (heldAtLimit && decision === 'approve') return false;
+    let budgetPass: BudgetPass | undefined;
+    let releasePass: (() => void) | undefined;
+    if (decision === 'session') dontAskAgain(sessionId);
+    else if (decision === 'until-next-session') dontAskUntilNextSession();
+    else if (decision === 'once') {
+      const unknownSteps = remainingSpends.filter((s) => !s.estimate || s.estimate.usd == null || s.estimate.lowerBound).length;
+      const grant = beginOncePass(sessionId, remainingEstimate.usd, unknownSteps);
+      budgetPass = grant.pass;
+      releasePass = grant.end;
+    }
+    replaying.add(itemId);
+    updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));
+    replayCommandTicket(sessionId, itemId, ticket, budgetPass, releasePass);
+    return true;
   }
   if (decision === 'cancel') {
     pending.delete(itemId);
+    removeTicket(commandTicketId(itemId));
     updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'canceled' }));
     entry.resolve(false);
     return true;
@@ -168,6 +376,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
               ...(meta ? { meta } : {}),
             };
             appendFeed(sessionId, item);
+            createCommandTicket(sessionId, itemId, request);
             const onAbort = () => decideCommandApproval(sessionId, itemId, 'cancel');
             signal?.addEventListener('abort', onAbort, { once: true });
             pending.set(itemId, {
@@ -187,7 +396,16 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
 
   let result;
   try {
-    result = await run({ seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } }, { caller: 'agent', signal, approver: sessionApprover });
+    result = await run(
+      { seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } },
+      {
+        caller: 'agent',
+        signal,
+        approver: sessionApprover,
+        onStepStart: (step) => { if (approvalItemId) markCommandStepStart(approvalItemId, step); },
+        onStepEnd: (step, ok, val, err) => { if (approvalItemId) markCommandStepEnd(approvalItemId, step, ok, val, err); },
+      },
+    );
   } finally {
     for (const release of passes) release();
   }

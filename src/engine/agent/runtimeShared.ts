@@ -372,7 +372,7 @@ export async function presentPlan(
     materializeNodes(sessionId, plan);
     const targets = plan.steps.filter(s => !isStepKind(s, 'text')).map(s => `${plan.id}_${s.id}`);
     prepared = await prepareNodeRun(sessionId, targets);
-    nodeRun = { targets, force: true, signature: prepared.signature };
+    nodeRun = { targets, force: true, signature: prepared.signature, runIds: prepared.runIds };
   }
   const item: PlanFeedItem = {
     ...feedBase(workspace),

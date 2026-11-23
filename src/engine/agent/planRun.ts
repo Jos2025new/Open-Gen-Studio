@@ -24,7 +24,9 @@ import { editPairParts, WRAPUP_COMPARE_RULE } from './wrapUpPairs';
 import { agentSeesImages, userMessage } from './attachments';
 import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
-import { budgetProblem, consumeOnce, type BudgetPass } from '../budget';
+import { budgetProblem, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
+import { hasActiveTicketSend, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
+import { createTicket, priceFromEstimate } from '../money/ticket';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
 import { failedStepSummary } from './failureContext';
@@ -70,7 +72,16 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
     toast(problem, 'error');
     return;
   }
+  const hadPass = passActiveFor(budgetPass, sessionId, total);
   consumeOnce(budgetPass, total);
+  storeTickets.put(createTicket({
+    id: `plan:${item.id}`,
+    sessionId,
+    kind: 'plan',
+    scope: { steps: chosen.map((s) => s.id) },
+    price: priceFromEstimate(total),
+    ...(hadPass ? { pass: ticketPassFromEstimate(total) } : {}),
+  }));
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = agentOf(sessionId, owner).pending;
   const closesRequest = pending?.feedItemId === itemId;
@@ -102,7 +113,7 @@ export async function presentNodeRun(sessionId: string, targets: string[], toolC
   if (preview.errors.length) return { errors: preview.errors };
   const item: PlanFeedItem = {
     ...feedBase('node'), type: 'plan', style: get().composer.agentStyle, status: 'awaiting',
-    nodeRun: { targets, force: true, signature: preview.signature },
+    nodeRun: { targets, force: true, signature: preview.signature, runIds: preview.runIds },
     plan: { id: uid('pln'), title: 'Run existing nodes', summary: 'Existing node IDs and required upstream updates. No new flow is created.', workspace: 'node', steps: preview.steps, adjustments: [] },
     estimate: preview.estimate, stepStates: {}, stepGenerations: {},
     meta: meta ?? messageMeta('node', {}, sessionId, owner),
@@ -288,7 +299,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
     if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
     else if (gen?.status === 'review') waiting.add(st.id);
     else if (gen?.status === 'queued' || (gen?.status === 'running' && isRunning(gen.id))) reuseGenerations[st.id] = gen.id;
-    else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
+    else if (gen && (gen.status === 'running' || hasActiveTicketSend(gen))) blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
     else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({ ...it, status: 'running', stepStates: { ...it.stepStates, ...Object.fromEntries([...blocked.keys()].map(id => [id, 'error' as StepState])) } }));

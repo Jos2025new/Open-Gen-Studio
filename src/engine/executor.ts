@@ -26,7 +26,8 @@ export interface StepOutput {
 export interface ExecContext {
   sessionId: string;
   planId?: string;
-  batchToken?: symbol;
+  /** Durable D+ node-run approval ticket id covering the frozen preview scope. */
+  nodeRunTicketId?: string;
   /** Node lock owned by a running graph execution so an in-attempt 402 substitute can reenter it safely. */
   nodeLock?: () => void;
   workspace: Workspace;
@@ -174,7 +175,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       nodeSubjects.push({ id: subject.name, name: subject.name, description: subject.description ?? '', kind: subject.kind ?? 'character', frontalAssetId: asset, refAssetIds: [] });
     }
     const inputsFor = <T extends object>(inputs: T) => ({ ...withLocal(inputs), ...(nodeSubjects.length ? { subjects: nodeSubjects } : {}) });
-    const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id, ...(ctx.batchToken ? { batchToken: ctx.batchToken } : {}) };
+    const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id, ...(ctx.nodeRunTicketId ? { nodeRunTicketId: ctx.nodeRunTicketId } : {}) };
     return (RUN_STEP[s.kind] as RunStep<typeof s.kind>)(s as never, { ...runEnv, base, inputsFor });
   };
 

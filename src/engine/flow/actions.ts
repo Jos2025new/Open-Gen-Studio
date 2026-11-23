@@ -16,9 +16,9 @@ import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, LinkKind, OpId, SystemNodeType } from '../types';
 import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
-import { beginBatchPass, type BudgetPass } from '../budget';
+import { consumeOnce, passActiveFor, releaseOwnedPasses, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
-import { storeTickets } from '../money/storeBridge';
+import { storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
@@ -297,12 +297,16 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
+  const hadPass = passActiveFor(budgetPass, sessionId, preview.estimate);
+  consumeOnce(budgetPass, preview.estimate);
+  const nodeRunTicketId = `nr:${uid('run')}`;
   storeTickets.put(createTicket({
-    id: `nr:${uid('run')}`,
+    id: nodeRunTicketId,
     sessionId,
     kind: 'node_run',
     scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
     price: priceFromEstimate(preview.estimate),
+    ...(hadPass ? { pass: ticketPassFromEstimate(preview.estimate) } : {}),
   }));
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
@@ -318,10 +322,9 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
   const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
-  const batch = beginBatchPass(sessionId, preview.steps.map(s => s.id), preview.estimate, budgetPass);
   try {
     const result = await executeSteps(preview.steps, {
-      sessionId, workspace: 'node', origin: 'node', batchToken: batch.token, nodeLock: release, nodeLibrary: library, nodeOperations,
+      sessionId, workspace: 'node', origin: 'node', nodeRunTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
       onState: (stepId, state, info) => {
         if (info?.generationId) rememberNodeRequest(info.generationId, startGraph, library, context);
         onState?.(stepId, state, info);
@@ -329,7 +332,13 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     });
     if (result.failed.length) toast(`${result.failed.length} node(s) failed: ${result.failed[0].error}`, 'error');
     return result;
-  } finally { batch.end(); releaseAssets(); release(); }
+  } finally {
+    const cur = storeTickets.get(nodeRunTicketId);
+    if (cur?.pass) storeTickets.put({ ...cur, pass: undefined });
+    releaseOwnedPasses(nodeRunTicketId);
+    releaseAssets();
+    release();
+  }
 }
 
 export interface DeletedNodes { nodes: GraphNode[]; edges: import('../types').GraphEdge[] }

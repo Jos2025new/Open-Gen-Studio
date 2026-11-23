@@ -24,8 +24,8 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { shareOfEstimate } from './sendLedger';
 import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
-import { ensureGenerationTicket, hasOpenInFlightSend, hasUncertainTicketSend, sendGenerationViaPaidGate, ticketPassFromEstimate } from './money/storeBridge';
-import { assertWithinLimit, batchStepApproved, batchStepHadPass, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
+import { ensureGenerationTicket, hasOpenInFlightSend, hasUncertainTicketSend, sendGenerationViaPaidGate, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
@@ -53,10 +53,15 @@ export function modelName(ref: string): string {
 export function createGeneration(spec: GenerationSpec): Generation {
   const estimate = spec.estimate ?? estimateSpec(spec);
   // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
-  const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || batchStepApproved(spec.sessionId, spec.batchToken, spec.stepId);
+  const nrTicket = spec.nodeRunTicketId ? storeTickets.get(spec.nodeRunTicketId) : undefined;
+  const nodeRunApproved = Boolean(
+    nrTicket && nrTicket.kind === 'node_run' && nrTicket.sessionId === spec.sessionId && spec.stepId && nrTicket.scope.nodeIds?.includes(spec.stepId),
+  );
+  const nodeRunHadPass = Boolean(nodeRunApproved && nrTicket?.pass);
+  const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || nodeRunApproved;
   assertWithinLimit(estimate, spec.sessionId, approved, spec.budgetPass);
   const pass = passActiveFor(spec.budgetPass, spec.sessionId, estimate) ? spec.budgetPass : undefined;
-  const passOwner = pass ?? (batchStepHadPass(spec.sessionId, spec.batchToken, spec.stepId) ? spec.batchToken : undefined);
+  const passOwner = pass ?? (nodeRunHadPass ? spec.nodeRunTicketId : undefined);
   const parsed = parseModelRef(spec.modelRef);
   const g: Generation = {
     id: uid('gen'),

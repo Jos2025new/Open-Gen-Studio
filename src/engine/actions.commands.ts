@@ -5,6 +5,7 @@ import { estimateOp } from './costs';
 import { opChoice, opSpecForModel } from './opSpec';
 import { OP_IDS, OPS } from './ops';
 import { MEDIA_KINDS, type AdvancedValue, type OpId } from './types';
+import { hasActiveTicketSend } from './money/storeBridge';
 import * as A from './actions';
 
 function estimateStudioOp(
@@ -244,7 +245,7 @@ export const commands = [
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
     estimate: (_ctx, args) => A.regenerateEstimate(args.generationId) ?? useStore.getState().generations[args.generationId]?.estimate ?? { usd: null, approximate: true },
     debt: 'The action reports some failures only as notices.',
-    run: async ({ budgetPass }, args) => { const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, useStore.getState().generations[args.generationId].sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass); },
+    run: async ({ budgetPass }, args) => { const g = useStore.getState().generations[args.generationId]; if (g && g.status !== 'done' && hasActiveTicketSend(g)) throw new Error('The previous attempt may have been submitted. Check its status before regenerating.'); const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, g.sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass); },
   }),
   defineCommand({
     id: 'studio.asset.run_op',
