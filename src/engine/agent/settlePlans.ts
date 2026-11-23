@@ -3,7 +3,7 @@ import { appendFeed, updateFeedItem, useStore } from '../../store/store';
 import { hasActiveTicketSend, storeTickets } from '../money/storeBridge';
 import { markSendUncertain } from '../money/ticket';
 import { settleInterruptedCommandCards } from './commandCalls';
-import { feedBase } from './runtimeShared';
+import { uid } from '../../lib/id';
 import { recordPriceResults } from './priceNotes';
 
 const get = () => useStore.getState();
@@ -27,7 +27,7 @@ export function settleInterruptedPlans(): void {
     if (!feed || feed.some((item) => item.type === 'notice' &&
       (item.uncertainLlmTicketId === t.id || (item.meta?.runId && `llm:${item.meta.runId}` === t.id)))) continue;
     appendFeed(t.sessionId, {
-      ...feedBase('chat'), type: 'notice', level: 'info', uncertainLlmTicketId: t.id,
+      id: uid('fd'), createdAt: Date.now(), workspace: 'chat', type: 'notice', level: 'info', uncertainLlmTicketId: t.id,
       text: 'An interrupted model request may have been charged. Its amount is unknown.',
     });
   }

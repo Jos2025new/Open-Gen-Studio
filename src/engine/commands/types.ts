@@ -38,6 +38,7 @@ export interface CommandContext {
   /** Per-sequence budget pass granted by "Allow this time"; never visible to other actions. */
   budgetPass?: BudgetPass;
   reviewed?: CommandReview;
+  approvalTicketId?: string;
 }
 
 /** `true`, or the reason it cannot run now ("no layer is selected"): the agent reads it, the interface shows it. */

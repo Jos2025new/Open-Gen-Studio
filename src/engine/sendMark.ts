@@ -6,7 +6,7 @@ import { saveNow, toast } from '../store/store';
 import { isMuted, setMuted } from './notices';
 import { PROVIDER_LABELS } from './providers/types';
 import type { Generation, RemoteJob, SendRecord } from './types';
-import { interruptTicketOnReload, SendNotCommittedError, wasFreeTicketSend } from './money/storeBridge';
+import { hasUnstoredPaidResult, interruptTicketOnReload, SendNotCommittedError, wasFreeTicketSend } from './money/storeBridge';
 
 export { SendNotCommittedError };
 
@@ -37,7 +37,7 @@ export function interruptedByReload(g: Generation, job: RemoteJob | undefined): 
   const fromTicket = interruptTicketOnReload(g, job);
   const free = fromTicket.handled ? !fromTicket.maybeCharged && wasFreeSend(g) : wasFreeSend(g);
   const hasUncertainRecord = Boolean(g.sends?.some((s) => !s.remoteJob && (s.status === 'intent' || s.status === 'uncertain')));
-  const maybeCharged = fromTicket.handled ? fromTicket.maybeCharged : (!free && !job && (g.sending != null || hasUncertainRecord));
+  const maybeCharged = fromTicket.handled ? fromTicket.maybeCharged : (!free && !job && (g.sending != null || hasUncertainRecord || hasUnstoredPaidResult(g, g.sends ?? [])));
   if (maybeCharged && !isMuted('send-uncertain')) {
     toast(`${g.modelName}: this may have been sent and charged; check the provider before regenerating.`, 'error', 12000, { label: 'Don\u2019t show again', run: () => setMuted('send-uncertain', true) });
   }

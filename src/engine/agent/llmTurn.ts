@@ -17,7 +17,7 @@ import { untilStopped } from './turnStop';
 import { activityLog } from './activityLog';
 import { inferChoices } from './userChoice';
 import { TOOLS, CAPABILITIES, MUST } from './tools';
-import { agentEngine, feedOfAgent, controllers, turnKey, ending, engineLabel, feedBase, get, hasLlmCatalogPrice, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
+import { agentEngine, feedOfAgent, controllers, turnKey, ending, engineLabel, feedBase, get, keepCommentedPlan, llmCallUsd, messageMeta, notice, patchAgent, presentPlan, rowCanvas, session, setThreadOpen, showQuestions } from './runtimeShared';
 import { agentOf } from './lanes';
 import { CONVERTED_CALL, flushToolResults, pushHistory, repairHistory } from './conversation';
 import { createTurnGuard, SILENCE_MS, TURN_CAP_MS } from './turnGuard';
@@ -128,10 +128,9 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
           messageMeta,
           feedBase,
           engineLabel,
-          hasLlmCatalogPrice,
           llmCallUsd,
           onAgentCredit,
-          retryWithCredit: () => llmTurn(sessionId, workspace, { ...opts, runId, creditRetried: true }),
+          retryWithCredit: () => llmTurn(sessionId, workspace, { ...opts, runId, budgetPass: false, creditRetried: true }),
           onBudgetBlocked: () => { guardBudget(); },
         },
       });

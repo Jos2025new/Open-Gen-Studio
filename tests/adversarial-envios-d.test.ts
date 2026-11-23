@@ -358,7 +358,9 @@ describe('2. Rutas verificadas que sí cuadran el gasto', () => {
     const g1 = make(2, NANO);
     await expect(runGeneration(g1.id)).rejects.toThrow();
     expect(spent()).toBeCloseTo(0.1);
-    const ids = await retryGeneration(g1.id);
+    await retryGeneration(g1.id);
+    expect(n).toBe(2);
+    const ids = await retryGeneration(g1.id, undefined, undefined, true);
     expect(ids).toHaveLength(2);
     expect(spent()).toBeCloseTo(0.2);
     expect(logLen()).toBe(2);

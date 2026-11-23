@@ -67,6 +67,8 @@ describe('retry after a dropped connection', () => {
     expect(feed.some((f) => f.type === 'assistant' && f.text.includes('y acerc'))).toBe(true);
 
     await retryAgentTurn(sid, note.id);
+    expect(calls).toHaveLength(2);
+    await retryAgentTurn(sid, note.id, true);
     feed = useStore.getState().sessions[sid].feed;
     // The half answer and the error are gone; the finished answer is there once.
     expect(feed.some((f) => f.type === 'notice')).toBe(false);

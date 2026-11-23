@@ -14,8 +14,7 @@ export interface TurnUsageTracker {
     provider: LlmProviderId;
     model: string;
     result: ChatResult;
-    llmUsd: number;
-    hasCatalogPrice: boolean;
+    llmUsd: number | null;
     wrapUp: boolean;
     textItemId: string | null;
     hasBubble: boolean;
@@ -59,7 +58,6 @@ export function createTurnUsageTracker(): TurnUsageTracker {
     model,
     result,
     llmUsd,
-    hasCatalogPrice,
     wrapUp,
     textItemId,
     hasBubble,
@@ -71,7 +69,7 @@ export function createTurnUsageTracker(): TurnUsageTracker {
       type: 'call',
       inputTokens: result.usage?.inputTokens ?? 0,
       outputTokens: result.usage?.outputTokens ?? 0,
-      usd: llmUsd,
+      usd: llmUsd ?? 0,
       wrapUp,
       timing: { ...result.timing, reasoningTokens: result.usage?.reasoningTokens, cachedTokens: result.usage?.cachedTokens },
     });
@@ -80,7 +78,7 @@ export function createTurnUsageTracker(): TurnUsageTracker {
       const u = result.usage;
       patchSession(sessionId, (s) => ({
         ...s,
-        usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + llmUsd },
+        usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + (llmUsd ?? 0) },
       }));
       const cachedTokens = (pendingUsage?.cachedTokens ?? 0) + (u.cachedTokens ?? 0);
       const reasoningTokens = (pendingUsage?.reasoningTokens ?? 0) + (u.reasoningTokens ?? 0);
@@ -90,7 +88,7 @@ export function createTurnUsageTracker(): TurnUsageTracker {
         ...(cachedTokens > 0 ? { cachedTokens } : {}),
         ...(reasoningTokens > 0 ? { reasoningTokens } : {}),
       };
-      if (u.costUsd != null || hasCatalogPrice) {
+      if (llmUsd != null) {
         pendingCost += llmUsd;
         pendingHasCost = true;
         pendingEstimated = pendingEstimated || u.costUsd == null;

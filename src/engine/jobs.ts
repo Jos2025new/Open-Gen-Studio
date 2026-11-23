@@ -24,7 +24,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { shareOfEstimate } from './sendLedger';
 import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
-import { ensureGenerationTicket, hasOpenInFlightSend, hasUncertainTicketSend, sendGenerationViaPaidGate, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendGenerationViaPaidGate, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
 import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, generationQuoteGuard, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { activeRemoteJob, followRemote } from './jobRecovery';
@@ -53,15 +53,15 @@ export function modelName(ref: string): string {
 export function createGeneration(spec: GenerationSpec): Generation {
   const estimate = spec.estimate ?? estimateSpec(spec);
   // The net behind every entry: before the pass of an approved action is spent, a run nobody approved is refused.
-  const nrTicket = spec.nodeRunTicketId ? storeTickets.get(spec.nodeRunTicketId) : undefined;
+  const approval = spec.approvalTicketId ? storeTickets.get(spec.approvalTicketId) : undefined;
   const nodeRunApproved = Boolean(
-    nrTicket && nrTicket.kind === 'node_run' && nrTicket.sessionId === spec.sessionId && spec.stepId && nrTicket.scope.nodeIds?.includes(spec.stepId),
+    approval && (approval.kind === 'node_run' || approval.kind === 'commands') && approval.sessionId === spec.sessionId && spec.stepId && approval.scope.nodeIds?.includes(spec.stepId),
   );
-  const nodeRunHadPass = Boolean(nodeRunApproved && nrTicket?.pass);
+  const nodeRunHadPass = Boolean(nodeRunApproved && approval?.pass);
   const approved = stepApproved(spec.sessionId, spec.planId, spec.stepId) || nodeRunApproved;
   assertWithinLimit(estimate, spec.sessionId, approved, spec.budgetPass);
   const pass = passActiveFor(spec.budgetPass, spec.sessionId, estimate) ? spec.budgetPass : undefined;
-  const passOwner = pass ?? (nodeRunHadPass ? spec.nodeRunTicketId : undefined);
+  const passOwner = pass ?? (nodeRunHadPass ? spec.approvalTicketId : undefined);
   const parsed = parseModelRef(spec.modelRef);
   const g: Generation = {
     id: uid('gen'),
@@ -80,6 +80,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     status: 'queued',
     assetIds: [],
     estimate,
+    ...(approval?.sessionId === spec.sessionId ? { approvalTicketId: approval.id } : {}),
     retryBaseEstimate: estimate,
     retryTotal: spec.variants?.length ?? spec.settings.count,
     parentId: spec.parentId,
@@ -99,7 +100,11 @@ export function createGeneration(spec: GenerationSpec): Generation {
   if (passOwner && estimate.usd !== 0) bindGenerationPass(g.id, spec.sessionId, estimate.lowerBound ? null : estimate.usd, passOwner);
   consumeOnce(spec.budgetPass, estimate);
   upsertGeneration(g);
-  ensureGenerationTicket(g, needsTicketPass ? { pass: ticketPassFromEstimate(estimate) } : {});
+  if (!g.approvalTicketId && slotPriceForGeneration(g).maxVerifiableUsd !== 0) {
+    ensureGenerationTicket(g, needsTicketPass ? { pass: ticketPassFromEstimate(estimate) } : {});
+  } else if (g.approvalTicketId && pass && !approval?.pass) {
+    grantGenerationTicketPass(g.id, estimate);
+  }
   return g;
 }
 

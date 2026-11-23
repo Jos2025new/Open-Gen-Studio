@@ -26,7 +26,6 @@ export interface TurnModelCallDeps {
   messageMeta: (workspace: Workspace, extra: Partial<ChatMessageMeta>, sessionId: string, owner: string) => ChatMessageMeta;
   feedBase: (workspace: Workspace) => { id: string; createdAt: number; workspace: Workspace };
   engineLabel: (sessionId: string, owner: string) => string;
-  hasLlmCatalogPrice: (provider: LlmProviderId, model: string) => boolean;
   llmCallUsd: (provider: LlmProviderId, model: string, usage: ChatResult['usage']) => number;
   onAgentCredit: (sessionId: string) => Promise<boolean>;
   retryWithCredit: () => Promise<void>;
@@ -68,6 +67,7 @@ export async function runTurnModelCall(opts: {
 
   const outcomeWasPaid = () => Boolean(storeTickets.get(`llm:${runId}`)?.sends.at(-1)?.status === 'done');
   let result: ChatResult;
+  let llmUsd: number | null;
   try {
     if (deps.mine().phase !== 'working') deps.patchAgent(sessionId, { phase: 'working' }, owner);
     drainAgentNotes(sessionId, owner);
@@ -111,6 +111,7 @@ export async function runTurnModelCall(opts: {
       },
     }));
     result = outcome.value;
+    llmUsd = outcome.costUsd;
   } catch (err) {
     if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false });
     if (err instanceof OverLimitError) {
@@ -177,14 +178,12 @@ export async function runTurnModelCall(opts: {
 
   if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
 
-  const llmUsd = deps.llmCallUsd(engine.provider, engine.model, result.usage);
   usage.recordCallUsage({
     sessionId,
     provider: engine.provider,
     model: engine.model,
     result,
     llmUsd,
-    hasCatalogPrice: deps.hasLlmCatalogPrice(engine.provider, engine.model),
     wrapUp,
     textItemId,
     hasBubble: hasTextBubble(),

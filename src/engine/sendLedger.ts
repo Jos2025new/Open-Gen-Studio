@@ -30,10 +30,10 @@ function bookPending(g: Generation, sends: SendRecord[]): SendRecord[] {
     if (s.status !== 'done' || s.bookedUsd != null || s.bookedUnknown) return s;
     if (s.costUsd == null) {
       if (!s.estimated) return s;
-      addSpend(null, spendEntry(g, true));
+      addSpend(null, { ...spendEntry(g, true), sendId: s.id });
       return { ...s, bookedUnknown: true };
     }
-    addSpend(s.costUsd, spendEntry(g, Boolean(s.estimated)));
+    addSpend(s.costUsd, { ...spendEntry(g, Boolean(s.estimated)), sendId: s.id });
     return { ...s, bookedUsd: s.costUsd };
   });
 }

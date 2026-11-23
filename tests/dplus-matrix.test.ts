@@ -530,6 +530,7 @@ describe('Escenario (f): LLM en streaming', () => {
     const turnPromise = llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main', budgetPass: true });
     await heldTurn.arrived;
     expect(fake.acceptedCount('/chat/completions')).toBe(1);
+    expect(remainingBudget()!).toBeLessThan(0.05);
 
     putRewritePlan('it_rw2');
     await rewritePrompts(sid, 'it_rw2', 'image');

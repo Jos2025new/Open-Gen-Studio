@@ -169,7 +169,7 @@ describe('espera de 3 s del catalogo LLM', () => {
     await vi.advanceTimersByTimeAsync(500);
     const b = sendAgentMessage('dos');
     await vi.advanceTimersByTimeAsync(500);
-    finish(Response.json(body({ id: 'paid-model', p: '0.00001' })));
+    finish(Response.json(body({ id: 'paid-model', p: '0' })));
     await vi.advanceTimersByTimeAsync(100);
     await Promise.all([a, b]);
     expect(send).toHaveBeenCalledTimes(1);

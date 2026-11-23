@@ -23,7 +23,7 @@ import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import type { ShapeSpec, StrokeStyle } from '../engine/types';
-import { isClosedLlmTicket, type ApprovalTicket } from '../engine/money/ticket';
+import { compactApprovalTickets, type ApprovalTicket } from '../engine/money/ticket';
 import type {
   Asset,
   DesignDoc,
@@ -374,7 +374,7 @@ export const useStore = create<AppState>()(
       sessions: s.sessions,
       activeSessionId: s.activeSessionId,
       generations: s.generations,
-      tickets: Object.fromEntries(Object.entries(s.tickets).filter(([, ticket]) => !isClosedLlmTicket(ticket))),
+      tickets: compactApprovalTickets(s.tickets, s.generations, s.sessions),
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
@@ -466,7 +466,10 @@ export function upsertGeneration(g: Generation): void {
 }
 
 export function upsertTicket(ticket: ApprovalTicket): void {
-  set((st) => ({ tickets: { ...st.tickets, [ticket.id]: ticket } }));
+  set((st) => {
+    const tickets = { ...st.tickets, [ticket.id]: ticket };
+    return { tickets: compactApprovalTickets(tickets, st.generations, st.sessions, 16) };
+  });
 }
 
 export function removeTicket(id: string): void {

@@ -127,11 +127,6 @@ export function messageMeta(workspace: Workspace, extra: Partial<ChatMessageMeta
   return meta;
 }
 
-export function hasLlmCatalogPrice(provider: LlmProviderId, model: string): boolean {
-  const m = get().catalog.llm[provider]?.find((x) => x.id === model);
-  return m?.inputPrice != null || m?.outputPrice != null;
-}
-
 export function notice(
   sessionId: string,
   workspace: Workspace,

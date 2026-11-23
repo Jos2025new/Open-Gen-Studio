@@ -197,6 +197,11 @@ it('requires a new review before sending a changed node from a restored command 
   expect(decideCommandApproval(sid, card.id, 'approve')).toBe(false);
   await vi.waitFor(() => expect(commandCard().status).not.toBe('running'));
   expect(fake.acceptedCount('different prompt'), 'the restored approval dispatched an unreviewed prompt').toBe(0);
+  expect(commandCard().status).toBe('awaiting');
+  expect(commandCard().steps[0].details?.join(' ')).toContain('different prompt');
+  expect(decideCommandApproval(sid, card.id, 'approve')).toBe(true);
+  await vi.waitFor(() => expect(commandCard().status).toBe('done'));
+  expect(fake.acceptedCount('different prompt')).toBe(1);
 });
 
 it('offers one-click approval for a plan whose next step was still pending', async () => {
@@ -221,8 +226,7 @@ it('offers one-click approval for a plan whose next step was still pending', asy
   expect(restored.status, 'pending work is shown as an error instead of offering approval').toBe('awaiting');
 });
 
-// reproduce: a local generation does not reserve money, but it still accumulates a pending ticket and invokes the paid transport wrapper.
-it.fails('runs local generation without creating a paid ticket or paid slot', async () => {
+it('runs local generation without creating a paid ticket or paid slot', async () => {
   const g = createGeneration({
     sessionId: sid, kind: 'image', modelRef: 'local::test', prompt: 'local image',
     settings: { count: 1, advanced: {} }, origin: 'composer', estimate: { usd: 0, approximate: false },
@@ -249,8 +253,7 @@ it('keeps terminal ticket history out of the synchronous pre-send serialization'
   }
 });
 
-// reproduce: repeated completed LLM turns each retain a separate ticket in the persisted store indefinitely.
-it.fails('compacts terminal LLM tickets while keeping their settled spend', async () => {
+it('compacts terminal LLM tickets while keeping their settled spend', async () => {
   for (let i = 0; i < 12; i++) await sendLlm(`llm:turn-${i}`);
   simulateReload(null, { sessionId: sid, state: snapshotStore() });
   settleInterruptedPlans();
@@ -321,8 +324,7 @@ it('does not treat a nominal LLM estimate as a guaranteed ceiling under the acti
   expect(fake.acceptedCount('/chat/completions'), `unconfirmed send booked $${useStore.getState().spentUsd} against $0.05`).toBe(0);
 });
 
-// reproduce: approving one node command creates three independent tickets; the actual paid send is recorded only on the generation ticket.
-it.fails('records a command approval and its paid node send on one ticket', async () => {
+it('records a command approval and its paid node send on one ticket', async () => {
   const pending = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } }] });
   const card = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands');
   await vi.waitFor(() => expect(card()?.status).toBe('awaiting'));
@@ -330,6 +332,8 @@ it.fails('records a command approval and its paid node send on one ticket', asyn
   await pending;
   expect(fake.acceptedCount('reviewed prompt')).toBe(1);
   expect(Object.values(useStore.getState().tickets).map((ticket) => ticket.kind)).toEqual(['commands']);
+  const ticket = useStore.getState().tickets[`cmd:${card()!.id}`];
+  expect(ticket.sends.filter((slot) => slot.generationId)).toMatchObject([{ status: 'done', bookedUsd: 0.1 }]);
 });
 
 it('applies a graph edit while the provider response is held', async () => {

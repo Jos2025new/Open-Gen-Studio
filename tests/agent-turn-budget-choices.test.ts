@@ -178,7 +178,7 @@ describe('Part 3b: agent turn over-limit choices and plan wrap-up budget guard',
     });
     const startup = loadLlmCatalog('nanogpt');
     const turn = llmTurn(sidA, 'chat', { route: 'new', agentNodeId: 'main' });
-    const catalogResponse = { data: [{ id: 'paid-model', pricing: { prompt: '0.01', completion: '0.01' }, capabilities: { tool_calling: true } }] };
+    const catalogResponse = { data: [{ id: 'paid-model', pricing: { prompt: '0', completion: '0' }, capabilities: { tool_calling: true } }] };
     try {
       await vi.advanceTimersByTimeAsync(2999);
       expect(fetchCatalog).toHaveBeenCalledTimes(1);

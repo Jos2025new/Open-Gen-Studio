@@ -35,8 +35,8 @@ export interface GenerationSpec {
   planId?: string;
   stepId?: string;
   nodeRequest?: string;
-  /** Durable D+ node-run approval ticket id covering the frozen preview scope. */
-  nodeRunTicketId?: string;
+  /** Durable approval ticket covering this generation. */
+  approvalTicketId?: string;
   /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
   budgetPass?: BudgetPass;
   estimate?: Estimate;

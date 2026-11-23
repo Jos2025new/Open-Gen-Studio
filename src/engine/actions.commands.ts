@@ -233,7 +233,7 @@ export const commands = [
     available: (ctx) => onScreen(ctx),
     estimate: (_ctx, args) => A.checkDirect(args.kind).estimate,
     debt: 'Reads the active session, composer and screen; the action reports some failures only as notices.',
-    run: async ({ on, budgetPass }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session, budgetPass); if (problem) throw new Error(problem); await A.generateDirect(args.kind, budgetPass); },
+    run: async ({ on, budgetPass, approvalTicketId }, args) => { const check = A.checkDirect(args.kind); if (!check.ok) throw new Error(check.reason ?? "Cannot generate yet."); const problem = A.budgetProblem(check.estimate, on.session, budgetPass); if (problem) throw new Error(problem); await A.generateDirect(args.kind, budgetPass, approvalTicketId); },
   }),
   defineCommand({
     id: 'studio.generation.regenerate',
@@ -245,7 +245,7 @@ export const commands = [
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : generation(args?.generationId),
     estimate: (_ctx, args) => A.regenerateEstimate(args.generationId) ?? useStore.getState().generations[args.generationId]?.estimate ?? { usd: null, approximate: true },
     debt: 'The action reports some failures only as notices.',
-    run: async ({ budgetPass }, args) => { const g = useStore.getState().generations[args.generationId]; if (g && g.status !== 'done' && hasActiveTicketSend(g)) throw new Error('The previous attempt may have been submitted. Check its status before regenerating.'); const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, g.sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass); },
+    run: async ({ budgetPass, approvalTicketId }, args) => { const g = useStore.getState().generations[args.generationId]; if (g && g.status !== 'done' && hasActiveTicketSend(g)) throw new Error('The previous attempt may have been submitted. Check its status before regenerating.'); const e = A.regenerateEstimate(args.generationId); if (!e) throw new Error("Generation estimate unavailable."); const problem = A.budgetProblem(e, g.sessionId, budgetPass); if (problem) throw new Error(problem); await A.regenerate(args.generationId, budgetPass, approvalTicketId); },
   }),
   defineCommand({
     id: 'studio.asset.run_op',
@@ -257,7 +257,7 @@ export const commands = [
     available: (ctx, args) => onScreen(ctx) !== true ? onScreen(ctx) : asset(args?.assetId),
     estimate: ({ on }, args) => estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }),
     debt: 'Reads the active session and screen; failures can be reported only as notices.',
-    run: async ({ on, budgetPass }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode, budgetPass); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
+    run: async ({ on, budgetPass, approvalTicketId }, args) => { const e = estimateStudioOp(args.op, args.params, { sourceAssetId: args.assetId, modelRef: args.modelRef, origin: 'op', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); const result = await A.runAssetOp(args.assetId, args.op, args.params, args.parentId, args.modelRef, args.place, args.mode, budgetPass, approvalTicketId); if (!result.length) throw new Error("Asset operation did not produce a result."); return result; },
   }),
   defineCommand({
     id: 'studio.layer.run_op',
@@ -269,7 +269,7 @@ export const commands = [
     available: (ctx, args) => session(ctx) !== true ? session(ctx) : layer(ctx, args),
     estimate: ({ on }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); return estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); },
     debt: 'The action catches failures and reports them only as notices.',
-    run: async ({ on, budgetPass }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params, budgetPass); },
+    run: async ({ on, budgetPass, approvalTicketId }, args) => { const st = useStore.getState(); const l = st.sessions[on.session!]?.docs.find((d) => d.id === args.docId)?.layers.find((x) => x.id === args.layerId); const e = estimateStudioOp(args.op, args.params, { sourceDims: l?.type === 'raster' ? { width: l.pxWidth, height: l.pxHeight } : undefined, origin: 'designer', sessionId: on.session }); const problem = A.budgetProblem(e, on.session, budgetPass); if (problem) throw new Error(problem); await A.runLayerOp(on.session!, args.docId, args.layerId, args.op, args.params, budgetPass, approvalTicketId); },
   }),
   defineCommand({
     id: 'studio.generation.delete',

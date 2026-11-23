@@ -1,3 +1,4 @@
+import { hasActiveTicketSend } from './money/storeBridge';
 import { wrongRef } from './wrongRef';
 import { directModelRef } from './directModel';
 import { refsLimit } from './officialLimits';
@@ -154,7 +155,7 @@ function pick<T>(map: Record<string, T> | undefined, ids: string[]): Record<stri
   return Object.keys(out).length ? out : undefined;
 }
 
-export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass): Promise<void> {
+export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
   const check = checkDirect(kind);
   if (!check.ok) {
     toast(check.reason ?? 'Cannot generate yet', 'error');
@@ -198,6 +199,7 @@ export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass): 
     parentId,
     estimate: check.estimate,
     budgetPass,
+    approvalTicketId,
   };
   autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
@@ -319,9 +321,13 @@ export function regenerateEstimate(generationId: string): Estimate | null {
 }
 
 /** Run the same request again with a new seed. Call after the user confirmed the cost. */
-export async function regenerate(generationId: string, budgetPass?: BudgetPass): Promise<void> {
+export async function regenerate(generationId: string, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
+  if (g.status !== 'done' && hasActiveTicketSend(g)) {
+    toast('The previous request may have been charged. Use Retry on the failed result to confirm a new request.', 'info');
+    return;
+  }
   const estimate = regenerateEstimate(generationId) ?? g.estimate;
   const problem = budgetProblem(estimate, g.sessionId, budgetPass);
   if (problem) {
@@ -341,7 +347,7 @@ export async function regenerate(generationId: string, budgetPass?: BudgetPass):
   const held = holdAttemptNode(g, nodes);
   if (!held) return;
   const node = held.node;
-  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass });
+  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass, approvalTicketId });
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) {
       deleteAssets([node.data.sketchAssetId]);
@@ -415,7 +421,7 @@ export async function opEstimate(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
-export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass): Promise<string[]> {
+export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<string[]> {
   const st = get();
   const asset = st.assets[assetId];
   if (!asset) return [];
@@ -431,7 +437,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(problem, 'error');
     return [];
   }
-  const g = createGeneration({ ...spec, budgetPass });
+  const g = createGeneration({ ...spec, budgetPass, approvalTicketId });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     return await runGeneration(g.id);
@@ -442,7 +448,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Designer: run an image operation on a raster layer; the result is a new layer above it (the original is kept). */
-export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass): Promise<void> {
+export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
   const def = OPS[op];
   if (def.input !== 'image' || def.output !== 'image') {
     toast(`${def.label} does not produce an image for a layer.`, 'error');
@@ -456,7 +462,7 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
       toast(problem, 'error');
       return;
     }
-    const g = createGeneration({ ...spec, budgetPass });
+    const g = createGeneration({ ...spec, budgetPass, approvalTicketId });
     // Its card in the Designer's conversation, like any generation (also in Generations and Assets).
     appendFeed(sessionId, { ...feedBase('designer'), type: 'generation', generationId: g.id });
     const ids = await runGeneration(g.id);

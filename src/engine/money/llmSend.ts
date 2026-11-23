@@ -20,11 +20,13 @@ import {
 } from './storeBridge';
 import {
   createTicket,
+  isFreePrice,
   priceFromEstimate,
   roundUsd,
   settleSend,
   ticketCommittedUsd,
   type ApprovalTicket,
+  type MoneyPrice,
   type TicketPass,
 } from './ticket';
 
@@ -53,7 +55,7 @@ export interface LlmPaidSendOpts {
 export interface LlmPaidSendOutcome {
   readonly sendId: string;
   readonly value: ChatResult;
-  readonly costUsd: number;
+  readonly costUsd: number | null;
 }
 
 export function hasLlmPossibleCharge(runId: string | undefined): boolean {
@@ -100,19 +102,15 @@ function ensureLlmTicket(opts: {
   provider: LlmProviderId;
   model: string;
   budgetPass?: boolean;
-}): { ticket: ApprovalTicket; price: ReturnType<typeof priceFromEstimate> } {
-  const est = llmCallEstimate(opts.provider, opts.model);
-  const price = priceFromEstimate(est);
-  let ticket = storeTickets.get(opts.ticketId);
-  if (!ticket) {
-    ticket = createTicket({
-      id: opts.ticketId,
-      sessionId: opts.sessionId,
-      kind: 'llm',
-      scope: { llm: { provider: opts.provider, model: opts.model } },
-      price,
-    });
-  }
+}, price: MoneyPrice): ApprovalTicket {
+  const existing = storeTickets.get(opts.ticketId);
+  let ticket = existing ?? createTicket({
+    id: opts.ticketId,
+    sessionId: opts.sessionId,
+    kind: 'llm',
+    scope: { llm: { provider: opts.provider, model: opts.model } },
+    price,
+  });
   if (opts.budgetPass) {
     const committed = ticketCommittedUsd(ticket);
     const pass: TicketPass = price.maxVerifiableUsd == null
@@ -120,10 +118,11 @@ function ensureLlmTicket(opts: {
       : { kind: 'once', maxUsd: roundUsd(committed + price.maxVerifiableUsd) };
     ticket = { ...ticket, price, pass };
     storeTickets.put(ticket);
-  } else if (!storeTickets.get(opts.ticketId)) {
+  } else if (!existing || ticket.pass) {
+    ticket = { ...ticket, pass: undefined };
     storeTickets.put(ticket);
   }
-  return { ticket, price };
+  return ticket;
 }
 
 /**
@@ -131,9 +130,37 @@ function ensureLlmTicket(opts: {
  * persists the durable mark, streams `chat()`, and settles actual usage cost idempotently by `sendId`.
  */
 export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaidSendOutcome> {
-  const { ticket, price } = ensureLlmTicket(opts);
+  const price = priceFromEstimate(llmCallEstimate(opts.provider, opts.model));
   const sendId = uid('llm');
-  let reportedUsd = 0;
+  const chatOptions = {
+    provider: opts.provider,
+    apiKey: opts.apiKey,
+    model: opts.model,
+    system: opts.system,
+    messages: opts.messages,
+    tools: opts.tools,
+    effort: opts.effort,
+    showReasoning: opts.showReasoning,
+    signal: opts.signal,
+    onText: opts.onText,
+    onReasoning: opts.onReasoning,
+    onToolCall: opts.onToolCall,
+    onNotice: opts.onNotice,
+  };
+  if (isFreePrice(price)) {
+    const value = await chat(chatOptions);
+    const costUsd = value.usage?.costUsd ?? 0;
+    if (costUsd > 0) addSpend(costUsd, {
+      category: 'agent', provider: opts.provider, model: opts.model,
+      sessionId: opts.sessionId, estimated: false, sendId,
+    });
+    return { sendId, value, costUsd };
+  }
+  const prior = storeTickets.get(opts.ticketId);
+  if (prior?.sends.some((send) => send.status === 'uncertain' || send.status === 'in_flight')) {
+    throw new PaidSendBlockedError('ALREADY_SENT', 'This model request may already have been charged.', { ticketId: opts.ticketId });
+  }
+  const ticket = ensureLlmTicket(opts, price);
   try {
     const outcome = await paidSend<ChatResult>({
       ticketId: ticket.id,
@@ -157,30 +184,15 @@ export async function sendLlmViaPaidGate(opts: LlmPaidSendOpts): Promise<LlmPaid
         });
       },
       send: async () => {
-        const value = await chat({
-          provider: opts.provider,
-          apiKey: opts.apiKey,
-          model: opts.model,
-          system: opts.system,
-          messages: opts.messages,
-          tools: opts.tools,
-          effort: opts.effort,
-          showReasoning: opts.showReasoning,
-          signal: opts.signal,
-          onText: opts.onText,
-          onReasoning: opts.onReasoning,
-          onToolCall: opts.onToolCall,
-          onNotice: opts.onNotice,
-        });
+        const value = await chat(chatOptions);
         const estimated = value.usage?.costUsd == null;
         const costUsd = value.usage && (!estimated || price.kind !== 'unknown') ? opts.computeUsd(value.usage) : null;
-        reportedUsd = costUsd ?? 0;
         return { value, costUsd, estimated };
       },
       signal: opts.signal,
       classifyError: (err) => classifyLlmError(err, opts.signal),
     });
-    return { sendId: outcome.sendId, value: outcome.value, costUsd: reportedUsd };
+    return { sendId: outcome.sendId, value: outcome.value, costUsd: outcome.settled?.ticket.sends.find((send) => send.id === sendId)?.settledUsd ?? null };
   } catch (err) {
     if (err instanceof PaidSendBlockedError) {
       if (err.code === 'ABORTED') throw new AbortedError();

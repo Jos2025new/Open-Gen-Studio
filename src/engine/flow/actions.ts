@@ -19,7 +19,7 @@ import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, N
 import { consumeOnce, passActiveFor, releaseOwnedPasses, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
-import { createTicket, priceFromEstimate } from '../money/ticket';
+import { createTicket, isFreePrice, priceFromEstimate, ticketCommittedUsd } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
@@ -290,7 +290,7 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
 
 /** Revalidate the reviewed version before taking the lock or spending. */
 export async function runNodes(sessionId: string, targets: string[], approved?: NodeRunPreview, force = true,
-  onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass): Promise<import('../executor').ExecResult | null> {
+  onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass, commandTicketId?: string): Promise<import('../executor').ExecResult | null> {
   const preview = await prepareNodeRun(sessionId, targets, force, approved?.runIds);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
@@ -299,15 +299,23 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
   const hadPass = passActiveFor(budgetPass, sessionId, preview.estimate);
   consumeOnce(budgetPass, preview.estimate);
-  const nodeRunTicketId = `nr:${uid('run')}`;
-  storeTickets.put(createTicket({
-    id: nodeRunTicketId,
-    sessionId,
-    kind: 'node_run',
-    scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
-    price: priceFromEstimate(preview.estimate),
-    ...(hadPass ? { pass: ticketPassFromEstimate(preview.estimate) } : {}),
-  }));
+  const price = priceFromEstimate(preview.estimate);
+  const commandTicket = commandTicketId ? storeTickets.get(commandTicketId) : undefined;
+  const approvalTicketId = isFreePrice(price) ? undefined : commandTicket?.id ?? `nr:${uid('run')}`;
+  if (approvalTicketId) {
+    const approvedPrice = hadPass && price.maxVerifiableUsd != null
+      ? { ...preview.estimate, usd: price.maxVerifiableUsd + (commandTicket ? ticketCommittedUsd(commandTicket) : 0) }
+      : preview.estimate;
+    const pass = hadPass ? ticketPassFromEstimate(approvedPrice) : undefined;
+    storeTickets.put(commandTicket ? {
+      ...commandTicket, pass,
+      scope: { ...commandTicket.scope, nodeIds: [...new Set([...commandTicket.scope.nodeIds ?? [], ...preview.runIds])] },
+    } : createTicket({
+      id: approvalTicketId, sessionId, kind: 'node_run',
+      scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
+      price, pass,
+    }));
+  }
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
   const startGraph = get().sessions[sessionId].graph;
@@ -324,7 +332,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
   try {
     const result = await executeSteps(preview.steps, {
-      sessionId, workspace: 'node', origin: 'node', nodeRunTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
+      sessionId, workspace: 'node', origin: 'node', approvalTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
       onState: (stepId, state, info) => {
         if (info?.generationId) rememberNodeRequest(info.generationId, startGraph, library, context);
         onState?.(stepId, state, info);
@@ -333,9 +341,11 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     if (result.failed.length) toast(`${result.failed.length} node(s) failed: ${result.failed[0].error}`, 'error');
     return result;
   } finally {
-    const cur = storeTickets.get(nodeRunTicketId);
-    if (cur?.pass) storeTickets.put({ ...cur, pass: undefined });
-    releaseOwnedPasses(nodeRunTicketId);
+    if (approvalTicketId) {
+      const cur = storeTickets.get(approvalTicketId);
+      if (cur) storeTickets.put({ ...cur, pass: undefined, ...(cur.kind === 'node_run' ? { closed: true } : {}) });
+      releaseOwnedPasses(approvalTicketId);
+    }
     releaseAssets();
     release();
   }

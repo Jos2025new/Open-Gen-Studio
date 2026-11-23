@@ -136,7 +136,7 @@ export interface ApprovalRequest {
   /** Full frozen sequence (including write/read steps and `$N` producers/pre-results). */
   sequence?: FrozenCommandStep[];
 }
-export type ApprovalOutcome = boolean | { approved: boolean; budgetPass?: BudgetPass };
+export type ApprovalOutcome = boolean | { approved: boolean; budgetPass?: BudgetPass; approvalTicketId?: string };
 /** Shows the user what is about to happen and answers yes or no. One question per sequence, never one per step. */
 export type Approver = (request: ApprovalRequest) => ApprovalOutcome | Promise<ApprovalOutcome>;
 
@@ -255,6 +255,7 @@ export interface RunOptions {
   resume?: {
     skipSteps?: ReadonlySet<number>;
     priorResults?: Readonly<Record<number, unknown>>;
+    approvalTicketId?: string;
     reviews?: Readonly<Record<number, CommandReview>>;
     reviewedSpends?: Readonly<Record<number, Estimate>>;
     budgetPass?: BudgetPass;
@@ -325,6 +326,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
 
   const seq = steps.length > 1 ? ++sequences : undefined;
   let budgetPass: BudgetPass | undefined = options.resume?.budgetPass;
+  let approvalTicketId = options.resume?.approvalTicketId;
   const reviews = { ...options.resume?.reviews };
   const reviewedSpends = new Map<number, Estimate>();
   if (options.resume?.reviewedSpends) {
@@ -373,6 +375,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
       const reviewed = reviews[i + 1];
       if (reviewed) ctx.reviewed = reviewed;
+      if (approvalTicketId) ctx.approvalTicketId = approvalTicketId;
       check(spec, ctx, args);
       openHistories(spec, on, args, txs);
       if (track) options.onStepStart?.(i + 1);
@@ -492,7 +495,10 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
     try {
       const outcome = await activeApprover({ caller: options.caller, steps: asks, estimate, sequence });
       yes = typeof outcome === 'boolean' ? outcome : outcome.approved;
-      if (typeof outcome === 'object' && outcome.approved) budgetPass = outcome.budgetPass;
+      if (typeof outcome === 'object' && outcome.approved) {
+        budgetPass = outcome.budgetPass;
+        approvalTicketId = outcome.approvalTicketId;
+      }
     } catch (error) {
       for (const s of steps) s.ran = false;
       const out = fail(error, asks[0].step);

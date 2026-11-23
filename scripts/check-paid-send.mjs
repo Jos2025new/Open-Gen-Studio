@@ -2,7 +2,7 @@
  * Single paid-send gate rule (D+ pilot, docs/diagnostico-dinero.md):
  * No billable provider call may bypass `paidSend` (`src/engine/money/paidSend.ts`):
  *  1. LLM `chat()` (`src/engine/providers/llm.ts`) may only be imported/called from `src/engine/money/llmSend.ts`,
- *     and every `chat(...)` call inside `llmSend.ts` must occur inside a `paidSend(...)` gate call.
+ *     and every `chat(...)` call must be in the gate's transport callback or the guarded free-price branch.
  *  2. Billable adapter methods (`generate`, `transcribe`, `createStyle`, `createVoice`) may only be invoked
  *     inside `src/engine/providers/*`, `src/engine/jobs.ts` (nested inside `sendGenerationViaPaidGate`/`paidSend`),
  *     or `src/engine/specialSends.ts` (nested inside `runSpecialSend`/`sendGenerationViaPaidGate`/`paidSend`).
@@ -68,6 +68,14 @@ function inTransport(ancestors, gates, rel) {
     && unwrap(gate.arguments[0]) === object && gates.has(unwrap(gate.callee)?.name);
 }
 
+function inFreeLlmBranch(ancestors, guards) {
+  const i = ancestors.findLastIndex((node) => node.type === 'IfStatement');
+  const branch = ancestors[i];
+  const test = branch?.test;
+  return test?.type === 'CallExpression' && guards.has(unwrap(test.callee)?.name)
+    && branch.consequent === ancestors[i + 1];
+}
+
 function isProviderImpl(rel) {
   return rel.startsWith('src/engine/providers/');
 }
@@ -84,6 +92,7 @@ export function check(root = '.') {
       const fetchLocals = new Set();
       const ancestors = [];
       const gates = new Set();
+      const freePriceGuards = new Set();
 
       for (const d of program.body) {
         if (d.type !== 'ImportDeclaration' || d.importKind === 'type') continue;
@@ -92,6 +101,8 @@ export function check(root = '.') {
           if (sp.type === 'ImportSpecifier' && sp.importKind !== 'type' && GATE_IMPORTS.get(target) === keyName(sp.imported)) {
             gates.add(sp.local.name);
           }
+          if (target === 'src/engine/money/ticket' && sp.type === 'ImportSpecifier'
+              && sp.importKind !== 'type' && keyName(sp.imported) === 'isFreePrice') freePriceGuards.add(sp.local.name);
         }
         if (target === 'src/engine/providers/llm') {
           for (const sp of d.specifiers ?? []) {
@@ -209,7 +220,7 @@ export function check(root = '.') {
         const callee = unwrap(node.callee);
         const indirect = callee?.type === 'MemberExpression' && ['bind', 'call', 'apply'].includes(keyName(callee.property))
           ? unwrap(callee.object) : undefined;
-        if (rel === LLM_SEND_FILE && (isChat(callee) || isChat(indirect)) && !inGate()) {
+        if (rel === LLM_SEND_FILE && (isChat(callee) || isChat(indirect)) && !inGate() && !inFreeLlmBranch(ancestors, freePriceGuards)) {
           report(node, `calls billable LLM \`chat()\` outside \`paidSend()\`. ${LLM_HINT}`);
         }
         // 2. Billable adapter methods: forbidden outside providers/, and inside jobs.ts / specialSends.ts must sit inside the gate.

@@ -91,11 +91,11 @@ describe('nodo con intento dudoso', () => {
 });
 
 describe('modelo LLM aun sin catalogo cargado', () => {
-  it('el primer turno tras abrir la app no pregunta por un modelo que el catalogo prueba barato', async () => {
+  it('el primer turno tras abrir la app no pregunta por un modelo que el catalogo prueba gratuito', async () => {
     const st = useStore.getState();
     const chat = vi.fn();
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
-      if (String(url).includes('/models')) return new Response(JSON.stringify({ data: [{ id: 'm', pricing: { prompt: '0.01', completion: '0.01' }, capabilities: { tool_calling: true } }] }));
+      if (String(url).includes('/models')) return new Response(JSON.stringify({ data: [{ id: 'm', pricing: { prompt: '0', completion: '0' }, capabilities: { tool_calling: true } }] }));
       chat(init);
       return new Response('data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
     });

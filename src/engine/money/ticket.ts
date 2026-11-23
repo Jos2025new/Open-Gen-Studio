@@ -5,7 +5,7 @@
  * Own registry (not Generation.sends[]) so LLM calls, multi-step commands, plans and node
  * runs share the exact same model.
  */
-import type { Estimate } from '../types';
+import type { Estimate, Generation, Session } from '../types';
 import type { RemoteJob } from '../sendTypes';
 
 export type PriceKind = 'exact' | 'estimated' | 'unknown';
@@ -71,6 +71,7 @@ export interface ApprovalTicket {
   readonly sessionId: string;
   readonly kind: TicketKind;
   readonly createdAt: number;
+  readonly closed?: boolean;
   readonly scope: FrozenScope;
   readonly price: MoneyPrice;
   readonly pass?: TicketPass;
@@ -344,8 +345,38 @@ export function isHeldStatus(status: TicketSendStatus): boolean {
   return status === 'in_flight' || status === 'sent' || status === 'uncertain';
 }
 
-export function isClosedLlmTicket(ticket: ApprovalTicket): boolean {
-  return ticket.kind === 'llm' && ticket.sends.every((send) => send.status === 'done' || send.status === 'failed');
+/** Keep durable tickets only while recovery needs them. Settled media receipts live on the generation. */
+export function compactApprovalTickets(
+  tickets: Record<string, ApprovalTicket>,
+  generations: Record<string, Generation>,
+  sessions: Record<string, Session>,
+  keepClosed = 0,
+): Record<string, ApprovalTicket> {
+  const retired: string[] = [];
+  for (const ticket of Object.values(tickets)) {
+    const legacyId = ticket.id.startsWith('gen:') ? ticket.id.slice(4) : undefined;
+    const session = sessions[ticket.sessionId];
+    const cardId = ticket.kind === 'commands' ? ticket.id.slice(4) : ticket.kind === 'plan' ? ticket.id.slice(5) : undefined;
+    const card = cardId ? session?.feed.find((item) => item.id === cardId) : undefined;
+    const cardOpen = (card?.type === 'commands' || card?.type === 'plan') &&
+      (card.status === 'awaiting' || card.status === 'running' || card.status === 'review');
+    if (cardOpen || (keepClosed && ticket.kind === 'node_run' && !ticket.closed)) continue;
+    const needsTicket = ticket.sends.some((send) => {
+      if (ticket.kind === 'llm') return isHeldStatus(send.status);
+      const genId = send.generationId ?? legacyId;
+      if (!genId) return !isFreePrice(send.price) && (send.status === 'pending' || isHeldStatus(send.status));
+      const generation = generations[genId];
+      if (!generation) return false;
+      if (isHeldStatus(send.status) || generation.status === 'queued' || generation.status === 'running') return true;
+      return send.status === 'done' && !generation.sends?.some((receipt) => receipt.id === send.id && receipt.status === 'done');
+    });
+    const queued = legacyId && generations[legacyId]?.status === 'queued';
+    if (!needsTicket && !queued) retired.push(ticket.id);
+  }
+  if (retired.length <= keepClosed) return tickets;
+  const compacted = { ...tickets };
+  for (const id of retired.slice(0, retired.length - keepClosed)) delete compacted[id];
+  return compacted;
 }
 
 export function isSendOut(status: TicketSendStatus): boolean {

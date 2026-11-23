@@ -385,7 +385,7 @@ const sameName = (s: string) => s.toLowerCase().replace(/^[^:]+:\s*/, '').replac
  * becomes the agent's model (said above the prompt box) and the turn runs again; otherwise up to three capable
  * models with credit are offered (tools, and vision when the current one has it), or "recharge".
  */
-export async function onAgentCredit(sessionId: string = get().activeSessionId): Promise<boolean> {
+export async function onAgentCredit(_sessionId: string = get().activeSessionId): Promise<boolean> {
   const { settings, catalog } = get();
   const provider = settings.agent.provider;
   if (provider === 'offline') return false;
@@ -410,17 +410,11 @@ export async function onAgentCredit(sessionId: string = get().activeSessionId): 
   const switchTo = (c: (typeof choices)[number]) => {
     useStore.setState((s) => ({ settings: { ...s.settings, agent: { ...s.settings.agent, provider: c.p, model: c.m.id, modelPinned: true } } }));
   };
-  const pick = (c: (typeof choices)[number], remember = false) =>
-    confirmOverLimit(
-      sessionId,
-      `${c.m.name} · ${PROVIDER_LABELS[c.p]}`,
-      llmCallEstimate(c.p, c.m.id),
-      '\u201cContinue once\u201d switches the agent to this model.',
-      () => {
-        if (remember) setSettings({ autoSwitchProvider: 'always' });
-        switchTo(c);
-      },
-    );
+  // Switching selects a model. The next request still goes through the LLM spending guard.
+  const pick = (c: (typeof choices)[number], remember = false) => {
+    if (remember) setSettings({ autoSwitchProvider: 'always' });
+    switchTo(c);
+  };
   const auto = choices.find((c) => c.same);
   const mode = autoSwitchMode();
   if (auto && mode === 'ask') {
@@ -435,10 +429,6 @@ export async function onAgentCredit(sessionId: string = get().activeSessionId): 
     return false;
   }
   if (auto && mode === 'always') {
-    if (budgetVerdict(llmCallEstimate(auto.p, auto.m.id), { sessionId }).over) {
-      pick(auto);
-      return false;
-    }
     switchTo(auto);
     pushAlert({ level: 'info', text: `${empty} has no credit: the agent switched to the same model at ${PROVIDER_LABELS[auto.p]} (${auto.m.name}, same price or less).` });
     return true;

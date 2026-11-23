@@ -396,7 +396,7 @@ export const commands = [
       }
       const problem = budgetProblem(prepared.snapshot.preview.estimate, on.session, ctx.budgetPass);
       if (problem) throw new Error(problem);
-      const started = (await runAction(prepared.snapshot, undefined, undefined, ctx.budgetPass)).result;
+      const started = (await runAction(prepared.snapshot, undefined, undefined, ctx.budgetPass, ctx.approvalTicketId)).result;
       if (!started) throw new Error(COMMAND_REVIEW_CHANGED);
       return { outputs: Object.fromEntries(started.outputs), failed: started.failed, skipped: started.skipped, waiting: started.waiting, ...(started.stopped ? { stopped: true } : {}) };
     },

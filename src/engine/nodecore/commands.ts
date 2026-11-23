@@ -78,7 +78,7 @@ export const commands = [
       if (!snapshot || snapshot.session !== on.session) throw new Error('This approval is unknown or belongs to another session; prepare the action again.');
       const problem = budgetProblem(snapshot.preview.estimate, on.session, ctx.budgetPass);
       if (problem) throw new Error(problem);
-      const record = await runAction(snapshot, args.runId, undefined, ctx.budgetPass);
+      const record = await runAction(snapshot, args.runId, undefined, ctx.budgetPass, ctx.approvalTicketId);
       if (record.status === 'stale' || (record.status === 'failed' && !record.result)) throw new Error(record.error ?? 'The action did not run.');
       return { runId: record.runId, status: record.status, sends: record.sends, failed: record.result?.failed ?? [], error: record.error ?? null };
     },

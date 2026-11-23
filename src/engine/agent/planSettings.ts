@@ -1,5 +1,9 @@
 import { isVisualStep as isGen, isStepKind, stepInfo } from '../planSteps/inspect';
 import { create } from 'zustand';
+import { dismissAlert, pushAlert } from '../alerts';
+import { guardLlmBudget } from '../credit';
+import { storeTickets } from '../money/storeBridge';
+import { uid } from '../../lib/id';
 import { ensureSchema, lineRoutes, modelSummary, sentModelRef } from '../catalog';
 import { guideForModel } from '../guides';
 import { sendLlmViaPaidGate } from '../money/llmSend';
@@ -170,7 +174,7 @@ function stepInputs(s: GenStep): string {
  * Rewrite the prompts of one kind for the card as it is now: its model (and prompting guide), duration, aspect and the
  * images each step sends, with the agent's video rules. The agent is told that the card's writer wrote them, not it.
  */
-export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[]): Promise<void> {
+export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind, groupModelRef?: string, stepIds?: readonly string[], approval?: { budgetPass?: boolean; confirmedCharge?: boolean }): Promise<void> {
   // The card's writer is the agent that raised the card: its model, its notes, whoever is on screen.
   const owner = laneOfItem(sessionId, itemId);
   const engine = agentEngine(sessionId, owner);
@@ -179,15 +183,34 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   if (engine.kind !== 'llm' || !item || !steps.length) return;
   const ref = steps[0].modelRef;
   const name = modelSummary(ref)?.name ?? ref;
+  const ticketPrefix = `llm:rewrite:${itemId}:`;
+  const possibleCharge = storeTickets.list().some((ticket) => ticket.sessionId === sessionId &&
+    ticket.id.startsWith(ticketPrefix) && ticket.sends.some((send) => send.status === 'uncertain'));
+  if (possibleCharge && !approval?.confirmedCharge) {
+    const id = pushAlert({ level: 'warn', text: 'The previous prompt rewrite may have been charged. Sending again may charge you again.', actions: [
+      { label: 'Resend anyway', run: () => {
+        dismissAlert(id);
+        void rewritePrompts(sessionId, itemId, kind, groupModelRef, stepIds, { ...approval, confirmedCharge: true });
+      } },
+      { label: 'Cancel', run: () => dismissAlert(id) },
+    ] });
+    return;
+  }
+  const ticketId = uid(ticketPrefix);
+  const askBudget = () => guardLlmBudget(sessionId, engine.provider, engine.model, `Rewrite prompts for ${name}`, () =>
+    rewritePrompts(sessionId, itemId, kind, groupModelRef, stepIds, { ...approval, budgetPass: true }), approval?.budgetPass);
   const guardBlock = (): string | null => {
     if (!mayStartWork()) return 'Open Gen Studio is open in another tab';
     const est = llmCallEstimate(engine.provider, engine.model);
-    return budgetProblem(est, sessionId);
+    return approval?.budgetPass ? null : budgetProblem(est, sessionId);
   };
   const run = (runs.get(itemId) ?? 0) + 1;
   runs.set(itemId, run);
   const blocked = guardBlock();
-  if (blocked) return setRewrite(itemId, false, `The prompt was not rewritten for ${name}: ${blocked}`);
+  if (blocked) {
+    if (mayStartWork()) askBudget();
+    return setRewrite(itemId, false, `The prompt was not rewritten for ${name}: ${blocked}`);
+  }
   setRewrite(itemId, true);
   const guide = guideForModel(ref.split('::')[1] ?? '');
   const text = guide ? readGuide(`model:${guide.id}`) : undefined;
@@ -200,10 +223,11 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
     for (let attempt = 0; attempt < 2; attempt++) {
       if (runs.get(itemId) !== run) return;
       const why = guardBlock();
-      if (why) throw new Error(why);
+      if (why) { if (mayStartWork()) askBudget(); throw new Error(why); }
       const content = attempt ? `${lines}\n\nYour last answer had a prompt over ${MAX_PROMPT} characters (${tooLong}). Write them shorter.` : lines;
       const { value: result } = await sendLlmViaPaidGate({
-        ticketId: `llm:rewrite:${itemId}:${run}`,
+        ticketId,
+        budgetPass: approval?.budgetPass,
         sessionId,
         provider: engine.provider,
         apiKey: engine.key,

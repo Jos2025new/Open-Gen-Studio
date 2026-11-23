@@ -26,7 +26,7 @@ import { closeRequest } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { budgetProblem, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
 import { hasActiveTicketSend, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
-import { createTicket, priceFromEstimate } from '../money/ticket';
+import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { confirmApproved, inheritApproved } from './inherit';
 import { ranFacts } from './ranFacts';
 import { failedStepSummary } from './failureContext';
@@ -74,7 +74,7 @@ export async function approvePlan(sessionId: string, itemId: string, budgetPass?
   }
   const hadPass = passActiveFor(budgetPass, sessionId, total);
   consumeOnce(budgetPass, total);
-  storeTickets.put(createTicket({
+  if (!isFreePrice(priceFromEstimate(total))) storeTickets.put(createTicket({
     id: `plan:${item.id}`,
     sessionId,
     kind: 'plan',
@@ -185,6 +185,7 @@ async function executePlanItem(
     canceled: new Set(item.canceledSteps ?? []),
     sessionId,
     planId: plan.id,
+    approvalTicketId: `plan:${itemId}`,
     workspace,
     origin: 'agent',
     docId,

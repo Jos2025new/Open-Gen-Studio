@@ -11,6 +11,7 @@ import { storeTickets } from '../money/storeBridge';
 import {
   createTicket,
   FREE_PRICE,
+  isFreePrice,
   isSendOut,
   markSendFailed,
   markSendInFlight,
@@ -80,7 +81,7 @@ interface PendingCommandApproval {
   sessionId: string;
   itemId: string;
   request: ApprovalRequest;
-  resolve: (outcome: boolean | { approved: boolean; budgetPass?: BudgetPass }) => void;
+  resolve: (outcome: boolean | { approved: boolean; budgetPass?: BudgetPass; approvalTicketId?: string }) => void;
   setReleasePass: (fn: () => void) => void;
 }
 
@@ -109,7 +110,8 @@ function extractNodeIds(sequence: readonly FrozenCommandStep[] | undefined): str
   return [...ids];
 }
 
-function createCommandTicket(sessionId: string, itemId: string, request: ApprovalRequest): ApprovalTicket {
+function createCommandTicket(sessionId: string, itemId: string, request: ApprovalRequest): void {
+  if (isFreePrice(priceFromEstimate(request.estimate)) && !request.steps.some((step) => step.effect === 'delete')) return;
   const sequence = (request.sequence ?? []).map((s) => ({
     ...s,
     ...(s.preRan ? { preResult: cloneSafe(s.preResult) } : {}),
@@ -123,7 +125,7 @@ function createCommandTicket(sessionId: string, itemId: string, request: Approva
   });
   for (const s of sequence) {
     if (s.preRan) continue;
-    // Parent orchestration slot holds FREE_PRICE and no nodeId so monetary reservation and node-busy state live exclusively on leaf paidSend tickets.
+    // Orchestration slots track completed commands and references, without reserving money.
     ticket = prepareSend(ticket, {
       id: stepSendId(itemId, s.step),
       slotKey: `step:${s.step}`,
@@ -132,7 +134,6 @@ function createCommandTicket(sessionId: string, itemId: string, request: Approva
     });
   }
   storeTickets.put(ticket);
-  return ticket;
 }
 
 function markCommandStepStart(itemId: string, step: number): void {
@@ -257,7 +258,7 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
           caller: 'agent',
           onStepStart: (step) => markCommandStepStart(itemId, step),
           onStepEnd: (step, ok, val, err) => markCommandStepEnd(itemId, step, ok, val, err),
-          resume: { skipSteps, priorResults, reviewedSpends, reviews, budgetPass, skipApproval: true },
+          resume: { skipSteps, priorResults, reviewedSpends, reviews, budgetPass, approvalTicketId: ticket.id, skipApproval: true },
         },
       );
       if (!result.ok && result.error.message === COMMAND_REVIEW_CHANGED && refreshCommandReview(sessionId, itemId, result.error.step)) return;
@@ -347,7 +348,8 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
   }
   pending.delete(itemId);
   updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));
-  entry.resolve(budgetPass ? { approved: true, budgetPass } : true);
+  const approvalTicketId = commandTicketId(itemId);
+  entry.resolve({ approved: true, budgetPass, approvalTicketId: storeTickets.get(approvalTicketId) ? approvalTicketId : undefined });
   return true;
 }
 
@@ -393,7 +395,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   const sessionApprover: Approver | undefined =
     !getApprover() && useStore.getState().sessions[sessionId]
       ? (request) =>
-          new Promise<boolean | { approved: boolean; budgetPass?: BudgetPass }>((resolve) => {
+          new Promise<Awaited<ReturnType<Approver>>>((resolve) => {
             if (signal?.aborted) {
               resolve(false);
               return;
