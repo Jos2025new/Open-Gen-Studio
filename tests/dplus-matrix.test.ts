@@ -233,8 +233,8 @@ describe('Escenario (a): recargas p9/p9c', () => {
     expect(fake.acceptedCount('alpha mug')).toBe(1);
   });
 
-  // reproduce: jobs.ts:433-438 (allDelivered) termina g1 sin enlazar n1.data.generationId; correr n2 recompila el grafo y vuelve a cobrar n1
-  it.fails('a2: allDelivered tras recargar enlaza n1 y correr n2 no reenvia n1', async () => {
+  // fixed by task/urgente-dinero (991769f8): jobs.ts:433-438 (allDelivered) termina g1 sin enlazar n1.data.generationId; correr n2 recompila el grafo y vuelve a cobrar n1
+  it('a2: allDelivered tras recargar enlaza n1 y correr n2 no reenvia n1', async () => {
     setupSession({ graph: twoImageGraph(true) });
     let savedAtDelivered: string | undefined;
     idb.onStateSet = (raw) => {
@@ -328,8 +328,8 @@ describe('Escenario (a): recargas p9/p9c', () => {
     expect(audioPrompts.filter((p) => p.includes('alpha song'))).toHaveLength(0);
   });
 
-  // reproduce: tras salir n1 y recargar (corte post-aceptacion), desconectar e12 (n1->n2) y correr n3 recompila el grafo en flow/graph.ts:414 sin consultar envios previos de n1, reenviando n1 dos veces
-  it.fails('a5: arista desconectada entre recargar y aprobar no causa segundo cobro de n1 al ejecutar n3', async () => {
+  // fixed by task/urgente-dinero (991769f8): tras salir n1 y recargar (corte post-aceptacion), desconectar e12 (n1->n2) y correr n3 recompila el grafo en flow/graph.ts:414 sin consultar envios previos de n1, reenviando n1 dos veces
+  it('a5: arista desconectada entre recargar y aprobar no causa segundo cobro de n1 al ejecutar n3', async () => {
     setupSession({ graph: fanOutGraph() });
     const held = fake.holdNext('alpha mug');
     const first = runNodes(sid, ['n2']).catch(() => null);
@@ -371,8 +371,8 @@ describe('Escenario (a): recargas p9/p9c', () => {
 });
 
 describe('Escenario (b): Allow this time con subida de precio', () => {
-  // reproduce: budget.ts:210-220 (beginOncePass) no tiene tope maxUsd y commandCalls.ts:99 emite un cheque en blanco; si count sube de 1 a 4 ($0.10 -> $0.40), Allow this time cobra $0.40 sin reconfirmar
-  it.fails('b1: Allow this time aprobado a $0.10 no puede cobrar $0.40 si count sube de 1 a 4 antes de ejecutar', async () => {
+  // fixed by task/urgente-dinero (991769f8): budget.ts:210-220 (beginOncePass) no tiene tope maxUsd y commandCalls.ts:99 emite un cheque en blanco; si count sube de 1 a 4 ($0.10 -> $0.40), Allow this time cobra $0.40 sin reconfirmar
+  it('b1: Allow this time aprobado a $0.10 no puede cobrar $0.40 si count sube de 1 a 4 antes de ejecutar', async () => {
     setupSession({ spentUsd: 0, budgetUsd: 0.05, budgetOn: true, graph: twoImageGraph(false) });
     const running = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } }] });
     const card = await waitForAwaiting();
@@ -384,8 +384,8 @@ describe('Escenario (b): Allow this time con subida de precio', () => {
     expect(useStore.getState().spentUsd).toBeLessThanOrEqual(0.1 + 1e-6);
   });
 
-  // reproduce: nodecore/commands.ts:74 devuelve { usd: 0 } cuando snapshotById no encuentra la aprobacion en vez de precio desconocido (usd: null), burlando budgetVerdict como si fuera gratis
-  it.fails('b2: nodes.action.run sin snapshot devuelve precio desconocido (usd: null) y no $0', () => {
+  // fixed by task/urgente-dinero (991769f8): nodecore/commands.ts:74 devuelve { usd: 0 } cuando snapshotById no encuentra la aprobacion en vez de precio desconocido (usd: null), burlando budgetVerdict como si fuera gratis
+  it('b2: nodes.action.run sin snapshot devuelve precio desconocido (usd: null) y no $0', () => {
     setupSession({ spentUsd: 0, budgetUsd: 1.0, budgetOn: true });
     const est = command('nodes.action.run')!.estimate!({ on: { session: sid }, caller: 'agent' }, { approval: 'appr_missing' });
     expect(est.usd).toBeNull();
@@ -512,8 +512,8 @@ describe('Escenario (f): LLM en streaming', () => {
     expect(useStore.getState().spentUsd).toBeCloseTo(0.1, 6);
   });
 
-  // reproduce: budget.ts:383-388 (llmCallEstimate) devuelve $0.0001 en vez de usd:null cuando el modelo LLM no tiene precio en catalogo; bajo limite activo ($1.00), llmTurn y rewritePrompts envian POST sin preguntar
-  it.fails('f2: modelo LLM sin precio en catalogo exige aprobacion en llmTurn y bloquea rewritePrompts bajo limite activo', async () => {
+  // fixed by task/urgente-dinero (991769f8): budget.ts:383-388 (llmCallEstimate) devuelve $0.0001 en vez de usd:null cuando el modelo LLM no tiene precio en catalogo; bajo limite activo ($1.00), llmTurn y rewritePrompts envian POST sin preguntar
+  it('f2: modelo LLM sin precio en catalogo exige aprobacion en llmTurn y bloquea rewritePrompts bajo limite activo', async () => {
     setupSession({ spentUsd: 0, budgetUsd: 1.0, budgetOn: true, llmCatalog: [] });
     await llmTurn(sid, 'chat', { route: 'new', agentNodeId: 'main' });
     putRewritePlan('it_rw');
