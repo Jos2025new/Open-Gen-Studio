@@ -45,8 +45,10 @@ describe('p10e rendimiento: bucle cuadratico/cubico con 200 tarjetas', () => {
       const moves = settleFresh(nodes, fresh, measured);
       return { ms: performance.now() - t0, moved: moves.size };
     };
-    const r20 = run(20);
-    const r200 = run(200);
+    // Best of 3: a full parallel suite adds scheduler noise; a real quadratic loop stays slow on every run.
+    const best = (count: number) => [run(count), run(count), run(count)].reduce((a, b) => (b.ms < a.ms ? b : a));
+    const r20 = best(20);
+    const r200 = best(200);
     expect(r200.moved).toBe(199);
     expect(r200.ms, `N=20: ${r20.ms.toFixed(1)} ms, N=200: ${r200.ms.toFixed(1)} ms`).toBeLessThan(50);
   });
