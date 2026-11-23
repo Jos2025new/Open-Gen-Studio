@@ -20,7 +20,7 @@ import { patchNodeData } from '../src/engine/flow/actions';
 import { createGeneration, resumeInterrupted, retryGeneration, runGeneration } from '../src/engine/jobs';
 import { reconcileLlmCharge } from '../src/engine/money/llmSend';
 import { resetSendLocks } from '../src/engine/money/paidSend';
-import { sendGenerationViaPaidGate, storeTickets } from '../src/engine/money/storeBridge';
+import { reconcileUnknownCharge, sendGenerationViaPaidGate, storeTickets } from '../src/engine/money/storeBridge';
 import { compactApprovalTickets, createTicket, exactPrice } from '../src/engine/money/ticket';
 import type { CommandApprovalFeedItem, GenNodeData, ModelSummary, PlanFeedItem } from '../src/engine/types';
 import { createFakeProvider, jsonResponse, simulateReload, snapshotStore, sseResponse, type FakeProvider } from './helpers/fakeProvider';
@@ -409,6 +409,16 @@ it('control: compactApprovalTickets preserves uncertain reservations and settled
   // Calling plain retry on gLost after reload still requires confirmation.
   await retryGeneration(gLost.id);
   expect(fake.acceptedCount('uncertain image')).toBe(1);
+
+  const ticketId = `gen:${gLost.id}`;
+  const sendId = useStore.getState().tickets[ticketId].sends[0].id;
+  expect(useStore.getState().sessions[sid].feed).toContainEqual(expect.objectContaining({
+    type: 'notice', uncertainTicketId: ticketId,
+  }));
+  expect(reconcileUnknownCharge(sid, ticketId)).toBe(true);
+  expect(reconcileUnknownCharge(sid, ticketId)).toBe(false);
+  expect(remainingBudget()).toBeCloseTo(0.9, 6);
+  expect(useStore.getState().spendLog.filter(entry => entry.sendId === sendId)).toHaveLength(1);
 });
 
 it('control: reconcileLlmCharge settles an uncertain turn once and releases its reservation', async () => {

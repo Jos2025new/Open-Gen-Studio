@@ -164,10 +164,11 @@ export function ensureUncertainChargeNotice(ticket: ApprovalTicket): void {
 }
 
 export function reconcileUnknownCharge(sessionId: string, ticketId: string): boolean {
-  let ticket = storeTickets.get(ticketId);
-  if (ticket?.sessionId !== sessionId || !canWriteTicket()) return false;
-  const uncertain = ticket.sends.filter((send) => isUncertainCharge(ticket, send));
+  const existing = storeTickets.get(ticketId);
+  if (existing?.sessionId !== sessionId || !canWriteTicket()) return false;
+  const uncertain = existing.sends.filter(send => isUncertainCharge(existing, send));
   if (!uncertain.length) return false;
+  let ticket = existing;
   for (const send of uncertain) {
     const settlement = settleSend(ticket, send.id, { costUsd: null, estimated: true });
     ticket = settlement.ticket;
