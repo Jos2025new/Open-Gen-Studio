@@ -365,7 +365,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
       const stepList = mode === 'retry' ? recovery.retry : recovery.retry.filter((st) => !recovery.checkable.includes(st.id));
       const perStep = Object.fromEntries(stepList.map((st) => [st.id, recovery.perStep[st.id]]));
       grantTicketPass(ticket, estimate, stepCapsFromMap(perStep));
-    } else if (ticket.closed) storeTickets.put({ ...ticket, closed: undefined });
+    } else if (ticket.closed || ticket.pass) storeTickets.put({ ...ticket, closed: undefined, pass: undefined });
   }
   consumeOnce(budgetPass, estimate);
   const { chosen, off } = approvedSteps(item);

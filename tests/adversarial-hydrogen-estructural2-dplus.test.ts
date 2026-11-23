@@ -270,7 +270,7 @@ it('H3b: downstream node with dynamic upstream drops approvedFingerprint on its 
 });
 
 // reproduce: resumePlan (planRun.ts:368) clears ticket.closed without clearing ticket.pass (whose pass.steps was emptied to {} on close), causing paidSend to reject with PASS_EXCEEDED even when within remaining budget.
-it.fails('H4a: resumePlan(retry) within budget after an initial Continue once plan stays deadlocked by stale pass header', async () => {
+it('H4a: resumePlan(retry) within budget after an initial Continue once plan stays deadlocked by stale pass header', async () => {
   useStore.setState((state) => ({
     settings: { ...state.settings, budgetOn: true, budgetUsd: 0.15 },
   }));
