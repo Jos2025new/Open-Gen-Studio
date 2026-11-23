@@ -19,7 +19,7 @@ import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, N
 import { consumeOnce, passActiveFor, releaseOwnedPasses, type BudgetPass } from '../budget';
 import { budgetProblem, deleteAssets } from '../actions';
 import { storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
-import { createTicket, isFreePrice, priceFromEstimate, ticketCommittedUsd } from '../money/ticket';
+import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
 import { applyEdit, editCompound, editError, editPresentation } from '../nodecore/edit';
 import { coreSignature, runProblems } from '../nodecore/guard';
@@ -303,17 +303,13 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const commandTicket = commandTicketId ? storeTickets.get(commandTicketId) : undefined;
   const approvalTicketId = isFreePrice(price) ? undefined : commandTicket?.id ?? `nr:${uid('run')}`;
   if (approvalTicketId) {
-    const approvedPrice = hadPass && price.maxVerifiableUsd != null
-      ? { ...preview.estimate, usd: price.maxVerifiableUsd + (commandTicket ? ticketCommittedUsd(commandTicket) : 0) }
-      : preview.estimate;
-    const pass = hadPass ? ticketPassFromEstimate(approvedPrice) : undefined;
     storeTickets.put(commandTicket ? {
-      ...commandTicket, pass,
+      ...commandTicket,
       scope: { ...commandTicket.scope, nodeIds: [...new Set([...commandTicket.scope.nodeIds ?? [], ...preview.runIds])] },
     } : createTicket({
       id: approvalTicketId, sessionId, kind: 'node_run',
       scope: { nodeIds: preview.runIds, steps: preview.steps, signature: preview.signature },
-      price, pass,
+      price, pass: hadPass ? ticketPassFromEstimate(preview.estimate) : undefined,
     }));
   }
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
@@ -341,9 +337,9 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     if (result.failed.length) toast(`${result.failed.length} node(s) failed: ${result.failed[0].error}`, 'error');
     return result;
   } finally {
-    if (approvalTicketId) {
+    if (approvalTicketId && !commandTicket) {
       const cur = storeTickets.get(approvalTicketId);
-      if (cur) storeTickets.put({ ...cur, pass: undefined, ...(cur.kind === 'node_run' ? { closed: true } : {}) });
+      if (cur) storeTickets.put({ ...cur, pass: undefined, closed: true });
       releaseOwnedPasses(approvalTicketId);
     }
     releaseAssets();

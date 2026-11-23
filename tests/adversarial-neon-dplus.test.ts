@@ -282,8 +282,7 @@ it('N3: does not trap a generation permanently in running when Check status is c
   expect(isRunning(g.id)).toBe(false);
 });
 
-// reproduce: resumePlan consumes budgetPass without updating plan:<id>.pass, so step 2 of a recovered plan is blocked by OVER_LIMIT despite the user's Continue once approval.
-it.fails('N4: updates plan ticket pass ceiling when user approves Continue once on resumePlan so dependent steps are not blocked', async () => {
+it('N4: updates plan ticket pass ceiling when user approves Continue once on resumePlan so dependent steps are not blocked', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetUsd: 0.2 } }));
   const item: PlanFeedItem = {
     id: 'plan-2step', createdAt: 1, type: 'plan', style: 'auto', workspace: 'chat', status: 'awaiting',
@@ -318,8 +317,7 @@ it.fails('N4: updates plan ticket pass ceiling when user approves Continue once 
   expect(failedPlan().status).toBe('done');
 });
 
-// reproduce: runNodes overwrites and then clears pass on the shared cmd:<id> ticket in finally, blocking subsequent paid steps approved under Allow this time with OVER_LIMIT.
-it.fails('N5: preserves command ticket once pass across nodes.run.start followed by studio.generate.start in one approved sequence', async () => {
+it('N5: preserves command ticket once pass across nodes.run.start followed by studio.generate.start in one approved sequence', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetUsd: 0.15 } }));
   setComposer({ text: 'studio after node' });
   setComposerMedia('image', { modelRef });
