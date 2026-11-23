@@ -398,9 +398,9 @@ export function ticketReservedUsd(ticket: ApprovalTicket): number {
   return roundUsd(sum);
 }
 
-/** Total USD already booked on this ticket. */
+/** Confirmed spend plus open reservations against the approved cap. */
 export function ticketCommittedUsd(ticket: ApprovalTicket): number {
-  return roundUsd(ticket.sends.reduce((sum, send) => sum + (send.bookedUsd ?? 0), ticketReservedUsd(ticket)));
+  return roundUsd(ticket.sends.reduce((sum, send) => sum + (send.booked ? send.bookedUsd ?? 0 : 0), ticketReservedUsd(ticket)));
 }
 
 /** Total USD reserved across all tickets in the store. */

@@ -4,7 +4,7 @@
  * in-flight & uncertain reservations, cumulative pass cap, durable pre-send mark (8 s cap),
  * and idempotent settlement by sendId. No store coupling and no pluggable store interface (KISS).
  */
-import { HttpError, isAbort, JobFailedError, NetworkError } from '../../lib/http';
+import { HttpError, isAbort, NetworkError } from '../../lib/http';
 import type { RemoteJob } from '../sendTypes';
 import {
   availableBudgetUsd,
@@ -164,13 +164,16 @@ export function isCreditError(err: unknown): boolean {
   return /insufficient (credits?|balance|funds)|not enough (credits?|balance)|out of credits/i.test(String((err as Error)?.message ?? err));
 }
 
-function classifySendError(err: unknown, opts: PaidSendOptions<unknown>): SendErrorDisposition {
+export function classifySendError(err: unknown, opts: Pick<PaidSendOptions<unknown>, 'restart' | 'signal' | 'isRetryable'> = {}): SendErrorDisposition {
+  const { name, status, message = '' } = (err ?? {}) as { name?: string; status?: number; message?: string };
   if (opts.restart?.()) return 'keep_in_flight';
-  if (err instanceof JobFailedError) return 'job_failed';
+  if (name === 'JobFailedError') return 'job_failed';
   if (err instanceof NetworkError || isAbort(err) || opts.signal?.aborted) return 'uncertain';
-  if (opts.isRetryable?.(err)) return 'retryable_before_charge';
-  if (err instanceof HttpError) return err.status >= 500 || err.status === 408 ? 'uncertain' : 'refused_before_charge';
-  return isCreditError(err) ? 'refused_before_charge' : 'uncertain';
+  const retryable = opts.isRetryable?.(err) ?? ((status === 400 && /reason|effort|think/i.test(message)) || /upstream access denied/i.test(message));
+  if (retryable) return 'retryable_before_charge';
+  if (status && (status >= 500 || status === 408)) return 'uncertain';
+  if (status === 402 || isCreditError(err) || (status && status >= 400 && status < 500)) return 'refused_before_charge';
+  return 'uncertain';
 }
 
 export interface TicketAccess {

@@ -219,11 +219,11 @@ export function budgetSnapshotFor(sessionId: string): BudgetSnapshot {
 }
 
 export function ticketPassFromEstimate(estimate: Estimate): TicketPass {
-  const unknown = estimate.usd == null || Boolean(estimate.lowerBound);
+  const maxUsd = priceFromEstimate(estimate).maxVerifiableUsd;
   return {
     kind: 'once',
-    maxUsd: unknown ? null : estimate.usd,
-    ...(unknown ? { allowUnknown: true } : {}),
+    maxUsd,
+    ...(maxUsd == null ? { allowUnknown: true } : {}),
   };
 }
 
@@ -374,7 +374,7 @@ export function legacyPaidSendError(err: unknown, price: MoneyPrice, saveError?:
   if (err.code === 'SAVE_FAILED') return new SendNotCommittedError(saveError?.());
   if (err.code === 'ABORTED') return new AbortedError();
   if (err.code === 'OVER_LIMIT' || err.code === 'UNKNOWN_PRICE' || err.code === 'PASS_EXCEEDED') {
-    return new OverLimitError({ usd: price.usd, approximate: price.kind !== 'exact', ...(price.lowerBound ? { lowerBound: true } : {}) });
+    return new OverLimitError({ usd: price.usd, approximate: price.kind !== 'exact', ...(price.lowerBound ? { lowerBound: true } : price.usd != null && price.maxVerifiableUsd == null ? { unbounded: true } : {}) });
   }
   return err;
 }

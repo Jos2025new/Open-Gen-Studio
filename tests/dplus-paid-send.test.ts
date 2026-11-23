@@ -16,7 +16,7 @@ import {
   type ApprovalTicket,
 } from '../src/engine/money/ticket';
 import {
-  defaultClassifySendError,
+  classifySendError,
   evaluateBudgetGate,
   heldSendLocks,
   PAID_SEND_SAVE_TIMEOUT_MS,
@@ -267,11 +267,11 @@ describe('D+ paidSend: puerta unica, presupuesto con reservas, pases, candado y 
 
   it('fallo o timeout de save() (o perdida de writerLock) revierte a pending y nunca llama a send()', async () => {
     expect(PAID_SEND_SAVE_TIMEOUT_MS).toBe(8000);
-    expect(defaultClassifySendError({ name: 'JobFailedError' })).toBe('job_failed');
-    expect(defaultClassifySendError({ status: 402, message: 'No credit' })).toBe('refused_before_charge');
-    expect(defaultClassifySendError({ status: 400, message: 'Unsupported reasoning_effort' })).toBe('retryable_before_charge');
-    expect(defaultClassifySendError({ status: 500, message: 'Upstream access denied' })).toBe('retryable_before_charge');
-    expect(defaultClassifySendError(new TypeError('Failed to fetch'))).toBe('uncertain');
+    expect(classifySendError({ name: 'JobFailedError' })).toBe('job_failed');
+    expect(classifySendError({ status: 402, message: 'No credit' })).toBe('refused_before_charge');
+    expect(classifySendError({ status: 400, message: 'Unsupported reasoning_effort' })).toBe('retryable_before_charge');
+    expect(classifySendError({ status: 500, message: 'Upstream access denied' })).toBe('retryable_before_charge');
+    expect(classifySendError(new TypeError('Failed to fetch'))).toBe('uncertain');
     const h = createMemoryHarness({ budgetOn: true, budgetUsd: 1.0, spentUsd: 0 });
     h.tickets.put(createTicket({ id: 't_save', sessionId: 's1', kind: 'generation', price: exactPrice(0.1) }));
     let transportCalls = 0;
