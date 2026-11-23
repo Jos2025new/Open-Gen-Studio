@@ -107,7 +107,7 @@ async function install() {
     },
     generations: {},
     catalog: { ...st.catalog, models: c.models, schemas: c.schemas },
-    settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k', nanogpt: 'k' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, atlas: 'k', nanogpt: 'k' } },
   });
   for (const id of ['img', 'img2', 'wide']) blobs.set(id, new Blob([PNG], { type: 'image/png' }));
   return c;
