@@ -260,6 +260,7 @@ async function execute(id: string): Promise<string[]> {
       const send = (retry: number) => sendMediaViaPaidGate({
         g,
         provider: model.provider,
+        adapter,
         chunkIndex: reqChunk,
         index: reqIndex,
         items: n,

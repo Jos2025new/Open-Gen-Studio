@@ -28,6 +28,7 @@ async function runSpecialSend(
   const outcome = await sendMediaViaPaidGate({
     g,
     provider,
+    adapter: ADAPTERS[provider],
     index: 0,
     signal,
     beforeTransport: authorize,

@@ -68,10 +68,10 @@ export const ADAPTERS: Record<ProviderId, GuardedAdapter> = {
 };
 
 type MediaSend = Omit<GenerationPaidSendOpts<GenResult>, 'send'> & {
-  provider: ProviderId; chunkIndex?: number; request: (onRemoteJob: (job: RemoteJob) => void) => MediaRequest; settlement: (result: GenResult) => { costUsd: number | null; estimated: boolean };
+  provider: ProviderId; adapter?: GuardedAdapter; chunkIndex?: number; request: (onRemoteJob: (job: RemoteJob) => void) => MediaRequest; settlement: (result: GenResult) => { costUsd: number | null; estimated: boolean };
 };
 
-export function sendMediaViaPaidGate({ provider, chunkIndex = 0, request, settlement, beforeTransport, ...options }: MediaSend) {
+export function sendMediaViaPaidGate({ provider, adapter, chunkIndex = 0, request, settlement, beforeTransport, ...options }: MediaSend) {
   return sendGenerationViaPaidGate({
     ...options,
     beforeTransport: () => {
@@ -79,9 +79,9 @@ export function sendMediaViaPaidGate({ provider, chunkIndex = 0, request, settle
       beforeTransport?.();
     },
     send: async ({ onRemoteJob }) => {
-      const adapter = ADAPTERS[provider], req = request(onRemoteJob);
-      const fn = adapter[req.method] as ((input: RequestOf<PaidMethod>, authority: typeof permit) => Promise<GenResult>) | undefined;
-      if (!fn) throw new Error(`${adapter.label} cannot run ${req.method}.`);
+      const chosen = adapter ?? ADAPTERS[provider], req = request(onRemoteJob);
+      const fn = chosen[req.method] as ((input: RequestOf<PaidMethod>, authority: typeof permit) => Promise<GenResult>) | undefined;
+      if (!fn) throw new Error(`${chosen.label} cannot run ${req.method}.`);
       const value = await fn(req.input, permit);
       return { value, ...settlement(value) };
     },
