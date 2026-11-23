@@ -13,6 +13,14 @@ vi.mock('../src/engine/providers/llm', async (importOriginal) => {
   return { ...mod, chat: (opts: ChatArgs) => mockChat(opts) };
 });
 
+vi.mock('../src/lib/idb', () => ({
+  stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
+  cacheDb: { get: async () => undefined, set: async () => undefined },
+  getAssetBlob: async () => undefined,
+  putAssetBlob: async (id: string) => id,
+  deleteAssetBlobs: async () => undefined,
+}));
+
 vi.mock('../src/lib/writerLock', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../src/lib/writerLock')>();
   return { ...mod, mayStartWork: () => true };
