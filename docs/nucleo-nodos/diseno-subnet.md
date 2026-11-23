@@ -45,15 +45,17 @@ Cada criterio es un test que falla antes del arreglo.
   5. el lienzo, los avisos y el plan ven los mismos puertos.
 - **Equivalencia:** los nodos y cables de hoy se comportan igual, también en coste, aprobación y frescura.
 
-## Qué pasa con `task/descriptor-2`
-- **Se conserva:**
-  - los valores iniciales por tipo y `DefaultsEnv`;
-  - el verificador endurecido;
+## Qué queda de `task/descriptor-2` (rama borrada)
+Borrada el 2026-11-23 con el sí del usuario: GPT la dio por no fusionable, nadie usaba su código y `main` avanzó 229 commits. El registro de interfaz por tipo ya está en `main` (`f9ec5f14`). Lo demás no se rescata: si vuelve Subnet, se rehace sobre `main` con estos criterios.
+
+- **Ideas que siguen valiendo:**
+  - los valores iniciales por tipo con un entorno mínimo (`DefaultsEnv`), sin depender del store;
+  - el verificador de descriptores endurecido;
   - el contexto de puertos (`env`);
-  - el guardado del handle al conectar y que un handle retirado no caiga en `out`;
-  - la frescura por tipo y el registro de interfaz por tipo.
-- **Se sustituye:** el plan de varios pasos que escribe en el nodo dueño (`ownerNodeId`, commit `f51e21b4`). Contradice el punto 5: con nodos interiores reales, cada paso es de su propio nodo.
-- **Se arregla antes de fusionar:** el fallo 1, que el lienzo no se caiga.
+  - guardar el handle al conectar, y que un handle retirado no caiga en `out`;
+  - la frescura por tipo.
+- **Descartado:** el plan de varios pasos que escribe en el nodo dueño (`ownerNodeId`). Contradice el punto 5: con nodos interiores reales, cada paso es de su propio nodo.
+- **A evitar al rehacerlo:** el fallo 1 de la revisión, que el lienzo no se caiga.
 
 ## Plan
 1. **Prueba de dos arquitecturas, medida y corta:**
