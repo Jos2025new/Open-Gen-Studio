@@ -38,6 +38,8 @@ import {
 import { keptDrafts } from '../store/homeDrafts';
 import { applyEdit, editCompound } from './nodecore/edit';
 import { deleteAssets } from './assetActions';
+import { COMMAND_REVIEW_CHANGED } from './commands/types';
+import { resolveSendPlan, sendFingerprint } from './sendInputs';
 
 export {
   SUBJECT_KINDS,
@@ -149,7 +151,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   return { ok: true, estimate, overLimit: budgetProblem(estimate, sendSessionId(st)) !== null };
 }
 
-export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
+export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const check = checkDirect(kind);
   if (!check.ok) {
     toast(check.reason ?? 'Cannot generate yet', 'error');
@@ -164,6 +166,7 @@ export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, a
     place: placeFor(st.ui, workspace),
     budgetPass,
     approvalTicketId,
+    ...(approvedFingerprint ? { approvedFingerprint } : {}),
     ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}),
   };
   autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
@@ -286,7 +289,7 @@ export function regenerateEstimate(generationId: string): Estimate | null {
 }
 
 /** Run the same request again with a new seed. Call after the user confirmed the cost. */
-export async function regenerate(generationId: string, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
+export async function regenerate(generationId: string, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
   if (g.status !== 'done' && hasActiveTicketSend(g)) {
@@ -312,7 +315,7 @@ export async function regenerate(generationId: string, budgetPass?: BudgetPass, 
   const held = holdAttemptNode(g, nodes);
   if (!held) return;
   const node = held.node;
-  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
+  const next = createGeneration({ ...spec, ...(node ? { origin: 'node', stepId: node.id, nodeRequest: g.nodeRequest } : {}), settings: { ...spec.settings, seed: randomSeed() }, estimate, budgetPass, approvalTicketId, ...(approvedFingerprint ? { approvedFingerprint } : {}), ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   if (node) {
     if ('sketchAssetId' in node.data && node.data.sketchAssetId) {
       deleteAssets([node.data.sketchAssetId]);
@@ -386,7 +389,7 @@ export async function opEstimate(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
-export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<string[]> {
+export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<string[]> {
   const st = get();
   const asset = st.assets[assetId];
   if (!asset) return [];
@@ -402,7 +405,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(problem, 'error');
     return [];
   }
-  const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
+  const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(approvedFingerprint ? { approvedFingerprint } : {}), ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     return await runGeneration(g.id);
@@ -413,7 +416,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Designer: run an image operation on a raster layer; the result is a new layer above it (the original is kept). */
-export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
+export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const def = OPS[op];
   if (def.input !== 'image' || def.output !== 'image') {
     toast(`${def.label} does not produce an image for a layer.`, 'error');
@@ -422,12 +425,18 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
   try {
     const source = await layerToAsset(sessionId, docId, layerId);
     const spec = await opSpec({ sessionId, sourceAssetId: source.id, op, params, origin: 'designer', place: 'designer', mode: 'image' });
+    let fp = approvedFingerprint;
+    if (fp) {
+      const checkSpec = { ...spec, inputs: spec.inputs ?? { refs: [] }, ...(spec.op ? { op: { ...spec.op, sourceAssetId: '' } } : {}) };
+      if (sendFingerprint(resolveSendPlan(checkSpec), get(), { ignoreSeed: true }) !== fp) throw new Error(COMMAND_REVIEW_CHANGED);
+      fp = sendFingerprint(resolveSendPlan({ ...spec, inputs: spec.inputs ?? { refs: [] } }), get(), { ignoreSeed: true });
+    }
     const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true }, sessionId, budgetPass);
     if (problem) {
       toast(problem, 'error');
       return;
     }
-    const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
+    const g = createGeneration({ ...spec, budgetPass, approvalTicketId, ...(fp ? { approvedFingerprint: fp } : {}), ...(budgetPass?.stepKey ? { passStepKey: budgetPass.stepKey } : {}) });
     // Its card in the Designer's conversation, like any generation (also in Generations and Assets).
     appendFeed(sessionId, { ...feedBase('designer'), type: 'generation', generationId: g.id });
     const ids = await runGeneration(g.id);

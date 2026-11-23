@@ -36,12 +36,21 @@ export function splitSource(slots: InputSlots, refs: MediaInput[]): { source?: M
   return slots.source && refs.length ? { source: refs[0], refs: refs.slice(1) } : { refs };
 }
 
+/** Resolve any nested Promises inside a prepared request body before serialization. */
+export async function resolveBody<T>(v: T): Promise<T> {
+  if (v instanceof Promise) return resolveBody(await v);
+  if (Array.isArray(v)) return Promise.all(v.map(resolveBody)) as Promise<T>;
+  if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+    return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await resolveBody(x)] as const))) as T;
+  }
+  return v;
+}
+
 /**
  * Keyframe and trimmed-clip lists (FLUX 3 `keyframes`, `video_clips`) and audio inputs, built from the slot's
- * field names. `image`/`video` encode one input the way the provider takes files (uploaded URL or data URL);
- * `video` also encodes audio (both are sent as files, untouched).
+ * field names. `image`/`video` encode one input (sync token in dry-run, Promise of URL/data URL when sending).
  */
-export async function structuredInputs(
+export function structuredInputs(
   slots: InputSlots,
   req: {
     keyframes?: Array<{ input: MediaInput; frame: number }>;
@@ -51,40 +60,31 @@ export async function structuredInputs(
     elements?: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }>;
     mask?: MediaInput;
   },
-  image: (m: MediaInput) => Promise<unknown>,
-  video: (m: MediaInput) => Promise<string>,
-): Promise<Record<string, unknown>> {
+  image: (m: MediaInput) => unknown,
+  video: (m: MediaInput) => unknown,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  if (slots.mask && req.mask) out[slots.mask.key] = await image(req.mask);
+  if (slots.mask && req.mask) out[slots.mask.key] = image(req.mask);
   const el = slots.elements;
   if (el && req.elements?.length) {
-    out[el.key] = await Promise.all(
-      req.elements.slice(0, el.max).map(async (e) => {
-        const frontal = e.frontal ? await image(e.frontal) : undefined;
-        const refs = await Promise.all(e.refs.slice(0, el.refMax).map(image));
-        const clip = el.video && e.video ? await video(e.video) : undefined;
-        if (el.style === 'atlas') {
-          // Atlas creates the element inline: an image set needs at least one extra view, the frontal image serves.
-          return clip && !frontal
-            ? { element_name: e.name, ...(e.description ? { element_description: e.description } : {}), reference_type: 'video_refer', refer_videos: [clip] }
-            : { element_name: e.name, ...(e.description ? { element_description: e.description } : {}), reference_type: 'image_refer', frontal_image: frontal, refer_images: refs.length ? refs : [frontal] };
-        }
-        return { ...(frontal ? { frontal_image_url: frontal } : {}), ...(refs.length ? { reference_image_urls: refs } : {}), ...(clip ? { video_url: clip } : {}), ...(el.voice && e.voiceId ? { voice_id: e.voiceId } : {}) };
-      }),
-    );
+    out[el.key] = req.elements.slice(0, el.max).map((e) => {
+      const frontal = e.frontal ? image(e.frontal) : undefined;
+      const refs = e.refs.slice(0, el.refMax).map(image);
+      const clip = el.video && e.video ? video(e.video) : undefined;
+      if (el.style === 'atlas') {
+        return clip && !frontal
+          ? { element_name: e.name, ...(e.description ? { element_description: e.description } : {}), reference_type: 'video_refer', refer_videos: [clip] }
+          : { element_name: e.name, ...(e.description ? { element_description: e.description } : {}), reference_type: 'image_refer', frontal_image: frontal, refer_images: refs.length ? refs : [frontal] };
+      }
+      return { ...(frontal ? { frontal_image_url: frontal } : {}), ...(refs.length ? { reference_image_urls: refs } : {}), ...(clip ? { video_url: clip } : {}), ...(el.voice && e.voiceId ? { voice_id: e.voiceId } : {}) };
+    });
   }
-  if (slots.audio && req.audio) out[slots.audio.key] = await video(req.audio);
-  if (slots.refAudios && req.refAudios?.length) out[slots.refAudios.key] = await Promise.all(req.refAudios.slice(0, slots.refAudios.max).map(video));
+  if (slots.audio && req.audio) out[slots.audio.key] = video(req.audio);
+  if (slots.refAudios && req.refAudios?.length) out[slots.refAudios.key] = req.refAudios.slice(0, slots.refAudios.max).map(video);
   const kf = slots.keyframes;
-  if (kf && req.keyframes?.length) {
-    out[kf.key] = await Promise.all(req.keyframes.slice(0, kf.max).map(async (k) => ({ [kf.imageKey]: await image(k.input), [kf.indexKey]: k.frame })));
-  }
+  if (kf && req.keyframes?.length) out[kf.key] = req.keyframes.slice(0, kf.max).map((k) => ({ [kf.imageKey]: image(k.input), [kf.indexKey]: k.frame }));
   const cl = slots.clips;
-  if (cl && req.clips?.length) {
-    out[cl.key] = await Promise.all(
-      req.clips.slice(0, cl.max).map(async (c) => ({ url: await video(c.input), start: c.start, ends: c.end, ...(cl.fps ? { [cl.fps.key]: cl.fps.value } : {}) })),
-    );
-  }
+  if (cl && req.clips?.length) out[cl.key] = req.clips.slice(0, cl.max).map((c) => ({ url: video(c.input), start: c.start, ends: c.end, ...(cl.fps ? { [cl.fps.key]: cl.fps.value } : {}) }));
   return out;
 }
 

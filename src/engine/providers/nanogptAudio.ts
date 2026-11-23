@@ -3,7 +3,7 @@ import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http
 import { extensionForMime } from '../../lib/media';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, RemoteJob, TranscriberSummary } from '../types';
 import { cachedJson, JSON_HEADERS, numberOrUndefined as num, POLL_TIMEOUT_MS, pollJob } from './shared';
-import type { GenRequest, GenResult, ResumeContext, TranscribeRequest } from './types';
+import type { GenBuildRequest, GenRequest, GenResult, PreparedRequest, RequestEncoder, ResumeContext, TranscribeRequest } from './types';
 import { modelRef } from './types';
 
 /*
@@ -91,16 +91,21 @@ export async function speechSchema(model: ModelSummary): Promise<ModelSchema> {
   return { ref: model.ref, params, slots: { prompt: 'input', promptRequired: true, ...(promptMax ? { promptMax } : {}) }, price, source: 'catalog' };
 }
 
-/** POST /v1/audio/speech: the audio comes back in the response (or, for some models, as a JSON with its URL). */
-export async function generateSpeech(req: GenRequest): Promise<GenResult> {
+export function buildSpeechRequest(req: Pick<GenBuildRequest, 'model' | 'prompt' | 'settings'>): PreparedRequest {
   const body: Loose = { model: req.model.id, input: req.prompt };
   const voice = req.settings.advanced.voice;
   if (typeof voice === 'string' && voice) body.voice = voice;
   const instructions = req.settings.advanced.instructions;
   if (typeof instructions === 'string' && instructions.trim() && TAKES_INSTRUCTIONS.test(req.model.id)) body.instructions = instructions.trim();
+  return { url: `${BASE}/v1/audio/speech`, body };
+}
+
+/** POST /v1/audio/speech: the audio comes back in the response (or, for some models, as a JSON with its URL). */
+export async function generateSpeech(req: GenRequest): Promise<GenResult> {
+  const { url, body } = buildSpeechRequest(req);
   req.onStatus('Generating');
-  req.onRequest?.({ url: `${BASE}/v1/audio/speech`, body });
-  const res = await providerFetch(`${BASE}/v1/audio/speech`, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
+  req.onRequest?.({ url, body });
+  const res = await providerFetch(url, { method: 'POST', headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) }, body: JSON.stringify(body), signal: req.signal });
   const type = res.headers.get('content-type') ?? '';
   if (!res.ok || type.includes('json')) {
     const json = (await res.json().catch(() => ({}))) as Loose;
@@ -165,13 +170,21 @@ export async function listTranscribers(): Promise<TranscriberSummary[]> {
     );
 }
 
+export function buildTranscribeRequest(req: Pick<TranscribeRequest, 'model' | 'input' | 'language'>, enc: RequestEncoder): PreparedRequest {
+  return {
+    url: `${BASE}/transcribe`,
+    body: { audio: (enc.file ?? enc.video)(req.input), model: req.model.id, language: req.language || 'auto' },
+  };
+}
+
 export async function transcribe(req: TranscribeRequest): Promise<GenResult> {
+  const raw = buildTranscribeRequest(req, { image: (m) => m.blob, video: (m) => m.blob, file: (m) => m.blob });
   const form = new FormData();
-  form.append('audio', req.input.blob, `input.${extensionForMime(req.input.mime || req.input.blob.type)}`);
-  form.append('model', req.model.id);
-  form.append('language', req.language || 'auto');
+  form.append('audio', raw.body.audio as Blob, `input.${extensionForMime(req.input.mime || req.input.blob.type)}`);
+  form.append('model', String(raw.body.model));
+  form.append('language', String(raw.body.language));
   req.onStatus('Transcribing');
-  const res = await requestJson<Loose>(`${BASE}/transcribe`, { method: 'POST', headers: nanoHeaders(req.apiKey), body: form, signal: req.signal });
+  const res = await requestJson<Loose>(raw.url, { method: 'POST', headers: nanoHeaders(req.apiKey), body: form, signal: req.signal });
   if (typeof res.transcription === 'string') return { outputs: [], text: res.transcription, costUsd: num((res.metadata as Loose | undefined)?.cost) };
   // Long files run as a job (HTTP 202): keep it so a reload or a failed check can resume.
   const runId = String(res.runId ?? '');

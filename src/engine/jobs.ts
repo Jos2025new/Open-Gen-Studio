@@ -19,7 +19,6 @@ import { ADAPTERS } from './providers/registry';
 import { resolveSendable, SchemaUnavailableError } from './schemaGuard';
 import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
-import { COMMAND_REVIEW_CHANGED } from './commands/types';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
@@ -28,12 +27,13 @@ import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend 
 import { ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
 import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
+import { lockAssets } from './flow/locks';
 import { activeRemoteJob, followRemote } from './jobRecovery';
 import { requestQuote } from './quotes';
 import { chargePartial, checkDelivery, controllers, estimateSpec, finish, finishText, keptJob, purgeDiscarded, requestEstimate, running, type GenerationSpec } from './jobState';
 import { runLocalOp } from './localOps';
 import { runCreateStyle, runCreateVoice, runTranscribe } from './specialSends';
-import { materializeSendInputs, resolveSendPlan, sendFingerprint } from './sendInputs';
+import { materializeSendInputs, resolveSendPlan } from './sendInputs';
 
 // Moved out of this file (Opus #4); kept here so every caller and mock keeps its path.
 export { adoptRemoteAssets, storeModelOutputs } from './assetIO';
@@ -141,10 +141,12 @@ export function runGeneration(id: string, nodeLock?: () => void): Promise<string
     return Promise.reject(new PriceReviewRequired('Necesita revisión'));
   }
   startGenerationPass(id);
+  const releaseAssets = generation ? lockAssets(resolveSendPlan(generation).assetIds) : () => {};
   const p = attempt(id, nodeLock).finally(() => {
     running.delete(id);
     controllers.delete(id);
     clearGenerationPass(id);
+    releaseAssets();
     purgeDiscarded(id);
   });
   running.set(id, p);
@@ -241,11 +243,13 @@ async function execute(id: string): Promise<string[]> {
     let providerReportedCost = 0;
     let providerReportedCostKnown = true;
     let done = 0;
+    let chunkIndex = 0;
     // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     let activeReqId: string | undefined;
     while (done < total) {
       const n = Math.min(perRequest, total - done);
+      const reqChunk = chunkIndex++;
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // A quote is not a provider-reported charge in the agent notice.
       const quote = await requestQuote(g.modelRef, schema, settings, n);
@@ -255,16 +259,12 @@ async function execute(id: string): Promise<string[]> {
       const send = (retry: number) => sendMediaViaPaidGate({
         g,
         provider: model.provider,
+        chunkIndex: reqChunk,
         index: reqIndex,
         items: n,
         quote,
         signal,
-        beforeTransport: () => {
-          if (g.approvedFingerprint && sendFingerprint(resolveSendPlan(g, get(), { model, schema, kind }), get(), { ignoreSeed: true }) !== g.approvedFingerprint) {
-            throw new Error(COMMAND_REVIEW_CHANGED);
-          }
-          if (proposed) checkStepAuthorization(g, proposed);
-        },
+        beforeTransport: proposed ? () => checkStepAuthorization(g, proposed) : undefined,
         isRetryable: (err) => {
           const policy = adapter.retry;
           const wait = policy?.waits[retry];

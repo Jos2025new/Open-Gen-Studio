@@ -96,7 +96,8 @@ export function opChoice(input: OpChoiceInput): { ref: string; viaEdit: boolean;
   return input.sourceAssetId ? opModelForAsset(engine, input.sourceAssetId) : opModelFor(engine);
 }
 
-export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
+/** Single synchronous spec builder for non-model and in-memory-schema operations (shared by opSpec, preview and review). */
+export function syncOpSpec(input: OpSpecInput, opts: { schema?: ModelSchema; upstreamModelRef?: string; sourceForChoice?: string } = {}): GenerationSpec | null {
   const def = OPS[input.op];
   const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId, batchToken: input.batchToken };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
@@ -109,17 +110,24 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'voice') {
-    const host = KLING_VOICE_PROVIDER;
-    if (!isConnected(host)) throw new Error(`Creating Kling voices needs ${PROVIDER_LABELS[host]}. Connect it in Settings.`);
-    return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: `${PROVIDER_LABELS[host]} bills the voice when it is created` } };
+    return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: `${PROVIDER_LABELS[KLING_VOICE_PROVIDER]} bills the voice when it is created` } };
   }
   if (def.engine === 'transcribe') {
     const t = transcriberForRun(input.modelRef);
-    if (!t) throw new Error(`No connected provider offers Transcribe. Connect ${preferredProviderLabel('transcribe')}.`);
     const clip = get().assets[input.sourceAssetId];
     const language = String(input.params.language ?? 'auto');
-    return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
+    return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t?.ref ?? input.modelRef ?? '', settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t?.usdPerMinute, clip?.duration) };
   }
+  const choice = opChoice({ ...input, sourceAssetId: opts.sourceForChoice ?? input.sourceAssetId, upstreamModelRef: opts.upstreamModelRef });
+  if (!choice.ref) return null;
+  return opSpecForModel(input, choice.ref, choice.viaEdit, opts.schema ?? get().catalog.schemas[choice.ref]);
+}
+
+export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
+  const def = OPS[input.op];
+  if (def.engine === 'voice' && !isConnected(KLING_VOICE_PROVIDER)) throw new Error(`Creating Kling voices needs ${PROVIDER_LABELS[KLING_VOICE_PROVIDER]}. Connect it in Settings.`);
+  if (def.engine === 'transcribe' && !transcriberForRun(input.modelRef)) throw new Error(`No connected provider offers Transcribe. Connect ${preferredProviderLabel('transcribe')}.`);
+  if (['local', 'voice', 'transcribe'].includes(def.engine)) return syncOpSpec(input)!;
   const choice = opChoice(input);
   const upscaleRef = choice.pinned ? choice.ref : undefined;
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error(def.engine === 'video_upscale' ? 'Choose a dedicated video upscaler, not a video generation/edit model.' : `Choose a connected model that can ${def.label.toLowerCase()}.`);

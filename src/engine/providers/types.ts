@@ -1,4 +1,12 @@
-import type { AdvancedValue, GenSettings, MediaKind, ModelSchema, ModelSummary, OpId, ProviderId, RemoteJob, TranscriberSummary } from '../types';
+import type { AdvancedValue, GenSettings, ImageInputFormat, MediaKind, ModelSchema, ModelSummary, OpId, ProviderId, RemoteJob, TranscriberSummary } from '../types';
+
+export interface PreparedRequest { url: string; body: Record<string, unknown> }
+export interface RequestEncoder {
+  image(input: MediaInput, format: ImageInputFormat): unknown;
+  video(input: MediaInput): unknown;
+  file?(input: MediaInput): unknown;
+}
+export type GenBuildRequest = Omit<GenRequest, 'apiKey' | 'signal' | 'onStatus' | 'onRemoteJob' | 'onRequest'>;
 
 export interface RecoverQuery {
   modelId: string;
@@ -98,6 +106,10 @@ export interface ProviderAdapter {
   /** Model catalog. Public catalogs may be listed without a key. */
   listModels(apiKey: string | undefined, signal?: AbortSignal): Promise<ModelSummary[]>;
   loadSchema(model: ModelSummary, apiKey: string | undefined): Promise<ModelSchema>;
+  buildRequest?(req: GenBuildRequest, enc: RequestEncoder): PreparedRequest;
+  buildTranscribeRequest?(req: Pick<TranscribeRequest, 'model' | 'input' | 'language'>, enc: RequestEncoder): PreparedRequest;
+  buildCreateStyleRequest?(req: { images: MediaInput[] }, enc: RequestEncoder): PreparedRequest;
+  buildCreateVoiceRequest?(req: { input: MediaInput }, enc: RequestEncoder): PreparedRequest;
   generate(req: GenRequest): Promise<GenResult>;
   /** Continue polling a job submitted before a reload. */
   resume?(job: RemoteJob, ctx: ResumeContext): Promise<GenResult>;

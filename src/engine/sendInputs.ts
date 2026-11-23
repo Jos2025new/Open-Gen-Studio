@@ -1,30 +1,31 @@
 /* Single payload builder for approval fingerprinting and provider transport (model, final params, all asset slots). */
 import { maskToAlpha } from '../lib/media';
 import { assetRevisionIdentity } from './assetRevisions';
-import { KLING_VOICE_REF, RECRAFT_STYLE_REF, sentModelRef } from './catalog';
+import { RECRAFT_STYLE_REF, sentModelRef } from './catalog';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
+import { buildDryRequest, dryMedia, stable } from './money/transport';
 import { refsLimit } from './officialLimits';
-import { opChoice, opSpecForModel, type OpSpecInput } from './opSpec';
-import { OPS, isVideoOpEngine, opCount } from './ops';
+import { syncOpSpec, type OpSpecInput } from './opSpec';
+import { OPS, isVideoOpEngine } from './ops';
 import {
-  audioInputProblem, clipTrim, durationChoices, mentionSubjects, paramByRole,
-  placeKeyframes, routeAudio, routeVideoInputs, shotsProblem, songProblem, videoInputProblem, wireParams,
+  audioInputProblem, clipTrim, durationChoices, lyricsBody, lyricsParam, maxCountPerRequest, mentionSubjects,
+  paramByRole, placeKeyframes, routeAudio, routeVideoInputs, shotsProblem, songProblem, videoInputProblem,
 } from './params';
 import { parseRef } from './planRef';
+import { parseModelRef, type MediaInput } from './providers/types';
 import { negFor, opRealism } from './realism';
+import { withVariation } from './sentPrompt';
 import { mapSubjectPrompts } from './subjectPrompts';
-import type { MediaInput } from './providers/types';
-import type { AdvancedValue, Asset, GenSettings, Generation, MediaKind, ModelSchema, ModelSummary, OpId, PlanStep, Subject } from './types';
+import type { AdvancedValue, Asset, GenSettings, Generation, MediaKind, ModelSchema, ModelSummary, OpId, PlanStep, Subject, TranscriberSummary } from './types';
 import { useStore } from '../store/store';
 import { mediaInput, frameInput } from './assetIO';
 
+export { stable };
 const get = useStore.getState;
-export const stable = (value: unknown): string => JSON.stringify(value, (_k, v) => v && typeof v === 'object' && !Array.isArray(v)
-  ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b))) : v);
 
 export type SendSpec = Pick<Generation, 'kind' | 'modelRef' | 'prompt' | 'settings' | 'inputs' | 'op' | 'variants'>;
-export type SendState = { assets: Record<string, Asset>; library: Subject[]; catalog: { models: Record<string, ModelSummary>; schemas: Record<string, ModelSchema> } };
+export type SendState = { assets: Record<string, Asset>; library: Subject[]; catalog: { models: Record<string, ModelSummary>; schemas: Record<string, ModelSchema>; transcribers?: Record<string, TranscriberSummary> } };
 
 export interface SendSlots {
   refs: string[]; refVideos: string[]; audios: string[]; refAudios: string[];
@@ -151,58 +152,82 @@ function buildPlan(spec: SendSpec, state: SendState = get(), over?: { model?: Mo
 export const resolveSendPlan = (spec: SendSpec, state: SendState = get(), over?: { model?: ModelSummary; schema?: ModelSchema; kind?: MediaKind }): ResolvedSendPlan =>
   buildPlan(spec, state, over).plan;
 
-export function sendFingerprint(plan: ResolvedSendPlan, state: Pick<SendState, 'assets' | 'catalog'> = get(), opts: { ignoreSeed?: boolean } = {}): string {
-  const schema = state.catalog.schemas[plan.modelRef];
-  const source = { ...plan.settings, ...(opts.ignoreSeed ? { seed: undefined } : {}) };
-  const settings = schema ? { count: plan.settings.count, params: { ...Object.fromEntries(schema.params.filter((p) => !['seed', 'count', 'negative'].includes(p.role) && p.default !== undefined).map((p) => [p.key, p.default])), ...wireParams(schema, source, plan.settings.count) } } : source;
-  return stable({ kind: plan.kind, modelRef: plan.modelRef, prompt: plan.prompt, settings, op: plan.op, variants: plan.variants, slots: plan.slots, assets: plan.assetIds.map((id) => [id, assetRevisionIdentity(state.assets[id])]) });
+export function applyLyricsSettings(settings: GenSettings, text: string, schema: ModelSchema | undefined): { settings: GenSettings; key?: string } {
+  const key = lyricsParam(schema)?.key;
+  return key ? { key, settings: { ...settings, extras: { ...settings.extras, [key]: lyricsBody(text) } } } : { settings };
 }
 
-export function describeStepsSend(steps: readonly PlanStep[], nodeOperations?: Record<string, OpSpecInput['nodeChoice']>, state: SendState = get()) {
-  const textById = new Map(steps.filter((s) => s.kind === 'text').map((s) => [s.id, s.text]));
-  const fingerprints: Record<string, string> = {}, concreteFingerprints: Record<string, string> = {};
-  const assetIds = new Set<string>();
-  for (const s of steps) {
-    if (s.kind === 'text' || s.kind === 'layer') { fingerprints[s.id] = stable(s.kind === 'text' ? { kind: 'text', text: s.text } : s); continue; }
-    let dynamic = false;
-    const take = (ref: string | undefined) => { if (!ref) return undefined; const p = parseRef(ref); if (p?.type === 'asset') return p.id; dynamic = true; return `step:${ref}`; };
-    const textOf = (ref: string | undefined) => { const p = ref ? parseRef(ref) : null; const t = p?.type === 'step' ? textById.get(p.id) : undefined; if (ref && t == null) dynamic = true; return t; };
-    const promptFor = (step: { prompt: string; promptFrom?: string }) => step.promptFrom ? [(textOf(step.promptFrom) ?? `step:${step.promptFrom}`).trim(), step.prompt.trim()].filter(Boolean).join('\n') : step.prompt;
-    const subjects: Subject[] = (s.nodeSubjects ?? []).map((b) => ({ id: b.name, name: b.name, description: b.description ?? '', kind: b.kind ?? 'character', frontalAssetId: take(b.from), refAssetIds: [] }));
-    const inputsBase = { ...(subjects.length ? { subjects } : {}), nodeLibrary: state.library };
-
-    let spec: SendSpec;
-    if (s.kind === 'op') {
-      const source = take(s.input) ?? '';
-      let params = s.params;
-      if (s.more?.length) params = { ...params, clips: s.more.map((r) => take(r) ?? '').join(','), ...(typeof params.music === 'string' && params.music ? { music: take(params.music) ?? '' } : {}) };
-      if (s.refs?.length) { const got = s.refs.map((r) => ({ asset: take(r.ref) ?? '', role: r.role, note: r.note })); params = { ...params, _refs: got.map((x) => x.asset).join(','), _refRoles: JSON.stringify(got) }; }
-      const def = OPS[s.op];
-      if (def.engine === 'local' || def.engine === 'voice' || def.engine === 'transcribe') {
-        const modelRef = s.op === 'join_clips' ? 'local::join' : def.engine === 'local' ? 'local::frame' : def.engine === 'voice' ? KLING_VOICE_REF : 'transcribe';
-        spec = { kind: def.engine === 'local' ? (s.op === 'join_clips' ? 'video' : 'image') : 'text', prompt: def.label, modelRef, settings: { count: opCount(def, params), advanced: {} }, inputs: { refs: [] }, op: { id: s.op, params, sourceAssetId: source } };
-      } else {
-        const p = parseRef(s.input), upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined, nodeChoice = nodeOperations?.[s.id];
-        const choice = opChoice({ op: s.op, params, sourceAssetId: dynamic ? '' : source, nodeChoice, upstreamModelRef: upstream && 'modelRef' in upstream ? upstream.modelRef : undefined });
-        const built = opSpecForModel({ sessionId: '', origin: 'node', op: s.op, params, sourceAssetId: source, nodeChoice }, choice.ref, choice.viaEdit, state.catalog.schemas[choice.ref]);
-        spec = { ...built, inputs: built.inputs ?? { refs: [] } };
-      }
-    } else if (s.kind === 'audio') {
-      const settings = s.lyricsFrom ? { ...s.settings, extras: { ...s.settings.extras, __lyricsFrom: textOf(s.lyricsFrom) ?? `step:${s.lyricsFrom}` } } : s.settings;
-      spec = { kind: s.textOutput ? 'text' : 'audio', prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: { refs: [], ...inputsBase } };
-    } else if (s.kind === 'video') {
-      const refs = (s.refs ?? []).map((r) => take(r) ?? '');
-      const times = Object.fromEntries(refs.flatMap((a, i) => (s.times?.[i] != null ? [[a, s.times[i]]] : [])));
-      spec = { kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs, firstFrame: take(s.firstFrame), lastFrame: take(s.lastFrame), ...(Object.keys(times).length ? { times } : {}), ...inputsBase } };
-    } else {
-      spec = { kind: s.kind, prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs: s.refs.map((r) => take(r) ?? ''), ...inputsBase }, ...(s.kind === 'image' && s.variations?.length ? { variants: s.variations } : {}) };
-    }
-    const plan = resolveSendPlan(spec, state);
-    fingerprints[s.id] = sendFingerprint(plan, state);
-    if (!dynamic) concreteFingerprints[s.id] = sendFingerprint(plan, state, { ignoreSeed: true });
-    plan.assetIds.forEach((id) => assetIds.add(id));
+export function sendFingerprint(plan: ResolvedSendPlan, state: Pick<SendState, 'assets' | 'catalog'> = get(), opts: { ignoreSeed?: boolean } = {}): string {
+  const source = { ...plan.settings, ...(opts.ignoreSeed ? { seed: undefined } : {}) }, engine = plan.op ? OPS[plan.op.id].engine : undefined;
+  const fallback = () => stable([{ url: `model://${plan.modelRef}`, body: { kind: plan.kind, modelRef: plan.modelRef, prompt: plan.prompt, settings: source, op: plan.op, variants: plan.variants, slots: plan.slots, assets: plan.assetIds.map((id) => [id, assetRevisionIdentity(state.assets[id])]) } }]);
+  const one = (p: Parameters<typeof buildDryRequest>[0] | undefined, req: Parameters<typeof buildDryRequest>[1]) => { const b = p ? buildDryRequest(p, req, state.assets, opts) : null; return b ? stable([b]) : fallback(); };
+  if (engine === 'local') return fallback();
+  if (engine === 'transcribe') {
+    const model = state.catalog.transcribers?.[plan.modelRef];
+    return model ? one(model.provider, { method: 'transcribe', input: { model, input: dryMedia(plan.slots.audio ?? ''), language: String(plan.op!.params.language ?? 'auto') } }) : fallback();
   }
-  return { fingerprints, concreteFingerprints, assetIds: [...assetIds].sort() };
+  if (engine === 'voice') return one(parseModelRef(plan.modelRef)?.provider, { method: 'createVoice', input: { input: dryMedia(plan.slots.audio ?? '') } });
+  if (plan.kind === 'text' && plan.modelRef === RECRAFT_STYLE_REF) return one(parseModelRef(plan.modelRef)?.provider, { method: 'createStyle', input: { images: plan.slots.refs.map(dryMedia) } });
+  const model = state.catalog.models[plan.modelRef], schema = state.catalog.schemas[plan.modelRef];
+  if (!model || !schema) return fallback();
+  const kind: MediaKind = plan.kind === 'text' ? model.kind : plan.kind, variants = plan.variants?.length ? plan.variants : undefined;
+  const total = variants ? variants.length : Math.max(0, plan.settings.count), perRequest = variants ? 1 : Math.max(1, Math.min(total || 1, maxCountPerRequest(schema)));
+  const s = plan.slots, dryInputs = {
+    refs: s.refs.map(dryMedia), refVideos: s.refVideos.map(dryMedia), refAudios: s.refAudios.map(dryMedia),
+    firstFrame: s.firstFrame ? dryMedia(s.firstFrame) : undefined, lastFrame: s.lastFrame ? dryMedia(s.lastFrame) : undefined,
+    video: s.video ? dryMedia(s.video) : undefined, audio: s.audio ? dryMedia(s.audio) : undefined, mask: s.mask ? dryMedia(s.mask) : undefined,
+    elements: s.elements?.map((e) => ({ ...e, frontal: e.frontal ? dryMedia(e.frontal) : undefined, refs: e.refs.map(dryMedia), video: e.video ? dryMedia(e.video) : undefined })),
+    keyframes: s.keyframes?.map((k) => ({ input: dryMedia(k.assetId), frame: k.frame })), clips: s.clips?.map((c) => ({ input: dryMedia(c.assetId), start: c.start, end: c.end })),
+  };
+  const requests = [];
+  for (let done = 0; done < total;) {
+    const n = Math.min(perRequest, total - done), settings = { ...source, seed: source.seed != null ? source.seed + done : undefined };
+    const built = buildDryRequest(model.provider, { method: 'generate', input: { kind, model, schema, prompt: withVariation(plan.prompt, variants?.[done]), settings, count: n, ...dryInputs, op: plan.op } }, state.assets, opts);
+    if (!built) return fallback();
+    requests.push(built);
+    done += n;
+  }
+  return stable(requests);
+}
+
+/** Build the dry-run SendSpec for a PlanStep using the same opSpec/lyrics rules as execution. */
+export function stepSendSpec(s: PlanStep, steps: readonly PlanStep[], nodeOperations?: Record<string, OpSpecInput['nodeChoice']>, state: SendState = get()): { spec?: SendSpec; dynamic: boolean } {
+  if (s.kind === 'text' || s.kind === 'layer') return { dynamic: false };
+  const textById = new Map(steps.filter((x) => x.kind === 'text').map((x) => [x.id, x.text]));
+  let dynamic = false;
+  const take = (ref: string | undefined) => { if (!ref) return undefined; const p = parseRef(ref); if (p?.type === 'asset') return p.id; dynamic = true; return `step:${ref}`; };
+  const textOf = (ref: string | undefined) => { const p = ref ? parseRef(ref) : null; const t = p?.type === 'step' ? textById.get(p.id) : undefined; if (ref && t == null) dynamic = true; return t; };
+  const promptFor = (step: { prompt: string; promptFrom?: string }) => step.promptFrom ? [(textOf(step.promptFrom) ?? `step:${step.promptFrom}`).trim(), step.prompt.trim()].filter(Boolean).join('\n') : step.prompt;
+  const subjects: Subject[] = (s.nodeSubjects ?? []).map((b) => ({ id: b.name, name: b.name, description: b.description ?? '', kind: b.kind ?? 'character', frontalAssetId: take(b.from), refAssetIds: [] }));
+  const inputsBase = { ...(subjects.length ? { subjects } : {}), nodeLibrary: state.library };
+  if (s.kind === 'op') {
+    const source = take(s.input) ?? '';
+    let params = s.params;
+    if (s.more?.length) params = { ...params, clips: s.more.map((r) => take(r) ?? '').join(','), ...(typeof params.music === 'string' && params.music ? { music: take(params.music) ?? '' } : {}) };
+    if (s.refs?.length) { const got = s.refs.map((r) => ({ asset: take(r.ref) ?? '', role: r.role, note: r.note })); params = { ...params, _refs: got.map((x) => x.asset).join(','), _refRoles: JSON.stringify(got) }; }
+    const p = parseRef(s.input), upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
+    const built = syncOpSpec(
+      { sessionId: '', origin: 'node', op: s.op, params, sourceAssetId: source, nodeChoice: nodeOperations?.[s.id] },
+      { sourceForChoice: dynamic ? '' : source, upstreamModelRef: upstream && 'modelRef' in upstream ? upstream.modelRef : undefined },
+    );
+    return { spec: built ? { ...built, inputs: built.inputs ?? { refs: [] } } : { kind: 'image', prompt: OPS[s.op].label, modelRef: '', settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: s.op, params, sourceAssetId: source } }, dynamic };
+  }
+  if (s.kind === 'audio') {
+    let settings = s.settings;
+    if (s.lyricsFrom) {
+      const text = textOf(s.lyricsFrom);
+      const applied = applyLyricsSettings(settings, text ?? `step:${s.lyricsFrom}`, state.catalog.schemas[s.modelRef]);
+      if (!applied.key) dynamic = true;
+      settings = applied.settings;
+    }
+    return { spec: { kind: s.textOutput ? 'text' : 'audio', prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: { refs: [], ...inputsBase } }, dynamic };
+  }
+  if (s.kind === 'video') {
+    const refs = (s.refs ?? []).map((r) => take(r) ?? '');
+    const times = Object.fromEntries(refs.flatMap((a, i) => (s.times?.[i] != null ? [[a, s.times[i]]] : [])));
+    return { spec: { kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs, firstFrame: take(s.firstFrame), lastFrame: take(s.lastFrame), ...(Object.keys(times).length ? { times } : {}), ...inputsBase } }, dynamic };
+  }
+  return { spec: { kind: s.kind, prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs: s.refs.map((r) => take(r) ?? ''), ...inputsBase }, ...(s.kind === 'image' && s.variations?.length ? { variants: s.variations } : {}) }, dynamic };
 }
 
 /** Validate and load blobs strictly from the exact asset IDs resolved by `resolveSendPlan`. */

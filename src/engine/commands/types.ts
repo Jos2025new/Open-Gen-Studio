@@ -31,6 +31,8 @@ export interface CommandReview {
   details: string[];
   /** Per-step price ceilings approved by the user for multi-node commands (`node:<id>` -> USD or null). */
   stepCaps?: Record<string, number | null>;
+  /** Frozen final-request fingerprint approved for single-send commands; verified by paid transport before fetch. */
+  sendFingerprint?: string;
 }
 
 export interface CommandContext {

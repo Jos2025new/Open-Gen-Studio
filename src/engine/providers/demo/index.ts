@@ -130,6 +130,16 @@ export const local: ProviderAdapter = {
     return s;
   },
 
+  buildRequest(req, enc) {
+    return {
+      url: `local://${req.model.id}`,
+      body: {
+        kind: req.kind, model: req.model.id, prompt: req.prompt, count: req.count, settings: req.settings, op: req.op,
+        refs: req.refs.map((r) => enc.image(r, 'data-url')), ...(req.firstFrame ? { firstFrame: enc.image(req.firstFrame, 'data-url') } : {}),
+      },
+    };
+  },
+
   async generate(req: GenRequest): Promise<GenResult> {
     const seed = req.settings.seed ?? hashString(req.prompt || 'untitled');
     if (req.kind === 'image') {

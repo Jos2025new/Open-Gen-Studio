@@ -1,5 +1,4 @@
 /* Sends that are not a media generation: transcribe, create a voice, create a style (moved out of jobs.ts, Opus #4). */
-import { COMMAND_REVIEW_CHANGED } from './commands/types';
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
@@ -11,7 +10,7 @@ import { flushSendSave } from './sendMark';
 import { sendMediaViaPaidGate, type MediaRequest } from './money/transport';
 import { finishText, requestEstimate } from './jobState';
 import { mediaInput } from './assetIO';
-import { resolveSendPlan, sendFingerprint } from './sendInputs';
+import { resolveSendPlan } from './sendInputs';
 
 const get = useStore.getState;
 
@@ -22,9 +21,6 @@ async function runSpecialSend(
   request: (hooks: { onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }) => MediaRequest,
 ): Promise<void> {
   const authorize = () => {
-    if (g.approvedFingerprint && sendFingerprint(resolveSendPlan(g), get(), { ignoreSeed: true }) !== g.approvedFingerprint) {
-      throw new Error(COMMAND_REVIEW_CHANGED);
-    }
     if (g.planId) checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
   };
   signal.throwIfAborted();

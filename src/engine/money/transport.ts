@@ -1,15 +1,18 @@
 import { HttpError } from '../../lib/http';
 import { uid } from '../../lib/id';
 import { addSpend } from '../../store/spend';
+import { useStore } from '../../store/store';
+import { assetRevisionIdentity } from '../assetRevisions';
 import { llmCallEstimate } from '../budget';
+import { COMMAND_REVIEW_CHANGED } from '../commands/types';
 import { chat, type ChatResult, type ReasoningEffort, type ToolSpec } from '../providers/llm';
-import type { LlmMessage, LlmProviderId, ProviderId, RemoteJob } from '../types';
+import type { Asset, LlmMessage, LlmProviderId, ProviderId, RemoteJob } from '../types';
 import { atlas } from '../providers/atlas';
 import { local } from '../providers/demo';
 import { fal } from '../providers/fal';
 import { nanogpt } from '../providers/nanogpt';
 import { openrouter } from '../providers/openrouter';
-import type { GenResult, ProviderAdapter } from '../providers/types';
+import type { GenBuildRequest, GenResult, MediaInput, PreparedRequest, ProviderAdapter, RequestEncoder, TranscribeRequest } from '../providers/types';
 import { paidSend, PaidSendBlockedError, sendFree } from './paidSend';
 import { budgetSnapshotFor, canWriteTicket, grantTicketPass, legacyPaidSendError, saveTicketMark, sendGenerationViaPaidGate, storeTickets, type GenerationPaidSendOpts } from './storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate, type ApprovalTicket, type MoneyPrice } from './ticket';
@@ -17,6 +20,34 @@ import { createTicket, isFreePrice, priceFromEstimate, type ApprovalTicket, type
 type PaidMethod = 'generate' | 'transcribe' | 'createStyle' | 'createVoice';
 type RequestOf<K extends PaidMethod> = Parameters<NonNullable<ProviderAdapter[K]>>[0];
 export type MediaRequest = { [K in PaidMethod]: { method: K; input: RequestOf<K> } }[PaidMethod];
+export type DryMediaRequest =
+  | { method: 'generate'; input: GenBuildRequest }
+  | { method: 'transcribe'; input: Pick<TranscribeRequest, 'model' | 'input' | 'language'> }
+  | { method: 'createStyle'; input: { images: MediaInput[] } }
+  | { method: 'createVoice'; input: { input: MediaInput } };
+
+export const stable = (value: unknown): string => JSON.stringify(value, (_k, v) => v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b))) : v);
+
+const DRY_BLOB = new Blob([]);
+export const dryMedia = (assetId: string): MediaInput => ({ assetId, blob: DRY_BLOB, mime: '', width: 0, height: 0 });
+
+export function buildDryRequest(provider: ProviderId, req: DryMediaRequest, assets: Record<string, Asset>, opts: { ignoreSeed?: boolean } = {}): PreparedRequest | null {
+  const adapter = ADAPTERS[provider];
+  const token = (m: MediaInput) => ({ asset: m.assetId, rev: assetRevisionIdentity(assets[m.assetId]) });
+  const enc: RequestEncoder = { image: token, video: token, file: token };
+  if (req.method === 'generate') return adapter.buildRequest?.(opts.ignoreSeed ? { ...req.input, settings: { ...req.input.settings, seed: undefined } } : req.input, enc) ?? null;
+  if (req.method === 'transcribe') return adapter.buildTranscribeRequest?.(req.input, enc) ?? null;
+  if (req.method === 'createStyle') return adapter.buildCreateStyleRequest?.(req.input, enc) ?? null;
+  return adapter.buildCreateVoiceRequest?.(req.input, enc) ?? null;
+}
+
+function assertApprovedRequest(provider: ProviderId, req: MediaRequest, approvedFingerprint: string, chunkIndex: number): void {
+  const actual = buildDryRequest(provider, req, useStore.getState().assets, { ignoreSeed: true });
+  let expected: unknown;
+  try { expected = JSON.parse(approvedFingerprint); } catch { expected = null; }
+  if (!actual || !Array.isArray(expected) || chunkIndex >= expected.length || stable(expected[chunkIndex]) !== stable(actual)) throw new Error(COMMAND_REVIEW_CHANGED);
+}
 
 const permit = Symbol('paid transport');
 type GuardedAdapter = Omit<ProviderAdapter, PaidMethod> & {
@@ -37,12 +68,16 @@ export const ADAPTERS: Record<ProviderId, GuardedAdapter> = {
 };
 
 type MediaSend = Omit<GenerationPaidSendOpts<GenResult>, 'send'> & {
-  provider: ProviderId; request: (onRemoteJob: (job: RemoteJob) => void) => MediaRequest; settlement: (result: GenResult) => { costUsd: number | null; estimated: boolean };
+  provider: ProviderId; chunkIndex?: number; request: (onRemoteJob: (job: RemoteJob) => void) => MediaRequest; settlement: (result: GenResult) => { costUsd: number | null; estimated: boolean };
 };
 
-export function sendMediaViaPaidGate({ provider, request, settlement, ...options }: MediaSend) {
+export function sendMediaViaPaidGate({ provider, chunkIndex = 0, request, settlement, beforeTransport, ...options }: MediaSend) {
   return sendGenerationViaPaidGate({
     ...options,
+    beforeTransport: () => {
+      if (options.g.approvedFingerprint) assertApprovedRequest(provider, request(() => undefined), options.g.approvedFingerprint, chunkIndex);
+      beforeTransport?.();
+    },
     send: async ({ onRemoteJob }) => {
       const adapter = ADAPTERS[provider], req = request(onRemoteJob);
       const fn = adapter[req.method] as ((input: RequestOf<PaidMethod>, authority: typeof permit) => Promise<GenResult>) | undefined;

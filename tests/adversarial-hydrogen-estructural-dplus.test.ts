@@ -142,7 +142,7 @@ function installModels(defaultImageCost = 0.1) {
       llm: {
         ...state.catalog.llm,
         openrouter: [
-          { id: 'paid-llm', name: 'Paid LLM', inputPrice: 1, outputPrice: 2, contextLength: 8192, supportsTools: true, supportsVision: false, supportsReasoning: false },
+          { id: 'paid-llm', name: 'Paid LLM', inputPrice: 1, outputPrice: 2, contextLength: 8192, tools: true, vision: false, reasoning: false },
         ],
       },
     },
@@ -176,8 +176,7 @@ afterEach(() => {
 // FINDINGS
 // ============================================================================
 
-// reproduce: describeStepsSend (sendInputs.ts:181-183) freezes concreteFingerprints for op:'transcribe' with modelRef:'transcribe' and prompt:'Transcribe', whereas opSpec (opSpec.ts:116-122) sets modelRef:t.ref and prompt:'Transcribe (<lang>)'; runSpecialSend (specialSends.ts:25) always throws COMMAND_REVIEW_CHANGED.
-it.fails('H1a: nodes.run.start on a transcribe tool node must not deadlock in COMMAND_REVIEW_CHANGED', async () => {
+it('H1a: nodes.run.start on a transcribe tool node must not deadlock in COMMAND_REVIEW_CHANGED', async () => {
   blobs.set('ast_audio', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/mpeg' }));
   let transcribeCalls = 0;
   const origFetch = globalThis.fetch;
@@ -197,7 +196,7 @@ it.fails('H1a: nodes.run.start on a transcribe tool node must not deadlock in CO
   useStore.setState((state) => ({
     assets: {
       ...state.assets,
-      ast_audio: { id: 'ast_audio', kind: 'audio', mime: 'audio/mpeg', duration: 30, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 },
+      ast_audio: { id: 'ast_audio', kind: 'audio', mime: 'audio/mpeg', width: 0, height: 0, duration: 30, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 },
     },
     sessions: {
       ...state.sessions,
@@ -227,8 +226,7 @@ it.fails('H1a: nodes.run.start on a transcribe tool node must not deadlock in CO
   expect(transcribeCalls).toBe(1);
 });
 
-// reproduce: describeStepsSend (sendInputs.ts:190-192) resolves textOf(s.lyricsFrom) into settings.extras.__lyricsFrom (dropped by wireParams in sendFingerprint), while runAudio (planSteps/exec/audio.ts:16-18) writes settings.extras[lyricsParamKey], causing jobs.ts:263 beforeTransport to always throw COMMAND_REVIEW_CHANGED.
-it.fails('H1b: nodes.run.start on an audio node with lyrics wired from a text node must not deadlock in COMMAND_REVIEW_CHANGED', async () => {
+it('H1b: nodes.run.start on an audio node with lyrics wired from a text node must not deadlock in COMMAND_REVIEW_CHANGED', async () => {
   const audioData: GenNodeData = {
     kind: 'audio', title: 'Song', prompt: 'indie pop', modelRef: atlasAudioRef,
     settings: { count: 1, advanced: {} }, outputIndex: 0,
@@ -261,8 +259,7 @@ it.fails('H1b: nodes.run.start on an audio node with lyrics wired from a text no
   expect(fake.acceptedCount('indie pop')).toBe(1);
 });
 
-// reproduce: actions.commands.ts:235-297 and library.commands.ts:32-33 compute review with sendFingerprint, but generateDirect/regenerate/runAssetOp/runLayerOp/createRecraftStyle/createSubjectVoice never pass approvedFingerprint to createGeneration (nor lockAssets), so in-place asset edits before transport bypass jobs.ts:263 / specialSends.ts:25.
-it.fails('H1c: studio.generate.start blocks transport when an attached image is edited in-place between review and transport', async () => {
+it('H1c: studio.generate.start blocks transport when an attached image is edited in-place between review and transport', async () => {
   blobs.set('ast_ref', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
   const origFetch = globalThis.fetch;
   let editedDuringQuote = false;
@@ -305,8 +302,7 @@ it.fails('H1c: studio.generate.start blocks transport when an attached image is 
   expect(fake.acceptedCount('studio direct edited ref'), 'studio.generate.start dispatched edited asset bytes without fingerprint verification before transport').toBe(0);
 });
 
-// reproduce: sendFingerprint (sendInputs.ts:157) only hashes wireParams(schema, source, count) when schema exists, omitting settings.extras/advanced keys outside schema.params that OpenRouter sends via passthroughSettings -> provider.options (openrouter.ts:313,348-352).
-it.fails('H1d: sendFingerprint covers OpenRouter passthrough options (settings.extras) sent in provider.options', async () => {
+it('H1d: sendFingerprint covers OpenRouter passthrough options (settings.extras) sent in provider.options', async () => {
   const orRef = 'openrouter::acme/or-img';
   const origFetch = globalThis.fetch;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -339,7 +335,7 @@ it.fails('H1d: sendFingerprint covers OpenRouter passthrough options (settings.e
     ref: orRef, provider: 'openrouter', id: 'acme/or-img', name: 'OR Img', kind: 'image',
     acceptsText: true, acceptsImage: false, tags: [],
   } as unknown as ModelSummary;
-  const schema = await openrouter.loadSchema!(orModel);
+  const schema = await openrouter.loadSchema!(orModel, 'test-only');
   useStore.setState((state) => ({
     catalog: {
       ...state.catalog,
@@ -588,7 +584,7 @@ it('control: create_voice special send matches approvedFingerprint when audio as
   useStore.setState((state) => ({
     assets: {
       ...state.assets,
-      ast_voice: { id: 'ast_voice', kind: 'audio', mime: 'audio/mpeg', duration: 10, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 },
+      ast_voice: { id: 'ast_voice', kind: 'audio', mime: 'audio/mpeg', width: 0, height: 0, duration: 10, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 },
     },
     sessions: {
       ...state.sessions,

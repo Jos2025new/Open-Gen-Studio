@@ -5,7 +5,7 @@ import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModel
 import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
 import { isStepKind } from '../planSteps/inspect';
 import { nodeRequest, stable } from './freshness';
-import { describeStepsSend } from '../sendInputs';
+import { resolveSendPlan, sendFingerprint, stepSendSpec } from '../sendInputs';
 import { rememberNodeRequest, requestContext } from './result';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
@@ -263,13 +263,21 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
   errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
   const nodeOperations = nodeOperationsOf(context, graph, run.runIds);
   const { total, perStep } = estimateSteps(run.steps, nodeOperations);
-  const send = describeStepsSend(run.steps, nodeOperations, st);
+  const sendFingerprints: Record<string, string> = {}, stepFingerprints: Record<string, string> = {}, sendAssets = new Set<string>();
+  for (const step of run.steps) {
+    const { spec, dynamic } = stepSendSpec(step, run.steps, nodeOperations, st);
+    if (!spec) { sendFingerprints[step.id] = stable(step.kind === 'text' ? { kind: 'text', text: step.text } : step); continue; }
+    const plan = resolveSendPlan(spec, st);
+    sendFingerprints[step.id] = sendFingerprint(plan, st);
+    if (!dynamic) stepFingerprints[step.id] = sendFingerprint(plan, st, { ignoreSeed: true });
+    plan.assetIds.forEach((id) => sendAssets.add(id));
+  }
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) return [id, 'missing']; // already reported as an error above
     return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
   });
-  return { estimate: total, perStep, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], sendAssets: send.assetIds, stepFingerprints: send.concreteFingerprints, signature: stable({ requests, send: send.fingerprints, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
+  return { estimate: total, perStep, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], sendAssets: [...sendAssets].sort(), stepFingerprints, signature: stable({ requests, send: sendFingerprints, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
 
 export async function prepareNodeRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): Promise<NodeRunPreview> {
@@ -325,7 +333,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
   const nodeOperations = nodeOperationsOf(context, startGraph, preview.runIds);
-  const releaseAssets = lockAssets(preview.sendAssets ?? describeStepsSend(preview.steps, nodeOperations, get()).assetIds);
+  const releaseAssets = lockAssets(preview.sendAssets ?? []);
   try {
     const result = await executeSteps(preview.steps, {
       sessionId, workspace: 'node', origin: 'node', approvalTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
