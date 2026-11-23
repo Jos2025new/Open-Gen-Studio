@@ -75,7 +75,7 @@ beforeEach(() => {
         openrouter: [{ id: 'default/model', name: 'Default', tools: true, vision: true, inputPrice: 1, outputPrice: 1 }],
       },
     },
-    settings: { ...st.settings, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'default/model' } },
+    settings: { ...st.settings, budgetOn: false, keys: { ...st.settings.keys, openrouter: 'sk-test' }, agent: { ...st.settings.agent, provider: 'openrouter', model: 'default/model' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
     sessions: {
       ...st.sessions,

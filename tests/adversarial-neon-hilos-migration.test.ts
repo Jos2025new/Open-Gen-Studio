@@ -74,6 +74,7 @@ beforeEach(() => {
   useStore.setState({
     settings: {
       ...st.settings,
+      budgetOn: false,
       keys: { ...st.settings.keys, openrouter: 'sk-test' },
       agent: { ...st.settings.agent, provider: 'openrouter', model: 'openai/gpt-4o-mini', showThinking: false },
     },
