@@ -86,6 +86,7 @@ function setupStore(opts?: {
   const au = { id: 'au', kind: 'audio', mime: 'audio/mpeg', duration: 60, sessionId: sId, origin: 'upload', stored: true, favorite: false, createdAt: 1 } as never;
   useStore.setState({
     generations: {},
+    tickets: {},
     quotes: {},
     spendLog: [],
     spentUsd: opts?.spentUsd ?? 0,
