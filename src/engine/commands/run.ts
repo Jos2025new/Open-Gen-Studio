@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { useStore } from '../../store/store';
 import { assetRevisionIdentity } from '../assetRevisions';
+import { bufferVersion } from '../design/raster';
 import { directModelRef } from '../directModel';
 import { stable } from '../flow/freshness';
 import { mentionSubjects } from '../params';
@@ -54,7 +55,7 @@ export function commandReview(spec: AnyCommand, ctx: CommandContext, args: unkno
   const estimate = previewEstimate(spec, ctx, args);
   const prompt = generations[0]?.prompt ?? text;
   return {
-    signature: stable({ args, on: ctx.on, composer, layers, generations, subjects, assets, models, ops, estimate, workspace: state.ui.workspace, space: state.ui.space }),
+    signature: stable({ args, on: ctx.on, composer, layers, raster: layers?.map(layer => bufferVersion(layer.id)), generations, subjects, assets, models, ops, estimate, workspace: state.ui.workspace, space: state.ui.space }),
     details: prompt.trim() ? [prompt] : [],
   };
 }

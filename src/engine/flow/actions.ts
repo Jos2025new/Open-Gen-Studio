@@ -1,3 +1,4 @@
+import { assetRevisionIdentity } from '../assetRevisions';
 import { parseRef } from '../planRef';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
@@ -214,10 +215,15 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
   const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context, ...(frozenRunIds ? { frozenRunIds } : {}) });
   const env = storeEnv();
   const inputs = new Set(run.runIds);
+  const assets = new Set<string>();
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
     const subjects = n && 'subjects' in n.data ? (n.data.subjects ?? []).filter(s => !s.from.startsWith('asset:')).map(s => s.from.split('#')[0]) : [];
-    const linked = n ? resolveInputs(graph, n, env).flatMap(i => i.from && !i.broken && !ignoredRunCable(i) ? [i.from] : []) : [];
+    const linked = n ? resolveInputs(graph, n, env).flatMap(i => {
+      if (!i.from || i.broken || ignoredRunCable(i)) return [];
+      if (i.value && st.assets[i.value]) assets.add(i.value);
+      return [i.from];
+    }) : [];
     for (const source of [...linked, ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
   };
   run.runIds.forEach(visit);
@@ -263,7 +269,7 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
     if (!n) return [id, 'missing']; // already reported as an error above
     return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
   });
-  return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
+  return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, assets: [...assets].sort().map(id => assetRevisionIdentity(st.assets[id])), steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
 
 export async function prepareNodeRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): Promise<NodeRunPreview> {

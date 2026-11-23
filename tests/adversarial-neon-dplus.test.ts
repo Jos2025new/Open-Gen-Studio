@@ -184,8 +184,7 @@ function makeFakeCanvas(bytes: number[]): HTMLCanvasElement {
 
 // --- Findings ---
 
-// reproduce: deliverGenerated omits asset revisions for upstream generated assets, so editing the asset in-place keeps preview.signature identical and dispatches unreviewed bytes.
-it.fails('N1: invalidates nodes.run.start review when an upstream generated node asset is edited in-place', async () => {
+it('N1: invalidates nodes.run.start review when an upstream generated node asset is edited in-place', async () => {
   blobs.set('asset_up', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
   useStore.setState((state) => ({
     assets: {
@@ -238,8 +237,7 @@ it.fails('N1: invalidates nodes.run.start review when an upstream generated node
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: commandReview hashes doc.layers metadata without raster bufferVersion, so mutating a raster layer pixel buffer keeps signature identical and sends modified pixels without re-review.
-it.fails('N2: invalidates studio.layer.run_op review when raster layer pixel buffer changes without changing layer metadata', async () => {
+it('N2: invalidates studio.layer.run_op review when raster layer pixel buffer changes without changing layer metadata', async () => {
   const doc = createDoc('Test doc', 16, 16);
   const layer = newRasterLayer('Paint', { x: 0, y: 0, width: 16, height: 16 }, { width: 16, height: 16 });
   doc.layers = [layer];
