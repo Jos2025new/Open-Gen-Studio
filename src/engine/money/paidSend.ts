@@ -83,6 +83,7 @@ export function evaluateBudgetGate(opts: {
     return { ok: false, free: false, code: 'UNKNOWN_PRICE', reason, remainingUsd };
   }
   if (ticket && pass?.kind === 'once') {
+    if (pass.allowUnknown) return { ok: true, free: false, remainingUsd };
     const committed = ticketCommittedUsd(ticket);
     if (pass.maxUsd == null || committed + verifiable > pass.maxUsd + 1e-9) {
       return { ok: false, free: false, code: 'PASS_EXCEEDED', reason: `Send ($${verifiable.toFixed(4)}) exceeds the approved pass cap ($${pass.maxUsd ?? 0}).`, remainingUsd };

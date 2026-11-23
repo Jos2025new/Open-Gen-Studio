@@ -153,8 +153,8 @@ export function budgetSnapshotFor(sessionId: string): BudgetSnapshot {
 }
 
 export function ticketPassFromEstimate(estimate: Estimate): TicketPass {
-  const maxUsd = priceFromEstimate(estimate).maxVerifiableUsd;
-  return { kind: 'once', maxUsd, ...(maxUsd == null ? { allowUnknown: true } : {}) };
+  const price = priceFromEstimate(estimate);
+  return { kind: 'once', maxUsd: price.maxVerifiableUsd ?? price.usd, ...(price.maxVerifiableUsd == null ? { allowUnknown: true } : {}) };
 }
 
 /** Ensure a generation has an authoritative ticket in `useStore.tickets` without touching legacy `g.sends`. */

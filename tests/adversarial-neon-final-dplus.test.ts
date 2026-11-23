@@ -227,8 +227,7 @@ it('F1b: invalidates nodes.run.start review when a tool node reference asset (pa
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: ticketPassFromEstimate emits maxUsd: null with allowUnknown: true for mixed priced + unpriced totals, and evaluateBudgetGate rejects any priced step when pass.maxUsd is null, deadlocking the user under Allow this time.
-it.fails('F2a: allows mixed priced + unpriced approved command sequence to run under "Allow this time" without PASS_EXCEEDED deadlock', async () => {
+it('F2a: allows mixed priced + unpriced approved command sequence to run under "Allow this time" without PASS_EXCEEDED deadlock', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetOn: true, budgetUsd: 0.05 } }));
 
   const pending = runCommandsTool(sid, {
@@ -249,8 +248,7 @@ it.fails('F2a: allows mixed priced + unpriced approved command sequence to run u
   expect(fake.acceptedCount('node two prompt'), 'unpriced step in approved mixed sequence never ran').toBe(1);
 });
 
-// reproduce: approving an unpriced generation with Continue once sets pass.maxUsd: null, and when requestQuote returns an exact price evaluateBudgetGate fails with PASS_EXCEEDED, deadlocking the user without a way to run once.
-it.fails('F2b: allows an unpriced generation approved with "Continue once" to run when requestQuote returns an exact price', async () => {
+it('F2b: allows an unpriced generation approved with "Continue once" to run when requestQuote returns an exact price', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetOn: true, budgetUsd: 0.05 } }));
 
   const g = withOncePass(sid, (pass) => createGeneration({

@@ -55,6 +55,7 @@ type GenerationPassEntry = {
   budgetUsd: number;
   approvedUsd: number | null;
   quoteApprovedUsd: number | null;
+  allowUnknown?: boolean;
   priorSendIds?: ReadonlySet<string>;
   started: boolean;
   owner?: BudgetPass | string;
@@ -253,7 +254,7 @@ export function withSequenceStepPass<T>(
 export function bindGenerationPass(generationId: string, sessionId: string, approvedUsd: number | null, owner?: BudgetPass | string): void {
   const amount = approvedUsd != null && Number.isFinite(approvedUsd) ? approvedUsd : null;
   const once = typeof owner === 'object' && owner.kind === 'once' ? activePasses.get(owner) : undefined;
-  substitutePasses.set(generationId, { sessionId, budgetUsd: get().settings.budgetUsd, approvedUsd: amount, quoteApprovedUsd: amount == null ? null : once?.remainingUsd ?? amount, started: false, owner });
+  substitutePasses.set(generationId, { sessionId, budgetUsd: get().settings.budgetUsd, approvedUsd: amount, quoteApprovedUsd: amount == null ? null : once?.remainingUsd ?? amount, allowUnknown: amount == null, started: false, owner });
 }
 
 /** Mark `generationId` as having started running so its 402 substitute entitlement outlives a fire-and-forget approving action. */
@@ -270,7 +271,7 @@ export function generationQuoteGuard(generationId: string): (usd: number | null)
     const sends = get().generations[generationId]?.sends;
     const prior = entry.priorSendIds;
     const booked = ledgerCost({ sends: prior ? sends?.filter((s) => !prior.has(s.id)) : sends });
-    const covered = entry.quoteApprovedUsd != null && !booked.hasUnknown && usd <= entry.quoteApprovedUsd - booked.usd + 1e-9;
+    const covered = Boolean(entry.allowUnknown) || (entry.quoteApprovedUsd != null && !booked.hasUnknown && usd <= entry.quoteApprovedUsd - booked.usd + 1e-9);
     assertWithinLimit({ usd, approximate: false, exact: true }, entry.sessionId, covered);
   };
 }
@@ -283,6 +284,7 @@ export function bindRetryQuoteApproval(generationId: string, estimate: Estimate,
   substitutePasses.set(generationId, {
     sessionId: g.sessionId, budgetUsd: get().settings.budgetUsd, approvedUsd: null,
     quoteApprovedUsd: hasUnknownPrice(estimate) ? null : remaining,
+    allowUnknown: hasUnknownPrice(estimate),
     priorSendIds: new Set(g.sends?.filter((s) => s.status === 'done').map((s) => s.id)), started: true,
   });
   consumeOnce(pass, estimate);
