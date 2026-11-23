@@ -1,3 +1,4 @@
+import { isHeldStatus } from '../money/ticket';
 import { commandReview, previewEstimate, type RunOptions } from '../commands/run';
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
@@ -297,7 +298,9 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
   const ticket = storeTickets.get(commandTicketId(itemId));
   if (decision === 'cancel') {
     pending.delete(itemId);
-    removeTicket(commandTicketId(itemId));
+    if (ticket?.sends.some(send => send.generationId && isHeldStatus(send.status))) {
+      storeTickets.put({ ...ticket, closed: true, pass: undefined });
+    } else removeTicket(commandTicketId(itemId));
     updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, { status: 'canceled' });
     entry?.resolve(false);
     return Boolean(entry);

@@ -28,16 +28,9 @@ export function remainingBudget(
     sessions?: Record<string, unknown>;
   } = get(),
 ): number | null {
-  const { settings, spentUsd, tickets, generations, sessions } = state;
+  const { settings, spentUsd, tickets } = state;
   if (!settings.budgetOn) return null;
-  const active = tickets
-    ? Object.values(tickets).filter((t) => {
-        if (sessions && !sessions[t.sessionId]) return false;
-        if (generations && t.id.startsWith('gen:') && !generations[t.id.slice(4)]) return false;
-        return true;
-      })
-    : [];
-  const reserved = totalReservedUsd(active);
+  const reserved = totalReservedUsd(Object.values(tickets ?? {}));
   return roundUsd(settings.budgetUsd - spentUsd - reserved);
 }
 

@@ -357,6 +357,9 @@ export function compactApprovalTickets(
   sessions: Record<string, Session>,
   keepClosed = 0,
 ): Record<string, ApprovalTicket> {
+  const active = new Set(Object.values(generations)
+    .filter(g => g.status === 'queued' || g.status === 'running')
+    .map(g => g.approvalTicketId ?? 'gen:' + g.id));
   const retired: string[] = [];
   for (const ticket of Object.values(tickets)) {
     const legacyId = ticket.id.startsWith('gen:') ? ticket.id.slice(4) : undefined;
@@ -365,18 +368,17 @@ export function compactApprovalTickets(
     const card = cardId ? session?.feed.find((item) => item.id === cardId) : undefined;
     const cardOpen = (card?.type === 'commands' || card?.type === 'plan') &&
       (card.status === 'awaiting' || card.status === 'running' || card.status === 'review');
-    if (cardOpen || (keepClosed && ticket.kind === 'node_run' && !ticket.closed)) continue;
+    if (active.has(ticket.id) || cardOpen || (keepClosed && ticket.kind === 'node_run' && !ticket.closed)) continue;
     const needsTicket = ticket.sends.some((send) => {
-      if (ticket.kind === 'llm') return isHeldStatus(send.status);
+      if (isHeldStatus(send.status)) return true;
+      if (ticket.kind === 'llm') return false;
       const genId = send.generationId ?? legacyId;
-      if (!genId) return !isFreePrice(send.price) && (send.status === 'pending' || isHeldStatus(send.status));
+      if (!genId) return !isFreePrice(send.price) && send.status === 'pending';
       const generation = generations[genId];
       if (!generation) return false;
-      if (isHeldStatus(send.status) || generation.status === 'queued' || generation.status === 'running') return true;
       return send.status === 'done' && !generation.sends?.some((receipt) => receipt.id === send.id && receipt.status === 'done');
     });
-    const queued = legacyId && generations[legacyId]?.status === 'queued';
-    if (!needsTicket && !queued) retired.push(ticket.id);
+    if (!needsTicket) retired.push(ticket.id);
   }
   if (retired.length <= keepClosed) return tickets;
   const compacted = { ...tickets };

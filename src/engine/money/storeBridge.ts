@@ -119,14 +119,7 @@ function projectTicketToGeneration(genId: string, sends: readonly TicketSend[]):
 /** Authoritative `TicketAccess` backed by `useStore.tickets` with one-way projection onto `Generation`. */
 export const storeTickets: TicketAccess = {
   get: (ticketId) => get().tickets[ticketId],
-  list: () => {
-    const st = get();
-    return Object.values(st.tickets).filter((t) => {
-      if (!st.sessions[t.sessionId]) return false;
-      if (t.id.startsWith('gen:') && !st.generations[t.id.slice(4)]) return false;
-      return true;
-    });
-  },
+  list: () => Object.values(get().tickets),
   put: (ticket) => {
     const previous = get().tickets[ticket.id];
     if (previous === ticket) return;

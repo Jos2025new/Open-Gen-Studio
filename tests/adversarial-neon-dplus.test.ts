@@ -345,8 +345,7 @@ it('N5: preserves command ticket once pass across nodes.run.start followed by st
   expect(fake.acceptedCount('studio after node'), 'runNodes cleared cmd:<id>.pass in finally, blocking the second approved command').toBe(1);
 });
 
-// reproduce: decideCommandApproval('cancel') unconditionally removes cmd:<id>, dropping uncertain reservations from earlier interrupted steps and breaking reconcileUnknownCharge.
-it.fails('N6: canceling a reloaded command card preserves uncertain reservations from already-sent steps and keeps reconciliation working', async () => {
+it('N6: canceling a reloaded command card preserves uncertain reservations from already-sent steps and keeps reconciliation working', async () => {
   const held = fake.holdNext('node one prompt');
   const pending = runCommandsTool(sid, {
     seq: [
@@ -378,8 +377,7 @@ it.fails('N6: canceling a reloaded command card preserves uncertain reservations
   expect(reconcileUnknownCharge(sid, `cmd:${card.id}`), 'durable reconciliation notice became broken after cancel').toBe(true);
 });
 
-// reproduce: generateDirect in chat closes the command card before runGeneration enters paidSend, so compactApprovalTickets evicts cmd:<id> and drops its once pass.
-it.fails('N7: does not compact away an approved cmd:<id> ticket and its once pass while studio.generate.start generation is still starting', async () => {
+it('N7: does not compact away an approved cmd:<id> ticket and its once pass while studio.generate.start generation is still starting', async () => {
   useStore.setState((state) => ({
     settings: { ...state.settings, budgetUsd: 0.05 },
     assets: {
@@ -423,8 +421,7 @@ it.fails('N7: does not compact away an approved cmd:<id> ticket and its once pas
   expect(fake.acceptedCount('chat direct image'), 'cmd:<id> ticket was compacted before runGeneration reached paidSend, dropping the once pass').toBe(1);
 });
 
-// reproduce: deleteGeneration removes generations[id], causing remainingBudget/storeTickets.list/compactApprovalTickets to ignore or drop the uncertain gen:<id> reservation without booking spend.
-it.fails('N8: deleting a failed generation with an uncertain charge keeps its reservation until explicitly reconciled', async () => {
+it('N8: deleting a failed generation with an uncertain charge keeps its reservation until explicitly reconciled', async () => {
   fake.onNext('test uncertain', 'cut-after-accept');
   const g = createGeneration({
     sessionId: sid, kind: 'image', modelRef, prompt: 'test uncertain',
