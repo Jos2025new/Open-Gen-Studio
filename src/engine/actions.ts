@@ -1,6 +1,6 @@
 import { hasActiveTicketSend } from './money/storeBridge';
 import { wrongRef } from './wrongRef';
-import { directModelRef } from './directModel';
+import { buildDirectSpec, directModelRef } from './directModel';
 import { refsLimit } from './officialLimits';
 import { opSessionId } from './opSession';
 import { model3dProblem } from './modelRules';
@@ -149,12 +149,6 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   return { ok: true, estimate, overLimit: budgetProblem(estimate, sendSessionId(st)) !== null };
 }
 
-/** The entries of `map` for these ids, or undefined when there are none. */
-function pick<T>(map: Record<string, T> | undefined, ids: string[]): Record<string, T> | undefined {
-  const out = Object.fromEntries(ids.filter((id) => map?.[id] !== undefined).map((id) => [id, map![id]]));
-  return Object.keys(out).length ? out : undefined;
-}
-
 export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
   const check = checkDirect(kind);
   if (!check.ok) {
@@ -164,40 +158,10 @@ export async function generateDirect(kind: MediaKind, budgetPass?: BudgetPass, a
   const st = get();
   const workspace = st.ui.workspace;
   const sessionId = ensureSendSession();
-  const { settings } = st.composer[kind];
   const text = st.composer.text.trim();
-  const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
-  const modelRef = directModelRef(kind, st.composer[kind].modelRef, attachments.length > 0);
-  const videoAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'video');
-  const audioAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'audio');
-  // Video: the first image is the start frame when the model has one; the rest are references.
-  const slots = st.catalog.schemas[modelRef]?.slots ?? {};
-  const routed = routeVideoInputs(slots, attachments, videoAttachments);
-  const parentId = st.composer.editing?.generationId;
   const spec: GenerationSpec = {
-    sessionId,
-    // A lyrics model answers with text.
-    kind: kind === 'audio' && st.catalog.models[modelRef]?.textOutput ? 'text' : kind,
-    prompt: text,
-    modelRef,
-    // Editing a result keeps its seed, so the edited prompt is the only change (PLAN_PROMPTING.md §4).
-    settings: { ...settings, seed: parentId ? settings.seed : undefined },
-    inputs: {
-      ...(kind === 'image'
-        ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] }
-        : kind === 'audio'
-          ? { refs: audioAttachments }
-          : kind === 'model3d'
-            ? { refs: attachments }
-          : { refs: [...routed.images, ...routed.videos, ...audioAttachments], firstFrame: routed.firstFrame }),
-      times: pick(st.composer.times, attachments),
-      trims: pick(st.composer.trims, videoAttachments),
-    },
-    origin: workspace === 'node' ? 'node' : workspace === 'designer' ? 'designer' : 'composer',
+    ...buildDirectSpec(kind, sessionId, check.estimate),
     place: placeFor(st.ui, workspace),
-    mode: kind,
-    parentId,
-    estimate: check.estimate,
     budgetPass,
     approvalTicketId,
   };

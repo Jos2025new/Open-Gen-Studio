@@ -14,12 +14,12 @@ import { variantRoute } from './variants';
 import { withVariation } from './sentPrompt';
 import { isCreditError, onGenerationCredit } from './credit';
 import { OPS, operationFactor } from './ops';
-import { maxCountPerRequest, paramByRole } from './params';
+import { maxCountPerRequest } from './params';
 import { ADAPTERS } from './providers/registry';
 import { resolveSendable, SchemaUnavailableError } from './schemaGuard';
 import { retrySpec } from './retryPartial';
 import { PROVIDER_LABELS, parseModelRef, type MediaInput } from './providers/types';
-import { opRealism, negFor } from './realism';
+import { COMMAND_REVIEW_CHANGED } from './commands/types';
 import type { Asset, Generation, MediaKind, ModelSchema } from './types';
 import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '../store/store';
 import { holdRetry, relinkAttempt } from './relinkAttempt';
@@ -33,7 +33,7 @@ import { requestQuote } from './quotes';
 import { chargePartial, checkDelivery, controllers, estimateSpec, finish, finishText, keptJob, purgeDiscarded, requestEstimate, running, type GenerationSpec } from './jobState';
 import { runLocalOp } from './localOps';
 import { runCreateStyle, runCreateVoice, runTranscribe } from './specialSends';
-import { promptShape, slotInputs, structuredSlots, subjectInputs } from './sendInputs';
+import { materializeSendInputs, resolveSendPlan, sendFingerprint } from './sendInputs';
 
 // Moved out of this file (Opus #4); kept here so every caller and mock keeps its path.
 export { adoptRemoteAssets, storeModelOutputs } from './assetIO';
@@ -82,6 +82,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     assetIds: [],
     estimate,
     ...(approval?.sessionId === spec.sessionId ? { approvalTicketId: approval.id } : {}),
+    ...(spec.approvedFingerprint ? { approvedFingerprint: spec.approvedFingerprint } : {}),
     retryBaseEstimate: estimate,
     retryTotal: spec.variants?.length ?? spec.settings.count,
     parentId: spec.parentId,
@@ -219,22 +220,14 @@ async function execute(id: string): Promise<string[]> {
     if (model.provider !== 'local' && !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
     const adapter = ADAPTERS[model.provider];
 
-    // Inputs
-    const slots = await slotInputs(g, model, schema, kind);
-    const subjects = await subjectInputs(g, model, schema, slots);
-    const shaped = promptShape(g, model, schema, kind, slots, subjects);
-    const { firstFrame, lastFrame, video, mask, audio, refAudios } = slots;
-    const { elements } = subjects;
-    const { prompt } = shaped;
-    const { keyframes, clips, refs, refVideos, genSettings: shapedSettings } = structuredSlots(g, schema, subjects, slots, shaped.genSettings);
-    let genSettings = shapedSettings;
+    // Inputs resolved by the same send-plan builder used for approval fingerprinting.
+    const built = await materializeSendInputs(g, model, schema, kind);
+    const { prompt: shown, genSettings, refs, refVideos, keyframes, clips, audio, refAudios, elements, mask, firstFrame, lastFrame, video } = built;
 
     const { variants, priorCount, total, progressTotal, perRequest } = batchPlan(g, schema);
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), operationFactor(g.op)) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
-    const shown = opRealism(g, kind, prompt, model.id);
-    genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [...g.assetIds];
     const delivered: Asset[] = [];
@@ -262,6 +255,9 @@ async function execute(id: string): Promise<string[]> {
         quote,
         signal,
         beforeTransport: () => {
+          if (g.approvedFingerprint && sendFingerprint(resolveSendPlan(g, get(), { model, schema, kind }), get(), { ignoreSeed: true }) !== g.approvedFingerprint) {
+            throw new Error(COMMAND_REVIEW_CHANGED);
+          }
           checkQuote(quote);
           if (proposed) checkStepAuthorization(g, proposed);
         },

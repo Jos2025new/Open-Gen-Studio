@@ -228,7 +228,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       : o.ratio === undefined ? 'price not comparable' : `about ${Math.round(o.ratio * 10) / 10}× the price`;
     const note = `${empty} had no credit, so this switched to ${PROVIDER_LABELS[patch.provider]} (${model}, ${price}).`;
     const notes = [...(get().generations[genId]?.notes ?? []), note];
-    patchGeneration(genId, { ...patch, notes });
+    patchGeneration(genId, { ...patch, notes, approvedFingerprint: undefined });
   };
   const superseded = () => {
     const now = get().generations[genId];

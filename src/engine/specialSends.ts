@@ -1,4 +1,5 @@
 /* Sends that are not a media generation: transcribe, create a voice, create a style (moved out of jobs.ts, Opus #4). */
+import { COMMAND_REVIEW_CHANGED } from './commands/types';
 import { checkStepAuthorization, costAuthorization } from './priceAuthorization';
 import { apiKeyFor } from './catalog';
 import { InputError } from './errors';
@@ -10,6 +11,7 @@ import { flushSendSave } from './sendMark';
 import { sendMediaViaPaidGate, type MediaRequest } from './money/transport';
 import { finishText, requestEstimate } from './jobState';
 import { mediaInput } from './assetIO';
+import { resolveSendPlan, sendFingerprint } from './sendInputs';
 
 const get = useStore.getState;
 
@@ -19,9 +21,14 @@ async function runSpecialSend(
   provider: ProviderId,
   request: (hooks: { onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }) => MediaRequest,
 ): Promise<void> {
-  const authorize = g.planId ? () => checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g))) : undefined;
+  const authorize = () => {
+    if (g.approvedFingerprint && sendFingerprint(resolveSendPlan(g), get(), { ignoreSeed: true }) !== g.approvedFingerprint) {
+      throw new Error(COMMAND_REVIEW_CHANGED);
+    }
+    if (g.planId) checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
+  };
   signal.throwIfAborted();
-  authorize?.();
+  authorize();
   const outcome = await sendMediaViaPaidGate({
     g,
     provider,
@@ -42,7 +49,8 @@ export async function runTranscribe(g: Generation, signal: AbortSignal): Promise
   const adapter = ADAPTERS[model.provider];
   const apiKey = apiKeyFor(model.provider);
   if (!adapter.transcribe || !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
-  const input = await mediaInput(g.op!.sourceAssetId);
+  const plan = resolveSendPlan(g);
+  const input = await mediaInput(plan.slots.audio ?? g.op!.sourceAssetId);
   if (input.blob.size > model.maxDirectBytes) {
     const mb = (n: number) => (n / 1048576).toFixed(1);
     throw new InputError('AUDIO_TOO_LARGE', `${model.name} takes files up to ${mb(model.maxDirectBytes)} MB from the app; this one is ${mb(input.blob.size)} MB. Use a shorter or compressed (MP3) clip.`);
@@ -70,9 +78,11 @@ function creatorOf(g: Generation, what: string): { adapter: (typeof ADAPTERS)[Pr
 export async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void> {
   const { adapter, apiKey } = creatorOf(g, 'Kling voices');
   if (!adapter.createVoice) throw new Error(`${adapter.label} cannot create voices.`);
-  const seconds = get().assets[g.op!.sourceAssetId]?.duration;
+  const plan = resolveSendPlan(g);
+  const sourceId = plan.slots.audio ?? g.op!.sourceAssetId;
+  const seconds = get().assets[sourceId]?.duration;
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
-  const input = await mediaInput(g.op!.sourceAssetId);
+  const input = await mediaInput(sourceId);
   await runSpecialSend(g, signal, adapter.id, (hooks) => ({ method: 'createVoice', input: { input, apiKey, signal, ...hooks } }));
 }
 
@@ -80,7 +90,7 @@ export async function runCreateVoice(g: Generation, signal: AbortSignal): Promis
 export async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void> {
   const { adapter, apiKey } = creatorOf(g, 'Recraft styles');
   if (!adapter.createStyle) throw new Error(`${adapter.label} cannot create styles.`);
-  const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
+  const images = resolveSendPlan(g).slots.refs.filter((r) => get().assets[r]?.kind === 'image');
   if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
   const inputs = await Promise.all(images.map((r) => mediaInput(r)));
   await runSpecialSend(g, signal, adapter.id, (hooks) => ({ method: 'createStyle', input: { images: inputs, apiKey, signal, ...hooks } }));

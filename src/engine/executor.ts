@@ -38,6 +38,8 @@ export interface ExecContext {
   subjects?: PlanSubject[];
   nodeLibrary?: Subject[];
   nodeOperations?: Record<string, OpSpecInput['nodeChoice']>;
+  /** Frozen per-step send fingerprints approved from the preview; re-checked before transport. */
+  stepFingerprints?: Record<string, string>;
   /** Resuming a plan: steps already done (their outputs are reused, they do not run again). */
   prior?: Map<string, StepOutput>;
   /** Resuming a plan: steps that failed again and stay failed (their dependents are skipped). */
@@ -175,7 +177,11 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       nodeSubjects.push({ id: subject.name, name: subject.name, description: subject.description ?? '', kind: subject.kind ?? 'character', frontalAssetId: asset, refAssetIds: [] });
     }
     const inputsFor = <T extends object>(inputs: T) => ({ ...withLocal(inputs), ...(nodeSubjects.length ? { subjects: nodeSubjects } : {}) });
-    const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id, ...(ctx.approvalTicketId ? { approvalTicketId: ctx.approvalTicketId } : {}) };
+    const base = {
+      sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id,
+      ...(ctx.approvalTicketId ? { approvalTicketId: ctx.approvalTicketId } : {}),
+      ...(ctx.stepFingerprints?.[s.id] ? { approvedFingerprint: ctx.stepFingerprints[s.id] } : {}),
+    };
     return (RUN_STEP[s.kind] as RunStep<typeof s.kind>)(s as never, { ...runEnv, base, inputsFor });
   };
 

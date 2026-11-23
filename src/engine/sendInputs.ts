@@ -1,225 +1,282 @@
-/* The inputs of a send: media by slot, subjects, prompt rules, keyframes and clips (moved out of jobs.ts execute(), Opus #4). */
+/* Single payload builder for approval fingerprinting and provider transport (model, final params, all asset slots). */
 import { maskToAlpha } from '../lib/media';
+import { assetRevisionIdentity } from './assetRevisions';
+import { KLING_VOICE_REF, RECRAFT_STYLE_REF, sentModelRef } from './catalog';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { refsLimit } from './officialLimits';
-import { OPS, isVideoOpEngine } from './ops';
-import { audioInputProblem, songProblem, clipTrim, shotsProblem, routeAudio, durationChoices, placeKeyframes, paramByRole, routeVideoInputs, videoInputProblem } from './params';
+import { opChoice, opSpecForModel, type OpSpecInput } from './opSpec';
+import { OPS, isVideoOpEngine, opCount } from './ops';
+import {
+  audioInputProblem, clipTrim, durationChoices, mentionSubjects, paramByRole,
+  placeKeyframes, routeAudio, routeVideoInputs, shotsProblem, songProblem, videoInputProblem, wireParams,
+} from './params';
+import { parseRef } from './planRef';
+import { negFor, opRealism } from './realism';
 import { mapSubjectPrompts } from './subjectPrompts';
 import type { MediaInput } from './providers/types';
-import type { GenSettings, Generation, MediaKind, ModelSchema, ModelSummary } from './types';
+import type { AdvancedValue, Asset, GenSettings, Generation, MediaKind, ModelSchema, ModelSummary, OpId, PlanStep, Subject } from './types';
 import { useStore } from '../store/store';
 import { mediaInput, frameInput } from './assetIO';
 
 const get = useStore.getState;
+export const stable = (value: unknown): string => JSON.stringify(value, (_k, v) => v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b))) : v);
 
-export interface SlotInputs {
-  refs: MediaInput[];
-  refVideos: MediaInput[];
-  audios: MediaInput[];
-  firstFrame?: MediaInput;
-  lastFrame?: MediaInput;
-  video?: MediaInput;
-  mask?: MediaInput;
-  audio?: MediaInput;
-  refAudios: MediaInput[];
+export type SendSpec = Pick<Generation, 'kind' | 'modelRef' | 'prompt' | 'settings' | 'inputs' | 'op' | 'variants'>;
+export type SendState = { assets: Record<string, Asset>; library: Subject[]; catalog: { models: Record<string, ModelSummary>; schemas: Record<string, ModelSchema> } };
+
+export interface SendSlots {
+  refs: string[]; refVideos: string[]; audios: string[]; refAudios: string[];
+  firstFrame?: string; firstFrameFromLast?: boolean; lastFrame?: string; video?: string; mask?: string; audio?: string;
+  elements?: Array<{ name: string; description?: string; frontal?: string; refs: string[]; video?: string; voiceId?: string }>;
+  keyframes?: Array<{ assetId: string; frame: number }>;
+  clips?: Array<{ assetId: string; start: number; end: number }>;
 }
 
-/** The media the send carries, by slot: the operation's source or the generation's references, frames, mask and audio. */
-export async function slotInputs(g: Generation, model: ModelSummary, schema: ModelSchema, kind: MediaKind): Promise<SlotInputs> {
-    let refs: MediaInput[] = [];
-    let refVideos: MediaInput[] = [];
-    let audios: MediaInput[] = [];
-    let firstFrame: MediaInput | undefined;
-    let lastFrame: MediaInput | undefined;
-    let video: MediaInput | undefined;
-    if (g.op) {
-      const def = OPS[g.op.id];
-      if (isVideoOpEngine(def.engine)) {
-        video = await mediaInput(g.op.sourceAssetId);
-        const rule = sourceVideoRule(model.id);
-        const range = def.engine === 'video_edit' ? rule?.seconds.edit : def.engine === 'video_extend' ? rule?.seconds.extend : undefined;
-        const seconds = get().assets[g.op.sourceAssetId]?.duration;
-        if (range && seconds != null && (seconds < range[0] || seconds > range[1])) {
-          throw new InputError('VIDEO_DURATION', `${model.name} takes clips of ${range[0]}–${range[1]} s for this; this one is ${seconds.toFixed(1)} s.`);
-        }
-        // No source-video field (Seedance 2.5 omni reference): the clip goes in as the one reference video.
-        if (!schema.slots.video && (schema.slots.refVideos || schema.slots.mixedRefs)) {
-          refVideos = [video];
-          video = undefined;
-        }
-      } else if (def.engine === 'video') {
-        firstFrame = g.op.id === 'continue' ? await frameInput(g.op.sourceAssetId, 'last') : await mediaInput(g.op.sourceAssetId);
-      } else {
-        refs.push(await mediaInput(g.op.sourceAssetId));
-        for (const id of String(g.op.params._refs ?? '').split(',').filter(Boolean)) refs.push(await mediaInput(id));
-      }
-    } else {
-      for (const r of g.inputs.refs) {
-        const kind = get().assets[r]?.kind;
-        (kind === 'video' ? refVideos : kind === 'audio' ? audios : refs).push(await mediaInput(r));
-      }
-      if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
-      if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
+export interface ResolvedSendPlan {
+  kind: MediaKind | 'text'; modelRef: string; prompt: string; settings: GenSettings;
+  op?: { id: OpId; params: Record<string, AdvancedValue> }; variants?: string[]; slots: SendSlots; assetIds: string[];
+}
+
+const collectAssets = (s: SendSlots, assets: Record<string, Asset>) => [...new Set([
+  ...s.refs, ...s.refVideos, ...s.audios, ...s.refAudios, s.firstFrame, s.lastFrame, s.video, s.mask, s.audio,
+  ...(s.elements ?? []).flatMap((e) => [e.frontal, ...e.refs, e.video]),
+  ...(s.keyframes ?? []).map((k) => k.assetId), ...(s.clips ?? []).map((c) => c.assetId),
+].filter((id): id is string => Boolean(id && assets[id])))].sort();
+
+function buildPlan(spec: SendSpec, state: SendState = get(), over?: { model?: ModelSummary; schema?: ModelSchema; kind?: MediaKind }) {
+  const { assets, catalog } = state;
+  const slots: SendSlots = { refs: [], refVideos: [], audios: [], refAudios: [] };
+  const opMeta = spec.op ? { id: spec.op.id, params: spec.op.params } : undefined;
+  const finish = (kind: MediaKind | 'text', modelRef: string, prompt: string, settings: GenSettings) => ({
+    plan: { kind, modelRef, prompt, settings, op: opMeta, variants: spec.variants, slots, assetIds: collectAssets(slots, assets) } as ResolvedSendPlan,
+    rawImages: 0, preRefs: 0, preVideos: 0, subjects: [] as Subject[], mapped: undefined as ReturnType<typeof mapSubjectPrompts> | undefined,
+  });
+
+  if (spec.op && OPS[spec.op.id].engine === 'local') {
+    if (spec.op.sourceAssetId) slots.refs.push(spec.op.sourceAssetId);
+    if (spec.op.id === 'join_clips') {
+      slots.refVideos.push(...String(spec.op.params.clips ?? '').split(',').filter(Boolean));
+      if (String(spec.op.params.music ?? '')) slots.audio = String(spec.op.params.music);
     }
-    if (g.op && g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
-    // Mask operations (Edit region, Remove object): only models that declare a mask, in their convention.
-    let mask: MediaInput | undefined;
-    const engine = g.op ? OPS[g.op.id].engine : undefined;
-    if (g.op && (engine === 'inpaint' || engine === 'remove_object')) {
-      const def = OPS[g.op.id];
-      const maskId = String(g.op.params.mask ?? '');
-      const maskAsset = get().assets[maskId];
+    return finish(spec.kind, spec.modelRef, spec.prompt, spec.settings);
+  }
+  if (spec.op && ['transcribe', 'voice'].includes(OPS[spec.op.id].engine)) {
+    if (spec.op.sourceAssetId) slots.audio = spec.op.sourceAssetId;
+    return finish(spec.kind, spec.modelRef, spec.prompt, spec.settings);
+  }
+  if (spec.kind === 'text' && spec.modelRef === RECRAFT_STYLE_REF) {
+    slots.refs = spec.inputs.refs.filter((r) => !assets[r] || assets[r].kind === 'image');
+    return finish(spec.kind, spec.modelRef, spec.prompt, spec.settings);
+  }
+
+  const modelRef = (spec.kind === 'image' || spec.kind === 'video') && !spec.op && (spec.inputs.refs.length || spec.inputs.firstFrame)
+    ? sentModelRef(spec.modelRef, spec.kind, true) : spec.modelRef;
+  const model = over?.model ?? catalog.models[modelRef], schema = over?.schema ?? catalog.schemas[modelRef];
+  const kind: MediaKind | 'text' = over?.kind ?? (spec.kind === 'text' && model ? model.kind : spec.kind);
+
+  if (spec.op) {
+    const def = OPS[spec.op.id];
+    if (isVideoOpEngine(def.engine)) {
+      if (spec.op.sourceAssetId) slots.video = spec.op.sourceAssetId;
+      if (schema && !schema.slots.video && (schema.slots.refVideos || schema.slots.mixedRefs) && slots.video) { slots.refVideos = [slots.video]; slots.video = undefined; }
+    } else if (def.engine === 'video') {
+      if (spec.op.sourceAssetId) slots.firstFrame = spec.op.sourceAssetId;
+      if (spec.op.id === 'continue') slots.firstFrameFromLast = true;
+    } else {
+      if (spec.op.sourceAssetId) slots.refs.push(spec.op.sourceAssetId);
+      slots.refs.push(...String(spec.op.params._refs ?? '').split(',').filter(Boolean));
+    }
+    if (spec.inputs.lastFrame) slots.lastFrame = spec.inputs.lastFrame;
+    if ((def.engine === 'inpaint' || def.engine === 'remove_object') && String(spec.op.params.mask ?? '')) slots.mask = String(spec.op.params.mask);
+  } else {
+    for (const r of spec.inputs.refs) (assets[r]?.kind === 'video' ? slots.refVideos : assets[r]?.kind === 'audio' ? slots.audios : slots.refs).push(r);
+    slots.firstFrame = spec.inputs.firstFrame;
+    slots.lastFrame = spec.inputs.lastFrame;
+  }
+
+  if (schema && spec.kind === 'video' && !slots.video && !(spec.op && slots.refVideos.length)) {
+    ({ firstFrame: slots.firstFrame, images: slots.refs, videos: slots.refVideos } = routeVideoInputs(schema.slots, slots.refs, slots.refVideos, slots.firstFrame));
+  }
+  if (schema) ({ audio: slots.audio, refAudios: slots.refAudios } = routeAudio(schema.slots, slots.audios));
+  const rawImages = slots.refs.length;
+
+  const local = spec.inputs.subjects ?? [];
+  const subjects = [...local, ...(spec.inputs.nodeLibrary ?? state.library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
+  let prompt = spec.prompt, genSettings = spec.settings;
+  let mapped: ReturnType<typeof mapSubjectPrompts> | undefined;
+  if (schema && model) {
+    mapped = mapSubjectPrompts(spec.prompt, spec.settings.shots, subjects, schema, model.id, slots.refs.length);
+    prompt = mapped.prompt;
+    if (mapped.shots) genSettings = { ...genSettings, shots: mapped.shots };
+    const el = schema.slots.elements;
+    if (el && mapped.ids.length) {
+      slots.elements = mapped.ids.map((sid) => {
+        const s = subjects.find((x) => x.id === sid)!;
+        return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: s.refAssetIds.slice(0, el.refMax), video: el.video ? s.videoAssetId : undefined, voiceId: s.voiceId };
+      });
+    } else if (mapped.subjectImages && mapped.ids.length) {
+      const chosen = mapped.ids.map((id) => subjects.find((x) => x.id === id)!);
+      const room = Math.max(0, refsLimit(schema, spec.settings.count) - (schema.slots.mixedRefs ? slots.refs.length + slots.refVideos.length + slots.refAudios.length : slots.refs.length));
+      slots.refs = [...slots.refs, ...chosen.map((s) => s.frontalAssetId).filter((id): id is string => Boolean(id)), ...chosen.flatMap((s) => s.refAssetIds).slice(0, Math.max(0, room - chosen.length))];
+    }
+  } else {
+    const ids = mentionSubjects([spec.prompt, ...(spec.settings.shots ?? []).map((s) => s.prompt)].join('\n'), subjects).ids;
+    if (ids.length) slots.elements = ids.map((sid) => { const s = subjects.find((x) => x.id === sid)!; return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: [...s.refAssetIds], video: s.videoAssetId, voiceId: s.voiceId }; });
+  }
+
+  const preRefs = slots.refs.length, preVideos = slots.refVideos.length;
+  if (schema?.slots.shots?.exclusivePrompt && spec.settings.shots?.length) prompt = '';
+  if (schema?.slots.keyframes && slots.refs.length) {
+    const def = Number(paramByRole(schema, 'duration')?.default);
+    const duration = genSettings.duration != null && genSettings.duration > 0 ? genSettings.duration : Number.isFinite(def) && def > 0 ? def : durationChoices(schema).find((d) => d > 0) ?? 5;
+    genSettings = { ...genSettings, duration };
+    const frames = placeKeyframes(slots.refs.length, duration, schema.slots.keyframes.fps, slots.refs.map((id) => spec.inputs.times?.[id]));
+    slots.keyframes = slots.refs.map((assetId, i) => ({ assetId, frame: frames[i] }));
+    slots.refs = [];
+  }
+  if (schema?.slots.clips && slots.refVideos.length) {
+    slots.clips = slots.refVideos.map((assetId) => { const [start, end] = clipTrim(schema.slots.clips!, assets[assetId]?.duration, spec.inputs.trims?.[assetId]); return { assetId, start, end }; });
+    slots.refVideos = [];
+  }
+  if (model && schema && kind !== 'text') {
+    const shown = opRealism(spec, kind, prompt, model.id);
+    genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
+    prompt = shown;
+  }
+  return { plan: { kind, modelRef, prompt, settings: genSettings, op: opMeta, variants: spec.variants, slots, assetIds: collectAssets(slots, assets) } as ResolvedSendPlan, rawImages, preRefs, preVideos, subjects, mapped };
+}
+
+export const resolveSendPlan = (spec: SendSpec, state: SendState = get(), over?: { model?: ModelSummary; schema?: ModelSchema; kind?: MediaKind }): ResolvedSendPlan =>
+  buildPlan(spec, state, over).plan;
+
+export function sendFingerprint(plan: ResolvedSendPlan, state: Pick<SendState, 'assets' | 'catalog'> = get(), opts: { ignoreSeed?: boolean } = {}): string {
+  const schema = state.catalog.schemas[plan.modelRef];
+  const source = { ...plan.settings, ...(opts.ignoreSeed ? { seed: undefined } : {}) };
+  const settings = schema ? { count: plan.settings.count, params: { ...Object.fromEntries(schema.params.filter((p) => !['seed', 'count', 'negative'].includes(p.role) && p.default !== undefined).map((p) => [p.key, p.default])), ...wireParams(schema, source, plan.settings.count) } } : source;
+  return stable({ kind: plan.kind, modelRef: plan.modelRef, prompt: plan.prompt, settings, op: plan.op, variants: plan.variants, slots: plan.slots, assets: plan.assetIds.map((id) => [id, assetRevisionIdentity(state.assets[id])]) });
+}
+
+export function describeStepsSend(steps: readonly PlanStep[], nodeOperations?: Record<string, OpSpecInput['nodeChoice']>, state: SendState = get()) {
+  const textById = new Map(steps.filter((s) => s.kind === 'text').map((s) => [s.id, s.text]));
+  const fingerprints: Record<string, string> = {}, concreteFingerprints: Record<string, string> = {};
+  const assetIds = new Set<string>();
+  for (const s of steps) {
+    if (s.kind === 'text' || s.kind === 'layer') { fingerprints[s.id] = stable(s.kind === 'text' ? { kind: 'text', text: s.text } : s); continue; }
+    let dynamic = false;
+    const take = (ref: string | undefined) => { if (!ref) return undefined; const p = parseRef(ref); if (p?.type === 'asset') return p.id; dynamic = true; return `step:${ref}`; };
+    const textOf = (ref: string | undefined) => { const p = ref ? parseRef(ref) : null; const t = p?.type === 'step' ? textById.get(p.id) : undefined; if (ref && t == null) dynamic = true; return t; };
+    const promptFor = (step: { prompt: string; promptFrom?: string }) => step.promptFrom ? [(textOf(step.promptFrom) ?? `step:${step.promptFrom}`).trim(), step.prompt.trim()].filter(Boolean).join('\n') : step.prompt;
+    const subjects: Subject[] = (s.nodeSubjects ?? []).map((b) => ({ id: b.name, name: b.name, description: b.description ?? '', kind: b.kind ?? 'character', frontalAssetId: take(b.from), refAssetIds: [] }));
+    const inputsBase = { ...(subjects.length ? { subjects } : {}), nodeLibrary: state.library };
+
+    let spec: SendSpec;
+    if (s.kind === 'op') {
+      const source = take(s.input) ?? '';
+      let params = s.params;
+      if (s.more?.length) params = { ...params, clips: s.more.map((r) => take(r) ?? '').join(','), ...(typeof params.music === 'string' && params.music ? { music: take(params.music) ?? '' } : {}) };
+      if (s.refs?.length) { const got = s.refs.map((r) => ({ asset: take(r.ref) ?? '', role: r.role, note: r.note })); params = { ...params, _refs: got.map((x) => x.asset).join(','), _refRoles: JSON.stringify(got) }; }
+      const def = OPS[s.op];
+      if (def.engine === 'local' || def.engine === 'voice' || def.engine === 'transcribe') {
+        const modelRef = s.op === 'join_clips' ? 'local::join' : def.engine === 'local' ? 'local::frame' : def.engine === 'voice' ? KLING_VOICE_REF : 'transcribe';
+        spec = { kind: def.engine === 'local' ? (s.op === 'join_clips' ? 'video' : 'image') : 'text', prompt: def.label, modelRef, settings: { count: opCount(def, params), advanced: {} }, inputs: { refs: [] }, op: { id: s.op, params, sourceAssetId: source } };
+      } else {
+        const p = parseRef(s.input), upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined, nodeChoice = nodeOperations?.[s.id];
+        const choice = opChoice({ op: s.op, params, sourceAssetId: dynamic ? '' : source, nodeChoice, upstreamModelRef: upstream && 'modelRef' in upstream ? upstream.modelRef : undefined });
+        const built = opSpecForModel({ sessionId: '', origin: 'node', op: s.op, params, sourceAssetId: source, nodeChoice }, choice.ref, choice.viaEdit, state.catalog.schemas[choice.ref]);
+        spec = { ...built, inputs: built.inputs ?? { refs: [] } };
+      }
+    } else if (s.kind === 'audio') {
+      const settings = s.lyricsFrom ? { ...s.settings, extras: { ...s.settings.extras, __lyricsFrom: textOf(s.lyricsFrom) ?? `step:${s.lyricsFrom}` } } : s.settings;
+      spec = { kind: s.textOutput ? 'text' : 'audio', prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: { refs: [], ...inputsBase } };
+    } else if (s.kind === 'video') {
+      const refs = (s.refs ?? []).map((r) => take(r) ?? '');
+      const times = Object.fromEntries(refs.flatMap((a, i) => (s.times?.[i] != null ? [[a, s.times[i]]] : [])));
+      spec = { kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs, firstFrame: take(s.firstFrame), lastFrame: take(s.lastFrame), ...(Object.keys(times).length ? { times } : {}), ...inputsBase } };
+    } else {
+      spec = { kind: s.kind, prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs: s.refs.map((r) => take(r) ?? ''), ...inputsBase }, ...(s.kind === 'image' && s.variations?.length ? { variants: s.variations } : {}) };
+    }
+    const plan = resolveSendPlan(spec, state);
+    fingerprints[s.id] = sendFingerprint(plan, state);
+    if (!dynamic) concreteFingerprints[s.id] = sendFingerprint(plan, state, { ignoreSeed: true });
+    plan.assetIds.forEach((id) => assetIds.add(id));
+  }
+  return { fingerprints, concreteFingerprints, assetIds: [...assetIds].sort() };
+}
+
+/** Validate and load blobs strictly from the exact asset IDs resolved by `resolveSendPlan`. */
+export async function materializeSendInputs(g: Generation, model: ModelSummary, schema: ModelSchema, kind: MediaKind) {
+  const state = get();
+  const { plan, rawImages, preRefs, preVideos, subjects, mapped } = buildPlan(g, state, { model, schema, kind });
+  const cache = new Map<string, Promise<MediaInput>>();
+  const load = (id: string, last = false) => cache.get(`${last}:${id}`) ?? (cache.set(`${last}:${id}`, last ? frameInput(id, 'last') : mediaInput(id)), cache.get(`${last}:${id}`)!);
+
+  if (g.op) {
+    const def = OPS[g.op.id];
+    if (isVideoOpEngine(def.engine)) {
+      const range = def.engine === 'video_edit' ? sourceVideoRule(model.id)?.seconds.edit : def.engine === 'video_extend' ? sourceVideoRule(model.id)?.seconds.extend : undefined;
+      const seconds = state.assets[g.op.sourceAssetId]?.duration;
+      if (range && seconds != null && (seconds < range[0] || seconds > range[1])) throw new InputError('VIDEO_DURATION', `${model.name} takes clips of ${range[0]}–${range[1]} s for this; this one is ${seconds.toFixed(1)} s.`);
+    }
+    if (def.engine === 'inpaint' || def.engine === 'remove_object') {
+      const maskAsset = state.assets[plan.slots.mask ?? ''], src = state.assets[g.op.sourceAssetId];
       if (!maskAsset) throw new InputError('MASK_MISSING', `${def.label} needs a mask: paint the area in Sketch.`);
       if (!schema.slots.mask) throw new InputError('MASK_UNSUPPORTED', `${model.name} cannot take a mask. Pick a model for ${def.label} in Settings → Operations.`);
-      const src = get().assets[g.op.sourceAssetId];
-      if (src && (maskAsset.width !== src.width || maskAsset.height !== src.height)) {
-        throw new InputError('MASK_SIZE', `The mask is ${maskAsset.width}×${maskAsset.height} but the image is ${src.width}×${src.height}.`);
-      }
-      const input = await mediaInput(maskId);
-      mask = schema.slots.mask.convention === 'alpha' ? { ...input, blob: await maskToAlpha(input.blob), mime: 'image/png' } : input;
+      if (src && (maskAsset.width !== src.width || maskAsset.height !== src.height)) throw new InputError('MASK_SIZE', `The mask is ${maskAsset.width}×${maskAsset.height} but the image is ${src.width}×${src.height}.`);
     }
-    if (g.kind === 'image' && (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0) > refs.length) {
-      throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
-    }
-    if (kind === 'model3d') {
-      if (refVideos.length || audios.length || firstFrame || lastFrame) throw new InputError('MODEL3D_MEDIA_INPUT', `${model.name} takes only images.`);
-      if (refs.length && !schema.slots.images) throw new InputError('MODEL3D_NO_IMAGE_INPUT', `${model.name} takes text only.`);
-      const problem = model3dProblem(model.id, model, g.prompt, refs.map((r) => ({ size: r.blob.size, width: r.width, height: r.height })));
-      if (problem) throw new InputError(problem.code, `${model.name} ${problem.message}`);
-    }
-    if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
-    if (g.kind === 'video' && !video && !(g.op && refVideos.length)) {
-      // A reference-to-video model has no start frame: an image given as one becomes a reference.
-      const routed = routeVideoInputs(schema.slots, refs, refVideos, firstFrame);
-      ({ firstFrame, images: refs, videos: refVideos } = routed);
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
-      if (problem) throw new Error(`${model.name} ${problem}`);
-    }
-    if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
-    if (g.kind === 'image' && refVideos.length && !schema.slots.clips) throw new InputError('VIDEO_REF_UNSUPPORTED', `${model.name} does not take video references.`);
-    if (g.kind === 'image' && refVideos.length < (schema.slots.clips?.min ?? 0)) throw new InputError('VIDEO_REF_REQUIRED', `${model.name} needs a reference video clip.`);
-    if (kind === 'image' || kind === 'audio') {
-      const problem = audioInputProblem(schema.slots, audios.length);
-      if (problem) throw new InputError('AUDIO_INPUT', `${model.name} ${problem}`);
-    }
-    if (kind === 'audio') {
-      if (refs.length || refVideos.length || firstFrame || lastFrame) throw new InputError('AUDIO_MEDIA_INPUT', `${model.name} takes no images or videos.`);
-      const song = songProblem(schema, g.prompt, g.settings);
-      if (song) throw new InputError(song.code, `${model.name}: ${song.message}`);
-    }
-    // Audio: the first track to a single-track field (lip-sync, soundtrack), the rest as references.
-    const { audio, refAudios } = routeAudio(schema.slots, audios);
-    return { refs, refVideos, audios, firstFrame, lastFrame, video, mask, audio, refAudios };
-}
+  }
+  if (g.kind === 'image' && (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0) > rawImages) throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
+  if (kind === 'model3d') {
+    if (preVideos || plan.slots.audios.length || plan.slots.firstFrame || plan.slots.lastFrame) throw new InputError('MODEL3D_MEDIA_INPUT', `${model.name} takes only images.`);
+    if (preRefs && !schema.slots.images) throw new InputError('MODEL3D_NO_IMAGE_INPUT', `${model.name} takes text only.`);
+  }
+  if (g.kind === 'image' && rawImages && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
+  if (g.kind === 'video' && !plan.slots.video && !(g.op && preVideos)) {
+    const p = videoInputProblem(schema.slots, { firstFrame: Boolean(plan.slots.firstFrame), lastFrame: Boolean(plan.slots.lastFrame), sourceVideo: Boolean(plan.slots.video), images: rawImages, videos: preVideos, audios: plan.slots.audios.length, resolution: g.settings.resolution });
+    if (p) throw new Error(`${model.name} ${p}`);
+  }
+  if (plan.slots.video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
+  if (g.kind === 'image' && preVideos && !schema.slots.clips) throw new InputError('VIDEO_REF_UNSUPPORTED', `${model.name} does not take video references.`);
+  if (g.kind === 'image' && preVideos < (schema.slots.clips?.min ?? 0)) throw new InputError('VIDEO_REF_REQUIRED', `${model.name} needs a reference video clip.`);
+  if (kind === 'image' || kind === 'audio') { const p = audioInputProblem(schema.slots, plan.slots.audios.length); if (p) throw new InputError('AUDIO_INPUT', `${model.name} ${p}`); }
+  if (kind === 'audio') {
+    if (preRefs || preVideos || plan.slots.firstFrame || plan.slots.lastFrame) throw new InputError('AUDIO_MEDIA_INPUT', `${model.name} takes no images or videos.`);
+    const song = songProblem(schema, g.prompt, g.settings);
+    if (song) throw new InputError(song.code, `${model.name}: ${song.message}`);
+  }
+  if (schema.slots.elements && mapped?.ids.length) {
+    if (mapped.ids.length > schema.slots.elements.max) throw new InputError('SUBJECTS_MAX', `${model.name} takes up to ${schema.slots.elements.max} subjects; the prompt mentions ${mapped.ids.length}.`);
+    for (const sid of mapped.ids) { const s = subjects.find((x) => x.id === sid)!; if (!s.frontalAssetId && !(schema.slots.elements.video && s.videoAssetId)) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${s.name}" needs a frontal image${schema.slots.elements.video ? ' or a video' : ''}.`); }
+  } else if (mapped?.subjectImages && mapped.ids.length) {
+    const chosen = mapped.ids.map((id) => subjects.find((x) => x.id === id)!);
+    const inc = chosen.find((s) => !s.frontalAssetId);
+    if (inc) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${inc.name}" needs a frontal image to be used with ${model.name}.`);
+    const used = schema.slots.mixedRefs ? rawImages + preVideos + plan.slots.refAudios.length : rawImages, max = refsLimit(schema, g.settings.count);
+    if (chosen.length > max - used) throw new InputError('SUBJECTS_MAX', `${model.name} takes ${max} reference image${max === 1 ? '' : 's'}; the step already has ${used}, so ${chosen.length} subject${chosen.length === 1 ? '' : 's'} do not fit.`);
+  }
+  if (kind === 'video' && schema.slots.frameRules) {
+    const p = videoInputProblem(schema.slots, { firstFrame: Boolean(plan.slots.firstFrame), lastFrame: Boolean(plan.slots.lastFrame), sourceVideo: Boolean(plan.slots.video), images: preRefs, videos: preVideos, audios: plan.slots.audios.length, resolution: g.settings.resolution });
+    if (p) throw new Error(`${model.name} ${p}`);
+  }
+  if (schema.slots.promptMax && (mapped?.prompt.length ?? 0) > schema.slots.promptMax) throw new InputError('PROMPT_TOO_LONG', `${model.name} takes prompts up to ${schema.slots.promptMax} characters (this one has ${mapped!.prompt.length}).`);
+  const shotP = schema.slots.shots ? shotsProblem(g.settings.shots, g.settings.duration) : null;
+  if (shotP) throw new InputError('SHOTS_DURATION', `${model.name}: ${shotP}`);
+  void (schema.slots.shots?.exclusivePrompt && g.settings.shots?.length);
 
-type Shots = ReturnType<typeof mapSubjectPrompts>['shots'];
-export interface SubjectInputs {
-  refs: MediaInput[];
-  prompt: string;
-  shots: Shots;
-  elements?: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }>;
-}
-
-/** "@Name" mentions: the provider's elements where it has them, else subject images joined to the references. */
-export async function subjectInputs(g: Generation, model: ModelSummary, schema: ModelSchema, slots: SlotInputs): Promise<SubjectInputs> {
-  const { refVideos, refAudios } = slots;
-  let { refs } = slots;
-    // Subjects: "@Name" mentions become the provider's elements (Kling); elsewhere just the name.
-    // A plan's own reference (not yet chosen for the library) wins over a library item with the same name.
-    const local = g.inputs.subjects ?? [];
-    const subjects = [...local, ...(g.inputs.nodeLibrary ?? get().library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
-    const elSlot = schema.slots.elements;
-    const mappedSubjects = mapSubjectPrompts(g.prompt, g.settings.shots, subjects, schema, model.id, refs.length);
-    const mentioned = { ids: mappedSubjects.ids };
-    let prompt = mappedSubjects.prompt;
-    let elements: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }> | undefined;
-    if (elSlot && mentioned.ids.length) {
-      if (mentioned.ids.length > elSlot.max) throw new InputError('SUBJECTS_MAX', `${model.name} takes up to ${elSlot.max} subjects; the prompt mentions ${mentioned.ids.length}.`);
-      elements = [];
-      for (const sid of mentioned.ids) {
-        const s = subjects.find((x) => x.id === sid)!;
-        const video = elSlot.video && s.videoAssetId ? await mediaInput(s.videoAssetId) : undefined;
-        if (!s.frontalAssetId && !video) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${s.name}" needs a frontal image${elSlot.video ? ' or a video' : ''}.`);
-        elements.push({
-          name: s.name,
-          description: s.description,
-          frontal: s.frontalAssetId ? await mediaInput(s.frontalAssetId) : undefined,
-          refs: await Promise.all(s.refAssetIds.slice(0, elSlot.refMax).map((r) => mediaInput(r))),
-          video,
-          voiceId: s.voiceId,
-        });
-      }
-    }
-    // Models without elements (R10): subject images join the references; the mention becomes the model's own
-    // syntax, numbered from the step's real references (frontal views first).
-    const subjectImages = mappedSubjects.subjectImages;
-    if (subjectImages) {
-      if (mentioned.ids.length) {
-        const chosen = mentioned.ids.map((id) => subjects.find((x) => x.id === id)!);
-        const incomplete = chosen.find((s) => !s.frontalAssetId);
-        if (incomplete) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${incomplete.name}" needs a frontal image to be used with ${model.name}.`);
-        const used = schema.slots.mixedRefs ? refs.length + refVideos.length + refAudios.length : refs.length;
-        const max = refsLimit(schema, g.settings.count);
-        const room = max - used;
-        if (chosen.length > room) throw new InputError('SUBJECTS_MAX', `${model.name} takes ${max} reference image${max === 1 ? '' : 's'}; the step already has ${used}, so ${chosen.length} subject${chosen.length === 1 ? '' : 's'} do not fit.`);
-        const frontals = await Promise.all(chosen.map((s) => mediaInput(s.frontalAssetId!)));
-        const views = chosen.flatMap((s) => s.refAssetIds).slice(0, room - chosen.length);
-        refs = [...refs, ...frontals, ...(await Promise.all(views.map((id) => mediaInput(id))))];
-      }
-    }
-    return { refs, prompt, shots: mappedSubjects.shots, elements };
-}
-
-/** What the model's own rules say about the inputs, the prompt length and the shots; the settings the send runs with. */
-export function promptShape(g: Generation, model: ModelSummary, schema: ModelSchema, kind: MediaKind, slots: SlotInputs, subjects: SubjectInputs): { prompt: string; genSettings: GenSettings } {
-  const { firstFrame, lastFrame, video, audios } = slots;
-  const { refs } = subjects;
-  const { refVideos } = slots;
-  let { prompt } = subjects;
-  const mappedSubjects = { shots: subjects.shots };
-    if (kind === 'video' && schema.slots.frameRules) {
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
-      if (problem) throw new Error(`${model.name} ${problem}`);
-    }
-    const promptMax = schema.slots.promptMax;
-    if (promptMax && prompt.length > promptMax) throw new InputError('PROMPT_TOO_LONG', `${model.name} takes prompts up to ${promptMax} characters (this one has ${prompt.length}).`);
-    // Multi-shot storyboard: shots must add up to the clip; some providers take shots instead of the prompt.
-    const shotProblem = schema.slots.shots ? shotsProblem(g.settings.shots, g.settings.duration) : null;
-    if (shotProblem) throw new InputError('SHOTS_DURATION', `${model.name}: ${shotProblem}`);
-    let genSettings = g.settings;
-    if (mappedSubjects.shots) genSettings = { ...g.settings, shots: mappedSubjects.shots };
-    if (schema.slots.shots?.exclusivePrompt && g.settings.shots?.length) prompt = '';
-
-    return { prompt, genSettings };
-}
-
-/** Keyframe images at frame positions and reference videos as trimmed clips, for the models that take them that way. */
-export function structuredSlots(g: Generation, schema: ModelSchema, subjects: SubjectInputs, slots: SlotInputs, settings: GenSettings) {
-  let { refs } = subjects;
-  let { refVideos } = slots;
-  let genSettings = settings;
-    // Structured inputs: keyframe images at frame positions, reference videos as trimmed clips.
-    let keyframes: Array<{ input: MediaInput; frame: number }> | undefined;
-    let clips: Array<{ input: MediaInput; start: number; end: number }> | undefined;
-    if (schema.slots.keyframes && refs.length) {
-      // Positions need an explicit length (BFL): the chosen one, else the model's default, else its shortest.
-      const choices = durationChoices(schema).filter((d) => d > 0);
-      const def = Number(paramByRole(schema, 'duration')?.default);
-      const duration = genSettings.duration != null && genSettings.duration > 0 ? genSettings.duration : Number.isFinite(def) && def > 0 ? def : choices[0] ?? 5;
-      genSettings = { ...genSettings, duration };
-      const frames = placeKeyframes(refs.length, duration, schema.slots.keyframes.fps, refs.map((r) => g.inputs.times?.[r.assetId]));
-      keyframes = refs.map((input, i) => ({ input, frame: frames[i] }));
-      refs = [];
-    }
-    if (schema.slots.clips && refVideos.length) {
-      const slot = schema.slots.clips;
-      clips = refVideos.map((input) => {
-        const [start, end] = clipTrim(slot, get().assets[input.assetId]?.duration, g.inputs.trims?.[input.assetId]);
-        return { input, start, end };
-      });
-      refVideos = [];
-    }
-
-    return { keyframes, clips, refs, refVideos, genSettings };
+  const [refs, refVideos, refAudios, firstFrame, lastFrame, video, audio] = await Promise.all([
+    Promise.all(plan.slots.refs.map((id) => load(id))), Promise.all(plan.slots.refVideos.map((id) => load(id))), Promise.all(plan.slots.refAudios.map((id) => load(id))),
+    plan.slots.firstFrame ? load(plan.slots.firstFrame, Boolean(plan.slots.firstFrameFromLast)) : undefined,
+    plan.slots.lastFrame ? load(plan.slots.lastFrame) : undefined, plan.slots.video ? load(plan.slots.video) : undefined, plan.slots.audio ? load(plan.slots.audio) : undefined,
+  ]);
+  const rawMask = plan.slots.mask ? await load(plan.slots.mask) : undefined;
+  const mask = rawMask && schema.slots.mask?.convention === 'alpha' ? { ...rawMask, blob: await maskToAlpha(rawMask.blob), mime: 'image/png' } : rawMask;
+  const elements = plan.slots.elements ? await Promise.all(plan.slots.elements.map(async (e) => ({ name: e.name, description: e.description, voiceId: e.voiceId, frontal: e.frontal ? await load(e.frontal) : undefined, refs: await Promise.all(e.refs.map((id) => load(id))), video: e.video ? await load(e.video) : undefined }))) : undefined;
+  const keyframes = plan.slots.keyframes ? await Promise.all(plan.slots.keyframes.map(async (k) => ({ input: await load(k.assetId), frame: k.frame }))) : undefined;
+  const clips = plan.slots.clips ? await Promise.all(plan.slots.clips.map(async (c) => ({ input: await load(c.assetId), start: c.start, end: c.end }))) : undefined;
+  if (kind === 'model3d') {
+    const p = model3dProblem(model.id, model, g.prompt, refs.map((r) => ({ size: r.blob.size, width: r.width, height: r.height })));
+    if (p) throw new InputError(p.code, `${model.name} ${p.message}`);
+  }
+  return { plan, prompt: plan.prompt, genSettings: plan.settings, refs, refVideos, keyframes, clips, audio, refAudios, elements, mask, firstFrame, lastFrame, video };
 }

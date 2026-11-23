@@ -1,11 +1,11 @@
-import { assetRevisionIdentity } from '../assetRevisions';
 import { parseRef } from '../planRef';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor } from '../catalog';
 import { nodePreviewInputProblem, nodePreviewRefs } from '../planSteps/graph';
 import { isStepKind } from '../planSteps/inspect';
-import { nodeRequest, stable, toolParamAssets } from './freshness';
+import { nodeRequest, stable } from './freshness';
+import { describeStepsSend } from '../sendInputs';
 import { rememberNodeRequest, requestContext } from './result';
 import { lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { localTimeZone } from '../feedMeta';
@@ -200,12 +200,15 @@ function nodeOperationsOf(context: ReturnType<typeof requestContext>, graph: imp
 
 export interface NodeRunPreview {
   estimate: Estimate;
+  perStep?: Record<string, Estimate>;
   count: number;
   errors: string[];
   runIds: string[];
   steps: import('../types').PlanStep[];
   signature: string;
   inputIds: string[];
+  sendAssets?: string[];
+  stepFingerprints?: Record<string, string>;
 }
 
 export function previewRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): NodeRunPreview {
@@ -215,16 +218,10 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
   const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context, ...(frozenRunIds ? { frozenRunIds } : {}) });
   const env = storeEnv();
   const inputs = new Set(run.runIds);
-  const assets = new Set<string>();
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);
     const subjects = n && 'subjects' in n.data ? (n.data.subjects ?? []).filter(s => !s.from.startsWith('asset:')).map(s => s.from.split('#')[0]) : [];
-    if (n?.data.kind === 'tool') for (const aid of toolParamAssets(n.data.params, st.assets)) assets.add(aid);
-    const linked = n ? resolveInputs(graph, n, env).flatMap(i => {
-      if (!i.from || i.broken || ignoredRunCable(i)) return [];
-      if (i.value && st.assets[i.value]) assets.add(i.value);
-      return [i.from];
-    }) : [];
+    const linked = n ? resolveInputs(graph, n, env).flatMap(i => (!i.from || i.broken || ignoredRunCable(i) ? [] : [i.from])) : [];
     for (const source of [...linked, ...subjects]) if (!inputs.has(source)) { inputs.add(source); visit(source); }
   };
   run.runIds.forEach(visit);
@@ -264,13 +261,15 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
     if (problem) errors.push(`${step.title}: ${problem}`);
   }
   errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : isStepKind(s, 'op') && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
-  const { total } = estimateSteps(run.steps, nodeOperationsOf(context, graph, run.runIds));
+  const nodeOperations = nodeOperationsOf(context, graph, run.runIds);
+  const { total, perStep } = estimateSteps(run.steps, nodeOperations);
+  const send = describeStepsSend(run.steps, nodeOperations, st);
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) return [id, 'missing']; // already reported as an error above
     return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
   });
-  return { estimate: total, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], signature: stable({ requests, assets: [...assets].sort().map(id => assetRevisionIdentity(st.assets[id])), steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
+  return { estimate: total, perStep, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], sendAssets: send.assetIds, stepFingerprints: send.concreteFingerprints, signature: stable({ requests, send: send.fingerprints, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
 
 export async function prepareNodeRun(sessionId: string, targets: string[], force = true, frozenRunIds?: readonly string[]): Promise<NodeRunPreview> {
@@ -322,20 +321,14 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
   const startGraph = get().sessions[sessionId].graph;
-  const assetIds = preview.inputIds.flatMap(id => {
-    const st = get(), n = st.sessions[sessionId].graph.nodes.find(n => n.id === id)!;
-    const asset = nodeOutputAsset(n, st.generations);
-    const req = nodeRequest(st.sessions[sessionId].graph, n, st.generations, st.library, requestContext(sessionId));
-    const subjects = 'subjects' in req ? req.subjects ?? [] : [];
-    return [...(asset ? [asset] : []), ...subjects.flatMap(s => [s.frontal, s.video, ...s.refs].filter((id): id is string => Boolean(id))), ...(n.data.kind === 'tool' ? toolParamAssets(n.data.params, st.assets) : [])];
-  });
-  const releaseAssets = lockAssets(assetIds);
   const library = structuredClone(get().library);
   const context = requestContext(sessionId);
-  const nodeOperations = nodeOperationsOf(context, get().sessions[sessionId].graph, preview.runIds);
+  const nodeOperations = nodeOperationsOf(context, startGraph, preview.runIds);
+  const releaseAssets = lockAssets(preview.sendAssets ?? describeStepsSend(preview.steps, nodeOperations, get()).assetIds);
   try {
     const result = await executeSteps(preview.steps, {
       sessionId, workspace: 'node', origin: 'node', approvalTicketId, nodeLock: release, nodeLibrary: library, nodeOperations,
+      stepFingerprints: preview.stepFingerprints,
       onState: (stepId, state, info) => {
         if (info?.generationId) rememberNodeRequest(info.generationId, startGraph, library, context);
         onState?.(stepId, state, info);

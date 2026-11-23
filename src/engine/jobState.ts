@@ -37,6 +37,8 @@ export interface GenerationSpec {
   nodeRequest?: string;
   /** Durable approval ticket covering this generation. */
   approvalTicketId?: string;
+  /** Frozen fingerprint of the resolved send payload approved by the user. */
+  approvedFingerprint?: string;
   /** Runtime per-action budget pass ("Continue once" / "Allow this time"); never persisted. */
   budgetPass?: BudgetPass;
   estimate?: Estimate;

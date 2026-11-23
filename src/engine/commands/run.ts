@@ -1,10 +1,5 @@
 import { z } from 'zod';
-import { useStore } from '../../store/store';
-import { assetRevisionIdentity } from '../assetRevisions';
-import { bufferVersion } from '../design/raster';
-import { directModelRef } from '../directModel';
 import { stable } from '../flow/freshness';
-import { mentionSubjects } from '../params';
 import { withSequenceStepPass, type BudgetPass } from '../budget';
 import { FREE, UNKNOWN, sumEstimates } from '../pricing';
 import type { Estimate } from '../types';
@@ -21,35 +16,10 @@ import { COMMAND_REVIEW_CHANGED, CommandError, type AnyCommand, type Caller, typ
  * Both go through the same commands, the same undo transactions and the same echo.
  */
 
-const stringsIn = (value: unknown): string[] =>
-  typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(stringsIn) : [];
-
-/** Paid commands share the same review/before-run check. Graph commands supply their resolved preview. */
+/** Paid commands supply their resolved send review; fallback signs args, target and estimate. */
 export function commandReview(spec: AnyCommand, ctx: CommandContext, args: unknown): CommandReview {
   if (spec.review) return spec.review(ctx, args);
-  const state = useStore.getState();
-  const { mode, text, attachments, times, trims, editing, image, video, audio, model3d, designerTarget } = state.composer;
-  const composer = { mode, text, attachments, times, trims, editing, image, video, audio, model3d, designerTarget };
-  const refs = stringsIn([args, ctx.on, editing]);
-  const layers = state.sessions[ctx.on.session ?? '']?.docs.find((d) => refs.includes(d.id))?.layers.filter((l) => refs.includes(l.id));
-  const generations = refs.flatMap((id) => {
-    const g = state.generations[id];
-    return g ? [{ kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, inputs: g.inputs, settings: g.settings, op: g.op, variants: g.variants }] : [];
-  });
-  const inputs = stringsIn([args, composer, layers, generations]);
-  const mentioned = new Set(inputs.flatMap((t) => (t.includes('@') ? mentionSubjects(t, state.library).ids : [])));
-  const subjects = state.library.filter((s) => mentioned.has(s.id) || refs.includes(s.id));
-  const assets = [...new Set([...inputs.flatMap((s) => s.split(',').map((id) => id.trim().replace(/^asset:/, ''))), ...stringsIn(subjects)])]
-    .filter((id) => state.assets[id]).sort().map((id) => [assetRevisionIdentity(state.assets[id]), state.generations[state.assets[id].generationId ?? '']?.modelRef]);
-  const hasImage = attachments.some((id) => state.assets[id]?.kind === 'image');
-  const models = [...new Set([...inputs, ...Object.values(state.settings.ops), directModelRef('image', image.modelRef, hasImage), directModelRef('video', video.modelRef, hasImage)]
-    .filter((ref): ref is string => Boolean(ref && state.catalog.models[ref])))].sort().map((ref) => [ref, state.catalog.models[ref], state.catalog.schemas[ref]]);
-  const estimate = previewEstimate(spec, ctx, args);
-  const prompt = generations[0]?.prompt ?? text;
-  return {
-    signature: stable({ args, on: ctx.on, composer, layers, raster: layers?.map((l) => bufferVersion(l.id)), generations, subjects, assets, models, ops: state.settings.ops, estimate, workspace: state.ui.workspace, space: state.ui.space }),
-    details: prompt.trim() ? [prompt] : [],
-  };
+  return { signature: stable({ args, on: ctx.on, estimate: previewEstimate(spec, ctx, args) }), details: [] };
 }
 
 export function previewEstimate(spec: AnyCommand, ctx: CommandContext, args: unknown): Estimate {

@@ -3,21 +3,11 @@ import { composePrompt } from '../nodecore/evaluate';
 import { descriptorOf } from '../nodecore/registry';
 import { assetRevisionIdentity, normalizeAssetRevisions } from '../assetRevisions';
 import { sentModelRef } from '../catalog';
+import { resolveSendPlan, stable } from '../sendInputs';
 import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
 
-export function stable(value: unknown): string {
-  return JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v)
-    ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined).sort(([a], [b]) => a.localeCompare(b))) : v);
-}
-
-/** Asset ids carried inside a tool node's params (mask, _refs, clips, music). */
-export function toolParamAssets(params: Record<string, unknown>, assets: Record<string, Asset> = {}): string[] {
-  const ids = Object.values(params).flatMap(v =>
-    typeof v === 'string' ? v.split(',').map(s => s.trim().replace(/^asset:/, '')).filter(id => Boolean(assets[id])) : [],
-  );
-  return [...new Set(ids)];
-}
+export { stable };
 
 export function comparableSettings(modelRef: string, settings: GenSettings, schemas: Record<string, ModelSchema> = {}, automaticSeed = false) {
   const schema = schemas[modelRef];
@@ -77,7 +67,10 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
   const links = linkTarget(graph, node, generations, ctx.assets);
   const extra = links.length ? { links } : {}; // absent when empty, so results saved before this stay current
   if (d.kind === 'tool') {
-    const paramAssets = toolParamAssets(d.params, ctx.assets).flatMap(id => {
+    const paramAssets = resolveSendPlan(
+      { kind: 'image', modelRef: '', prompt: '', settings: { count: 1, advanced: {} }, inputs: { refs: [] }, op: { id: d.op, params: d.params, sourceAssetId: '' } },
+      { assets: ctx.assets ?? {}, library: [], catalog: { models: {}, schemas: {} } },
+    ).assetIds.flatMap(id => {
       const asset = ctx.assets?.[id];
       return asset && (asset.revisions?.length || asset.originalRevision) ? [assetRevisionIdentity(asset)] : [];
     });

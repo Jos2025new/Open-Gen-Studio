@@ -10,7 +10,7 @@ export interface RunEnv {
   ctx: ExecContext;
   outputs: Map<string, StepOutput>;
   /** What every generation of this step carries: session, origin, place, planId, stepId. */
-  base: { sessionId: string; origin: GenerationOrigin; place: ReturnType<typeof placeFor>; mode: 'agent'; planId?: string; stepId: string; batchToken?: symbol };
+  base: { sessionId: string; origin: GenerationOrigin; place: ReturnType<typeof placeFor>; mode: 'agent'; planId?: string; stepId: string; approvalTicketId?: string; approvedFingerprint?: string; batchToken?: symbol };
   requireAsset(ref: string, what?: string): Promise<string>;
   resolveAsset(ref: string | undefined): Promise<string | null>;
   promptFor(s: { prompt: string; promptFrom?: string }): string;

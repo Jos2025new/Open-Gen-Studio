@@ -305,6 +305,8 @@ export interface Generation {
   variants?: string[];
   /** The shared approval ticket for this generation, if it came from a larger action. */
   approvalTicketId?: string;
+  /** Frozen fingerprint of the resolved send payload approved by the user; re-checked before transport. */
+  approvedFingerprint?: string;
   /** Logical node request at execution time; provider transformations do not affect freshness. */
   nodeRequest?: string;
   id: string;

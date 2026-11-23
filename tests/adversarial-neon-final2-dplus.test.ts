@@ -154,8 +154,7 @@ afterEach(() => {
 
 // --- Findings ---
 
-// reproduce: toolParamAssets (freshness.ts:15-20) only inspects top-level typeof v === 'string' values, skipping array/nested params like _refs: ['ast_ref'] that sendInputs.ts coerces via String(...) and dispatches unreviewed after in-place edits.
-it.fails('R1a: invalidates nodes.run.start review when a tool node array param (_refs) asset is edited in-place', async () => {
+it('R1a: invalidates nodes.run.start review when a tool node array param (_refs) asset is edited in-place', async () => {
   blobs.set('ast_src', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
   blobs.set('ast_ref', new Blob([new Uint8Array([6, 6, 6, 6])], { type: 'image/png' }));
   const toolData = {
@@ -198,8 +197,7 @@ it.fails('R1a: invalidates nodes.run.start review when a tool node array param (
   expect(commandCard().status).toBe('awaiting');
 });
 
-// reproduce: previewRun (actions.ts:218-230,273,325-331) only records the model3d asset id in assets and assetRevisionIdentity only hashes the viewImageId string, not the viewImageId asset revision that graph.ts:472-478 and sendInputs dispatch.
-it.fails('R1b: invalidates nodes.run.start review when an upstream model3d node viewImageId asset is edited in-place', async () => {
+it('R1b: invalidates nodes.run.start review when an upstream model3d node viewImageId asset is edited in-place', async () => {
   blobs.set('ast_3d', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'model/gltf-binary' }));
   blobs.set('ast_view', new Blob([new Uint8Array([7, 7, 7, 7])], { type: 'image/png' }));
   const imgData: GenNodeData = {
