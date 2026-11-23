@@ -65,7 +65,7 @@ const imgOut = (tag = 'x', costUsd = 0) => ({
   outputs: [{ blob: new Blob([tag], { type: 'image/png' }), mime: 'image/png' }],
   costUsd,
 });
-const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+const tick = (ms = 20) => new Promise<void>((r) => setTimeout(r, ms));
 const reloadAndResume = async () => {
   running.clear();
   controllers.clear();

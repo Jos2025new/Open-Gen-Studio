@@ -15,7 +15,27 @@ export interface BoardOptions extends GenerationQuery {
   place?: Place | 'workspace';
 }
 
-/** `failed` is filled only with "show failed" on: its own row, never mixed into Done. */
+const RELOAD_INTERRUPTED_RE = /^Interrupted by a page reload or tab change\./;
+
+/** True when a generation failed because a page reload or tab change cut it short. */
+export function isReloadInterrupted(g: Pick<Generation, 'status' | 'error'>): boolean {
+  return g.status === 'error' && Boolean(g.error && RELOAD_INTERRUPTED_RE.test(g.error));
+}
+
+/** True when a failed generation is local or guaranteed free ($0, with no paid send uncertainty). */
+export function isFreeGeneration(g: Pick<Generation, 'provider' | 'modelRef' | 'estimate' | 'lostJob' | 'remoteJob' | 'sends'>): boolean {
+  if (g.lostJob || g.remoteJob || g.sends?.some((s) => s.status === 'uncertain' || s.status === 'intent' || s.status === 'sent')) return false;
+  return g.provider === 'local' || g.modelRef.startsWith('local::') || (g.estimate?.usd === 0 && !g.estimate.lowerBound);
+}
+
+/** Generation ids that already have a retry child attempt. */
+export function retriedGenerationIds(generations: Record<string, Pick<Generation, 'parentId'>>): Set<string> {
+  const ids = new Set<string>();
+  for (const g of Object.values(generations)) if (g.parentId) ids.add(g.parentId);
+  return ids;
+}
+
+/** `failed` includes all failures when "show failed" is on, plus unretried local/free runs interrupted by a reload. */
 export interface BoardRows { done: DoneCell[]; failed: Generation[]; ongoing: Generation[] }
 
 /** Rows of the board: finished results on top, running or queued generations below. */
@@ -23,6 +43,7 @@ export function splitBoard(generations: Record<string, Generation>, assets: Reco
   const inPlace = (g: Generation) => !o.place || o.place === 'workspace' ? g.place !== 'space-create' && g.place !== 'space-tools' : g.place === o.place;
   const inScope = Object.values(generations).filter((g) => !g.discard && inPlace(g) && (o.scope === 'all' || g.sessionId === o.scope.sessionId));
   const list = filterGenerations(inScope, { kind: o.kind, status: o.status, q: o.q, sort: o.sort });
+  const retried = retriedGenerationIds(generations);
   const done: DoneCell[] = [];
   const ongoing: Generation[] = [];
   const failed: Generation[] = [];
@@ -35,7 +56,7 @@ export function splitBoard(generations: Record<string, Generation>, assets: Reco
         const a = assets[id];
         if (a && (!o.starred || a.favorite)) done.push({ type: 'asset', assetId: id, generationId: g.id });
       }
-    } else if (o.showFailed) failed.push(g);
+    } else if (o.showFailed || (isReloadInterrupted(g) && isFreeGeneration(g) && !retried.has(g.id))) failed.push(g);
   }
   return { done, failed, ongoing };
 }

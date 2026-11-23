@@ -114,6 +114,18 @@ export async function saveTicketMark(): Promise<void> {
   await saveNow();
   if (!holdsWriterLock() || guard.discarding || saveStatus.getState().confirmed < v) throw new Error('save not confirmed');
 }
+/** Best-effort immediate flush with a short cap so free/local runs persist before a reload without blocking on storage failures. */
+export async function flushFreeSendSave(timeoutMs = 250): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      saveNow().catch(() => undefined),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 export const budgetSnapshotFor = (sessionId: string): BudgetSnapshot => {
   const st = get();
   return { budgetOn: st.settings.budgetOn, budgetUsd: st.settings.budgetUsd, spentUsd: st.spentUsd, sessionNoAsk: noAskDurable(st, sessionId) };
@@ -262,7 +274,7 @@ export async function sendGenerationViaPaidGate<T>(opts: GenerationPaidSendOpts<
   if (accepted) throw new PaidSendBlockedError('ALREADY_SENT', 'This request may already have been charged.', { ticketId: existing?.id ?? generationTicketId(g.id), sendId });
   try {
     if (isFreePrice(price)) {
-      void saveNow().catch(() => undefined);
+      await flushFreeSendSave();
       return await sendFree(sendId, send, signal, beforeTransport, (r, cost) => { deliverSend(g.id, sendId, index, cost, Boolean(r.estimated)); });
     }
     const ticket = ensureGenerationTicket(g), slotKey = g.id + ':' + index, stepKey = sendStepKeyFor(g);

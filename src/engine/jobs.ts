@@ -24,7 +24,7 @@ import { addAssets, patchGeneration, toast, upsertGeneration, useStore } from '.
 import { holdRetry, relinkAttempt } from './relinkAttempt';
 import { shareOfEstimate } from './sendLedger';
 import { flushSendSave, interruptedByReload, SendNotCommittedError, wasFreeSend } from './sendMark';
-import { consumeGenerationTicketStep, ensureGenerationTicket, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
+import { consumeGenerationTicketStep, ensureGenerationTicket, flushFreeSendSave, grantGenerationTicketPass, hasOpenInFlightSend, hasUncertainTicketSend, sendStepKeyFor, slotPriceForGeneration, storeTickets, ticketPassFromEstimate } from './money/storeBridge';
 import { assertWithinLimit, bindGenerationPass, clearGenerationPass, consumeOnce, passActiveFor, remainingBudget, startGenerationPass, type BudgetPass } from './budget';
 import { expectedDims, storeModelOutputs, storeOutput } from './assetIO';
 import { lockAssets } from './flow/locks';
@@ -184,6 +184,7 @@ async function execute(id: string): Promise<string[]> {
   let localPostSend = false;
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
+      await flushFreeSendSave();
       const assetIds = await runLocalOp(g, signal);
       finish(id, assetIds, 0);
       return assetIds;
@@ -442,6 +443,7 @@ export function isRunning(id: string): boolean {
 /** After a reload: resume polling remote jobs; mark other in-flight generations as interrupted. */
 export async function resumeInterrupted(): Promise<void> {
   const gens = Object.values(get().generations).filter((g) => g.status === 'running' || g.status === 'queued');
+  let markedInterrupted = false;
   for (const g of gens) {
     if (running.has(g.id)) continue;
     const job = activeRemoteJob(g);
@@ -455,12 +457,14 @@ export async function resumeInterrupted(): Promise<void> {
         continue;
       }
       patchGeneration(g.id, { status: 'error', statusText: undefined, finishedAt: Date.now(), ...interruptedByReload(g, job) });
+      markedInterrupted = true;
       purgeDiscarded(g.id);
       continue;
     }
     patchGeneration(g.id, { statusText: 'Resuming', remoteJob: job });
     followRemote(g.id, job);
   }
+  if (markedInterrupted) void flushSendSave();
 }
 
 export function retryGeneration(id: string, planItemId?: string, budgetPass?: BudgetPass, confirmedCharge = false): Promise<string[]> {
