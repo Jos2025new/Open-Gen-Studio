@@ -149,7 +149,12 @@ export function evaluateBudgetGate(opts: {
   return { ok: true, free: false, remainingUsd };
 }
 
-export type SendErrorDisposition = 'retryable_before_charge' | 'refused_before_charge' | 'job_failed' | 'uncertain';
+export type SendErrorDisposition =
+  | 'retryable_before_charge'
+  | 'refused_before_charge'
+  | 'job_failed'
+  | 'keep_in_flight'
+  | 'uncertain';
 
 /** Default provider-neutral error classifier: HTTP 402/400 refused before billing; network/abort after send is uncertain. */
 export function defaultClassifySendError(err: unknown): SendErrorDisposition {
@@ -198,6 +203,8 @@ export interface PaidSendOptions<T> {
   readonly canWrite?: () => boolean;
   /** Called at most once per `sendId` when settled. */
   readonly onBookSpend: (booking: SpendBooking) => void;
+  /** Optional authorization check executed after durable save and right before calling `send()` (throws to roll back). */
+  readonly beforeTransport?: () => void;
   /** Actual transport call invoked only after reservation, lock, budget check and durable save succeed. */
   readonly send: (ctx: { sendId: string; onRemoteJob: (job: RemoteJob) => void }) => Promise<PaidSendTransportResult<T>>;
   readonly signal?: AbortSignal;
@@ -274,7 +281,24 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
   // Free ($0 exact) or local sends never enter the paid reservation/save gate.
   if (opts.local || isFreePrice(slot.price)) {
     if (opts.signal?.aborted) throw new PaidSendBlockedError('ABORTED', 'Send aborted before start.', { ticketId: ticket.id, sendId });
+    opts.beforeTransport?.();
     const res = await opts.send({ sendId, onRemoteJob: () => undefined });
+    if (res.costUsd != null && Number.isFinite(res.costUsd) && res.costUsd > 0) {
+      const latest = opts.tickets.get(opts.ticketId) ?? ticket;
+      const inFlight = markSendInFlight(latest, sendId, now());
+      const settled = settleSend(inFlight, sendId, { costUsd: res.costUsd, estimated: Boolean(res.estimated), now: now() });
+      opts.tickets.put(settled.ticket);
+      if (!settled.alreadyBooked && settled.bookedDeltaUsd > 0) {
+        opts.onBookSpend({
+          ticketId: ticket.id,
+          sendId,
+          usd: settled.bookedDeltaUsd,
+          estimated: Boolean(res.estimated),
+        });
+      }
+      void opts.save().catch(() => undefined);
+      return { sendId, value: res.value, free: true, settled };
+    }
     return { sendId, value: res.value, free: true };
   }
 
@@ -323,6 +347,7 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
       if (opts.signal?.aborted) {
         throw new PaidSendBlockedError('ABORTED', 'Send aborted before transport.', { ticketId: ticket.id, sendId });
       }
+      opts.beforeTransport?.();
     } catch (preErr) {
       const latest = opts.tickets.get(opts.ticketId);
       if (latest?.sends.find((s) => s.id === sendId)?.status === 'in_flight') {
@@ -367,7 +392,9 @@ export async function paidSend<T>(opts: PaidSendOptions<T>): Promise<PaidSendOut
         const disposition = (opts.classifyError ?? defaultClassifySendError)(err);
         const msg = err instanceof Error ? err.message : String(err);
         if (s && s.status !== 'done' && s.status !== 'failed') {
-          if (disposition === 'job_failed') {
+          if (disposition === 'keep_in_flight') {
+            // Simulated or real restart teardown: leave durable state untouched for resumeInterrupted().
+          } else if (disposition === 'job_failed') {
             opts.tickets.put(markSendFailed(latest, sendId, msg, now()));
             void opts.save().catch(() => undefined);
           } else if (hasJob) {

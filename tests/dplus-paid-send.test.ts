@@ -29,6 +29,13 @@ import {
 import { removeTicket, upsertTicket, useStore } from '../src/store/store';
 import { addSpend } from '../src/store/spend';
 import { budgetVerdict, remainingBudget, withOncePass } from '../src/engine/budget';
+import {
+  budgetSnapshotFor,
+  canWriteTicket,
+  saveTicketMark,
+  slotPriceForGeneration,
+  storeTickets,
+} from '../src/engine/money/storeBridge';
 import { createFakeProvider, simulateReload, snapshotStore, sseResponse, type FakeProvider } from './helpers/fakeProvider';
 
 function createMemoryHarness(initialBudget = { budgetOn: true, budgetUsd: 1.0, spentUsd: 0 }) {
@@ -531,6 +538,63 @@ describe('D+ store & spend: tickets persistidos y addSpend idempotente por sendI
     expect(approved.over).toBe(false);
 
     removeTicket('tkt_res');
+  });
+
+  it('storeBridge: storeTickets, budgetSnapshotFor, canWriteTicket, saveTicketMark y slotPriceForGeneration', async () => {
+    const sid = useStore.getState().activeSessionId;
+    const st = useStore.getState();
+    useStore.setState({
+      tickets: {},
+      spentUsd: 0.05,
+      spendLog: [],
+      settings: { ...st.settings, budgetOn: true, budgetUsd: 0.25, budgetNoAsk: false, budgetAccepted: null },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], noAskOverLimit: false } },
+    });
+
+    const t = createTicket({ id: 'tkt_bridge', sessionId: sid, kind: 'llm', price: exactPrice(0.05) });
+    storeTickets.put(t);
+    expect(storeTickets.get('tkt_bridge')?.id).toBe('tkt_bridge');
+    expect(storeTickets.list().some((x) => x.id === 'tkt_bridge')).toBe(true);
+    expect(budgetSnapshotFor(sid)).toMatchObject({ budgetOn: true, budgetUsd: 0.25, spentUsd: 0.05, sessionNoAsk: false });
+    expect(typeof canWriteTicket()).toBe('boolean');
+    await expect(saveTicketMark()).rejects.toThrow();
+
+    expect(slotPriceForGeneration({ provider: 'local', modelRef: 'local::sketch', estimate: { usd: 0.5, approximate: false }, assetIds: [], settings: { count: 1, advanced: {} } })).toEqual(FREE_PRICE);
+    expect(slotPriceForGeneration({ provider: 'atlas', modelRef: 'atlas::img', estimate: { usd: 0, approximate: true }, assetIds: [], settings: { count: 1, advanced: {} } }, 1, 0.1)).toEqual(exactPrice(0.1));
+    expect(slotPriceForGeneration({ provider: 'nanogpt', modelRef: 'nanogpt::img', estimate: { usd: null, approximate: true }, assetIds: [], settings: { count: 1, advanced: {} } })).toEqual(UNKNOWN_PRICE);
+
+    // Free path still books provider-reported costUsd > 0, and beforeTransport error rolls back in_flight cleanly:
+    const h = createMemoryHarness({ budgetOn: true, budgetUsd: 1.0, spentUsd: 0 });
+    h.tickets.put(createTicket({ id: 't_free_real', sessionId: sid, kind: 'generation', price: FREE_PRICE }));
+    const freeOut = await paidSend({
+      ticketId: 't_free_real',
+      prepare: { id: 'snd_fr', slotKey: 'fr', price: FREE_PRICE },
+      tickets: h.tickets,
+      getBudget: h.getBudget,
+      save: h.save,
+      onBookSpend: h.onBookSpend,
+      send: async () => ({ value: 'ok', costUsd: 0.1, estimated: false }),
+    });
+    expect(freeOut.free).toBe(true);
+    expect(h.bookings).toEqual([{ ticketId: 't_free_real', sendId: 'snd_fr', usd: 0.1, estimated: false }]);
+
+    h.tickets.put(createTicket({ id: 't_bt', sessionId: sid, kind: 'generation', price: exactPrice(0.1) }));
+    await expect(
+      paidSend({
+        ticketId: 't_bt',
+        prepare: { id: 'snd_bt', slotKey: 'bt', price: exactPrice(0.1) },
+        tickets: h.tickets,
+        getBudget: h.getBudget,
+        save: h.save,
+        onBookSpend: h.onBookSpend,
+        beforeTransport: () => { throw new Error('price drift'); },
+        send: async () => ({ value: 'never', costUsd: 0.1 }),
+      }),
+    ).rejects.toThrow('price drift');
+    expect(sendStateOf(h.tickets.list(), { sendId: 'snd_bt' }).status).toBe('pending');
+    expect(ticketReservedUsd(h.tickets.get('t_bt')!)).toBe(0);
+
+    removeTicket('tkt_bridge');
   });
 });
 

@@ -20,11 +20,24 @@ const get = useStore.getState;
 
 /** Money left under the limit (after confirmed spend and open ticket reservations), or null when there is no limit. */
 export function remainingBudget(
-  state: { settings: { budgetOn: boolean; budgetUsd: number }; spentUsd: number; tickets?: Record<string, ApprovalTicket> } = get(),
+  state: {
+    settings: { budgetOn: boolean; budgetUsd: number };
+    spentUsd: number;
+    tickets?: Record<string, ApprovalTicket>;
+    generations?: Record<string, unknown>;
+    sessions?: Record<string, unknown>;
+  } = get(),
 ): number | null {
-  const { settings, spentUsd, tickets } = state;
+  const { settings, spentUsd, tickets, generations, sessions } = state;
   if (!settings.budgetOn) return null;
-  const reserved = tickets ? totalReservedUsd(Object.values(tickets)) : 0;
+  const active = tickets
+    ? Object.values(tickets).filter((t) => {
+        if (sessions && !sessions[t.sessionId]) return false;
+        if (generations && t.id.startsWith('gen:') && !generations[t.id.slice(4)]) return false;
+        return true;
+      })
+    : [];
+  const reserved = totalReservedUsd(active);
   return roundUsd(settings.budgetUsd - spentUsd - reserved);
 }
 
