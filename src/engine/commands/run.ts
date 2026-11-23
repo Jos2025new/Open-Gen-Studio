@@ -177,8 +177,8 @@ export interface FrozenCommandStep {
   on: Target;
   ready: boolean;
   onReady: boolean;
-  preRan?: boolean;
-  preResult?: unknown;
+  state?: 'running' | 'done' | 'failed';
+  result?: unknown;
   estimate?: Estimate;
   review?: CommandReview;
 }
@@ -541,7 +541,7 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         on: s.on,
         ready: s.ready,
         onReady: s.onReady,
-        ...(s.ran ? { preRan: true, preResult: results[i] } : {}),
+        ...(s.ran ? { state: 'done', result: results[i] } : {}),
         ...(ask ? { estimate: ask.estimate, review: ask.review } : {}),
       };
     });

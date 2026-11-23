@@ -1,4 +1,3 @@
-import { isHeldStatus } from '../money/ticket';
 import { commandReview, previewEstimate, type RunOptions } from '../commands/run';
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
@@ -10,19 +9,7 @@ import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
 import { grantTicketPass, storeTickets } from '../money/storeBridge';
-import {
-  createTicket,
-  FREE_PRICE,
-  isSendOut,
-  markSendFailed,
-  markSendInFlight,
-  interruptSends,
-  prepareSend,
-  priceFromEstimate,
-  settleSend,
-  rollbackSendToPending,
-  type ApprovalTicket,
-} from '../money/ticket';
+import { createTicket, isHeldStatus, priceFromEstimate, type ApprovalTicket } from '../money/ticket';
 import { FREE, sumEstimates } from '../pricing';
 import type { CommandApprovalFeedItem, Estimate } from '../types';
 import { findCommandsSchema, runCommandsSchema } from './commandTools';
@@ -88,7 +75,6 @@ const pending = new Map<string, PendingCommandApproval>();
 const replaying = new Set<string>();
 
 const commandTicketId = (itemId: string) => `cmd:${itemId}`;
-const stepSendId = (itemId: string, step: number) => `${itemId}:s${step}`;
 
 function cloneSafe(val: unknown): unknown {
   if (val === undefined) return null;
@@ -96,111 +82,45 @@ function cloneSafe(val: unknown): unknown {
 }
 
 function frozenStepsOf(ticket: ApprovalTicket | undefined): FrozenCommandStep[] {
-  return Array.isArray(ticket?.scope.steps) ? (ticket.scope.steps as FrozenCommandStep[]) : [];
+  return Array.isArray(ticket?.scope.steps) ? ticket.scope.steps as FrozenCommandStep[] : [];
 }
 
-function extractNodeIds(sequence: readonly FrozenCommandStep[] | undefined): string[] {
-  const ids = new Set<string>();
-  for (const s of sequence ?? []) {
-    const a = s.args as { targets?: unknown; node?: unknown } | undefined;
-    if (Array.isArray(a?.targets)) for (const t of a.targets) if (typeof t === 'string') ids.add(t);
-    if (typeof a?.node === 'string') ids.add(a.node);
-  }
-  return [...ids];
+function putSteps(ticket: ApprovalTicket, steps: FrozenCommandStep[]): void {
+  storeTickets.put({ ...ticket, scope: { ...ticket.scope, steps } });
+}
+
+function trackCommand(itemId: string | null, step: number, state?: FrozenCommandStep['state'], result?: unknown): void {
+  const ticket = itemId && storeTickets.get(commandTicketId(itemId));
+  if (ticket) putSteps(ticket, frozenStepsOf(ticket).map(s => s.step === step
+    ? { ...s, state, ...(state === 'done' ? { result: cloneSafe(result) } : {}) }
+    : s));
 }
 
 function createCommandTicket(sessionId: string, itemId: string, request: ApprovalRequest): void {
-  const sequence = (request.sequence ?? []).map((s) => ({
-    ...s,
-    ...(s.preRan ? { preResult: cloneSafe(s.preResult) } : {}),
+  const steps = request.sequence?.map(s => s.state === 'done' ? { ...s, result: cloneSafe(s.result) } : s);
+  storeTickets.put(createTicket({
+    id: commandTicketId(itemId), sessionId, kind: 'commands',
+    scope: { steps }, price: priceFromEstimate(request.estimate),
   }));
-  let ticket = createTicket({
-    id: commandTicketId(itemId),
-    sessionId,
-    kind: 'commands',
-    scope: { steps: sequence, nodeIds: extractNodeIds(sequence) },
-    price: priceFromEstimate(request.estimate),
-  });
-  for (const s of sequence) {
-    if (s.preRan) continue;
-    // Orchestration slots track completed commands and references, without reserving money.
-    ticket = prepareSend(ticket, {
-      id: stepSendId(itemId, s.step),
-      slotKey: `step:${s.step}`,
-      index: s.step - 1,
-      price: FREE_PRICE,
-    });
-  }
-  storeTickets.put(ticket);
 }
 
-function markCommandStepStart(itemId: string, step: number): void {
-  const ticket = storeTickets.get(commandTicketId(itemId));
-  if (!ticket) return;
-  const sid = stepSendId(itemId, step);
-  const slot = ticket.sends.find((s) => s.id === sid);
-  if (!slot || slot.status !== 'pending') return;
-  storeTickets.put(markSendInFlight(ticket, sid));
-}
-
-function markCommandStepEnd(itemId: string, step: number, ok: boolean, val?: unknown, error?: string): void {
-  const ticket = storeTickets.get(commandTicketId(itemId));
-  if (!ticket) return;
-  const sid = stepSendId(itemId, step);
-  const slot = ticket.sends.find((s) => s.id === sid);
-  let next = ticket;
-  if (error === COMMAND_REVIEW_CHANGED) {
-    if (slot?.status === 'in_flight') storeTickets.put(rollbackSendToPending(ticket, sid));
-    return;
-  }
-  if (slot && (slot.status === 'in_flight' || slot.status === 'pending')) {
-    const base = slot.status === 'pending' ? markSendInFlight(next, sid) : next;
-    next = ok ? settleSend(base, sid, { costUsd: 0 }).ticket : markSendFailed(base, sid, error);
-  }
-  if (ok) {
-    const steps = frozenStepsOf(next).map((s) => (s.step === step ? { ...s, preRan: true, preResult: cloneSafe(val) } : s));
-    next = { ...next, scope: { ...next.scope, steps } };
-  }
-  storeTickets.put(next);
-}
-
-/**
- * After a reload, command cards left `running` transition any `in_flight` step slots to `uncertain`
- * (never auto-sending anything). If pending steps remain, the card returns to `awaiting` for one-click resume.
- */
 export function settleInterruptedCommandCards(): void {
-  for (const s of Object.values(useStore.getState().sessions)) {
-    for (const f of s.feed) {
-      if (f.type !== 'commands' || f.status !== 'running') continue;
-      if (pending.has(f.id) || replaying.has(f.id)) continue;
-      const ticket = storeTickets.get(commandTicketId(f.id));
-      if (!ticket) {
-        updateFeedItem<CommandApprovalFeedItem>(s.id, f.id, { status: 'error', error: 'Interrupted by a page reload.' });
-        continue;
+  for (const session of Object.values(useStore.getState().sessions)) {
+    for (const item of session.feed) {
+      if (item.type !== 'commands' || item.status !== 'running' || pending.has(item.id) || replaying.has(item.id)) continue;
+      const ticket = storeTickets.get(commandTicketId(item.id));
+      const steps = frozenStepsOf(ticket);
+      if (ticket && steps.some(step => step.state === 'running')) {
+        putSteps(ticket, steps.map(step => step.state === 'running' ? { ...step, state: 'failed' } : step));
       }
-      const next = interruptSends(ticket);
-      storeTickets.put(next);
-      const hasPending = frozenStepsOf(next).some((step) => {
-        if (step.preRan) return false;
-        const slot = next.sends.find((x) => x.id === stepSendId(f.id, step.step));
-        return !slot || slot.status === 'pending';
+      const status = steps.some(step => !step.state) ? 'awaiting'
+        : ticket && steps.every(step => step.state === 'done') ? 'done' : 'error';
+      updateFeedItem<CommandApprovalFeedItem>(session.id, item.id, {
+        status,
+        ...(status === 'error' ? { error: 'Interrupted by a page reload; already-sent steps were not re-submitted.' } : {}),
       });
-      if (hasPending) {
-        updateFeedItem<CommandApprovalFeedItem>(s.id, f.id, { status: 'awaiting' });
-      } else {
-        const hadProblem = next.sends.some((x) => x.status === 'uncertain' || x.status === 'failed');
-        updateFeedItem<CommandApprovalFeedItem>(s.id, f.id, {
-          status: hadProblem ? 'error' : 'done',
-          ...(hadProblem ? { error: 'Interrupted by a page reload; already-sent steps were not re-submitted.' } : {}),
-        });
-      }
     }
   }
-}
-
-function remainingSteps(ticket: ApprovalTicket, itemId: string, steps = frozenStepsOf(ticket)) {
-  return steps.filter(step => !step.preRan &&
-    !ticket.sends.some(send => send.id === stepSendId(itemId, step.step) && isSendOut(send.status)));
 }
 
 function closeCommandCard(sessionId: string, itemId: string, result: RunResult): void {
@@ -221,7 +141,7 @@ function refreshCommandReview(sessionId: string, itemId: string, stepNumber: num
     const ctx = { on: stale.on, caller: 'agent' as const };
     const current = resolved ?? { review: commandReview(spec, ctx, stale.args), estimate: previewEstimate(spec, ctx, stale.args) };
     const revised = steps.map((step) => step === stale ? { ...step, ...current, ready: true, onReady: true } : step);
-    const remaining = remainingSteps(ticket, itemId, revised).filter(step => step.estimate);
+    const remaining = revised.filter(step => !step.state && step.estimate);
     const estimateTotal = sumEstimates(remaining.map((step) => step.estimate!));
     storeTickets.put({ ...ticket, pass: undefined, price: priceFromEstimate(estimateTotal), scope: { ...ticket.scope, steps: revised } });
     updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, {
@@ -244,10 +164,9 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
   const reviewedSpends: Record<number, Estimate> = {};
   const reviews = Object.fromEntries(steps.flatMap((step) => step.review ? [[step.step, step.review]] : []));
   for (const s of steps) {
-    const slot = ticket.sends.find((x) => x.id === stepSendId(itemId, s.step));
-    if (s.preRan || (slot && isSendOut(slot.status))) {
+    if (s.state) {
       skipSteps.add(s.step);
-      if (s.preResult !== undefined) priorResults[s.step] = s.preResult;
+      if (s.state === 'done') priorResults[s.step] = s.result;
     }
     if (s.effect === 'spend' && s.estimate) reviewedSpends[s.step] = s.estimate;
   }
@@ -264,8 +183,8 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
         {
           caller: 'agent',
           onReviewChanged: current => { changed = current; },
-          onStepStart: (step) => markCommandStepStart(itemId, step),
-          onStepEnd: (step, ok, val, err) => markCommandStepEnd(itemId, step, ok, val, err),
+          onStepStart: step => trackCommand(itemId, step, 'running'),
+          onStepEnd: (step, ok, val, err) => trackCommand(itemId, step, ok ? 'done' : err === COMMAND_REVIEW_CHANGED ? undefined : 'failed', val),
           resume: { skipSteps, priorResults, reviewedSpends, reviews, budgetPass, approvalTicketId: ticket.id, skipApproval: true },
         },
       );
@@ -306,7 +225,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
     return Boolean(entry);
   }
   if (!ticket || ticket.sessionId !== sessionId) return false;
-  const spends = remainingSteps(ticket, itemId).filter(step => step.effect === 'spend');
+  const spends = frozenStepsOf(ticket).filter(step => !step.state && step.effect === 'spend');
   const estimate = sumEstimates(spends.map(step => step.estimate ?? FREE));
   if (decision === 'approve' && spends.length && budgetProblem(estimate, sessionId)) return false;
 
@@ -418,8 +337,8 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
         signal,
         approver: sessionApprover,
         onReviewChanged: current => { changed = current; },
-        onStepStart: (step) => { if (approvalItemId) markCommandStepStart(approvalItemId, step); },
-        onStepEnd: (step, ok, val, err) => { if (approvalItemId) markCommandStepEnd(approvalItemId, step, ok, val, err); },
+        onStepStart: step => trackCommand(approvalItemId, step, 'running'),
+        onStepEnd: (step, ok, val, err) => trackCommand(approvalItemId, step, ok ? 'done' : err === COMMAND_REVIEW_CHANGED ? undefined : 'failed', val),
       },
     );
   } finally {
