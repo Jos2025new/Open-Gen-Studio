@@ -23,6 +23,7 @@ import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import type { ShapeSpec, StrokeStyle } from '../engine/types';
+import type { ApprovalTicket } from '../engine/money/ticket';
 import type {
   Asset,
   DesignDoc,
@@ -127,6 +128,8 @@ export interface AppState {
   sessions: Record<string, Session>;
   activeSessionId: string;
   generations: Record<string, Generation>;
+  /** Durable approval tickets and paid-send records (D+ money registry). */
+  tickets: Record<string, ApprovalTicket>;
   assets: Record<string, Asset>;
   /** Saved characters, objects, products and styles, shared by every session (@Name). */
   library: Subject[];
@@ -190,6 +193,7 @@ const initial: AppState = {
   sessions: { [firstSession.id]: firstSession },
   activeSessionId: firstSession.id,
   generations: {},
+  tickets: {},
   assets: {},
   library: [],
   composer: {
@@ -370,6 +374,7 @@ export const useStore = create<AppState>()(
       sessions: s.sessions,
       activeSessionId: s.activeSessionId,
       generations: s.generations,
+      tickets: s.tickets,
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
@@ -458,6 +463,19 @@ export function reconcileDeletionNotices(sessionId: string): void {
 
 export function upsertGeneration(g: Generation): void {
   set((st) => ({ generations: { ...st.generations, [g.id]: g } }));
+}
+
+export function upsertTicket(ticket: ApprovalTicket): void {
+  set((st) => ({ tickets: { ...st.tickets, [ticket.id]: ticket } }));
+}
+
+export function removeTicket(id: string): void {
+  set((st) => {
+    if (!st.tickets[id]) return {};
+    const tickets = { ...st.tickets };
+    delete tickets[id];
+    return { tickets };
+  });
 }
 
 export function patchGeneration(id: string, patch: Partial<Generation>): void {

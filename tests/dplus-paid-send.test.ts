@@ -23,7 +23,9 @@ import {
   type SpendBooking,
   type TicketAccess,
 } from '../src/engine/money/paidSend';
-import { createFakeProvider, sseResponse, type FakeProvider } from './helpers/fakeProvider';
+import { removeTicket, upsertTicket, useStore } from '../src/store/store';
+import { addSpend } from '../src/store/spend';
+import { createFakeProvider, simulateReload, snapshotStore, sseResponse, type FakeProvider } from './helpers/fakeProvider';
 
 function createMemoryHarness(initialBudget = { budgetOn: true, budgetUsd: 1.0, spentUsd: 0 }) {
   const map = new Map<string, ApprovalTicket>();
@@ -450,3 +452,45 @@ describe('D+ paidSend: puerta unica, presupuesto con reservas, pases, candado y 
     expect(ticketReservedUsd(h.tickets.get('t_rem')!)).toBe(0.1);
   });
 });
+
+describe('D+ store & spend: tickets persistidos y addSpend idempotente por sendId', () => {
+  it('tickets sobreviven partialize + merge (recarga) y removeTicket los limpia', () => {
+    const sid = useStore.getState().activeSessionId;
+    useStore.setState({ tickets: {}, spentUsd: 0, spendLog: [] });
+    const t = prepareSend(
+      createTicket({ id: 'tkt_pers', sessionId: sid, kind: 'commands', scope: { nodeIds: ['n1'] }, price: exactPrice(0.1) }),
+      { id: 'snd_pers', slotKey: 'n1', price: exactPrice(0.1), nodeId: 'n1' },
+    );
+    upsertTicket(t);
+    expect(useStore.getState().tickets.tkt_pers).toEqual(t);
+
+    const saved = snapshotStore();
+    useStore.setState({ tickets: {} });
+    simulateReload(null, { sessionId: sid, state: saved });
+    expect(useStore.getState().tickets.tkt_pers).toEqual(t);
+
+    removeTicket('tkt_pers');
+    expect(useStore.getState().tickets.tkt_pers).toBeUndefined();
+  });
+
+  it('addSpend deduplica por sendId tanto cobros conocidos como desconocidos sin doblar spentUsd', () => {
+    const sid = useStore.getState().activeSessionId;
+    useStore.setState({ spentUsd: 0, spendLog: [] });
+    const base = { category: 'image' as const, provider: 'nanogpt', model: 'nanogpt::seed', sessionId: sid, estimated: false };
+
+    addSpend(0.1, { ...base, sendId: 'snd_dedup_1' });
+    addSpend(0.1, { ...base, sendId: 'snd_dedup_1' });
+    expect(useStore.getState().spentUsd).toBe(0.1);
+    expect(useStore.getState().spendLog.filter((e) => e.sendId === 'snd_dedup_1')).toHaveLength(1);
+
+    addSpend(null, { ...base, estimated: true, sendId: 'snd_dedup_unk' });
+    addSpend(null, { ...base, estimated: true, sendId: 'snd_dedup_unk' });
+    expect(useStore.getState().spendLog.filter((e) => e.sendId === 'snd_dedup_unk')).toHaveLength(1);
+
+    // Legacy calls without sendId still sum normally:
+    addSpend(0.05, base);
+    addSpend(0.05, base);
+    expect(useStore.getState().spentUsd).toBe(0.2);
+  });
+});
+

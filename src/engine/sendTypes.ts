@@ -40,4 +40,6 @@ export interface SpendEntry {
   /** Model ref, or the LLM id for agent calls. */
   model: string;
   sessionId: string;
+  /** Optional stable paid-send id for idempotent spend booking (D+ ticket). */
+  sendId?: string;
 }

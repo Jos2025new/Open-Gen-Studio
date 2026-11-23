@@ -4,7 +4,7 @@ import { sanitizeUi, type PersistedUi } from './persistUi';
 import type { AppState } from './store';
 import type { ComposerState, Settings } from './storeTypes';
 
-export type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
+export type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'tickets' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
   ui: PersistedUi;
 };
@@ -40,6 +40,7 @@ export function mergePersistedState(
     sessions,
     activeSessionId,
     generations: p.generations ?? {},
+    tickets: p.tickets ?? {},
     assets,
     library: p.library ?? legacySubjects(restored),
     composer: { ...current.composer, ...p.composer, editing: null },
