@@ -126,3 +126,22 @@ Implementar A, B y C (C con una tabla propia, sin migrar datos reales), en ramas
 4. un ataque adversarial corto de otro modelo sobre cada prototipo, contando los hallazgos.
 
 Se elige con esos números. Mientras tanto, los parches de dinero de p9 quedan congelados: la rama task/p9-7 se conserva como evidencia y sus tests como red de casos.
+
+## Revisiones (2026-11-22)
+
+Informes completos en el bus de workers: `20261122-neon-opina-dinero.md` (Neon, código) y `20261122-sol-dinero-practicas.md` (GPT Sol, prácticas con fuentes web).
+
+- **Coinciden** en: un ticket durable de lo aprobado; una sola puerta de pago con reserva en vuelo y tope de importe en todo pase; una regla de comprobación que impida pagar fuera de la puerta; un piloto antes de migrar todo.
+- **Neon añade una causa 4:** el grafo se recompila al ejecutar. `graphToSteps` (flow/graph.ts:412) añade ancestros según `nodeIsCurrent` (freshness.ts:69-102), que depende de `status === 'done'`, de `modelRef` tras pasar al modelo de edición y de esquemas que no se persisten. Por eso el ticket debe congelar al aprobar los nodos ya expandidos y la secuencia completa, incluidos los pasos `write`.
+- **Discrepan en C.** Sol la quiere como red final, citando a Stripe y PayPal, y señala la salida directa de providerFetch.ts:31. Neon la descarta con hechos del código:
+  - el proxy es un relé ciego por el que también pasan POST que no cobran (saldo, sondeo, subidas);
+  - corta el envío al proveedor si se cierra la conexión (provider-proxy.js:56);
+  - no puede liquidar un LLM en streaming sin parsear SSE;
+  - un segundo `.sqlite` queda fuera de `/export`.
+- **Neon elige D:** A corregida (ticket con alcance congelado) más la puerta `paidSend` en el cliente; el ticket pasa a SQLite cuando se migren los datos. Sol deja como punto de extensión mover la puerta al lado nativo o del servidor.
+- **Urgente en main, comprobado en el código:**
+  - `beginOncePass` no tiene tope de importe (budget.ts:210);
+  - `llmCallEstimate` sin precio devuelve $0.0001 y no «desconocido» (budget.ts:383);
+  - `nodes.action.run` sin snapshot estima `usd: 0` (nodecore/commands.ts:74);
+  - `generationId` del nodo solo se escribe al terminar (flow/actions.ts:345), y la recuperación no lo enlaza.
+- **Prueba de elección:** la matriz de 6 escenarios de Neon sustituye a la de 4 medidas. Cubre recargas p9/p9c, «Allow this time» con subida de precio, Retry de un dudoso y lote parcial, reintento de Atlas más 402, dos envíos junto al tope, y LLM en streaming.
