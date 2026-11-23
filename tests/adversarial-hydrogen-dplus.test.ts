@@ -180,7 +180,7 @@ it('H3b: re-offers a live free/local command card for review when the node is ed
   expect(commandCard().status, 'free command card transitioned to dead error instead of re-offering paid review').toBe('awaiting');
 });
 
-it('H4: invalidates nodes.run.start command review signature when a mentioned @Subject asset is edited in-place', async () => {
+it.each(['prompt', 'shot'])('H4: invalidates nodes.run.start review when an asset mentioned in the %s is edited in-place', async (source) => {
   const originalBlob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' });
   blobs.set('asset_hero', originalBlob);
   useStore.setState(() => ({
@@ -192,7 +192,16 @@ it('H4: invalidates nodes.run.start command review signature when a mentioned @S
     },
     library: [{ id: 'sub_hero', name: 'Hero', kind: 'character', description: 'protagonist', frontalAssetId: 'asset_hero', refAssetIds: [] }],
   }));
-  patchNodeData(sid, 'n1', { prompt: 'portrait of @Hero' });
+  if (source === 'shot') {
+    const { catalog } = useStore.getState();
+    const schema = catalog.schemas[modelRef];
+    const shots = { key: 'multi_prompt', max: 2, indexed: false, durationAsString: false, exclusivePrompt: false };
+    useStore.setState({ catalog: { ...catalog, schemas: { ...catalog.schemas, [modelRef]: { ...schema, slots: { ...schema.slots, shots } } } } });
+  }
+  patchNodeData(sid, 'n1', source === 'prompt' ? { prompt: 'portrait of @Hero' } : {
+    prompt: 'portrait',
+    settings: { count: 1, advanced: {}, shots: [{ prompt: 'portrait of @Hero', duration: 5 }] },
+  });
 
   const pending = runCommandsTool(sid, { seq: [{ cmd: 'nodes.run.start', args: { targets: ['n1'], force: true } }] });
   const commandCard = () => useStore.getState().sessions[sid].feed.find((item): item is CommandApprovalFeedItem => item.type === 'commands')!;

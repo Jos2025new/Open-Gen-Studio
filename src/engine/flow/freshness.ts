@@ -57,7 +57,8 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
     if (index < 0) locals.push(subject); else locals[index] = subject;
   }
   const subjects = [...locals, ...library.filter(s => !locals.some(l => l.name.toLowerCase() === s.name.toLowerCase()))];
-  const mentioned = mentionSubjects(prompt, subjects).ids.map(id => {
+  const shots = 'settings' in d ? d.settings.shots ?? [] : [];
+  const mentioned = mentionSubjects([prompt, ...shots.map(shot => shot.prompt)].join('\n'), subjects).ids.map(id => {
     const s = subjects.find(x => x.id === id)!;
     const assets = [s.frontalAssetId, ...s.refAssetIds, s.videoAssetId].flatMap(id => {
       const asset = id ? ctx.assets?.[id] : undefined;
