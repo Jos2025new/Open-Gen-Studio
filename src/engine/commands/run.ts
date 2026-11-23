@@ -1,11 +1,16 @@
 import { z } from 'zod';
+import { useStore } from '../../store/store';
+import { assetRevisionIdentity } from '../assetRevisions';
+import { directModelRef } from '../directModel';
+import { stable } from '../flow/freshness';
+import { mentionSubjects } from '../params';
 import { withSequenceStepPass, type BudgetPass } from '../budget';
 import { FREE, UNKNOWN, sumEstimates } from '../pricing';
 import type { Estimate } from '../types';
 import { echo } from './echo';
 import { Transactions, takeStateSnapshot } from './history';
 import { command, missingTarget } from './registry';
-import { CommandError, type AnyCommand, type Caller, type CommandContext, type CommandReview, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
+import { COMMAND_REVIEW_CHANGED, CommandError, type AnyCommand, type Caller, type CommandContext, type CommandReview, type CommandSpec, type Effect, type ErrorCode, type RunResult, type Target } from './types';
 
 /*
  * The two ways in (ADR 0030).
@@ -14,6 +19,53 @@ import { CommandError, type AnyCommand, type Caller, type CommandContext, type C
  *    once, never throws, and runs one call or a sequence where `"$1"` is the result of step 1.
  * Both go through the same commands, the same undo transactions and the same echo.
  */
+
+function stringsIn(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  return value && typeof value === 'object' ? Object.values(value).flatMap(stringsIn) : [];
+}
+
+/** Paid commands share the same review/before-run check. Graph commands supply their resolved preview. */
+export function commandReview(spec: AnyCommand, ctx: CommandContext, args: unknown): CommandReview {
+  if (spec.review) return spec.review(ctx, args);
+  const state = useStore.getState();
+  const { mode, text, attachments, times, trims, editing, image, video, audio, model3d, designerTarget } = state.composer;
+  const composer = { mode, text, attachments, times, trims, editing, image, video, audio, model3d, designerTarget };
+  const refs = stringsIn([args, ctx.on, editing]);
+  const session = state.sessions[ctx.on.session ?? ''];
+  const doc = session?.docs.find(d => refs.includes(d.id));
+  const layers = doc?.layers.filter(l => refs.includes(l.id));
+  const generations = refs.flatMap(id => {
+    const g = state.generations[id];
+    return g ? [{ kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, inputs: g.inputs, settings: g.settings, op: g.op, variants: g.variants }] : [];
+  });
+  const inputs = stringsIn([args, composer, layers, generations]);
+  const mentioned = new Set(inputs.flatMap(text => text.includes('@') ? mentionSubjects(text, state.library).ids : []));
+  const subjects = state.library.filter(subject => mentioned.has(subject.id) || refs.includes(subject.id));
+  const assetIds = new Set([...inputs.flatMap(s => s.split(',').map(id => id.trim().replace(/^asset:/, ''))), ...stringsIn(subjects)]);
+  const assets = [...assetIds].filter(id => state.assets[id]).sort().map(id => {
+    const asset = state.assets[id];
+    return [assetRevisionIdentity(asset), state.generations[asset.generationId ?? '']?.modelRef];
+  });
+  const ops = state.settings.ops;
+  const hasImage = attachments.some(id => state.assets[id]?.kind === 'image');
+  const modelRefs = new Set([...inputs, ...Object.values(ops), directModelRef('image', image.modelRef, hasImage), directModelRef('video', video.modelRef, hasImage)].filter((ref): ref is string => Boolean(ref && state.catalog.models[ref])));
+  const models = [...modelRefs].sort().map(ref => [ref, state.catalog.models[ref], state.catalog.schemas[ref]]);
+  const estimate = previewEstimate(spec, ctx, args);
+  const prompt = generations[0]?.prompt ?? text;
+  return {
+    signature: stable({ args, on: ctx.on, composer, layers, generations, subjects, assets, models, ops, estimate, workspace: state.ui.workspace, space: state.ui.space }),
+    details: prompt.trim() ? [prompt] : [],
+  };
+}
+
+export function previewEstimate(spec: AnyCommand, ctx: CommandContext, args: unknown): Estimate {
+  try {
+    return spec.estimate?.(ctx, args) ?? UNKNOWN;
+  } catch {
+    return UNKNOWN;
+  }
+}
 
 const thenable = (value: unknown): value is PromiseLike<unknown> => typeof (value as PromiseLike<unknown> | null)?.then === 'function';
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -251,6 +303,7 @@ export interface RunOptions {
   onStepStart?: (step: number) => void;
   /** Invoked when a post-approval step finishes executing (1-based step index). */
   onStepEnd?: (step: number, ok: boolean, result?: unknown, error?: string) => void;
+  onReviewChanged?: (current: Pick<FrozenCommandStep, 'args' | 'on' | 'review' | 'estimate'>) => void;
   /** Durable replay options for resuming an already-approved frozen sequence after reload. */
   resume?: {
     skipSteps?: ReadonlySet<number>;
@@ -374,7 +427,14 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
       }
       const ctx: CommandContext = { on, caller: options.caller, signal: options.signal, ...(budgetPass ? { budgetPass } : {}) };
       const reviewed = reviews[i + 1];
-      if (reviewed) ctx.reviewed = reviewed;
+      if (spec.effect === 'spend' && needsApproval(spec.effect, options.caller)) {
+        const current = commandReview(spec, ctx, args);
+        if (reviewed?.signature !== current.signature) {
+          options.onReviewChanged?.({ args, on, review: current, estimate: previewEstimate(spec, ctx, args) });
+          throw new Error(COMMAND_REVIEW_CHANGED);
+        }
+        ctx.reviewed = current;
+      } else if (reviewed) ctx.reviewed = reviewed;
       if (approvalTicketId) ctx.approvalTicketId = approvalTicketId;
       check(spec, ctx, args);
       openHistories(spec, on, args, txs);
@@ -449,17 +509,10 @@ export async function run(input: unknown, options: RunOptions): Promise<RunResul
         }
         const previewOn = step.onReady ? step.on : (partialRefs(step.rawOn, i + 1, results, ran) as Target);
         const previewArgs = step.ready ? step.args : partialRefs(step.rawArgs, i + 1, results, ran);
-        let estimate: Estimate = FREE;
-        if (step.spec.effect === 'spend') {
-          try {
-            estimate = step.spec.estimate ? step.spec.estimate({ on: previewOn, caller: options.caller, signal: options.signal }, previewArgs) : UNKNOWN;
-          } catch {
-            estimate = UNKNOWN;
-          }
-        }
-        const review = step.spec.review && step.ready && step.onReady
-          ? step.spec.review({ on: previewOn, caller: options.caller }, previewArgs)
-          : undefined;
+        const ctx = { on: previewOn, caller: options.caller, signal: options.signal };
+        const spends = step.spec.effect === 'spend';
+        const estimate = spends ? previewEstimate(step.spec, ctx, previewArgs) : FREE;
+        const review = spends && step.ready && step.onReady ? commandReview(step.spec, ctx, previewArgs) : undefined;
         if (review) reviews[i + 1] = review;
         asks.push({ review, step: i + 1, cmd: step.spec.id, title: step.spec.title, effect: step.spec.effect, args: previewArgs, on: previewOn, estimate });
       }

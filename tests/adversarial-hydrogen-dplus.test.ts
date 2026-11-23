@@ -131,8 +131,7 @@ it('H1: requires charge confirmation before retrying a paid LLM turn whose think
   expect(fake.acceptedCount('/chat/completions'), 'plain Retry re-sent an already-charged empty/length LLM call without confirmation').toBe(1);
 });
 
-// reproduce: studio.generate.start has no review() or signature verification, so approving a restored card executes an edited live composer prompt without re-review.
-it.fails('H2: requires re-review when live composer changes before approving a restored studio.generate.start command card', async () => {
+it('H2: requires re-review when live composer changes before approving a restored studio.generate.start command card', async () => {
   setComposer({ text: 'reviewed composer prompt' });
   setComposerMedia('image', { modelRef });
   const pending = runCommandsTool(sid, { seq: [{ cmd: 'studio.generate.start', args: { kind: 'image' } }] });
@@ -181,8 +180,7 @@ it('H3b: re-offers a live free/local command card for review when the node is ed
   expect(commandCard().status, 'free command card transitioned to dead error instead of re-offering paid review').toBe('awaiting');
 });
 
-// reproduce: nodeRequest omits asset revisions for mentioned @Subject assets, so editing the asset in-place keeps preview.signature identical and sends unreviewed bytes.
-it.fails('H4: invalidates nodes.run.start command review signature when a mentioned @Subject asset is edited in-place', async () => {
+it('H4: invalidates nodes.run.start command review signature when a mentioned @Subject asset is edited in-place', async () => {
   const originalBlob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' });
   blobs.set('asset_hero', originalBlob);
   useStore.setState(() => ({

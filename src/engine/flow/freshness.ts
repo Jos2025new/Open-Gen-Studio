@@ -1,7 +1,7 @@
 import { incomingOf, resolveInputs, storeEnv } from '../nodecore/resolver';
 import { composePrompt } from '../nodecore/evaluate';
 import { descriptorOf } from '../nodecore/registry';
-import { normalizeAssetRevisions } from '../assetRevisions';
+import { assetRevisionIdentity, normalizeAssetRevisions } from '../assetRevisions';
 import { sentModelRef } from '../catalog';
 import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
@@ -59,7 +59,11 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
   const subjects = [...locals, ...library.filter(s => !locals.some(l => l.name.toLowerCase() === s.name.toLowerCase()))];
   const mentioned = mentionSubjects(prompt, subjects).ids.map(id => {
     const s = subjects.find(x => x.id === id)!;
-    return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: s.refAssetIds, video: s.videoAssetId, voice: s.voiceId };
+    const assets = [s.frontalAssetId, ...s.refAssetIds, s.videoAssetId].flatMap(id => {
+      const asset = id ? ctx.assets?.[id] : undefined;
+      return asset && (asset.revisions?.length || asset.originalRevision) ? [assetRevisionIdentity(asset)] : [];
+    });
+    return { name: s.name, description: s.description, frontal: s.frontalAssetId, refs: s.refAssetIds, video: s.videoAssetId, voice: s.voiceId, ...(assets.length ? { assets } : {}) };
   });
   const links = linkTarget(graph, node, generations, ctx.assets);
   const extra = links.length ? { links } : {}; // absent when empty, so results saved before this stay current

@@ -82,6 +82,13 @@ export function normalizeAssetRevisions(asset: Asset | undefined): { versions: A
   };
 }
 
+export function assetRevisionIdentity(asset: Asset | undefined) {
+  if (!asset) return null;
+  const revision = normalizeAssetRevisions(asset);
+  const version = revision.versions[revision.index];
+  return { id: asset.id, version, index: revision.index, duration: asset.duration, remoteUrl: asset.remoteUrl, stored: asset.stored, view: asset.viewImageId };
+}
+
 /** Ensures every version in a legacy asset has its own immutable snapshot blob in IDB before mutating `assetId`. */
 async function ensureMaterializedRevisions(assetId: string): Promise<{ versions: AssetRevision[]; index: number } | null> {
   const asset = useStore.getState().assets[assetId];

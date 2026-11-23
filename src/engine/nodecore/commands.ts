@@ -73,6 +73,7 @@ export const commands = [
     args: z.object({ approval: z.string().min(1).max(80), runId: z.string().min(1).max(80).optional() }).strict(),
     effect: 'spend',
     estimate: (_on, args) => snapshotById(args.approval)?.preview.estimate ?? UNKNOWN,
+    review: (_ctx, args) => ({ signature: snapshotById(args.approval)?.preview.signature ?? '', details: [] }),
     run: async (on, args, ctx) => {
       const snapshot = snapshotById(args.approval);
       if (!snapshot || snapshot.session !== on.session) throw new Error('This approval is unknown or belongs to another session; prepare the action again.');

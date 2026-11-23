@@ -108,14 +108,14 @@ export function subjectFromAttachments(name: string): Subject | null {
 }
 
 /** Create a Recraft V4 style from the attached images and select it (after cost confirmation). */
-export async function createRecraftStyle(sessionId: string, name: string, budgetPass?: BudgetPass): Promise<void> {
+export async function createRecraftStyle(sessionId: string, name: string, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
   const st = get();
   const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image').slice(0, 10);
   if (!images.length) {
     toast('Attach 1–10 reference images first.', 'error');
     return;
   }
-  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: estimateRecraftStyle(), budgetPass });
+  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: estimateRecraftStyle(), budgetPass, approvalTicketId });
   appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
   try {
     await runGeneration(g.id);
@@ -131,7 +131,7 @@ export async function createRecraftStyle(sessionId: string, name: string, budget
 }
 
 /** Create a Kling voice and bind it to the subject when ready (after cost confirmation). */
-export async function createSubjectVoice(sessionId: string, subjectId: string, budgetPass?: BudgetPass): Promise<void> {
+export async function createSubjectVoice(sessionId: string, subjectId: string, budgetPass?: BudgetPass, approvalTicketId?: string): Promise<void> {
   const st = get();
   const audio = st.composer.attachments.find((id) => st.assets[id]?.kind === 'audio');
   if (!audio) {
@@ -140,7 +140,7 @@ export async function createSubjectVoice(sessionId: string, subjectId: string, b
   }
   try {
     const spec = await opSpec({ sessionId, sourceAssetId: audio, op: 'create_voice', params: {}, origin: 'op' });
-    const g = createGeneration({ ...spec, budgetPass });
+    const g = createGeneration({ ...spec, budgetPass, approvalTicketId });
     appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
     await runGeneration(g.id);
     const voiceId = get().generations[g.id]?.text;

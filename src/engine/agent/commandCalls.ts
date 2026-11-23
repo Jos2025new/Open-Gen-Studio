@@ -1,3 +1,4 @@
+import { commandReview, previewEstimate, type RunOptions } from '../commands/run';
 import type { ChatMessageMeta } from '../feedMeta';
 import { uid } from '../../lib/id';
 import { appendFeed, removeTicket, saveNow, updateFeedItem, useStore } from '../../store/store';
@@ -201,31 +202,33 @@ export function settleInterruptedCommandCards(): void {
   }
 }
 
-function refreshCommandReview(sessionId: string, itemId: string, stepNumber: number | undefined): boolean {
+type ChangedReview = Parameters<NonNullable<RunOptions['onReviewChanged']>>[0];
+
+function refreshCommandReview(sessionId: string, itemId: string, stepNumber: number | undefined, resolved?: ChangedReview): Estimate | undefined {
   const ticket = storeTickets.get(commandTicketId(itemId));
   const steps = frozenStepsOf(ticket);
   const stale = steps.find((step) => step.step === stepNumber);
   const spec = stale && command(stale.cmd);
-  if (!ticket || !stale?.ready || !stale.onReady || !spec?.review) return false;
+  if (!ticket || !stale || spec?.effect !== 'spend' || (!resolved && (!stale.ready || !stale.onReady))) return;
   try {
     const ctx = { on: stale.on, caller: 'agent' as const };
-    const review = spec.review(ctx, stale.args);
-    const estimate = spec.estimate?.(ctx, stale.args) ?? stale.estimate ?? FREE;
-    const revised = steps.map((step) => step === stale ? { ...step, review, estimate } : step);
+    const current = resolved ?? { review: commandReview(spec, ctx, stale.args), estimate: previewEstimate(spec, ctx, stale.args) };
+    const revised = steps.map((step) => step === stale ? { ...step, ...current, ready: true, onReady: true } : step);
     const remaining = revised.filter((step) => !step.preRan && step.estimate && !ticket.sends.some(
       (send) => send.id === stepSendId(itemId, step.step) && isSendOut(send.status),
     ));
-    storeTickets.put({ ...ticket, scope: { ...ticket.scope, steps: revised } });
+    const estimateTotal = sumEstimates(remaining.map((step) => step.estimate!));
+    storeTickets.put({ ...ticket, pass: undefined, price: priceFromEstimate(estimateTotal), scope: { ...ticket.scope, steps: revised } });
     updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, {
-      status: 'awaiting', error: COMMAND_REVIEW_CHANGED, estimate: sumEstimates(remaining.map((step) => step.estimate!)),
+      status: 'awaiting', error: COMMAND_REVIEW_CHANGED, estimate: estimateTotal,
       steps: remaining.map((step) => ({
         step: step.step, cmd: step.cmd, title: step.title, effect: step.effect,
         args: step.args, estimate: step.estimate!, details: step.review?.details,
       })),
     });
-    return true;
+    return estimateTotal;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -250,16 +253,18 @@ function replayCommandTicket(sessionId: string, itemId: string, ticket: Approval
   }));
   void (async () => {
     try {
+      let changed: ChangedReview | undefined;
       const result = await run(
         { seq, on: { session: sessionId } },
         {
           caller: 'agent',
+          onReviewChanged: current => { changed = current; },
           onStepStart: (step) => markCommandStepStart(itemId, step),
           onStepEnd: (step, ok, val, err) => markCommandStepEnd(itemId, step, ok, val, err),
           resume: { skipSteps, priorResults, reviewedSpends, reviews, budgetPass, approvalTicketId: ticket.id, skipApproval: true },
         },
       );
-      if (!result.ok && result.error.message === COMMAND_REVIEW_CHANGED && refreshCommandReview(sessionId, itemId, result.error.step)) return;
+      if (!result.ok && result.error.message === COMMAND_REVIEW_CHANGED && refreshCommandReview(sessionId, itemId, result.error.step, changed)) return;
       updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) =>
         result.ok
           ? { ...it, status: 'done', error: undefined }
@@ -299,7 +304,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
       return false;
     }
     if (!item || item.status !== 'awaiting' || replaying.has(itemId)) return false;
-    let ticket = storeTickets.get(commandTicketId(itemId));
+    const ticket = storeTickets.get(commandTicketId(itemId));
     const steps = frozenStepsOf(ticket);
     if (!ticket || ticket.sessionId !== sessionId || !steps.length) return false;
     const remainingSpends = steps.filter((s) => {
@@ -312,6 +317,7 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
     if (heldAtLimit && decision === 'approve') return false;
     let budgetPass: BudgetPass | undefined;
     let releasePass: (() => void) | undefined;
+    let approvedTicket = ticket;
     if (decision === 'session') dontAskAgain(sessionId);
     else if (decision === 'until-next-session') dontAskUntilNextSession();
     else if (decision === 'once') {
@@ -319,11 +325,11 @@ export function decideCommandApproval(sessionId: string, itemId: string, decisio
       const grant = beginOncePass(sessionId, remainingEstimate.usd, unknownSteps);
       budgetPass = grant.pass;
       releasePass = grant.end;
-      ticket = grantTicketPass(ticket, remainingEstimate);
+      approvedTicket = grantTicketPass(ticket, remainingEstimate);
     }
     replaying.add(itemId);
     updateFeedItem<CommandApprovalFeedItem>(sessionId, itemId, (it) => ({ ...it, status: 'running' }));
-    replayCommandTicket(sessionId, itemId, ticket, budgetPass, releasePass);
+    replayCommandTicket(sessionId, itemId, approvedTicket, budgetPass, releasePass);
     return true;
   }
   if (decision === 'cancel') {
@@ -434,6 +440,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
       : undefined;
 
   let result;
+  let changed: ChangedReview | undefined;
   try {
     result = await run(
       { seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } },
@@ -441,6 +448,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
         caller: 'agent',
         signal,
         approver: sessionApprover,
+        onReviewChanged: current => { changed = current; },
         onStepStart: (step) => { if (approvalItemId) markCommandStepStart(approvalItemId, step); },
         onStepEnd: (step, ok, val, err) => { if (approvalItemId) markCommandStepEnd(approvalItemId, step, ok, val, err); },
       },
@@ -449,7 +457,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
     for (const release of passes) release();
   }
   const reoffered = approvalItemId && !result.ok && result.error.message === COMMAND_REVIEW_CHANGED
-    && refreshCommandReview(sessionId, approvalItemId, result.error.step);
+    && refreshCommandReview(sessionId, approvalItemId, result.error.step, changed);
   if (approvalItemId && !reoffered) {
     updateFeedItem<CommandApprovalFeedItem>(sessionId, approvalItemId, (it) =>
       result.ok
@@ -466,7 +474,8 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
       : result.rolledBack ? `Steps 1 to ${ran} ran and were taken back: the documents are as before.` : `Steps 1 to ${ran} ran and stay.`;
     if (result.error.code === 'denied') return { text: `Step ${result.error.step ?? 1} ${NEEDS_APPROVAL} (it spends or deletes). Nothing ran.`, done: false };
     const msg = result.error.code === 'target' && result.error.message.includes('on.doc') ? `${result.error.message.replace(/\.$/, '')}${ON_DOC_HINT}.` : result.error.message;
-    return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${msg} ${kept}`, done: false };
+    const over = reoffered ? budgetProblem(reoffered, sessionId) : null;
+    return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${msg}${over ? ' ' + over : ''} ${kept}`, done: false };
   }
   // The agent's edit glows on the canvas for a moment (in memory only: never saved, undone or exported).
   const after = doc ? getDoc(sessionId, doc.id) : undefined;
