@@ -297,7 +297,7 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
 /** Revalidate the reviewed version before taking the lock or spending. */
 export async function runNodes(sessionId: string, targets: string[], approved?: NodeRunPreview, force = true,
   onState?: import('../executor').ExecContext['onState'], budgetPass?: BudgetPass, commandTicketId?: string): Promise<import('../executor').ExecResult | null> {
-  const preview = await prepareNodeRun(sessionId, targets, force, approved?.runIds);
+  const preview = await prepareNodeRun(sessionId, targets, force, approved?.runIds.length ? approved.runIds : undefined);
   if (approved && preview.signature !== approved.signature) return null;
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
   const problem = budgetProblem(preview.estimate, sessionId, budgetPass);
