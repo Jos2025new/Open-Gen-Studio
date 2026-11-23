@@ -329,6 +329,7 @@ export async function sendGenerationViaPaidGate<T>(opts: GenerationPaidSendOpts<
   if (accepted) throw new PaidSendBlockedError('ALREADY_SENT', 'This request may already have been charged.', { ticketId: existing?.id ?? generationTicketId(g.id), sendId });
   try {
     if (isFreePrice(price)) {
+      void saveNow().catch(() => undefined);
       return await sendFree(sendId, send, signal, beforeTransport, (result, cost) => {
         deliverSend(g.id, sendId, index, cost, Boolean(result.estimated));
       });
