@@ -206,12 +206,14 @@ export async function runTurnModelCall(opts: {
     if (!result.text.trim()) {
       guard.setOutcome('empty');
       const cut = result.finishReason === 'length';
+      const possibleCharge = outcomeWasPaid();
+      const reason = cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.';
       deps.notice(
         sessionId,
         workspace,
-        cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.',
+        possibleCharge ? reason + ' This request may have been charged. Retrying may charge you again.' : reason,
         'error',
-        {},
+        { possibleCharge },
         usage.takePendingMeta(turnMeta(), hasTextBubble()),
       );
     }

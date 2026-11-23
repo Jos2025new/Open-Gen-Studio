@@ -114,8 +114,7 @@ function scanFixture(file: string, content: string): string[] {
 
 // --- Findings ---
 
-// reproduce: turnModelCall omits possibleCharge on an empty/length-exhausted reply even though the LLM ticket settled and charged, so plain Retry re-sends without charge confirmation.
-it.fails('H1: requires charge confirmation before retrying a paid LLM turn whose thinking exhausted output with empty text', async () => {
+it('H1: requires charge confirmation before retrying a paid LLM turn whose thinking exhausted output with empty text', async () => {
   useStore.setState((state) => ({ settings: { ...state.settings, budgetOn: false } }));
   fake.onNext('/chat/completions', () =>
     sseResponse([
