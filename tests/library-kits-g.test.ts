@@ -64,6 +64,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
 }));
 
 import { createItem, libraryToDesigner, readKitVersion, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { deleteAssets } from '../src/engine/assetActions';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { run } from '../src/engine/commands';
 import { deleteLayer, getDoc, mergeDown, placeAsset } from '../src/engine/design/actions';
@@ -319,5 +320,29 @@ describe('Lote G fixes', () => {
     const snapAfter = await readKitVersion(fromNodes.versionId!);
     expect(snapAfter?.doc?.background).toBe('#223344');
     expect(snapAfter?.docRev).toBe(v1.docRev);
+  });
+
+  it('6) saveItem with workDoc rejects and cleans up if a layer sourceAssetId present at save start is deleted mid-flight, while already-missing originals still save', async () => {
+    const s = resetStore();
+    useStore.setState({ assets: { a: mkAsset('a', s.id) } });
+    const { subject: kit, doc } = await createItem({ name: 'RaceDocKit', kind: 'moodboard', space: 'designer', sessionId: s.id, by: 'user' });
+    const lyrA: RasterLayer = { ...newRasterLayer('Layer A', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }, 'a'), rev: 1 };
+    setDoc(s.id, doc!.id, (d) => ({ ...d, layers: [lyrA] }));
+    hoisted.blobs.set(`raster:${lyrA.id}`, new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
+
+    const keysBefore = new Set(hoisted.blobs.keys());
+    hoisted.setOnSet((k) => {
+      if (k.startsWith('libver:')) deleteAssets(['a']);
+    });
+    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'designer', by: 'user' }))
+      .rejects.toThrow(/deleted while saving/i);
+    expect([...hoisted.blobs.keys()].filter((k) => !keysBefore.has(k))).toEqual([]);
+
+    // Original asset already absent before save starts must NOT block saving
+    hoisted.setOnSet(null);
+    expect(useStore.getState().assets.a).toBeUndefined();
+    const saved = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'designer', by: 'user' });
+    expect(saved.versionId).toBeTruthy();
+    expect((await readKitVersion(saved.versionId!))?.doc?.layers).toHaveLength(1);
   });
 });

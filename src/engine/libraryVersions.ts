@@ -268,6 +268,7 @@ export function saveItem(opts: {
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
     const workDoc = opts.docId && opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined;
     if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
+    if (workDoc) { const assets = get().assets; for (const l of workDoc.layers) if ('sourceAssetId' in l && l.sourceAssetId && assets[l.sourceAssetId]) checkAssetIds.push(l.sourceAssetId); }
     const prevSnap = cur.versionId ? (workDoc ? await readKitVersion(cur.versionId).catch(() => null) : await readKitVersion(cur.versionId)) : null;
     if (!workDoc && cur.versionId && !prevSnap) throw new Error(`Cannot save "${cur.id}": current version "${cur.versionId}" blob is missing.`);
     return withCleanup(async (written) => {
