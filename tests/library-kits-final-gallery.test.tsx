@@ -110,3 +110,14 @@ it('uses the current cover without reading old assets, then falls back when the 
   expect(q('.lib-tile [data-asset="older"]')).toBeTruthy();
   expect(oldReads).toBeGreaterThan(0);
 });
+
+it('omits the save warning when a draft has never had a version', async () => {
+  const sessionId = sid();
+  const graph: Graph = { nodes: [{ id: 't', position: { x: 100, y: 100 }, data: { kind: 'text', title: 'Note', text: 'Hi' } }], edges: [] };
+  const { subject } = await createItem({ name: 'Draft', kind: 'moodboard', space: 'studio', by: 'user', sessionId, graph, draft: true });
+  const { groupId } = libraryToNodes(sessionId, subject.id);
+  const group = useStore.getState().sessions[sessionId].graph.groups!.find(g => g.id === groupId)!;
+  expect([subject.versionId, group.library?.versionId]).toEqual([undefined, undefined]);
+  await act(async () => root.render(createElement(SaveToLibrary, { space: 'nodes', sessionId, group, onDone: () => undefined })));
+  expect(host.textContent).not.toContain('Changed since it was opened here');
+});
