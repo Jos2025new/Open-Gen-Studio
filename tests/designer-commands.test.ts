@@ -21,7 +21,7 @@ import { z } from 'zod';
 import { allCommands, argsSchema, collected, command, defineCommand, findCommands, invoke, run, signature } from '../src/engine/commands';
 import { register } from '../src/engine/commands/registry';
 import * as actions from '../src/engine/design/actions';
-import { DESIGNER_ACTIONS } from '../src/engine/design/commands';
+import { DESIGNER_ACTIONS, GROUP_COMMANDS } from '../src/engine/design/commands';
 import { FX_DO } from '../src/engine/design/fx.commands';
 import { createDoc } from '../src/engine/design/doc';
 import { historyDepth } from '../src/engine/design/history';
@@ -48,8 +48,8 @@ describe('the Designer actions as commands', () => {
     const ids = new Set(Object.values(DESIGNER_ACTIONS).filter((to) => !to.startsWith('- ')));
     for (const id of ids) expect(command(id), id).toBeDefined();
     const designer = allCommands().filter((c) => c.id.startsWith('designer.')).map((c) => c.id);
-    expect(designer.sort()).toEqual([...ids, ...Object.values(FX_DO)].sort());
-    expect(designer).toHaveLength(37);
+    expect(designer.sort()).toEqual([...ids, ...Object.values(FX_DO), ...GROUP_COMMANDS].sort());
+    expect(designer).toHaveLength(40);
   });
 
   it('are found by the automatic index, each with a target, a schema and a one-line signature', () => {
@@ -172,7 +172,7 @@ describe('the agent: find_commands and run_commands', () => {
     const all = findCommandsTool(sid, { area: 'designer' });
     const lines = all.text.split('\n');
     expect(lines[0]).toBe(`Commands run as the user's own actions in this session. Document on screen: ${doc.id} "Page", 800x600.`);
-    expect(lines).toHaveLength(38);
+    expect(lines).toHaveLength(41);
     expect(lines).toContain('designer.layer.move {layer: string, dir: 1|-1} — One place up (1) or down (-1) in the stack.');
     expect(lines.find((l) => l.startsWith('designer.doc.undo'))).toBe('designer.doc.undo {} — Takes back the last change of the document. [not now: Nothing to undo.]');
     expect(findCommandsTool(sid, { text: 'opacity' }).text.split('\n')).toHaveLength(2);
@@ -226,7 +226,7 @@ describe('the agent: find_commands and run_commands', () => {
     );
     // Call 1 (find_commands) and Calls 2-3 (failed target + split doc.new) disappear: 1 run_commands + 1 reply = 2 calls.
     expect(calls).toHaveLength(2);
-    expect(calls[0]).toContain('designer.doc.new {width: int 1..16384, height: int 1..16384, name?: string}');
+    expect(calls[0]).toContain('designer.doc.new {width: int 1..16384, height: int 1..16384, name?: string, background?: string,null}');
     expect(calls[0]).toContain('designer.fx.add');
     expect(calls[0]).toContain('blur) or effect (glow, shadow, flare)');
     expect(calls[1]).toContain('Done, 6 steps.');

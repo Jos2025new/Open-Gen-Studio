@@ -19,13 +19,13 @@ export function liveGroups(doc: DesignDoc): LayerGroup[] {
 }
 
 /** Put these layers in a new group; they are gathered next to each other where the topmost one was. One undo step. */
-export function groupLayers(sessionId: string, docId: string, ids: string[]): string | null {
+export function groupLayers(sessionId: string, docId: string, ids: string[], name?: string, minLayers = 2): string | null {
   const doc = getDoc(sessionId, docId);
   if (!doc) return null;
   const set = new Set(ids);
   const members = doc.layers.filter((l) => set.has(l.id));
-  if (members.length < 2) return null;
-  const group: LayerGroup = { id: uid('grp'), name: `Group ${liveGroups(doc).length + 1}` };
+  if (members.length < minLayers) return null;
+  const group: LayerGroup = { id: uid('grp'), name: name?.trim() || `Group ${liveGroups(doc).length + 1}` };
   const top = Math.max(...members.map((l) => doc.layers.indexOf(l)));
   const before = doc.layers.slice(0, top + 1).filter((l) => !set.has(l.id));
   const after = doc.layers.slice(top + 1);

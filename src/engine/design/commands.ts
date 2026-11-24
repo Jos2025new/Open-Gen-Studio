@@ -3,15 +3,39 @@ import { defineCommand } from '../commands/types';
 import { useStore } from '../../store/store';
 import type { Layer } from '../types';
 import * as A from './actions';
-import { docCommand, docOf } from './commandKit';
+import { docCommand, docOf, hasTarget, layerRef } from './commandKit';
+import { shapeBox, unionBox } from './doc';
 import { EXPORT_FORMATS } from './exportSettings';
+import { groupLayers, liveGroups, patchGroup, ungroup } from './groups';
 import { canRedo, canUndo } from './history';
 
 /* The Designer's documents as commands (ADR 0030). Each wraps the action the interface already calls. */
 
 const none = z.object({}).strict();
 const side = z.number().int().min(1).max(16384);
-const brief = (l: Layer) => ({ id: l.id, name: l.name, type: l.type, visible: l.visible, locked: l.locked, opacity: l.opacity, blend: l.blend });
+const groupName = z.string().trim().min(1).max(80);
+const layerBoxBrief = (l: Layer) =>
+  l.type === 'raster' ? { x: l.x, y: l.y, w: l.width, h: l.height }
+    : l.type === 'text' ? { x: l.x, y: l.y, w: l.width, h: Math.round(l.fontSize * l.lineHeight) }
+      : l.type === 'vector' ? unionBox(l.shapes.map(shapeBox)) : null;
+const layerColor = (l: Layer) =>
+  l.type === 'text' ? l.color
+    : l.type === 'vector' ? (l.shapes.find((s) => s.fill)?.fill ?? l.shapes.find((s) => s.stroke)?.stroke)
+      : l.type === 'raster' ? l.pageFill?.color : undefined;
+const brief = (l: Layer) => {
+  const box = layerBoxBrief(l), color = layerColor(l);
+  return {
+    id: l.id, name: l.name, type: l.type, visible: l.visible, locked: l.locked, opacity: l.opacity, blend: l.blend,
+    ...(l.groupId ? { group: l.groupId } : {}), ...(box ? { box } : {}),
+    ...(l.type === 'text' ? { text: l.text.length > 120 ? `${l.text.slice(0, 120)}…` : l.text } : {}),
+    ...(color ? { color } : {}),
+  };
+};
+const hasGroup = (ctx: Parameters<typeof hasTarget>[0], args?: { group?: string }) => {
+  const t = hasTarget(ctx);
+  if (t !== true || !args?.group) return t;
+  return liveGroups(docOf(ctx.on)).some((g) => g.id === args.group) ? true : `No group "${args.group}" in this document.`;
+};
 
 export const commands = [
   defineCommand({
@@ -36,18 +60,23 @@ export const commands = [
     undo: false,
     run: (on) => {
       const d = docOf(on);
-      return { id: d.id, name: d.name, width: d.width, height: d.height, active_layer: d.activeLayerId ?? null, layers: d.layers.map(brief) };
+      return {
+        id: d.id, name: d.name, width: d.width, height: d.height, background: d.background,
+        active_layer: d.activeLayerId ?? null,
+        groups: liveGroups(d).map((g) => ({ id: g.id, name: g.name, ...(g.from ? { from: g.from } : {}) })),
+        layers: d.layers.map(brief),
+      };
     },
   }),
   defineCommand({
     id: 'designer.doc.new',
     title: 'New document',
     description: 'A blank document; it becomes the one on screen. Returns {doc}.',
-    args: z.object({ width: side, height: side, name: z.string().min(1).max(80).optional() }).strict(),
+    args: z.object({ width: side, height: side, name: z.string().min(1).max(80).optional(), background: z.string().nullable().optional() }).strict(),
     effect: 'write',
     needs: ['session'],
     run: ({ on }, args) => {
-      const doc = A.newBlankDoc(on.session!, { label: args.name ?? 'Design', width: args.width, height: args.height });
+      const doc = A.newBlankDoc(on.session!, { label: args.name ?? 'Design', width: args.width, height: args.height, ...(args.background !== undefined ? { background: args.background } : {}) });
       if (args.name) A.renameDoc(on.session!, doc.id, args.name);
       return { doc: doc.id };
     },
@@ -150,7 +179,37 @@ export const commands = [
       return { asset: asset.id };
     },
   }),
+  docCommand({
+    id: 'designer.group.create',
+    title: 'Group layers',
+    description: 'Puts these layers into a new group. Returns {group}.',
+    args: z.object({ layers: z.array(layerRef).min(1).max(40), name: groupName.optional() }).strict(),
+    effect: 'write',
+    run: (on, args) => {
+      const group = groupLayers(on.session, on.doc, args.layers, args.name, 1);
+      if (!group) throw new Error('The layers could not be grouped.');
+      return { group };
+    },
+  }),
+  docCommand({
+    id: 'designer.group.rename',
+    title: 'Rename group',
+    args: z.object({ group: layerRef, name: groupName }).strict(),
+    effect: 'write',
+    available: hasGroup,
+    run: (on, args) => patchGroup(on.session, on.doc, args.group, { name: args.name }),
+  }),
+  docCommand({
+    id: 'designer.group.ungroup',
+    title: 'Ungroup layers',
+    args: z.object({ group: layerRef }).strict(),
+    effect: 'write',
+    available: hasGroup,
+    run: (on, args) => ungroup(on.session, on.doc, args.group),
+  }),
 ];
+
+export const GROUP_COMMANDS = ['designer.group.create', 'designer.group.rename', 'designer.group.ungroup'] as const;
 
 /**
  * Every exported action of `actions.ts`: the command that runs it, or (after "-") why it is not one. A test keeps

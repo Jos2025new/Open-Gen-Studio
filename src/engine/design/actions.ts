@@ -71,9 +71,9 @@ export function selectDoc(sessionId: string, docId: string): void {
   if (doc) void ensureBuffers(doc.layers);
 }
 
-export function newBlankDoc(sessionId: string, preset: { label: string; width: number; height: number }): DesignDoc {
+export function newBlankDoc(sessionId: string, preset: { label: string; width: number; height: number; background?: string | null }): DesignDoc {
   const count = sessionDocs(sessionId).length + 1;
-  const doc = D.createDoc(`Design ${count}`, preset.width, preset.height, D.newDocBackground());
+  const doc = D.createDoc(`Design ${count}`, preset.width, preset.height, preset.background !== undefined ? preset.background : D.newDocBackground());
   addDoc(sessionId, doc);
   return doc;
 }

@@ -14,7 +14,7 @@ const one = z.object({ layer: layerRef }).strict();
 const name = z.string().min(1).max(80);
 const asset = z.string().min(1).max(80);
 const textStyle = z
-  .object({ fontFamily: z.string(), fontSize: z.number().positive(), fontWeight: z.number(), color: z.string(), align: z.enum(['left', 'center', 'right']), lineHeight: z.number().positive(), letterSpacing: z.number() })
+  .object({ fontFamily: z.string(), fontSize: z.number().positive(), fontWeight: z.number(), color: z.string(), align: z.enum(['left', 'center', 'right']), lineHeight: z.number().positive(), letterSpacing: z.number(), underline: z.boolean(), strike: z.boolean(), textCase: z.enum(['upper', 'lower', 'title']) })
   .partial()
   .strict();
 
@@ -92,15 +92,18 @@ export const commands = [
   docCommand({
     id: 'designer.layer.set',
     title: 'Change layer',
-    description: 'Name, visibility, lock, opacity (0..1), blend, or the text of a text layer.',
+    description: 'Name, visibility, lock, opacity (0..1), blend, position (x, y for raster/text), or text and text style.',
     args: z
-      .object({ layer: layerRef, name: name.optional(), visible: z.boolean().optional(), locked: z.boolean().optional(), opacity: z.number().min(0).max(1).optional(), blend: z.enum(BLEND_MODES as [BlendMode, ...BlendMode[]]).optional(), text: z.string().max(4000).optional() })
+      .object({ layer: layerRef, name: name.optional(), visible: z.boolean().optional(), locked: z.boolean().optional(), opacity: z.number().min(0).max(1).optional(), blend: z.enum(BLEND_MODES as [BlendMode, ...BlendMode[]]).optional(), text: z.string().max(4000).optional(), x: z.number().optional(), y: z.number().optional(), style: textStyle.optional() })
       .strict(),
     effect: 'write',
-    run: (on, { layer, ...patch }) => {
-      if (patch.text !== undefined && layerOf(on, layer).type !== 'text') throw new Error('Only a text layer has text.');
-      if (!Object.values(patch).some((value) => value !== undefined)) throw new Error('Nothing to change: give at least one field.');
-      A.patchLayer(on.session, on.doc, layer, patch as Partial<Layer>);
+    run: (on, { layer, style, ...patch }) => {
+      const target = layerOf(on, layer);
+      if ((patch.text !== undefined || style !== undefined) && target.type !== 'text') throw new Error('Only a text layer has text or text style.');
+      if ((patch.x !== undefined || patch.y !== undefined) && target.type !== 'raster' && target.type !== 'text') throw new Error('Only raster and text layers have x/y position.');
+      const merged = { ...patch, ...(style ?? {}) };
+      if (!Object.values(merged).some((value) => value !== undefined)) throw new Error('Nothing to change: give at least one field.');
+      A.patchLayer(on.session, on.doc, layer, merged as Partial<Layer>);
     },
   }),
   docCommand({
