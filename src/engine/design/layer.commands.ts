@@ -99,6 +99,9 @@ export const commands = [
     effect: 'write',
     run: (on, { layer, style, ...patch }) => {
       const target = layerOf(on, layer);
+      if (target.locked && patch.locked !== false && (patch.x !== undefined || patch.y !== undefined || style !== undefined || patch.text !== undefined)) {
+        throw new Error(`"${target.name}" is locked. Unlock it first.`);
+      }
       if ((patch.text !== undefined || style !== undefined) && target.type !== 'text') throw new Error('Only a text layer has text or text style.');
       if ((patch.x !== undefined || patch.y !== undefined) && target.type !== 'raster' && target.type !== 'text') throw new Error('Only raster and text layers have x/y position.');
       const merged = { ...patch, ...(style ?? {}) };

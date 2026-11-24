@@ -20,9 +20,9 @@ describe('Part 6: brief Library kits rule in agent capability map', () => {
     expect(kitLine).toBeDefined();
     expect(kitLine!.length).toBeLessThan(400);
     expect(kitLine).toMatch(/moodboard|design-system|brand-kit/i);
-    expect(kitLine).toMatch(/library\.kit\.create/);
+    expect(kitLine).toMatch(/library\.item\.create/);
     expect(kitLine).toMatch(/designer\.group\.create/);
-    expect(kitLine).toMatch(/library\.kit\.update/);
+    expect(kitLine).toMatch(/library\.item\.save/);
     expect(kitLine).toMatch(/before designing/i);
     expect(agentSystem()).toContain(kitLine!);
 

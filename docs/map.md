@@ -20,17 +20,17 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 470 | 401 |
-| [store.ts](../src/store/store.ts) | 314 | 394 |
+| [types.ts](../src/engine/types.ts) | 472 | 405 |
+| [store.ts](../src/store/store.ts) | 315 | 398 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 83 | 51 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 68 | 5 |
+| [id.ts](../src/lib/id.ts) | 60 | 0 |
 | [media.ts](../src/lib/media.ts) | 60 | 83 |
-| [id.ts](../src/lib/id.ts) | 59 | 0 |
 | [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 57 | 22 |
-| [doc.ts](../src/engine/design/doc.ts) | 53 | 80 |
+| [doc.ts](../src/engine/design/doc.ts) | 53 | 81 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 46 | 41 |
@@ -38,8 +38,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 39 | 10 |
 | [format.ts](../src/lib/format.ts) | 38 | 1 |
 | [actions.ts](../src/engine/actions.ts) | 36 | 40 |
+| [graph.ts](../src/engine/flow/graph.ts) | 36 | 35 |
 | [budget.ts](../src/engine/budget.ts) | 35 | 33 |
-| [render.ts](../src/engine/design/render.ts) | 35 | 10 |
 
 ## Por área
 
@@ -57,24 +57,24 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 10 | 9 |
 | `src/components/studio` | 8 | 4 |
 | `src/components/ui` | 25 | 22 |
-| `src/engine` | 95 | 473 |
+| `src/engine` | 95 | 477 |
 | `src/engine/agent` | 71 | 182 |
-| `src/engine/commands` | 7 | 45 |
-| `src/engine/design` | 163 | 224 |
-| `src/engine/flow` | 22 | 106 |
+| `src/engine/commands` | 7 | 43 |
+| `src/engine/design` | 163 | 225 |
+| `src/engine/flow` | 23 | 108 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/money` | 4 | 12 |
-| `src/engine/nodecore` | 23 | 51 |
-| `src/engine/nodes` | 8 | 36 |
+| `src/engine/nodecore` | 24 | 53 |
+| `src/engine/nodes` | 8 | 37 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 19 | 3 |
 | `src/engine/providers` | 15 | 99 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 494 |
-| `src/store` | 19 | 396 |
+| `src/lib` | 38 | 498 |
+| `src/store` | 19 | 400 |
 
-280 de 813 módulos no tienen ningún test que los importe directamente.
+281 de 815 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -88,6 +88,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [audio.node.ts](../src/engine/nodecore/types/audio.node.ts)
 - [image.node.ts](../src/engine/nodecore/types/image.node.ts)
 - [model3d.node.ts](../src/engine/nodecore/types/model3d.node.ts)
+- [part.node.ts](../src/engine/nodecore/types/part.node.ts)
 - [ref.node.ts](../src/engine/nodecore/types/ref.node.ts)
 - [text.node.ts](../src/engine/nodecore/types/text.node.ts)
 - [tool.node.ts](../src/engine/nodecore/types/tool.node.ts)

@@ -14,6 +14,7 @@ import { canRedo, canUndo } from './history';
 const none = z.object({}).strict();
 const side = z.number().int().min(1).max(16384);
 const groupName = z.string().trim().min(1).max(80);
+const hexColor = z.string().refine((v) => /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v), 'Expected a hex color (#RGB, #RRGGBB, or #RRGGBBAA).');
 const layerColor = (l: Layer) =>
   l.type === 'text' ? l.color
     : l.type === 'vector' ? (l.shapes.find((s) => s.fill)?.fill ?? l.shapes.find((s) => s.stroke)?.stroke)
@@ -68,7 +69,7 @@ export const commands = [
     id: 'designer.doc.new',
     title: 'New document',
     description: 'A blank document; it becomes the one on screen. Returns {doc}.',
-    args: z.object({ width: side, height: side, name: z.string().min(1).max(80).optional(), background: z.string().nullable().optional() }).strict(),
+    args: z.object({ width: side, height: side, name: z.string().min(1).max(80).optional(), background: hexColor.nullable().optional() }).strict(),
     effect: 'write',
     needs: ['session'],
     run: ({ on }, args) => {

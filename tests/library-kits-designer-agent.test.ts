@@ -133,4 +133,26 @@ describe('Part 4: Designer group commands, enriched doc.read, doc.new background
     const layers = (readRes.results[0] as { layers: Array<{ id: string; color?: string }> }).layers;
     expect(layers.find((l) => l.id === raster.id)?.color).toBe('#00ffaa');
   });
+
+  it('B1 review (b) & (c): designer.layer.set respects locked layers for x/y/style/text and designer.doc.new validates background color', async () => {
+    // (c) designer.doc.new rejects invalid background color strings, accepts valid hex & null
+    expect(await run({ cmd: 'designer.doc.new', on: { session: sid }, args: { width: 400, height: 400, background: 'not-a-color' } }, { caller: 'agent' })).toMatchObject({ ok: false, error: { code: 'invalid' } });
+    expect(await run({ cmd: 'designer.doc.new', on: { session: sid }, args: { width: 400, height: 400, background: '' } }, { caller: 'agent' })).toMatchObject({ ok: false, error: { code: 'invalid' } });
+    expect(await run({ cmd: 'designer.doc.new', on: { session: sid }, args: { width: 400, height: 400, background: '#112233aa' } }, { caller: 'agent' })).toMatchObject({ ok: true });
+
+    // (b) designer.layer.set refuses x/y/style/text changes on a locked layer, while still allowing unlock
+    const doc = createDoc('LockDoc', 400, 400);
+    addDoc(sid, doc);
+    const added = await run({ cmd: 'designer.layer.add_text', on: { session: sid, doc: doc.id }, args: { text: 'LockedTitle', x: 10, y: 20, width: 100 } }, { caller: 'agent' });
+    const textId = (added.results[0] as { layer: string }).layer;
+    expect((await run({ cmd: 'designer.layer.set', on: { session: sid, doc: doc.id }, args: { layer: textId, locked: true } }, { caller: 'agent' })).ok).toBe(true);
+
+    expect(await run({ cmd: 'designer.layer.set', on: { session: sid, doc: doc.id }, args: { layer: textId, x: 99 } }, { caller: 'agent' })).toMatchObject({ ok: false });
+    expect(await run({ cmd: 'designer.layer.set', on: { session: sid, doc: doc.id }, args: { layer: textId, style: { color: '#ff0000' } } }, { caller: 'agent' })).toMatchObject({ ok: false });
+    expect((getDoc(sid, doc.id)!.layers.find((l) => l.id === textId) as TextLayer).x).toBe(10);
+
+    // Unlocking works and then x/y/style succeeds
+    expect((await run({ cmd: 'designer.layer.set', on: { session: sid, doc: doc.id }, args: { layer: textId, locked: false, x: 50 } }, { caller: 'agent' })).ok).toBe(true);
+    expect((getDoc(sid, doc.id)!.layers.find((l) => l.id === textId) as TextLayer).x).toBe(50);
+  });
 });
