@@ -1,7 +1,7 @@
 import { uid } from '../lib/id';
 import { blobDb } from '../lib/idb';
 import { setDoc, useStore } from '../store/store';
-import { addDoc, getDoc, selectDoc } from './design/actions';
+import { addDoc, addTextLayer, getDoc, placeAsset, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
@@ -115,8 +115,8 @@ const detachWorkingDoc = (sessionId: string, docId: string) => setDoc(sessionId,
   const { library, ...rest } = d;
   return { ...rest, ...(library?.view === 'studio' ? { view: 'studio' as const } : {}), name: d.name.endsWith(' (local copy)') ? d.name : `${d.name} (local copy)` };
 });
-const linkedBlankDoc = (name: string, subjectId: string, versionId: string, docRev?: string, view?: 'studio'): DesignDoc =>
-  ({ ...D.createDoc(name, 1080, 1080, null), library: { subjectId, versionId, ...(docRev ? { docRev } : {}), ...(view ? { view } : {}) } });
+const linkedBlankDoc = (name: string, subjectId: string, versionId: string, docRev?: string, view?: 'studio', w = 1080, h = 1080): DesignDoc =>
+  ({ ...D.createDoc(name, w, h, null), library: { subjectId, versionId, ...(docRev ? { docRev } : {}), ...(view ? { view } : {}) } });
 
 function optionalFields(c: { description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; docRev?: string; groupIds?: string[] }) {
   const graph = hasGraph(c.graph) ? c.graph : undefined, kits = c.kits?.length ? [...new Set(c.kits)] : undefined, tokens = c.tokens && Object.keys(c.tokens).length ? c.tokens : undefined;
@@ -193,7 +193,8 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
     const subject = requireItem(subjectId), session = get().sessions[sessionId];
     if (!session) throw new Error(`No session "${sessionId}".`);
     const curVer = subject.versionId ?? '', curDocRev = subject.docRev ?? '', existing = session.docs.find((d) => d.library?.subjectId === subjectId);
-    if (existing && (existing.library?.docRev ?? '') === curDocRev) {
+    const same = curDocRev ? existing?.library?.docRev === curDocRev : Boolean(existing && !existing.library?.docRev && existing.library?.versionId === curVer);
+    if (existing && same) {
       const promote = space === 'designer' && Boolean(existing.library?.view || existing.view);
       if (promote || existing.name !== subject.name) {
         setDoc(sessionId, existing.id, (d) => {
@@ -211,13 +212,25 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const docRev = snap?.doc ? (snap.docRev ?? subject.docRev) : undefined;
       const link: NonNullable<DesignDoc['library']> = { subjectId, versionId: curVer, ...(docRev ? { docRev } : {}), ...(space === 'studio' ? { view: 'studio' as const } : {}) };
       const px = snap?.doc ? (await copyDocPixels(snap.doc, null, expectedRasterIds(snap), written)).map : null;
+      const gNodes = snap?.doc ? [] : ((snap?.graph ?? subject.graph)?.nodes ?? []), assets = get().assets;
+      const imgs = gNodes.filter((n) => n.data.kind === 'asset' && n.data.assetId && assets[n.data.assetId]?.kind === 'image');
+      const first = imgs[0]?.data.kind === 'asset' ? assets[imgs[0].data.assetId!] : undefined;
+      const k = first && first.width > 0 && first.height > 0 ? Math.min(1, 4096 / Math.max(first.width, first.height)) : 0;
+      const [w, h] = k ? [Math.round(first!.width * k), Math.round(first!.height * k)] : [1080, 1080];
       const doc = snap?.doc
         ? { ...remapDoc(snap.doc, px!, { newDocId: true, library: link }), name: subject.name }
-        : linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined);
+        : linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined, w, h);
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      return doc;
+      let placed = 0;
+      for (const n of imgs) {
+        if (n.data.kind !== 'asset' || !n.data.assetId) continue;
+        try { if (await placeAsset(sessionId, doc.id, n.data.assetId, placed ? 'new' : 'base', n.data.title || undefined)) placed++; } catch {}
+      }
+      const box = { x: Math.round(w * 0.08), y: Math.round(h * 0.08), width: Math.round(w * 0.84) };
+      for (const n of gNodes) if (n.data.kind === 'text' && n.data.text.trim()) addTextLayer(sessionId, doc.id, n.data.text, box, {}, n.data.title || undefined);
+      return getDoc(sessionId, doc.id) ?? doc;
     });
   });
 }
