@@ -45,10 +45,6 @@ const AREAS: Record<string, string> = {
 };
 const NEEDS_APPROVAL = 'needs the user\'s approval';
 const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset']);
-const LIBRARY_WRITERS = new Set([
-  'library.item.create', 'library.item.save', 'library.item.restore',
-  'library.subject.save', 'library.subject.from_asset', 'library.subject.from_sheet', 'library.subject.from_attachments', 'library.voice.create',
-]);
 const ON_DOC_HINT = ' (target a new doc from an earlier step with "on": "$1.doc", or pass an id from designer.doc.list)';
 const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
 const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
@@ -298,7 +294,10 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   );
   const reoffered = approvalItemId ? finishCommandCard(sessionId, approvalItemId, result, changed) : undefined;
   const ran = result.results.length, afterState = useStore.getState();
-  const saved = afterState.library !== beforeState.library && result.results.some((_, i) => LIBRARY_WRITERS.has(command(seq[i].cmd)?.id ?? ''));
+  const saved = afterState.library !== beforeState.library && result.results.some((_, i) => {
+    const spec = command(seq[i].cmd);
+    return spec && areaOf(spec.id) === 'library' && spec.effect !== 'delete' && spec.effect !== 'read';
+  });
   const libraryNote = saved ? ' Saved in Library (restore a version or delete the entry to undo).' : '';
   if (!result.ok) {
     const kept = ran === 0 ? 'Nothing ran.'
@@ -312,11 +311,14 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   // The agent's edit glows on the canvas for a moment (in memory only: never saved, undone or exported).
   const after = doc ? getDoc(sessionId, doc.id) : undefined;
   if (doc && after) markAgentEdit(doc.id, doc, after);
-  const docEdited = afterState.sessions[sessionId]?.docs.some((d) => {
+  const docs = afterState.sessions[sessionId]?.docs ?? [];
+  const edited = docs.filter((d) => d !== beforeDocs.get(d.id)?.doc);
+  const oneUndo = docs.length === beforeDocs.size && edited.length > 0 && edited.every((d) => {
     const before = beforeDocs.get(d.id), undo = undoHead(d.id);
-    return d !== before?.doc && undo && undo !== before?.undo && !canRedo(d.id);
+    return before && undo?.doc === before.doc && undo !== before.undo && undoHead(d.id, 1) === before.undo
+      && (!d.library || d.name === before.doc.name) && !canRedo(d.id);
   });
-  const undoNote = docEdited ? ' One Ctrl+Z per document undoes it all.' : '';
+  const undoNote = oneUndo ? ' One Ctrl+Z per document undoes it all.' : '';
   const results = JSON.stringify(result.results);
   return { text: `Done, ${ran} step${ran === 1 ? '' : 's'}. Results: ${results.length > RESULT_MAX ? `${results.slice(0, RESULT_MAX)}… (cut)` : results}.${undoNote}${libraryNote}`, done: true };
 }

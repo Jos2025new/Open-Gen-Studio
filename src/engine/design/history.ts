@@ -184,9 +184,9 @@ export function redo(current: DesignDoc): DesignDoc | null {
   return next.doc;
 }
 
-/** Identity of the newest undo step, even when a new edit evicts the oldest one. */
-export function undoHead(docId: string): object | undefined {
-  return stacks.get(docId)?.past.at(-1);
+/** Identity of an undo step, counting back from the newest even if older steps were evicted. */
+export function undoHead(docId: string, offset = 0): Pick<Snapshot, 'doc'> | undefined {
+  return stacks.get(docId)?.past.at(-1 - offset);
 }
 
 export function canUndo(docId: string): boolean {

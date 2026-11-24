@@ -4,6 +4,7 @@ import { setDoc, useStore } from '../store/store';
 import { copyAssetRevision, normalizeAssetRevisions } from './assetRevisions';
 import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
+import { dropHistory } from './design/history';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
 import { assetRatio, boardNodes, bringGraph, graphFromDoc, loadBoardImages } from './libraryBoard';
@@ -251,6 +252,7 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
       bringGraph(sessionId, doc.id, graph, subject.kind, images);
+      dropHistory(doc.id);
       return getDoc(sessionId, doc.id) ?? doc;
     });
   });
