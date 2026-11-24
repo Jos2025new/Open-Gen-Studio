@@ -33,7 +33,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { sendAgentMessage, stopAgent } from '../src/engine/agent/runtime';
-import { readKitVersion, updateKit, waitKitQueue } from '../src/engine/libraryVersions';
+import { readKitVersion, renameItem, waitKitQueue } from '../src/engine/libraryVersions';
 import { useStore } from '../src/store/store';
 import { mainThread } from './helpers/threads';
 import type { NoticeFeedItem } from '../src/engine/types';
@@ -85,7 +85,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
         name: 'run_commands',
         args: {
           seq: [
-            { cmd: 'library.kit.create', args: { name: 'AutoDS', kind: 'design-system', space: 'studio' } },
+            { cmd: 'library.item.create', args: { name: 'AutoDS', kind: 'design-system', space: 'studio' } },
             { cmd: 'designer.layer.add_text', args: { text: 'Hero', x: 10, y: 10, width: 120 } },
             { cmd: 'designer.layer.add_shapes', args: { shapes: [{ type: 'rect', x: 0, y: 0, w: 100, h: 40, fill: '#111' }] } },
           ],
@@ -164,7 +164,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
     expect(useStore.getState().library.find((x) => x.id === kit.id)!.versions?.length).toBe(3);
 
     // Turn 6: user names the kit -> draft becomes false -> agent edits NO LONGER auto-save!
-    const named = await updateKit(kit.id, { name: 'Named DS', by: 'user' });
+    const named = renameItem(kit.id, { name: 'Named DS', by: 'user' });
     expect(named.draft).toBe(false);
     replies = [
       tool({

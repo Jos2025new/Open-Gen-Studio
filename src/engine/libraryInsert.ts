@@ -33,11 +33,12 @@ export async function insertComponent(
   const node = (subject.graph?.nodes ?? []).find((n) => n.id === pieceId);
   if (!node) throw new Error(`No piece "${pieceId}" in "${subjectId}".`);
   if (node.data.kind !== 'part' || node.data.partKind !== 'component' || !node.data.groupId) throw new Error(`Node "${pieceId}" is not a component.`);
+  const groupIdRef = node.data.groupId, compTitle = node.data.title;
   const snap = await readKitVersion(subject.versionId);
   if (!snap?.doc) throw new Error(`Item "${subjectId}" version "${subject.versionId}" has no document.`);
-  const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === node.data.groupId);
-  const srcLayers = snap.doc.layers.filter((l) => l.groupId === node.data.groupId);
-  if (!srcGroup || !srcLayers.length) throw new Error(`Component group "${node.data.groupId}" is missing.`);
+  const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === groupIdRef);
+  const srcLayers = snap.doc.layers.filter((l) => l.groupId === groupIdRef);
+  if (!srcGroup || !srcLayers.length) throw new Error(`Component group "${groupIdRef}" is missing.`);
 
   const written: string[] = [];
   try {
@@ -50,7 +51,7 @@ export async function insertComponent(
     }
     if (!getDoc(sessionId, docId)) throw new Error(`Target document "${docId}" was deleted while inserting.`);
     const newGroup: LayerGroup = {
-      id: groupId, name: node.data.title || srcGroup.name,
+      id: groupId, name: compTitle || srcGroup.name,
       ...(srcGroup.keptHidden ? { keptHidden: srcGroup.keptHidden.map((id) => idMap.get(id) ?? id) } : {}),
       ...(srcGroup.keptLocked ? { keptLocked: srcGroup.keptLocked.map((id) => idMap.get(id) ?? id) } : {}),
       from: { subjectId, pieceId, versionId: subject.versionId },

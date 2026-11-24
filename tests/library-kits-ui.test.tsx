@@ -56,7 +56,7 @@ describe('Contract 5 completion: kits stay out of mentions, sendSpec, flow, Medi
     const s = useStore.getState().sessions[useStore.getState().activeSessionId];
     const heroImg = makeAsset('a-hero', s.id);
     const hero: Subject = { id: 'sub-hero', name: 'Hero', kind: 'character', frontalAssetId: heroImg.id, refAssetIds: [] };
-    const kit: Subject = { id: 'kit-1', name: 'AcmeBrand', kind: 'brand-kit', refAssetIds: [], pieces: [] };
+    const kit: Subject = { id: 'kit-1', name: 'AcmeBrand', kind: 'brand-kit', refAssetIds: [] };
     const modelRef = 'local::demo-img';
     useStore.setState((st) => ({
       assets: { [heroImg.id]: heroImg },
@@ -121,26 +121,12 @@ describe('Contract 5 completion: kits stay out of mentions, sendSpec, flow, Medi
     expect(names).toEqual(['@Hero']);
   });
 
-  it('excludes kits from @Name library line in buildContext and adds a kit index line with contents and missing refs', () => {
+  it('excludes kits from @Name library line in buildContext and adds a count-only library items line', () => {
     const s = useStore.getState().sessions[useStore.getState().activeSessionId];
     const a1 = makeAsset('a-logo', s.id);
     const hero: Subject = { id: 'sub-hero', name: 'Hero', kind: 'character', frontalAssetId: a1.id, refAssetIds: [] };
-    const ds: Subject = {
-      id: 'kit-ds', name: 'AcmeDS', kind: 'design-system', refAssetIds: [],
-      pieces: [{ id: 'p-c', kind: 'color', color: '#ff0000' }],
-      tokens: { 'color.primary': { type: 'color', value: '#ff0000' }, 'font.heading': { type: 'fontFamily', value: 'Inter' } },
-    };
-    const brand: Subject = {
-      id: 'kit-brand', name: 'AcmeBrand', kind: 'brand-kit', refAssetIds: [],
-      pieces: [
-        { id: 'p1', kind: 'kit', kitId: 'kit-ds' },
-        { id: 'p2', kind: 'kit', kitId: 'kit-gone' },
-        { id: 'p3', kind: 'asset', assetId: a1.id },
-        { id: 'p4', kind: 'asset', assetId: 'a-missing' },
-        { id: 'p5', kind: 'text', text: 'Bold and minimal' },
-      ],
-      links: [{ id: 'l1', from: 'p3', to: 'p5', label: 'tone' }],
-    };
+    const ds: Subject = { id: 'kit-ds', name: 'AcmeDS', kind: 'design-system', refAssetIds: [], tokens: { 'color.primary': { type: 'color', value: '#ff0000' } } };
+    const brand: Subject = { id: 'kit-brand', name: 'AcmeBrand', kind: 'brand-kit', refAssetIds: [], kits: ['kit-ds'] };
     useStore.setState({ assets: { [a1.id]: a1 }, library: [hero, ds, brand] });
 
     const text = buildContext(useStore.getState().sessions[s.id], { workspace: 'chat', style: 'auto', round: 0, maxRounds: 2, attachments: [] });
@@ -149,20 +135,10 @@ describe('Contract 5 completion: kits stay out of mentions, sendSpec, flow, Medi
     expect(mentionLine).not.toContain('AcmeDS');
     expect(mentionLine).not.toContain('AcmeBrand');
 
-    const kitLine = text.split('\n').find((l) => l.startsWith('library kits')) ?? '';
-    expect(kitLine).toBeTruthy();
-    expect(kitLine).not.toContain('mention as @Name');
+    const kitLine = text.split('\n').find((l) => l.startsWith('library items:')) ?? '';
+    expect(kitLine).toContain('library items: 2');
     expect(kitLine).not.toContain('@AcmeBrand');
-    expect(kitLine).not.toContain('@AcmeDS');
-    expect(kitLine).toContain('kit-ds');
-    expect(kitLine).toContain('AcmeDS');
-    expect(kitLine).toContain('design-system');
-    expect(kitLine).toContain('color/font');
-    expect(kitLine).toContain('kit-brand');
-    expect(kitLine).toContain('AcmeBrand');
-    expect(kitLine).toContain('brand-kit');
-    expect(kitLine).toContain('kit-gone');
-    expect(kitLine).toContain('a-missing');
+    expect(kitLine).not.toContain('AcmeDS');
   });
 });
 

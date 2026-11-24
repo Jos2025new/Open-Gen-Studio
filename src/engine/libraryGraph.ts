@@ -2,23 +2,15 @@ import { parseTokenAlias } from './libraryTokens';
 import { isKit, mentionableSubjects } from './libraryTypes';
 import type { DesignDoc, Subject } from './types';
 
-/* Pure dependency graph, reverse usage index, cycle checks, and asset ownership across all versions. */
-
+/* Pure dependency graph, reverse usage, cycle checks, asset ownership across versions, and plain-text index. */
 export interface KitDependencies {
   kitIds: string[]; missingKitIds: string[]; assetIds: string[];
   missingGroupIds: string[]; pieceTokens: Record<string, string[]>; tokenIds: string[]; missingTokenIds: string[];
 }
-export interface LibraryIndex {
-  byId: Map<string, Subject>;
-  dependencies: Map<string, KitDependencies>;
-  usedBy: Map<string, Subject[]>;
-  missingRefs: Map<string, string[]>;
-  assetIds: Set<string>;
-  assetOwners: Map<string, Subject[]>;
-}
 
 const uniq = (ids: Iterable<string | undefined>): string[] => [...new Set([...ids].filter((x): x is string => Boolean(x)))];
 const pushMap = <K, V>(m: Map<K, V[]>, k: K, v: V) => { const list = m.get(k); if (list) list.push(v); else m.set(k, [v]); };
+export const shortText = (s: string, max = 120): string => (s.length <= max ? s : `${s.slice(0, max - 1)}…`);
 
 /** Direct kit, asset, group, and component/style -> token dependencies of one entry. */
 export function kitDependencies(subject: Subject, library: readonly Subject[] | ReadonlyMap<string, Subject>, doc?: DesignDoc): KitDependencies {
@@ -27,7 +19,6 @@ export function kitDependencies(subject: Subject, library: readonly Subject[] | 
   const liveGroups = new Set(doc ? (doc.groups ?? []).filter((g) => doc.layers.some((l) => l.groupId === g.id)).map((g) => g.id) : (subject.groupIds ?? []));
   const kitIds: string[] = [], missingKitIds: string[] = [], assetIds: string[] = [], missingGroupIds: string[] = [];
   const tokenMap = new Map<string, string[]>(), addTok = (nid: string, t: string) => pushMap(tokenMap, nid, t);
-  const tokens = subject.tokens;
   for (const kid of subject.kits ?? []) (byId.has(kid) ? kitIds : missingKitIds).push(kid);
   for (const n of nodes) {
     const d = n.data;
@@ -46,17 +37,13 @@ export function kitDependencies(subject: Subject, library: readonly Subject[] | 
   }
   const pieceTokens: Record<string, string[]> = {}, allToks: string[] = [];
   for (const [nid, list] of tokenMap) { const u = uniq(list); pieceTokens[nid] = u; allToks.push(...u); }
-  const tokenIds = uniq(allToks);
+  const tokenIds = uniq(allToks), tokens = subject.tokens;
   const missingTokenIds = tokenIds.filter((t) => !tokens || !Object.prototype.hasOwnProperty.call(tokens, t));
   return { kitIds: uniq(kitIds), missingKitIds: uniq(missingKitIds), assetIds: uniq(assetIds), missingGroupIds: uniq(missingGroupIds), pieceTokens, tokenIds, missingTokenIds };
 }
 
-/** Entries that directly reference `id` via `kits`. */
-export function kitUsedBy(id: string, library: readonly Subject[]): Subject[] {
-  return library.filter((s) => s.id !== id && (s.kits ?? []).includes(id));
-}
+export const kitUsedBy = (id: string, library: readonly Subject[]): Subject[] => library.filter((s) => s.id !== id && (s.kits ?? []).includes(id));
 
-/** Reject direct or transitive kit containment cycles before saving. */
 export function wouldCreateKitCycle(library: readonly Subject[], parentId: string, nextKits: readonly string[]): { ok: true } | { ok: false; reason: string } {
   const byId = new Map(library.map((s) => [s.id, s]));
   for (const target of uniq(nextKits)) {
@@ -73,43 +60,70 @@ export function wouldCreateKitCycle(library: readonly Subject[], parentId: strin
   return { ok: true };
 }
 
-/** Every asset referenced by a Library entry in its current state and across ALL saved versions. */
 export function subjectAssetIds(subject: Subject): string[] {
-  const graphAssets = (subject.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined));
-  return uniq([
-    subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId,
-    ...graphAssets,
-    ...(subject.versions ?? []).flatMap((v) => v.assetIds),
-  ]);
+  const gAssets = (subject.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined));
+  return uniq([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId, ...gAssets, ...(subject.versions ?? []).flatMap((v) => v.assetIds)]);
 }
 
-/** Map of assetId -> Library entries (subjects and kits, all versions) that reference it. */
 export function libraryAssetOwners(library: readonly Subject[]): Map<string, Subject[]> {
   const owners = new Map<string, Subject[]>();
   for (const s of library) for (const id of subjectAssetIds(s)) pushMap(owners, id, s);
   return owners;
 }
+export const libraryAssetSet = (library: readonly Subject[]): Set<string> => new Set(libraryAssetOwners(library).keys());
 
-/** Set of all asset IDs currently protected by any Library entry (all versions included). */
-export function libraryAssetSet(library: readonly Subject[]): Set<string> {
-  return new Set(libraryAssetOwners(library).keys());
-}
-
-/** Derived in-memory graph index over `st.library`. */
-export function buildLibraryIndex(library: readonly Subject[]): LibraryIndex {
-  const byId = new Map(library.map((s) => [s.id, s]));
-  const dependencies = new Map<string, KitDependencies>(), usedBy = new Map<string, Subject[]>(), missingRefs = new Map<string, string[]>();
-  for (const s of library) {
-    const dep = kitDependencies(s, byId);
-    dependencies.set(s.id, dep);
-    if (dep.missingKitIds.length) missingRefs.set(s.id, dep.missingKitIds);
-    for (const target of dep.kitIds) pushMap(usedBy, target, s);
+/** Pure plain-text index derived on read: properties, relations, origin, versions, usedBy, missing; line-capped at maxChars. */
+export function formatLibraryItemIndex(subject: Subject, library: readonly Subject[], assets: Record<string, unknown>, maxChars = 2500): { text: string; truncated: boolean } {
+  const byId = new Map(library.map((s) => [s.id, s])), dep = kitDependencies(subject, byId), usedBy = kitUsedBy(subject.id, library);
+  const lines: string[] = [`${subject.id} "${shortText(subject.name, 100)}" (${subject.kind ?? 'item'}${subject.draft ? ', draft' : ''})`];
+  if (subject.description) lines.push(`description: ${shortText(subject.description, 200)}`);
+  if (subject.origin) {
+    const o = subject.origin;
+    lines.push(`origin: ${o.space} by ${o.by}${o.sessionTitle ? ` (${shortText(o.sessionTitle, 60)})` : ''}${subject.copiedFrom ? `, copiedFrom ${subject.copiedFrom}` : ''}`);
   }
-  const assetOwners = libraryAssetOwners(library);
-  return { byId, dependencies, usedBy, missingRefs, assetIds: new Set(assetOwners.keys()), assetOwners };
+  const vers = subject.versions ?? [];
+  lines.push(`versions: ${vers.length}${subject.versionId ? ` (current ${subject.versionId})` : ''}${vers.length ? ` — ${vers.slice(-3).map((v) => `${v.id}:${v.space}/${v.by}${v.label ? ` "${shortText(v.label, 40)}"` : ''}`).join(', ')}` : ''}`);
+  if (subject.tokens && Object.keys(subject.tokens).length) {
+    for (const [k, tok] of Object.entries(subject.tokens)) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}`);
+  }
+  const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
+  for (const n of nodes) {
+    const d = n.data;
+    if (d.kind === 'asset') lines.push(`node ${n.id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}`);
+    else if (d.kind === 'text') lines.push(`node ${n.id} [text] "${shortText(d.title, 60)}": ${shortText(d.text, 120)}`);
+    else if (d.kind === 'part') lines.push(`node ${n.id} [${d.partKind}] "${shortText(d.title, 60)}"${d.color ? ` ${d.color}` : ''}${d.groupId ? ` group:${d.groupId}` : ''}${d.styleType ? ` ${d.styleType}` : ''}${dep.pieceTokens[n.id]?.length ? ` tokens:${dep.pieceTokens[n.id].join(',')}` : ''}`);
+  }
+  for (const gr of subject.graph?.groups ?? []) lines.push(`group ${gr.id} "${shortText(gr.title, 60)}" (${gr.nodeIds.length} nodes)`);
+  for (const e of subject.graph?.edges ?? []) {
+    const a = shortText(byNode.get(e.source)?.data.title ?? e.source, 40), b = shortText(byNode.get(e.target)?.data.title ?? e.target, 40);
+    lines.push(`link: ${a} -> ${b}${e.label ? ` [${shortText(e.label, 40)}]` : ''}`);
+  }
+  for (const kid of dep.kitIds) lines.push(`contains: ${kid} "${shortText(byId.get(kid)?.name ?? kid, 60)}" (${byId.get(kid)?.kind ?? 'item'})`);
+  for (const u of usedBy) lines.push(`usedBy: ${u.id} "${shortText(u.name, 60)}" (${u.kind ?? 'item'})`);
+  const missing = [
+    ...dep.missingKitIds.map((id) => `kit:${id}`), ...dep.missingGroupIds.map((id) => `group:${id}`),
+    ...dep.missingTokenIds.map((id) => `token:${id}`), ...dep.assetIds.filter((id) => !assets[id]).map((id) => `asset:${id}`),
+  ];
+  if (missing.length) lines.push(`missing: ${missing.join(', ')}`);
+
+  const out: string[] = [];
+  let len = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i], sep = out.length ? 1 : 0;
+    const rem = lines.length - i;
+    const notice = `\n[truncated: ${rem} more line(s)]`;
+    if (len + sep + line.length + (rem > 1 ? notice.length : 0) > maxChars) {
+      const cutNotice = `[truncated: ${rem} more line(s)]`;
+      if (!out.length) return { text: `${line.slice(0, Math.max(0, maxChars - cutNotice.length - 1))}\n${cutNotice}`.slice(0, maxChars), truncated: true };
+      return { text: `${out.join('\n')}\n${cutNotice}`, truncated: true };
+    }
+    out.push(line);
+    len += sep + line.length;
+  }
+  return { text: out.join('\n'), truncated: false };
 }
 
-/** Agent context lines for Library: mentionable @Name subjects plus total kit count (details via read/list). */
+/** Agent context lines for Library: mentionable @Name subjects plus total kit count only. */
 export function libraryContextLines(library: readonly Subject[], _assets?: Record<string, unknown>): string[] {
   const out: string[] = [];
   const named = mentionableSubjects(library).filter((s) => !s.capture || s.frontalAssetId);

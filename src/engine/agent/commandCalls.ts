@@ -43,7 +43,7 @@ const AREAS: Record<string, string> = {
   sessions: 'list, rename, pin and title sessions',
 };
 const NEEDS_APPROVAL = 'needs the user\'s approval';
-const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset', 'library.kit.create', 'library.kit.open']);
+const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset', 'library.item.create', 'library.item.open']);
 const ON_DOC_HINT = ' (target a new doc from an earlier step with "on": "$1.doc", or pass an id from designer.doc.list)';
 const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
 const areaOf = (id: string) => id.slice(0, id.indexOf('.'));

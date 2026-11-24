@@ -10,7 +10,7 @@ describe('library commands', () => {
   it('covers the library actions and registers every command', () => {
     expect(Object.keys(LIBRARY_ACTIONS).sort()).toEqual([
       'saveSubject', 'deleteSubject', 'libraryItem', 'subjectFromAsset', 'saveSheetViews', 'subjectFromAttachments',
-      'createRecraftStyle', 'createSubjectVoice', 'createKit', 'readKit', 'updateKit', 'openKit', 'saveKit', 'restoreKitVersion', 'listKits', 'insertComponent',
+      'createRecraftStyle', 'createSubjectVoice', 'createItem', 'saveItem', 'openItem', 'restoreItemVersion', 'deleteItem', 'readItem', 'listItems', 'insertComponent',
     ].sort());
     for (const id of Object.values(LIBRARY_ACTIONS)) if (!id.startsWith('-')) expect(command(id)).toBeDefined();
   });
