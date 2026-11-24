@@ -29,7 +29,7 @@ export function libraryLosses(q, delta, removedSessions) {
   for (const coll of COLLS) {
     prev[coll] = new Map();
     next[coll] = new Map();
-    const up = delta.up?.[coll] ?? {}, del = new Set(delta.del?.[coll] ?? []);
+    const up = delta.up?.[coll] ?? {}, del = new Set((delta.del?.[coll] ?? []).map(String)); // SQLite matches a number to the same text id
     if (!delta.full && !del.size) continue;
     const ids = delta.full ? q.recIds.all(coll).map((r) => r.id) : [...del].filter((id) => q.recFp.get(coll, id));
     const goes = (id) => del.has(id) || (delta.full && !Object.hasOwn(up, id));

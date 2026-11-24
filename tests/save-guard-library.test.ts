@@ -146,6 +146,30 @@ describe.each(['sqlite', 'files'] as const)('library loss guard (%s)', (kind) =>
   });
 });
 
+describe('library loss guard: the delta as it comes', () => {
+  const whole = (s: ReturnType<typeof open>, ids: string[]) => s.save({ library: ids }, ['s1']);
+  const send = (s: ReturnType<typeof open>, delta: object) => s.sql!.commit({ savedAt: 9000, baseAt: 1000, version: 1, order: ['s1'], sessions: {}, delta: { up: {}, spend: { append: [], len: 0 }, ...delta } });
+
+  it('ids sent as numbers delete rows too, so they count', async () => {
+    const s = open('sqlite');
+    await whole(s, ['1', '2', '3']);
+    expect(send(s, { del: { library: [1, 2, 3] } }).status).toBe(409);
+  });
+
+  it('a full delta that does not carry the records is a loss', async () => {
+    const s = open('sqlite');
+    await whole(s, ['1', '2', '3']);
+    expect(send(s, { full: true, small: '{}' }).status).toBe(409);
+  });
+
+  it('a record both sent and deleted ends up deleted, so it counts', async () => {
+    const s = open('sqlite');
+    await whole(s, ['1', '2', '3']);
+    const up = Object.fromEntries(['1', '2', '3'].map((id) => [id, JSON.stringify({ id })]));
+    expect(send(s, { up: { library: up }, del: { library: ['1', '2', '3'] } }).status).toBe(409);
+  });
+});
+
 describe('library loss guard: format 1 on disk', () => {
   it('the first format-2 commit is compared with state.json', async () => {
     const at = dir();
