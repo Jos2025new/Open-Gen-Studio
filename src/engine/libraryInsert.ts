@@ -27,12 +27,12 @@ export async function insertComponent(sessionId: string, docId: string, subjectI
   if (!subject || !isKit(subject)) throw new Error(`No Library item "${subjectId}".`);
   if (!subject.versionId) throw new Error(`Library item "${subjectId}" has no saved version.`);
   const node = (subject.graph?.nodes ?? []).find((n) => n.id === pieceId);
-  if (!node) throw new Error(`No piece "${pieceId}" in "${subjectId}".`);
-  if (node.data.kind !== 'part' || node.data.partKind !== 'component' || !node.data.groupId) throw new Error(`Node "${pieceId}" is not a component.`);
-  const groupIdRef = node.data.groupId, compTitle = node.data.title, snap = await readKitVersion(subject.versionId);
+  if (node && (node.data.kind !== 'part' || node.data.partKind !== 'component' || !node.data.groupId)) throw new Error(`Node "${pieceId}" is not a component.`);
+  const snap = await readKitVersion(subject.versionId);
   if (!snap?.doc) throw new Error(`Item "${subjectId}" version "${subject.versionId}" has no document.`);
+  const groupIdRef = node?.data.kind === 'part' ? node.data.groupId! : pieceId, compTitle = node?.data.kind === 'part' ? node.data.title : '';
   const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === groupIdRef), srcLayers = snap.doc.layers.filter((l) => l.groupId === groupIdRef);
-  if (!srcGroup || !srcLayers.length) throw new Error(`Component group "${groupIdRef}" is missing.`);
+  if (!srcGroup || !srcLayers.length) throw new Error(node ? `Component group "${groupIdRef}" is missing.` : `No component piece or group "${pieceId}" in "${subjectId}".`);
   const written: string[] = [];
   try {
     const copied = await copyDocPixels({ ...snap.doc, layers: srcLayers }, null, expectedRasterIds(snap), written);

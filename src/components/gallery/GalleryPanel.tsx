@@ -8,7 +8,7 @@ import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
 import { isKit, KIT_KINDS, type KitKind, type KitVersionRef } from '../../engine/libraryTypes';
 import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
-import { createItem, deleteItem, libraryToDesigner, libraryToStudio, restoreItemVersion } from '../../engine/libraryVersions';
+import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
 import { kitImageAssetIds, libraryToNodes } from '../../engine/flow/fromLibrary';
 import { setStudioBoard } from '../../lib/studioBoard';
@@ -146,16 +146,21 @@ type KitMenuView = 'menu' | 'versions' | 'components' | 'remove' | { restore: Ki
 function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
   const sessionId = useStore((s) => s.activeSessionId), library = useStore((s) => s.library), assets = useStore((s) => s.assets);
   const session = useStore((s) => s.sessions[s.activeSessionId]), ui = useStore((s) => s.ui);
-  const [sub, setSub] = useState<KitMenuView>('menu'), [busy, setBusy] = useState(false);
+  const [sub, setSub] = useState<KitMenuView>('menu'), [busy, setBusy] = useState(false), [comps, setComps] = useState<Array<{ id: string; name: string }>>([]);
   const busyRef = useRef(false);
-  const run = async (fn: () => Promise<unknown>, ok?: string) => {
+  const run = async (fn: () => Promise<unknown>, ok?: string, stay?: boolean) => {
     if (busyRef.current) return;
     busyRef.current = true; setBusy(true);
-    try { await fn(); if (ok) toast(ok, 'success'); close(); } catch (e) { toast((e as Error).message, 'error'); } finally { busyRef.current = false; setBusy(false); }
+    try { await fn(); if (ok) toast(ok, 'success'); if (!stay) close(); } catch (e) { toast((e as Error).message, 'error'); } finally { busyRef.current = false; setBusy(false); }
   };
   const visible = session?.docs.filter((d) => d.view !== 'studio' && d.library?.view !== 'studio') ?? [];
   const designerDoc = ui.workspace === 'designer' && !ui.home ? (visible.find((d) => d.id === session?.activeDocId) ?? visible[0]) : undefined;
-  const comps = (item.graph?.nodes ?? []).filter((n) => n.data.kind === 'part' && n.data.partKind === 'component' && n.data.groupId);
+  const compCount = (item.kind === 'design-system' || item.kind === 'brand-kit') && item.versionId ? (item.groupIds?.length ?? 0) : 0;
+  const openComps = () => void run(async () => {
+    const snap = await readKitVersion(item.versionId!);
+    setComps((snap?.doc?.groups ?? []).filter((g) => snap!.doc!.layers.some((l) => l.groupId === g.id)).map((g) => ({ id: g.id, name: g.name })));
+    setSub('components');
+  }, undefined, true);
   const versions = [...(item.versions ?? [])].reverse(), usedBy = kitUsedBy(item.id, library);
   if (sub === 'remove') {
     const why = usedBy.length ? `Used by: ${usedBy.map((u) => u.name).join(', ')}.` : 'Its images stay in Generated.';
@@ -174,7 +179,7 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Components</MenuItem>
     {comps.map((c) => {
       const insert = () => void run(() => insertComponent(sessionId, designerDoc.id, item.id, c.id), 'Component inserted.');
-      return <MenuItem key={c.id} icon={Layers} disabled={busy} onClick={insert}>{c.data.title}</MenuItem>;
+      return <MenuItem key={c.id} icon={Layers} disabled={busy} onClick={insert}>{c.name}</MenuItem>;
     })}
   </>;
   return <>
@@ -182,8 +187,8 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     <MenuItem icon={PenTool} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'designer'))}>Open in Designer</MenuItem>
     {canOpenNodes(item, assets) ? <MenuItem icon={Workflow} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'nodes'))}>Open in Nodes</MenuItem> : null}
     <MenuItem icon={History} disabled={!versions.length} onClick={() => setSub('versions')}>Versions<span className="pc-count num">{versions.length}</span></MenuItem>
-    {item.kind === 'design-system' && designerDoc && comps.length
-      ? <MenuItem icon={Layers} onClick={() => setSub('components')}>Components<span className="pc-count num">{comps.length}</span></MenuItem> : null}
+    {designerDoc && compCount
+      ? <MenuItem icon={Layers} disabled={busy} onClick={openComps}>Components<span className="pc-count num">{compCount}</span></MenuItem> : null}
     <MenuItem icon={item.userHidden ? Eye : EyeOff} onClick={() => { setUserHidden('subject', [item.id], !item.userHidden); close(); }}>{item.userHidden ? 'Unhide' : 'Hide'}</MenuItem>
     <MenuItem icon={Trash} tone="danger" onClick={() => setSub('remove')}>{`Remove ${item.name}`}</MenuItem>
   </>;
