@@ -66,6 +66,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
 import { createItem, libraryToDesigner, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { addTextLayer, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createSession, useStore } from '../src/store/store';
+import { deleteSession } from '../src/engine/actions';
 import { run } from '../src/engine/commands';
 import type { Graph, Layer } from '../src/engine/types';
 
@@ -154,4 +155,35 @@ it('saves and restores a historical reference after the kit is deleted', async (
   await saveItem({subjectId:parent.id,mode:'overwrite',space:'library',by:'user',kits:[]});
   const restored = await restoreItemVersion({subjectId:parent.id,versionId:parent.versionId!,space:'library',by:'user'});
   expect(restored.kits).toEqual([child.id]);
+});
+
+it('does not publish a creation if its session disappears during the write', async () => {
+  const s = resetStore();
+  hoisted.setOnSet(key => { if(key.startsWith('libver:')) deleteSession(s.id); });
+  const res = await run({cmd:'library.item.create',on:{session:s.id},args:{name:'A medias',kind:'moodboard',space:'designer',graph:graphOf(text('x','uno',100,100))}},{caller:'agent'});
+  expect(res.ok).toBe(false);
+  expect(useStore.getState().library.map(x=>x.name)).toEqual([]);
+  expect(hoisted.blobs.size).toBe(0);
+});
+
+it.each([true, false])('cleans only the failed creation after publication (draft=%s)', async (draft) => {
+  const s = resetStore();
+  const { subject: kept } = await createItem({ name: 'Keep', kind: 'moodboard', space: 'library', by: 'user' });
+  const before = [...hoisted.blobs.keys()];
+  let published = false;
+  const stop = useStore.subscribe((state) => {
+    if (published || state.library.length !== 2) return;
+    published = true;
+    deleteSession(s.id);
+  });
+  try {
+    await expect(createItem({
+      name: 'Partial', kind: 'moodboard', space: 'designer', by: 'user', sessionId: s.id, draft,
+    })).rejects.toThrow(s.id);
+    expect(published).toBe(true);
+    expect(useStore.getState().library).toEqual([kept]);
+    expect([...hoisted.blobs.keys()]).toEqual(before);
+  } finally {
+    stop();
+  }
 });

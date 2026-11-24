@@ -132,7 +132,7 @@ function optionalFields(c: { description?: string; graph?: Graph; kits?: string[
 /** Single verified version writer shared by create, save, and restore: writes blob, re-reads live store, cleans up on error. */
 async function commitVersion(
   entry: Subject,
-  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[]; newKitIds?: readonly string[] },
+  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[]; newKitIds?: readonly string[]; createSessionId?: string },
   written: string[],
 ): Promise<Subject> {
   const verId = uid('lv'), groupIds = docGroupIds(c.doc), fields = optionalFields({ description: c.description, graph: c.graph, kits: c.kits, tokens: c.tokens, docRev: c.docRev, groupIds });
@@ -142,6 +142,7 @@ async function commitVersion(
   const ref: KitVersionRef = { id: verId, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), assetIds: snapshotAssets(entry, fields.graph, c.doc), ...(c.docRev ? { docRev: c.docRev } : {}), ...(groupIds?.length ? { groupIds } : {}) };
   let updated: Subject | null = null;
   useStore.setState((st) => {
+    if (c.createSessionId && !st.sessions[c.createSessionId]) throw new Error(`No session "${c.createSessionId}".`);
     const missing = c.checkAssetIds?.find((aid) => !st.assets[aid]);
     if (missing) throw new Error(`Asset "${missing}" was deleted while saving.`);
     if (fields.kits?.length) { const cy = wouldCreateKitCycle(st.library, entry.id, fields.kits, c.newKitIds); if (!cy.ok) throw new Error(cy.reason); }
@@ -169,16 +170,26 @@ export async function createItem(opts: {
   const draft = opts.draft ?? (opts.space === 'studio' && Boolean(session)), at = Date.now();
   const origin = { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}), ...(opts.from?.length ? { from: [...opts.from] } : {}) };
   const base: Subject = { id, name, kind: opts.kind, refAssetIds: [], ...optionalFields({ description, graph, kits, tokens }), draft, origin };
-  const subject = draft
-    ? (useStore.setState((st) => ({ library: [...st.library, base] })), base)
-    : await withCleanup((w) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description, graph, kits, tokens, checkAssetIds, newKitIds: kits }, w));
-  if (opts.open !== false && session && (opts.space === 'studio' || opts.space === 'designer')) {
-    if (hasGraph(graph)) return { subject, doc: await openInSpace(session.id, id, opts.space) };
-    const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, opts.space === 'studio' ? 'studio' : undefined);
-    addDoc(session.id, doc);
-    return { subject, doc };
-  }
-  return { subject };
+  return withCleanup(async (written) => {
+    try {
+      const subject = draft
+        ? (useStore.setState((st) => ({ library: [...st.library, base] })), base)
+        : await commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description, graph, kits, tokens, checkAssetIds, newKitIds: kits, createSessionId: session?.id }, written);
+      if (opts.open === false || !session || (opts.space !== 'studio' && opts.space !== 'designer')) return { subject };
+      let doc: DesignDoc;
+      if (hasGraph(graph)) {
+        doc = await openInSpace(session.id, id, opts.space);
+      } else {
+        doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, opts.space === 'studio' ? 'studio' : undefined);
+        addDoc(session.id, doc);
+      }
+      if (!getDoc(session.id, doc.id)) throw new Error(`Could not open the new item in session "${session.id}".`);
+      return { subject, doc };
+    } catch (error) {
+      if (get().library.some((item) => item.id === id)) await deleteItem(id);
+      throw error;
+    }
+  });
 }
 
 export function renameItem(id: string, patch: { name?: string; description?: string; by?: KitActor }): Subject {
