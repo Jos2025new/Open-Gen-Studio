@@ -3,6 +3,7 @@ import { setDoc, toast, useStore } from '../store/store';
 import { addTextLayer, getDoc, mutateDoc, patchLayer, placeAsset } from './design/actions';
 import { resizeCanvas } from './design/canvasSize';
 import * as D from './design/doc';
+import { openHistoryGroup } from './design/history';
 import { layerBox } from './design/render';
 import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, placedAt, placeNodes, unplaced } from './libraryLayout';
@@ -91,6 +92,11 @@ async function placeNode(sessionId: string, docId: string, n: GraphNode, box: { 
 
 /** Brings the graph to an open document: its changes first, then the elements the document never had. */
 export async function bringGraph(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined): Promise<void> {
+  const history = openHistoryGroup(docId, { join: true });
+  try { await updateBoard(sessionId, docId, graph, kind); } finally { history.close(); }
+}
+
+async function updateBoard(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined): Promise<void> {
   const was = getDoc(sessionId, docId), synced = was && syncDoc(was, graph);
   if (was && synced && synced !== was) mutateDoc(sessionId, docId, () => synced, { record: synced.layers.some((l, i) => l !== was.layers[i]) });
   const doc = getDoc(sessionId, docId), items = boardNodes(graph), news = items.filter((n) => !doc?.board?.at[n.id]);
@@ -104,7 +110,7 @@ export async function bringGraph(sessionId: string, docId: string, graph: Graph 
     if (!live || !b) return;
     const taken = new Set(Object.values(b.at).map((a) => a.layer)), d = n.data;
     // Outside moodboards the document's own images are not elements, so one that joined the graph elsewhere is already here.
-    const own = (born || kind !== 'moodboard') && live.layers.find((l) => !taken.has(l.id) && ((l.type === 'raster' && d.kind === 'asset' && l.sourceAssetId === d.assetId) || (l.type === 'text' && d.kind === 'text' && l.text === d.text)));
+    const own = (born || kind !== 'moodboard') && live.layers.find((l) => !taken.has(l.id) && ((l.type === 'raster' && d.kind === 'asset' && l.sourceAssetId === d.assetId) || (born && l.type === 'text' && d.kind === 'text' && l.text === d.text)));
     const box = { x: b.x + r.x * b.k, y: b.y + r.y * b.k, width: r.w * b.k, height: r.h * b.k, fontSize: Math.max(6, Math.round(r.fontSize * b.k)) };
     const layer = (own ? own.id : undefined) ?? await placeNode(sessionId, docId, n, box);
     if (!layer) continue;

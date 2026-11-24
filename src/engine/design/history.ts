@@ -113,7 +113,8 @@ const groups = new Map<string, { first: Snapshot | null; extra: number }>();
  * pixels and picks back as they were at the first change, takes that step out and returns the document of then (or
  * null when nothing was recorded); the caller stores it.
  */
-export function openHistoryGroup(docId: string): { close(): void; revert(): DesignDoc | null } {
+export function openHistoryGroup(docId: string, opts: { join?: boolean } = {}): { close(): void; revert(): DesignDoc | null } {
+  if (opts.join && groups.has(docId)) return { close() {}, revert: () => null };
   const group = { first: null as Snapshot | null, extra: 0 };
   groups.set(docId, group);
   const end = () => { if (groups.get(docId) === group) groups.delete(docId); };
