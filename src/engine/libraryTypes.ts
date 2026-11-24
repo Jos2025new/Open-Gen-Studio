@@ -26,8 +26,8 @@ export interface LibraryKitFields {
 }
 
 /** Where a document shows its entry's elements: page pixels per graph unit, where graph (0, 0) falls, and per element
-    its layer plus the position and text both sides last agreed on. Kept across undo. */
-export interface KitBoard { k: number; x: number; y: number; at: Record<string, { layer: string; x: number; y: number; text?: string }>; }
+    its layer, agreed position and text, and the last synced raster rev (initial import: 0). Kept across undo. */
+export interface KitBoard { k: number; x: number; y: number; at: Record<string, { layer: string; x: number; y: number; text?: string; rev?: number }>; }
 /** The entry version a Nodes group shows, the corner of its elements in the entry, and which element each node is. */
 export interface KitGroupLink { subjectId: string; versionId?: string; corner?: { x: number; y: number }; ids?: Record<string, string>; }
 

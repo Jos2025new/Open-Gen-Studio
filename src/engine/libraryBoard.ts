@@ -1,14 +1,15 @@
 import { uid } from '../lib/id';
 import { setDoc, toast, useStore } from '../store/store';
-import { addTextLayer, getDoc, mutateDoc, patchLayer, placeAsset } from './design/actions';
+import { addTextLayer, assetCanvas, getDoc, mutateDoc, patchLayer, placeAssetCanvas, replaceLayerPixels } from './design/actions';
 import { resizeCanvas } from './design/canvasSize';
 import * as D from './design/doc';
 import { openHistoryGroup } from './design/history';
+import { ensureBuffers, getBuffer, isUnreadable, paintingLive } from './design/raster';
 import { layerBox } from './design/render';
 import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, placedAt, placeNodes, unplaced } from './libraryLayout';
 import type { KitBoard } from './libraryTypes';
-import type { DesignDoc, Graph, GraphNode, Layer } from './types';
+import type { DesignDoc, Graph, GraphNode, Layer, RasterLayer } from './types';
 
 /* An entry's graph elements as layers of a Designer document, at the positions the graph keeps. `doc.board` says which
    layer is which element and what both sides last agreed on, so a difference tells who changed it. */
@@ -74,33 +75,81 @@ function syncDoc(doc: DesignDoc, graph: Graph | undefined): DesignDoc {
   return changed ? { ...doc, layers: doc.layers.map((l) => layers.get(l.id) ?? l), board: { ...b, at } } : doc;
 }
 
-async function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: number; y: number; width: number; height: number; fontSize: number }): Promise<string | null> {
+function ownLayer(doc: DesignDoc, node: GraphNode, taken: ReadonlySet<string>, kind: string | undefined, born = !doc.board): Layer | undefined {
+  if (!born && kind === 'moodboard') return;
+  const data = node.data;
+  return doc.layers.find(l => !taken.has(l.id) && (
+    (l.type === 'raster' && data.kind === 'asset' && l.sourceAssetId === data.assetId)
+    || (born && l.type === 'text' && data.kind === 'text' && l.text === data.text)
+  ));
+}
+
+const canRefresh = (layer: RasterLayer, rev = 0) => layer.sourceAssetId && layer.rev === rev
+  && !layer.locked && !layer.paintBaseId && !layer.paintStrokes?.length && !layer.paintFlattened && !isUnreadable(layer.id);
+
+/** Resolve imports before opening the document's history group. Existing pixels must also be ready for undo. */
+export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, kind: string | undefined, refreshLinked = false): Promise<Map<string, HTMLCanvasElement | null>> {
+  const images = new Map<string, HTMLCanvasElement | null>();
+  const taken = new Set(Object.values(doc.board?.at ?? {}).map(a => a.layer));
+  for (const n of boardNodes(graph)) {
+    if (n.data.kind !== 'asset' || !n.data.assetId) continue;
+    const id = n.data.assetId, entry = linked(doc, n.id);
+    if (doc.board?.at[n.id]) {
+      if (!refreshLinked || entry?.layer.type !== 'raster' || entry.layer.sourceAssetId === id) continue;
+      images.set(n.id, null);
+      if (!canRefresh(entry.layer, entry.at.rev)) continue;
+      if (!getBuffer(entry.layer.id)) await ensureBuffers([entry.layer]);
+    } else {
+      const own = ownLayer(doc, n, taken, kind);
+      if (own) { taken.add(own.id); continue; }
+    }
+    try { images.set(n.id, await assetCanvas(id)); } catch { /* Report missing images when applying the graph. */ }
+  }
+  return images;
+}
+
+function missingImage(assetId: string, title: string | undefined) {
+  toast(`Could not load image "${title?.trim() || get().assets[assetId]?.name || assetId}".`, 'error');
+}
+
+function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: number; y: number; width: number; height: number; fontSize: number }, images: ReadonlyMap<string, HTMLCanvasElement | null>): string | null {
   const d = n.data;
   if (d.kind === 'text') return addTextLayer(sessionId, docId, d.text, box, { fontSize: box.fontSize }, d.title || undefined);
   if (d.kind !== 'asset' || !d.assetId) return null;
-  try {
-    const id = await placeAsset(sessionId, docId, d.assetId, 'new', d.title || undefined), layer = getDoc(sessionId, docId)?.layers.find((l) => l.id === id);
-    if (layer?.type === 'raster') {
-      const fit = D.fitRect(box.width, box.height, layer.pxWidth, layer.pxHeight, 'contain');
-      patchLayer(sessionId, docId, layer.id, { width: fit.width, height: fit.height, x: box.x, y: box.y }, { record: false });
-      return layer.id;
-    }
-  } catch {}
-  toast(`Could not load image "${d.title?.trim() || get().assets[d.assetId]?.name || d.assetId}".`, 'error');
-  return null;
+  const canvas = images.get(n.id);
+  if (!canvas) { missingImage(d.assetId, d.title); return null; }
+  const id = placeAssetCanvas(sessionId, docId, d.assetId, canvas, 'new', d.title || undefined);
+  if (id) {
+    const fit = D.fitRect(box.width, box.height, canvas.width, canvas.height, 'contain');
+    patchLayer(sessionId, docId, id, { width: fit.width, height: fit.height, x: box.x, y: box.y }, { record: false });
+  }
+  return id;
 }
 
-/** Brings the graph to an open document: its changes first, then the elements the document never had. */
-export async function bringGraph(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined): Promise<void> {
+/** Brings the graph to an open document in one synchronous undo step. */
+export function bringGraph(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, images: ReadonlyMap<string, HTMLCanvasElement | null>): void {
   const history = openHistoryGroup(docId, { join: true });
-  try { await updateBoard(sessionId, docId, graph, kind); } finally { history.close(); }
+  try { updateBoard(sessionId, docId, graph, kind, images); } finally { history.close(); }
 }
 
-async function updateBoard(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined): Promise<void> {
+function updateBoard(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, images: ReadonlyMap<string, HTMLCanvasElement | null>): void {
   const was = getDoc(sessionId, docId), synced = was && syncDoc(was, graph);
   if (was && synced && synced !== was) mutateDoc(sessionId, docId, () => synced, { record: synced.layers.some((l, i) => l !== was.layers[i]) });
   const doc = getDoc(sessionId, docId), items = boardNodes(graph), news = items.filter((n) => !doc?.board?.at[n.id]);
-  if (!doc || !news.length) return;
+  if (!doc) return;
+  for (const n of items) {
+    const d = n.data, e = linked(doc, n.id);
+    if (!images.has(n.id) || d.kind !== 'asset' || !d.assetId || e?.layer.type !== 'raster' || e.layer.sourceAssetId === d.assetId) continue;
+    if (!canRefresh(e.layer, e.at.rev) || paintingLive() || !getBuffer(e.layer.id)) {
+      toast(`Kept "${e.layer.name}" as it is.`, 'info');
+      continue;
+    }
+    const canvas = images.get(n.id);
+    if (!canvas) { missingImage(d.assetId, d.title); continue; }
+    replaceLayerPixels(sessionId, docId, e.layer.id, d.assetId, canvas);
+    setDoc(sessionId, docId, (x) => x.board ? { ...x, board: { ...x.board, at: { ...x.board.at, [n.id]: { ...e.at, rev: e.layer.rev + 1 } } } } : x);
+  }
+  if (!news.length) return;
   const born = !doc.board;
   if (born) setDoc(sessionId, docId, (d) => { const { k, x, y } = boardLayout(items, assetRatio, d); return { ...d, board: { k, x, y, at: {} } }; });
   const rects = new Map(placeNodes(items, assetRatio).map((r) => [r.id, r]));
@@ -110,9 +159,9 @@ async function updateBoard(sessionId: string, docId: string, graph: Graph | unde
     if (!live || !b) return;
     const taken = new Set(Object.values(b.at).map((a) => a.layer)), d = n.data;
     // Outside moodboards the document's own images are not elements, so one that joined the graph elsewhere is already here.
-    const own = (born || kind !== 'moodboard') && live.layers.find((l) => !taken.has(l.id) && ((l.type === 'raster' && d.kind === 'asset' && l.sourceAssetId === d.assetId) || (born && l.type === 'text' && d.kind === 'text' && l.text === d.text)));
+    const own = ownLayer(live, n, taken, kind, born);
     const box = { x: b.x + r.x * b.k, y: b.y + r.y * b.k, width: r.w * b.k, height: r.h * b.k, fontSize: Math.max(6, Math.round(r.fontSize * b.k)) };
-    const layer = (own ? own.id : undefined) ?? await placeNode(sessionId, docId, n, box);
+    const layer = (own ? own.id : undefined) ?? placeNode(sessionId, docId, n, box, images);
     if (!layer) continue;
     if (!own) { right = Math.max(right, Math.ceil(box.x + box.width - 0.5)); bottom = Math.max(bottom, Math.ceil(box.y + box.height - 0.5)); }
     setDoc(sessionId, docId, (x) => (x.board ? { ...x, board: { ...x.board, at: { ...x.board.at, [n.id]: { layer, ...placedAt(r.x, r.y), ...(d.kind === 'text' ? { text: d.text } : {}) } } } } : x));

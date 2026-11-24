@@ -133,8 +133,12 @@ export async function placeAsset(sessionId: string, docId: string, assetId: stri
     toast(placementError(targetLayer, 'image')!, 'error');
     return null;
   }
-  const canvas = await assetCanvas(assetId);
-  const current = getDoc(sessionId, docId)!;
+  return placeAssetCanvas(sessionId, docId, assetId, await assetCanvas(assetId), target, name, targetLayer);
+}
+
+export function placeAssetCanvas(sessionId: string, docId: string, assetId: string, canvas: HTMLCanvasElement, target: string, name?: string, targetLayer?: Layer): string | null {
+  const current = getDoc(sessionId, docId);
+  if (!current) return null;
   record(current);
   if (target === 'base') {
     const base = current.layers[0];
@@ -435,16 +439,21 @@ export async function layerToAsset(sessionId: string, docId: string, layerId: st
 }
 
 /** Replace a raster layer's pixels with an asset produced by an operation. */
-export async function replaceLayerPixels(sessionId: string, docId: string, layerId: string, assetId: string): Promise<void> {
-  const doc = getDoc(sessionId, docId);
-  const layer = doc?.layers.find((l) => l.id === layerId);
-  if (!doc || !layer || layer.type !== 'raster') return;
-  const canvas = await assetCanvas(assetId);
-  record(getDoc(sessionId, docId)!);
-  setBuffer(layer.id, canvas);
-  // Keep the on-canvas width, follow the new pixel aspect (reframe/upscale change it).
-  const height = (layer.width * canvas.height) / canvas.width;
-  setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
+export function replaceLayerPixels(sessionId: string, docId: string, layerId: string, assetId: string): Promise<void>;
+export function replaceLayerPixels(sessionId: string, docId: string, layerId: string, assetId: string, ready: HTMLCanvasElement): void;
+export function replaceLayerPixels(sessionId: string, docId: string, layerId: string, assetId: string, ready?: HTMLCanvasElement): Promise<void> | void {
+  const layer = getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId);
+  if (layer?.type !== 'raster') return ready ? undefined : Promise.resolve();
+  const apply = (canvas: HTMLCanvasElement) => {
+    const doc = getDoc(sessionId, docId);
+    if (!doc) return;
+    record(doc);
+    setBuffer(layer.id, canvas);
+    // Board imports retain their box. Operation results follow the new aspect.
+    const height = ready ? layer.height : (layer.width * canvas.height) / canvas.width;
+    setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
+  };
+  return ready ? apply(ready) : assetCanvas(assetId).then(apply);
 }
 
 /**

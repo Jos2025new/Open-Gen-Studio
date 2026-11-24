@@ -6,7 +6,7 @@ import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
-import { assetRatio, boardNodes, bringGraph, graphFromDoc } from './libraryBoard';
+import { assetRatio, boardNodes, bringGraph, graphFromDoc, loadBoardImages } from './libraryBoard';
 import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, fromOrigin } from './libraryLayout';
 import { validateTokens } from './libraryTokens';
@@ -225,7 +225,8 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
       }
-      await bringGraph(sessionId, existing.id, subject.graph, subject.kind);
+      const images = await loadBoardImages(existing, subject.graph, subject.kind, true);
+      bringGraph(sessionId, existing.id, subject.graph, subject.kind, images);
       setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId && d.library.versionId !== curVer ? { ...d, library: { ...d.library, versionId: curVer } } : d));
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;
@@ -245,10 +246,11 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const doc = snap?.doc
         ? { ...remapDoc(snap.doc, px!, { newDocId: true, library: link }), name: subject.name }
         : { ...linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined, page.width, page.height), ...(board ? { board: { k: board.k, x: board.x, y: board.y, at: {} } } : {}) };
+      const images = await loadBoardImages(doc, graph, subject.kind);
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      await bringGraph(sessionId, doc.id, graph, subject.kind);
+      bringGraph(sessionId, doc.id, graph, subject.kind, images);
       return getDoc(sessionId, doc.id) ?? doc;
     });
   });
