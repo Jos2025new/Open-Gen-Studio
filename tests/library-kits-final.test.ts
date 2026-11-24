@@ -63,9 +63,10 @@ vi.mock('../src/engine/design/render', async (orig) => ({
   drawDoc: () => undefined,
 }));
 
-import { createItem, libraryToDesigner, saveItem } from '../src/engine/libraryVersions';
+import { createItem, libraryToDesigner, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { addTextLayer, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createSession, useStore } from '../src/store/store';
+import { run } from '../src/engine/commands';
 import type { Graph, Layer } from '../src/engine/types';
 
 function resetStore() {
@@ -112,4 +113,45 @@ for (const kind of ['design-system','brand-kit'] as const) it(`preserves separat
   const live = getDoc(s.id,doc.id)!;
   expect(notesOf(s.id,doc.id)).toEqual(['Original','Same','Same']);
   expect(live.board!.at.t2.layer).not.toBe(own);
+});
+
+it('rejects duplicate node IDs before publishing', async () => {
+  const s = resetStore();
+  const graph = { ...graphOf(text('dup','primero',100,100), text('dup','segundo',500,100),text('to','destino',100,500)), edges:[{id:'e',source:'dup',target:'to',sourceHandle:'out_ref',targetHandle:'sys_ref'}] };
+  const res = await run({cmd:'library.item.create',on:{session:s.id},args:{name:'Dup',kind:'moodboard',space:'library',graph}},{caller:'agent'});
+  expect(res).toMatchObject({ok:false,error:{message:expect.stringMatching(/duplicate.*dup/i)}});
+  expect(useStore.getState().library).toEqual([]);
+  expect(hoisted.blobs.size).toBe(0);
+});
+
+it.each(['missing','character'])('rejects new kit references to %s', async (id) => {
+  const s = resetStore();
+  useStore.setState({library:[{id:'character',name:'Character',kind:'character',refAssetIds:[]}]});
+  const res = await run({cmd:'library.item.create',on:{session:s.id},args:{name:'A',kind:'brand-kit',space:'library',kits:[id]}},{caller:'agent'});
+  expect(res.ok).toBe(false);
+  expect(useStore.getState().library.map(x=>x.id)).toEqual(['character']);
+  expect(hoisted.blobs.size).toBe(0);
+});
+
+it('revalidates a new kit reference at publication', async () => {
+  resetStore();
+  const {subject:child} = await createItem({name:'Child',kind:'brand-kit',space:'library',by:'user'});
+  const {subject:parent} = await createItem({name:'Parent',kind:'brand-kit',space:'library',by:'user'});
+  const keys = [...hoisted.blobs.keys()];
+  hoisted.setOnSet(() => useStore.setState({library:[parent]}));
+  await expect(saveItem({subjectId:parent.id,mode:'overwrite',space:'library',by:'user',kits:[child.id]})).rejects.toThrow(child.id);
+  expect(useStore.getState().library).toEqual([parent]);
+  expect([...hoisted.blobs.keys()]).toEqual(keys);
+});
+
+it('saves and restores a historical reference after the kit is deleted', async () => {
+  resetStore();
+  const {subject:child} = await createItem({name:'Child',kind:'brand-kit',space:'library',by:'user'});
+  const {subject:parent} = await createItem({name:'Parent',kind:'brand-kit',space:'library',by:'user',kits:[child.id]});
+  useStore.setState({library:[parent]});
+  const saved = await saveItem({subjectId:parent.id,mode:'overwrite',space:'library',by:'user',name:'Renamed'});
+  expect(saved.kits).toEqual([child.id]);
+  await saveItem({subjectId:parent.id,mode:'overwrite',space:'library',by:'user',kits:[]});
+  const restored = await restoreItemVersion({subjectId:parent.id,versionId:parent.versionId!,space:'library',by:'user'});
+  expect(restored.kits).toEqual([child.id]);
 });

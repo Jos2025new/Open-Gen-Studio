@@ -41,7 +41,7 @@ export function kitDependencies(subject: Subject, library: readonly Subject[] | 
 
 export const kitUsedBy = (id: string, library: readonly Subject[]): Subject[] => library.filter((s) => s.id !== id && (s.kits ?? []).includes(id));
 
-export function wouldCreateKitCycle(library: readonly Subject[], parentId: string, nextKits: readonly string[]): { ok: true } | { ok: false; reason: string } {
+export function wouldCreateKitCycle(library: readonly Subject[], parentId: string, nextKits: readonly string[], required: readonly string[] = []): { ok: true } | { ok: false; reason: string } {
   const byId = new Map(library.map((s) => [s.id, s]));
   for (const target of uniq(nextKits)) {
     if (target === parentId) return { ok: false, reason: `Entry "${parentId}" cannot contain itself.` };
@@ -53,6 +53,10 @@ export function wouldCreateKitCycle(library: readonly Subject[], parentId: strin
       seen.add(cur);
       for (const kid of byId.get(cur)?.kits ?? []) if (!seen.has(kid)) stack.push(kid);
     }
+  }
+  for (const id of required) {
+    const item = byId.get(id);
+    if (!item || !isKit(item)) return { ok: false, reason: `No Library kit "${id}".` };
   }
   return { ok: true };
 }
