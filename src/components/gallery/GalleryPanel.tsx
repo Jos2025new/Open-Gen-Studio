@@ -11,6 +11,7 @@ import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
 import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
 import { kitImageAssetIds, libraryToNodes } from '../../engine/flow/fromLibrary';
+import { focusNodes } from '../../engine/flow/selection';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { formatDateTime } from '../../lib/format';
 import { Button, IconButton } from '../ui/primitives';
@@ -57,9 +58,10 @@ function goSpace(space: OpenSpace) {
   setUi({ workspace: space === 'studio' ? 'chat' : space === 'nodes' ? 'node' : 'designer', home: false, space: undefined, omni: false, panel: null });
 }
 async function openKitIn(sessionId: string, id: string, space: OpenSpace) {
-  if (space === 'nodes') libraryToNodes(sessionId, id);
-  else await (space === 'studio' ? libraryToStudio : libraryToDesigner)(sessionId, id);
+  const added = space === 'nodes' ? libraryToNodes(sessionId, id).added : [];
+  if (space !== 'nodes') await (space === 'studio' ? libraryToStudio : libraryToDesigner)(sessionId, id);
   goSpace(space);
+  focusNodes(sessionId, added.map((n) => n.id));
 }
 
 /** Assets: every generation and upload, and the library of saved characters, locations, products, objects, styles and kits. */
@@ -100,7 +102,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
   const createNew = async () => {
     if (!kitKind || creatingRef.current) return;
     creatingRef.current = true; setCreating(true);
-    try { const sp = spaceOf(workspace); await createItem({ name: `New ${KIT_META[kind].singular.toLowerCase()}`, kind, space: sp, by: 'user', sessionId }); goSpace(sp); }
+    try { const sp = spaceOf(workspace); await createItem({ name: `${KIT_META[kind].singular} ${library.filter((x) => itemKind(x) === kind).length + 1}`, kind, space: sp, by: 'user', sessionId }); goSpace(sp); }
     catch (e) { toast((e as Error).message, 'error'); } finally { creatingRef.current = false; setCreating(false); }
   };
   const emptyMsg = library.some((x) => itemKind(x) === kind) ? 'Nothing matches this search.'
@@ -127,7 +129,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
           </div>
         </div>
         <div className="pc-grp pc-right">
-          {kitKind ? <Button size="sm" icon={Plus} disabled={creating} onClick={() => void createNew()}>New</Button> : null}
+          {kitKind ? <div className="pc-flags"><Button size="sm" icon={Plus} disabled={creating} onClick={() => void createNew()}>New</Button></div> : null}
           {chrome}
         </div>
       </div></div>
@@ -227,7 +229,7 @@ function LibraryTile({ item, view }: { item: Subject; view: ItemView }) {
     </div>;
   }
   const figures = <Figures items={kit
-    ? [[String(item.graph?.nodes.length ?? 0), 'Items'], [String(item.versions?.length ?? 0), 'Versions'], [kindLabel ?? '', 'Kind']]
+    ? [...(item.graph?.nodes.length ? [[String(item.graph.nodes.length), 'Items'] as [string, string]] : []), [String(item.versions?.length ?? 0), 'Versions']]
     : [[String(item.refAssetIds.length), 'References'], [item.videoAssetId ? '1' : '0', 'Videos'], [kindLabel ?? '', 'Kind']]} />;
   const openCls = `g-open pc-open${!cover && kit ? ' pc-glyph-cover' : ''}`;
   return (

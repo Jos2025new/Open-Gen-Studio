@@ -23,6 +23,7 @@ vi.mock('../src/components/ui/AssetMedia', () => ({
 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { useNodeFocus } from '../src/engine/flow/selection';
 import { GalleryPanel } from '../src/components/gallery/GalleryPanel';
 import { createDoc } from '../src/engine/design/doc';
 import { addDoc } from '../src/engine/design/actions';
@@ -126,6 +127,9 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
       'Board One', 'Board Three', 'Board Two',
     ]);
     expect(tiles[0].querySelector('[data-asset="a1"]')).not.toBeNull();
+    // A kit without a graph never claims "0 Items": its content may be a saved document.
+    expect(tiles[0].textContent).toContain('Items');
+    expect(tiles[2].textContent).not.toContain('Items');
     expect(tiles[1].querySelector('[data-asset]')).toBeNull();
     expect(tiles[1].querySelector('.g-open svg')).not.toBeNull();
     expect(tiles[2].querySelector('[data-asset="a2"]')).not.toBeNull();
@@ -175,6 +179,14 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
     expect(items.some((t) => t?.includes('Open in Nodes'))).toBe(true);
     expect(items.some((t) => t?.includes('Versions'))).toBe(true);
     expect(items.some((t) => t?.includes('Components'))).toBe(true);
+
+    // Nodes frames what it just added
+    await click(menuItem('Open in Nodes'));
+    const placed = useStore.getState().sessions[sid()].graph.nodes.map((n) => n.id);
+    expect(placed.length).toBeGreaterThan(0);
+    expect(useNodeFocus.getState()).toMatchObject({ sessionId: sid(), ids: placed });
+    act(() => { setUi({ workspace: 'designer', home: false, panel: 'gallery' }); });
+    await click(q('.lib-tile').querySelector('[aria-label="More actions for Acme DS"]'));
 
     // Insert component into open Designer doc
     await click(menuItem('Components'));
@@ -229,6 +241,7 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
     });
     const mbs = useStore.getState().library.filter((s) => s.kind === 'moodboard');
     expect(mbs).toHaveLength(1);
+    expect(mbs[0].name).toBe('Moodboard 1');
     expect(useStore.getState().sessions[sid()].docs.some((d) => d.library?.subjectId === mbs[0].id)).toBe(true);
   });
 });
