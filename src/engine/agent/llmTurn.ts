@@ -25,6 +25,7 @@ import { createTurnUsageTracker } from './turnUsage';
 import { runTurnModelCall } from './turnModelCall';
 import type { ProposePlanState } from './proposePlanCall';
 import { runTurnToolLoop } from './turnToolLoop';
+import { autoVersionDraftKits, captureDraftBaseline } from '../libraryAutoSave';
 
 /** Direct mode asks nothing and shows no settings card, so those two tools are not offered to the model. */
 const DIRECT_HIDDEN_TOOLS = new Set(['ask_questions', 'confirm_settings']);
@@ -65,6 +66,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
   const turnMeta = (): ChatMessageMeta => messageMeta(workspace, { agent: 'Director', provider: engine.provider, model: engine.model, runId }, sessionId, owner);
   const limitNote = () => notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {}, turnMeta());
   const usage = createTurnUsageTracker();
+  const draftBaseline = captureDraftBaseline(sessionId);
   const guard = createTurnGuard({
     sessionId,
     controller,
@@ -77,6 +79,7 @@ export async function llmTurn(sessionId: string, startWorkspace: Workspace, opts
       clock.end();
       patchAgent(sessionId, { busy: false, phase: undefined, waiting: undefined }, owner);
       if (controllers.get(turnKey(sessionId, owner)) === controller) controllers.delete(turnKey(sessionId, owner));
+      void autoVersionDraftKits(sessionId, draftBaseline, workspace === 'designer' ? 'designer' : workspace === 'node' ? 'nodes' : 'studio', (name, reason) => notice(sessionId, workspace, `Could not auto-save kit "${name}": ${reason}`, 'error', undefined, turnMeta()));
     },
   });
   ending.set(controller, () => guard.cancel(() => notice(sessionId, workspace, 'Stopped.', 'info', undefined, turnMeta())));

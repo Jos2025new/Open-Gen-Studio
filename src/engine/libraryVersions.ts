@@ -233,7 +233,7 @@ function isBlankWorkingDoc(doc: DesignDoc, expectedName?: string): boolean {
     && (expectedName === undefined || doc.name === expectedName);
 }
 
-async function isWorkingCopyDirty(doc: DesignDoc): Promise<boolean> {
+export async function isWorkingCopyDirty(doc: DesignDoc): Promise<boolean> {
   if (!doc.library) return true;
   const pending = new Set(pendingRaster());
   for (const rid of rasterBufferIds(doc.layers)) if (pending.has(rid) || isUnreadable(rid)) return true;
