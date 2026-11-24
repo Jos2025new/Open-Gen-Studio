@@ -90,6 +90,8 @@ export function validateSqliteCommit(body, fresh = false) {
   }
   if (hasDelta) {
     for (const coll of ['generations', 'assets', 'library']) {
+      const del = delta.del?.[coll];
+      if (del != null && (!Array.isArray(del) || !del.every((id) => typeof id === 'string'))) return { status: 400, reason: `invalid del.${coll}` };
       for (const text of Object.values(delta.up?.[coll] ?? {})) {
         if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: 'invalid record' };
       }

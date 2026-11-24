@@ -55,6 +55,8 @@ export function recordIndex(g) {
 export function createDeltaClient() {
   const known = { generations: new Map(), assets: new Map(), library: new Map() };
   const unconfirmedUp = { generations: new Map(), assets: new Map(), library: new Map() };
+  // Deleted in a commit whose outcome is unknown: a record that comes back is sent again, the disk may have dropped it.
+  const unconfirmedDel = { generations: new Set(), assets: new Set(), library: new Set() };
   const unconfirmedOrder = { generations: null, assets: null, library: null };
   let knownSessions = null;
   const unconfirmedSessions = new Set();
@@ -70,7 +72,7 @@ export function createDeltaClient() {
     let order = null;
     for (const coll of COLLS) {
       const prev = known[coll];
-      const uncUp = unconfirmedUp[coll];
+      const uncUp = unconfirmedUp[coll], uncDel = unconfirmedDel[coll];
       up[coll] = {}; del[coll] = []; staged[coll] = new Map();
       const present = new Set();
       if (coll === 'library') {
@@ -104,6 +106,7 @@ export function createDeltaClient() {
           if (!p || p.text !== text || (uncUp.has(id) && uncUp.get(id) !== text)) up[coll][id] = text;
         }
       }
+      for (const id of uncDel) if (present.has(id)) up[coll][id] = staged[coll].get(id).text;
       for (const id of prev.keys()) if (!present.has(id)) del[coll].push(id);
       for (const id of uncUp.keys()) if (!present.has(id) && !prev.has(id)) del[coll].push(id);
       const curOrder = [...staged[coll].keys()];
@@ -156,7 +159,7 @@ export function createDeltaClient() {
       spend: { append: texts.slice(start), len: texts.length, from: start },
     };
     pending = {
-      staged, smallText, spend: texts, up, order,
+      staged, smallText, spend: texts, up, del, order,
       sessionOrder: Array.isArray(sessionOrder) ? [...sessionOrder] : null,
       sessUp: sessionUpKeys, sessMoved,
     };
@@ -168,7 +171,8 @@ export function createDeltaClient() {
     if (pending.smallText !== small) unconfirmedSmall = true;
     for (const coll of COLLS) {
       for (const [id, text] of Object.entries(pending.up[coll])) unconfirmedUp[coll].set(id, text);
-      if (pending.order?.[coll]) unconfirmedOrder[coll] = [...pending.staged[coll].keys()];
+      for (const id of pending.del[coll]) unconfirmedDel[coll].add(id);
+      if (pending.order?.[coll] || pending.del[coll].length) unconfirmedOrder[coll] = [...pending.staged[coll].keys()];
     }
     if (pending.sessionOrder) {
       const prevSet = new Set(knownSessions ?? []);
@@ -182,6 +186,7 @@ export function createDeltaClient() {
     for (const coll of COLLS) {
       known[coll] = pending.staged[coll];
       unconfirmedUp[coll].clear();
+      unconfirmedDel[coll].clear();
       unconfirmedOrder[coll] = null;
     }
     if (pending.sessionOrder) knownSessions = pending.sessionOrder;

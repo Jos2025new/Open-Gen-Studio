@@ -150,10 +150,20 @@ describe('library loss guard: the delta as it comes', () => {
   const whole = (s: ReturnType<typeof open>, ids: string[]) => s.save({ library: ids }, ['s1']);
   const send = (s: ReturnType<typeof open>, delta: object) => s.sql!.commit({ savedAt: 9000, baseAt: 1000, version: 1, order: ['s1'], sessions: {}, delta: { up: {}, spend: { append: [], len: 0 }, ...delta } });
 
-  it('ids sent as numbers delete rows too, so they count', async () => {
+  it('ids that are not texts are refused: SQLite could match them to other rows', async () => {
     const s = open('sqlite');
-    await whole(s, ['1', '2', '3']);
-    expect(send(s, { del: { library: [1, 2, 3] } }).status).toBe(409);
+    await whole(s, ['5.0', '8.0', '13.0']);
+    expect(send(s, { del: { library: [5, 8, 13] } }).status).toBe(400);
+    expect((await s.state()).library).toHaveLength(3);
+  });
+
+  it('a session removed by the delta takes its own results with it', async () => {
+    const s = open('sqlite');
+    await s.save({ assets: of(12, 's1') });
+    const assets = Object.keys(of(12, 's1'));
+    const del = (sessions: string[]) => s.sql!.commit({ savedAt: 9000, baseAt: 1000, version: 1, sessions: {}, delta: { up: {}, del: { assets, sessions }, spend: { append: [], len: 0 } } } as never).status;
+    expect(del([])).toBe(409);
+    expect(del(['s1'])).toBe(204);
   });
 
   it('a full delta that does not carry the records is a loss', async () => {
@@ -176,6 +186,14 @@ describe('library loss guard: format 1 on disk', () => {
     writeFileSync(join(at, 'state.json'), JSON.stringify({ savedAt: 700, state: { ...globalsObj({ library: 5 }), sessions: { s1: JSON.parse(ses('s1')) } }, version: 1 }));
     const r = await createStoreV2(at).commit({ savedAt: 800, baseAt: 700, version: 1, globals: JSON.stringify(globalsObj({})), order: ['s1'], sessions: { s1: ses('s1') } });
     expect(r.records!.map((x) => [x.coll, x.lost])).toEqual([['library', 5]]);
+  });
+
+  it('a session removed by that first commit takes its own results with it', async () => {
+    const at = dir();
+    const sessions = Object.fromEntries(['s1', 's2', 's3'].map((id) => [id, JSON.parse(ses(id))]));
+    writeFileSync(join(at, 'state.json'), JSON.stringify({ savedAt: 700, state: { ...globalsObj({ assets: of(12, 's1') }), sessions }, version: 1 }));
+    const r = await createStoreV2(at).commit({ savedAt: 800, baseAt: 700, version: 1, globals: JSON.stringify(globalsObj({})), order: ['s2', 's3'], sessions: { s2: ses('s2'), s3: ses('s3') } });
+    expect(r.status).toBe(204);
   });
 });
 
@@ -219,6 +237,7 @@ describe('library loss guard: the 409 bodies through the HTTP layer', () => {
 describe('library loss guard: the real client against the real store', () => {
   let sql: ReturnType<typeof createSqliteStore>;
   const bodies: any[] = [];
+  let drop = false;
   beforeEach(async () => {
     stores.clear(); bodies.length = 0;
     vi.resetModules();
@@ -230,6 +249,7 @@ describe('library loss guard: the real client against the real store', () => {
       const body = JSON.parse(init!.body as string);
       bodies.push(body);
       const r = sql.commit(body);
+      if (drop) { drop = false; throw new TypeError('Failed to fetch'); }
       return new Response(r.status === 204 ? null : r.status === 409 ? JSON.stringify(r) : r.reason, { status: r.status });
     });
   });
@@ -253,6 +273,46 @@ describe('library loss guard: the real client against the real store', () => {
     expect(guard.problem).toBeNull();
     expect(JSON.parse(sql.read()!).state.library.map((x: { id: string }) => x.id)).toEqual(['lib2', 'new']);
     expect(await stateDb.set('ogs-app', value({ library: ['lib2', 'new', 'more'] }))).toBe('ok');
+  });
+
+  const ids = () => JSON.parse(sql.read()!).state.library.map((x: { id: string }) => x.id);
+
+  it('a loss that grows after the notice needs one more "Keep", not a loop', async () => {
+    const { stateDb } = await import('../src/lib/idb');
+    await stateDb.get('ogs-app');
+    await stateDb.set('ogs-app', value({ library: 4, assets: of(12, 's1') }));
+    expect(await stateDb.set('ogs-app', value({ library: 4 }))).toBe('rejected');
+    expect(await stateDb.set('ogs-app', value({}), { keep: true })).toBe('rejected');
+    expect(await stateDb.set('ogs-app', value({}), { keep: true })).toBe('ok');
+  });
+
+  it('a shrunk session and a lost library are approved together, whatever the notice listed first', async () => {
+    const { stateDb } = await import('../src/lib/idb');
+    const big = JSON.stringify({ id: 's1', feed: Array.from({ length: 30 }, (_, i) => ({ id: `f${i}`, text: 'x'.repeat(400) })), docs: [] });
+    const withSession = (text: string, s: Shape) => { const v = value(s) as unknown as { v2: { sessions: Map<string, string> } }; v.v2.sessions = new Map([['s1', text]]); return v as never; };
+    await stateDb.get('ogs-app');
+    await stateDb.set('ogs-app', withSession(big, { library: 4 }));
+    expect(await stateDb.set('ogs-app', withSession(ses('s1'), { library: 4 }))).toBe('rejected');
+    expect(await stateDb.set('ogs-app', withSession(ses('s1'), {}), { keep: true })).toBe('rejected');
+    expect(await stateDb.set('ogs-app', withSession(ses('s1'), {}), { keep: true })).toBe('ok');
+  });
+
+  it('a deletion whose answer was lost and then undone is on disk again, and "Keep" still matches', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { stateDb } = await import('../src/lib/idb');
+    await stateDb.get('ogs-app');
+    const all = ['a', 'b', 'c', 'd', 'e'];
+    await stateDb.set('ogs-app', value({ library: all }));
+    drop = true;
+    expect(await stateDb.set('ogs-app', value({ library: all.slice(1) }))).toBe('fail');
+    expect(ids()).toEqual(all.slice(1));
+    expect(await stateDb.set('ogs-app', value({ library: all }))).toBe('ok');
+    expect(ids()).toEqual(all);
+    drop = true;
+    await stateDb.set('ogs-app', value({ library: all.slice(1) }));
+    expect(await stateDb.set('ogs-app', value({ library: ['a'] }))).toBe('rejected');
+    expect(await stateDb.set('ogs-app', value({ library: ['a'] }), { keep: true })).toBe('ok');
+    expect(ids()).toEqual(['a']);
   });
 
   it('restoring the records lifts the refusal without any approval', async () => {

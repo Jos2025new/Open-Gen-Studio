@@ -46,7 +46,7 @@ export function createStoreV2(dir) {
   const stateFile = join(dir, 'state.json');
   const backups = join(dir, 'backups');
   let lastSnapshot = 0;
-  let lastIndex = null; // the records of the last accepted commit, so a save does not parse the previous globals again
+  let lastIndex = null; // the records and sessions of the last accepted commit, so a save does not parse the previous globals again
 
   const readHead = () => readFile(headFile, 'utf8').then((t) => JSON.parse(t), () => null);
 
@@ -96,9 +96,13 @@ export function createStoreV2(dir) {
     for (const f of kept.slice(0, -KEPT)) await rm(join(backups, f), { recursive: true, force: true });
   }
 
-  /** The records on disk before this commit. Globals that cannot be read have nothing to compare, as before the guard. */
-  async function previousIndex(head, legacy) {
-    try { return recordIndex(head ? JSON.parse(await readFile(globalsFile, 'utf8')) : JSON.parse(legacy).state); } catch { return null; }
+  /** The records and sessions on disk before this commit. Globals that cannot be read have nothing to compare, as before the guard. */
+  async function previousState(head, legacy) {
+    try {
+      if (head) return { index: recordIndex(JSON.parse(await readFile(globalsFile, 'utf8'))), sessions: head.order };
+      const { state } = JSON.parse(legacy);
+      return { index: recordIndex(state), sessions: Object.keys(state?.sessions ?? {}) };
+    } catch { return null; }
   }
 
   /**
@@ -134,9 +138,8 @@ export function createStoreV2(dir) {
     const totalOk = total && keep?.total?.diskOrderHash === total.diskOrderHash && keep.total.candidateOrderHash === sha256(json(order));
     let nextIndex;
     try { nextIndex = recordIndex(JSON.parse(globals)); } catch { return { status: 400, reason: 'globals must be a JSON text (a string), not an object' }; }
-    const prevIndex = !current ? null : lastIndex?.savedAt === current ? lastIndex.index : await previousIndex(head, legacy);
-    const removed = new Set(prevOrder.filter((id) => !order.includes(id)));
-    const recLosses = prevIndex ? recordLosses(prevIndex, nextIndex, removed) : [];
+    const prev = !current ? null : lastIndex?.savedAt === current ? lastIndex : await previousState(head, legacy);
+    const recLosses = prev ? recordLosses(prev.index, nextIndex, new Set(prev.sessions.filter((id) => !order.includes(id)))) : [];
     const records = unapprovedRecords(recLosses, keep);
     const approved = new Map((Array.isArray(keep?.sessions) ? keep.sessions : []).map((k) => [k.sessionId, k]));
     const losses = [], kept = [];
@@ -148,10 +151,11 @@ export function createStoreV2(dir) {
       else losses.push({ sessionId: id, diskHash, text });
     }
     if ((total && !totalOk) || losses.length || records.length) {
+      const listed = [...losses, ...kept.map(([sessionId, prev]) => ({ sessionId, diskHash: sha256(prev) }))]; // see store-b.js
       const first = losses[0];
       const rejectedFile = first ? await keepRejected(`rejected-session-${first.sessionId}`, first.text) : await keepRejected('rejected', json(body));
       for (const l of losses.slice(1)) await keepRejected(`rejected-session-${l.sessionId}`, l.text);
-      return { status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}), losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}), ...(records.length ? { records: recordsBody(records) } : {}), rejectedFile, savedAt: current };
+      return { status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}), losses: listed.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}), ...(recLosses.length ? { records: recordsBody(recLosses) } : {}), rejectedFile, savedAt: current };
     }
     if (totalOk) await keepRejected('kept-before-order', json(head ?? {}));
     for (const [id, prev] of kept) await keepRejected(`kept-before-${id}`, prev);
@@ -162,7 +166,7 @@ export function createStoreV2(dir) {
     await writeAtomic(globalsFile, globals);
     const next = { format: 2, savedAt, version, order };
     await writeAtomic(headFile, json(next));
-    lastIndex = { savedAt, index: nextIndex };
+    lastIndex = { savedAt, index: nextIndex, sessions: order };
     // Sessions no longer referenced move to backups: nothing is deleted.
     const known = new Set(order);
     for (const f of await readdir(sessionsDir).catch(() => [])) {

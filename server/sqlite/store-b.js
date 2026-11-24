@@ -332,13 +332,15 @@ export function createStoreB(dir, opts = {}) {
       else losses.push({ sessionId: id, diskHash, text });
     }
     if ((total && !totalOk) || losses.length || records.length) {
+      // All of them, also those this send approved: the next approval is built from this list alone.
+      const listed = [...losses, ...kept.map(([sessionId, prev]) => ({ sessionId, diskHash: sha256(prev) }))];
       const first = losses[0];
       const rejectedFile = first ? keepCopy(`rejected-session-${first.sessionId}`, first.text) : keepCopy('rejected', json(body));
       for (const l of losses.slice(1)) keepCopy(`rejected-session-${l.sessionId}`, l.text);
       return {
         status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}),
-        losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}),
-        ...(records.length ? { records: recordsBody(records) } : {}), rejectedFile, savedAt: current,
+        losses: listed.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}),
+        ...(recLosses.length ? { records: recordsBody(recLosses) } : {}), rejectedFile, savedAt: current,
       };
     }
     if (totalOk) keepCopy('kept-before-order', json({ ...(head ?? {}), order: prevOrder }));
@@ -398,6 +400,8 @@ export function createStoreB(dir, opts = {}) {
     }
     for (const coll of [...COLLS, 'sessions']) {
       if (coll !== 'sessions') {
+        const del = delta?.del?.[coll];
+        if (del != null && (!Array.isArray(del) || !del.every((id) => typeof id === 'string'))) return { status: 400, reason: `del.${coll} must be an array of ids` };
         for (const [id, text] of Object.entries(delta?.up?.[coll] ?? {})) {
           if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: `record ${coll}/${id} must be a JSON text` };
         }
