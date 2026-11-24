@@ -199,9 +199,9 @@ describe('Lote F fixes', () => {
   it('5) undoDoc and redoDoc preserve current library link, view, and detached local-copy name', async () => {
     const s = resetStore();
     const { subject: kit, doc } = await createItem({ name: 'UndoKit', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'user' });
-    addTextLayer(s.id, doc!.id, 'Step 1', { x: 0, y: 0, width: 100 });
+    addTextLayer(s.id, doc!.id, 'Step 1', { x: 0, y: 0, width: 100 }, {});
     const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' });
-    addTextLayer(s.id, doc!.id, 'Step 2', { x: 0, y: 40, width: 100 });
+    addTextLayer(s.id, doc!.id, 'Step 2', { x: 0, y: 40, width: 100 }, {});
     const v2 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' });
     expect(v2.docRev).not.toBe(v1.docRev);
 
