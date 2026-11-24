@@ -1,6 +1,6 @@
 import { uid } from '../lib/id';
 import { blobDb } from '../lib/idb';
-import { setDoc, useStore } from '../store/store';
+import { setDoc, toast, useStore } from '../store/store';
 import { addDoc, addTextLayer, getDoc, placeAsset, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
@@ -203,12 +203,20 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
       }
-      if (!curDocRev) {
-        const seen = new Set(existing.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)));
-        let placed = existing.layers.length;
-        for (const n of subject.graph?.nodes ?? []) {
-          if (n.data.kind !== 'asset' || !n.data.assetId || seen.has(n.data.assetId) || get().assets[n.data.assetId]?.kind !== 'image') continue;
-          try { if (await placeAsset(sessionId, existing.id, n.data.assetId, placed ? 'new' : 'base', n.data.title || undefined)) { seen.add(n.data.assetId); placed++; } } catch {}
+      if (!curDocRev && (existing.library?.versionId ?? '') !== curVer) {
+        const prevVer = existing.library?.versionId ?? '';
+        const prevSnap = prevVer ? await readKitVersion(prevVer).catch(() => null) : null;
+        if (prevVer && !prevSnap) {
+          toast(`Could not read previous version "${prevVer}" to sync new images.`, 'error');
+        } else {
+          const prevIds = new Set((prevSnap?.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'asset' && n.data.assetId ? [n.data.assetId] : [])));
+          const seen = new Set(existing.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)));
+          let placed = existing.layers.length;
+          for (const n of subject.graph?.nodes ?? []) {
+            if (n.data.kind !== 'asset' || !n.data.assetId || prevIds.has(n.data.assetId) || seen.has(n.data.assetId) || get().assets[n.data.assetId]?.kind !== 'image') continue;
+            try { if (await placeAsset(sessionId, existing.id, n.data.assetId, placed ? 'new' : 'base', n.data.title || undefined)) { seen.add(n.data.assetId); placed++; } } catch {}
+          }
+          setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId ? { ...d, library: { ...d.library, versionId: curVer } } : d));
         }
       }
       selectDoc(sessionId, existing.id);
