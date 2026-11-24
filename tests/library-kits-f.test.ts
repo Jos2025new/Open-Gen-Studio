@@ -149,4 +149,27 @@ describe('Lote F fixes', () => {
     const liveKit = useStore.getState().library.find((x) => x.id === kit.id)!;
     expect((await readKitVersion(liveKit.versionId!))?.doc?.background).toBe('#111111');
   });
+
+  it('3) commitVersion rejects and cleans up written blobs if a newly validated asset is deleted mid-flight', async () => {
+    const s = resetStore();
+    useStore.setState({ assets: { ast_new: mkAsset('ast_new', s.id), ast_new2: mkAsset('ast_new2', s.id) } });
+    const keysBefore = new Set(hoisted.blobs.keys());
+    hoisted.setOnSet((k) => {
+      if (k.startsWith('libver:')) useStore.setState((st) => { const { ast_new: _drop, ...rest } = st.assets; return { assets: rest }; });
+    });
+    const g1: Graph = { nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Pic', assetId: 'ast_new' } }], edges: [] };
+    await expect(createItem({ name: 'RaceCreate', kind: 'moodboard', space: 'library', by: 'user', graph: g1, draft: false })).rejects.toThrow(/asset|deleted|missing/i);
+    expect(useStore.getState().library.some((x) => x.name === 'RaceCreate')).toBe(false);
+    expect([...hoisted.blobs.keys()].filter((k) => !keysBefore.has(k))).toEqual([]);
+
+    hoisted.setOnSet(null);
+    const { subject: kit } = await createItem({ name: 'RaceSave', kind: 'moodboard', space: 'library', by: 'user', draft: false });
+    const keysBeforeSave = new Set(hoisted.blobs.keys());
+    hoisted.setOnSet((k) => {
+      if (k.startsWith('libver:')) useStore.setState((st) => { const { ast_new2: _drop, ...rest } = st.assets; return { assets: rest }; });
+    });
+    const g2: Graph = { nodes: [{ id: 'n2', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Pic2', assetId: 'ast_new2' } }], edges: [] };
+    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'user', graph: g2 })).rejects.toThrow(/asset|deleted|missing/i);
+    expect([...hoisted.blobs.keys()].filter((k) => !keysBeforeSave.has(k))).toEqual([]);
+  });
 });

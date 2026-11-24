@@ -82,20 +82,20 @@ export async function copyDocPixels(doc: DesignDoc, reuseFrom: DesignDoc | null 
   return { map, storedIds };
 }
 
-function validateContent(kind: KitKind, subjectId: string, opts: { graph?: Graph; kits?: string[]; tokens?: KitTokens; checkAssets: boolean }): void {
-  const spec = KIT_KINDS[kind];
+function validateContent(kind: KitKind, subjectId: string, opts: { graph?: Graph; kits?: string[]; tokens?: KitTokens; checkAssets: boolean }): string[] {
+  const spec = KIT_KINDS[kind], checked: string[] = [];
   if (opts.tokens && Object.keys(opts.tokens).length) { if (!spec.tokens) throw new Error(`Kind "${kind}" does not support tokens.`); validateTokens(opts.tokens); }
   if (opts.kits?.length) {
     if (!spec.kits) throw new Error(`Kind "${kind}" cannot contain other kits.`);
     const cycle = wouldCreateKitCycle(get().library, subjectId, opts.kits);
     if (!cycle.ok) throw new Error(cycle.reason);
   }
-  if (!opts.graph) return;
+  if (!opts.graph) return checked;
   const assets = get().assets, nodeIds = new Set(opts.graph.nodes.map((n) => n.id));
   for (const { id, data: d } of opts.graph.nodes) {
     if (d.kind === 'asset') {
       if (!d.assetId?.trim()) throw new Error(`Asset node "${id}" requires assetId.`);
-      if (opts.checkAssets && !assets[d.assetId]) throw new Error(`Node "${id}" references missing asset "${d.assetId}".`);
+      if (opts.checkAssets) { if (!assets[d.assetId]) throw new Error(`Node "${id}" references missing asset "${d.assetId}".`); checked.push(d.assetId); }
     } else if (d.kind === 'text') {
       if (!d.text.trim()) throw new Error(`Text node "${id}" requires text.`);
     } else if (d.kind === 'part') {
@@ -106,6 +106,7 @@ function validateContent(kind: KitKind, subjectId: string, opts: { graph?: Graph
     } else throw new Error(`Unsupported Library graph node kind "${d.kind}".`);
   }
   for (const e of opts.graph.edges) if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) throw new Error(`Edge "${e.id}" references a missing node.`);
+  return checked;
 }
 
 const snapshotAssets = (s: Pick<Subject, 'frontalAssetId' | 'refAssetIds' | 'videoAssetId'>, graph?: Graph, doc?: DesignDoc) =>
@@ -126,7 +127,7 @@ function optionalFields(c: { description?: string; graph?: Graph; kits?: string[
 /** Single verified version writer shared by create, save, and restore: writes blob, re-reads live store, cleans up on error. */
 async function commitVersion(
   entry: Subject,
-  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean },
+  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[] },
   written: string[],
 ): Promise<Subject> {
   const verId = uid('lv'), groupIds = docGroupIds(c.doc), fields = optionalFields({ description: c.description, graph: c.graph, kits: c.kits, tokens: c.tokens, docRev: c.docRev, groupIds });
@@ -134,13 +135,11 @@ async function commitVersion(
   const encoded = new TextEncoder().encode(JSON.stringify(snap));
   await writeVerified(vKey(verId), new Blob([encoded], { type: 'application/json' }), encoded, written);
   const ref: KitVersionRef = { id: verId, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), assetIds: snapshotAssets(entry, fields.graph, c.doc), ...(c.docRev ? { docRev: c.docRev } : {}), ...(groupIds?.length ? { groupIds } : {}) };
-  if (c.mode === 'create') {
-    const created: Subject = { ...entry, ...fields, versionId: verId, versions: [ref] };
-    useStore.setState((st) => ({ library: [...st.library, created] }));
-    return created;
-  }
   let updated: Subject | null = null;
   useStore.setState((st) => {
+    const missing = c.checkAssetIds?.find((aid) => !st.assets[aid]);
+    if (missing) throw new Error(`Asset "${missing}" was deleted while saving.`);
+    if (c.mode === 'create') { updated = { ...entry, ...fields, versionId: verId, versions: [ref] }; return { library: [...st.library, updated] }; }
     const live = st.library.find((x) => x.id === entry.id);
     if (!live || !isKit(live)) return {};
     const { graph: _g, kits: _k, tokens: _t, docRev: _dr, groupIds: _gi, description: _d, ...base } = live;
@@ -159,13 +158,13 @@ export async function createItem(opts: {
   if (!name) throw new Error('Item name is required.');
   const id = uid('sub'), session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
   if (opts.sessionId && !session) throw new Error(`No session "${opts.sessionId}".`);
-  validateContent(opts.kind, id, { graph: opts.graph, kits: opts.kits, tokens: opts.tokens, checkAssets: true });
+  const checkAssetIds = validateContent(opts.kind, id, { graph: opts.graph, kits: opts.kits, tokens: opts.tokens, checkAssets: true });
   const draft = opts.draft ?? (opts.space === 'studio' && Boolean(session)), at = Date.now();
   const origin = { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}), ...(opts.from?.length ? { from: [...opts.from] } : {}) };
   const base: Subject = { id, name, kind: opts.kind, refAssetIds: [], ...optionalFields(opts), draft, origin };
   const subject = draft
     ? (useStore.setState((st) => ({ library: [...st.library, base] })), base)
-    : await withCleanup((w) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens }, w));
+    : await withCleanup((w) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens, checkAssetIds }, w));
   if (opts.open !== false && session && (opts.space === 'studio' || opts.space === 'designer')) {
     const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, opts.space === 'studio' ? 'studio' : undefined);
     addDoc(session.id, doc);
@@ -253,7 +252,7 @@ export function saveItem(opts: {
     const cur = requireItem(opts.subjectId), kind = cur.kind as KitKind, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
     const graph = typeof opts.graph === 'function' ? opts.graph(cur.graph) : opts.graph !== undefined ? opts.graph : cur.graph;
     const kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
-    validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined });
+    const checkAssetIds = validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined });
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
     const workDoc = opts.docId && opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined;
     if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
@@ -277,7 +276,7 @@ export function saveItem(opts: {
         mode: opts.mode === 'copy' ? 'create' : 'append', at, by: opts.by, space: opts.space, label: opts.label,
         name: opts.mode === 'overwrite' && opts.name?.trim() ? opts.name.trim() : undefined,
         description: opts.description !== undefined ? opts.description : (opts.mode === 'copy' ? cur.description : undefined),
-        graph, kits, tokens, doc: storedDoc, docRev, storedRasterIds, clearsDraft: opts.by === 'user',
+        graph, kits, tokens, doc: storedDoc, docRev, storedRasterIds, clearsDraft: opts.by === 'user', checkAssetIds,
       }, written);
       if (opts.mode === 'overwrite' && workDoc && opts.sessionId && workDoc.library?.subjectId === cur.id) {
         setDoc(opts.sessionId, workDoc.id, (d) => d.library?.subjectId === cur.id ? { ...d, library: { ...d.library, versionId: saved.versionId!, ...(docRev ? { docRev } : {}) } } : d);
