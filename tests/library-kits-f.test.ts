@@ -270,4 +270,37 @@ describe('Lote F fixes', () => {
       setApprover(null);
     }
   });
+
+  it('8) write commands (create/save/open/restore) return only ids (and doc/versionId), never Subject or graph, while read keeps trimmed text', async () => {
+    const s = resetStore();
+    const g: Graph = { nodes: [{ id: 'nt', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Prompt', text: 'Secret prompt body' } }], edges: [] };
+
+    const created = await run({ cmd: 'library.item.create', on: { session: s.id }, args: { name: 'SlimOut', kind: 'moodboard', space: 'designer', graph: g } }, { caller: 'agent' });
+    expect(created.ok).toBe(true);
+    const cRes = created.results[0] as Record<string, unknown>;
+    expect(Object.keys(cRes).sort()).toEqual(['doc', 'id', 'versionId']);
+    expect('subject' in cRes || 'graph' in cRes).toBe(false);
+    const kitId = cRes.id as string;
+    const v1 = cRes.versionId as string;
+
+    const saved = await run({ cmd: 'library.item.save', on: { session: s.id }, args: { id: kitId, mode: 'overwrite', space: 'library', graph: g } }, { caller: 'agent' });
+    expect(saved.ok).toBe(true);
+    const sRes = saved.results[0] as Record<string, unknown>;
+    expect(Object.keys(sRes).sort()).toEqual(['id', 'versionId']);
+    expect(JSON.stringify(sRes)).not.toContain('Secret prompt body');
+
+    const opened = await run({ cmd: 'library.item.open', on: { session: s.id }, args: { id: kitId, space: 'nodes' } }, { caller: 'agent' });
+    expect(opened.ok).toBe(true);
+    expect(Object.keys(opened.results[0] as Record<string, unknown>).sort()).toEqual(['edges', 'groupId', 'nodes']);
+
+    const restored = await run({ cmd: 'library.item.restore', args: { id: kitId, versionId: v1, space: 'library' } }, { caller: 'agent' });
+    expect(restored.ok).toBe(true);
+    const rRes = restored.results[0] as Record<string, unknown>;
+    expect(Object.keys(rRes).sort()).toEqual(['id', 'versionId']);
+    expect(JSON.stringify(rRes)).not.toContain('Secret prompt body');
+
+    const read = await run({ cmd: 'library.item.read', args: { id: kitId } }, { caller: 'agent' });
+    expect(read.ok).toBe(true);
+    expect((read.results[0] as { index: string }).index).toContain('Secret prompt body');
+  });
 });

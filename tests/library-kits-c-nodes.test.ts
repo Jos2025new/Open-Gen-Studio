@@ -134,8 +134,8 @@ describe('Part 4: libraryToNodes, nodesToLibrary (overwrite|copy|new), and full 
       args: { mode: 'new', kind: 'brand-kit', space: 'nodes', groupId: 'rt_grp', name: 'Cobalt Kit' },
     }, { caller: 'agent' });
     expect(savedFromNodes.ok, JSON.stringify(savedFromNodes)).toBe(true);
-    const item = savedFromNodes.results[0] as Subject;
-    expect(item.origin?.space).toBe('nodes');
+    const item = savedFromNodes.results[0] as { id: string; versionId?: string };
+    expect(useStore.getState().library.find((x) => x.id === item.id)?.origin?.space).toBe('nodes');
 
     // Serialize & reload #1
     const r1 = JSON.parse(JSON.stringify({ library: useStore.getState().library, sessions: useStore.getState().sessions, assets: useStore.getState().assets })) as { library: Subject[]; sessions: ReturnType<typeof useStore.getState>['sessions']; assets: Record<string, Asset> };

@@ -314,11 +314,11 @@ describe('Contract 5 (engine) & 6: kits out of sends + library.item.* commands +
 
     const saved = await run({ cmd: 'library.item.save', on: { session: s.id, doc: studioDoc.id }, args: { id: createdKit.id, mode: 'overwrite', space: 'studio', label: 'v1' } }, { caller: 'agent' });
     expect(saved.ok).toBe(true);
-    const v1Id = (saved.results[0] as Subject).versionId!;
+    const v1Id = (saved.results[0] as { id: string; versionId: string }).versionId;
 
     const brandRes = await run({ cmd: 'library.item.create', args: { name: 'MasterKit', kind: 'brand-kit', space: 'library', kits: [createdKit.id] } }, { caller: 'agent' });
     expect(brandRes.ok).toBe(true);
-    const brandId = (brandRes.results[0] as { subject: Subject }).subject.id;
+    const brandId = (brandRes.results[0] as { id: string }).id;
     expect(await run({ cmd: 'library.item.save', args: { id: createdKit.id, mode: 'overwrite', kits: [brandId] } }, { caller: 'agent' })).toMatchObject({ ok: false });
 
     const blankOpen = await run({ cmd: 'library.item.open', on: { session: s.id }, args: { id: brandId, space: 'designer' } }, { caller: 'agent' });

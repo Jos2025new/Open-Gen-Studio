@@ -57,12 +57,12 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
     // Real origin.space for studio, designer, library
     const cStudio = await run({ cmd: 'library.item.create', on: { session: sid }, args: { name: 'StudioDS', kind: 'design-system', space: 'studio', tokens: { 'color.main': { type: 'color', value: '#2255ff' } } } }, { caller: 'agent' });
     expect(cStudio.ok, JSON.stringify(cStudio)).toBe(true);
-    const ds = (cStudio.results[0] as { subject: Subject }).subject;
+    const ds = useStore.getState().library.find((x) => x.id === (cStudio.results[0] as { id: string }).id)!;
     expect(ds.origin?.space).toBe('studio');
 
     const cDesigner = await run({ cmd: 'library.item.create', on: { session: sid }, args: { name: 'DesignerMB', kind: 'moodboard', space: 'designer' } }, { caller: 'agent' });
     expect(cDesigner.ok).toBe(true);
-    expect((cDesigner.results[0] as { subject: Subject }).subject.origin?.space).toBe('designer');
+    expect(useStore.getState().library.find((x) => x.id === (cDesigner.results[0] as { id: string }).id)?.origin?.space).toBe('designer');
 
     const cBrand = await run({
       cmd: 'library.item.create',
@@ -81,7 +81,7 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
       },
     }, { caller: 'agent' });
     expect(cBrand.ok, JSON.stringify(cBrand)).toBe(true);
-    const brand = (cBrand.results[0] as { subject: Subject }).subject;
+    const brand = useStore.getState().library.find((x) => x.id === (cBrand.results[0] as { id: string }).id)!;
     expect(brand.origin?.space).toBe('library');
 
     // Pure plain-text index via library.item.read (no snapshot, no raw graph, no blobs)

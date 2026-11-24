@@ -223,7 +223,7 @@ describe('Full-cycle test (commands + bytes + serialized reload midway)', () => 
     expect(await blobBytes(hoisted.blobs.get(`raster:${d1v1.layers.find((l) => l.name === 'LogoPx')!.id}`))).toEqual(pxV1);
 
     const copyRes = await run({ cmd: 'library.item.save', on: { session: s1.id }, args: { id: kit.id, mode: 'copy', name: 'CycleBrand Copy', space: 'designer' } }, { caller: 'agent' });
-    const copyKit = copyRes.results[0] as Subject;
+    const copyKit = copyRes.results[0] as { id: string; versionId?: string };
     expect((await run({ cmd: 'library.item.delete', args: { id: kit.id } }, { caller: 'agent' })).ok).toBe(true);
 
     expect((await runCommandsTool(s2.id, { seq: [{ cmd: 'library.item.open', args: { id: copyKit.id, space: 'designer' } }] })).done).toBe(true);
