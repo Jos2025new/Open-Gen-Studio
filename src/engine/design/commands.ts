@@ -4,7 +4,7 @@ import { useStore } from '../../store/store';
 import type { Layer } from '../types';
 import * as A from './actions';
 import { docCommand, docOf, hasTarget, layerRef } from './commandKit';
-import { shapeBox, unionBox } from './doc';
+import { approxLayerBox } from './doc';
 import { EXPORT_FORMATS } from './exportSettings';
 import { groupLayers, liveGroups, patchGroup, ungroup } from './groups';
 import { canRedo, canUndo } from './history';
@@ -14,16 +14,12 @@ import { canRedo, canUndo } from './history';
 const none = z.object({}).strict();
 const side = z.number().int().min(1).max(16384);
 const groupName = z.string().trim().min(1).max(80);
-const layerBoxBrief = (l: Layer) =>
-  l.type === 'raster' ? { x: l.x, y: l.y, w: l.width, h: l.height }
-    : l.type === 'text' ? { x: l.x, y: l.y, w: l.width, h: Math.round(l.fontSize * l.lineHeight) }
-      : l.type === 'vector' ? unionBox(l.shapes.map(shapeBox)) : null;
 const layerColor = (l: Layer) =>
   l.type === 'text' ? l.color
     : l.type === 'vector' ? (l.shapes.find((s) => s.fill)?.fill ?? l.shapes.find((s) => s.stroke)?.stroke)
       : l.type === 'raster' ? l.pageFill?.color : undefined;
 const brief = (l: Layer) => {
-  const box = layerBoxBrief(l), color = layerColor(l);
+  const box = approxLayerBox(l), color = layerColor(l);
   return {
     id: l.id, name: l.name, type: l.type, visible: l.visible, locked: l.locked, opacity: l.opacity, blend: l.blend,
     ...(l.groupId ? { group: l.groupId } : {}), ...(box ? { box } : {}),

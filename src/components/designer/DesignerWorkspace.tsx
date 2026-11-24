@@ -28,7 +28,7 @@ import { LayersPanel } from './LayersPanel';
 
 export function DesignerWorkspace() {
   const session = useStore((s) => s.sessions[s.activeSessionId]);
-  const visibleDocs = session.docs.filter((d) => d.library?.view !== 'studio');
+  const visibleDocs = session.docs.filter((d) => d.view !== 'studio' && d.library?.view !== 'studio');
   const doc = visibleDocs.find((d) => d.id === session.activeDocId) ?? visibleDocs[0];
   const presets = usePopover();
   const exportMenu = usePopover();

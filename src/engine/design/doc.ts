@@ -197,6 +197,14 @@ export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay:
   return { ...layer, x: fx(layer.x), y: fy(layer.y), width: layer.width > 0 ? Math.max(20, layer.width * sx) : 0, fontSize: Math.max(4, layer.fontSize * k) };
 }
 
+/** Approximate layer bounding box without canvas measurement or masks (shared by Designer read and component insert). */
+export function approxLayerBox(l: Layer): Box | null {
+  if (l.type === 'raster') return { x: l.x, y: l.y, w: l.width, h: l.height };
+  if (l.type === 'text') return { x: l.x, y: l.y, w: l.width, h: Math.round(l.fontSize * l.lineHeight) };
+  if (l.type === 'vector') return unionBox(l.shapes.map(shapeBox));
+  return null;
+}
+
 /** Fit an image of w×h into the doc: 'cover' fills, 'contain' fits inside, both centered. */
 export function fitRect(docW: number, docH: number, w: number, h: number, mode: 'cover' | 'contain'): { x: number; y: number; width: number; height: number } {
   const s = mode === 'cover' ? Math.max(docW / w, docH / h) : Math.min(docW / w, docH / h);

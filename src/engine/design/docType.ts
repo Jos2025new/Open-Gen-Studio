@@ -14,8 +14,10 @@ export interface DesignDoc {
   /** Guides dragged from the rulers, in page units: vertical lines at x, horizontal lines at y. */
   guides?: { x: number[]; y: number[] };
   activeLayerId: string | null;
-  /** Working-copy link to a Library kit entry (`view: 'studio'` hides it from the full Designer). */
+  /** Working-copy link to a Library entry (`view: 'studio'` hides it from the full Designer). */
   library?: { subjectId: string; versionId: string; docRev?: string; view?: 'studio' };
+  /** Preserved when a Studio-only working doc is detached so it stays hidden from the full Designer. */
+  view?: 'studio';
   lastExport?: RememberedExport;
   createdAt: number;
   updatedAt: number;

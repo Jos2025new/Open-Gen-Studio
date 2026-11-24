@@ -1,10 +1,10 @@
 import { useStore } from '../store/store';
 import { bufferVersion, rasterBufferIds } from './design/raster';
 import { isKit, type LibrarySpace } from './libraryTypes';
-import { isWorkingCopyDirty, saveKit } from './libraryVersions';
+import { saveItem } from './libraryVersions';
 import type { DesignDoc } from './types';
 
-/* Auto-version draft Library kits at the single end-of-turn point without blocking or breaking the turn. */
+/* Auto-version draft Library items at the single end-of-turn point using turn baseline (doc ref + raster revs). */
 export interface DraftTurnBaseline { kitIds: Set<string>; docs: Map<string, { doc: DesignDoc; revs: Map<string, number> }>; }
 const rasterRevs = (doc: DesignDoc) => new Map(rasterBufferIds(doc.layers).map((id) => [id, bufferVersion(id)]));
 const revsChanged = (a: Map<string, number>, b: Map<string, number>) => a.size !== b.size || [...a].some(([k, v]) => b.get(k) !== v);
@@ -20,10 +20,10 @@ export async function autoVersionDraftKits(sessionId: string, baseline: DraftTur
   if (!session) return;
   for (const kit of st.library.filter((s) => isKit(s) && s.draft)) {
     const workDoc = session.docs.find((d) => d.library?.subjectId === kit.id), prev = baseline.docs.get(kit.id);
-    const created = !baseline.kitIds.has(kit.id) && kit.origin?.by === 'agent' && (!kit.origin.sessionId || kit.origin.sessionId === sessionId);
+    const created = !baseline.kitIds.has(kit.id) && kit.origin?.by === 'agent' && (!kit.origin.sessionId || kit.origin.sessionId === sessionId) && !kit.versionId;
     const changed = Boolean(workDoc && (!prev || prev.doc !== workDoc || revsChanged(prev.revs, rasterRevs(workDoc))));
-    if ((!created && !changed) || !(workDoc ? (!kit.versionId || await isWorkingCopyDirty(workDoc)) : (created && !kit.versionId))) continue;
-    try { await saveKit({ subjectId: kit.id, mode: 'overwrite', space, by: 'agent', sessionId, ...(workDoc ? { docId: workDoc.id } : {}) }); }
+    if (!created && !changed) continue;
+    try { await saveItem({ subjectId: kit.id, mode: 'overwrite', space, by: 'agent', sessionId, ...(workDoc ? { docId: workDoc.id } : {}) }); }
     catch (err) { onError(kit.name, err instanceof Error ? err.message : String(err)); }
   }
 }

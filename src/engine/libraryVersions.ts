@@ -1,19 +1,18 @@
 import { uid } from '../lib/id';
 import { blobDb } from '../lib/idb';
 import { setDoc, useStore } from '../store/store';
-import { addDoc, deleteDoc, getDoc, selectDoc } from './design/actions';
+import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
-import { flushRaster, isUnreadable, pendingRaster, rasterBufferIds } from './design/raster';
+import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
 import { validateTokens } from './libraryTokens';
-import { isKit, type KitActor, type KitKind, type KitLink, type KitPiece, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
-import type { DesignDoc, Layer, Subject } from './types';
+import { isKit, KIT_KINDS, type KitActor, type KitKind, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
+import type { DesignDoc, Graph, Layer, Subject } from './types';
 
-/* Immutable versioned snapshots (`libver:<id>`) and pixel-safe open/save/restore/delete for Library kits. */
-
+/* Immutable versioned snapshots (`libver:<id>`) and pixel-safe open/save/restore/delete for Library items. */
 export interface KitVersionSnapshot {
   id: string; subjectId: string; at: number; by: KitActor; space: LibrarySpace;
-  label?: string; pieces: KitPiece[]; links: KitLink[]; tokens?: KitTokens; doc?: DesignDoc;
+  label?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc;
   docRev?: string; storedRasterIds?: string[];
 }
 
@@ -23,6 +22,11 @@ const vKey = (id: string) => `libver:${id}`;
 const queues = new Map<string, Promise<void>>();
 export const cleanupKeys = (keys: readonly string[]) => (keys.length ? blobDb.delMany([...new Set(keys)]).catch(() => undefined) : Promise.resolve());
 
+async function withCleanup<T>(fn: (written: string[]) => Promise<T>): Promise<T> {
+  const written: string[] = [];
+  try { return await fn(written); } catch (err) { await cleanupKeys(written); throw err; }
+}
+
 function serialize<T>(id: string, fn: () => Promise<T>): Promise<T> {
   const next = (queues.get(id) ?? Promise.resolve()).then(fn);
   const tail = next.then(() => undefined, () => undefined);
@@ -30,7 +34,6 @@ function serialize<T>(id: string, fn: () => Promise<T>): Promise<T> {
   void tail.then(() => { if (queues.get(id) === tail) queues.delete(id); });
   return next;
 }
-
 export async function waitKitQueue(id: string): Promise<void> { await queues.get(id); }
 
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
@@ -44,9 +47,7 @@ async function writeVerified(key: string, blob: Blob, expected: Uint8Array, writ
   written.push(key);
   await blobDb.set(key, blob);
   const check = await blobDb.get(key);
-  if (!check || !sameBytes(expected, new Uint8Array(await check.arrayBuffer()))) {
-    throw new Error(`Could not verify saved blob "${key}" (writer lock missing or storage error).`);
-  }
+  if (!check || !sameBytes(expected, new Uint8Array(await check.arrayBuffer()))) throw new Error(`Could not verify saved blob "${key}" (writer lock missing or storage error).`);
 }
 
 export async function readKitVersion(versionId: string): Promise<KitVersionSnapshot | null> {
@@ -56,46 +57,25 @@ export async function readKitVersion(versionId: string): Promise<KitVersionSnaps
   catch { throw new Error(`Version "${versionId}" blob is unreadable.`); }
 }
 
-function paintBaseIdsOf(layers: readonly Layer[]): Set<string> {
-  const bases = new Set<string>();
-  for (const l of layers) {
-    if (l.type === 'raster' && l.paintBaseId) bases.add(l.paintBaseId);
-    else if (l.type === 'vector' && l.pixelMask?.paintBaseId) bases.add(l.pixelMask.paintBaseId);
-  }
-  return bases;
-}
-
-function rasterRevMap(layers: readonly Layer[]): Map<string, number> {
-  const revs = new Map<string, number>();
-  for (const l of layers) {
-    if (l.type === 'raster') revs.set(l.id, l.rev);
-    else if (l.type === 'vector' && l.pixelMask) revs.set(l.pixelMask.id, l.pixelMask.rev);
-  }
-  return revs;
-}
+const paintBaseIdsOf = (layers: readonly Layer[]) => new Set(layers.flatMap((l) => (l.type === 'raster' && l.paintBaseId ? [l.paintBaseId] : l.type === 'vector' && l.pixelMask?.paintBaseId ? [l.pixelMask.paintBaseId] : [])));
+const rasterRevMap = (layers: readonly Layer[]) => new Map(layers.flatMap((l): Array<[string, number]> => (l.type === 'raster' ? [[l.id, l.rev]] : l.type === 'vector' && l.pixelMask ? [[l.pixelMask.id, l.pixelMask.rev]] : [])));
+const docGroupIds = (doc?: DesignDoc) => doc ? (doc.groups ?? []).filter((g) => doc.layers.some((l) => l.groupId === g.id)).map((g) => g.id) : undefined;
+const hasGraph = (g?: Graph) => Boolean(g && (g.nodes.length || g.edges.length || g.groups?.length));
 
 export function expectedRasterIds(snap: KitVersionSnapshot): Set<string> {
   if (!snap.doc) return new Set();
-  const baseIds = paintBaseIdsOf(snap.doc.layers);
-  return snap.storedRasterIds !== undefined ? new Set([...snap.storedRasterIds, ...baseIds]) : new Set(rasterBufferIds(snap.doc.layers));
+  return snap.storedRasterIds !== undefined ? new Set([...snap.storedRasterIds, ...paintBaseIdsOf(snap.doc.layers)]) : new Set(rasterBufferIds(snap.doc.layers));
 }
 
 function remapDoc(doc: DesignDoc, map: ReadonlyMap<string, string>, opts: { newDocId: boolean; library?: DesignDoc['library'] }): DesignDoc {
-  const { library: _drop, ...rest } = structuredClone(doc);
+  const { library: _drop, view: _view, ...rest } = structuredClone(doc);
   const remap = (id: string) => map.get(id) ?? id;
-  const layers: Layer[] = rest.layers.map((l) => {
-    if (l.type === 'raster') return { ...l, id: remap(l.id), ...(l.paintBaseId ? { paintBaseId: remap(l.paintBaseId) } : {}) };
-    if (l.type === 'vector' && l.pixelMask) {
-      const m = l.pixelMask;
-      return { ...l, pixelMask: { ...m, id: remap(m.id), ...(m.paintBaseId ? { paintBaseId: remap(m.paintBaseId) } : {}) } };
-    }
-    return l;
-  });
-  const groups = rest.groups?.map((g) => ({
-    ...g,
-    ...(g.keptHidden ? { keptHidden: g.keptHidden.map(remap) } : {}),
-    ...(g.keptLocked ? { keptLocked: g.keptLocked.map(remap) } : {}),
-  }));
+  const layers: Layer[] = rest.layers.map((l) =>
+    l.type === 'raster' ? { ...l, id: remap(l.id), ...(l.paintBaseId ? { paintBaseId: remap(l.paintBaseId) } : {}) }
+      : l.type === 'vector' && l.pixelMask ? { ...l, pixelMask: { ...l.pixelMask, id: remap(l.pixelMask.id), ...(l.pixelMask.paintBaseId ? { paintBaseId: remap(l.pixelMask.paintBaseId) } : {}) } }
+        : l,
+  );
+  const groups = rest.groups?.map((g) => ({ ...g, ...(g.keptHidden ? { keptHidden: g.keptHidden.map(remap) } : {}), ...(g.keptLocked ? { keptLocked: g.keptLocked.map(remap) } : {}) }));
   return { ...rest, ...(groups ? { groups } : {}), id: opts.newDocId ? uid('doc') : rest.id, layers, activeLayerId: rest.activeLayerId ? remap(rest.activeLayerId) : null, ...(opts.library ? { library: opts.library } : {}) };
 }
 
@@ -103,18 +83,12 @@ export async function copyDocPixels(doc: DesignDoc, reuseFrom: DesignDoc | null 
   const ids = rasterBufferIds(doc.layers), baseIds = paintBaseIdsOf(doc.layers), revMap = rasterRevMap(doc.layers);
   for (const id of ids) if (isUnreadable(id)) throw new Error(`Cannot save: layer pixels "${id}" are unreadable.`);
   const prevEntries: Array<[string, Uint8Array]> = [];
-  if (reuseFrom) {
-    for (const pid of rasterBufferIds(reuseFrom.layers)) {
-      const b = await blobDb.get(rKey(pid));
-      if (b) prevEntries.push([pid, new Uint8Array(await b.arrayBuffer())]);
-    }
-  }
+  if (reuseFrom) for (const pid of rasterBufferIds(reuseFrom.layers)) { const b = await blobDb.get(rKey(pid)); if (b) prevEntries.push([pid, new Uint8Array(await b.arrayBuffer())]); }
   const usedPrev = new Set<string>(), map = new Map<string, string>(), storedIds: string[] = [];
   for (const id of ids) {
     const src = await blobDb.get(rKey(id));
     if (!src) {
-      const mustExist = baseIds.has(id) || (expectedIds ? expectedIds.has(id) : (revMap.get(id) ?? 0) > 0);
-      if (mustExist) throw new Error(`Missing expected pixel blob "${rKey(id)}".`);
+      if (baseIds.has(id) || (expectedIds ? expectedIds.has(id) : (revMap.get(id) ?? 0) > 0)) throw new Error(`Missing expected pixel blob "${rKey(id)}".`);
       map.set(id, uid('lyr'));
       continue;
     }
@@ -124,383 +98,221 @@ export async function copyDocPixels(doc: DesignDoc, reuseFrom: DesignDoc | null 
     else {
       const nextId = uid('lyr');
       await writeVerified(rKey(nextId), new Blob([bytes], { type: src.type || 'image/png' }), bytes, written);
-      map.set(id, nextId);
-      storedIds.push(nextId);
+      map.set(id, nextId); storedIds.push(nextId);
     }
   }
   return { map, storedIds };
 }
 
-function validatePieces(pieces: readonly KitPiece[], checkAssets: boolean): void {
-  const assets = get().assets;
-  for (const p of pieces) {
-    if (p.kind === 'asset') {
-      if (!p.assetId?.trim()) throw new Error(`Piece "${p.id}" of kind "asset" requires assetId.`);
-      if (checkAssets && !assets[p.assetId]) throw new Error(`Piece "${p.id}" references missing asset "${p.assetId}".`);
-    } else if (p.kind === 'text') {
-      if (!p.text?.trim()) throw new Error(`Piece "${p.id}" of kind "text" requires text.`);
-    } else if (p.kind === 'color') {
-      if (!p.color?.trim()) throw new Error(`Piece "${p.id}" of kind "color" requires color.`);
-    } else if (p.kind === 'kit') {
-      if (!p.kitId?.trim()) throw new Error(`Piece "${p.id}" of kind "kit" requires kitId.`);
-    } else if (p.kind === 'component') {
-      if (!p.groupId?.trim()) throw new Error(`Piece "${p.id}" of kind "component" requires groupId.`);
-      if (!p.name?.trim()) throw new Error(`Piece "${p.id}" of kind "component" requires name.`);
-    } else if (p.kind === 'style') {
-      if (p.styleType !== 'text' && p.styleType !== 'color') throw new Error(`Piece "${p.id}" of kind "style" requires styleType ("text" or "color").`);
-      if (!p.values || !Object.keys(p.values).length) throw new Error(`Piece "${p.id}" of kind "style" requires non-empty values.`);
-    }
+function validateContent(kind: KitKind, subjectId: string, opts: { graph?: Graph; kits?: string[]; tokens?: KitTokens; checkAssets: boolean }): void {
+  const spec = KIT_KINDS[kind];
+  if (opts.tokens && Object.keys(opts.tokens).length) { if (!spec.tokens) throw new Error(`Kind "${kind}" does not support tokens.`); validateTokens(opts.tokens); }
+  if (opts.kits?.length) {
+    if (!spec.kits) throw new Error(`Kind "${kind}" cannot contain other kits.`);
+    const cycle = wouldCreateKitCycle(get().library, subjectId, opts.kits);
+    if (!cycle.ok) throw new Error(cycle.reason);
   }
+  if (!opts.graph) return;
+  const assets = get().assets, nodeIds = new Set(opts.graph.nodes.map((n) => n.id));
+  for (const n of opts.graph.nodes) {
+    const d = n.data;
+    if (d.kind === 'asset') {
+      if (!d.assetId?.trim()) throw new Error(`Asset node "${n.id}" requires assetId.`);
+      if (opts.checkAssets && !assets[d.assetId]) throw new Error(`Node "${n.id}" references missing asset "${d.assetId}".`);
+    } else if (d.kind === 'text') {
+      if (!d.text.trim()) throw new Error(`Text node "${n.id}" requires text.`);
+    } else if (d.kind === 'part') {
+      if (!(spec.parts as readonly string[]).includes(d.partKind)) throw new Error(`Kind "${kind}" does not support part "${d.partKind}".`);
+      if (d.partKind === 'color' && !d.color?.trim()) throw new Error(`Color part "${n.id}" requires color.`);
+      if (d.partKind === 'component' && (!d.groupId?.trim() || !d.title.trim())) throw new Error(`Component part "${n.id}" requires groupId and title.`);
+      if (d.partKind === 'style' && ((d.styleType !== 'text' && d.styleType !== 'color') || !d.values || !Object.keys(d.values).length)) throw new Error(`Style part "${n.id}" requires styleType and values.`);
+    } else throw new Error(`Unsupported Library graph node kind "${d.kind}".`);
+  }
+  for (const e of opts.graph.edges) if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) throw new Error(`Edge "${e.id}" references a missing node.`);
 }
 
-function validateGraph(subjectId: string, pieces: readonly KitPiece[], links: readonly KitLink[], checkAssets: boolean, tokens?: KitTokens): void {
-  validatePieces(pieces, checkAssets);
-  if (tokens) validateTokens(tokens);
-  const cycle = wouldCreateKitCycle(get().library, subjectId, pieces);
-  if (!cycle.ok) throw new Error(cycle.reason);
-  const pieceIds = new Set(pieces.map((p) => p.id));
-  const hasEndpoint = (ref: string) => pieceIds.has(ref) || Boolean(tokens && (Object.prototype.hasOwnProperty.call(tokens, ref) || (ref.startsWith('token:') && Object.prototype.hasOwnProperty.call(tokens, ref.slice(6)))));
-  for (const l of links) if (!hasEndpoint(l.from) || !hasEndpoint(l.to)) throw new Error(`Link "${l.id}" references a missing piece or token id.`);
-}
+const snapshotAssets = (subject: Pick<Subject, 'frontalAssetId' | 'refAssetIds' | 'videoAssetId'>, graph?: Graph, doc?: DesignDoc) =>
+  [...new Set([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId, ...(graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined)), ...(doc?.layers ?? []).map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined))].filter((x): x is string => Boolean(x)))];
 
-function docGroupIds(doc?: DesignDoc): string[] | undefined {
-  return doc ? (doc.groups ?? []).filter((g) => doc.layers.some((l) => l.groupId === g.id)).map((g) => g.id) : undefined;
-}
-
-function snapshotAssets(subject: Subject, pieces: readonly KitPiece[], doc?: DesignDoc): string[] {
-  const docAssets = (doc?.layers ?? []).map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined));
-  const pieceAssets = pieces.map((p) => (p.kind === 'asset' ? p.assetId : undefined));
-  return [...new Set([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId, ...pieceAssets, ...docAssets].filter((x): x is string => Boolean(x)))];
-}
-
-function requireKit(id: string): Subject {
+function requireItem(id: string): Subject {
   const entry = get().library.find((s) => s.id === id);
-  if (!entry || !isKit(entry)) throw new Error(`No kit "${id}".`);
+  if (!entry || !isKit(entry)) throw new Error(`No Library item "${id}".`);
   return entry;
 }
 
-async function writeSnapshot(snap: KitVersionSnapshot, written: string[]): Promise<void> {
+const detachedName = (name: string) => (name.endsWith(' (local copy)') ? name : `${name} (local copy)`);
+const detachWorkingDoc = (sessionId: string, docId: string) => setDoc(sessionId, docId, (d) => { const { library, ...rest } = d; return { ...rest, ...(library?.view === 'studio' ? { view: 'studio' as const } : {}), name: detachedName(d.name) }; });
+const linkedBlankDoc = (name: string, subjectId: string, versionId: string, docRev?: string, view?: 'studio'): DesignDoc =>
+  ({ ...D.createDoc(name, 1080, 1080, null), library: { subjectId, versionId, ...(docRev ? { docRev } : {}), ...(view ? { view } : {}) } });
+
+function optionalFields(c: { description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; docRev?: string; groupIds?: string[] }) {
+  const graph = hasGraph(c.graph) ? c.graph : undefined, kits = c.kits?.length ? [...new Set(c.kits)] : undefined, tokens = c.tokens && Object.keys(c.tokens).length ? c.tokens : undefined;
+  return { ...(c.description ? { description: c.description } : {}), ...(graph ? { graph } : {}), ...(kits ? { kits } : {}), ...(tokens ? { tokens } : {}), ...(c.docRev ? { docRev: c.docRev } : {}), ...(c.groupIds?.length ? { groupIds: c.groupIds } : {}) };
+}
+
+/** Single verified version writer shared by create, save, and restore: writes blob, re-reads live store, cleans up on error. */
+async function commitVersion(
+  entry: Subject,
+  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean },
+  written: string[],
+): Promise<Subject> {
+  const verId = uid('lv'), groupIds = docGroupIds(c.doc), fields = optionalFields({ description: c.description, graph: c.graph, kits: c.kits, tokens: c.tokens, docRev: c.docRev, groupIds });
+  const snap: KitVersionSnapshot = { id: verId, subjectId: entry.id, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), ...(fields.graph ? { graph: fields.graph } : {}), ...(fields.kits ? { kits: fields.kits } : {}), ...(fields.tokens ? { tokens: fields.tokens } : {}), ...(c.doc ? { doc: c.doc, ...(c.docRev ? { docRev: c.docRev } : {}), ...(c.storedRasterIds ? { storedRasterIds: c.storedRasterIds } : {}) } : {}) };
   const encoded = new TextEncoder().encode(JSON.stringify(snap));
-  await writeVerified(vKey(snap.id), new Blob([encoded], { type: 'application/json' }), encoded, written);
-}
-
-function canonicalJson(v: unknown): string {
-  if (v === null || typeof v !== 'object') return JSON.stringify(v);
-  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
-  const entries = Object.entries(v as Record<string, unknown>).filter(([, val]) => val !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `{${entries.map(([k, val]) => `${JSON.stringify(k)}:${canonicalJson(val)}`).join(',')}}`;
-}
-
-function docFingerprint(doc: DesignDoc): { json: string; pixelIds: string[] } {
-  const map = new Map<string, string>(), pixelIds: string[] = [];
-  doc.layers.forEach((l, i) => {
-    if (l.type === 'raster') {
-      map.set(l.id, `@r${i}`); pixelIds.push(l.id);
-      if (l.paintBaseId) { map.set(l.paintBaseId, `@b${i}`); pixelIds.push(l.paintBaseId); }
-    } else if (l.type === 'vector' && l.pixelMask) {
-      map.set(l.pixelMask.id, `@m${i}`); pixelIds.push(l.pixelMask.id);
-      if (l.pixelMask.paintBaseId) { map.set(l.pixelMask.paintBaseId, `@mb${i}`); pixelIds.push(l.pixelMask.paintBaseId); }
-    }
+  await writeVerified(vKey(verId), new Blob([encoded], { type: 'application/json' }), encoded, written);
+  const ref: KitVersionRef = { id: verId, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), assetIds: snapshotAssets(entry, fields.graph, c.doc), ...(c.docRev ? { docRev: c.docRev } : {}), ...(groupIds?.length ? { groupIds } : {}) };
+  if (c.mode === 'create') {
+    const created: Subject = { ...entry, ...fields, versionId: verId, versions: [ref] };
+    useStore.setState((st) => ({ library: [...st.library, created] }));
+    return created;
+  }
+  let updated: Subject | null = null;
+  useStore.setState((st) => {
+    const live = st.library.find((x) => x.id === entry.id);
+    if (!live || !isKit(live)) return {};
+    const { graph: _g, kits: _k, tokens: _t, docRev: _dr, groupIds: _gi, description: _d, ...base } = live;
+    updated = { ...base, name: c.name ?? live.name, ...optionalFields({ ...fields, description: c.description !== undefined ? c.description : live.description }), draft: c.clearsDraft ? false : live.draft, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin };
+    return { library: st.library.map((x) => (x.id === entry.id ? updated! : x)) };
   });
-  const norm = remapDoc(doc, map, { newDocId: false });
-  const { id: _i, createdAt: _c, updatedAt: _u, library: _l, lastExport: _e, activeLayerId: _a, groups, guides, ...rest } = norm;
-  const clean = {
-    ...rest,
-    ...(groups?.length ? { groups } : {}),
-    ...(guides && (guides.x.length || guides.y.length) ? { guides } : {}),
-  };
-  return { json: canonicalJson(clean), pixelIds };
+  if (!updated) throw new Error(`Library item "${entry.id}" was deleted while saving.`);
+  return updated;
 }
 
-async function sameDocContent(workDoc: DesignDoc, baseDoc: DesignDoc, baseSnap: KitVersionSnapshot): Promise<boolean> {
-  const a = docFingerprint(workDoc), b = docFingerprint(baseDoc);
-  if (a.json !== b.json || a.pixelIds.length !== b.pixelIds.length) return false;
-  const expected = expectedRasterIds(baseSnap);
-  for (let i = 0; i < a.pixelIds.length; i++) {
-    const wId = a.pixelIds[i], bId = b.pixelIds[i];
-    const [wBlob, bBlob] = await Promise.all([blobDb.get(rKey(wId)), blobDb.get(rKey(bId))]);
-    if (expected.has(bId) && !bBlob) return false;
-    if (!wBlob && !bBlob) continue;
-    if (!wBlob || !bBlob) return false;
-    if (!sameBytes(new Uint8Array(await wBlob.arrayBuffer()), new Uint8Array(await bBlob.arrayBuffer()))) return false;
-  }
-  return true;
-}
-
-function isBlankWorkingDoc(doc: DesignDoc, expectedName?: string): boolean {
-  return doc.layers.length === 0 && !(doc.groups?.length) && !(doc.guides && (doc.guides.x.length || doc.guides.y.length))
-    && doc.background === null && doc.width === 1080 && doc.height === 1080
-    && (expectedName === undefined || doc.name === expectedName);
-}
-
-export async function isWorkingCopyDirty(doc: DesignDoc): Promise<boolean> {
-  if (!doc.library) return true;
-  const pending = new Set(pendingRaster());
-  for (const rid of rasterBufferIds(doc.layers)) if (pending.has(rid) || isUnreadable(rid)) return true;
-  const sub = get().library.find((s) => s.id === doc.library!.subjectId);
-  if (!doc.library.versionId) return !isBlankWorkingDoc(doc, sub?.name);
-  try {
-    const snap = await readKitVersion(doc.library.versionId);
-    if (!snap) return true;
-    if (!snap.doc) return !isBlankWorkingDoc(doc, sub?.name);
-    return !(await sameDocContent(doc, snap.doc, snap));
-  } catch {
-    return true;
-  }
-}
-
-const detachedName = (name: string): string => (name.endsWith(' (local copy)') ? name : `${name} (local copy)`);
-
-async function reconcileWorkingDoc(sessionId: string, doc: DesignDoc): Promise<void> {
-  if (!(await isWorkingCopyDirty(doc))) deleteDoc(sessionId, doc.id);
-  else setDoc(sessionId, doc.id, (d) => { const { library: _drop, ...rest } = d; return { ...rest, name: detachedName(d.name) }; });
-}
-
-function linkedBlankDoc(name: string, subjectId: string, versionId: string, docRev?: string, view?: 'studio'): DesignDoc {
-  return { ...D.createDoc(name, 1080, 1080, null), library: { subjectId, versionId, ...(docRev ? { docRev } : {}), ...(view ? { view } : {}) } };
-}
-
-export async function createKit(opts: {
-  name: string; kind: KitKind; space: LibrarySpace; by: KitActor;
-  sessionId?: string; description?: string; from?: string[];
-  pieces?: KitPiece[]; links?: KitLink[]; tokens?: KitTokens; draft?: boolean;
+export async function createItem(opts: {
+  name: string; kind: KitKind; space: LibrarySpace; by: KitActor; sessionId?: string;
+  description?: string; from?: string[]; graph?: Graph; kits?: string[]; tokens?: KitTokens; draft?: boolean;
 }): Promise<{ subject: Subject; doc?: DesignDoc }> {
   const name = opts.name.trim();
-  if (!name) throw new Error('Kit name is required.');
-  const id = uid('sub'), pieces = opts.pieces ?? [], links = opts.links ?? [];
-  validateGraph(id, pieces, links, true, opts.tokens);
-  const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
+  if (!name) throw new Error('Item name is required.');
+  const id = uid('sub'), session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
   if (opts.sessionId && !session) throw new Error(`No session "${opts.sessionId}".`);
+  validateContent(opts.kind, id, { graph: opts.graph, kits: opts.kits, tokens: opts.tokens, checkAssets: true });
   const draft = opts.draft ?? (opts.space === 'studio' && Boolean(session)), at = Date.now();
-  const baseSubject: Subject = {
-    id, name, kind: opts.kind, refAssetIds: [], pieces, links, versions: [],
-    ...(opts.description ? { description: opts.description } : {}), ...(opts.tokens ? { tokens: opts.tokens } : {}),
-    draft, origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}), ...(opts.from?.length ? { from: [...opts.from] } : {}) },
-  };
-  let subject = baseSubject;
-  if (!draft) {
-    const written: string[] = [], verId = uid('lv');
-    try {
-      await writeSnapshot({ id: verId, subjectId: id, at, by: opts.by, space: opts.space, pieces, links, ...(opts.tokens ? { tokens: opts.tokens } : {}) }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, assetIds: snapshotAssets(baseSubject, pieces) };
-      subject = { ...baseSubject, versionId: verId, versions: [ref] };
-    } catch (err) {
-      await cleanupKeys(written);
-      throw err;
-    }
-  }
-  useStore.setState((st) => ({ library: [...st.library, subject] }));
-  if (session && opts.space === 'studio') {
-    const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, 'studio');
+  const base: Subject = { id, name, kind: opts.kind, refAssetIds: [], ...optionalFields({ description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens }), draft, origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}), ...(opts.from?.length ? { from: [...opts.from] } : {}) } };
+  const subject = draft
+    ? (useStore.setState((st) => ({ library: [...st.library, base] })), base)
+    : await withCleanup((written) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens }, written));
+  if (session && (opts.space === 'studio' || opts.space === 'designer')) {
+    const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, opts.space === 'studio' ? 'studio' : undefined);
     addDoc(session.id, doc);
     return { subject, doc };
   }
   return { subject };
 }
 
-export async function updateKit(id: string, patch: {
-  name?: string; description?: string; pieces?: KitPiece[]; links?: KitLink[]; tokens?: KitTokens;
-  by?: KitActor; space?: LibrarySpace; label?: string;
-}): Promise<Subject> {
-  const versioned = patch.pieces !== undefined || patch.links !== undefined || patch.tokens !== undefined;
-  const by = patch.by ?? 'user';
-  const clearsDraft = patch.name !== undefined && by === 'user';
-  if (!versioned) {
-    let result: Subject | null = null;
-    useStore.setState((st) => {
-      const cur = st.library.find((x) => x.id === id);
-      if (!cur || !isKit(cur)) return {};
-      const name = patch.name !== undefined ? patch.name.trim() : cur.name;
-      if (!name) throw new Error('Kit name cannot be empty.');
-      result = { ...cur, name, ...(patch.description !== undefined ? { description: patch.description } : {}), draft: clearsDraft ? false : cur.draft, origin: cur.origin };
-      return { library: st.library.map((x) => (x.id === id ? result! : x)) };
-    });
-    if (!result) throw new Error(`No kit "${id}".`);
-    return result;
-  }
-  return serialize(id, async () => {
-    const cur = requireKit(id), pieces = patch.pieces ?? cur.pieces ?? [], links = patch.links ?? cur.links ?? [];
-    const tokens = patch.tokens !== undefined ? patch.tokens : cur.tokens;
+/** Rename or update description without creating a new version; clears `draft` when user names it. */
+export function renameItem(id: string, patch: { name?: string; description?: string; by?: KitActor }): Subject {
+  let result: Subject | null = null;
+  useStore.setState((st) => {
+    const cur = st.library.find((x) => x.id === id);
+    if (!cur || !isKit(cur)) return {};
     const name = patch.name !== undefined ? patch.name.trim() : cur.name;
-    if (!name) throw new Error('Kit name cannot be empty.');
-    validateGraph(id, pieces, links, patch.pieces !== undefined, tokens);
-    const prevSnap = cur.versionId ? await readKitVersion(cur.versionId) : null;
-    if (cur.versionId && !prevSnap) throw new Error(`Cannot update kit "${id}": current version "${cur.versionId}" blob is missing.`);
-    const docRev = prevSnap?.doc ? (prevSnap.docRev ?? cur.docRev) : undefined;
-    const groupIds = docGroupIds(prevSnap?.doc);
-    const written: string[] = [], verId = uid('lv'), at = Date.now(), space = patch.space ?? 'library';
-    try {
-      await writeSnapshot({
-        id: verId, subjectId: id, at, by, space, ...(patch.label ? { label: patch.label } : {}),
-        pieces, links, ...(tokens ? { tokens } : {}),
-        ...(prevSnap?.doc ? { doc: prevSnap.doc, ...(docRev ? { docRev } : {}), ...(prevSnap.storedRasterIds ? { storedRasterIds: prevSnap.storedRasterIds } : {}) } : {}),
-      }, written);
-      const ref: KitVersionRef = { id: verId, at, by, space, ...(patch.label ? { label: patch.label } : {}), assetIds: snapshotAssets(cur, pieces, prevSnap?.doc), ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}) };
-      let next: Subject | null = null;
-      useStore.setState((st) => {
-        const live = st.library.find((x) => x.id === id);
-        if (!live || !isKit(live)) return {};
-        next = {
-          ...live, name: patch.name !== undefined ? name : live.name,
-          ...(patch.description !== undefined ? { description: patch.description } : {}),
-          pieces, links, ...(patch.tokens !== undefined ? { tokens } : {}),
-          draft: clearsDraft ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), ...(groupIds ? { groupIds } : { groupIds: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
-        };
-        return { library: st.library.map((x) => (x.id === id ? next! : x)) };
-      });
-      if (!next) throw new Error(`Kit "${id}" was deleted while updating.`);
-      return next;
-    } catch (err) {
-      await cleanupKeys(written);
-      throw err;
-    }
+    if (!name) throw new Error('Item name cannot be empty.');
+    result = { ...cur, name, ...(patch.description !== undefined ? { description: patch.description } : {}), draft: patch.name !== undefined && (patch.by ?? 'user') === 'user' ? false : cur.draft, origin: cur.origin };
+    return { library: st.library.map((x) => (x.id === id ? result! : x)) };
   });
+  if (!result) throw new Error(`No Library item "${id}".`);
+  return result;
 }
 
-export function openKit(subjectId: string, opts: { sessionId?: string; space: 'studio' | 'designer' }): Promise<DesignDoc> {
+function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'designer'): Promise<DesignDoc> {
   return serialize(subjectId, async () => {
-    const subject = requireKit(subjectId), sessionId = opts.sessionId ?? get().activeSessionId, session = get().sessions[sessionId];
+    const subject = requireItem(subjectId), session = get().sessions[sessionId];
     if (!session) throw new Error(`No session "${sessionId}".`);
     const curVer = subject.versionId ?? '', curDocRev = subject.docRev ?? '', existing = session.docs.find((d) => d.library?.subjectId === subjectId);
     if (existing && (existing.library?.docRev ?? '') === curDocRev) {
-      if (opts.space === 'designer' && existing.library?.view) {
-        setDoc(sessionId, existing.id, (d) => ({ ...d, library: d.library ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.docRev ? { docRev: d.library.docRev } : {}) } : undefined }));
+      if (space === 'designer' && (existing.library?.view || existing.view)) {
+        setDoc(sessionId, existing.id, (d) => { const { view: _v, ...rest } = d; return { ...rest, library: d.library ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.docRev ? { docRev: d.library.docRev } : {}) } : undefined }; });
       }
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;
     }
     const snap = curVer ? await readKitVersion(curVer) : null;
     if (curVer && !snap) throw new Error(`Version "${curVer}" blob is missing.`);
-    const written: string[] = [];
-    try {
+    return withCleanup(async (written) => {
       const docRev = snap?.doc ? (snap.docRev ?? subject.docRev) : undefined;
-      const link: NonNullable<DesignDoc['library']> = { subjectId, versionId: curVer, ...(docRev ? { docRev } : {}), ...(opts.space === 'studio' ? { view: 'studio' as const } : {}) };
+      const link: NonNullable<DesignDoc['library']> = { subjectId, versionId: curVer, ...(docRev ? { docRev } : {}), ...(space === 'studio' ? { view: 'studio' as const } : {}) };
       const doc = snap?.doc
         ? remapDoc(snap.doc, (await copyDocPixels(snap.doc, null, expectedRasterIds(snap), written)).map, { newDocId: true, library: link })
-        : linkedBlankDoc(subject.name, subjectId, curVer, docRev, opts.space === 'studio' ? 'studio' : undefined);
+        : linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined);
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
-      if (liveExisting) await reconcileWorkingDoc(sessionId, liveExisting);
+      if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
       return doc;
-    } catch (err) {
-      await cleanupKeys(written);
-      throw err;
-    }
+    });
   });
 }
 
-export function saveKit(opts: {
+export const libraryToStudio = (sessionId: string, subjectId: string) => openInSpace(sessionId, subjectId, 'studio');
+export const libraryToDesigner = (sessionId: string, subjectId: string) => openInSpace(sessionId, subjectId, 'designer');
+
+export function saveItem(opts: {
   subjectId: string; mode: 'overwrite' | 'copy'; space: LibrarySpace; by: KitActor;
-  sessionId?: string; docId?: string; label?: string; name?: string;
-  pieces?: KitPiece[]; links?: KitLink[]; tokens?: KitTokens;
+  sessionId?: string; docId?: string; label?: string; name?: string; description?: string;
+  graph?: Graph; kits?: string[]; tokens?: KitTokens;
 }): Promise<Subject> {
   return serialize(opts.subjectId, async () => {
-    const cur = requireKit(opts.subjectId), pieces = opts.pieces ?? cur.pieces ?? [], links = opts.links ?? cur.links ?? [];
-    const tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
-    validateGraph(targetId, pieces, links, opts.pieces !== undefined, tokens);
+    const cur = requireItem(opts.subjectId), kind = cur.kind as KitKind, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
+    const graph = opts.graph !== undefined ? opts.graph : cur.graph, kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
+    validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined });
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
     const workDoc = opts.docId ? (opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined) : session?.docs.find((d) => d.library?.subjectId === cur.id);
     if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
     const prevSnap = cur.versionId ? (workDoc ? await readKitVersion(cur.versionId).catch(() => null) : await readKitVersion(cur.versionId)) : null;
-    if (!workDoc && cur.versionId && !prevSnap) throw new Error(`Cannot save kit "${cur.id}": current version "${cur.versionId}" blob is missing.`);
-    const written: string[] = [];
-    try {
+    if (!workDoc && cur.versionId && !prevSnap) throw new Error(`Cannot save "${cur.id}": current version "${cur.versionId}" blob is missing.`);
+    return withCleanup(async (written) => {
       let storedDoc: DesignDoc | undefined, storedRasterIds: string[] | undefined, docRev: string | undefined;
       if (workDoc) {
         await flushRaster();
-        const unchanged = opts.mode === 'overwrite' && Boolean(prevSnap?.doc) && await sameDocContent(workDoc, prevSnap!.doc!, prevSnap!);
         const copied = await copyDocPixels(workDoc, opts.mode === 'overwrite' ? prevSnap?.doc : null, undefined, written);
-        storedDoc = remapDoc(workDoc, copied.map, { newDocId: false });
-        storedRasterIds = copied.storedIds;
-        docRev = unchanged ? (prevSnap!.docRev ?? cur.docRev ?? uid('drev')) : uid('drev');
+        storedDoc = remapDoc(workDoc, copied.map, { newDocId: false }); storedRasterIds = copied.storedIds; docRev = uid('drev');
       } else if (prevSnap?.doc) {
         const expected = expectedRasterIds(prevSnap);
         if (opts.mode === 'overwrite') {
           for (const rid of expected) if (!(await blobDb.get(rKey(rid)))) throw new Error(`Missing expected pixel blob "${rKey(rid)}".`);
-          storedDoc = prevSnap.doc;
-          storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers);
-          docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
+          storedDoc = prevSnap.doc; storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers); docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
         } else {
           const copied = await copyDocPixels(prevSnap.doc, null, expected, written);
-          storedDoc = remapDoc(prevSnap.doc, copied.map, { newDocId: false });
-          storedRasterIds = copied.storedIds;
-          docRev = uid('drev');
+          storedDoc = remapDoc(prevSnap.doc, copied.map, { newDocId: false }); storedRasterIds = copied.storedIds; docRev = uid('drev');
         }
       }
-      const verId = uid('lv'), at = Date.now(), groupIds = docGroupIds(storedDoc);
-      await writeSnapshot({ id: verId, subjectId: targetId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), pieces, links, ...(tokens ? { tokens } : {}), ...(storedDoc ? { doc: storedDoc, ...(docRev ? { docRev } : {}), ...(storedRasterIds ? { storedRasterIds } : {}) } : {}) }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), assetIds: snapshotAssets(cur, pieces, storedDoc), ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}) };
-      let saved: Subject | null = null;
-      useStore.setState((st) => {
-        const live = st.library.find((x) => x.id === cur.id);
-        if (!live || !isKit(live)) return {};
-        if (opts.mode === 'copy') {
-          saved = {
-            id: targetId, name: opts.name?.trim() || `${live.name} copy`, kind: live.kind, refAssetIds: [], pieces, links,
-            ...(live.description ? { description: live.description } : {}), ...(tokens ? { tokens } : {}),
-            copiedFrom: live.id, draft: opts.by === 'user' ? false : Boolean(live.draft), versionId: verId, ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}), versions: [ref],
-            origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) },
-          };
-          return { library: [...st.library, saved] };
-        }
-        saved = {
-          ...live,
-          pieces: opts.pieces !== undefined ? pieces : live.pieces,
-          links: opts.links !== undefined ? links : live.links,
-          ...(opts.tokens !== undefined ? { tokens } : {}),
-          draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), ...(groupIds ? { groupIds } : { groupIds: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
-        };
-        return { library: st.library.map((x) => (x.id === cur.id ? saved! : x)) };
-      });
-      if (!saved) throw new Error(`Kit "${cur.id}" was deleted while saving.`);
+      const at = Date.now();
+      const targetEntry: Subject = opts.mode === 'copy'
+        ? { id: targetId, name: opts.name?.trim() || `${cur.name} copy`, kind, refAssetIds: [], copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }
+        : cur;
+      const saved = await commitVersion(targetEntry, {
+        mode: opts.mode === 'copy' ? 'create' : 'append', at, by: opts.by, space: opts.space, label: opts.label,
+        name: opts.mode === 'overwrite' && opts.name?.trim() ? opts.name.trim() : undefined,
+        description: opts.description !== undefined ? opts.description : (opts.mode === 'copy' ? cur.description : undefined),
+        graph, kits, tokens, doc: storedDoc, docRev, storedRasterIds, clearsDraft: opts.by === 'user',
+      }, written);
       if (opts.mode === 'overwrite' && workDoc && opts.sessionId && workDoc.library?.subjectId === cur.id) {
-        setDoc(opts.sessionId, workDoc.id, (d) => {
-          if (!d.library || d.library.subjectId !== cur.id) return d;
-          return { ...d, library: { ...d.library, versionId: verId, ...(docRev ? { docRev } : {}) } };
-        });
+        setDoc(opts.sessionId, workDoc.id, (d) => d.library?.subjectId === cur.id ? { ...d, library: { ...d.library, versionId: saved.versionId!, ...(docRev ? { docRev } : {}) } } : d);
       }
       return saved;
-    } catch (err) {
-      await cleanupKeys(written);
-      throw err;
-    }
+    });
   });
 }
 
-export function restoreKitVersion(opts: { subjectId: string; versionId: string; space: LibrarySpace; by: KitActor; label?: string }): Promise<Subject> {
+export function restoreItemVersion(opts: { subjectId: string; versionId: string; space: LibrarySpace; by: KitActor; label?: string }): Promise<Subject> {
   return serialize(opts.subjectId, async () => {
-    const cur = requireKit(opts.subjectId), snap = await readKitVersion(opts.versionId);
+    const cur = requireItem(opts.subjectId), snap = await readKitVersion(opts.versionId);
     if (!snap) throw new Error(`Version "${opts.versionId}" blob is missing and cannot be restored.`);
+    if (snap.subjectId !== cur.id) throw new Error(`Version "${opts.versionId}" belongs to another Library entry ("${snap.subjectId}").`);
     if (snap.doc) for (const id of expectedRasterIds(snap)) if (!(await blobDb.get(rKey(id)))) throw new Error(`Cannot restore version "${opts.versionId}": missing pixel blob "${rKey(id)}".`);
-    const docRev = snap.doc ? (snap.docRev ?? uid('drev')) : undefined;
-    const groupIds = docGroupIds(snap.doc);
-    const written: string[] = [], verId = uid('lv'), at = Date.now(), label = opts.label ?? `Restore ${opts.versionId}`;
-    try {
-      await writeSnapshot({ ...snap, id: verId, subjectId: cur.id, at, by: opts.by, space: opts.space, label, ...(docRev ? { docRev } : { docRev: undefined }) }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, label, assetIds: snapshotAssets(cur, snap.pieces, snap.doc), ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}) };
-      let restored: Subject | null = null;
-      useStore.setState((st) => {
-        const live = st.library.find((x) => x.id === cur.id);
-        if (!live || !isKit(live)) return {};
-        restored = { ...live, pieces: snap.pieces, links: snap.links, tokens: snap.tokens, draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), ...(groupIds ? { groupIds } : { groupIds: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin };
-        return { library: st.library.map((x) => (x.id === cur.id ? restored! : x)) };
-      });
-      if (!restored) throw new Error(`Kit "${cur.id}" was deleted while restoring.`);
-      return restored;
-    } catch (err) {
-      await cleanupKeys(written);
-      throw err;
-    }
+    return withCleanup((written) => commitVersion(cur, {
+      mode: 'append', at: Date.now(), by: opts.by, space: opts.space, label: opts.label ?? `Restore ${opts.versionId}`,
+      graph: snap.graph, kits: snap.kits, tokens: snap.tokens, doc: snap.doc,
+      docRev: snap.doc ? (snap.docRev ?? uid('drev')) : undefined, storedRasterIds: snap.storedRasterIds, clearsDraft: opts.by === 'user',
+    }, written));
   });
 }
 
-export function deleteKit(id: string): Promise<void> {
+export function deleteItem(id: string): Promise<void> {
   return serialize(id, async () => {
     const live = get().library.find((s) => s.id === id);
     if (!live || !isKit(live)) return;
-    for (const [sid, s] of Object.entries(get().sessions)) {
-      for (const d of [...s.docs]) if (d.library?.subjectId === id) await reconcileWorkingDoc(sid, d);
-    }
+    for (const [sid, s] of Object.entries(get().sessions)) for (const d of [...s.docs]) if (d.library?.subjectId === id) detachWorkingDoc(sid, d.id);
     useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
     const verIds = [...new Set([...(live.versions ?? []).map((v) => v.id), ...(live.versionId ? [live.versionId] : [])])];
     const keys = new Set<string>();

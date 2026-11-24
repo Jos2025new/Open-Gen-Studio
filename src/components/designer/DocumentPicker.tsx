@@ -28,7 +28,7 @@ function Thumbnail({ doc }: { doc: DesignDoc }) {
 
 /** The thumbnails of the session's designs: click one to open it. */
 export function DocumentChoices({ sessionId, docs, active }: { sessionId: string; docs: DesignDoc[]; active: DesignDoc }) {
-  const visible = docs.filter((d) => d.library?.view !== 'studio');
+  const visible = docs.filter((d) => d.view !== 'studio' && d.library?.view !== 'studio');
   return <div className="document-thumbnails document-picker-panel" role="listbox" aria-label="Canvases">
     {visible.map((doc) => <button type="button" key={doc.id} className={`document-choice ${doc.id === active.id ? 'is-active' : ''}`} aria-pressed={doc.id === active.id} onClick={() => selectDoc(sessionId, doc.id)}>
       <Thumbnail doc={doc} /><span>{doc.name}</span><small>{doc.width} × {doc.height}</small>

@@ -1,8 +1,8 @@
 import { parseTokenAlias } from './libraryTokens';
-import { isKit, mentionableSubjects, type KitPiece } from './libraryTypes';
+import { isKit, mentionableSubjects } from './libraryTypes';
 import type { DesignDoc, Subject } from './types';
 
-/* Pure dependency graph, reverse usage index, cycle checks, and asset ownership across all kit versions. */
+/* Pure dependency graph, reverse usage index, cycle checks, and asset ownership across all versions. */
 
 export interface KitDependencies {
   kitIds: string[]; missingKitIds: string[]; assetIds: string[];
@@ -23,59 +23,51 @@ const pushMap = <K, V>(m: Map<K, V[]>, k: K, v: V) => { const list = m.get(k); i
 /** Direct kit, asset, group, and component/style -> token dependencies of one entry. */
 export function kitDependencies(subject: Subject, library: readonly Subject[] | ReadonlyMap<string, Subject>, doc?: DesignDoc): KitDependencies {
   const byId = library instanceof Map ? library : new Map((library as readonly Subject[]).map((s) => [s.id, s]));
-  const pieces = subject.pieces ?? [], pieceById = new Map(pieces.map((p) => [p.id, p]));
+  const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
   const liveGroups = new Set(doc ? (doc.groups ?? []).filter((g) => doc.layers.some((l) => l.groupId === g.id)).map((g) => g.id) : (subject.groupIds ?? []));
   const kitIds: string[] = [], missingKitIds: string[] = [], assetIds: string[] = [], missingGroupIds: string[] = [];
-  const tokenMap = new Map<string, string[]>(), addTok = (pid: string, t: string) => pushMap(tokenMap, pid, t);
+  const tokenMap = new Map<string, string[]>(), addTok = (nid: string, t: string) => pushMap(tokenMap, nid, t);
   const tokens = subject.tokens;
-  const linkToken = (ref: string): string | null => (ref.startsWith('token:') ? ref.slice(6) : tokens && Object.prototype.hasOwnProperty.call(tokens, ref) ? ref : null);
-  for (const p of pieces) {
-    if (p.kind === 'kit' && p.kitId) (byId.has(p.kitId) ? kitIds : missingKitIds).push(p.kitId);
-    else if (p.kind === 'asset' && p.assetId) assetIds.push(p.assetId);
-    else if (p.kind === 'component' && p.groupId && !liveGroups.has(p.groupId)) missingGroupIds.push(p.groupId);
-    else if (p.kind === 'style' && p.values) {
-      for (const v of Object.values(p.values)) { const t = parseTokenAlias(v); if (t) addTok(p.id, t); }
+  for (const kid of subject.kits ?? []) (byId.has(kid) ? kitIds : missingKitIds).push(kid);
+  for (const n of nodes) {
+    const d = n.data;
+    if (d.kind === 'asset' && d.assetId) assetIds.push(d.assetId);
+    else if (d.kind === 'part') {
+      if (d.partKind === 'component' && d.groupId && !liveGroups.has(d.groupId)) missingGroupIds.push(d.groupId);
+      if (d.values) for (const v of Object.values(d.values)) { const t = parseTokenAlias(v); if (t) addTok(n.id, t); }
     }
   }
-  const styleLinks: Array<[string, string]> = [];
-  for (const l of subject.links ?? []) {
-    const a = pieceById.get(l.from), b = pieceById.get(l.to);
-    const ta = !a ? linkToken(l.from) : null, tb = !b ? linkToken(l.to) : null;
-    if (a && (a.kind === 'component' || a.kind === 'style') && tb) addTok(a.id, tb);
-    if (b && (b.kind === 'component' || b.kind === 'style') && ta) addTok(b.id, ta);
-    if (a?.kind === 'component' && b?.kind === 'style') styleLinks.push([a.id, b.id]);
-    if (b?.kind === 'component' && a?.kind === 'style') styleLinks.push([b.id, a.id]);
+  for (const e of subject.graph?.edges ?? []) {
+    const a = byNode.get(e.source)?.data, b = byNode.get(e.target)?.data;
+    if (a?.kind === 'part' && b?.kind === 'part') {
+      if (a.partKind === 'component' && b.partKind === 'style') for (const t of tokenMap.get(e.target) ?? []) addTok(e.source, t);
+      if (b.partKind === 'component' && a.partKind === 'style') for (const t of tokenMap.get(e.source) ?? []) addTok(e.target, t);
+    }
   }
-  for (const [compId, styleId] of styleLinks) for (const t of tokenMap.get(styleId) ?? []) addTok(compId, t);
-  const pieceTokens: Record<string, string[]> = {};
-  const allToks: string[] = [];
-  for (const [pid, list] of tokenMap) {
-    const u = uniq(list);
-    pieceTokens[pid] = u;
-    allToks.push(...u);
-  }
+  const pieceTokens: Record<string, string[]> = {}, allToks: string[] = [];
+  for (const [nid, list] of tokenMap) { const u = uniq(list); pieceTokens[nid] = u; allToks.push(...u); }
   const tokenIds = uniq(allToks);
   const missingTokenIds = tokenIds.filter((t) => !tokens || !Object.prototype.hasOwnProperty.call(tokens, t));
   return { kitIds: uniq(kitIds), missingKitIds: uniq(missingKitIds), assetIds: uniq(assetIds), missingGroupIds: uniq(missingGroupIds), pieceTokens, tokenIds, missingTokenIds };
 }
 
-/** Entries that directly reference `id` via a `kit` piece. */
+/** Entries that directly reference `id` via `kits`. */
 export function kitUsedBy(id: string, library: readonly Subject[]): Subject[] {
-  return library.filter((s) => s.id !== id && (s.pieces ?? []).some((p) => p.kind === 'kit' && p.kitId === id));
+  return library.filter((s) => s.id !== id && (s.kits ?? []).includes(id));
 }
 
-/** Reject direct or transitive kit containment cycles before saving or updating pieces. */
-export function wouldCreateKitCycle(library: readonly Subject[], parentId: string, nextPieces: readonly KitPiece[]): { ok: true } | { ok: false; reason: string } {
+/** Reject direct or transitive kit containment cycles before saving. */
+export function wouldCreateKitCycle(library: readonly Subject[], parentId: string, nextKits: readonly string[]): { ok: true } | { ok: false; reason: string } {
   const byId = new Map(library.map((s) => [s.id, s]));
-  for (const target of uniq(nextPieces.filter((p) => p.kind === 'kit').map((p) => p.kitId))) {
-    if (target === parentId) return { ok: false, reason: `Kit "${parentId}" cannot contain itself.` };
+  for (const target of uniq(nextKits)) {
+    if (target === parentId) return { ok: false, reason: `Entry "${parentId}" cannot contain itself.` };
     const stack = [target], seen = new Set<string>();
     while (stack.length) {
       const cur = stack.pop()!;
       if (cur === parentId) return { ok: false, reason: `Cycle detected: "${target}" already depends on "${parentId}".` };
       if (seen.has(cur)) continue;
       seen.add(cur);
-      for (const p of byId.get(cur)?.pieces ?? []) if (p.kind === 'kit' && p.kitId && !seen.has(p.kitId)) stack.push(p.kitId);
+      for (const kid of byId.get(cur)?.kits ?? []) if (!seen.has(kid)) stack.push(kid);
     }
   }
   return { ok: true };
@@ -83,9 +75,10 @@ export function wouldCreateKitCycle(library: readonly Subject[], parentId: strin
 
 /** Every asset referenced by a Library entry in its current state and across ALL saved versions. */
 export function subjectAssetIds(subject: Subject): string[] {
+  const graphAssets = (subject.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined));
   return uniq([
     subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId,
-    ...(subject.pieces ?? []).map((p) => (p.kind === 'asset' ? p.assetId : undefined)),
+    ...graphAssets,
     ...(subject.versions ?? []).flatMap((v) => v.assetIds),
   ]);
 }
@@ -116,44 +109,12 @@ export function buildLibraryIndex(library: readonly Subject[]): LibraryIndex {
   return { byId, dependencies, usedBy, missingRefs, assetIds: new Set(assetOwners.keys()), assetOwners };
 }
 
-/** Agent context lines for Library: mentionable @Name subjects plus a separate kit index (never @-mentioned). */
-export function libraryContextLines(library: readonly Subject[], assets: Record<string, unknown>): string[] {
+/** Agent context lines for Library: mentionable @Name subjects plus total kit count (details via read/list). */
+export function libraryContextLines(library: readonly Subject[], _assets?: Record<string, unknown>): string[] {
   const out: string[] = [];
   const named = mentionableSubjects(library).filter((s) => !s.capture || s.frontalAssetId);
   if (named.length) out.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
-  const kits = library.filter((s) => isKit(s));
-  if (kits.length) {
-    const idx = buildLibraryIndex(library);
-    const items = kits.map((k) => {
-      const dep = idx.dependencies.get(k.id), parts: string[] = [];
-      if (dep?.kitIds.length) parts.push(`kits: ${dep.kitIds.map((id) => `${id} "${idx.byId.get(id)?.name ?? id}"`).join(', ')}`);
-      const pAssets = (k.pieces ?? []).filter((p) => p.kind === 'asset' && p.assetId);
-      if (pAssets.length) parts.push(`${pAssets.length} asset${pAssets.length === 1 ? '' : 's'}`);
-      const texts = (k.pieces ?? []).filter((p) => p.kind === 'text').length;
-      if (texts) parts.push(`${texts} text${texts === 1 ? '' : 's'}`);
-      const colors = (k.pieces ?? []).filter((p) => p.kind === 'color').length;
-      if (colors) parts.push(`${colors} color${colors === 1 ? '' : 's'}`);
-      const comps = (k.pieces ?? []).filter((p) => p.kind === 'component').length;
-      if (comps) parts.push(`${comps} component${comps === 1 ? '' : 's'}`);
-      const styles = (k.pieces ?? []).filter((p) => p.kind === 'style').length;
-      if (styles) parts.push(`${styles} style${styles === 1 ? '' : 's'}`);
-      if (k.tokens) {
-        const keys = Object.keys(k.tokens);
-        if (keys.length) {
-          const groups = [...new Set(keys.map((n) => n.split('.')[0]))];
-          parts.push(`tokens: ${keys.length} (${groups.join('/')})`);
-        }
-      }
-      if (k.links?.length) parts.push(`${k.links.length} link${k.links.length === 1 ? '' : 's'}`);
-      const missing = [
-        ...(dep?.missingKitIds.map((id) => `kit:${id}`) ?? []),
-        ...(dep?.missingGroupIds.map((id) => `group:${id}`) ?? []),
-        ...(dep?.missingTokenIds.map((id) => `token:${id}`) ?? []),
-        ...pAssets.filter((p) => !assets[p.assetId!]).map((p) => `asset:${p.assetId}`),
-      ];
-      return `${k.id} "${k.name}" (${k.kind}${k.draft ? ', draft' : ''}) — contains: ${parts.join(', ') || 'empty'}${missing.length ? `; missing: ${missing.join(', ')}` : ''}`;
-    });
-    out.push(`library kits (read/edit via library.kit.* commands): ${items.join(' | ')}`);
-  }
+  const kits = library.filter(isKit);
+  if (kits.length) out.push(`library items: ${kits.length} (use library.item.list and library.item.read to inspect)`);
   return out;
 }

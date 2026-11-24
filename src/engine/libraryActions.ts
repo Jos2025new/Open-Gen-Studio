@@ -8,7 +8,7 @@ import { mentionSubjects } from './params';
 import { sheetCut } from './sheet';
 import type { Subject, SubjectKind, Workspace } from './types';
 import { isKit, mentionableSubjects } from './libraryTypes';
-import { deleteKit } from './libraryVersions';
+import { deleteItem } from './libraryVersions';
 import { appendFeed, patchSession, setComposer, setComposerMedia, toast, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -55,7 +55,7 @@ export function saveSubject(subject: Subject): void {
 
 export function deleteSubject(id: string): void {
   const previous = get().library.find(s => s.id === id);
-  if (previous && isKit(previous)) { void deleteKit(id); return; }
+  if (previous && isKit(previous)) { void deleteItem(id); return; }
   if (previous) rememberNodeLibrary(previous.name);
   useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
 }

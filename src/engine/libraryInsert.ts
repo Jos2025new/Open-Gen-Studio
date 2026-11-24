@@ -7,21 +7,11 @@ import { isKit } from './libraryTypes';
 import { cleanupKeys, copyDocPixels, expectedRasterIds, readKitVersion } from './libraryVersions';
 import type { Layer, LayerGroup } from './types';
 
-/* Copy-with-origin insertion of a Library kit component into a Designer document (single undo step, own pixels). */
-
-function pureBox(l: Layer): D.Box | null {
-  if (l.type === 'raster') return { x: l.x, y: l.y, w: l.width, h: l.height };
-  if (l.type === 'text') return { x: l.x, y: l.y, w: l.width, h: Math.round(l.fontSize * l.lineHeight) };
-  if (l.type === 'vector') return D.unionBox(l.shapes.map(D.shapeBox));
-  return null;
-}
-
+/* Copy-with-origin insertion of a Library component into a Designer document (single undo step, own pixels). */
 function cloneMember(layer: Layer, newGroupId: string, pxMap: ReadonlyMap<string, string>): Layer {
   const remap = (id: string) => pxMap.get(id) ?? id;
   const copy = structuredClone(layer);
-  if (copy.type === 'raster') {
-    return { ...copy, id: remap(copy.id), groupId: newGroupId, ...(copy.paintBaseId ? { paintBaseId: remap(copy.paintBaseId) } : {}) };
-  }
+  if (copy.type === 'raster') return { ...copy, id: remap(copy.id), groupId: newGroupId, ...(copy.paintBaseId ? { paintBaseId: remap(copy.paintBaseId) } : {}) };
   if (copy.type === 'vector') {
     const gids = new Map((copy.objectGroups ?? []).map((g) => [g.id, uid('og')]));
     const objectGroups = gids.size ? copy.objectGroups!.map((g) => ({ ...g, id: gids.get(g.id)!, parentId: g.parentId && gids.get(g.parentId) })) : copy.objectGroups;
@@ -38,47 +28,34 @@ export async function insertComponent(
 ): Promise<{ groupId: string; layerIds: string[] }> {
   if (!getDoc(sessionId, docId)) throw new Error(`No document "${docId}" in session "${sessionId}".`);
   const subject = useStore.getState().library.find((s) => s.id === subjectId);
-  if (!subject || !isKit(subject)) throw new Error(`No kit "${subjectId}".`);
-  if (!subject.versionId) throw new Error(`Kit "${subjectId}" has no saved version to insert from.`);
-  const piece = (subject.pieces ?? []).find((p) => p.id === pieceId);
-  if (!piece) throw new Error(`No piece "${pieceId}" in kit "${subjectId}".`);
-  if (piece.kind !== 'component' || !piece.groupId) throw new Error(`Piece "${pieceId}" is not a component.`);
+  if (!subject || !isKit(subject)) throw new Error(`No Library item "${subjectId}".`);
+  if (!subject.versionId) throw new Error(`Library item "${subjectId}" has no saved version.`);
+  const node = (subject.graph?.nodes ?? []).find((n) => n.id === pieceId);
+  if (!node) throw new Error(`No piece "${pieceId}" in "${subjectId}".`);
+  if (node.data.kind !== 'part' || node.data.partKind !== 'component' || !node.data.groupId) throw new Error(`Node "${pieceId}" is not a component.`);
   const snap = await readKitVersion(subject.versionId);
-  if (!snap?.doc) throw new Error(`Kit "${subjectId}" version "${subject.versionId}" has no document.`);
-  const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === piece.groupId);
-  const srcLayers = snap.doc.layers.filter((l) => l.groupId === piece.groupId);
-  if (!srcGroup || !srcLayers.length) throw new Error(`Component group "${piece.groupId}" is missing in version "${subject.versionId}".`);
+  if (!snap?.doc) throw new Error(`Item "${subjectId}" version "${subject.versionId}" has no document.`);
+  const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === node.data.groupId);
+  const srcLayers = snap.doc.layers.filter((l) => l.groupId === node.data.groupId);
+  if (!srcGroup || !srcLayers.length) throw new Error(`Component group "${node.data.groupId}" is missing.`);
 
   const written: string[] = [];
   try {
     const copied = await copyDocPixels({ ...snap.doc, layers: srcLayers }, null, expectedRasterIds(snap), written);
-    const groupId = uid('grp');
-    const idMap = new Map<string, string>();
-    let layers = srcLayers.map((l) => {
-      const next = cloneMember(l, groupId, copied.map);
-      idMap.set(l.id, next.id);
-      return next;
-    });
+    const groupId = uid('grp'), idMap = new Map<string, string>();
+    let layers = srcLayers.map((l) => { const next = cloneMember(l, groupId, copied.map); idMap.set(l.id, next.id); return next; });
     if (at) {
-      const box = D.unionBox(layers.map(pureBox).filter((b): b is D.Box => b != null));
-      if (box) {
-        const dx = at.x - box.x, dy = at.y - box.y;
-        layers = layers.map((l) => D.translateLayer(l, dx, dy));
-      }
+      const box = D.unionBox(layers.map(D.approxLayerBox).filter((b): b is D.Box => b != null));
+      if (box) layers = layers.map((l) => D.translateLayer(l, at.x - box.x, at.y - box.y));
     }
     if (!getDoc(sessionId, docId)) throw new Error(`Target document "${docId}" was deleted while inserting.`);
     const newGroup: LayerGroup = {
-      id: groupId, name: piece.name || srcGroup.name,
+      id: groupId, name: node.data.title || srcGroup.name,
       ...(srcGroup.keptHidden ? { keptHidden: srcGroup.keptHidden.map((id) => idMap.get(id) ?? id) } : {}),
       ...(srcGroup.keptLocked ? { keptLocked: srcGroup.keptLocked.map((id) => idMap.get(id) ?? id) } : {}),
       from: { subjectId, pieceId, versionId: subject.versionId },
     };
-    mutateDoc(sessionId, docId, (d) => ({
-      ...d, updatedAt: Date.now(),
-      groups: [...liveGroups(d), newGroup],
-      layers: [...d.layers, ...layers],
-      activeLayerId: layers[layers.length - 1].id,
-    }));
+    mutateDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), groups: [...liveGroups(d), newGroup], layers: [...d.layers, ...layers], activeLayerId: layers[layers.length - 1].id }));
     return { groupId, layerIds: layers.map((l) => l.id) };
   } catch (err) {
     await cleanupKeys(written);

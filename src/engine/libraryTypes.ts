@@ -1,18 +1,16 @@
-/* Library kit kinds (moodboard, design-system, brand-kit) and shared helpers. */
+import type { Graph } from './graphTypes';
 
-export const KIT_KINDS = ['moodboard', 'design-system', 'brand-kit'] as const;
-export type KitKind = (typeof KIT_KINDS)[number];
+/* Library item kinds (moodboard, design-system, brand-kit) and shared helpers. */
+export const KIT_KINDS = {
+  moodboard: { tokens: false, kits: false, parts: ['color'] },
+  'design-system': { tokens: true, kits: false, parts: ['color', 'component', 'style'] },
+  'brand-kit': { tokens: true, kits: true, parts: ['color', 'component', 'style'] },
+} as const;
+export type KitKind = keyof typeof KIT_KINDS;
+export const KIT_KIND_LIST = Object.keys(KIT_KINDS) as [KitKind, ...KitKind[]];
 export type LibrarySpace = 'studio' | 'designer' | 'nodes' | 'library';
 export type KitActor = 'user' | 'agent';
-export type KitPieceKind = 'asset' | 'text' | 'color' | 'kit' | 'component' | 'style';
-export type KitStyleType = 'text' | 'color';
 
-export interface KitPiece {
-  id: string; kind: KitPieceKind; role?: string; name?: string; description?: string;
-  assetId?: string; text?: string; color?: string; kitId?: string;
-  groupId?: string; styleType?: KitStyleType; values?: Record<string, string | number>;
-}
-export interface KitLink { id: string; from: string; to: string; label?: string; }
 export const TOKEN_TYPES = ['color', 'dimension', 'fontFamily', 'number', 'string'] as const;
 export type KitTokenType = (typeof TOKEN_TYPES)[number];
 export interface KitToken { type: KitTokenType; value: string | number; description?: string; }
@@ -21,24 +19,14 @@ export interface KitOrigin { space: LibrarySpace; sessionId?: string; sessionTit
 export interface KitVersionRef { id: string; at: number; by: KitActor; space: LibrarySpace; label?: string; assetIds: string[]; docRev?: string; groupIds?: string[]; }
 
 export interface LibraryKitFields {
-  pieces?: KitPiece[];
-  links?: KitLink[];
-  tokens?: KitTokens;
+  graph?: Graph; kits?: string[]; tokens?: KitTokens;
   /** Immutable after creation. */
-  origin?: KitOrigin;
-  copiedFrom?: string;
-  draft?: boolean;
-  versionId?: string;
-  docRev?: string;
-  groupIds?: string[];
-  versions?: KitVersionRef[];
+  origin?: KitOrigin; copiedFrom?: string; draft?: boolean;
+  versionId?: string; docRev?: string; groupIds?: string[]; versions?: KitVersionRef[];
 }
 
-export function isKit<T extends { kind?: string }>(subject: T | null | undefined): boolean {
-  return Boolean(subject?.kind && (KIT_KINDS as readonly string[]).includes(subject.kind));
-}
+export const isKit = <T extends { kind?: string }>(subject: T | null | undefined): boolean =>
+  Boolean(subject?.kind && Object.prototype.hasOwnProperty.call(KIT_KINDS, subject.kind));
 
 /** Subjects that can be mentioned as @Name or sent as provider references (never kits). */
-export function mentionableSubjects<T extends { kind?: string }>(library: readonly T[]): T[] {
-  return library.filter((s) => !isKit(s));
-}
+export const mentionableSubjects = <T extends { kind?: string }>(library: readonly T[]): T[] => library.filter((s) => !isKit(s));
