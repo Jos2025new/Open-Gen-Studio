@@ -30,6 +30,8 @@ export function estimatedHeight(data: GraphNodeData): number {
     case 'tool':
     case 'asset':
       return 220;
+    case 'part':
+      return 150;
   }
 }
 

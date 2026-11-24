@@ -128,6 +128,8 @@ export interface GraphEdge {
   both?: boolean;
   /** Pinned reference (ADR 0031): the source revision this link was fixed to. Absent = moving (follows the current one). */
   pin?: string;
+  /** Optional label for explicit ref links (e.g. Library relationships). */
+  label?: string;
 }
 
 /** A link whose node was deleted (ADR 0031 point 2): kept visible to the core as invalid, never silently dropped. */

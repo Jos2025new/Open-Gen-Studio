@@ -102,7 +102,7 @@ export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenN
 /** Set (or clear, with `undefined`) a node's painted-over copy. The copy it replaces is deleted. */
 export function setSketch(sessionId: string, nodeId: string, assetId: string | undefined): void {
   const node = get().sessions[sessionId].graph.nodes.find((n) => n.id === nodeId);
-  if (!node || node.data.kind === 'text' || node.data.kind === 'ref') return;
+  if (!node || node.data.kind === 'text' || node.data.kind === 'ref' || node.data.kind === 'part') return;
   const prev = node.data.sketchAssetId;
   if (patchNodeData(sessionId, nodeId, { sketchAssetId: assetId })) return;
   if (prev && prev !== assetId) deleteAssets([prev]);
