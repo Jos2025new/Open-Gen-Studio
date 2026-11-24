@@ -167,6 +167,7 @@ export async function createItem(opts: {
     ? (useStore.setState((st) => ({ library: [...st.library, base] })), base)
     : await withCleanup((w) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens, checkAssetIds }, w));
   if (opts.open !== false && session && (opts.space === 'studio' || opts.space === 'designer')) {
+    if (hasGraph(opts.graph)) return { subject, doc: await openInSpace(session.id, id, opts.space) };
     const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, opts.space === 'studio' ? 'studio' : undefined);
     addDoc(session.id, doc);
     return { subject, doc };

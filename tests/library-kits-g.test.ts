@@ -64,9 +64,10 @@ vi.mock('../src/engine/design/render', async (orig) => ({
 }));
 
 import { createItem, libraryToDesigner, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { run } from '../src/engine/commands';
 import { deleteLayer, getDoc, mergeDown, placeAsset } from '../src/engine/design/actions';
 import { createSession, useStore } from '../src/store/store';
-import type { Asset, Graph, RasterLayer } from '../src/engine/types';
+import type { Asset, Graph, RasterLayer, TextLayer } from '../src/engine/types';
 
 function mkAsset(id: string, sessionId: string, w = 800, h = 600): Asset {
   return { id, sessionId, kind: 'image', mime: 'image/png', name: `${id}.png`, width: w, height: h, origin: 'upload', stored: true, favorite: false, createdAt: 1 };
@@ -237,5 +238,53 @@ describe('Lote G fixes', () => {
     expect(rasterSources(doc2)).toEqual(['ok', 'ok2']);
     const toasts2 = useStore.getState().ui.toasts.filter((t) => t.level === 'error').map((t) => t.text);
     expect(toasts2.some((t) => t.includes('Broken Delta'))).toBe(true);
+  });
+
+  it('4) createItem with graph opens via openInSpace with image size, image layer, and text note without duplicate docs or deadlock', async () => {
+    const s = resetStore();
+    useStore.setState({ assets: { hero: mkAsset('hero', s.id, 1600, 900) } });
+    putImageBlob('hero', 1600, 900);
+
+    const graph: Graph = {
+      nodes: [
+        { id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Hero', assetId: 'hero' } },
+        { id: 'n2', position: { x: 200, y: 0 }, data: { kind: 'text', title: 'Mood Note', text: 'Golden light note' } },
+      ],
+      edges: [],
+    };
+
+    const cmdRes = await run(
+      { cmd: 'library.item.create', on: { session: s.id }, args: { name: 'StudioBoard', kind: 'moodboard', space: 'studio', graph } },
+      { caller: 'agent' },
+    );
+    expect(cmdRes.ok).toBe(true);
+    const out = cmdRes.results[0] as { id: string; versionId?: string; doc?: string };
+    expect(Object.keys(out).sort()).toEqual(['doc', 'id']);
+    expect(useStore.getState().sessions[s.id].docs).toHaveLength(1);
+
+    const doc = getDoc(s.id, out.doc!)!;
+    expect([doc.width, doc.height]).toEqual([1600, 900]);
+    expect(rasterSources(doc)).toEqual(['hero']);
+    expect(doc.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
+
+    // Opening the same entry in Designer reuses that doc, keeping size, image, and text note
+    const reopened = await libraryToDesigner(s.id, out.id);
+    expect(reopened.id).toBe(doc.id);
+    expect(useStore.getState().sessions[s.id].docs).toHaveLength(1);
+    expect([reopened.width, reopened.height]).toEqual([1600, 900]);
+    expect(rasterSources(reopened)).toEqual(['hero']);
+    expect(reopened.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
+
+    // Non-draft createItem in designer also preserves return shape { id, versionId, doc } and graph content
+    const cmdRes2 = await run(
+      { cmd: 'library.item.create', on: { session: s.id }, args: { name: 'PublishedBoard', kind: 'moodboard', space: 'designer', graph, draft: false } },
+      { caller: 'agent' },
+    );
+    expect(cmdRes2.ok).toBe(true);
+    const out2 = cmdRes2.results[0] as { id: string; versionId?: string; doc?: string };
+    expect(Object.keys(out2).sort()).toEqual(['doc', 'id', 'versionId']);
+    const doc2 = getDoc(s.id, out2.doc!)!;
+    expect([doc2.width, doc2.height]).toEqual([1600, 900]);
+    expect(doc2.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
   });
 });
