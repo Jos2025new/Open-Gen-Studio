@@ -4,6 +4,7 @@ import { descriptorOf } from '../nodecore/registry';
 import { assetRevisionIdentity, normalizeAssetRevisions } from '../assetRevisions';
 import { sentModelRef } from '../catalog';
 import { resolveSendPlan, stable } from '../sendInputs';
+import { mentionableSubjects } from '../libraryTypes';
 import type { Asset, GenSettings, Generation, Graph, GraphNode, ModelSchema, Subject } from '../types';
 import { lyricsBody, lyricsParam, mentionSubjects, wireParams } from '../params';
 
@@ -54,7 +55,7 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
     const index = locals.findIndex(s => s.name.toLowerCase() === subject.name.toLowerCase());
     if (index < 0) locals.push(subject); else locals[index] = subject;
   }
-  const subjects = [...locals, ...library.filter(s => !locals.some(l => l.name.toLowerCase() === s.name.toLowerCase()))];
+  const subjects = [...locals, ...mentionableSubjects(library).filter(s => !locals.some(l => l.name.toLowerCase() === s.name.toLowerCase()))];
   const shots = 'settings' in d ? d.settings.shots ?? [] : [];
   const mentioned = mentionSubjects([prompt, ...shots.map(shot => shot.prompt)].join('\n'), subjects).ids.map(id => {
     const s = subjects.find(x => x.id === id)!;

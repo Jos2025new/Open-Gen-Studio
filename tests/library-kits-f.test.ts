@@ -55,6 +55,7 @@ import { createItem, deleteItem, libraryToDesigner, readKitVersion, restoreItemV
 import { createSubjectVoice } from '../src/engine/libraryActions';
 import { subjectAssetIds } from '../src/engine/libraryGraph';
 import { nodesToLibrary } from '../src/engine/flow/fromLibrary';
+import { nodeRequest, stable } from '../src/engine/flow/freshness';
 import { editCompound } from '../src/engine/nodecore/edit';
 import { run, setApprover } from '../src/engine/commands';
 import { addTextLayer, getDoc, redoDoc, undoDoc } from '../src/engine/design/actions';
@@ -302,5 +303,16 @@ describe('Lote F fixes', () => {
     const read = await run({ cmd: 'library.item.read', args: { id: kitId } }, { caller: 'agent' });
     expect(read.ok).toBe(true);
     expect((read.results[0] as { index: string }).index).toContain('Secret prompt body');
+  });
+
+  it('9) nodeRequest filters kits via mentionableSubjects so @KitName never enters request signature', () => {
+    const node = { id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'image' as const, title: 'Img', prompt: 'Photo with @Board and @Hero', modelRef: 'local::image', settings: { count: 1, advanced: {} }, outputIndex: 0 } };
+    const graph: Graph = { nodes: [node], edges: [] };
+    const hero = { id: 's1', name: 'Hero', kind: 'character' as const, refAssetIds: [] };
+    const board = { id: 'k1', name: 'Board', kind: 'moodboard' as const, description: 'Warm mood', refAssetIds: [] };
+    const reqWithoutKit = nodeRequest(graph, node, {}, [hero]) as { subjects: Array<{ name: string }> };
+    const reqWithKit = nodeRequest(graph, node, {}, [hero, board]) as { subjects: Array<{ name: string }> };
+    expect(reqWithKit.subjects.map((s) => s.name)).toEqual(['Hero']);
+    expect(stable(reqWithKit)).toBe(stable(reqWithoutKit));
   });
 });
