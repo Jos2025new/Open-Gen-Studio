@@ -63,10 +63,12 @@ vi.mock('../src/engine/design/render', async (orig) => ({
   drawDoc: () => undefined,
 }));
 
-import { createItem, libraryToDesigner, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { createItem, libraryToDesigner, readKitVersion, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { run } from '../src/engine/commands';
 import { deleteLayer, getDoc, mergeDown, placeAsset } from '../src/engine/design/actions';
-import { createSession, useStore } from '../src/store/store';
+import { newRasterLayer } from '../src/engine/design/doc';
+import { createSession, setDoc, useStore } from '../src/store/store';
 import type { Asset, Graph, RasterLayer, TextLayer } from '../src/engine/types';
 
 function mkAsset(id: string, sessionId: string, w = 800, h = 600): Asset {
@@ -286,5 +288,36 @@ describe('Lote G fixes', () => {
     const doc2 = getDoc(s.id, out2.doc!)!;
     expect([doc2.width, doc2.height]).toEqual([1600, 900]);
     expect(doc2.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
+  });
+
+  it('5) libraryToNodes includes both graph nodes and unrepresented current-version images, and saving from Nodes keeps stored doc intact', async () => {
+    const s = resetStore();
+    useStore.setState({ assets: { a: mkAsset('a', s.id), b: mkAsset('b', s.id) } });
+    putImageBlob('a');
+    putImageBlob('b');
+
+    const { subject: mb, doc } = await createItem({ name: 'MixedBoard', kind: 'moodboard', space: 'designer', sessionId: s.id, by: 'user' });
+    const lyrA: RasterLayer = { ...newRasterLayer('Layer A', { x: 0, y: 0, width: 100, height: 100 }, { width: 100, height: 100 }, 'a'), rev: 1 };
+    setDoc(s.id, doc!.id, (d) => ({ ...d, background: '#223344', layers: [lyrA] }));
+    hoisted.blobs.set(`raster:${lyrA.id}`, new Blob([new Uint8Array([9, 8, 7])], { type: 'image/png' }));
+    const v1 = await saveItem({ subjectId: mb.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'designer', by: 'user' });
+
+    const first = libraryToNodes(s.id, mb.id);
+    expect(first.added.map((n) => (n.data.kind === 'asset' ? n.data.assetId : null))).toEqual(['a']);
+
+    // Add to moodboard B (graph node, no docId)
+    const nB = { id: 'nb', position: { x: 0, y: 0 }, data: { kind: 'asset' as const, title: 'Img B', assetId: 'b' } };
+    await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'studio', by: 'user', sessionId: s.id, graph: (g) => ({ ...(g ?? { nodes: [], edges: [] }), nodes: [...(g?.nodes ?? []), nB] }) as Graph });
+
+    const second = libraryToNodes(s.id, mb.id);
+    const assetIds = second.added.map((n) => (n.data.kind === 'asset' ? n.data.assetId : null)).sort();
+    expect(assetIds).toEqual(['a', 'b']);
+
+    // Edit local working doc without saving, then save from Nodes: stored doc must remain unchanged (#223344)
+    setDoc(s.id, doc!.id, (d) => ({ ...d, background: '#ff0000' }));
+    const fromNodes = await nodesToLibrary({ sessionId: s.id, mode: 'overwrite', subjectId: mb.id, groupId: second.groupId!, by: 'user' });
+    const snapAfter = await readKitVersion(fromNodes.versionId!);
+    expect(snapAfter?.doc?.background).toBe('#223344');
+    expect(snapAfter?.docRev).toBe(v1.docRev);
   });
 });

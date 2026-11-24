@@ -22,16 +22,16 @@ export function libraryToNodes(sessionId: string, subjectId: string): { added: G
   if (!session) throw new Error(`No session "${sessionId}".`);
   const subject = st.library.find((s) => s.id === subjectId);
   if (!subject || !isKit(subject)) throw new Error(`No Library item "${subjectId}".`);
-  const src = subject.graph, imgIds = src?.nodes.length ? [] : kitImageAssetIds(subject, st.assets);
-  if (!src?.nodes.length && !imgIds.length) return { added: [], edges: [], groupId: null };
+  const src = subject.graph, srcNodes = src?.nodes ?? [];
+  const inGraph = new Set(srcNodes.flatMap((n) => (n.data.kind === 'asset' && n.data.assetId ? [n.data.assetId] : [])));
+  const extraIds = kitImageAssetIds(subject, st.assets).filter((id) => !inGraph.has(id));
+  if (!srcNodes.length && !extraIds.length) return { added: [], edges: [], groupId: null };
 
   const idMap = new Map<string, string>();
-  const nodes: GraphNode[] = src?.nodes.length
-    ? src.nodes.map((n) => {
-        const id = uid('nd'); idMap.set(n.id, id);
-        return { id, position: { ...n.position }, data: structuredClone(n.data) };
-      })
-    : imgIds.map((assetId) => ({ id: uid('nd'), position: { x: 0, y: 0 }, data: { kind: 'asset', title: st.assets[assetId]?.name || 'Asset', assetId } }));
+  const nodes: GraphNode[] = srcNodes.map((n) => { const id = uid('nd'); idMap.set(n.id, id); return { id, position: { ...n.position }, data: structuredClone(n.data) }; });
+  const hasPos = nodes.some((n) => n.position.x !== 0 || n.position.y !== 0);
+  const extraX = hasPos ? Math.max(...nodes.map((n) => n.position.x)) + NODE_WIDTH + 60 : 0, extraY = hasPos ? Math.min(...nodes.map((n) => n.position.y)) : 0;
+  for (const [i, assetId] of extraIds.entries()) nodes.push({ id: uid('nd'), position: hasPos ? { x: extraX + i * (NODE_WIDTH + 60), y: extraY } : { x: 0, y: 0 }, data: { kind: 'asset', title: st.assets[assetId]?.name || 'Asset', assetId } });
   const edges = (src?.edges ?? []).filter((e) => idMap.has(e.source) && idMap.has(e.target)).map((e) => refEdge(e, uid('edge'), idMap.get(e.source)!, idMap.get(e.target)!));
   const right = session.graph.nodes.reduce((x, n) => Math.max(x, n.position.x + NODE_WIDTH), -Infinity);
   const top = session.graph.nodes.reduce((y, n) => Math.min(y, n.position.y), Infinity);
