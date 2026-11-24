@@ -3,7 +3,7 @@ import { useStore } from '../../store/store';
 import { isKit, type KitActor, type KitKind } from '../libraryTypes';
 import { createItem, saveItem } from '../libraryVersions';
 import { editCompound, editPresentation } from '../nodecore/edit';
-import type { Graph, GraphEdge, GraphGroup, GraphNode, Subject } from '../types';
+import type { Asset, Graph, GraphEdge, GraphGroup, GraphNode, Subject } from '../types';
 import { autoLayout, NODE_WIDTH, nodeOutputAsset } from './graph';
 
 /* Sister of chatToNodes: import Library graphs into Nodes as a named group (1 undo step, no run) and save back. */
@@ -12,20 +12,27 @@ const refEdge = (e: GraphEdge, id: string, source: string, target: string): Grap
   kind: e.kind ?? 'ref', ...(e.label ? { label: e.label } : {}), ...(e.both ? { both: true } : {}),
 });
 
+export function kitImageAssetIds(subject: Subject, assets: Record<string, Asset>): string[] {
+  const ver = subject.versions?.find((v) => v.id === subject.versionId) ?? subject.versions?.at(-1);
+  return [...new Set(ver?.assetIds ?? [])].filter((id) => assets[id]?.kind === 'image');
+}
+
 export function libraryToNodes(sessionId: string, subjectId: string): { added: GraphNode[]; edges: GraphEdge[]; groupId: string | null } {
   const st = useStore.getState(), session = st.sessions[sessionId];
   if (!session) throw new Error(`No session "${sessionId}".`);
   const subject = st.library.find((s) => s.id === subjectId);
   if (!subject || !isKit(subject)) throw new Error(`No Library item "${subjectId}".`);
-  const src = subject.graph;
-  if (!src?.nodes.length) return { added: [], edges: [], groupId: null };
+  const src = subject.graph, imgIds = src?.nodes.length ? [] : kitImageAssetIds(subject, st.assets);
+  if (!src?.nodes.length && !imgIds.length) return { added: [], edges: [], groupId: null };
 
   const idMap = new Map<string, string>();
-  const nodes: GraphNode[] = src.nodes.map((n) => {
-    const id = uid('nd'); idMap.set(n.id, id);
-    return { id, position: { ...n.position }, data: structuredClone(n.data) };
-  });
-  const edges = src.edges.filter((e) => idMap.has(e.source) && idMap.has(e.target)).map((e) => refEdge(e, uid('edge'), idMap.get(e.source)!, idMap.get(e.target)!));
+  const nodes: GraphNode[] = src?.nodes.length
+    ? src.nodes.map((n) => {
+        const id = uid('nd'); idMap.set(n.id, id);
+        return { id, position: { ...n.position }, data: structuredClone(n.data) };
+      })
+    : imgIds.map((assetId) => ({ id: uid('nd'), position: { x: 0, y: 0 }, data: { kind: 'asset', title: st.assets[assetId]?.name || 'Asset', assetId } }));
+  const edges = (src?.edges ?? []).filter((e) => idMap.has(e.source) && idMap.has(e.target)).map((e) => refEdge(e, uid('edge'), idMap.get(e.source)!, idMap.get(e.target)!));
   const right = session.graph.nodes.reduce((x, n) => Math.max(x, n.position.x + NODE_WIDTH), -Infinity);
   const top = session.graph.nodes.reduce((y, n) => Math.min(y, n.position.y), Infinity);
   const baseX = Number.isFinite(right) ? right + 200 : 0, baseY = Number.isFinite(top) ? top : 0;
@@ -36,7 +43,7 @@ export function libraryToNodes(sessionId: string, subjectId: string): { added: G
     const pos = autoLayout(nodes, edges, { x: baseX, y: baseY });
     for (const n of nodes) n.position = pos.get(n.id) ?? n.position;
   }
-  const srcGrp = src.groups?.[0];
+  const srcGrp = src?.groups?.[0];
   const group: GraphGroup = {
     id: uid('grp'), title: srcGrp?.title || subject.name, nodeIds: nodes.map((n) => n.id),
     ...(srcGrp?.color ? { color: srcGrp.color } : {}), library: { subjectId: subject.id },

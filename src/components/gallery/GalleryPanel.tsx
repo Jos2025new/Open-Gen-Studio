@@ -10,7 +10,7 @@ import { isKit, KIT_KINDS, type KitKind, type KitVersionRef } from '../../engine
 import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
 import { createItem, deleteItem, libraryToDesigner, libraryToStudio, restoreItemVersion } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
-import { libraryToNodes } from '../../engine/flow/fromLibrary';
+import { kitImageAssetIds, libraryToNodes } from '../../engine/flow/fromLibrary';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { formatDateTime } from '../../lib/format';
 import { Button, IconButton } from '../ui/primitives';
@@ -51,6 +51,7 @@ function coverOf(item: Subject, assets: Record<string, Asset>): string | undefin
   const gAssets = (item.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined));
   return [item.frontalAssetId, ...gAssets, ...(ver?.assetIds ?? []), ...subjectAssetIds(item)].find((id): id is string => Boolean(id && assets[id]?.kind === 'image'));
 }
+const canOpenNodes = (item: Subject, assets: Record<string, Asset>) => Boolean(item.graph?.nodes.length || kitImageAssetIds(item, assets).length);
 function goSpace(space: OpenSpace) {
   if (space === 'studio') setStudioBoard({ open: true, view: 'designer' });
   setUi({ workspace: space === 'studio' ? 'chat' : space === 'nodes' ? 'node' : 'designer', home: false, space: undefined, omni: false, panel: null });
@@ -143,7 +144,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
 
 type KitMenuView = 'menu' | 'versions' | 'components' | 'remove' | { restore: KitVersionRef };
 function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
-  const sessionId = useStore((s) => s.activeSessionId), library = useStore((s) => s.library);
+  const sessionId = useStore((s) => s.activeSessionId), library = useStore((s) => s.library), assets = useStore((s) => s.assets);
   const session = useStore((s) => s.sessions[s.activeSessionId]), ui = useStore((s) => s.ui);
   const [sub, setSub] = useState<KitMenuView>('menu'), [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -179,7 +180,7 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
   return <>
     <MenuItem icon={MessageSquare} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'studio'))}>Open in Studio</MenuItem>
     <MenuItem icon={PenTool} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'designer'))}>Open in Designer</MenuItem>
-    {item.graph?.nodes.length ? <MenuItem icon={Workflow} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'nodes'))}>Open in Nodes</MenuItem> : null}
+    {canOpenNodes(item, assets) ? <MenuItem icon={Workflow} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'nodes'))}>Open in Nodes</MenuItem> : null}
     <MenuItem icon={History} disabled={!versions.length} onClick={() => setSub('versions')}>Versions<span className="pc-count num">{versions.length}</span></MenuItem>
     {item.kind === 'design-system' && designerDoc && comps.length
       ? <MenuItem icon={Layers} onClick={() => setSub('components')}>Components<span className="pc-count num">{comps.length}</span></MenuItem> : null}
@@ -194,7 +195,7 @@ function LibraryTile({ item, view }: { item: Subject; view: ItemView }) {
   const open = () => {
     if (kit) {
       const sp = spaceOf(workspace);
-      void openKitIn(sessionId, item.id, sp === 'nodes' && !item.graph?.nodes.length ? 'designer' : sp).catch((e) => toast((e as Error).message, 'error'));
+      void openKitIn(sessionId, item.id, sp === 'nodes' && !canOpenNodes(item, assets) ? 'designer' : sp).catch((e) => toast((e as Error).message, 'error'));
     } else if (cover) setUi({ lightbox: { assetIds: [cover, ...item.refAssetIds], index: 0 } });
   };
   const tap = useTapReveal(open), [confirming, setConfirming] = useState(false);
