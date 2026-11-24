@@ -504,6 +504,7 @@ export interface LayerGroup {
   /** Layers hidden or locked before the group was: showing/unlocking it keeps them so. */
   keptHidden?: string[];
   keptLocked?: string[];
+  from?: { subjectId: string; pieceId: string; versionId: string };
 }
 
 

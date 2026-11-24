@@ -21,7 +21,7 @@ const get = useStore.getState;
 const rKey = (id: string) => `raster:${id}`;
 const vKey = (id: string) => `libver:${id}`;
 const queues = new Map<string, Promise<void>>();
-const cleanupKeys = (keys: readonly string[]) => (keys.length ? blobDb.delMany([...new Set(keys)]).catch(() => undefined) : Promise.resolve());
+export const cleanupKeys = (keys: readonly string[]) => (keys.length ? blobDb.delMany([...new Set(keys)]).catch(() => undefined) : Promise.resolve());
 
 function serialize<T>(id: string, fn: () => Promise<T>): Promise<T> {
   const next = (queues.get(id) ?? Promise.resolve()).then(fn);
@@ -74,7 +74,7 @@ function rasterRevMap(layers: readonly Layer[]): Map<string, number> {
   return revs;
 }
 
-function expectedRasterIds(snap: KitVersionSnapshot): Set<string> {
+export function expectedRasterIds(snap: KitVersionSnapshot): Set<string> {
   if (!snap.doc) return new Set();
   const baseIds = paintBaseIdsOf(snap.doc.layers);
   return snap.storedRasterIds !== undefined ? new Set([...snap.storedRasterIds, ...baseIds]) : new Set(rasterBufferIds(snap.doc.layers));
@@ -99,7 +99,7 @@ function remapDoc(doc: DesignDoc, map: ReadonlyMap<string, string>, opts: { newD
   return { ...rest, ...(groups ? { groups } : {}), id: opts.newDocId ? uid('doc') : rest.id, layers, activeLayerId: rest.activeLayerId ? remap(rest.activeLayerId) : null, ...(opts.library ? { library: opts.library } : {}) };
 }
 
-async function copyDocPixels(doc: DesignDoc, reuseFrom: DesignDoc | null | undefined, expectedIds: ReadonlySet<string> | undefined, written: string[]): Promise<{ map: Map<string, string>; storedIds: string[] }> {
+export async function copyDocPixels(doc: DesignDoc, reuseFrom: DesignDoc | null | undefined, expectedIds: ReadonlySet<string> | undefined, written: string[]): Promise<{ map: Map<string, string>; storedIds: string[] }> {
   const ids = rasterBufferIds(doc.layers), baseIds = paintBaseIdsOf(doc.layers), revMap = rasterRevMap(doc.layers);
   for (const id of ids) if (isUnreadable(id)) throw new Error(`Cannot save: layer pixels "${id}" are unreadable.`);
   const prevEntries: Array<[string, Uint8Array]> = [];
