@@ -103,7 +103,7 @@ describe('Contract 1 & 2: kit types, graph, cycles, missing refs and assets', ()
     const ds: Subject = {
       id: 'ds1', name: 'AcmeDS', kind: 'design-system', refAssetIds: [],
       pieces: [{ id: 'p1', kind: 'asset', role: 'logo', assetId: 'ast_logo_v2' }],
-      tokens: { colors: { bg: '#111', accent: '#d4f25a' }, fonts: { display: 'Inter' }, spacing: { md: 16 }, radii: { card: 8 } },
+      tokens: { 'color.bg': { type: 'color', value: '#111' }, 'color.accent': { type: 'color', value: '#d4f25a' }, 'font.display': { type: 'fontFamily', value: 'Inter' }, 'spacing.md': { type: 'dimension', value: 16 }, 'radii.card': { type: 'dimension', value: 8 } },
       versions: [
         { id: 'lv1', at: 1, by: 'user', space: 'studio', label: 'v1', assetIds: ['ast_logo_v1'] },
         { id: 'lv2', at: 2, by: 'agent', space: 'designer', label: 'v2', assetIds: ['ast_logo_v2'] },
@@ -155,7 +155,7 @@ describe('Contract 1 & 2: kit types, graph, cycles, missing refs and assets', ()
 describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', () => {
   it('round-trips through serialized persistence, edits pixels, overwrites, restores v1 with exact bytes, and reuses unchanged bytes', async () => {
     const s = resetStore();
-    const { subject: kit } = await createKit({ name: 'AcmeDS', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'agent', tokens: { colors: { bg: '#111' } } });
+    const { subject: kit } = await createKit({ name: 'AcmeDS', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'agent', tokens: { 'color.bg': { type: 'color', value: '#111' } } });
     // Build a working doc with 2 raster layers (one with paintBaseId) and a vector layer with pixelMask
     const baseLayer: RasterLayer = { ...newRasterLayer('Hero', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), paintBaseId: 'pb_1', rev: 1 };
     const staticLayer: RasterLayer = { ...newRasterLayer('Static', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), rev: 1 };
@@ -431,7 +431,7 @@ describe('Contract 5 (engine) & 6: kits out of sends + library.kit.* commands + 
     // 1) create in studio with session -> draft + working doc view: 'studio' + chains $1.doc via DOC_CREATORS
     const chained = await runCommandsTool(s.id, {
       seq: [
-        { cmd: 'library.kit.create', args: { name: 'StudioDS', kind: 'design-system', space: 'studio', tokens: { colors: { bg: '#111' } } } },
+        { cmd: 'library.kit.create', args: { name: 'StudioDS', kind: 'design-system', space: 'studio', tokens: { 'color.bg': { type: 'color', value: '#111' } } } },
         { cmd: 'designer.layer.add_text', args: { text: 'Heading', x: 20, y: 20, width: 200 } },
       ],
     });

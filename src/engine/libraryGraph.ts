@@ -102,8 +102,11 @@ export function libraryContextLines(library: readonly Subject[], assets: Record<
       const colors = (k.pieces ?? []).filter((p) => p.kind === 'color').length;
       if (colors) parts.push(`${colors} color${colors === 1 ? '' : 's'}`);
       if (k.tokens) {
-        const groups = (['colors', 'fonts', 'spacing', 'radii'] as const).filter((g) => k.tokens?.[g] && Object.keys(k.tokens[g]!).length);
-        if (groups.length) parts.push(`tokens: ${groups.join('/')}`);
+        const keys = Object.keys(k.tokens);
+        if (keys.length) {
+          const groups = [...new Set(keys.map((n) => n.split('.')[0]))];
+          parts.push(`tokens: ${keys.length} (${groups.join('/')})`);
+        }
       }
       if (k.links?.length) parts.push(`${k.links.length} link${k.links.length === 1 ? '' : 's'}`);
       const missing = [

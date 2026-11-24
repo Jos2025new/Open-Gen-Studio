@@ -6,7 +6,7 @@ import { resolveSendPlan, sendFingerprint, stable } from './sendInputs';
 import { useStore } from '../store/store';
 import * as A from './actions';
 import { buildLibraryIndex, kitDependencies, kitUsedBy } from './libraryGraph';
-import { isKit, KIT_KINDS } from './libraryTypes';
+import { isKit, KIT_KINDS, TOKEN_TYPES } from './libraryTypes';
 import { createKit, openKit, readKitVersion, restoreKitVersion, saveKit, updateKit, waitKitQueue } from './libraryVersions';
 
 const styleEstimate = () => {
@@ -23,7 +23,8 @@ const space = z.enum(['studio', 'designer', 'nodes', 'library']);
 const piece = z.object({ id, kind: z.enum(['asset', 'text', 'color', 'kit']), role: z.string().optional(), assetId: id.optional(), text: z.string().optional(), color: z.string().optional(), kitId: id.optional() }).strict();
 const link = z.object({ id, from: id, to: id, label: z.string().optional() }).strict();
 const tokVal = z.union([z.string(), z.number()]);
-const tokens = z.object({ colors: z.record(z.string(), z.string()).optional(), fonts: z.record(z.string(), z.string()).optional(), spacing: z.record(z.string(), tokVal).optional(), radii: z.record(z.string(), tokVal).optional() }).strict();
+const token = z.object({ type: z.enum(TOKEN_TYPES), value: tokVal, description: z.string().optional() }).strict();
+const tokens = z.record(z.string(), token);
 const capture = z.object({ camera: z.string(), tone: z.string(), light: z.string(), texture: z.string(), imperfect: z.array(z.string()).optional() }).strict();
 const subject = z.object({ id, name, kind: kind.optional(), description: z.string().optional(), frontalAssetId: id.optional(), refAssetIds: z.array(id), videoAssetId: id.optional(), voiceId: z.string().optional(), capture: capture.optional() }).strict();
 const imageAvailable = (asset?: string) => !asset || useStore.getState().assets[asset]?.kind === 'image' ? true : `No image asset "${asset}".`;

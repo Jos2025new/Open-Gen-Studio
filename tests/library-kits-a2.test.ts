@@ -259,11 +259,11 @@ describe('Lote A2 fixes (1-9)', () => {
     useStore.setState({ assets: { a1: mkAsset('a1', s.id) } });
 
     // Non-draft createKit writes version 1 immediately
-    const { subject: nonDraft } = await createKit({ name: 'ReadyDS', kind: 'design-system', space: 'library', by: 'user', tokens: { colors: { bg: '#000' } } });
+    const { subject: nonDraft } = await createKit({ name: 'ReadyDS', kind: 'design-system', space: 'library', by: 'user', tokens: { 'color.bg': { type: 'color', value: '#000' } } });
     expect(nonDraft.draft).toBe(false);
     expect(nonDraft.versionId).toBeTruthy();
     expect(nonDraft.versions?.length).toBe(1);
-    expect((await readKitVersion(nonDraft.versionId!))?.tokens).toEqual({ colors: { bg: '#000' } });
+    expect((await readKitVersion(nonDraft.versionId!))?.tokens).toEqual({ 'color.bg': { type: 'color', value: '#000' } });
 
     // Add a doc with pixels via saveKit -> v2
     const work = await openKit(nonDraft.id, { sessionId: s.id, space: 'designer' });
@@ -284,7 +284,7 @@ describe('Lote A2 fixes (1-9)', () => {
     const v3 = await updateKit(nonDraft.id, {
       pieces: [{ id: 'p1', kind: 'asset', assetId: 'a1' }, { id: 'p2', kind: 'text', text: 'Note' }],
       links: [{ id: 'l1', from: 'p1', to: 'p2' }],
-      tokens: { colors: { bg: '#fff' } },
+      tokens: { 'color.bg': { type: 'color', value: '#fff' } },
     });
     expect(v3.versions?.length).toBe(3);
     const v3Snap = await readKitVersion(v3.versionId!);
@@ -293,7 +293,7 @@ describe('Lote A2 fixes (1-9)', () => {
 
     // Restoring v2 restores old tokens and pieces (v3 changes are not lost from history)
     const backToV2 = await restoreKitVersion({ subjectId: nonDraft.id, versionId: v2.versionId!, space: 'library', by: 'user' });
-    expect(backToV2.tokens).toEqual({ colors: { bg: '#000' } });
+    expect(backToV2.tokens).toEqual({ 'color.bg': { type: 'color', value: '#000' } });
     expect(backToV2.pieces).toEqual([]);
   });
 
@@ -357,7 +357,7 @@ describe('Mandatory full-cycle test (commands + bytes + serialized reload midway
     // 1) Create in Studio (draft) + 2) Edit with commands
     const created = await runCommandsTool(s1.id, {
       seq: [
-        { cmd: 'library.kit.create', args: { name: 'CycleBrand', kind: 'brand-kit', space: 'studio', tokens: { colors: { brand: '#ff5500' } } } },
+        { cmd: 'library.kit.create', args: { name: 'CycleBrand', kind: 'brand-kit', space: 'studio', tokens: { 'color.brand': { type: 'color', value: '#ff5500' } } } },
         { cmd: 'designer.layer.add_text', args: { text: 'V1 Headline', x: 10, y: 10, width: 200 } },
       ],
     });

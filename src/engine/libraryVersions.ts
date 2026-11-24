@@ -5,6 +5,7 @@ import { addDoc, deleteDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, pendingRaster, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
+import { validateTokens } from './libraryTokens';
 import { isKit, type KitActor, type KitKind, type KitLink, type KitPiece, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
 import type { DesignDoc, Layer, Subject } from './types';
 
@@ -146,8 +147,9 @@ function validatePieces(pieces: readonly KitPiece[], checkAssets: boolean): void
   }
 }
 
-function validateGraph(subjectId: string, pieces: readonly KitPiece[], links: readonly KitLink[], checkAssets: boolean): void {
+function validateGraph(subjectId: string, pieces: readonly KitPiece[], links: readonly KitLink[], checkAssets: boolean, tokens?: KitTokens): void {
   validatePieces(pieces, checkAssets);
+  if (tokens) validateTokens(tokens);
   const cycle = wouldCreateKitCycle(get().library, subjectId, pieces);
   if (!cycle.ok) throw new Error(cycle.reason);
   const pieceIds = new Set(pieces.map((p) => p.id));
@@ -255,7 +257,7 @@ export async function createKit(opts: {
   const name = opts.name.trim();
   if (!name) throw new Error('Kit name is required.');
   const id = uid('sub'), pieces = opts.pieces ?? [], links = opts.links ?? [];
-  validateGraph(id, pieces, links, true);
+  validateGraph(id, pieces, links, true, opts.tokens);
   const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
   if (opts.sessionId && !session) throw new Error(`No session "${opts.sessionId}".`);
   const draft = opts.draft ?? (opts.space === 'studio' && Boolean(session)), at = Date.now();
@@ -310,7 +312,7 @@ export async function updateKit(id: string, patch: {
     const tokens = patch.tokens !== undefined ? patch.tokens : cur.tokens;
     const name = patch.name !== undefined ? patch.name.trim() : cur.name;
     if (!name) throw new Error('Kit name cannot be empty.');
-    validateGraph(id, pieces, links, patch.pieces !== undefined);
+    validateGraph(id, pieces, links, patch.pieces !== undefined, tokens);
     const prevSnap = cur.versionId ? await readKitVersion(cur.versionId) : null;
     if (cur.versionId && !prevSnap) throw new Error(`Cannot update kit "${id}": current version "${cur.versionId}" blob is missing.`);
     const docRev = prevSnap?.doc ? (prevSnap.docRev ?? cur.docRev) : undefined;
@@ -383,7 +385,7 @@ export function saveKit(opts: {
   return serialize(opts.subjectId, async () => {
     const cur = requireKit(opts.subjectId), pieces = opts.pieces ?? cur.pieces ?? [], links = opts.links ?? cur.links ?? [];
     const tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
-    validateGraph(targetId, pieces, links, opts.pieces !== undefined);
+    validateGraph(targetId, pieces, links, opts.pieces !== undefined, tokens);
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
     const workDoc = opts.docId ? (opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined) : session?.docs.find((d) => d.library?.subjectId === cur.id);
     if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);

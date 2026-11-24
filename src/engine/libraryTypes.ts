@@ -8,12 +8,10 @@ export type KitPieceKind = 'asset' | 'text' | 'color' | 'kit';
 
 export interface KitPiece { id: string; kind: KitPieceKind; role?: string; assetId?: string; text?: string; color?: string; kitId?: string; }
 export interface KitLink { id: string; from: string; to: string; label?: string; }
-export interface KitTokens {
-  colors?: Record<string, string>;
-  fonts?: Record<string, string>;
-  spacing?: Record<string, number | string>;
-  radii?: Record<string, number | string>;
-}
+export const TOKEN_TYPES = ['color', 'dimension', 'fontFamily', 'number', 'string'] as const;
+export type KitTokenType = (typeof TOKEN_TYPES)[number];
+export interface KitToken { type: KitTokenType; value: string | number; description?: string; }
+export type KitTokens = Record<string, KitToken>;
 export interface KitOrigin { space: LibrarySpace; sessionId?: string; sessionTitle?: string; by: KitActor; from?: string[]; at: number; }
 export interface KitVersionRef { id: string; at: number; by: KitActor; space: LibrarySpace; label?: string; assetIds: string[]; docRev?: string; }
 

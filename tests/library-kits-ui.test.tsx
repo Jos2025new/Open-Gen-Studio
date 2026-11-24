@@ -128,7 +128,7 @@ describe('Contract 5 completion: kits stay out of mentions, sendSpec, flow, Medi
     const ds: Subject = {
       id: 'kit-ds', name: 'AcmeDS', kind: 'design-system', refAssetIds: [],
       pieces: [{ id: 'p-c', kind: 'color', color: '#ff0000' }],
-      tokens: { colors: { primary: '#ff0000' }, fonts: { heading: 'Inter' } },
+      tokens: { 'color.primary': { type: 'color', value: '#ff0000' }, 'font.heading': { type: 'fontFamily', value: 'Inter' } },
     };
     const brand: Subject = {
       id: 'kit-brand', name: 'AcmeBrand', kind: 'brand-kit', refAssetIds: [],
@@ -157,7 +157,7 @@ describe('Contract 5 completion: kits stay out of mentions, sendSpec, flow, Medi
     expect(kitLine).toContain('kit-ds');
     expect(kitLine).toContain('AcmeDS');
     expect(kitLine).toContain('design-system');
-    expect(kitLine).toContain('colors/fonts');
+    expect(kitLine).toContain('color/font');
     expect(kitLine).toContain('kit-brand');
     expect(kitLine).toContain('AcmeBrand');
     expect(kitLine).toContain('brand-kit');
