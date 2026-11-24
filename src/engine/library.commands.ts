@@ -20,9 +20,14 @@ const name = z.string().trim().min(1);
 const kind = z.enum(['character', 'object', 'product', 'location', 'style']);
 const kitKind = z.enum(KIT_KINDS);
 const space = z.enum(['studio', 'designer', 'nodes', 'library']);
-const piece = z.object({ id, kind: z.enum(['asset', 'text', 'color', 'kit']), role: z.string().optional(), assetId: id.optional(), text: z.string().optional(), color: z.string().optional(), kitId: id.optional() }).strict();
-const link = z.object({ id, from: id, to: id, label: z.string().optional() }).strict();
 const tokVal = z.union([z.string(), z.number()]);
+const piece = z.object({
+  id, kind: z.enum(['asset', 'text', 'color', 'kit', 'component', 'style']),
+  role: z.string().optional(), name: z.string().optional(), description: z.string().optional(),
+  assetId: id.optional(), text: z.string().optional(), color: z.string().optional(), kitId: id.optional(),
+  groupId: id.optional(), styleType: z.enum(['text', 'color']).optional(), values: z.record(z.string(), tokVal).optional(),
+}).strict();
+const link = z.object({ id, from: id, to: id, label: z.string().optional() }).strict();
 const token = z.object({ type: z.enum(TOKEN_TYPES), value: tokVal, description: z.string().optional() }).strict();
 const tokens = z.record(z.string(), token);
 const capture = z.object({ camera: z.string(), tone: z.string(), light: z.string(), texture: z.string(), imperfect: z.array(z.string()).optional() }).strict();

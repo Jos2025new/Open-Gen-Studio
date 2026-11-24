@@ -143,6 +143,12 @@ function validatePieces(pieces: readonly KitPiece[], checkAssets: boolean): void
       if (!p.color?.trim()) throw new Error(`Piece "${p.id}" of kind "color" requires color.`);
     } else if (p.kind === 'kit') {
       if (!p.kitId?.trim()) throw new Error(`Piece "${p.id}" of kind "kit" requires kitId.`);
+    } else if (p.kind === 'component') {
+      if (!p.groupId?.trim()) throw new Error(`Piece "${p.id}" of kind "component" requires groupId.`);
+      if (!p.name?.trim()) throw new Error(`Piece "${p.id}" of kind "component" requires name.`);
+    } else if (p.kind === 'style') {
+      if (p.styleType !== 'text' && p.styleType !== 'color') throw new Error(`Piece "${p.id}" of kind "style" requires styleType ("text" or "color").`);
+      if (!p.values || !Object.keys(p.values).length) throw new Error(`Piece "${p.id}" of kind "style" requires non-empty values.`);
     }
   }
 }
@@ -153,7 +159,12 @@ function validateGraph(subjectId: string, pieces: readonly KitPiece[], links: re
   const cycle = wouldCreateKitCycle(get().library, subjectId, pieces);
   if (!cycle.ok) throw new Error(cycle.reason);
   const pieceIds = new Set(pieces.map((p) => p.id));
-  for (const l of links) if (!pieceIds.has(l.from) || !pieceIds.has(l.to)) throw new Error(`Link "${l.id}" references a missing piece id.`);
+  const hasEndpoint = (ref: string) => pieceIds.has(ref) || Boolean(tokens && (Object.prototype.hasOwnProperty.call(tokens, ref) || (ref.startsWith('token:') && Object.prototype.hasOwnProperty.call(tokens, ref.slice(6)))));
+  for (const l of links) if (!hasEndpoint(l.from) || !hasEndpoint(l.to)) throw new Error(`Link "${l.id}" references a missing piece or token id.`);
+}
+
+function docGroupIds(doc?: DesignDoc): string[] | undefined {
+  return doc ? (doc.groups ?? []).filter((g) => doc.layers.some((l) => l.groupId === g.id)).map((g) => g.id) : undefined;
 }
 
 function snapshotAssets(subject: Subject, pieces: readonly KitPiece[], doc?: DesignDoc): string[] {
@@ -316,6 +327,7 @@ export async function updateKit(id: string, patch: {
     const prevSnap = cur.versionId ? await readKitVersion(cur.versionId) : null;
     if (cur.versionId && !prevSnap) throw new Error(`Cannot update kit "${id}": current version "${cur.versionId}" blob is missing.`);
     const docRev = prevSnap?.doc ? (prevSnap.docRev ?? cur.docRev) : undefined;
+    const groupIds = docGroupIds(prevSnap?.doc);
     const written: string[] = [], verId = uid('lv'), at = Date.now(), space = patch.space ?? 'library';
     try {
       await writeSnapshot({
@@ -323,7 +335,7 @@ export async function updateKit(id: string, patch: {
         pieces, links, ...(tokens ? { tokens } : {}),
         ...(prevSnap?.doc ? { doc: prevSnap.doc, ...(docRev ? { docRev } : {}), ...(prevSnap.storedRasterIds ? { storedRasterIds: prevSnap.storedRasterIds } : {}) } : {}),
       }, written);
-      const ref: KitVersionRef = { id: verId, at, by, space, ...(patch.label ? { label: patch.label } : {}), assetIds: snapshotAssets(cur, pieces, prevSnap?.doc), ...(docRev ? { docRev } : {}) };
+      const ref: KitVersionRef = { id: verId, at, by, space, ...(patch.label ? { label: patch.label } : {}), assetIds: snapshotAssets(cur, pieces, prevSnap?.doc), ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}) };
       let next: Subject | null = null;
       useStore.setState((st) => {
         const live = st.library.find((x) => x.id === id);
@@ -332,7 +344,7 @@ export async function updateKit(id: string, patch: {
           ...live, name: patch.name !== undefined ? name : live.name,
           ...(patch.description !== undefined ? { description: patch.description } : {}),
           pieces, links, ...(patch.tokens !== undefined ? { tokens } : {}),
-          draft: clearsDraft ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
+          draft: clearsDraft ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), ...(groupIds ? { groupIds } : { groupIds: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
         };
         return { library: st.library.map((x) => (x.id === id ? next! : x)) };
       });
@@ -415,9 +427,9 @@ export function saveKit(opts: {
           docRev = uid('drev');
         }
       }
-      const verId = uid('lv'), at = Date.now();
+      const verId = uid('lv'), at = Date.now(), groupIds = docGroupIds(storedDoc);
       await writeSnapshot({ id: verId, subjectId: targetId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), pieces, links, ...(tokens ? { tokens } : {}), ...(storedDoc ? { doc: storedDoc, ...(docRev ? { docRev } : {}), ...(storedRasterIds ? { storedRasterIds } : {}) } : {}) }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), assetIds: snapshotAssets(cur, pieces, storedDoc), ...(docRev ? { docRev } : {}) };
+      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), assetIds: snapshotAssets(cur, pieces, storedDoc), ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}) };
       let saved: Subject | null = null;
       useStore.setState((st) => {
         const live = st.library.find((x) => x.id === cur.id);
@@ -426,7 +438,7 @@ export function saveKit(opts: {
           saved = {
             id: targetId, name: opts.name?.trim() || `${live.name} copy`, kind: live.kind, refAssetIds: [], pieces, links,
             ...(live.description ? { description: live.description } : {}), ...(tokens ? { tokens } : {}),
-            copiedFrom: live.id, draft: opts.by === 'user' ? false : Boolean(live.draft), versionId: verId, ...(docRev ? { docRev } : {}), versions: [ref],
+            copiedFrom: live.id, draft: opts.by === 'user' ? false : Boolean(live.draft), versionId: verId, ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}), versions: [ref],
             origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) },
           };
           return { library: [...st.library, saved] };
@@ -436,7 +448,7 @@ export function saveKit(opts: {
           pieces: opts.pieces !== undefined ? pieces : live.pieces,
           links: opts.links !== undefined ? links : live.links,
           ...(opts.tokens !== undefined ? { tokens } : {}),
-          draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
+          draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), ...(groupIds ? { groupIds } : { groupIds: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
         };
         return { library: st.library.map((x) => (x.id === cur.id ? saved! : x)) };
       });
@@ -461,15 +473,16 @@ export function restoreKitVersion(opts: { subjectId: string; versionId: string; 
     if (!snap) throw new Error(`Version "${opts.versionId}" blob is missing and cannot be restored.`);
     if (snap.doc) for (const id of expectedRasterIds(snap)) if (!(await blobDb.get(rKey(id)))) throw new Error(`Cannot restore version "${opts.versionId}": missing pixel blob "${rKey(id)}".`);
     const docRev = snap.doc ? (snap.docRev ?? uid('drev')) : undefined;
+    const groupIds = docGroupIds(snap.doc);
     const written: string[] = [], verId = uid('lv'), at = Date.now(), label = opts.label ?? `Restore ${opts.versionId}`;
     try {
       await writeSnapshot({ ...snap, id: verId, subjectId: cur.id, at, by: opts.by, space: opts.space, label, ...(docRev ? { docRev } : { docRev: undefined }) }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, label, assetIds: snapshotAssets(cur, snap.pieces, snap.doc), ...(docRev ? { docRev } : {}) };
+      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, label, assetIds: snapshotAssets(cur, snap.pieces, snap.doc), ...(docRev ? { docRev } : {}), ...(groupIds ? { groupIds } : {}) };
       let restored: Subject | null = null;
       useStore.setState((st) => {
         const live = st.library.find((x) => x.id === cur.id);
         if (!live || !isKit(live)) return {};
-        restored = { ...live, pieces: snap.pieces, links: snap.links, tokens: snap.tokens, draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin };
+        restored = { ...live, pieces: snap.pieces, links: snap.links, tokens: snap.tokens, draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), ...(groupIds ? { groupIds } : { groupIds: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin };
         return { library: st.library.map((x) => (x.id === cur.id ? restored! : x)) };
       });
       if (!restored) throw new Error(`Kit "${cur.id}" was deleted while restoring.`);

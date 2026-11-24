@@ -128,7 +128,7 @@ describe('Contract 1 & 2: kit types, graph, cycles, missing refs and assets', ()
     const lib = [ds, mb, brand];
     const index = buildLibraryIndex(lib);
 
-    expect(kitDependencies(brand, lib)).toEqual({
+    expect(kitDependencies(brand, lib)).toMatchObject({
       kitIds: ['ds1', 'mb1'],
       missingKitIds: ['missing_kit'],
       assetIds: [],
