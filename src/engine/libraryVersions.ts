@@ -211,10 +211,9 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
         } else {
           const prevIds = new Set((prevSnap?.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'asset' && n.data.assetId ? [n.data.assetId] : [])));
           const seen = new Set(existing.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)));
-          let placed = existing.layers.length;
           for (const n of subject.graph?.nodes ?? []) {
             if (n.data.kind !== 'asset' || !n.data.assetId || prevIds.has(n.data.assetId) || seen.has(n.data.assetId) || get().assets[n.data.assetId]?.kind !== 'image') continue;
-            try { if (await placeAsset(sessionId, existing.id, n.data.assetId, placed ? 'new' : 'base', n.data.title || undefined)) { seen.add(n.data.assetId); placed++; } } catch {}
+            try { if (await placeAsset(sessionId, existing.id, n.data.assetId, 'new', n.data.title || undefined)) seen.add(n.data.assetId); } catch {}
           }
           setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId ? { ...d, library: { ...d.library, versionId: curVer } } : d));
         }
@@ -239,10 +238,9 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      let placed = 0;
       for (const n of imgs) {
         if (n.data.kind !== 'asset' || !n.data.assetId) continue;
-        try { if (await placeAsset(sessionId, doc.id, n.data.assetId, placed ? 'new' : 'base', n.data.title || undefined)) placed++; } catch {}
+        try { await placeAsset(sessionId, doc.id, n.data.assetId, 'new', n.data.title || undefined); } catch {}
       }
       const box = { x: Math.round(w * 0.08), y: Math.round(h * 0.08), width: Math.round(w * 0.84) };
       for (const n of gNodes) if (n.data.kind === 'text' && n.data.text.trim()) addTextLayer(sessionId, doc.id, n.data.text, box, {}, n.data.title || undefined);

@@ -64,7 +64,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
 }));
 
 import { createItem, libraryToDesigner, renameItem, saveItem } from '../src/engine/libraryVersions';
-import { deleteLayer, getDoc, mergeDown } from '../src/engine/design/actions';
+import { deleteLayer, getDoc, mergeDown, placeAsset } from '../src/engine/design/actions';
 import { createSession, useStore } from '../src/store/store';
 import type { Asset, Graph, RasterLayer } from '../src/engine/types';
 
@@ -152,5 +152,44 @@ describe('Lote G fixes', () => {
     const afterMergeReopen = await libraryToDesigner(s.id, mbMerge.id);
     expect(afterMergeReopen.id).toBe(docM.id);
     expect(afterMergeReopen.layers).toHaveLength(1);
+  });
+
+  it('2) openInSpace imports with target "new" so a layer placed during load is never overwritten, preserving 1600x900 doc size', async () => {
+    const s = resetStore();
+    useStore.setState({ assets: { a: mkAsset('a', s.id, 1600, 900), b: mkAsset('b', s.id, 600, 600) } });
+    putImageBlob('a', 1600, 900);
+    putImageBlob('b', 600, 600);
+
+    const nA = { id: 'na', position: { x: 0, y: 0 }, data: { kind: 'asset' as const, title: 'Hero 16:9', assetId: 'a' } };
+    const { subject: mb } = await createItem({ name: 'WideBoard', kind: 'moodboard', space: 'library', by: 'user', graph: { nodes: [nA], edges: [] }, draft: false });
+
+    // Empty-doc open keeps exact 1600x900 size and places A covering canvas
+    const cleanDoc = await libraryToDesigner(s.id, mb.id);
+    expect([cleanDoc.width, cleanDoc.height]).toEqual([1600, 900]);
+    expect(rasterSources(cleanDoc)).toEqual(['a']);
+
+    // Race: open into a fresh session while A load is paused, place B mid-load
+    const s2 = createSession('S2');
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [s2.id]: s2 } }));
+    let releaseA!: () => void;
+    let enteredA!: () => void;
+    const waitEnteredA = new Promise<void>((r) => { enteredA = r; });
+    const waitReleaseA = new Promise<void>((r) => { releaseA = r; });
+    hoisted.setOnGetAsset(async (id) => {
+      if (id === 'a') { enteredA(); await waitReleaseA; }
+    });
+
+    const opening = libraryToDesigner(s2.id, mb.id);
+    await waitEnteredA;
+    const activeId = useStore.getState().sessions[s2.id].activeDocId!;
+    const layerBId = await placeAsset(s2.id, activeId, 'b', 'new', 'User B');
+    expect(layerBId).toBeTruthy();
+    releaseA();
+    const docRace = await opening;
+
+    expect([docRace.width, docRace.height]).toEqual([1600, 900]);
+    const layerB = docRace.layers.find((l) => l.id === layerBId) as RasterLayer | undefined;
+    expect(layerB?.sourceAssetId).toBe('b');
+    expect(rasterSources(docRace)).toEqual(['b', 'a']);
   });
 });
