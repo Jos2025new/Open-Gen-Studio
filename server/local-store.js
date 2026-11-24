@@ -11,6 +11,8 @@ import { createSqliteStore, sqliteHead, stripSqliteKeys, validateSqliteCommit } 
 import { EPS_MAX_BYTES, handleEps } from './eps.js';
 import { PROVIDERS, createKeyStore, maskOf, sanitizeKeysInText } from './keys.js';
 import { handleProxy } from './provider-proxy.js';
+import { recordLosses, recordsBody } from './save-guard.js';
+import { recordIndex } from './sqlite/delta-client.mjs';
 
 const run = promisify(execFile);
 /** data/logs/app.log rotates here: the previous file is kept as app.log.1 and then overwritten. */
@@ -110,7 +112,16 @@ const BACKUPS_KEPT = 20;
 
 /** @param {string} [root] project folder (default: where Vite runs, i.e. the project root) */
 /** The body of a 409: why it was refused ('conflict' or 'possible-loss'), the current savedAt and, for a loss, the kept copy. */
-const conflictBody = ({ reason = 'conflict', savedAt, sessionId, diskHash, rejectedFile, losses, total }) => JSON.stringify({ reason, ...(sessionId ? { sessionId } : {}), ...(diskHash ? { diskHash } : {}), ...(losses ? { losses } : {}), ...(total ? { total } : {}), ...(rejectedFile ? { rejectedFile } : {}), savedAt });
+const conflictBody = ({ reason = 'conflict', savedAt, sessionId, diskHash, rejectedFile, losses, total, records }) => JSON.stringify({ reason, ...(sessionId ? { sessionId } : {}), ...(diskHash ? { diskHash } : {}), ...(losses ? { losses } : {}), ...(total ? { total } : {}), ...(records ? { records } : {}), ...(rejectedFile ? { rejectedFile } : {}), savedAt });
+
+/** Library guard for a format-1 write: what it loses of the records on disk ([] when either text cannot be read, as before). */
+function recordsLost(prev, next) {
+  try {
+    const a = JSON.parse(prev.toString('utf8')).state, b = JSON.parse(next.toString('utf8')).state;
+    const removed = new Set(Object.keys(a?.sessions ?? {}).filter((id) => !Object.hasOwn(b?.sessions ?? {}, id)));
+    return recordsBody(recordLosses(recordIndex(a), recordIndex(b), removed));
+  } catch { return []; }
+}
 
 export function localStore(root = process.cwd(), dataDir = 'data') {
   const dir = resolve(root, dataDir);
@@ -293,10 +304,11 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
           const old = await readFile(stateFile).catch(() => null);
           const had = old ? sessions(old) : 0;
           const has = sessions(next);
-          if (had >= 2 && has < had / 2) {
+          const records = old ? recordsLost(old, next) : [];
+          if ((had >= 2 && has < had / 2) || records.length) {
             const rejectedFile = `rejected-${Date.now()}.json`;
             await atomic(join(dir, 'backups', rejectedFile), next, 0o600);
-            return { reason: 'possible-loss', rejectedFile, savedAt: Number(current) };
+            return { reason: 'possible-loss', ...(records.length ? { records } : {}), rejectedFile, savedAt: Number(current) };
           }
           if (old && (has < had || Date.now() - lastBackup > BACKUP_EVERY_MS)) {
             await mkdir(join(dir, 'backups'), { recursive: true });

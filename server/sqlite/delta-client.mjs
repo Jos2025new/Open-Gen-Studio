@@ -29,6 +29,29 @@ function sameSequence(a, b) {
   return true;
 }
 
+/** The id each library item is stored under: its own, or its place when it has none; a repeated one gets a suffix. */
+function libraryIds(list) {
+  const ids = [], seen = new Set();
+  for (let i = 0; i < list.length; i++) {
+    const baseId = String(list[i]?.id ?? `#${i}`);
+    let id = baseId;
+    for (let dup = 2; seen.has(id); dup++) id = `${baseId}#${dup}`;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** The records of a globals object by collection: id -> the session it belongs to (undefined for library items). */
+export function recordIndex(g) {
+  const owner = (o) => new Map(Object.keys(o ?? {}).map((id) => [id, o[id]?.sessionId]));
+  return {
+    generations: owner(g?.generations),
+    assets: owner(g?.assets),
+    library: new Map(libraryIds(Array.isArray(g?.library) ? g.library : []).map((id) => [id, undefined])),
+  };
+}
+
 export function createDeltaClient() {
   const known = { generations: new Map(), assets: new Map(), library: new Map() };
   const unconfirmedUp = { generations: new Map(), assets: new Map(), library: new Map() };
@@ -52,11 +75,9 @@ export function createDeltaClient() {
       const present = new Set();
       if (coll === 'library') {
         const list = g.library ?? [];
+        const ids = libraryIds(list);
         for (let i = 0; i < list.length; i++) {
-          const item = list[i];
-          const baseId = String(item.id ?? `#${i}`);
-          let id = baseId;
-          for (let dup = 2; present.has(id); dup++) id = `${baseId}#${dup}`;
+          const item = list[i], id = ids[i];
           present.add(id);
           const p = prev.get(id);
           if (p && p.ref === item) {

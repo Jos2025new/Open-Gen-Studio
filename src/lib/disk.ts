@@ -4,7 +4,7 @@
  */
 
 import { holdsWriterLock } from './writerLock';
-import { createDeltaClient } from '../../server/sqlite/delta-client.mjs';
+import { createDeltaClient, type RecordColl } from '../../server/sqlite/delta-client.mjs';
 
 // Every function here that writes (PUT, DELETE, POST) first asks holdsWriterLock(): only the active tab changes the disk.
 let available: Promise<boolean> | null = null;
@@ -13,13 +13,15 @@ let unavailable = false;
 export type DiskWriteResult = 'ok' | 'conflict' | 'rejected' | 'fail' | 'browser-only';
 /** The body of a possible-loss 409 (see server/local-store.js `conflictBody`). */
 export interface Loss { sessionId: string; diskHash?: string }
+/** A Library collection that would lose most of its records (save-guard.js); diskHash covers the ids on disk. */
+export interface RecordLoss { coll: RecordColl; lost?: number; diskHash: string }
 /** `losses`: every shrinking session of the refused commit; `total`: the commit removes most sessions (hash of the disk order). */
-export interface Rejection { sessionId?: string; rejectedFile?: string; diskHash?: string; savedAt?: number; losses?: Loss[]; total?: { diskOrderHash: string } }
+export interface Rejection { sessionId?: string; rejectedFile?: string; diskHash?: string; savedAt?: number; losses?: Loss[]; total?: { diskOrderHash: string }; records?: RecordLoss[] }
 /**
  * "Keep this version" (ADR 0022): approves every loss of one exact commit, each bound to the disk text and the text sent by
  * hash (sessions), and a large removal bound to both session orders by hash (total).
  */
-export interface KeepVersion { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string } }
+export interface KeepVersion { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string }; records?: Array<{ coll: RecordColl; diskHash: string; candidateHash: string }> }
 
 /** True when the local store answers. A static host's SPA fallback returns HTML, not "ok", so it counts as absent. */
 /**
@@ -99,7 +101,7 @@ function seedDeltaFromText(text: string): void {
 async function refusal(res: Response): Promise<'conflict' | 'rejected'> {
   const body = await (async () => JSON.parse(await res.text()) as Rejection & { reason?: string })().catch(() => null);
   if (body?.reason !== 'possible-loss') return 'conflict';
-  lastRejection = { sessionId: body.sessionId, rejectedFile: body.rejectedFile, diskHash: body.diskHash, savedAt: body.savedAt, losses: body.losses, total: body.total };
+  lastRejection = { sessionId: body.sessionId, rejectedFile: body.rejectedFile, diskHash: body.diskHash, savedAt: body.savedAt, losses: body.losses, total: body.total, records: body.records };
   return 'rejected';
 }
 /** Bytes on the wire: the browser's keepalive limit (64 KiB) counts bytes, not string length. */

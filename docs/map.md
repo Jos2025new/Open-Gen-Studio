@@ -71,7 +71,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/planSteps` | 19 | 2 |
 | `src/engine/providers` | 15 | 99 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 484 |
+| `src/lib` | 38 | 485 |
 | `src/store` | 19 | 387 |
 
 283 de 807 módulos no tienen ningún test que los importe directamente.

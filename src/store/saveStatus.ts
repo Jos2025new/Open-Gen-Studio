@@ -11,7 +11,7 @@ export interface SaveStatus {
   /** Why the disk is not taking saves ('disk': unreachable or failing). The browser copy keeps being written in every case. */
   reason: 'conflict' | 'possible-loss' | 'disk' | null;
   /** The refused save of a possible-loss: its first session (absent for a total loss), and every loss to approve. */
-  rejected: { sessionId?: string; rejectedFile?: string; diskHash?: string; losses?: Array<{ sessionId: string }>; total?: boolean } | null;
+  rejected: { sessionId?: string; rejectedFile?: string; diskHash?: string; losses?: Array<{ sessionId: string }>; total?: boolean; records?: boolean } | null;
 }
 const initial: SaveStatus = { phase: 'saved', version: 0, confirmed: 0, browserOnly: false, conflict: false, error: null, reason: null, rejected: null };
 export const saveStatus = create<SaveStatus>(() => ({ ...initial }));

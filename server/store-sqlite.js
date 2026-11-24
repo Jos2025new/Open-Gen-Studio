@@ -1,6 +1,6 @@
 // Phase 1: the format-2 commit body (globals text, order, changed sessions) stored in SQLite.
 // The HTTP body stays the one the app sends today. Rows change only where that body differs.
-// save-guard.js is not modified: store-b.js calls looksLost on the session texts.
+// save-guard.js judges the losses: store-b.js calls looksLost on the session texts and libraryLosses on the records.
 import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
@@ -83,6 +83,7 @@ export function validateSqliteCommit(body, fresh = false) {
   if (order != null && (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id)))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
   if (!sessions || typeof sessions !== 'object' || Array.isArray(sessions)) return { status: 400, reason: 'invalid sessions' };
   if (body.keep?.sessions != null && (!Array.isArray(body.keep.sessions) || body.keep.sessions.some((k) => !k || typeof k !== 'object'))) return { status: 400, reason: 'invalid keep sessions' };
+  if (body.keep?.records != null && (!Array.isArray(body.keep.records) || body.keep.records.some((k) => !k || typeof k !== 'object'))) return { status: 400, reason: 'invalid keep records' };
   for (const [id, text] of Object.entries(sessions)) {
     if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
     if (order != null && !order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };

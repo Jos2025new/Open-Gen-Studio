@@ -75,6 +75,10 @@ Seis fallos de la fase 1, corregidos sin cambiar la arquitectura. Cada uno tiene
 
 Límite: la garantía del traspaso cubre el estado y los píxeles que pasan por `saveNow()`. Otras escrituras de medios (`putAssetBlob` de resultados descargados) no forman parte del traspaso.
 
+## Ampliación: freno de Library (2026-11-24)
+
+La guarda cubría las sesiones, no lo demás: en una prueba, un guardado que vaciaba 40 entradas de biblioteca y 200 imágenes se aceptaba. El usuario autorizó ampliarla. Reglas, contrato y límites en [persistencia](../features/persistencia.md). Se descartó aprobar de antemano los borrados del usuario (marcas de borrado): sigue siendo de la fase 2; hasta entonces, un borrado en lote de más de la mitad pide «Mantener», como con las sesiones.
+
 ## Pendiente
 
 **Fase 2: atomicidad, borrados explícitos e historial.**
