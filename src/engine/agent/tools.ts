@@ -368,7 +368,7 @@ export function toRawPlan(v: z.infer<typeof proposePlanSchema>): RawPlan {
 export const CAPABILITIES = [
   'YOU HAVE these tools (call them; do not wonder whether you can):',
   ...TOOLS.map((t) => `- ${t.function.name}: ${t.function.description.split(/(?<=\.)\s/)[0]}`),
-  'LIBRARY KITS (moodboard, design-system, brand-kit): reusable graph/token/asset collections (copied with origin on insert, no live link). Read the index (library.item.list/read) before designing; build via library.item.create → Designer/Nodes → designer.group.create → library.item.save (graph, tokens, kits).',
+  'LIBRARY KITS (moodboard, design-system, brand-kit): reusable graph/token/asset collections (copied with origin on insert, no live link). Read the index (library.item.list/read) before designing; build via library.item.create → Designer/Nodes → designer.group.create → library.item.save (graph, tokens, kits; pass the canvas ID as doc to publish the canvas).',
   'YOU DO NOT HAVE: files, the internet, a shell, or anything outside these tools and <app_context>. Never claim results you did not get from them.',
 ].join('\n');
 

@@ -66,6 +66,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
 import { createItem, libraryToDesigner, readKitVersion, renameItem, saveItem } from '../src/engine/libraryVersions';
 import { deleteAssets } from '../src/engine/assetActions';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
+import { CAPABILITIES } from '../src/engine/agent/tools';
 import { run } from '../src/engine/commands';
 import { deleteLayer, getDoc, mergeDown, placeAsset } from '../src/engine/design/actions';
 import { newRasterLayer } from '../src/engine/design/doc';
@@ -344,5 +345,12 @@ describe('Lote G fixes', () => {
     const saved = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'designer', by: 'user' });
     expect(saved.versionId).toBeTruthy();
     expect((await readKitVersion(saved.versionId!))?.doc?.layers).toHaveLength(1);
+  });
+
+  it('8) CAPABILITIES LIBRARY KITS guide states that publishing the canvas requires passing its ID as doc', () => {
+    const kitLine = CAPABILITIES.split('\n').find((l) => /LIBRARY KITS/i.test(l));
+    expect(kitLine).toBeDefined();
+    expect(kitLine!.length).toBeLessThan(400);
+    expect(kitLine).toMatch(/pass .*doc|doc\b.*canvas|canvas.*\bdoc\b/i);
   });
 });
