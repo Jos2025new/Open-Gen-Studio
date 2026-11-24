@@ -1,6 +1,6 @@
 import { parseTokenAlias } from './libraryTokens';
 import { isKit, mentionableSubjects } from './libraryTypes';
-import type { DesignDoc, Subject } from './types';
+import type { Asset, DesignDoc, Subject } from './types';
 
 /* Pure dependency graph, reverse usage, cycle checks, asset ownership across versions, and plain-text index. */
 export interface KitDependencies {
@@ -69,18 +69,39 @@ export function libraryAssetOwners(library: readonly Subject[]): Map<string, Sub
 }
 export const libraryAssetSet = (library: readonly Subject[]): Set<string> => new Set(libraryAssetOwners(library).keys());
 
+const assetMeta = (assets: Record<string, unknown>, aid?: string | null): string => {
+  const a = aid && assets[aid] && typeof assets[aid] === 'object' ? (assets[aid] as Partial<Asset>) : undefined;
+  return a ? `${a.width && a.height ? ` ${a.width}x${a.height}` : ''}${a.origin ? ` (${a.origin})` : ''}` : '';
+};
+function docSummaryLines(doc: DesignDoc, assets: Record<string, unknown>, seen: ReadonlySet<string>): string[] {
+  const fonts = uniq(doc.layers.map((l) => (l.type === 'text' ? l.fontFamily : undefined)));
+  const colors = uniq(doc.layers.flatMap((l) => {
+    if (l.type === 'text') return [l.color];
+    if (l.type === 'raster') return [l.pageFill?.color, ...(l.paintStrokes?.map((s) => s.color) ?? [])];
+    if (l.type !== 'vector') return [];
+    const stops = (g?: { stops: Array<{ color: string }> }) => g?.stops.map((x) => x.color) ?? [];
+    return [...l.shapes.flatMap((s) => [s.fill ?? undefined, s.stroke ?? undefined, ...stops(s.fillGradient), ...stops(s.strokeGradient)]), ...(l.strokes?.map((s) => s.color) ?? [])];
+  }));
+  const f = fonts.length ? `, fonts: ${fonts.join(', ')}` : '', c = colors.length ? `, colors: ${colors.join(', ')}` : '';
+  const out = [`doc: ${doc.width}x${doc.height}, bg ${doc.background ?? 'none'}, ${doc.layers.length} layers${f}${c}`];
+  for (const g of (doc.groups ?? []).filter((gr) => doc.layers.some((l) => l.groupId === gr.id))) out.push(`component ${g.id} "${shortText(g.name, 60)}"`);
+  for (const aid of uniq(doc.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)))) if (!seen.has(aid)) out.push(`image ${aid}${assetMeta(assets, aid)}`);
+  return out;
+}
+
 /** Pure plain-text index derived on read: properties, relations, origin, versions, usedBy, missing; line-capped at maxChars. */
-export function formatLibraryItemIndex(subject: Subject, library: readonly Subject[], assets: Record<string, unknown>, maxChars = 2500): { text: string; truncated: boolean } {
-  const byId = new Map(library.map((s) => [s.id, s])), dep = kitDependencies(subject, byId), usedBy = kitUsedBy(subject.id, library);
+export function formatLibraryItemIndex(subject: Subject, library: readonly Subject[], assets: Record<string, unknown>, maxChars = 2500, doc?: DesignDoc): { text: string; truncated: boolean } {
+  const byId = new Map(library.map((s) => [s.id, s])), dep = kitDependencies(subject, byId, doc), usedBy = kitUsedBy(subject.id, library);
   const lines: string[] = [`${subject.id} "${shortText(subject.name, 100)}" (${subject.kind ?? 'item'}${subject.draft ? ', draft' : ''})`];
   if (subject.description) lines.push(`description: ${shortText(subject.description, 200)}`);
   if (subject.origin) lines.push(`origin: ${subject.origin.space} by ${subject.origin.by}${subject.origin.sessionTitle ? ` (${shortText(subject.origin.sessionTitle, 60)})` : ''}${subject.copiedFrom ? `, copiedFrom ${subject.copiedFrom}` : ''}`);
   const vers = subject.versions ?? [];
   lines.push(`versions: ${vers.length}${subject.versionId ? ` (current ${subject.versionId})` : ''}${vers.length ? ` — ${vers.slice(-3).map((v) => `${v.id}:${v.space}/${v.by}${v.label ? ` "${shortText(v.label, 40)}"` : ''}`).join(', ')}` : ''}`);
+  if (doc) lines.push(...docSummaryLines(doc, assets, new Set(dep.assetIds)));
   for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}`);
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
   for (const { id, data: d } of nodes) {
-    if (d.kind === 'asset') lines.push(`node ${id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}`);
+    if (d.kind === 'asset') lines.push(`node ${id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}${assetMeta(assets, d.assetId)}`);
     else if (d.kind === 'text') lines.push(`node ${id} [text] "${shortText(d.title, 60)}": ${shortText(d.text, 120)}`);
     else if (d.kind === 'part') lines.push(`node ${id} [${d.partKind}] "${shortText(d.title, 60)}"${d.color ? ` ${d.color}` : ''}${d.groupId ? ` group:${d.groupId}` : ''}${d.styleType ? ` ${d.styleType}` : ''}${dep.pieceTokens[id]?.length ? ` tokens:${dep.pieceTokens[id].join(',')}` : ''}`);
   }

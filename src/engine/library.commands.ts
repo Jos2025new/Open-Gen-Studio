@@ -10,7 +10,7 @@ import { isKit, KIT_KIND_LIST, TOKEN_TYPES } from './libraryTypes';
 import { insertComponent } from './libraryInsert';
 import { getDoc } from './design/actions';
 import { libraryToNodes, nodesToLibrary } from './flow/fromLibrary';
-import { createItem, deleteItem, libraryToDesigner, libraryToStudio, restoreItemVersion, saveItem, waitKitQueue } from './libraryVersions';
+import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem, waitKitQueue } from './libraryVersions';
 import type { Graph } from './types';
 
 const styleEstimate = () => {
@@ -54,7 +54,12 @@ export const commands = [
   defineCommand({ id: 'library.item.open', title: 'Open Library item', args: z.object({ id, space: z.enum(['studio', 'designer', 'nodes']) }).strict(), effect: 'write', needs: ['session'], available: (ctx, args) => { const s = sessionAvailable(ctx.on.session); return s === true ? itemAvailable(args?.id) : s; }, run: async (ctx, args) => args.space === 'nodes' ? (() => { const r = libraryToNodes(ctx.on.session!, args.id); return { groupId: r.groupId, nodes: r.added.map((n) => n.id), edges: r.edges.map((e) => e.id) }; })() : { doc: (await (args.space === 'studio' ? libraryToStudio : libraryToDesigner)(ctx.on.session!, args.id)).id } }),
   defineCommand({ id: 'library.item.restore', title: 'Restore Library item version', args: z.object({ id, versionId: id, space: space.optional(), label: z.string().optional() }).strict(), effect: 'write', available: (_ctx, args) => itemAvailable(args?.id), run: (ctx, args) => restoreItemVersion({ subjectId: args.id, versionId: args.versionId, space: args.space ?? 'library', by: actorOf(ctx.caller), label: args.label }) }),
   defineCommand({ id: 'library.item.delete', title: 'Delete Library item', args: z.object({ id }).strict(), effect: 'delete', available: (_ctx, args) => itemAvailable(args?.id), run: async (_ctx, args) => { await deleteItem(args.id); return { id: args.id }; } }),
-  defineCommand({ id: 'library.item.read', title: 'Read Library item index', args: z.object({ id }).strict(), effect: 'read', available: (_ctx, args) => itemAvailable(args?.id), run: (_ctx, args) => { const st = useStore.getState(), s = requireSubject(st.library.find((x) => x.id === args.id && isKit(x)), `No Library item "${args.id}".`); const idx = formatLibraryItemIndex(s, st.library, st.assets, 2500); return { id: s.id, index: idx.text, truncated: idx.truncated }; } }),
+  defineCommand({ id: 'library.item.read', title: 'Read Library item index', args: z.object({ id }).strict(), effect: 'read',
+    available: (_ctx, args) => itemAvailable(args?.id), run: async (_ctx, args) => {
+      const st = useStore.getState(), s = requireSubject(st.library.find((x) => x.id === args.id && isKit(x)), `No Library item "${args.id}".`);
+      const snap = s.versionId ? await readKitVersion(s.versionId).catch(() => null) : null, idx = formatLibraryItemIndex(s, st.library, st.assets, 2500, snap?.doc);
+      return { id: s.id, index: idx.text, truncated: idx.truncated };
+    } }),
   defineCommand({ id: 'library.item.list', title: 'List Library items', args: z.object({ kind: kitKind.optional() }).strict(), effect: 'read', run: (_ctx, args) => { const list = useStore.getState().library.filter((s) => isKit(s) && (!args.kind || s.kind === args.kind)); return { total: list.length, items: list.slice(0, 20).map((s) => ({ id: s.id, name: shortText(s.name, 120), kind: s.kind })), ...(list.length > 20 ? { truncated: true } : {}) }; } }),
   defineCommand({ id: 'library.item.insert', title: 'Insert component', args: z.object({ id, piece: id, at: point.optional() }).strict(), effect: 'write', needs: ['session', 'doc'], history: (on) => `designer:${on.doc}`, available: (ctx, args) => { const s = sessionAvailable(ctx.on.session); if (s !== true) return s; if (!getDoc(ctx.on.session!, ctx.on.doc ?? '')) return 'That document is not in this session.'; return itemAvailable(args?.id); }, run: (ctx, args) => insertComponent(ctx.on.session!, ctx.on.doc!, args.id, args.piece, args.at) }),
 ];
