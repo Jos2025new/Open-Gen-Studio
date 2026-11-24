@@ -87,11 +87,17 @@ function ownLayer(doc: DesignDoc, node: GraphNode, taken: ReadonlySet<string>, k
 const canRefresh = (layer: RasterLayer) => layer.sourceAssetId && layer.rev === (layer.libraryImageRev ?? 0)
   && !layer.locked && !layer.paintBaseId && !layer.paintStrokes?.length && !layer.paintFlattened && !isUnreadable(layer.id);
 
+interface BoardImages {
+  items: GraphNode[];
+  images: ReadonlyMap<string, HTMLCanvasElement | null>;
+}
+
 /** Resolve imports before opening the document's history group. Existing pixels must also be ready for undo. */
-export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, kind: string | undefined, refreshLinked = false): Promise<Map<string, HTMLCanvasElement | null>> {
+export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, kind: string | undefined, refreshLinked = false): Promise<BoardImages> {
+  const items = boardNodes(graph);
   const images = new Map<string, HTMLCanvasElement | null>();
   const taken = new Set(Object.values(doc.board?.at ?? {}).map(a => a.layer));
-  for (const n of boardNodes(graph)) {
+  for (const n of items) {
     if (n.data.kind !== 'asset' || !n.data.assetId) continue;
     const id = n.data.assetId, entry = linked(doc, n.id);
     if (doc.board?.at[n.id]) {
@@ -105,7 +111,7 @@ export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, 
     }
     try { images.set(n.id, await assetCanvas(id)); } catch { /* Report missing images when applying the graph. */ }
   }
-  return images;
+  return { items, images };
 }
 
 function missingImage(assetId: string, title: string | undefined) {
@@ -116,7 +122,7 @@ function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: num
   const d = n.data;
   if (d.kind === 'text') return addTextLayer(sessionId, docId, d.text, box, { fontSize: box.fontSize }, d.title || undefined);
   if (d.kind !== 'asset' || !d.assetId) return null;
-  const canvas = images.get(n.id);
+  const canvas = isImageAsset(d.assetId) && images.get(n.id);
   if (!canvas) { missingImage(d.assetId, d.title); return null; }
   const id = placeAssetCanvas(sessionId, docId, d.assetId, canvas, 'new', d.title || undefined);
   if (id) {
@@ -127,15 +133,15 @@ function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: num
 }
 
 /** Brings the graph to an open document in one synchronous undo step. */
-export function bringGraph(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, images: ReadonlyMap<string, HTMLCanvasElement | null>): void {
+export function bringGraph(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, prepared: BoardImages): void {
   const history = openHistoryGroup(docId, { join: true });
-  try { updateBoard(sessionId, docId, graph, kind, images); } finally { history.close(); }
+  try { updateBoard(sessionId, docId, graph, kind, prepared); } finally { history.close(); }
 }
 
-function updateBoard(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, images: ReadonlyMap<string, HTMLCanvasElement | null>): void {
+function updateBoard(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, { items, images }: BoardImages): void {
   const was = getDoc(sessionId, docId), synced = was && syncDoc(was, graph);
   if (was && synced && synced !== was) mutateDoc(sessionId, docId, () => synced, { record: synced.layers.some((l, i) => l !== was.layers[i]) });
-  const doc = getDoc(sessionId, docId), items = boardNodes(graph), news = items.filter((n) => !doc?.board?.at[n.id]);
+  const doc = getDoc(sessionId, docId), news = items.filter((n) => !doc?.board?.at[n.id]);
   if (!doc) return;
   for (const n of items) {
     const d = n.data, e = linked(doc, n.id);
@@ -144,7 +150,7 @@ function updateBoard(sessionId: string, docId: string, graph: Graph | undefined,
       toast(`Kept "${e.layer.name}" as it is.`, 'info');
       continue;
     }
-    const canvas = images.get(n.id);
+    const canvas = isImageAsset(d.assetId) && images.get(n.id);
     if (!canvas) { missingImage(d.assetId, d.title); continue; }
     replaceLayerPixels(sessionId, docId, e.layer.id, d.assetId, canvas);
   }

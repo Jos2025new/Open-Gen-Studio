@@ -1,20 +1,26 @@
 import { expect, it } from 'vitest';
 import { graphOf, notesOf, resetStore, text, tool } from './library-kits-final-fixtures';
 import { undoDoc } from '../src/engine/design/actions';
-import { canUndo } from '../src/engine/design/history';
+import { canUndo, subscribeHistory } from '../src/engine/design/history';
 import { createItem, libraryToDesigner, saveItem } from '../src/engine/libraryVersions';
 import { useStore } from '../src/store/store';
 
 it('creates and populates a new document without an initial undo step', async () => {
   const s = resetStore();
+  const undoAvailability: boolean[] = [];
+  const unsubscribe = subscribeHistory(() => {
+    const doc = useStore.getState().sessions[s.id].docs[0];
+    if (doc) undoAvailability.push(canUndo(doc.id));
+  });
   const result = await tool(s.id, [{ cmd: 'library.item.create', args: {
     name: 'Board', kind: 'moodboard', space: 'designer', graph: graphOf(text('t', 'Hi', 100, 100)),
-  } }]);
+  } }]).finally(unsubscribe);
   expect(result.done).toBe(true);
   expect(result.text).toContain('Saved in Library');
   const doc = useStore.getState().sessions[s.id].docs[0];
   expect(notesOf(s.id, doc.id)).toEqual(['Hi']);
   expect({ canUndo: canUndo(doc.id), advertisesUndo: result.text.includes('One Ctrl+Z') }).toEqual({ canUndo: false, advertisesUndo: false });
+  expect(undoAvailability.at(-1) ?? false).toBe(false);
 });
 
 it('omits the one-undo promise when a reopen and a text edit need two undos', async () => {

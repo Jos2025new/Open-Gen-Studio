@@ -203,7 +203,7 @@ export function subscribeHistory(fn: () => void): () => void {
 }
 
 export function dropHistory(docId: string): void {
-  stacks.delete(docId);
+  if (stacks.delete(docId)) listeners.forEach((l) => l());
 }
 
 /** Read-only stack sizes for the sandbox state hook. */

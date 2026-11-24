@@ -68,7 +68,7 @@ import { deleteAssets } from '../src/engine/assetActions';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { CAPABILITIES } from '../src/engine/agent/tools';
 import { run } from '../src/engine/commands';
-import { deleteLayer, getDoc, mergeDown, placeAsset } from '../src/engine/design/actions';
+import { deleteLayer, getDoc, mergeDown, placeAsset, undoDoc } from '../src/engine/design/actions';
 import { newRasterLayer } from '../src/engine/design/doc';
 import { createSession, setDoc, useStore } from '../src/store/store';
 import type { Asset, Graph, RasterLayer, TextLayer } from '../src/engine/types';
@@ -201,6 +201,10 @@ describe('Lote G fixes', () => {
     const layerB = docRace.layers.find((l) => l.id === layerBId) as RasterLayer | undefined;
     expect(layerB?.sourceAssetId).toBe('b');
     expect(rasterSources(docRace)).toEqual(['b', 'a']);
+    undoDoc(s2.id, activeId);
+    expect(rasterSources(getDoc(s2.id, activeId)!)).toEqual(['b']);
+    undoDoc(s2.id, activeId);
+    expect(rasterSources(getDoc(s2.id, activeId)!)).toEqual([]);
   });
 
   it('3) openInSpace emits error toast with image title on decode error or falsy placeAsset and continues with remaining images', async () => {

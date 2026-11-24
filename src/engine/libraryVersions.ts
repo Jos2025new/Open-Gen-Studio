@@ -4,7 +4,7 @@ import { setDoc, useStore } from '../store/store';
 import { copyAssetRevision, normalizeAssetRevisions } from './assetRevisions';
 import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
-import { dropHistory } from './design/history';
+import { canRedo, canUndo, dropHistory } from './design/history';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
 import { assetRatio, boardNodes, bringGraph, graphFromDoc, loadBoardImages } from './libraryBoard';
@@ -226,8 +226,8 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
       }
-      const images = await loadBoardImages(existing, subject.graph, subject.kind, true);
-      bringGraph(sessionId, existing.id, subject.graph, subject.kind, images);
+      const prepared = await loadBoardImages(existing, subject.graph, subject.kind, true);
+      bringGraph(sessionId, existing.id, subject.graph, subject.kind, prepared);
       setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId && d.library.versionId !== curVer ? { ...d, library: { ...d.library, versionId: curVer } } : d));
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;
@@ -247,12 +247,14 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const doc = snap?.doc
         ? { ...remapDoc(snap.doc, px!, { newDocId: true, library: link }), name: subject.name }
         : { ...linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined, page.width, page.height), ...(board ? { board: { k: board.k, x: board.x, y: board.y, at: {} } } : {}) };
-      const images = await loadBoardImages(doc, graph, subject.kind);
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      bringGraph(sessionId, doc.id, graph, subject.kind, images);
-      dropHistory(doc.id);
+      const prepared = await loadBoardImages(doc, graph, subject.kind);
+      // If the user edited during loading, the import needs its own undo step after theirs.
+      const editedDuringLoad = canUndo(doc.id) || canRedo(doc.id);
+      bringGraph(sessionId, doc.id, graph, subject.kind, prepared);
+      if (!editedDuringLoad) dropHistory(doc.id);
       return getDoc(sessionId, doc.id) ?? doc;
     });
   });
