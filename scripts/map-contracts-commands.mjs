@@ -167,6 +167,9 @@ export default [
       'tests/library-kits-c-index.test.ts', 'tests/library-kits-c-nodes.test.ts',
       'tests/library-kits-d-gallery.test.tsx', 'tests/library-kits-d-save.test.tsx',
       'tests/library-kits-d-sendto.test.tsx', 'tests/library-kits-d-name.test.tsx',
+      'tests/library-kits-e-open.test.ts', 'tests/library-kits-e-nodes.test.tsx',
+      'tests/library-kits-e-components.test.tsx', 'tests/library-kits-e-index.test.ts',
+      'tests/library-kits-e-sendto.test.tsx',
     ],
   },
   {

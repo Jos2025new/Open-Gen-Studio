@@ -260,11 +260,13 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
       const space = workspace === 'chat' ? 'studio' : workspace === 'node' ? 'nodes' : 'designer';
       const node = { id: uid('nd'), position: { x: 0, y: 0 }, data: { kind: 'asset' as const, title: asset.name || 'Image', assetId } };
       if (target) {
-        const prev = target.graph ?? { nodes: [], edges: [] };
-        await saveItem({ subjectId: target.id, mode: 'overwrite', space, by: 'user', sessionId, graph: { ...prev, nodes: [...prev.nodes, node] } as Graph });
-        toast(`Added to "${target.name}".`, 'success');
+        const saved = await saveItem({
+          subjectId: target.id, mode: 'overwrite', space, by: 'user', sessionId,
+          graph: (g) => ({ ...(g ?? { nodes: [], edges: [] }), nodes: [...(g?.nodes ?? []), node] }) as Graph,
+        });
+        toast(`Added to "${saved.name}".`, 'success');
       } else {
-        const name = `Moodboard ${moodboards.length + 1}`;
+        const name = `Moodboard ${useStore.getState().library.filter((s) => s.kind === 'moodboard' && !s.userHidden).length + 1}`;
         await createItem({ name, kind: 'moodboard', space, by: 'user', sessionId, graph: { nodes: [node], edges: [] }, draft: false, open: false });
         toast(`Added to "${name}".`, 'success');
       }

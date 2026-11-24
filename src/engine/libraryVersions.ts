@@ -237,10 +237,14 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
 export const libraryToStudio = (sessionId: string, subjectId: string) => openInSpace(sessionId, subjectId, 'studio');
 export const libraryToDesigner = (sessionId: string, subjectId: string) => openInSpace(sessionId, subjectId, 'designer');
 
-export function saveItem(opts: { subjectId: string; mode: 'overwrite' | 'copy'; space: LibrarySpace; by: KitActor; sessionId?: string; docId?: string; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens }): Promise<Subject> {
+export function saveItem(opts: {
+  subjectId: string; mode: 'overwrite' | 'copy'; space: LibrarySpace; by: KitActor; sessionId?: string; docId?: string;
+  label?: string; name?: string; description?: string; graph?: Graph | ((prev?: Graph) => Graph); kits?: string[]; tokens?: KitTokens;
+}): Promise<Subject> {
   return serialize(opts.subjectId, async () => {
     const cur = requireItem(opts.subjectId), kind = cur.kind as KitKind, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
-    const graph = opts.graph !== undefined ? opts.graph : cur.graph, kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
+    const graph = typeof opts.graph === 'function' ? opts.graph(cur.graph) : opts.graph !== undefined ? opts.graph : cur.graph;
+    const kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
     validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined });
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
     const workDoc = opts.docId ? (opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined) : session?.docs.find((d) => d.library?.subjectId === cur.id);
