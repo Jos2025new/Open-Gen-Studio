@@ -115,12 +115,27 @@ export default [
   },
   {
     id: 'library-commands',
-    what: 'Las funciones de biblioteca de actions.ts son comandos (LIBRARY_ACTIONS); crear estilo o voz es `spend` y borrar un sujeto es `delete`.',
+    what: 'Las funciones de biblioteca de actions.ts y kits son comandos (LIBRARY_ACTIONS); crear estilo o voz es `spend` y borrar es `delete`.',
     sides: [
       ['src/engine/library.commands.ts', 'export const LIBRARY_ACTIONS'],
       ['src/engine/library.commands.ts', "id: 'library.voice.create'"],
+      ['src/engine/library.commands.ts', "id: 'library.kit.create'"],
     ],
-    tests: ['tests/library-commands.test.ts'],
+    tests: ['tests/library-commands.test.ts', 'tests/library-kits.test.ts'],
+  },
+  {
+    id: 'library-kits-engine',
+    what: 'Kits de Library (`KIT_KINDS`, `isKit`): grafo sin ciclos (`libraryGraph.ts`), versiones inmutables verificadas (`libver:<id>` + `raster:<id>` en `libraryVersions.ts`), protección de assets en todas las versiones (`deleteSession`, `purgeDiscarded`, `deleteAssets`, `deleteGeneration`) y exclusión de envíos (`mentionableSubjects`).',
+    sides: [
+      ['src/engine/libraryTypes.ts', 'export const KIT_KINDS'],
+      ['src/engine/libraryGraph.ts', 'export function libraryAssetOwners'],
+      ['src/engine/libraryVersions.ts', 'export function saveKit'],
+      ['src/engine/actions.ts', 'libraryAssetSet(st.library)'],
+      ['src/engine/jobState.ts', 'libraryAssetSet(st.library)'],
+      ['src/engine/assetActions.ts', 'libraryAssetOwners(get().library)'],
+      ['src/engine/sendInputs.ts', 'mentionableSubjects('],
+    ],
+    tests: ['tests/library-kits.test.ts'],
   },
   {
     id: 'catalog-commands',

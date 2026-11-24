@@ -59,6 +59,9 @@ import { deleteSession } from '../src/engine/actions';
 import { deleteAssets, deleteGeneration } from '../src/engine/assetActions';
 import { purgeDiscarded } from '../src/engine/jobState';
 import { createSession, useStore } from '../src/store/store';
+import { resolveSendPlan } from '../src/engine/sendInputs';
+import { run, setApprover } from '../src/engine/commands';
+import { runCommandsTool } from '../src/engine/agent/commandCalls';
 import type { Asset, Generation, RasterLayer, Subject } from '../src/engine/types';
 
 async function blobBytes(b: Blob | undefined): Promise<Uint8Array> {
@@ -333,7 +336,7 @@ describe('Contract 4: image protection across deleteSession, purgeDiscarded, del
     saveSubject({ id: 'sub_c', name: 'Hero', kind: 'character', frontalAssetId: 'ast_subj', refAssetIds: [] });
 
     const gen: Generation = {
-      id: 'gen_1', sessionId: s.id, kind: 'image', prompt: 'p', modelRef: 'm',
+      id: 'gen_1', sessionId: s.id, kind: 'image', prompt: 'p', modelRef: 'm', modelName: 'M', provider: 'local',
       settings: { count: 1, advanced: {} }, inputs: { refs: [] }, status: 'done',
       assetIds: ['ast_old_v1', 'ast_free_gen'], origin: 'composer', estimate: { usd: 0, approximate: false }, createdAt: 1,
     };
@@ -380,5 +383,97 @@ describe('Contract 4: image protection across deleteSession, purgeDiscarded, del
     expect(useStore.getState().assets.ast_v2).toBeDefined();
     expect(useStore.getState().assets.ast_subj).toBeDefined();
     expect(hoisted.blobs.has('asset:ast_old_v1')).toBe(true);
+  });
+});
+
+describe('Contract 5 (engine) & 6: kits out of sends + library.kit.* commands + DOC_CREATORS', () => {
+  it('treats @KitName as nonexistent in resolveSendPlan and excludes kits from legacy nodeLibrary capture', () => {
+    const s = resetStore();
+    createKit({ name: 'AcmeBrand', kind: 'brand-kit', space: 'library', by: 'user', pieces: [{ id: 'p1', kind: 'asset', assetId: 'ast_1' }] });
+    saveSubject({ id: 'sub_hero', name: 'Hero', kind: 'character', frontalAssetId: 'ast_hero', refAssetIds: [] });
+    const gen: Generation = {
+      id: 'g_node', sessionId: s.id, kind: 'image', prompt: 'Portrait of @Hero', modelRef: 'm::1', modelName: 'M', provider: 'local',
+      settings: { count: 1, advanced: {} }, inputs: { refs: [] }, status: 'done',
+      assetIds: [], origin: 'node', estimate: { usd: 0, approximate: false }, createdAt: 1,
+    };
+    useStore.setState((st) => ({
+      generations: { ...st.generations, g_node: gen },
+      sessions: { ...st.sessions, [s.id]: { ...st.sessions[s.id], graph: { nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'image', title: 'Img', outputIndex: 0, generationId: 'g_node', prompt: 'Portrait of @Hero', modelRef: 'm::1', settings: { count: 1, advanced: {} } } }], edges: [] } } },
+    }));
+
+    // resolveSendPlan with @AcmeBrand behaves identically to @NonExistent
+    const withKit = resolveSendPlan({ kind: 'image', modelRef: 'm::1', prompt: 'Poster in @AcmeBrand style', settings: { count: 1, advanced: {} }, inputs: { refs: [] } }, useStore.getState());
+    const withUnknown = resolveSendPlan({ kind: 'image', modelRef: 'm::1', prompt: 'Poster in @NonExistent style', settings: { count: 1, advanced: {} }, inputs: { refs: [] } }, useStore.getState());
+    expect(withKit.slots.elements).toBeUndefined();
+    expect(withKit.slots.refs).toEqual([]);
+    expect(withUnknown.slots.elements).toBeUndefined();
+
+    // Editing Hero captures legacy nodeLibrary WITHOUT kits
+    saveSubject({ id: 'sub_hero', name: 'Hero', kind: 'character', description: 'v2', frontalAssetId: 'ast_hero', refAssetIds: [] });
+    const captured = useStore.getState().generations.g_node.inputs.nodeLibrary ?? [];
+    expect(captured.map((x) => x.name)).toEqual(['Hero']);
+  });
+
+  it('runs library.kit.* commands, enforces strict schemas, chains DOC_CREATORS in studio, and deletes via library.subject.delete', async () => {
+    const s = resetStore();
+    setApprover(() => true);
+
+    // 1) create in studio with session -> draft + working doc view: 'studio' + chains $1.doc via DOC_CREATORS
+    const chained = await runCommandsTool(s.id, {
+      seq: [
+        { cmd: 'library.kit.create', args: { name: 'StudioDS', kind: 'design-system', space: 'studio', tokens: { colors: { bg: '#111' } } } },
+        { cmd: 'designer.layer.add_text', args: { text: 'Heading', x: 20, y: 20, width: 200 } },
+      ],
+    });
+    expect(chained.done, chained.text).toBe(true);
+    const createdKit = useStore.getState().library.find((x) => x.name === 'StudioDS')!;
+    expect(createdKit.draft).toBe(true);
+    expect(createdKit.origin?.space).toBe('studio');
+    const studioDoc = useStore.getState().sessions[s.id].docs.find((d) => d.library?.subjectId === createdKit.id)!;
+    expect(studioDoc.library?.view).toBe('studio');
+    expect(studioDoc.layers.some((l) => l.type === 'text' && l.text === 'Heading')).toBe(true);
+
+    // 2) update (valid + cycle rejected + strict rejects extra keys)
+    const upd = await run({ cmd: 'library.kit.update', args: { id: createdKit.id, pieces: [{ id: 'p1', kind: 'color', color: '#111' }, { id: 'p2', kind: 'text', text: 'Ink' }], links: [{ id: 'l1', from: 'p1', to: 'p2', label: 'note' }] } }, { caller: 'agent' });
+    expect(upd.ok).toBe(true);
+    expect(await run({ cmd: 'library.kit.update', args: { id: createdKit.id, pieces: [{ id: 'c1', kind: 'kit', kitId: createdKit.id }] } }, { caller: 'agent' })).toMatchObject({ ok: false });
+    expect(await run({ cmd: 'library.kit.create', args: { name: 'Bad', kind: 'moodboard', extra: 1 } }, { caller: 'agent' })).toMatchObject({ ok: false, error: { code: 'invalid' } });
+
+    // 3) save overwrite, copy, read, list with dependencies, open in designer, restore
+    const saved = await run({ cmd: 'library.kit.save', on: { session: s.id, doc: studioDoc.id }, args: { id: createdKit.id, mode: 'overwrite', space: 'studio', label: 'v1' } }, { caller: 'agent' });
+    expect(saved.ok).toBe(true);
+    const v1Id = (saved.results[0] as Subject).versionId!;
+
+    const brandRes = await run({ cmd: 'library.kit.create', args: { name: 'MasterKit', kind: 'brand-kit', space: 'library', pieces: [{ id: 'pk', kind: 'kit', kitId: createdKit.id }] } }, { caller: 'agent' });
+    expect(brandRes.ok).toBe(true);
+    const brandId = (brandRes.results[0] as { subject: Subject }).subject.id;
+
+    // Opening a kit without any saved document creates a new blank linked document
+    const blankOpen = await run({ cmd: 'library.kit.open', on: { session: s.id }, args: { id: brandId, space: 'designer' } }, { caller: 'agent' });
+    expect(blankOpen.ok).toBe(true);
+    const blankDocId = (blankOpen.results[0] as { doc: string }).doc;
+    expect(useStore.getState().sessions[s.id].docs.find((d) => d.id === blankDocId)?.library).toEqual({ subjectId: brandId, versionId: '' });
+
+    const listed = await run({ cmd: 'library.kit.list', args: {} }, { caller: 'agent' });
+    expect(listed.ok).toBe(true);
+    const rows = listed.results[0] as Array<{ id: string; dependencies: { kitIds: string[] }; usedBy: string[] }>;
+    expect(rows.find((r) => r.id === createdKit.id)?.usedBy.length).toBe(1);
+
+    const readRes = await run({ cmd: 'library.kit.read', args: { id: createdKit.id } }, { caller: 'agent' });
+    expect(readRes.ok).toBe(true);
+
+    const opened = await run({ cmd: 'library.kit.open', on: { session: s.id }, args: { id: createdKit.id, space: 'designer' } }, { caller: 'agent' });
+    expect(opened.ok).toBe(true);
+    expect(useStore.getState().sessions[s.id].docs.find((d) => d.id === studioDoc.id)?.library?.view).toBeUndefined();
+
+    const restored = await run({ cmd: 'library.kit.restore', args: { id: createdKit.id, versionId: v1Id, space: 'library' } }, { caller: 'agent' });
+    expect(restored.ok).toBe(true);
+    expect((restored.results[0] as Subject).versions?.length).toBe(2);
+
+    // 4) delete via library.subject.delete cleans blobs
+    const delRes = await run({ cmd: 'library.subject.delete', args: { id: createdKit.id } }, { caller: 'agent' });
+    expect(delRes.ok).toBe(true);
+    expect(hoisted.blobs.has(`libver:${v1Id}`)).toBe(false);
+    setApprover(null);
   });
 });

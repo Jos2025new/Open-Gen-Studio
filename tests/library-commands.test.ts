@@ -7,8 +7,11 @@ import { createSession, useStore } from '../src/store/store';
 
 beforeEach(() => { const s = createSession('Test'); useStore.setState({ sessions: { [s.id]: s }, activeSessionId: s.id, library: [], assets: {} }); setApprover(null); });
 describe('library commands', () => {
-  it('covers the eight actions and registers every command', () => {
-    expect(Object.keys(LIBRARY_ACTIONS).sort()).toEqual(['saveSubject','deleteSubject','libraryItem','subjectFromAsset','saveSheetViews','subjectFromAttachments','createRecraftStyle','createSubjectVoice'].sort());
+  it('covers the library actions and registers every command', () => {
+    expect(Object.keys(LIBRARY_ACTIONS).sort()).toEqual([
+      'saveSubject', 'deleteSubject', 'libraryItem', 'subjectFromAsset', 'saveSheetViews', 'subjectFromAttachments',
+      'createRecraftStyle', 'createSubjectVoice', 'createKit', 'readKit', 'updateKit', 'openKit', 'saveKit', 'restoreKitVersion', 'listKits',
+    ].sort());
     for (const id of Object.values(LIBRARY_ACTIONS)) if (!id.startsWith('-')) expect(command(id)).toBeDefined();
   });
   it('saves, reads and chains results', async () => {

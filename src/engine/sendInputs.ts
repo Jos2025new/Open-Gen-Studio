@@ -15,6 +15,7 @@ import { parseModelRef, type MediaInput } from './providers/types';
 import { negFor, opRealism } from './realism';
 import { withVariation } from './sentPrompt';
 import { mapSubjectPrompts } from './subjectPrompts';
+import { mentionableSubjects } from './libraryTypes';
 import type { AdvancedValue, Asset, GenSettings, Generation, MediaKind, ModelSchema, ModelSummary, OpId, Subject, TranscriberSummary } from './types';
 import { useStore } from '../store/store';
 import { mediaInput, frameInput } from './assetIO';
@@ -102,7 +103,7 @@ function buildPlan(spec: SendSpec, state: SendState = get(), over?: { model?: Mo
   const rawImages = slots.refs.length;
 
   const local = spec.inputs.subjects ?? [];
-  const subjects = [...local, ...(spec.inputs.nodeLibrary ?? state.library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
+  const subjects = [...local, ...mentionableSubjects(spec.inputs.nodeLibrary ?? state.library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
   let prompt = spec.prompt, genSettings = spec.settings;
   let mapped: ReturnType<typeof mapSubjectPrompts> | undefined;
   if (schema && model) {
