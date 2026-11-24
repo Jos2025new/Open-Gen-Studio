@@ -38,7 +38,7 @@ import { createDoc, newRasterLayer, newTextLayer, touch } from '../src/engine/de
 import { addDoc, selectDoc } from '../src/engine/design/actions';
 import { ensureBuffers } from '../src/engine/design/raster';
 import { createSession, setDoc, useStore } from '../src/store/store';
-import { run, setApprover } from '../src/engine/commands';
+import { command, invoke, run, setApprover } from '../src/engine/commands';
 import { runCommandsTool } from '../src/engine/agent/commandCalls';
 import type { Asset, RasterLayer, Subject } from '../src/engine/types';
 
@@ -158,10 +158,10 @@ describe('Hardening guarantees (versioning, rasters, races, rollback)', () => {
     const gate = new Promise<void>((r) => { releaseSave = r; });
     hoisted.setOnSet((k) => k.startsWith('libver:') ? gate : undefined);
     const savePromise = saveItem({ subjectId: kit2.id, mode: 'overwrite', sessionId: s.id, docId: doc2!.id, space: 'studio', by: 'user' });
-    const deletion = run({ cmd: 'library.subject.delete', args: { id: kit2.id } }, { caller: 'ui' });
+    const deletion = invoke(command('library.subject.delete')!, { id: kit2.id });
     releaseSave();
     const savedV = await savePromise;
-    expect(await deletion).toMatchObject({ ok: true });
+    expect(await deletion).toEqual({ id: kit2.id });
     expect(useStore.getState().library.some((x) => x.id === kit2.id)).toBe(false);
     expect(hoisted.blobs.has(`libver:${savedV.versionId}`)).toBe(true);
   });

@@ -62,13 +62,14 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
 
     const cDesigner = await run({ cmd: 'library.item.create', on: { session: sid }, args: { name: 'DesignerMB', kind: 'moodboard', space: 'designer' } }, { caller: 'agent' });
     expect(cDesigner.ok).toBe(true);
-    expect(useStore.getState().library.find((x) => x.id === (cDesigner.results[0] as { id: string }).id)?.origin?.space).toBe('designer');
+    const mbId = (cDesigner.results[0] as { id: string }).id;
+    expect(useStore.getState().library.find((x) => x.id === mbId)?.origin?.space).toBe('designer');
 
     const cBrand = await run({
       cmd: 'library.item.create',
       args: {
         name: 'AcmeBrand', kind: 'brand-kit', space: 'library', description: 'Main brand identity',
-        kits: [ds.id, 'kit_missing'],
+        kits: [ds.id, mbId],
         graph: {
           nodes: [
             { id: 'n_img', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Logo', assetId: 'a1' } },
@@ -83,6 +84,8 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
     expect(cBrand.ok, JSON.stringify(cBrand)).toBe(true);
     const brand = useStore.getState().library.find((x) => x.id === (cBrand.results[0] as { id: string }).id)!;
     expect(brand.origin?.space).toBe('library');
+    const deleteChild = await run({ cmd: 'library.item.delete', args: { id: mbId } }, { caller: 'agent' });
+    expect(deleteChild.ok).toBe(true);
 
     // Pure plain-text index via library.item.read (no snapshot, no raw graph, no blobs)
     const readBrand = await run({ cmd: 'library.item.read', args: { id: brand.id } }, { caller: 'agent' });
@@ -98,7 +101,7 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
     expect(txt).toContain('versions:');
     expect(txt).toContain(ds.id);
     expect(txt).toContain('Logo -> Voice [tone]');
-    expect(txt).toContain('kit:kit_missing');
+    expect(txt).toContain(`kit:${mbId}`);
     expect(txt).toContain('group:grp_gone');
 
     // usedBy appears on ds read

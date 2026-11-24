@@ -154,7 +154,7 @@ it('revalidates a new kit reference at publication', async () => {
   const {subject:child} = await createItem({name:'Child',kind:'brand-kit',space:'library',by:'user'});
   const {subject:parent} = await createItem({name:'Parent',kind:'brand-kit',space:'library',by:'user'});
   const keys = [...hoisted.blobs.keys()];
-  hoisted.setOnSet(() => useStore.setState({library:[parent]}));
+  hoisted.setOnSet(() => { useStore.setState({ library: [parent] }); });
   await expect(saveItem({subjectId:parent.id,mode:'overwrite',space:'library',by:'user',kits:[child.id]})).rejects.toThrow(child.id);
   expect(useStore.getState().library).toEqual([parent]);
   expect([...hoisted.blobs.keys()]).toEqual(keys);
