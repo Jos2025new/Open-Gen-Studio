@@ -51,7 +51,7 @@ vi.mock('../src/lib/media', async () => {
   };
 });
 
-import { createItem, deleteItem, libraryToDesigner, readKitVersion, saveItem } from '../src/engine/libraryVersions';
+import { createItem, deleteItem, libraryToDesigner, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { subjectAssetIds } from '../src/engine/libraryGraph';
 import { nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { editCompound } from '../src/engine/nodecore/edit';
@@ -224,5 +224,28 @@ describe('Lote F fixes', () => {
     expect(afterRedo.view).toBe('studio');
     expect(afterRedo.name).toBe('UndoKit (local copy)');
     expect(afterRedo.layers).toHaveLength(2);
+  });
+
+  it('6) restoreItemVersion rejects cycles via validateContent and commitVersion revalidates cycles inside setState', async () => {
+    resetStore();
+    const { subject: kitB } = await createItem({ name: 'KitB', kind: 'brand-kit', space: 'library', by: 'user', draft: false });
+    const { subject: kitA } = await createItem({ name: 'KitA', kind: 'brand-kit', space: 'library', by: 'user', kits: [kitB.id], draft: false });
+    const aV1 = kitA.versionId!;
+    await saveItem({ subjectId: kitA.id, mode: 'overwrite', space: 'library', by: 'user', kits: [] });
+    await saveItem({ subjectId: kitB.id, mode: 'overwrite', space: 'library', by: 'user', kits: [kitA.id] });
+
+    // Restoring A's v1 (which contains B) would create A -> B -> A
+    await expect(restoreItemVersion({ subjectId: kitA.id, versionId: aV1, space: 'library', by: 'user' })).rejects.toThrow(/cycle/i);
+
+    // Concurrent race: B starts containing A while A is writing libver: to contain B
+    await saveItem({ subjectId: kitB.id, mode: 'overwrite', space: 'library', by: 'user', kits: [] });
+    const keysBefore = new Set(hoisted.blobs.keys());
+    hoisted.setOnSet((k) => {
+      if (k.startsWith('libver:')) {
+        useStore.setState((st) => ({ library: st.library.map((x) => (x.id === kitB.id ? { ...x, kits: [kitA.id] } : x)) }));
+      }
+    });
+    await expect(saveItem({ subjectId: kitA.id, mode: 'overwrite', space: 'library', by: 'user', kits: [kitB.id] })).rejects.toThrow(/cycle/i);
+    expect([...hoisted.blobs.keys()].filter((k) => !keysBefore.has(k))).toEqual([]);
   });
 });

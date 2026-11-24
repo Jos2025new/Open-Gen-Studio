@@ -139,6 +139,7 @@ async function commitVersion(
   useStore.setState((st) => {
     const missing = c.checkAssetIds?.find((aid) => !st.assets[aid]);
     if (missing) throw new Error(`Asset "${missing}" was deleted while saving.`);
+    if (fields.kits?.length) { const cy = wouldCreateKitCycle(st.library, entry.id, fields.kits); if (!cy.ok) throw new Error(cy.reason); }
     if (c.mode === 'create') { updated = { ...entry, ...fields, versionId: verId, versions: [ref] }; return { library: [...st.library, updated] }; }
     const live = st.library.find((x) => x.id === entry.id);
     if (!live || !isKit(live)) return {};
@@ -291,6 +292,7 @@ export function restoreItemVersion(opts: { subjectId: string; versionId: string;
     const cur = requireItem(opts.subjectId), snap = await readKitVersion(opts.versionId);
     if (!snap) throw new Error(`Version "${opts.versionId}" blob is missing and cannot be restored.`);
     if (snap.subjectId !== cur.id) throw new Error(`Version "${opts.versionId}" belongs to another Library entry ("${snap.subjectId}").`);
+    validateContent(cur.kind as KitKind, cur.id, { graph: snap.graph, kits: snap.kits, tokens: snap.tokens, checkAssets: false });
     if (snap.doc) for (const id of expectedRasterIds(snap)) if (!(await blobDb.get(rKey(id)))) throw new Error(`Cannot restore version "${opts.versionId}": missing pixel blob "${rKey(id)}".`);
     return withCleanup((w) => commitVersion(cur, {
       mode: 'append', at: Date.now(), by: opts.by, space: opts.space, label: opts.label ?? `Restore ${opts.versionId}`,
