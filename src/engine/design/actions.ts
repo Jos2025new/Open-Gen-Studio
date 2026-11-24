@@ -353,12 +353,17 @@ export function reorderLayer(sessionId: string, docId: string, layerId: string, 
   mutateDoc(sessionId, docId, (d) => D.reorderLayer(d, layerId, toIndex));
 }
 
+const keepDocMeta = (target: DesignDoc, doc: DesignDoc): DesignDoc => {
+  const { library: _l, view: _v, ...rest } = target;
+  return { ...rest, ...(doc.library ? { library: doc.library } : target.library ? { name: doc.name } : {}), ...(doc.view ? { view: doc.view } : {}), lastExport: doc.lastExport, paintMode: doc.paintMode ?? target.paintMode ?? paintModeOf(target) };
+};
+
 export function undoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const prev = undo(doc);
   if (prev) {
-    const restored = { ...prev, lastExport: doc.lastExport, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };
+    const restored = keepDocMeta(prev, doc);
     (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored), releaseUnused(rasterBufferIds(doc.layers)));
   }
 }
@@ -368,7 +373,7 @@ export function redoDoc(sessionId: string, docId: string): void {
   if (!doc) return;
   const next = redo(doc);
   if (next) {
-    const restored = { ...next, lastExport: doc.lastExport, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };
+    const restored = keepDocMeta(next, doc);
     (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored), releaseUnused(rasterBufferIds(doc.layers)));
   }
 }

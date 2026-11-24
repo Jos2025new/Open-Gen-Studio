@@ -56,6 +56,7 @@ import { subjectAssetIds } from '../src/engine/libraryGraph';
 import { nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { editCompound } from '../src/engine/nodecore/edit';
 import { run } from '../src/engine/commands';
+import { addTextLayer, getDoc, redoDoc, undoDoc } from '../src/engine/design/actions';
 import { newRasterLayer } from '../src/engine/design/doc';
 import { createSession, setDoc, useStore } from '../src/store/store';
 import type { Asset, Graph, RasterLayer } from '../src/engine/types';
@@ -191,5 +192,37 @@ describe('Lote F fixes', () => {
     expect(d1).toEqual({ kind: 'asset', title: 'Sketched', assetId: 'ast_sketch' });
     expect(d2).toEqual({ kind: 'asset', title: 'Plain', assetId: 'ast_orig' });
     expect(subjectAssetIds(saved)).toContain('ast_sketch');
+  });
+
+  it('5) undoDoc and redoDoc preserve current library link, view, and detached local-copy name', async () => {
+    const s = resetStore();
+    const { subject: kit, doc } = await createItem({ name: 'UndoKit', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'user' });
+    addTextLayer(s.id, doc!.id, 'Step 1', { x: 0, y: 0, width: 100 });
+    const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' });
+    addTextLayer(s.id, doc!.id, 'Step 2', { x: 0, y: 40, width: 100 });
+    const v2 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' });
+    expect(v2.docRev).not.toBe(v1.docRev);
+
+    // Undo/redo while linked keeps latest docRev
+    undoDoc(s.id, doc!.id);
+    expect(getDoc(s.id, doc!.id)?.library?.docRev).toBe(v2.docRev);
+    redoDoc(s.id, doc!.id);
+    expect(getDoc(s.id, doc!.id)?.library?.docRev).toBe(v2.docRev);
+
+    // Delete kit -> detaches doc with view:'studio' and '(local copy)' name; undo/redo must NOT re-link or drop view/name
+    await deleteItem(kit.id);
+    undoDoc(s.id, doc!.id);
+    const afterUndo = getDoc(s.id, doc!.id)!;
+    expect(afterUndo.library).toBeUndefined();
+    expect(afterUndo.view).toBe('studio');
+    expect(afterUndo.name).toBe('UndoKit (local copy)');
+    expect(afterUndo.layers).toHaveLength(1);
+
+    redoDoc(s.id, doc!.id);
+    const afterRedo = getDoc(s.id, doc!.id)!;
+    expect(afterRedo.library).toBeUndefined();
+    expect(afterRedo.view).toBe('studio');
+    expect(afterRedo.name).toBe('UndoKit (local copy)');
+    expect(afterRedo.layers).toHaveLength(2);
   });
 });
