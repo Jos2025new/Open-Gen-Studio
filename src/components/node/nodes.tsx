@@ -495,6 +495,11 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
             placeholder="Prompt or copy…"
             onChange={(e) => patchNodeData(sessionId, node.id, { text: e.target.value })}
           />
+        ) : d.kind === 'part' ? (
+          <div className="nc-text">
+            {d.partKind === 'color' ? <span className="nt-row"><span className="group-swatch" style={{ background: d.color }} />{d.color}</span>
+              : d.partKind === 'style' ? (Object.entries(d.values ?? {}).map(([k, v]) => `${k}: ${v}`).join('\n') || d.title) : d.title}
+          </div>
         ) : (
           <div
             className="nc-body"

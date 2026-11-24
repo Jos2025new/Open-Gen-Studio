@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { AspectGlyph } from '../composer/MediaControls';
-import { ArrowUpFromLine, Images, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from '../ui/icons';
+import { ArrowUpFromLine, ChevronLeft, Images, Library, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from '../ui/icons';
+import { SaveToLibrary } from '../gallery/SaveToLibrary';
 import { useStore } from '../../store/store';
 import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
 import { DOC_PRESETS } from '../../engine/design/doc';
@@ -33,6 +34,8 @@ export function DesignerWorkspace() {
   const presets = usePopover();
   const exportMenu = usePopover();
   const saveConfirm = usePopover();
+  const [saveView, setSaveView] = useState<'gallery' | 'library'>('gallery');
+  const closeSave = () => { saveConfirm.close(); setSaveView('gallery'); };
   const [zoom, setZoom] = useState(1);
   const [zoomDraft, setZoomDraft] = useState<string | null>(null);
   const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
@@ -116,14 +119,18 @@ export function DesignerWorkspace() {
           <span className="topbar-sep" aria-hidden />
           <IconButton icon={PanelRight} label="Show or hide right panel" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
         </span>
-        <Popover open={saveConfirm.open} anchor={saveConfirm.ref} onClose={saveConfirm.close} width={260} label="Save to gallery">
-          <div className="confirm-pop">
+        <Popover open={saveConfirm.open} anchor={saveConfirm.ref} onClose={closeSave} width={saveView === 'library' ? 300 : 260} label="Save to gallery">
+          {saveView === 'library' ? <div className="menu">
+            <MenuItem icon={ChevronLeft} label="Save to Library" onClick={() => setSaveView('gallery')} />
+            <SaveToLibrary space="designer" sessionId={session.id} doc={doc} onDone={closeSave} />
+          </div> : <div className="confirm-pop">
             <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>
             <div className="confirm-pop-actions">
-              <Button size="sm" variant="ghost" onClick={saveConfirm.close}>Cancel</Button>
-              <Button size="sm" variant="primary" icon={Images} onClick={() => { saveConfirm.close(); void saveToGallery(); }}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={closeSave}>Cancel</Button>
+              <Button size="sm" variant="primary" icon={Images} onClick={() => { closeSave(); void saveToGallery(); }}>Save</Button>
             </div>
-          </div>
+            <MenuItem icon={Library} label="Save to Library…" onClick={() => setSaveView('library')} />
+          </div>}
         </Popover>
         <Button ref={exportMenu.ref} className="topbar-export" variant="primary" icon={ArrowUpFromLine} size="sm" disabled={busy} aria-haspopup="dialog" aria-expanded={exportMenu.open} onClick={exportMenu.toggle}>Export</Button>
         <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} width={350} label="Export design">

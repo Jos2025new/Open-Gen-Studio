@@ -2,13 +2,16 @@ import { memo, useState } from 'react';
 import { NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, ChevronRight, ClipboardCopy, Group, Scissors, Trash, Ungroup, X,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, ChevronRight, ClipboardCopy,
+  Group, Library, Scissors, Trash, Ungroup, X,
 } from '../ui/icons';
 import { alignNodes, copyNodes, cutNodes, groupNodes, renameGroup, setGroupColor, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
 import { deleteNodes } from '../../engine/flow/actions';
 import { useDeleteRequestContext } from './LinkBar';
 import type { Graph, GraphGroup } from '../../engine/types';
 import { toast } from '../../store/store';
+import { Popover, usePopover } from '../ui/Popover';
+import { SaveToLibrary } from '../gallery/SaveToLibrary';
 import { ProblemBadge } from './CanvasNotices';
 
 const ALIGN: Array<{ id: AlignMode; label: string; icon: typeof AlignStartVertical }> = [
@@ -21,6 +24,16 @@ const ALIGN: Array<{ id: AlignMode; label: string; icon: typeof AlignStartVertic
   { id: 'distribute-h', label: 'Distribute horizontally', icon: AlignHorizontalDistributeCenter },
   { id: 'distribute-v', label: 'Distribute vertically', icon: AlignVerticalDistributeCenter },
 ];
+
+function SaveNodesBtn({ sessionId, group, nodeIds, cls = '', onSaved }: { sessionId: string; group?: GraphGroup; nodeIds: string[]; cls?: string; onSaved?: () => void }) {
+  const pop = usePopover();
+  return <>
+    <button ref={pop.ref} type="button" className={`nt-btn ${cls} ${pop.open ? 'is-open' : ''}`} onClick={pop.toggle}><Library size={13} /> Save to Library</button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Save to Library">
+      <SaveToLibrary space="nodes" sessionId={sessionId} group={group} nodeIds={nodeIds} onDone={() => { pop.close(); onSaved?.(); }} />
+    </Popover>
+  </>;
+}
 
 /**
  * Several nodes selected: "Operations ▾" over them, in the same bar as a node's tools; it opens only on click into
@@ -85,6 +98,8 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect, onDelete }:
               <Trash size={14} />
             </button>
             <span className="nt-sep" />
+            <SaveNodesBtn sessionId={sessionId} group={group} nodeIds={ids} onSaved={() => setOpen(false)} />
+            <span className="nt-sep" />
             <button type="button" className="nt-btn nt-icon" aria-label="Close" data-tip="Close" onClick={() => { setOpen(false); setAlign(false); }}>
               <X size={13} />
             </button>
@@ -135,6 +150,7 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
         )}
         <ProblemBadge count={problems} hasErrors={hasErrors} />
         {'detachedOutputs' in group ? <button type="button" className="nt-btn nodrag" onClick={() => ungroup(sessionId, group.id)}>Reattach outputs</button> : null}
+        {group.library ? <SaveNodesBtn sessionId={sessionId} group={group} nodeIds={group.nodeIds} cls="nodrag" /> : null}
         <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
         {palette ? (
           <span className="group-palette nodrag">

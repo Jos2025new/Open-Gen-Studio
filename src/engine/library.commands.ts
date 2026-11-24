@@ -28,7 +28,8 @@ const graphNode = z.object({ id, position: point, data: z.discriminatedUnion('ki
   z.object({ kind: z.literal('part'), partKind: z.enum(['color', 'component', 'style']), title: z.string(), role: z.string().optional(), description: z.string().optional(), color: z.string().optional(), groupId: id.optional(), styleType: z.enum(['text', 'color']).optional(), values: z.record(z.string(), tokVal).optional() }).strict(),
 ]) }).strict();
 const graphEdge = z.object({ id, source: id, target: id, sourceHandle: z.string(), targetHandle: z.string(), kind: z.enum(['data', 'ref', 'control']).optional(), both: z.boolean().optional(), label: z.string().optional() }).strict();
-const graph = z.object({ nodes: z.array(graphNode), edges: z.array(graphEdge), groups: z.array(z.object({ id, title: z.string(), nodeIds: z.array(id), color: z.string().optional() }).strict()).optional() }).strict();
+const graphGroup = z.object({ id, title: z.string(), nodeIds: z.array(id), color: z.string().optional(), library: z.object({ subjectId: id }).strict().optional() }).strict();
+const graph = z.object({ nodes: z.array(graphNode), edges: z.array(graphEdge), groups: z.array(graphGroup).optional() }).strict();
 const tokens = z.record(z.string(), z.object({ type: z.enum(TOKEN_TYPES), value: tokVal, description: z.string().optional() }).strict());
 const capture = z.object({ camera: z.string(), tone: z.string(), light: z.string(), texture: z.string(), imperfect: z.array(z.string()).optional() }).strict();
 const subject = z.object({ id, name, kind: kind.optional(), description: z.string().optional(), frontalAssetId: id.optional(), refAssetIds: z.array(id), videoAssetId: id.optional(), voiceId: z.string().optional(), capture: capture.optional() }).strict();

@@ -151,16 +151,22 @@ async function commitVersion(
   return updated;
 }
 
-export async function createItem(opts: { name: string; kind: KitKind; space: LibrarySpace; by: KitActor; sessionId?: string; description?: string; from?: string[]; graph?: Graph; kits?: string[]; tokens?: KitTokens; draft?: boolean }): Promise<{ subject: Subject; doc?: DesignDoc }> {
+export async function createItem(opts: {
+  name: string; kind: KitKind; space: LibrarySpace; by: KitActor; sessionId?: string;
+  description?: string; from?: string[]; graph?: Graph; kits?: string[]; tokens?: KitTokens; draft?: boolean; open?: boolean;
+}): Promise<{ subject: Subject; doc?: DesignDoc }> {
   const name = opts.name.trim();
   if (!name) throw new Error('Item name is required.');
   const id = uid('sub'), session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
   if (opts.sessionId && !session) throw new Error(`No session "${opts.sessionId}".`);
   validateContent(opts.kind, id, { graph: opts.graph, kits: opts.kits, tokens: opts.tokens, checkAssets: true });
   const draft = opts.draft ?? (opts.space === 'studio' && Boolean(session)), at = Date.now();
-  const base: Subject = { id, name, kind: opts.kind, refAssetIds: [], ...optionalFields({ description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens }), draft, origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}), ...(opts.from?.length ? { from: [...opts.from] } : {}) } };
-  const subject = draft ? (useStore.setState((st) => ({ library: [...st.library, base] })), base) : await withCleanup((w) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens }, w));
-  if (session && (opts.space === 'studio' || opts.space === 'designer')) {
+  const origin = { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}), ...(opts.from?.length ? { from: [...opts.from] } : {}) };
+  const base: Subject = { id, name, kind: opts.kind, refAssetIds: [], ...optionalFields(opts), draft, origin };
+  const subject = draft
+    ? (useStore.setState((st) => ({ library: [...st.library, base] })), base)
+    : await withCleanup((w) => commitVersion(base, { mode: 'create', at, by: opts.by, space: opts.space, description: opts.description, graph: opts.graph, kits: opts.kits, tokens: opts.tokens }, w));
+  if (opts.open !== false && session && (opts.space === 'studio' || opts.space === 'designer')) {
     const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, opts.space === 'studio' ? 'studio' : undefined);
     addDoc(session.id, doc);
     return { subject, doc };

@@ -149,6 +149,8 @@ export interface GraphGroup {
   nodeIds: string[];
   /** Optional background tint (hex); none by default. */
   color?: string;
+  /** Set when the group came from or was saved to a Library entry. */
+  library?: { subjectId: string };
 }
 
 export interface Graph {
