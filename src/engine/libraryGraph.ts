@@ -12,7 +12,6 @@ const uniq = (ids: Iterable<string | undefined>): string[] => [...new Set([...id
 const pushMap = <K, V>(m: Map<K, V[]>, k: K, v: V) => { const list = m.get(k); if (list) list.push(v); else m.set(k, [v]); };
 export const shortText = (s: string, max = 120): string => (s.length <= max ? s : `${s.slice(0, max - 1)}…`);
 
-/** Direct kit, asset, group, and component/style -> token dependencies of one entry. */
 export function kitDependencies(subject: Subject, library: readonly Subject[] | ReadonlyMap<string, Subject>, doc?: DesignDoc): KitDependencies {
   const byId = library instanceof Map ? library : new Map((library as readonly Subject[]).map((s) => [s.id, s]));
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
@@ -20,20 +19,18 @@ export function kitDependencies(subject: Subject, library: readonly Subject[] | 
   const kitIds: string[] = [], missingKitIds: string[] = [], assetIds: string[] = [], missingGroupIds: string[] = [];
   const tokenMap = new Map<string, string[]>(), addTok = (nid: string, t: string) => pushMap(tokenMap, nid, t);
   for (const kid of subject.kits ?? []) (byId.has(kid) ? kitIds : missingKitIds).push(kid);
-  for (const n of nodes) {
-    const d = n.data;
+  for (const { id, data: d } of nodes) {
     if (d.kind === 'asset' && d.assetId) assetIds.push(d.assetId);
     else if (d.kind === 'part') {
       if (d.partKind === 'component' && d.groupId && !liveGroups.has(d.groupId)) missingGroupIds.push(d.groupId);
-      if (d.values) for (const v of Object.values(d.values)) { const t = parseTokenAlias(v); if (t) addTok(n.id, t); }
+      if (d.values) for (const v of Object.values(d.values)) { const t = parseTokenAlias(v); if (t) addTok(id, t); }
     }
   }
   for (const e of subject.graph?.edges ?? []) {
     const a = byNode.get(e.source)?.data, b = byNode.get(e.target)?.data;
-    if (a?.kind === 'part' && b?.kind === 'part') {
-      if (a.partKind === 'component' && b.partKind === 'style') for (const t of tokenMap.get(e.target) ?? []) addTok(e.source, t);
-      if (b.partKind === 'component' && a.partKind === 'style') for (const t of tokenMap.get(e.source) ?? []) addTok(e.target, t);
-    }
+    if (a?.kind !== 'part' || b?.kind !== 'part') continue;
+    if (a.partKind === 'component' && b.partKind === 'style') for (const t of tokenMap.get(e.target) ?? []) addTok(e.source, t);
+    if (b.partKind === 'component' && a.partKind === 'style') for (const t of tokenMap.get(e.source) ?? []) addTok(e.target, t);
   }
   const pieceTokens: Record<string, string[]> = {}, allToks: string[] = [];
   for (const [nid, list] of tokenMap) { const u = uniq(list); pieceTokens[nid] = u; allToks.push(...u); }
@@ -77,56 +74,37 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
   const byId = new Map(library.map((s) => [s.id, s])), dep = kitDependencies(subject, byId), usedBy = kitUsedBy(subject.id, library);
   const lines: string[] = [`${subject.id} "${shortText(subject.name, 100)}" (${subject.kind ?? 'item'}${subject.draft ? ', draft' : ''})`];
   if (subject.description) lines.push(`description: ${shortText(subject.description, 200)}`);
-  if (subject.origin) {
-    const o = subject.origin;
-    lines.push(`origin: ${o.space} by ${o.by}${o.sessionTitle ? ` (${shortText(o.sessionTitle, 60)})` : ''}${subject.copiedFrom ? `, copiedFrom ${subject.copiedFrom}` : ''}`);
-  }
+  if (subject.origin) lines.push(`origin: ${subject.origin.space} by ${subject.origin.by}${subject.origin.sessionTitle ? ` (${shortText(subject.origin.sessionTitle, 60)})` : ''}${subject.copiedFrom ? `, copiedFrom ${subject.copiedFrom}` : ''}`);
   const vers = subject.versions ?? [];
   lines.push(`versions: ${vers.length}${subject.versionId ? ` (current ${subject.versionId})` : ''}${vers.length ? ` — ${vers.slice(-3).map((v) => `${v.id}:${v.space}/${v.by}${v.label ? ` "${shortText(v.label, 40)}"` : ''}`).join(', ')}` : ''}`);
-  if (subject.tokens && Object.keys(subject.tokens).length) {
-    for (const [k, tok] of Object.entries(subject.tokens)) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}`);
-  }
+  for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}`);
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
-  for (const n of nodes) {
-    const d = n.data;
-    if (d.kind === 'asset') lines.push(`node ${n.id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}`);
-    else if (d.kind === 'text') lines.push(`node ${n.id} [text] "${shortText(d.title, 60)}": ${shortText(d.text, 120)}`);
-    else if (d.kind === 'part') lines.push(`node ${n.id} [${d.partKind}] "${shortText(d.title, 60)}"${d.color ? ` ${d.color}` : ''}${d.groupId ? ` group:${d.groupId}` : ''}${d.styleType ? ` ${d.styleType}` : ''}${dep.pieceTokens[n.id]?.length ? ` tokens:${dep.pieceTokens[n.id].join(',')}` : ''}`);
+  for (const { id, data: d } of nodes) {
+    if (d.kind === 'asset') lines.push(`node ${id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}`);
+    else if (d.kind === 'text') lines.push(`node ${id} [text] "${shortText(d.title, 60)}": ${shortText(d.text, 120)}`);
+    else if (d.kind === 'part') lines.push(`node ${id} [${d.partKind}] "${shortText(d.title, 60)}"${d.color ? ` ${d.color}` : ''}${d.groupId ? ` group:${d.groupId}` : ''}${d.styleType ? ` ${d.styleType}` : ''}${dep.pieceTokens[id]?.length ? ` tokens:${dep.pieceTokens[id].join(',')}` : ''}`);
   }
   for (const gr of subject.graph?.groups ?? []) lines.push(`group ${gr.id} "${shortText(gr.title, 60)}" (${gr.nodeIds.length} nodes)`);
-  for (const e of subject.graph?.edges ?? []) {
-    const a = shortText(byNode.get(e.source)?.data.title ?? e.source, 40), b = shortText(byNode.get(e.target)?.data.title ?? e.target, 40);
-    lines.push(`link: ${a} -> ${b}${e.label ? ` [${shortText(e.label, 40)}]` : ''}`);
-  }
+  for (const e of subject.graph?.edges ?? []) lines.push(`link: ${shortText(byNode.get(e.source)?.data.title ?? e.source, 40)} -> ${shortText(byNode.get(e.target)?.data.title ?? e.target, 40)}${e.label ? ` [${shortText(e.label, 40)}]` : ''}`);
   for (const kid of dep.kitIds) lines.push(`contains: ${kid} "${shortText(byId.get(kid)?.name ?? kid, 60)}" (${byId.get(kid)?.kind ?? 'item'})`);
   for (const u of usedBy) lines.push(`usedBy: ${u.id} "${shortText(u.name, 60)}" (${u.kind ?? 'item'})`);
-  const missing = [
-    ...dep.missingKitIds.map((id) => `kit:${id}`), ...dep.missingGroupIds.map((id) => `group:${id}`),
-    ...dep.missingTokenIds.map((id) => `token:${id}`), ...dep.assetIds.filter((id) => !assets[id]).map((id) => `asset:${id}`),
-  ];
+  const missing = [...dep.missingKitIds.map((id) => `kit:${id}`), ...dep.missingGroupIds.map((id) => `group:${id}`), ...dep.missingTokenIds.map((id) => `token:${id}`), ...dep.assetIds.filter((id) => !assets[id]).map((id) => `asset:${id}`)];
   if (missing.length) lines.push(`missing: ${missing.join(', ')}`);
 
   const out: string[] = [];
-  let len = 0;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i], sep = out.length ? 1 : 0;
-    const rem = lines.length - i;
-    const notice = `\n[truncated: ${rem} more line(s)]`;
-    if (len + sep + line.length + (rem > 1 ? notice.length : 0) > maxChars) {
-      const cutNotice = `[truncated: ${rem} more line(s)]`;
-      if (!out.length) return { text: `${line.slice(0, Math.max(0, maxChars - cutNotice.length - 1))}\n${cutNotice}`.slice(0, maxChars), truncated: true };
-      return { text: `${out.join('\n')}\n${cutNotice}`, truncated: true };
+  for (let i = 0, len = 0; i < lines.length; i++) {
+    const line = lines[i], sep = out.length ? 1 : 0, rem = lines.length - i, cut = `[truncated: ${rem} more line(s)]`;
+    if (len + sep + line.length + (rem > 1 ? cut.length + 1 : 0) > maxChars) {
+      return { text: out.length ? `${out.join('\n')}\n${cut}` : `${line.slice(0, Math.max(0, maxChars - cut.length - 1))}\n${cut}`.slice(0, maxChars), truncated: true };
     }
-    out.push(line);
-    len += sep + line.length;
+    out.push(line); len += sep + line.length;
   }
   return { text: out.join('\n'), truncated: false };
 }
 
 /** Agent context lines for Library: mentionable @Name subjects plus total kit count only. */
 export function libraryContextLines(library: readonly Subject[], _assets?: Record<string, unknown>): string[] {
-  const out: string[] = [];
-  const named = mentionableSubjects(library).filter((s) => !s.capture || s.frontalAssetId);
+  const out: string[] = [], named = mentionableSubjects(library).filter((s) => !s.capture || s.frontalAssetId);
   if (named.length) out.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   const kits = library.filter(isKit);
   if (kits.length) out.push(`library items: ${kits.length} (use library.item.list and library.item.read to inspect)`);
