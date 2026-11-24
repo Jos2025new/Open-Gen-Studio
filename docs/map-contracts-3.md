@@ -4,6 +4,7 @@ Generado por `node scripts/map.mjs --write`; [índice y cobertura](map.md). Se c
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **catalog-commands** — Cada función exportada de catalog.ts es un comando `models.*` o dice por qué no (CATALOG_ACTIONS); `apiKeyFor` nunca es un comando. | [catalog.commands.ts](../src/engine/catalog.commands.ts) | [catalog-commands.test.ts](../tests/catalog-commands.test.ts) |
 | **studio-commands** — Cada función exportada de engine/actions.ts es un comando `studio.*`, es de biblioteca o dice por qué no (STUDIO_ACTIONS); generar y operar son `spend`, borrar es `delete`. | [actions.commands.ts](../src/engine/actions.commands.ts) | [studio-commands.test.ts](../tests/studio-commands.test.ts) |
 | **designer-fx-commands** — Cada forma `do` de FxCommand es un comando `designer.fx.*` (FX_DO) sobre runFx: un paso de deshacer del doc. | [fx.commands.ts](../src/engine/design/fx.commands.ts), [fx.ts](../src/engine/design/fx.ts), [fxCommands.ts](../src/engine/fx/fxCommands.ts) | [designer-fx-commands.test.ts](../tests/designer-fx-commands.test.ts) |
 | **skills-commands** — Skills, workflows y guías son comandos `skills.*` (SKILLS_ACTIONS); elegir uno hace lo mismo que el selector del compositor. | [commands.ts](../src/engine/skills/commands.ts), [AgentControls.tsx](../src/components/composer/AgentControls.tsx) | [skills-commands.test.ts](../tests/skills-commands.test.ts) |

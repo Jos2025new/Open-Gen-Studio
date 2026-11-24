@@ -139,7 +139,8 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
     const layer = {
       id: 'l1', type: 'text' as const, name: 'Btn', visible: true, locked: false, opacity: 1,
       blend: 'normal' as const, groupId: 'g1', text: 'Go', x: 0, y: 0, width: 80, height: 30,
-      font: 'Inter', size: 16, weight: 600, color: '#ffffff', align: 'left' as const, lineHeight: 1.2,
+      fontFamily: 'Inter', fontSize: 16, fontWeight: 600, letterSpacing: 0, color: '#ffffff',
+      align: 'left' as const, lineHeight: 1.2,
     };
     const compGraph: Graph = {
       nodes: [{ id: 'p1', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', title: 'Primary Button', groupId: 'g1' } }],
@@ -220,7 +221,7 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
     await act(async () => root.render(createElement(GalleryPanel)));
     await openSource('Moodboards');
 
-    const newBtn = [...host.querySelectorAll('.pc-bar button')].find((b) => b.textContent?.includes('New'))!;
+    const newBtn = [...host.querySelectorAll<HTMLButtonElement>('.pc-bar button')].find((b) => b.textContent?.includes('New'))!;
     expect(newBtn).toBeDefined();
     await act(async () => {
       newBtn.click();

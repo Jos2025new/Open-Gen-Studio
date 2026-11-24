@@ -54,7 +54,7 @@ beforeEach(() => {
   const s = createSession('SendTo Moodboard Test');
   act(() => {
     useStore.setState({
-      sessions: { [s.id]: s }, activeSessionId: s.id, library: [], assets: {}, generations: {}, toasts: [],
+      sessions: { [s.id]: s }, activeSessionId: s.id, library: [], assets: {}, generations: {},
     });
     setUi({ workspace: 'chat', home: false, panel: null });
   });

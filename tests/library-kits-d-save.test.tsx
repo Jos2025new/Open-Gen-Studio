@@ -76,7 +76,7 @@ beforeEach(() => {
   const s = createSession('Save Kit Test');
   act(() => {
     useStore.setState({
-      sessions: { [s.id]: s }, activeSessionId: s.id, library: [], assets: {}, generations: {}, toasts: [],
+      sessions: { [s.id]: s }, activeSessionId: s.id, library: [], assets: {}, generations: {},
     });
     setUi({ workspace: 'designer', home: false, panel: null });
   });

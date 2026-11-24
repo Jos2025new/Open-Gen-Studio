@@ -37,7 +37,10 @@ export function libraryToNodes(sessionId: string, subjectId: string): { added: G
     for (const n of nodes) n.position = pos.get(n.id) ?? n.position;
   }
   const srcGrp = src.groups?.[0];
-  const group: GraphGroup = { id: uid('grp'), title: srcGrp?.title || subject.name, nodeIds: nodes.map((n) => n.id), ...(srcGrp?.color ? { color: srcGrp.color } : {}), library: { subjectId: subject.id } };
+  const group: GraphGroup = {
+    id: uid('grp'), title: srcGrp?.title || subject.name, nodeIds: nodes.map((n) => n.id),
+    ...(srcGrp?.color ? { color: srcGrp.color } : {}), library: { subjectId: subject.id },
+  };
   const err = editCompound(sessionId, 'from-library', (g) => ({ ...g, nodes: [...g.nodes, ...nodes], edges: [...g.edges, ...edges], groups: [...(g.groups ?? []), group] }));
   if (err) throw new Error(err);
   return { added: nodes, edges, groupId: group.id };
@@ -76,6 +79,8 @@ export async function nodesToLibrary(opts: {
     if (!opts.subjectId) throw new Error('Library item id is required for overwrite or copy.');
     saved = await saveItem({ subjectId: opts.subjectId, mode: opts.mode, space: 'nodes', by, sessionId: opts.sessionId, name: opts.name, description: opts.description, label: opts.label, graph });
   }
-  if (srcGrp && opts.mode !== 'copy') editPresentation(opts.sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((gr) => (gr.id === srcGrp.id ? { ...gr, library: { subjectId: saved.id } } : gr)) }));
+  if (srcGrp && opts.mode !== 'copy') {
+    editPresentation(opts.sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((gr) => (gr.id === srcGrp.id ? { ...gr, library: { subjectId: saved.id } } : gr)) }));
+  }
   return saved;
 }

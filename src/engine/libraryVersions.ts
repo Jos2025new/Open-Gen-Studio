@@ -194,8 +194,13 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
     if (!session) throw new Error(`No session "${sessionId}".`);
     const curVer = subject.versionId ?? '', curDocRev = subject.docRev ?? '', existing = session.docs.find((d) => d.library?.subjectId === subjectId);
     if (existing && (existing.library?.docRev ?? '') === curDocRev) {
-      if (space === 'designer' && (existing.library?.view || existing.view)) {
-        setDoc(sessionId, existing.id, (d) => { const { view: _v, ...rest } = d; return { ...rest, library: d.library ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.docRev ? { docRev: d.library.docRev } : {}) } : undefined }; });
+      const promote = space === 'designer' && Boolean(existing.library?.view || existing.view);
+      if (promote || existing.name !== subject.name) {
+        setDoc(sessionId, existing.id, (d) => {
+          const { view: _v, ...rest } = d;
+          const lib = d.library && promote ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.docRev ? { docRev: d.library.docRev } : {}) } : d.library;
+          return { ...(promote ? rest : d), name: subject.name, library: lib };
+        });
       }
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;
@@ -205,7 +210,10 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
     return withCleanup(async (written) => {
       const docRev = snap?.doc ? (snap.docRev ?? subject.docRev) : undefined;
       const link: NonNullable<DesignDoc['library']> = { subjectId, versionId: curVer, ...(docRev ? { docRev } : {}), ...(space === 'studio' ? { view: 'studio' as const } : {}) };
-      const doc = snap?.doc ? remapDoc(snap.doc, (await copyDocPixels(snap.doc, null, expectedRasterIds(snap), written)).map, { newDocId: true, library: link }) : linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined);
+      const px = snap?.doc ? (await copyDocPixels(snap.doc, null, expectedRasterIds(snap), written)).map : null;
+      const doc = snap?.doc
+        ? { ...remapDoc(snap.doc, px!, { newDocId: true, library: link }), name: subject.name }
+        : linkedBlankDoc(subject.name, subjectId, curVer, docRev, space === 'studio' ? 'studio' : undefined);
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
