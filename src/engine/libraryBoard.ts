@@ -84,7 +84,7 @@ function ownLayer(doc: DesignDoc, node: GraphNode, taken: ReadonlySet<string>, k
   ));
 }
 
-const canRefresh = (layer: RasterLayer, rev = 0) => layer.sourceAssetId && layer.rev === rev
+const canRefresh = (layer: RasterLayer) => layer.sourceAssetId && layer.rev === (layer.libraryImageRev ?? 0)
   && !layer.locked && !layer.paintBaseId && !layer.paintStrokes?.length && !layer.paintFlattened && !isUnreadable(layer.id);
 
 /** Resolve imports before opening the document's history group. Existing pixels must also be ready for undo. */
@@ -97,7 +97,7 @@ export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, 
     if (doc.board?.at[n.id]) {
       if (!refreshLinked || entry?.layer.type !== 'raster' || entry.layer.sourceAssetId === id) continue;
       images.set(n.id, null);
-      if (!canRefresh(entry.layer, entry.at.rev)) continue;
+      if (!canRefresh(entry.layer)) continue;
       if (!getBuffer(entry.layer.id)) await ensureBuffers([entry.layer]);
     } else {
       const own = ownLayer(doc, n, taken, kind);
@@ -140,14 +140,13 @@ function updateBoard(sessionId: string, docId: string, graph: Graph | undefined,
   for (const n of items) {
     const d = n.data, e = linked(doc, n.id);
     if (!images.has(n.id) || d.kind !== 'asset' || !d.assetId || e?.layer.type !== 'raster' || e.layer.sourceAssetId === d.assetId) continue;
-    if (!canRefresh(e.layer, e.at.rev) || paintingLive() || !getBuffer(e.layer.id)) {
+    if (!canRefresh(e.layer) || paintingLive() || !getBuffer(e.layer.id)) {
       toast(`Kept "${e.layer.name}" as it is.`, 'info');
       continue;
     }
     const canvas = images.get(n.id);
     if (!canvas) { missingImage(d.assetId, d.title); continue; }
     replaceLayerPixels(sessionId, docId, e.layer.id, d.assetId, canvas);
-    setDoc(sessionId, docId, (x) => x.board ? { ...x, board: { ...x.board, at: { ...x.board.at, [n.id]: { ...e.at, rev: e.layer.rev + 1 } } } } : x);
   }
   if (!news.length) return;
   const born = !doc.board;

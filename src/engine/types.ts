@@ -460,6 +460,8 @@ export interface RasterLayer extends LayerBase {
   pxWidth: number;
   pxHeight: number;
   rev: number;
+  /** Pixel revision of the last image refresh from a linked Library board. */
+  libraryImageRev?: number;
   sourceAssetId?: string;
   /** Images are protected from brush/eraser unless the user allows painting on them. */
   allowPaint?: boolean;

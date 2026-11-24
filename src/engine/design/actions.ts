@@ -449,9 +449,8 @@ export function replaceLayerPixels(sessionId: string, docId: string, layerId: st
     if (!doc) return;
     record(doc);
     setBuffer(layer.id, canvas);
-    // Board imports retain their box. Operation results follow the new aspect.
-    const height = ready ? layer.height : (layer.width * canvas.height) / canvas.width;
-    setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
+    const rev = layer.rev + 1, height = ready ? layer.height : (layer.width * canvas.height) / canvas.width;
+    setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, height, rev, ...(ready && { libraryImageRev: rev }), sourceAssetId: assetId }));
   };
   return ready ? apply(ready) : assetCanvas(assetId).then(apply);
 }

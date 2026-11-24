@@ -43,6 +43,9 @@ it('reopens a restored graph-only board with the saved image pixels in its linke
   undoDoc(s.id, doc.id);
   expect(getDoc(s.id, doc.id)!.layers).toEqual([layer, fx]);
   expect(getBuffer(layer.id)?.width).toBe(oldPixels?.width);
+  const openedAgain = await libraryToDesigner(s.id, subject.id);
+  expect(openedAgain.layers[0]).toMatchObject({ id: layer.id, sourceAssetId: node.assetId, pxWidth: 800 });
+  expect(getBuffer(layer.id)?.width).toBe(800);
 });
 
 it('undoes a new library image without removing a text layer added during loading', async () => {
