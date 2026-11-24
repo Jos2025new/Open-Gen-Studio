@@ -68,6 +68,7 @@ import { addTextLayer, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createSession, useStore } from '../src/store/store';
 import { deleteSession } from '../src/engine/actions';
 import { run } from '../src/engine/commands';
+import { runCommandsTool } from '../src/engine/agent/commandCalls';
 import type { Graph, Layer } from '../src/engine/types';
 
 function resetStore() {
@@ -86,6 +87,7 @@ beforeEach(() => {
 
 const text = (id: string, t: string, x: number, y: number) => ({ id, position: { x, y }, data: { kind: 'text' as const, title: id, text: t } });
 
+const tool = (session: string, seq: unknown[]) => runCommandsTool(session, { seq });
 const graphOf = (...nodes: Graph['nodes']): Graph => ({ nodes, edges: [] });
 const notesOf = (s: string, d: string) => getDoc(s, d)!.layers.flatMap(l => l.type === 'text' ? [l.text] : []);
 it('opening a revision undoes its moves, additions and page growth together', async () => {
@@ -186,4 +188,38 @@ it.each([true, false])('cleans only the failed creation after publication (draft
   } finally {
     stop();
   }
+});
+
+it('reports Library writes without promising document undo', async () => {
+  const s = resetStore();
+  const created = await tool(s.id,[{cmd:'library.item.create',args:{name:'Board',kind:'moodboard',space:'library'}}]);
+  expect(created.done).toBe(true);
+  expect(created.text).toContain('Saved in Library');
+  expect(created.text).not.toContain('One Ctrl+Z per document undoes it all');
+  expect(useStore.getState().sessions[s.id].docs).toHaveLength(0);
+});
+
+it.each(['nodes', 'library'])('keeps the existing document after a %s-only step', async (space) => {
+  const s = resetStore();
+  const { subject } = await createItem({ name: 'Board', kind: 'moodboard', space: 'library', by: 'user', graph: graphOf(text('x','one',100,100)) });
+  const doc = await libraryToDesigner(s.id, subject.id);
+  const step = space === 'nodes'
+    ? { cmd: 'library.item.open', args: { id: subject.id, space } }
+    : { cmd: 'library.item.create', args: { name: 'New', kind: 'moodboard', space } };
+  const result = await tool(s.id, [step, { cmd: 'designer.doc.read' }]);
+  expect(result.done).toBe(true);
+  expect(result.text).toContain(doc.id);
+  expect(result.text).not.toContain('One Ctrl+Z per document undoes it all');
+});
+
+it('routes a subsequent doc command to the document created in Studio', async () => {
+  const s = resetStore();
+  const result = await tool(s.id, [
+    { cmd: 'library.item.create', args: { name: 'New', kind: 'moodboard' } },
+    { cmd: 'designer.doc.read' },
+  ]);
+  expect(result.done).toBe(true);
+  expect(result.text).toContain(useStore.getState().sessions[s.id].docs[0].id);
+  expect(result.text).toContain('Saved in Library');
+  expect(result.text).not.toContain('One Ctrl+Z per document undoes it all');
 });

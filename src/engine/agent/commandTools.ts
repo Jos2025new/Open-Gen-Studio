@@ -27,7 +27,7 @@ export const COMMAND_TOOLS: ToolSpec[] = [
     function: {
       name: 'run_commands',
       description:
-        'Runs commands of any area in order, as the user\'s own actions. All or nothing, one undo step per document. Commands that spend or delete ask for the user\'s approval once for the whole sequence with its total cost. All command ids and arguments are in the system prompt: call run_commands directly without find_commands. A step can use an earlier result: "$1" is the whole result of step 1 (e.g. data: "$1") and "$1.layer" or "$2.node" a field of it. Designer steps act on the document on screen unless "on" names another one: use "on": "$1.doc" (or {"doc": "$1.doc"}) when step 1 creates the document.',
+        'Runs commands of any area in order, as the user\'s own actions. Document edits are grouped for undo. Library saves stay in Library. Commands that spend or delete ask for the user\'s approval once for the whole sequence with its total cost. All command ids and arguments are in the system prompt: call run_commands directly without find_commands. A step can use an earlier result: "$1" is the whole result of step 1 (e.g. data: "$1") and "$1.layer" or "$2.node" a field of it. Designer steps act on the document on screen unless "on" names another one: use "on": "$1.doc" (or {"doc": "$1.doc"}) when step 1 creates the document.',
       parameters: {
         type: 'object',
         properties: {

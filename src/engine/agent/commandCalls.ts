@@ -8,6 +8,7 @@ import { COMMAND_REVIEW_CHANGED, type RunResult } from '../commands/types';
 import type { FrozenCommandStep } from '../commands/run';
 import { activeDoc, getDoc } from '../design/actions';
 import { markAgentEdit } from '../design/agentGlow';
+import { canRedo, undoHead } from '../design/history';
 import { closeTicket, grantTicketPass, stepCapFromEstimate, storeTickets } from '../money/storeBridge';
 import { createTicket, isHeldStatus, priceFromEstimate, type ApprovalTicket } from '../money/ticket';
 import { FREE, sumEstimates } from '../pricing';
@@ -43,7 +44,11 @@ const AREAS: Record<string, string> = {
   sessions: 'list, rename, pin and title sessions',
 };
 const NEEDS_APPROVAL = 'needs the user\'s approval';
-const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset', 'library.item.create', 'library.item.open']);
+const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset']);
+const LIBRARY_WRITERS = new Set([
+  'library.item.create', 'library.item.save', 'library.item.restore',
+  'library.subject.save', 'library.subject.from_asset', 'library.subject.from_sheet', 'library.subject.from_attachments', 'library.voice.create',
+]);
 const ON_DOC_HINT = ' (target a new doc from an earlier step with "on": "$1.doc", or pass an id from designer.doc.list)';
 const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
 const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
@@ -254,7 +259,8 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   const seq = v.data.seq.map((step, i) => {
     const spec = command(step.cmd);
     const next = !step.on?.doc && docRef && spec?.needs?.includes('doc') ? { ...step, on: { doc: docRef } } : step;
-    if (spec && DOC_CREATORS.has(spec.id)) docRef = `$${i + 1}.doc`;
+    const space = step.args?.space, docSpace = space === 'studio' || space === 'designer';
+    if (spec && (DOC_CREATORS.has(spec.id) || (spec.id === 'library.item.create' && (space === undefined || docSpace)) || (spec.id === 'library.item.open' && docSpace))) docRef = `$${i + 1}.doc`;
     return next;
   });
   for (const [i, step] of seq.entries()) {
@@ -283,13 +289,17 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
     })
     : undefined;
 
+  const beforeState = useStore.getState();
+  const beforeDocs = new Map(beforeState.sessions[sessionId]?.docs.map((d) => [d.id, { doc: d, undo: undoHead(d.id) }]));
   const { result, changed } = await runTrackedSequence(
     { seq, on: { session: sessionId, ...(doc ? { doc: doc.id } : {}) } },
     () => approvalItemId,
     { signal, approver: sessionApprover },
   );
   const reoffered = approvalItemId ? finishCommandCard(sessionId, approvalItemId, result, changed) : undefined;
-  const ran = result.results.length;
+  const ran = result.results.length, afterState = useStore.getState();
+  const saved = afterState.library !== beforeState.library && result.results.some((_, i) => LIBRARY_WRITERS.has(command(seq[i].cmd)?.id ?? ''));
+  const libraryNote = saved ? ' Saved in Library (restore a version or delete the entry to undo).' : '';
   if (!result.ok) {
     const kept = ran === 0 ? 'Nothing ran.'
       : result.kept ? `Steps 1 to ${ran} ran and stay, as one undo step: the sequence waited on a step and the user may have edited meanwhile, so nothing was taken back. Read the document before going on.`
@@ -297,11 +307,16 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
     if (result.error.code === 'denied') return { text: `Step ${result.error.step ?? 1} ${NEEDS_APPROVAL} (it spends or deletes). Nothing ran.`, done: false };
     const msg = result.error.code === 'target' && result.error.message.includes('on.doc') ? `${result.error.message.replace(/\.$/, '')}${ON_DOC_HINT}.` : result.error.message;
     const over = reoffered ? budgetProblem(reoffered, sessionId) : null;
-    return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${msg}${over ? ' ' + over : ''} ${kept}`, done: false };
+    return { text: `Step ${result.error.step ?? 1} failed (${result.error.code}): ${msg}${over ? ' ' + over : ''} ${kept}${libraryNote}`, done: false };
   }
   // The agent's edit glows on the canvas for a moment (in memory only: never saved, undone or exported).
   const after = doc ? getDoc(sessionId, doc.id) : undefined;
   if (doc && after) markAgentEdit(doc.id, doc, after);
+  const docEdited = afterState.sessions[sessionId]?.docs.some((d) => {
+    const before = beforeDocs.get(d.id), undo = undoHead(d.id);
+    return d !== before?.doc && undo && undo !== before?.undo && !canRedo(d.id);
+  });
+  const undoNote = docEdited ? ' One Ctrl+Z per document undoes it all.' : '';
   const results = JSON.stringify(result.results);
-  return { text: `Done, ${ran} step${ran === 1 ? '' : 's'}. Results: ${results.length > RESULT_MAX ? `${results.slice(0, RESULT_MAX)}… (cut)` : results}. One Ctrl+Z per document undoes it all.`, done: true };
+  return { text: `Done, ${ran} step${ran === 1 ? '' : 's'}. Results: ${results.length > RESULT_MAX ? `${results.slice(0, RESULT_MAX)}… (cut)` : results}.${undoNote}${libraryNote}`, done: true };
 }
