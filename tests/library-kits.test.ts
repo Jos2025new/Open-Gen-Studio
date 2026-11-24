@@ -185,8 +185,8 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
 
     deleteSubject(orig.id);
     await waitKitQueue(orig.id);
-    expect(hoisted.blobs.has(`libver:${savedOrig.versionId}`)).toBe(false);
-    expect(hoisted.blobs.has(`raster:${origSnap!.doc!.layers[0].id}`)).toBe(false);
+    expect(hoisted.blobs.has(`libver:${savedOrig.versionId}`)).toBe(true);
+    expect(hoisted.blobs.has(`raster:${origSnap!.doc!.layers[0].id}`)).toBe(true);
     expect(await blobBytes(hoisted.blobs.get(`raster:${copySnap!.doc!.layers[0].id}`))).toEqual(px);
     const stillOpen = useStore.getState().sessions[s.id].docs.find((d) => d.id === doc.id)!;
     expect(stillOpen.library).toBeUndefined();
@@ -326,7 +326,7 @@ describe('Contract 5 (engine) & 6: kits out of sends + library.item.* commands +
 
     const delRes = await run({ cmd: 'library.item.delete', args: { id: createdKit.id } }, { caller: 'agent' });
     expect(delRes.ok).toBe(true);
-    expect(hoisted.blobs.has(`libver:${v1Id}`)).toBe(false);
+    expect(hoisted.blobs.has(`libver:${v1Id}`)).toBe(true);
     setApprover(null);
   });
 });

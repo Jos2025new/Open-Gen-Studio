@@ -159,7 +159,7 @@ describe('Hardening guarantees (versioning, rasters, races, rollback)', () => {
     const savedV = await savePromise;
     await waitKitQueue(kit2.id);
     expect(useStore.getState().library.some((x) => x.id === kit2.id)).toBe(false);
-    expect(hoisted.blobs.has(`libver:${savedV.versionId}`)).toBe(false);
+    expect(hoisted.blobs.has(`libver:${savedV.versionId}`)).toBe(true);
   });
 
   it('5) rejects saveSubject overwriting a kit and validates missing assets in graph nodes', async () => {

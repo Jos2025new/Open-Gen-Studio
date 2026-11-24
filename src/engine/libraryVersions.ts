@@ -307,13 +307,5 @@ export function deleteItem(id: string): Promise<void> {
     if (!live || !isKit(live)) return;
     for (const [sid, s] of Object.entries(get().sessions)) for (const d of [...s.docs]) if (d.library?.subjectId === id) detachWorkingDoc(sid, d.id);
     useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
-    const verIds = [...new Set([...(live.versions ?? []).map((v) => v.id), ...(live.versionId ? [live.versionId] : [])])];
-    const keys = new Set<string>();
-    for (const vid of verIds) {
-      keys.add(vKey(vid));
-      const snap = await readKitVersion(vid).catch(() => null);
-      if (snap?.doc) for (const rid of rasterBufferIds(snap.doc.layers)) keys.add(rKey(rid));
-    }
-    if (keys.size) await blobDb.delMany([...keys]).catch(() => undefined);
   });
 }

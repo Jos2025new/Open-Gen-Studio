@@ -51,8 +51,9 @@ vi.mock('../src/lib/media', async () => {
   };
 });
 
-import { createItem, libraryToDesigner, saveItem } from '../src/engine/libraryVersions';
-import { createSession, useStore } from '../src/store/store';
+import { createItem, deleteItem, libraryToDesigner, readKitVersion, saveItem } from '../src/engine/libraryVersions';
+import { newRasterLayer } from '../src/engine/design/doc';
+import { createSession, setDoc, useStore } from '../src/store/store';
 import type { Asset, Graph, RasterLayer } from '../src/engine/types';
 
 function mkAsset(id: string, sessionId: string, w = 800, h = 600): Asset {
@@ -100,5 +101,24 @@ describe('Lote F fixes', () => {
     const doc2 = await libraryToDesigner(s.id, mb.id);
     expect(doc2.id).toBe(doc1.id);
     expect(doc2.layers.filter((l): l is RasterLayer => l.type === 'raster').map((l) => l.sourceAssetId)).toEqual(['img_1', 'img_2']);
+  });
+
+  it('1) deleteItem removes library entry and detaches working docs without deleting version or raster blobs', async () => {
+    const s = resetStore();
+    const { subject: kit, doc } = await createItem({ name: 'KeepBlobs', kind: 'design-system', space: 'designer', sessionId: s.id, by: 'user' });
+    const lyr: RasterLayer = { ...newRasterLayer('Logo', { x: 0, y: 0, width: 4, height: 4 }, { width: 4, height: 4 }), rev: 1 };
+    setDoc(s.id, doc!.id, (d) => ({ ...d, layers: [lyr] }));
+    hoisted.blobs.set(`raster:${lyr.id}`, new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }));
+
+    const saved = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'designer', by: 'user' });
+    const snap = await readKitVersion(saved.versionId!);
+    const storedRasterId = snap!.doc!.layers[0].id;
+
+    await deleteItem(kit.id);
+    expect(useStore.getState().library.some((x) => x.id === kit.id)).toBe(false);
+    expect(useStore.getState().sessions[s.id].docs.find((d) => d.id === doc!.id)?.library).toBeUndefined();
+    // Blobs remain intact so a failed state write never loses data
+    expect(hoisted.blobs.has(`libver:${saved.versionId}`)).toBe(true);
+    expect(hoisted.blobs.has(`raster:${storedRasterId}`)).toBe(true);
   });
 });
