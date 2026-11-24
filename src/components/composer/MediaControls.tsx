@@ -7,6 +7,7 @@ import type { ProviderId } from '../../engine/types';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import type { AdvancedValue, MediaKind, ParamDef } from '../../engine/types';
 import { createSubjectVoice, deleteSubject, saveSubject, subjectFromAttachments } from '../../engine/actions';
+import { mentionableSubjects } from '../../engine/libraryTypes';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { setComposer, setComposerMedia, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -364,7 +365,7 @@ function SubjectsChip() {
   // Without elements (Kling), subjects go as reference images (R10): any model that takes them.
   const takesRefs = useStore((s) => Boolean(s.catalog.schemas[ref]?.slots.images || s.catalog.schemas[ref]?.slots.mixedRefs));
   const sessionId = useStore((s) => s.activeSessionId);
-  const subjects = useStore((s) => s.library);
+  const subjects = mentionableSubjects(useStore((s) => s.library));
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const [name, setName] = useState('');

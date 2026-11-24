@@ -2,6 +2,7 @@ import { syncOpSpec, type OpSpecInput } from '../opSpec';
 import { OPS } from '../ops';
 import { parseRef } from '../planRef';
 import { applyLyricsSettings, type SendSpec, type SendState } from '../sendInputs';
+import { mentionableSubjects } from '../libraryTypes';
 import type { PlanStep, Subject } from '../types';
 import { useStore } from '../../store/store';
 
@@ -16,7 +17,7 @@ export function stepSendSpec(s: PlanStep, steps: readonly PlanStep[], nodeOperat
   const textOf = (ref: string | undefined) => { const p = ref ? parseRef(ref) : null; const t = p?.type === 'step' ? textById.get(p.id) : undefined; if (ref && t == null) dynamic = true; return t; };
   const promptFor = (step: { prompt: string; promptFrom?: string }) => step.promptFrom ? [(textOf(step.promptFrom) ?? `step:${step.promptFrom}`).trim(), step.prompt.trim()].filter(Boolean).join('\n') : step.prompt;
   const subjects: Subject[] = (s.nodeSubjects ?? []).map((b) => ({ id: b.name, name: b.name, description: b.description ?? '', kind: b.kind ?? 'character', frontalAssetId: take(b.from), refAssetIds: [] }));
-  const inputsBase = { ...(subjects.length ? { subjects } : {}), nodeLibrary: state.library };
+  const inputsBase = { ...(subjects.length ? { subjects } : {}), nodeLibrary: mentionableSubjects(state.library) };
   if (s.kind === 'op') {
     const source = take(s.input) ?? '';
     let params = s.params;

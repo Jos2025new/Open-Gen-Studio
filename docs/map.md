@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 468 | 394 |
-| [store.ts](../src/store/store.ts) | 312 | 386 |
+| [types.ts](../src/engine/types.ts) | 468 | 395 |
+| [store.ts](../src/store/store.ts) | 312 | 387 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 153 | 1 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 108 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 81 | 48 |
@@ -31,7 +31,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 57 | 22 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
-| [doc.ts](../src/engine/design/doc.ts) | 51 | 74 |
+| [doc.ts](../src/engine/design/doc.ts) | 51 | 75 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 45 | 40 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 40 | 0 |
@@ -48,45 +48,37 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src` | 2 | 0 |
 | `src/components/assets` | 17 | 9 |
 | `src/components/chat` | 23 | 28 |
-| `src/components/composer` | 16 | 18 |
-| `src/components/designer` | 121 | 57 |
+| `src/components/composer` | 16 | 19 |
+| `src/components/designer` | 121 | 58 |
 | `src/components/gallery` | 4 | 4 |
 | `src/components/node` | 32 | 41 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 36 |
 | `src/components/space` | 10 | 9 |
 | `src/components/studio` | 8 | 4 |
-| `src/components/ui` | 25 | 21 |
-| `src/engine` | 92 | 465 |
-| `src/engine/agent` | 71 | 178 |
+| `src/components/ui` | 25 | 22 |
+| `src/engine` | 92 | 466 |
+| `src/engine/agent` | 71 | 179 |
 | `src/engine/commands` | 7 | 39 |
-| `src/engine/design` | 163 | 218 |
-| `src/engine/flow` | 22 | 105 |
+| `src/engine/design` | 163 | 219 |
+| `src/engine/flow` | 22 | 106 |
 | `src/engine/fx` | 8 | 10 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/money` | 4 | 12 |
 | `src/engine/nodecore` | 23 | 51 |
 | `src/engine/nodes` | 8 | 36 |
 | `src/engine/params` | 9 | 21 |
-| `src/engine/planSteps` | 19 | 2 |
+| `src/engine/planSteps` | 19 | 3 |
 | `src/engine/providers` | 15 | 99 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 485 |
-| `src/store` | 19 | 388 |
+| `src/lib` | 38 | 486 |
+| `src/store` | 19 | 389 |
 
-282 de 810 módulos no tienen ningún test que los importe directamente.
+279 de 810 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
 - [App.tsx](../src/App.tsx)
-- [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx)
-- [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
-- [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
-- [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
-- [LayerObjects.tsx](../src/components/designer/LayerObjects.tsx)
-- [LayerUnreadable.tsx](../src/components/designer/LayerUnreadable.tsx)
-- [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
-- [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
 - [OmniWorkspace.tsx](../src/components/omni/OmniWorkspace.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)

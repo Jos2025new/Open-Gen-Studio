@@ -20,6 +20,7 @@ import { appendFeed, updateFeedItem, toast, useStore } from '../../store/store';
 import { autoLayout, connectionError, graphToSteps, inferReplaces, inputPorts, NODE_WIDTH, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblemForSteps, consumeOnce, passActiveFor, type BudgetPass } from '../budget';
 import { deleteAssets } from '../actions';
+import { mentionableSubjects } from '../libraryTypes';
 import { closeTicket, stepCapsFromMap, storeTickets, ticketPassFromEstimate } from '../money/storeBridge';
 import { createTicket, isFreePrice, priceFromEstimate } from '../money/ticket';
 import { findCycle } from '../nodecore/deps';
@@ -216,7 +217,8 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
   const st = get();
   const graph = st.sessions[sessionId].graph;
   const context = requestContext(sessionId);
-  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context, ...(frozenRunIds ? { frozenRunIds } : {}) });
+  const lib = mentionableSubjects(st.library);
+  const run = graphToSteps(graph, targets, st.generations, { force, library: lib, ...context, ...(frozenRunIds ? { frozenRunIds } : {}) });
   const env = storeEnv();
   const inputs = new Set(run.runIds);
   const visit = (id: string) => {
@@ -254,7 +256,7 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
     const schema = st.catalog.schemas[step.modelRef];
     if (!schema) continue;
     const node = graph.nodes.find(n => n.id === step.id)!;
-    const request = nodeRequest(graph, node, st.generations, st.library, context);
+    const request = nodeRequest(graph, node, st.generations, lib, context);
     const subjects = 'subjects' in request ? request.subjects ?? [] : [];
     if (subjects.some(s => !step.nodeSubjects?.some(b => b.name === s.name && !b.from.startsWith('asset:')) && (!s.frontal || !st.assets[s.frontal]))) errors.push(`${step.title}: a mentioned subject needs an available image.`);
     const problem = nodePreviewInputProblem(step, schema, subjects.length, (ref) =>
@@ -276,7 +278,7 @@ export function previewRun(sessionId: string, targets: string[], force = true, f
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) return [id, 'missing']; // already reported as an error above
-    return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, st.library, context)];
+    return [id, 'outputIndex' in n.data ? n.data.outputIndex : undefined, n.data.kind === 'text' ? n.data.text : n.data.kind === 'asset' ? n.data.sketchAssetId ?? n.data.assetId : nodeRequest(graph, n, st.generations, lib, context)];
   });
   return { estimate: total, perStep, count: run.runIds.length, errors, runIds: run.runIds, steps: run.steps, inputIds: [...inputs], sendAssets: [...sendAssets].sort(), stepFingerprints, signature: stable({ requests, send: sendFingerprints, steps: run.steps.map(({ title: _title, ...s }) => s), total, core: coreSignature(graph, [...inputs]) }) };
 }
@@ -331,7 +333,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
   const startGraph = get().sessions[sessionId].graph;
-  const library = structuredClone(get().library);
+  const library = structuredClone(mentionableSubjects(get().library));
   const context = requestContext(sessionId);
   const nodeOperations = nodeOperationsOf(context, startGraph, preview.runIds);
   const releaseAssets = lockAssets(preview.sendAssets ?? []);

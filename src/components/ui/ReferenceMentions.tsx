@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { refMentionStyle } from '../../engine/params';
+import { mentionableSubjects } from '../../engine/libraryTypes';
 import type { Asset, Generation, PlanStep, PlanSubject, Subject } from '../../engine/types';
 import { AssetMedia } from './AssetMedia';
 import { Popover } from './Popover';
@@ -12,7 +13,7 @@ export function referenceChoices(images: Array<{ id: string; label: string; asse
   const style = refMentionStyle(modelId, promptRefs);
   return [
     ...images.map((image, i) => ({ ...image, mention: style ? style.template.replace('{n}', String(i + (style.zeroBased ? 0 : 1))) : `@Image${i + 1}` })),
-    ...subjects.map(s => ({ id: `subject:${s.id}`, label: s.name, mention: `@${s.name}`, assetId: s.frontalAssetId })),
+    ...mentionableSubjects(subjects).map(s => ({ id: `subject:${s.id}`, label: s.name, mention: `@${s.name}`, assetId: s.frontalAssetId })),
   ];
 }
 
@@ -35,7 +36,7 @@ export function stepReferenceChoices(step: PlanStep, steps: PlanStep[], assets: 
   });
   const stepSubjects = step.nodeSubjects ?? [];
   const subjects: Subject[] = [...stepSubjects, ...local.filter(s => !stepSubjects.some(n => n.name.toLowerCase() === s.name.toLowerCase()))].map((s, i) => ({ id: `plan-${i}`, name: s.name, frontalAssetId: s.from.startsWith('asset:') ? s.from.slice(6) : undefined, refAssetIds: [] }));
-  subjects.push(...library.filter(s => !subjects.some(local => local.name.toLowerCase() === s.name.toLowerCase())));
+  subjects.push(...mentionableSubjects(library).filter(s => !subjects.some(local => local.name.toLowerCase() === s.name.toLowerCase())));
   return referenceChoices(images, subjects, 'modelRef' in step ? step.modelRef : '', promptRefs);
 }
 

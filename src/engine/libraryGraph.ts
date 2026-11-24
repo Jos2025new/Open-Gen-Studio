@@ -1,4 +1,4 @@
-import type { KitPiece } from './libraryTypes';
+import { isKit, mentionableSubjects, type KitPiece } from './libraryTypes';
 import type { Subject } from './types';
 
 /* Pure dependency graph, reverse usage index, cycle checks, and asset ownership across all kit versions. */
@@ -82,4 +82,37 @@ export function buildLibraryIndex(library: readonly Subject[]): LibraryIndex {
   }
   const assetOwners = libraryAssetOwners(library);
   return { byId, dependencies, usedBy, missingRefs, assetIds: new Set(assetOwners.keys()), assetOwners };
+}
+
+/** Agent context lines for Library: mentionable @Name subjects plus a separate kit index (never @-mentioned). */
+export function libraryContextLines(library: readonly Subject[], assets: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  const named = mentionableSubjects(library).filter((s) => !s.capture || s.frontalAssetId);
+  if (named.length) out.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
+  const kits = library.filter((s) => isKit(s));
+  if (kits.length) {
+    const idx = buildLibraryIndex(library);
+    const items = kits.map((k) => {
+      const dep = idx.dependencies.get(k.id), parts: string[] = [];
+      if (dep?.kitIds.length) parts.push(`kits: ${dep.kitIds.map((id) => `${id} "${idx.byId.get(id)?.name ?? id}"`).join(', ')}`);
+      const pAssets = (k.pieces ?? []).filter((p) => p.kind === 'asset' && p.assetId);
+      if (pAssets.length) parts.push(`${pAssets.length} asset${pAssets.length === 1 ? '' : 's'}`);
+      const texts = (k.pieces ?? []).filter((p) => p.kind === 'text').length;
+      if (texts) parts.push(`${texts} text${texts === 1 ? '' : 's'}`);
+      const colors = (k.pieces ?? []).filter((p) => p.kind === 'color').length;
+      if (colors) parts.push(`${colors} color${colors === 1 ? '' : 's'}`);
+      if (k.tokens) {
+        const groups = (['colors', 'fonts', 'spacing', 'radii'] as const).filter((g) => k.tokens?.[g] && Object.keys(k.tokens[g]!).length);
+        if (groups.length) parts.push(`tokens: ${groups.join('/')}`);
+      }
+      if (k.links?.length) parts.push(`${k.links.length} link${k.links.length === 1 ? '' : 's'}`);
+      const missing = [
+        ...(dep?.missingKitIds.map((id) => `kit:${id}`) ?? []),
+        ...pAssets.filter((p) => !assets[p.assetId!]).map((p) => `asset:${p.assetId}`),
+      ];
+      return `${k.id} "${k.name}" (${k.kind}${k.draft ? ', draft' : ''}) — contains: ${parts.join(', ') || 'empty'}${missing.length ? `; missing: ${missing.join(', ')}` : ''}`;
+    });
+    out.push(`library kits (read/edit via library.kit.* commands): ${items.join(' | ')}`);
+  }
+  return out;
 }

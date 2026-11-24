@@ -31,6 +31,8 @@ import { studioLine, STUDIO_RULE } from './agentCanvas';
 import { viewReferenceLabel } from './assetSearch';
 import { assetShape } from './assetShape';
 import { LAYER_DOC } from './layerDoc';
+import { mentionableSubjects } from '../libraryTypes';
+import { libraryContextLines } from '../libraryGraph';
 
 const get = useStore.getState;
 /** What a confirmed model takes: a plan reusing it is written for it. */
@@ -283,10 +285,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (skill) lines.push(`skill: ${skill.name} — ${skill.guidance}`);
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (${WORKFLOW_CONTRACT}):\n${describeWorkflow(wf)}`);
-  const subjects = st.library;
-  const named = subjects.filter((s) => !s.capture || s.frontalAssetId);
-  if (named.length) lines.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
-  lines.push(...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
+  const subjects = mentionableSubjects(st.library);
+  lines.push(...libraryContextLines(st.library, st.assets), ...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
   // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);

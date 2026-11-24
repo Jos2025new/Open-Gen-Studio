@@ -28,7 +28,8 @@ import { LayersPanel } from './LayersPanel';
 
 export function DesignerWorkspace() {
   const session = useStore((s) => s.sessions[s.activeSessionId]);
-  const doc = session.docs.find((d) => d.id === session.activeDocId) ?? session.docs[0];
+  const visibleDocs = session.docs.filter((d) => d.library?.view !== 'studio');
+  const doc = visibleDocs.find((d) => d.id === session.activeDocId) ?? visibleDocs[0];
   const presets = usePopover();
   const exportMenu = usePopover();
   const saveConfirm = usePopover();
@@ -139,7 +140,7 @@ export function DesignerWorkspace() {
       onImport={(ids, mode) => void chatToDesigner(session.id, { assetIds: ids, as: mode === 'documents' ? 'documents' : 'layers' })}
     />
     {doc ? <>
-      <DocumentPicker sessionId={session.id} docs={session.docs} active={doc} />
+      <DocumentPicker sessionId={session.id} docs={visibleDocs} active={doc} />
       <ToolPalette sessionId={session.id} doc={doc} selectedCurve={selectedCurve}
         history={null}
         view={<>
