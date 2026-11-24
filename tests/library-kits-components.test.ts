@@ -76,7 +76,7 @@ describe('Component & style part nodes, missing groups, token deps, and remapDoc
       ],
       edges: [{ id: 'e1', source: 'c1', target: 'st_h1', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'uses typography' }],
     };
-    const updated = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user', graph });
+    const updated = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user', graph });
 
     const dep = kitDependencies(updated, useStore.getState().library);
     expect(dep.missingGroupIds).toEqual(['grp_deleted']);
@@ -105,7 +105,7 @@ describe('Component & style part nodes, missing groups, token deps, and remapDoc
     setDoc(s1.id, doc!.id, (d) => ({ ...d, layers: d.layers.map((l) => (l.id === r.id ? { ...l, visible: false } : l)) }));
     setGroupFlag(s1.id, doc!.id, gid, 'visible', false);
 
-    const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s1.id, space: 'studio', by: 'user', label: 'v1' });
+    const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s1.id, docId: doc!.id, space: 'studio', by: 'user', label: 'v1' });
     const snap1 = await readKitVersion(v1.versionId!);
     expect(snap1?.doc?.groups?.some((g) => g.id === gid && g.name === 'ActionPill')).toBe(true);
     const snapRaster = snap1!.doc!.layers.find((l) => l.type === 'raster')!;

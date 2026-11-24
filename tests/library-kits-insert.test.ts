@@ -66,7 +66,7 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
     patchGroup(s.id, kitDoc!.id, srcGid, { name: 'CTA Button' });
 
     const v1 = await saveItem({
-      subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user',
+      subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user',
       graph: { nodes: [{ id: 'comp_cta', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', groupId: srcGid, title: 'CTA Button', role: 'cta' } }], edges: [] },
     });
     const v1Raster = (await readKitVersion(v1.versionId!))!.doc!.layers.find((l) => l.type === 'raster') as RasterLayer;
@@ -94,7 +94,7 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
     const direct = await insertComponent(s.id, target.id, kit.id, 'comp_cta');
     const keptRaster = getDoc(s.id, target.id)!.layers.find((l) => l.type === 'raster') as RasterLayer;
     setDoc(s.id, kitDoc!.id, (d) => ({ ...d, layers: d.layers.map((l) => (l.type === 'text' ? { ...l, text: 'CHANGED V2' } : l)) }));
-    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user' });
+    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user' });
     deleteSubject(kit.id);
     await waitKitQueue(kit.id);
 
@@ -113,7 +113,7 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
     hoisted.blobs.set(`raster:${r.id}`, new Blob([new Uint8Array([5, 6])], { type: 'image/png' }));
     const gid = groupLayers(s.id, kitDoc!.id, [r.id, t.id])!;
     await saveItem({
-      subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user',
+      subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user',
       graph: {
         nodes: [
           { id: 'c_ok', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', groupId: gid, title: 'Ok' } },

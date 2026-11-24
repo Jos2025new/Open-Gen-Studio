@@ -52,6 +52,9 @@ vi.mock('../src/lib/media', async () => {
 });
 
 import { createItem, deleteItem, libraryToDesigner, readKitVersion, saveItem } from '../src/engine/libraryVersions';
+import { nodesToLibrary } from '../src/engine/flow/fromLibrary';
+import { editCompound } from '../src/engine/nodecore/edit';
+import { run } from '../src/engine/commands';
 import { newRasterLayer } from '../src/engine/design/doc';
 import { createSession, setDoc, useStore } from '../src/store/store';
 import type { Asset, Graph, RasterLayer } from '../src/engine/types';
@@ -93,9 +96,9 @@ describe('Lote F fixes', () => {
     const doc1 = await libraryToDesigner(s.id, mb.id);
     expect(doc1.layers.filter((l): l is RasterLayer => l.type === 'raster').map((l) => l.sourceAssetId)).toEqual(['img_1']);
 
-    // Add second image to moodboard (graph-only update)
+    // Add second image to moodboard (exact Add to moodboard pattern: sessionId, no docId)
     const n2 = { id: 'n2', position: { x: 0, y: 0 }, data: { kind: 'asset' as const, title: 'Img 2', assetId: 'img_2' } };
-    await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'studio', by: 'user', graph: (g) => ({ ...(g ?? { nodes: [], edges: [] }), nodes: [...(g?.nodes ?? []), n2] }) as Graph });
+    await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'studio', by: 'user', sessionId: s.id, graph: (g) => ({ ...(g ?? { nodes: [], edges: [] }), nodes: [...(g?.nodes ?? []), n2] }) as Graph });
 
     // Reopen: same working copy, both images, no duplicates
     const doc2 = await libraryToDesigner(s.id, mb.id);
@@ -120,5 +123,30 @@ describe('Lote F fixes', () => {
     // Blobs remain intact so a failed state write never loses data
     expect(hoisted.blobs.has(`libver:${saved.versionId}`)).toBe(true);
     expect(hoisted.blobs.has(`raster:${storedRasterId}`)).toBe(true);
+  });
+
+  it('2) saveItem captures working doc only with explicit docId (never via session lookup from Nodes, agent without doc, or Add to moodboard)', async () => {
+    const s = resetStore();
+    const { subject: kit, doc } = await createItem({ name: 'BrandDoc', kind: 'brand-kit', space: 'designer', sessionId: s.id, by: 'user' });
+    setDoc(s.id, doc!.id, (d) => ({ ...d, background: '#111111' }));
+    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'designer', by: 'user', label: 'v1' });
+
+    // Edit local Designer working copy without saving
+    setDoc(s.id, doc!.id, (d) => ({ ...d, background: '#ff0000' }));
+
+    // Save from Nodes in the same session: must keep v1's doc (#111111), NOT capture local edit (#ff0000)
+    expect(editCompound(s.id, 'seed', (g) => ({
+      ...g,
+      nodes: [{ id: 'nt1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Note', text: 'From nodes' } }],
+      groups: [{ id: 'grp1', title: 'BrandDoc', nodeIds: ['nt1'], library: { subjectId: kit.id } }],
+    }))).toBeNull();
+    const fromNodes = await nodesToLibrary({ sessionId: s.id, mode: 'overwrite', subjectId: kit.id, groupId: 'grp1', by: 'user' });
+    expect((await readKitVersion(fromNodes.versionId!))?.doc?.background).toBe('#111111');
+
+    // Agent library.item.save without doc in the same session: must also NOT capture local edit
+    const agentRes = await run({ cmd: 'library.item.save', on: { session: s.id, doc: doc!.id }, args: { id: kit.id, mode: 'overwrite', label: 'agent-meta' } }, { caller: 'agent' });
+    expect(agentRes.ok).toBe(true);
+    const liveKit = useStore.getState().library.find((x) => x.id === kit.id)!;
+    expect((await readKitVersion(liveKit.versionId!))?.doc?.background).toBe('#111111');
   });
 });

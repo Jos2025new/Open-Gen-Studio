@@ -95,12 +95,12 @@ describe('Part 2: Graph model, KIT_KINDS table, trimmed tokens, shared approxLay
 
     const { subject: kit, doc: d1 } = await createItem({ name: 'KeepDoc', kind: 'design-system', space: 'studio', sessionId: s1.id, by: 'user' });
     setDoc(s1.id, d1!.id, (d) => ({ ...d, layers: [Doc.newTextLayer('T', 'v1', { x: 0, y: 0, width: 100 })] }));
-    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s1.id, space: 'studio', by: 'user' });
+    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s1.id, docId: d1!.id, space: 'studio', by: 'user' });
 
     // Advance kit in S2 so S1's d1 has an older docRev
     const d2 = await libraryToDesigner(s2.id, kit.id);
     setDoc(s2.id, d2.id, (d) => ({ ...d, layers: [Doc.newTextLayer('T', 'v2', { x: 0, y: 0, width: 100 })] }));
-    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s2.id, space: 'designer', by: 'user' });
+    await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s2.id, docId: d2.id, space: 'designer', by: 'user' });
 
     // Simulate edit happening mid-await during open in S1: old d1 MUST survive, unlinked, and keep view:'studio'
     let editedMidAwait = false;

@@ -136,13 +136,13 @@ describe('Hardening guarantees (versioning, rasters, races, rollback)', () => {
 
     let renamedOnce = false;
     hoisted.setOnSet((k) => { if (!renamedOnce && k.startsWith('libver:')) { renamedOnce = true; renameItem(kit.id, { name: 'RenamedMidSave' }); } });
-    const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user' });
+    const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' });
     expect(v1.name).toBe('RenamedMidSave');
 
     hoisted.blobs.set(`raster:${lyr.id}`, new Blob([new Uint8Array([3, 4])], { type: 'image/png' }));
     const keysBefore = new Set(hoisted.blobs.keys());
     hoisted.setOnSet((k) => { if (k.startsWith('libver:')) useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== kit.id) })); });
-    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user' })).rejects.toThrow(/deleted/i);
+    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' })).rejects.toThrow(/deleted/i);
     expect([...hoisted.blobs.keys()].filter((k) => !keysBefore.has(k))).toEqual([]);
 
     hoisted.setOnSet(null);
@@ -153,7 +153,7 @@ describe('Hardening guarantees (versioning, rasters, races, rollback)', () => {
     let releaseSave!: () => void;
     const gate = new Promise<void>((r) => { releaseSave = r; });
     hoisted.setOnSet((k) => k.startsWith('libver:') ? gate : undefined);
-    const savePromise = saveItem({ subjectId: kit2.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user' });
+    const savePromise = saveItem({ subjectId: kit2.id, mode: 'overwrite', sessionId: s.id, docId: doc2!.id, space: 'studio', by: 'user' });
     deleteSubject(kit2.id);
     releaseSave();
     const savedV = await savePromise;
@@ -195,7 +195,7 @@ describe('Full-cycle test (commands + bytes + serialized reload midway)', () => 
     setDoc(s1.id, d1.id, (d) => touch({ ...d, layers: [...d.layers, rPainted, rEmpty] }));
     hoisted.blobs.set(`raster:${rPainted.id}`, new Blob([pxV1], { type: 'image/png' }));
 
-    expect((await runCommandsTool(s1.id, { seq: [{ cmd: 'library.item.save', args: { id: kit.id, mode: 'overwrite', space: 'studio', label: 'v1' } }] })).done).toBe(true);
+    expect((await runCommandsTool(s1.id, { seq: [{ cmd: 'library.item.save', args: { id: kit.id, mode: 'overwrite', space: 'studio', doc: d1.id, label: 'v1' } }] })).done).toBe(true);
     const v1Id = useStore.getState().library.find((x) => x.id === kit.id)!.versionId!;
 
     const reloaded = JSON.parse(JSON.stringify({ library: useStore.getState().library, sessions: useStore.getState().sessions, activeSessionId: useStore.getState().activeSessionId })) as { library: Subject[]; sessions: ReturnType<typeof useStore.getState>['sessions']; activeSessionId: string };
@@ -208,7 +208,7 @@ describe('Full-cycle test (commands + bytes + serialized reload midway)', () => 
 
     const pxV2 = new Uint8Array([99, 88, 77, 66]);
     hoisted.blobs.set(`raster:${d2Painted.id}`, new Blob([pxV2], { type: 'image/png' }));
-    expect((await runCommandsTool(s2.id, { seq: [{ cmd: 'designer.layer.add_text', on: { doc: d2.id }, args: { text: 'V2 Tagline', x: 10, y: 80, width: 200 } }, { cmd: 'library.item.save', args: { id: kit.id, mode: 'overwrite', space: 'designer', label: 'v2' } }] })).done).toBe(true);
+    expect((await runCommandsTool(s2.id, { seq: [{ cmd: 'designer.layer.add_text', on: { doc: d2.id }, args: { text: 'V2 Tagline', x: 10, y: 80, width: 200 } }, { cmd: 'library.item.save', args: { id: kit.id, mode: 'overwrite', space: 'designer', doc: d2.id, label: 'v2' } }] })).done).toBe(true);
 
     expect((await runCommandsTool(s1.id, { seq: [{ cmd: 'library.item.open', args: { id: kit.id, space: 'designer' } }] })).done).toBe(true);
     const d1Old = useStore.getState().sessions[s1.id].docs.find((d) => d.id === d1.id)!;

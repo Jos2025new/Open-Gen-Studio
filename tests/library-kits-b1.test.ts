@@ -53,7 +53,7 @@ describe('docRev tracking and draft preservation', () => {
     expect(opened.library?.view).toBeUndefined();
     expect(opened.layers.some((l) => l.type === 'text' && l.text === 'Brand Title')).toBe(true);
 
-    const saved = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s1.id, space: 'designer', by: 'user' });
+    const saved = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s1.id, docId: opened.id, space: 'designer', by: 'user' });
     const snapSaved = await readKitVersion(saved.versionId!);
     expect(snapSaved?.docRev).toBeTruthy();
 
