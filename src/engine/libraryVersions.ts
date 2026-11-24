@@ -188,6 +188,13 @@ export function renameItem(id: string, patch: { name?: string; description?: str
   return result;
 }
 
+async function placeKitImage(sessionId: string, docId: string, assetId: string, title?: string): Promise<boolean> {
+  const label = title?.trim() || get().assets[assetId]?.name || assetId;
+  try { if (await placeAsset(sessionId, docId, assetId, 'new', title || undefined)) return true; } catch {}
+  toast(`Could not load image "${label}".`, 'error');
+  return false;
+}
+
 function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'designer'): Promise<DesignDoc> {
   return serialize(subjectId, async () => {
     const subject = requireItem(subjectId), session = get().sessions[sessionId];
@@ -213,7 +220,7 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           const seen = new Set(existing.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)));
           for (const n of subject.graph?.nodes ?? []) {
             if (n.data.kind !== 'asset' || !n.data.assetId || prevIds.has(n.data.assetId) || seen.has(n.data.assetId) || get().assets[n.data.assetId]?.kind !== 'image') continue;
-            try { if (await placeAsset(sessionId, existing.id, n.data.assetId, 'new', n.data.title || undefined)) seen.add(n.data.assetId); } catch {}
+            if (await placeKitImage(sessionId, existing.id, n.data.assetId, n.data.title)) seen.add(n.data.assetId);
           }
           setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId ? { ...d, library: { ...d.library, versionId: curVer } } : d));
         }
@@ -238,10 +245,7 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      for (const n of imgs) {
-        if (n.data.kind !== 'asset' || !n.data.assetId) continue;
-        try { await placeAsset(sessionId, doc.id, n.data.assetId, 'new', n.data.title || undefined); } catch {}
-      }
+      for (const n of imgs) if (n.data.kind === 'asset' && n.data.assetId) await placeKitImage(sessionId, doc.id, n.data.assetId, n.data.title);
       const box = { x: Math.round(w * 0.08), y: Math.round(h * 0.08), width: Math.round(w * 0.84) };
       for (const n of gNodes) if (n.data.kind === 'text' && n.data.text.trim()) addTextLayer(sessionId, doc.id, n.data.text, box, {}, n.data.title || undefined);
       return getDoc(sessionId, doc.id) ?? doc;

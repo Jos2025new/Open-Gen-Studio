@@ -192,4 +192,50 @@ describe('Lote G fixes', () => {
     expect(layerB?.sourceAssetId).toBe('b');
     expect(rasterSources(docRace)).toEqual(['b', 'a']);
   });
+
+  it('3) openInSpace emits error toast with image title on decode error or falsy placeAsset and continues with remaining images', async () => {
+    const s = resetStore();
+    useStore.setState({
+      assets: {
+        bad: mkAsset('bad', s.id),
+        ok: mkAsset('ok', s.id),
+        vanished: mkAsset('vanished', s.id),
+        bad2: mkAsset('bad2', s.id),
+        ok2: mkAsset('ok2', s.id),
+      },
+    });
+    // bad & bad2 have corrupt blobs (not in dims -> blobToCanvas throws); ok, vanished, ok2 have valid blobs
+    hoisted.assetBlobs.set('bad', new Blob(['corrupt'], { type: 'image/png' }));
+    hoisted.assetBlobs.set('bad2', new Blob(['corrupt2'], { type: 'image/png' }));
+    putImageBlob('ok');
+    putImageBlob('vanished');
+    putImageBlob('ok2');
+
+    // During ok's blob read, remove vanished from assets so placeAsset returns null without throwing
+    hoisted.setOnGetAsset((id) => {
+      if (id === 'ok') useStore.setState((st) => { const { vanished: _v, ...rest } = st.assets; return { assets: rest }; });
+    });
+
+    const nBad = { id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'asset' as const, title: 'Broken Shot', assetId: 'bad' } };
+    const nOk = { id: 'n2', position: { x: 100, y: 0 }, data: { kind: 'asset' as const, title: 'Good Shot', assetId: 'ok' } };
+    const nVan = { id: 'n3', position: { x: 200, y: 0 }, data: { kind: 'asset' as const, title: 'Vanished Pic', assetId: 'vanished' } };
+    const { subject: mb } = await createItem({ name: 'ToastBoard', kind: 'moodboard', space: 'library', by: 'user', graph: { nodes: [nBad, nOk, nVan], edges: [] }, draft: false });
+
+    const doc1 = await libraryToDesigner(s.id, mb.id);
+    expect(rasterSources(doc1)).toEqual(['ok']);
+    const toasts1 = useStore.getState().ui.toasts.filter((t) => t.level === 'error').map((t) => t.text);
+    expect(toasts1.some((t) => t.includes('Broken Shot'))).toBe(true);
+    expect(toasts1.some((t) => t.includes('Vanished Pic'))).toBe(true);
+
+    // Reopen delta branch: corrupt image toasts title and valid image still enters
+    hoisted.setOnGetAsset(null);
+    useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
+    const nBad2 = { id: 'n4', position: { x: 300, y: 0 }, data: { kind: 'asset' as const, title: 'Broken Delta', assetId: 'bad2' } };
+    const nOk2 = { id: 'n5', position: { x: 400, y: 0 }, data: { kind: 'asset' as const, title: 'Valid Delta', assetId: 'ok2' } };
+    await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'library', by: 'user', graph: { nodes: [nBad, nOk, nBad2, nOk2], edges: [] } });
+    const doc2 = await libraryToDesigner(s.id, mb.id);
+    expect(rasterSources(doc2)).toEqual(['ok', 'ok2']);
+    const toasts2 = useStore.getState().ui.toasts.filter((t) => t.level === 'error').map((t) => t.text);
+    expect(toasts2.some((t) => t.includes('Broken Delta'))).toBe(true);
+  });
 });
