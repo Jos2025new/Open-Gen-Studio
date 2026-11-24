@@ -63,6 +63,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
   drawDoc: () => undefined,
 }));
 
+import { resizeCanvas } from '../src/engine/design/canvasSize';
 import { createItem, libraryToDesigner, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { addTextLayer, deleteLayer, getDoc, patchLayer, placeAsset, undoDoc } from '../src/engine/design/actions';
@@ -176,17 +177,105 @@ describe('one position per element, across Designer, Library and Nodes', () => {
   const move = (sessionId: string, groupAsset: (aid: string) => [number, number] | null) => useStore.setState((x) => ({ sessions: { ...x.sessions, [sessionId]: { ...x.sessions[sessionId], graph: { ...x.sessions[sessionId].graph, nodes: x.sessions[sessionId].graph.nodes.map((n) => { const d = n.data.kind === 'asset' ? groupAsset(n.data.assetId!) : null; return d ? { ...n, position: { x: n.position.x + d[0], y: n.position.y + d[1] } } : n; }) } } } }));
   const saveGroup = (sessionId: string, id: string, groupId: string) => nodesToLibrary({ sessionId, groupId, subjectId: id, mode: 'overwrite', by: 'user' });
 
-  it('a group opened before does not revert what Designer saved, nor lose what Library added', async () => {
+  it('a group opened before replaces the entry when saved; the previous version stays, and a copy gets the next name', async () => {
     const { s, id } = await board();
     const doc = await libraryToDesigner(s.id, id), { groupId } = libraryToNodes(s.id, id), b = layerAt(s.id, doc.id, 'b'), k = b.width / 260;
-    move(s.id, (a) => (a === 'a' ? [0, 30] : null));
+    const link = () => useStore.getState().sessions[s.id].graph.groups!.find((g) => g.id === groupId)!.library!;
+    expect(link().versionId).toBe(entry(id).versionId);
     patchLayer(s.id, doc.id, b.id, { x: b.x + 50 * k });
-    await saveDoc(s.id, id, doc.id);
-    await saveItem({ subjectId: id, mode: 'overwrite', space: 'library', by: 'user', graph: (g) => ({ ...g!, nodes: [...g!.nodes, asset('d', 0, 0)] }) });
-    await saveGroup(s.id, id, groupId!);
-    expect([nodeAt(entry(id).graph, 'a'), nodeAt(entry(id).graph, 'b'), nodeAt(entry(id).graph, 'd')]).toEqual([{ x: 100, y: 130 }, { x: 550, y: 150 }, { x: 0, y: 0 }]);
-    await saveGroup(s.id, id, groupId!);
+    const inDesigner = await saveDoc(s.id, id, doc.id);
+    expect(link().versionId).not.toBe(entry(id).versionId);
+    const copies = [1, 2].map(() => nodesToLibrary({ sessionId: s.id, groupId: groupId!, subjectId: id, mode: 'copy', name: 'Board', by: 'user' }));
+    expect((await Promise.all(copies)).map((c) => c.name)).toEqual(['Board_v2', 'Board_v3']);
     expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 550, y: 150 });
+    move(s.id, (x) => (x === 'a' ? [40, 60] : null));
+    await saveGroup(s.id, id, groupId!);
+    expect(link().versionId).toBe(entry(id).versionId);
+    expect([nodeAt(entry(id).graph, 'a'), nodeAt(entry(id).graph, 'b')].map((p) => p.y)).toEqual([110, 100]);
+    await restoreItemVersion({ subjectId: id, versionId: inDesigner.versionId!, space: 'library', by: 'user' });
+    expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 550, y: 150 });
+  });
+
+  it('each element moved its own way in Nodes keeps every move; edges and their labels are saved', async () => {
+    const { s, id } = await board();
+    const { groupId } = libraryToNodes(s.id, id);
+    move(s.id, (x) => (x === 'a' ? [10, 0] : [20, 0]));
+    await saveGroup(s.id, id, groupId!);
+    expect(nodeAt(entry(id).graph, 'b').x - nodeAt(entry(id).graph, 'a').x).toBe(410);
+  });
+
+  it('two saves from Nodes one after the other leave the last', async () => {
+    const { s, id } = await board();
+    const { groupId } = libraryToNodes(s.id, id);
+    move(s.id, (x) => (x === 'b' ? [40, 0] : null));
+    const first = saveGroup(s.id, id, groupId!);
+    move(s.id, (x) => (x === 'b' ? [-40, 0] : null));
+    await Promise.all([first, saveGroup(s.id, id, groupId!)]);
+    expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 500, y: 150 });
+  });
+
+  it('resizing the page from any corner, and undoing it, does not move the elements of the entry', async () => {
+    const { s, id } = await board();
+    const doc = await libraryToDesigner(s.id, id), at = () => [nodeAt(entry(id).graph, 'a'), nodeAt(entry(id).graph, 'b')];
+    resizeCanvas(s.id, doc.id, doc.width + 200, doc.height + 100, 'bottom-right');
+    await saveDoc(s.id, id, doc.id);
+    expect(at()).toEqual([{ x: 100, y: 100 }, { x: 500, y: 150 }]);
+    undoDoc(s.id, doc.id);
+    await saveDoc(s.id, id, doc.id);
+    expect(at()).toEqual([{ x: 100, y: 100 }, { x: 500, y: 150 }]);
+  });
+
+  it('a text equal to one added in Library stays a different element', async () => {
+    const { s, id } = await board();
+    const doc = await libraryToDesigner(s.id, id);
+    addTextLayer(s.id, doc.id, 'Same', { x: 40, y: 60, width: 200 }, {});
+    await saveItem({ subjectId: id, mode: 'overwrite', space: 'library', by: 'user', graph: (g) => ({ ...g!, nodes: [...g!.nodes, text('tx', 'Same', 500, 500)] }) });
+    await libraryToDesigner(s.id, id);
+    await saveDoc(s.id, id, doc.id);
+    expect(texts(entry(id).graph)).toEqual(['Same', 'Same']);
+    expect(entry(id).graph!.nodes.find((n) => n.id === 'tx')!.position).toEqual({ x: 500, y: 500 });
+  });
+
+  it('one undo takes back an image that arrived, with the page as it was', async () => {
+    const { s, id } = await board();
+    const doc = await libraryToDesigner(s.id, id), size = [doc.width, doc.height];
+    await saveItem({ subjectId: id, mode: 'overwrite', space: 'library', by: 'user', graph: (g) => ({ ...g!, nodes: [...g!.nodes, asset('c', 900, 450)] }) });
+    await libraryToDesigner(s.id, id);
+    expect(getDoc(s.id, doc.id)!.width).toBeGreaterThan(size[0]);
+    undoDoc(s.id, doc.id);
+    const now = getDoc(s.id, doc.id)!;
+    expect([layerAt(s.id, doc.id, 'c'), now.width, now.height]).toEqual([undefined, ...size]);
+  });
+
+  it('undoing while a save is on its way keeps the undo', async () => {
+    const { s, id } = await board();
+    const doc = await libraryToDesigner(s.id, id), a = layerAt(s.id, doc.id, 'a'), k = a.width / 260;
+    patchLayer(s.id, doc.id, a.id, { x: a.x + 40 * k });
+    let go!: () => void;
+    const held = new Promise<void>((r) => { go = r; }), reached = new Promise<void>((r) => hoisted.setOnSet(async (key) => { if (key.startsWith('libver:')) { r(); await held; } }));
+    const saving = saveDoc(s.id, id, doc.id);
+    await reached;
+    undoDoc(s.id, doc.id);
+    go();
+    await saving;
+    hoisted.setOnSet(null);
+    expect(nodeAt(entry(id).graph, 'a').x).toBe(140);
+    await libraryToDesigner(s.id, id);
+    expect(layerAt(s.id, doc.id, 'a').x).toBe(a.x);
+    await saveDoc(s.id, id, doc.id);
+    expect(nodeAt(entry(id).graph, 'a').x).toBe(100);
+  });
+
+  it('an image of a design system that joined the graph from Nodes is not placed twice', async () => {
+    const { s } = await board();
+    const { subject } = await createItem({ name: 'DS', kind: 'design-system', space: 'library', by: 'user', draft: false, graph: { edges: [], nodes: [asset('a', 100, 100), asset('b', 500, 100)] } });
+    const doc = await libraryToDesigner(s.id, subject.id);
+    await placeAsset(s.id, doc.id, 'c', 'new', 'C');
+    await saveDoc(s.id, subject.id, doc.id);
+    await saveGroup(s.id, subject.id, libraryToNodes(s.id, subject.id).groupId!);
+    expect(entry(subject.id).graph!.nodes).toHaveLength(3);
+    await libraryToDesigner(s.id, subject.id);
+    expect(getDoc(s.id, doc.id)!.layers).toHaveLength(3);
   });
 
   it('a save that fails changes nothing in the document; saving later or a copy applies the change once', async () => {
@@ -199,7 +288,7 @@ describe('one position per element, across Designer, Library and Nodes', () => {
     expect(layerAt(s.id, doc.id, 'b').x).toBe(b.x);
     await saveItem({ subjectId: id, mode: 'copy', space: 'designer', by: 'user', sessionId: s.id, docId: doc.id, name: 'Copy' });
     expect(layerAt(s.id, doc.id, 'b').x).toBe(b.x);
-    for (let i = 0; i < 2; i++) await saveDoc(s.id, id, doc.id);
+    for (let i = 0; i < 2; i++) { await saveDoc(s.id, id, doc.id); await libraryToDesigner(s.id, id); }
     expect(layerAt(s.id, doc.id, 'b').x - b.x).toBeCloseTo(20 * k, 2);
     expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 520, y: 150 });
   });
@@ -231,13 +320,12 @@ describe('one position per element, across Designer, Library and Nodes', () => {
     expect(texts(entry(subject.id).graph)).toEqual(['After']);
   });
 
-  it('an element removed in Nodes does not come back from Designer, nor one removed by others from an old group', async () => {
+  it('an element removed in Nodes does not come back from Designer', async () => {
     const { s, id } = await board();
-    const doc = await libraryToDesigner(s.id, id), { groupId } = libraryToNodes(s.id, id), old = libraryToNodes(s.id, id);
+    const doc = await libraryToDesigner(s.id, id), { groupId } = libraryToNodes(s.id, id);
     useStore.setState((x) => ({ sessions: { ...x.sessions, [s.id]: { ...x.sessions[s.id], graph: { ...x.sessions[s.id].graph, groups: x.sessions[s.id].graph.groups!.map((g) => (g.id === groupId ? { ...g, nodeIds: g.nodeIds.slice(0, 1) } : g)) } } } }));
     await saveGroup(s.id, id, groupId!);
     await saveDoc(s.id, id, doc.id);
-    await saveGroup(s.id, id, old.groupId!);
     expect(entry(id).graph!.nodes.map((n) => n.id)).toEqual(['na']);
     expect(layerAt(s.id, doc.id, 'b')).toBeTruthy();
   });
@@ -269,17 +357,17 @@ describe('one position per element, across Designer, Library and Nodes', () => {
     expect([t1[4] - t0[4], t1[5] - t0[5]].map((v) => Math.round(v * 10) / 10)).toEqual([Math.round(20 * k * 10) / 10, 0]);
   });
 
-  it('with two elements, moving one in Nodes moves that one; moving the group moves none', async () => {
+  it('moving the whole group in Nodes changes nothing; moving one element keeps how they sit together', async () => {
     const { s, id } = await board();
     const doc = await libraryToDesigner(s.id, id), { groupId } = libraryToNodes(s.id, id), a = layerAt(s.id, doc.id, 'a'), b = layerAt(s.id, doc.id, 'b'), k = a.width / 260;
     move(s.id, () => [900, -70]);
     await saveGroup(s.id, id, groupId!);
     expect([nodeAt(entry(id).graph, 'a'), nodeAt(entry(id).graph, 'b')]).toEqual([{ x: 100, y: 100 }, { x: 500, y: 150 }]);
-    move(s.id, (x) => (x === 'a' ? [-20, 0] : null));
+    move(s.id, (x) => (x === 'b' ? [30, 0] : null));
     await saveGroup(s.id, id, groupId!);
     await libraryToDesigner(s.id, id);
-    expect(layerAt(s.id, doc.id, 'a').x - a.x).toBeCloseTo(-20 * k, 2);
-    expect(layerAt(s.id, doc.id, 'b').x).toBe(b.x);
+    expect(layerAt(s.id, doc.id, 'a').x).toBe(a.x);
+    expect(layerAt(s.id, doc.id, 'b').x - b.x).toBeCloseTo(30 * k, 2);
   });
 
   it('opening and saving in any space, over and over, keeps fractional and repeated coordinates', async () => {

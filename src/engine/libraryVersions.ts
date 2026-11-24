@@ -5,7 +5,7 @@ import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
-import { applySync, assetRatio, boardNodes, bringGraph, graphFromDoc, syncDoc } from './libraryBoard';
+import { assetRatio, boardNodes, bringGraph, graphFromDoc } from './libraryBoard';
 import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, fromOrigin } from './libraryLayout';
 import { validateTokens } from './libraryTokens';
@@ -208,7 +208,7 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
       }
-      await bringGraph(sessionId, existing.id, subject.graph);
+      await bringGraph(sessionId, existing.id, subject.graph, subject.kind);
       setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId && d.library.versionId !== curVer ? { ...d, library: { ...d.library, versionId: curVer } } : d));
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;
@@ -231,13 +231,21 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      await bringGraph(sessionId, doc.id, graph);
+      await bringGraph(sessionId, doc.id, graph, subject.kind);
       return getDoc(sessionId, doc.id) ?? doc;
     });
   });
 }
 export const libraryToStudio = (sessionId: string, subjectId: string) => openInSpace(sessionId, subjectId, 'studio');
 export const libraryToDesigner = (sessionId: string, subjectId: string) => openInSpace(sessionId, subjectId, 'designer');
+
+/** A free name for a copy: Name_v2, Name_v3… */
+function copyName(name: string): string {
+  const taken = new Set(get().library.map((s) => s.name)), base = name.replace(/_v\d+$/, '');
+  let next = name;
+  for (let i = 2; taken.has(next); i++) next = `${base}_v${i}`;
+  return next;
+}
 
 export function saveItem(opts: {
   subjectId: string; mode: 'overwrite' | 'copy'; space: LibrarySpace; by: KitActor; sessionId?: string; docId?: string;
@@ -249,9 +257,8 @@ export function saveItem(opts: {
     if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
     if (owner && owner !== cur.id && get().library.some((s) => s.id === owner)) throw new Error(`"${workDoc!.name}" belongs to another Library entry.`);
     // A linked design writes back what it changed; a loose one only starts an entry that is still empty.
-    const back = workDoc && opts.graph === undefined && (owner === cur.id || !hasGraph(cur.graph)) ? graphFromDoc(cur.graph, owner === cur.id ? workDoc : { ...workDoc, board: undefined }, kind === 'moodboard') : undefined;
+    const back = workDoc && opts.graph === undefined && (owner === cur.id ? workDoc.board || !hasGraph(cur.graph) : !hasGraph(cur.graph)) ? graphFromDoc(cur.graph, owner === cur.id ? workDoc : { ...workDoc, board: undefined }, kind === 'moodboard') : undefined;
     const graph = typeof opts.graph === 'function' ? opts.graph(cur.graph) : opts.graph !== undefined ? fromOrigin(opts.graph) : back ? back.graph : cur.graph;
-    const synced = (d: DesignDoc): DesignDoc => (back?.board ? syncDoc({ ...d, board: back.board }, graph) : d);
     const kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
     const checkAssetIds = validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined });
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
@@ -262,7 +269,7 @@ export function saveItem(opts: {
       let storedDoc: DesignDoc | undefined, storedRasterIds: string[] | undefined, docRev: string | undefined;
       if (workDoc || (prevSnap?.doc && opts.mode === 'copy')) {
         if (workDoc) await flushRaster();
-        const src = workDoc ? synced(workDoc) : prevSnap!.doc!;
+        const src = workDoc ? { ...workDoc, ...(back?.board ? { board: back.board } : {}) } : prevSnap!.doc!;
         const copied = await copyDocPixels(src, workDoc && opts.mode === 'overwrite' ? prevSnap?.doc : null, workDoc ? undefined : expectedRasterIds(prevSnap!), written);
         storedDoc = remapDoc(src, copied.map, { newDocId: false }); storedRasterIds = copied.storedIds; docRev = uid('drev');
       } else if (prevSnap?.doc) {
@@ -270,7 +277,7 @@ export function saveItem(opts: {
         storedDoc = prevSnap.doc; storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers); docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
       }
       const at = Date.now(), targetEntry: Subject = opts.mode === 'copy'
-        ? { id: targetId, name: opts.name?.trim() || `${cur.name} copy`, kind, refAssetIds: [], copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }
+        ? { id: targetId, name: copyName(opts.name?.trim() || cur.name), kind, refAssetIds: [], copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }
         : cur;
       const saved = await commitVersion(targetEntry, {
         mode: opts.mode === 'copy' ? 'create' : 'append', at, by: opts.by, space: opts.space, label: opts.label,
@@ -278,7 +285,7 @@ export function saveItem(opts: {
         description: opts.description !== undefined ? opts.description : (opts.mode === 'copy' ? cur.description : undefined),
         graph, kits, tokens, doc: storedDoc, docRev, storedRasterIds, clearsDraft: opts.by === 'user', checkAssetIds,
       }, written);
-      if (opts.mode === 'overwrite' && workDoc && opts.sessionId) applySync(opts.sessionId, workDoc.id, synced);
+      if (opts.mode === 'overwrite' && workDoc && opts.sessionId) setDoc(opts.sessionId, workDoc.id, (d) => (back?.board ? { ...d, board: { ...back.board, ...(d.board ? { x: d.board.x, y: d.board.y } : {}) } } : d));
       if (opts.mode === 'overwrite' && workDoc && opts.sessionId && workDoc.library?.subjectId === cur.id) {
         setDoc(opts.sessionId, workDoc.id, (d) => d.library?.subjectId === cur.id ? { ...d, library: { ...d.library, versionId: saved.versionId!, ...(docRev ? { docRev } : {}) } } : d);
       }

@@ -23,11 +23,11 @@ export function anchorOffset(from: { width: number; height: number }, to: { widt
   return { dx: Math.round((to.width - from.width) * fx), dy: Math.round((to.height - from.height) * fy) };
 }
 
-function resizeBy(sessionId: string, docId: string, width: number, height: number, dx: number, dy: number): void {
+function resizeBy(sessionId: string, docId: string, width: number, height: number, dx: number, dy: number, opts: { record?: boolean } = {}): void {
   const before = getDoc(sessionId, docId);
   if (!before) return;
   const fills = solidPageFills(before);
-  mutateDoc(sessionId, docId, (d: DesignDoc) => ({ ...d, width, height, updatedAt: Date.now(), layers: d.layers.map((l) => translateLayer(l, dx, dy)) }));
+  mutateDoc(sessionId, docId, (d: DesignDoc) => ({ ...d, width, height, updatedAt: Date.now(), layers: d.layers.map((l) => translateLayer(l, dx, dy)), ...(d.board ? { board: { ...d.board, x: d.board.x + dx, y: d.board.y + dy } } : {}) }), opts);
   // A pixel selection was drawn on the old page: it no longer matches.
   setSelection(docId, null);
   // Page-sized paint layers follow the new page, so the brush reaches all of it.
@@ -37,14 +37,14 @@ function resizeBy(sessionId: string, docId: string, width: number, height: numbe
 }
 
 /** Set the page size; an error message if the size is not valid. */
-export function resizeCanvas(sessionId: string, docId: string, width: number, height: number, anchor: Anchor): string | null {
+export function resizeCanvas(sessionId: string, docId: string, width: number, height: number, anchor: Anchor, opts: { record?: boolean } = {}): string | null {
   const doc = getDoc(sessionId, docId);
   if (!doc) return 'No design.';
   const w = Math.round(width), h = Math.round(height);
   if (!(w >= 1 && h >= 1 && w <= MAX_SIDE && h <= MAX_SIDE)) return `Width and height go from 1 to ${MAX_SIDE} px.`;
   if (w === doc.width && h === doc.height) return null;
   const { dx, dy } = anchorOffset(doc, { width: w, height: h }, anchor);
-  resizeBy(sessionId, docId, w, h, dx, dy);
+  resizeBy(sessionId, docId, w, h, dx, dy, opts);
   return null;
 }
 

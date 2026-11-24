@@ -41,6 +41,7 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
     if (!e) return n;
     const text = e.layer.type === 'text' && e.layer.text !== e.at.text && e.layer.text.trim() ? e.layer.text : undefined;
     const position = e.movedHere ? spot(e.p) : unplaced(n.position) ? { x: e.at.x, y: e.at.y } : n.position;
+    if (position !== n.position || text !== undefined) at[n.id] = { ...e.at, ...(position !== n.position ? position : {}), ...(text !== undefined ? { text } : {}) };
     return { ...n, position, data: text !== undefined && n.data.kind === 'text' ? { ...n.data, text } : n.data };
   });
   for (const l of fresh) {
@@ -54,7 +55,7 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
 }
 
 /** The document with what the graph changed. What was changed here and not saved stays; nothing is removed or added. */
-export function syncDoc(doc: DesignDoc, graph: Graph | undefined): DesignDoc {
+function syncDoc(doc: DesignDoc, graph: Graph | undefined): DesignDoc {
   const b = doc.board;
   if (!b) return doc;
   const layers = new Map(doc.layers.map((l) => [l.id, l])), at = { ...b.at };
@@ -70,13 +71,6 @@ export function syncDoc(doc: DesignDoc, graph: Graph | undefined): DesignDoc {
     if (pos.x !== e.at.x || pos.y !== e.at.y || text !== e.at.text) { at[n.id] = { ...e.at, x: pos.x, y: pos.y, ...(text !== undefined ? { text } : {}) }; changed = true; }
   }
   return changed ? { ...doc, layers: doc.layers.map((l) => layers.get(l.id) ?? l), board: { ...b, at } } : doc;
-}
-
-/** Writes the synced document; one undo step when a layer changed. */
-export function applySync(sessionId: string, docId: string, fn: (d: DesignDoc) => DesignDoc): void {
-  const doc = getDoc(sessionId, docId), next = doc && fn(doc);
-  if (!doc || !next || next === doc) return;
-  mutateDoc(sessionId, docId, fn, { record: next.layers.some((l, i) => l !== doc.layers[i]) });
 }
 
 async function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: number; y: number; width: number; height: number; fontSize: number }): Promise<string | null> {
@@ -96,27 +90,29 @@ async function placeNode(sessionId: string, docId: string, n: GraphNode, box: { 
 }
 
 /** Brings the graph to an open document: its changes first, then the elements the document never had. */
-export async function bringGraph(sessionId: string, docId: string, graph: Graph | undefined): Promise<void> {
-  applySync(sessionId, docId, (d) => syncDoc(d, graph));
+export async function bringGraph(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined): Promise<void> {
+  const was = getDoc(sessionId, docId), synced = was && syncDoc(was, graph);
+  if (was && synced && synced !== was) mutateDoc(sessionId, docId, () => synced, { record: synced.layers.some((l, i) => l !== was.layers[i]) });
   const doc = getDoc(sessionId, docId), items = boardNodes(graph), news = items.filter((n) => !doc?.board?.at[n.id]);
   if (!doc || !news.length) return;
-  if (!doc.board) setDoc(sessionId, docId, (d) => { const { k, x, y } = boardLayout(items, assetRatio, d); return { ...d, board: { k, x, y, at: {} } }; });
+  const born = !doc.board;
+  if (born) setDoc(sessionId, docId, (d) => { const { k, x, y } = boardLayout(items, assetRatio, d); return { ...d, board: { k, x, y, at: {} } }; });
   const rects = new Map(placeNodes(items, assetRatio).map((r) => [r.id, r]));
   let right = doc.width, bottom = doc.height;
   for (const n of news) {
     const live = getDoc(sessionId, docId), b = live?.board, r = rects.get(n.id)!;
     if (!live || !b) return;
     const taken = new Set(Object.values(b.at).map((a) => a.layer)), d = n.data;
-    // Its image may already be here: an entry that was born from this document.
-    const own = live.layers.find((l) => !taken.has(l.id) && ((l.type === 'raster' && d.kind === 'asset' && l.sourceAssetId === d.assetId) || (l.type === 'text' && d.kind === 'text' && l.text === d.text)));
+    // Outside moodboards the document's own images are not elements, so one that joined the graph elsewhere is already here.
+    const own = (born || kind !== 'moodboard') && live.layers.find((l) => !taken.has(l.id) && ((l.type === 'raster' && d.kind === 'asset' && l.sourceAssetId === d.assetId) || (l.type === 'text' && d.kind === 'text' && l.text === d.text)));
     const box = { x: b.x + r.x * b.k, y: b.y + r.y * b.k, width: r.w * b.k, height: r.h * b.k, fontSize: Math.max(6, Math.round(r.fontSize * b.k)) };
-    const layer = own?.id ?? await placeNode(sessionId, docId, n, box);
+    const layer = (own ? own.id : undefined) ?? await placeNode(sessionId, docId, n, box);
     if (!layer) continue;
     if (!own) { right = Math.max(right, Math.ceil(box.x + box.width - 0.5)); bottom = Math.max(bottom, Math.ceil(box.y + box.height - 0.5)); }
     setDoc(sessionId, docId, (x) => (x.board ? { ...x, board: { ...x.board, at: { ...x.board.at, [n.id]: { layer, ...placedAt(r.x, r.y), ...(d.kind === 'text' ? { text: d.text } : {}) } } } } : x));
   }
   // The page grows right and down to show what was added; nothing already on it moves.
   const now = getDoc(sessionId, docId);
-  const problem = now && resizeCanvas(sessionId, docId, Math.max(now.width, right), Math.max(now.height, bottom), 'top-left');
+  const problem = now && resizeCanvas(sessionId, docId, Math.max(now.width, right), Math.max(now.height, bottom), 'top-left', { record: false });
   if (problem) toast(`Some elements are outside the page. ${problem}`, 'error');
 }
