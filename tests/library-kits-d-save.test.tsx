@@ -167,13 +167,13 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
     const placed = libraryToNodes(sid(), subject.id);
     const curGraph = () => useStore.getState().sessions[sid()].graph;
     const grp = curGraph().groups!.find((g) => g.id === placed.groupId)!;
-    expect(grp.library).toEqual({ subjectId: subject.id });
+    expect(grp.library).toMatchObject({ subjectId: subject.id });
 
     // Preserved across group edits
     renameGroup(sid(), grp.id, 'Flow Kit Renamed');
     setGroupColor(sid(), grp.id, '#5ec8ff');
     const editedGrp = curGraph().groups!.find((g) => g.id === grp.id)!;
-    expect(editedGrp.library).toEqual({ subjectId: subject.id });
+    expect(editedGrp.library).toMatchObject({ subjectId: subject.id });
 
     // Loose selection (plus extra node, not whole group): Save to Library offers only new, not overwrite/copy
     const extra: GraphNode = { id: 'extra', position: { x: 500, y: 0 }, data: { kind: 'text', title: 'Loose', text: 'Hi' } };
@@ -220,7 +220,7 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
       },
     }));
     const newSaved = await nodesToLibrary({ sessionId: sid(), mode: 'new', kind: 'moodboard', groupId: plainGrpId, name: 'Plain Saved' });
-    expect(curGraph().groups?.find((g) => g.id === plainGrpId)?.library).toEqual({ subjectId: newSaved.id });
+    expect(curGraph().groups?.find((g) => g.id === plainGrpId)?.library).toMatchObject({ subjectId: newSaved.id });
 
     // Deleting the linked Library item while open does not break GroupNode Save to Library
     await deleteItem(subject.id);

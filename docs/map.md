@@ -26,11 +26,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 110 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 84 | 58 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 69 | 5 |
-| [id.ts](../src/lib/id.ts) | 61 | 0 |
+| [id.ts](../src/lib/id.ts) | 62 | 0 |
 | [media.ts](../src/lib/media.ts) | 60 | 87 |
 | [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 57 | 22 |
-| [doc.ts](../src/engine/design/doc.ts) | 54 | 89 |
+| [doc.ts](../src/engine/design/doc.ts) | 54 | 90 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 53 | 24 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |
 | [raster.ts](../src/engine/design/raster.ts) | 46 | 41 |

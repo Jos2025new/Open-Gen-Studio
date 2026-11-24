@@ -25,6 +25,12 @@ export interface LibraryKitFields {
   versionId?: string; docRev?: string; groupIds?: string[]; versions?: KitVersionRef[];
 }
 
+/** Where a document shows its entry's elements: page pixels per graph unit, where graph (0, 0) falls, and per element
+    its layer plus the position and text both sides last agreed on. Kept across undo. */
+export interface KitBoard { k: number; x: number; y: number; at: Record<string, { layer: string; x: number; y: number; text?: string }>; }
+/** The same for a Nodes group: the element each node is, and what both sides last agreed on. */
+export interface KitGroupLink { subjectId: string; origin?: { x: number; y: number }; at?: Record<string, { id: string; x: number; y: number; content: string }>; edges?: string[]; }
+
 export const isKit = <T extends { kind?: string }>(subject: T | null | undefined): boolean =>
   Boolean(subject?.kind && Object.prototype.hasOwnProperty.call(KIT_KINDS, subject.kind));
 

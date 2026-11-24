@@ -354,8 +354,8 @@ export function reorderLayer(sessionId: string, docId: string, layerId: string, 
 }
 
 const keepDocMeta = (target: DesignDoc, doc: DesignDoc): DesignDoc => {
-  const { library: _l, view: _v, ...rest } = target;
-  return { ...rest, ...(doc.library ? { library: doc.library } : {}), ...(doc.library || target.library ? { name: doc.name } : {}), ...(doc.view ? { view: doc.view } : {}), lastExport: doc.lastExport, paintMode: doc.paintMode ?? target.paintMode ?? paintModeOf(target) };
+  const { library: _l, view: _v, board: _b, ...rest } = target;
+  return { ...rest, ...(doc.board ? { board: doc.board } : {}), ...(doc.library ? { library: doc.library } : {}), ...(doc.library || target.library ? { name: doc.name } : {}), ...(doc.view ? { view: doc.view } : {}), lastExport: doc.lastExport, paintMode: doc.paintMode ?? target.paintMode ?? paintModeOf(target) };
 };
 
 export function undoDoc(sessionId: string, docId: string): void {

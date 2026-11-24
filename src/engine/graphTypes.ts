@@ -1,4 +1,5 @@
 import type { AdvancedValue, GenSettings, MediaKind, OpId, PlanSubject } from './types';
+import type { KitGroupLink } from './libraryTypes';
 
 /* The node graph: creative nodes, system nodes that point to data where it lives, and classed links. Re-exported by types.ts. */
 
@@ -150,7 +151,7 @@ export interface GraphGroup {
   /** Optional background tint (hex); none by default. */
   color?: string;
   /** Set when the group came from or was saved to a Library entry. */
-  library?: { subjectId: string };
+  library?: KitGroupLink;
 }
 
 export interface Graph {

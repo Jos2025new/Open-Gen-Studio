@@ -144,13 +144,13 @@ describe('Lote G fixes', () => {
     expect(rasterSources(afterAddC)).toEqual(['b', 'c']);
     expect(afterAddC.library?.versionId).toBe(v2.versionId);
 
-    // Unreadable linked version: must NOT add anything and must toast error
+    // What to bring is known from the document itself: an older version that cannot be read does not stop it
     await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'library', by: 'user', graph: { nodes: [nA, nB, nC, nD], edges: [] } });
     hoisted.blobs.delete(`libver:${v2.versionId}`);
     useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
     const afterUnreadable = await libraryToDesigner(s.id, mb.id);
-    expect(rasterSources(afterUnreadable)).toEqual(['b', 'c']);
-    expect(useStore.getState().ui.toasts.some((t) => t.level === 'error')).toBe(true);
+    expect(rasterSources(afterUnreadable)).toEqual(['b', 'c', 'd']);
+    expect(useStore.getState().ui.toasts.some((t) => t.level === 'error')).toBe(false);
 
     // Merge down in a fresh moodboard and reopen: must NOT duplicate merged layers
     const { subject: mbMerge } = await createItem({ name: 'MergeBoard', kind: 'moodboard', space: 'library', by: 'user', graph: { nodes: [nA, nB], edges: [] }, draft: false });
@@ -272,7 +272,9 @@ describe('Lote G fixes', () => {
     expect(useStore.getState().sessions[s.id].docs).toHaveLength(1);
 
     const doc = getDoc(s.id, out.doc!)!;
-    expect([doc.width, doc.height]).toEqual([1600, 900]);
+    // The image and its note share a page, at their positions.
+    const size = [doc.width, doc.height];
+    expect(doc.layers.every((l) => 'x' in l && l.x >= 0 && l.x + l.width <= doc.width)).toBe(true);
     expect(rasterSources(doc)).toEqual(['hero']);
     expect(doc.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
 
@@ -280,7 +282,7 @@ describe('Lote G fixes', () => {
     const reopened = await libraryToDesigner(s.id, out.id);
     expect(reopened.id).toBe(doc.id);
     expect(useStore.getState().sessions[s.id].docs).toHaveLength(1);
-    expect([reopened.width, reopened.height]).toEqual([1600, 900]);
+    expect([reopened.width, reopened.height]).toEqual(size);
     expect(rasterSources(reopened)).toEqual(['hero']);
     expect(reopened.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
 
@@ -293,7 +295,7 @@ describe('Lote G fixes', () => {
     const out2 = cmdRes2.results[0] as { id: string; versionId?: string; doc?: string };
     expect(Object.keys(out2).sort()).toEqual(['doc', 'id', 'versionId']);
     const doc2 = getDoc(s.id, out2.doc!)!;
-    expect([doc2.width, doc2.height]).toEqual([1600, 900]);
+    expect([doc2.width, doc2.height]).toEqual(size);
     expect(doc2.layers.filter((l): l is TextLayer => l.type === 'text').map((l) => l.text)).toEqual(['Golden light note']);
   });
 

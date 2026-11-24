@@ -1,3 +1,4 @@
+import type { KitBoard } from '../libraryTypes';
 import type { Layer, LayerGroup } from '../types';
 import type { RememberedExport } from './exportSettings';
 
@@ -18,6 +19,8 @@ export interface DesignDoc {
   library?: { subjectId: string; versionId: string; docRev?: string; view?: 'studio' };
   /** Preserved when a Studio-only working doc is detached so it stays hidden from the full Designer. */
   view?: 'studio';
+  /** Its layers as elements of that entry's graph. */
+  board?: KitBoard;
   lastExport?: RememberedExport;
   createdAt: number;
   updatedAt: number;
