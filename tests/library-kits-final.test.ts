@@ -63,13 +63,25 @@ vi.mock('../src/engine/design/render', async (orig) => ({
   drawDoc: () => undefined,
 }));
 
-import { createItem, libraryToDesigner, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
+import { createItem, libraryToDesigner, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { addTextLayer, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createSession, useStore } from '../src/store/store';
 import { deleteSession } from '../src/engine/actions';
 import { run } from '../src/engine/commands';
 import { runCommandsTool } from '../src/engine/agent/commandCalls';
-import type { Graph, Layer } from '../src/engine/types';
+import { normalizeAssetRevisions, redoAssetRevision, saveAssetEdit, undoAssetRevision } from '../src/engine/assetRevisions';
+import { libraryToNodes } from '../src/engine/flow/fromLibrary';
+import type { Asset, Graph, Layer } from '../src/engine/types';
+
+function mkAsset(id: string, sessionId: string, w = 800, h = 600): Asset {
+  return { id, sessionId, kind: 'image', mime: 'image/png', name: `${id}.png`, width: w, height: h, origin: 'upload', stored: true, favorite: false, createdAt: 1 };
+}
+
+function putImageBlob(id: string, w = 800, h = 600) {
+  const b = new Blob([`img:${id}`], { type: 'image/png' });
+  hoisted.assetBlobs.set(id, b);
+  hoisted.dims.set(b, { w, h });
+}
 
 function resetStore() {
   const s = createSession('S1');
@@ -87,6 +99,7 @@ beforeEach(() => {
 
 const text = (id: string, t: string, x: number, y: number) => ({ id, position: { x, y }, data: { kind: 'text' as const, title: id, text: t } });
 
+const asset = (id: string, x: number, y: number) => ({ id: `n${id}`, position: { x, y }, data: { kind: 'asset' as const, title: id, assetId: id } });
 const tool = (session: string, seq: unknown[]) => runCommandsTool(session, { seq });
 const graphOf = (...nodes: Graph['nodes']): Graph => ({ nodes, edges: [] });
 const notesOf = (s: string, d: string) => getDoc(s, d)!.layers.flatMap(l => l.type === 'text' ? [l.text] : []);
@@ -222,4 +235,100 @@ it('routes a subsequent doc command to the document created in Studio', async ()
   expect(result.text).toContain(useStore.getState().sessions[s.id].docs[0].id);
   expect(result.text).toContain('Saved in Library');
   expect(result.text).not.toContain('One Ctrl+Z per document undoes it all');
+});
+
+const imageBytes = (id: string) => hoisted.assetBlobs.get(id)?.text();
+const paint = (id: string, label: string, width = 800) =>
+  saveAssetEdit(id, new Blob([label], { type: 'image/png' }), 'original', { width, height: 600 });
+const imageIds = (graph: Graph | undefined) => graph?.nodes.flatMap(n => n.data.kind === 'asset' ? [n.data.assetId] : []);
+
+it('restores the original image once for multiple nodes that share it', async () => {
+  const s = resetStore();
+  useStore.setState({ assets: { a: mkAsset('a', s.id) } });
+  putImageBlob('a');
+  const graph = graphOf(asset('a', 100, 100), { ...asset('a', 400, 400), id: 'alias' });
+  const { subject } = await createItem({ name: 'Pixels', kind: 'moodboard', space: 'library', by: 'user', graph });
+  expect((await readKitVersion(subject.versionId!))?.revs).toBeUndefined();
+  expect(await paint('a', 'img:painted', 320)).not.toBeNull();
+
+  const restored = await restoreItemVersion({ subjectId: subject.id, versionId: subject.versionId!, space: 'library', by: 'user' });
+  const [copy] = imageIds(restored.graph)!;
+  expect(copy).not.toBe('a');
+  expect(Object.keys(useStore.getState().assets).sort()).toEqual(['a', copy].sort());
+  expect(useStore.getState().assets[copy!]).toMatchObject({ copiedFromAssetId: 'a', name: 'a.png', width: 800, height: 600, mime: 'image/png' });
+  const opened = libraryToNodes(s.id, subject.id);
+  expect(imageIds({ nodes: opened.added, edges: opened.edges })).toEqual([copy, copy]);
+  expect(imageIds((await readKitVersion(restored.versionId!))?.graph)).toEqual([copy, copy]);
+  expect(await imageBytes(copy!)).toBe('img:a');
+  expect(await imageBytes('a')).toBe('img:painted');
+});
+
+it('pins a nonzero revision across asset undo and redo while normal opens use the live image', async () => {
+  const s = resetStore();
+  useStore.setState({ assets: { a: mkAsset('a', s.id) } });
+  putImageBlob('a');
+  expect(await paint('a', 'img:first')).not.toBeNull();
+  const { subject } = await createItem({ name: 'Pixels', kind: 'moodboard', space: 'library', by: 'user', graph: graphOf(asset('a', 100, 100)) });
+  expect(await paint('a', 'img:second')).not.toBeNull();
+  const revisions = () => normalizeAssetRevisions(useStore.getState().assets.a);
+  const order = revisions().versions.map(r => r.assetId);
+  expect(await undoAssetRevision('a')).toBe(true);
+  expect(revisions().index).toBe(1);
+  expect(await redoAssetRevision('a')).toBe(true);
+  expect(revisions().index).toBe(2);
+  expect(await undoAssetRevision('a')).toBe(true);
+  expect(await undoAssetRevision('a')).toBe(true);
+  expect(revisions()).toMatchObject({ index: 0, versions: order.map(assetId => ({ assetId })) });
+  const opened = libraryToNodes(s.id, subject.id);
+  expect(imageIds({ nodes: opened.added, edges: opened.edges })).toEqual(['a']);
+  expect(await imageBytes('a')).toBe('img:a');
+  const saved = await saveItem({ subjectId: subject.id, mode: 'overwrite', space: 'library', by: 'user' });
+  expect(imageIds(saved.graph)).toEqual(['a']);
+  const restored = await restoreItemVersion({ subjectId: subject.id, versionId: subject.versionId!, space: 'library', by: 'user' });
+  const [copy] = imageIds(restored.graph)!;
+  expect(await imageBytes(copy!)).toBe('img:first');
+  expect((await readKitVersion(subject.versionId!))?.revs).toEqual({ a: 1 });
+  expect((await readKitVersion(saved.versionId!))?.revs).toBeUndefined();
+});
+
+it.each(['missing revision', 'failed version write'])('leaves Library and its blobs intact on %s', async (failure) => {
+  const s = resetStore();
+  useStore.setState({ assets: { a: mkAsset('a', s.id), b: mkAsset('b', s.id) } });
+  putImageBlob('a');
+  putImageBlob('b');
+  const { subject } = await createItem({ name: 'Pixels', kind: 'moodboard', space: 'library', by: 'user', graph: graphOf(asset('a', 100, 100), asset('b', 400, 400)) });
+  expect(await paint('a', 'img:first')).not.toBeNull();
+  expect(await paint('b', 'img:other')).not.toBeNull();
+  if (failure === 'missing revision') {
+    const original = normalizeAssetRevisions(useStore.getState().assets.b).versions[0].assetId;
+    hoisted.assetBlobs.delete(original);
+  }
+  const before = useStore.getState();
+  const assets = [...hoisted.assetBlobs.keys()], versions = [...hoisted.blobs.keys()];
+  let wroteCopies = false;
+  if (failure === 'failed version write') hoisted.setOnSet(() => {
+    wroteCopies = hoisted.assetBlobs.size === assets.length + 2;
+    throw new Error('Version write failed');
+  });
+  await expect(restoreItemVersion({ subjectId: subject.id, versionId: subject.versionId!, space: 'library', by: 'user' })).rejects.toThrow(/revision|version write/i);
+  if (failure === 'failed version write') expect(wroteCopies).toBe(true);
+  expect(useStore.getState().library).toBe(before.library);
+  expect(useStore.getState().assets).toBe(before.assets);
+  expect([...hoisted.assetBlobs.keys()]).toEqual(assets);
+  expect([...hoisted.blobs.keys()]).toEqual(versions);
+});
+
+it('aborts a restore if a reused image changes during the version write', async () => {
+  const s = resetStore();
+  useStore.setState({ assets: { a: mkAsset('a', s.id) } });
+  putImageBlob('a');
+  expect(await paint('a', 'img:painted')).not.toBeNull();
+  const { subject } = await createItem({ name: 'Pixels', kind: 'moodboard', space: 'library', by: 'user', graph: graphOf(asset('a', 100, 100)) });
+  const versions = [...hoisted.blobs.keys()], assets = [...hoisted.assetBlobs.keys()];
+  hoisted.setOnSet(async () => { expect(await undoAssetRevision('a')).toBe(true); });
+  await expect(restoreItemVersion({ subjectId: subject.id, versionId: subject.versionId!, space: 'library', by: 'user' })).rejects.toThrow(/changed while restoring/i);
+  expect(useStore.getState().library).toEqual([subject]);
+  expect(await imageBytes('a')).toBe('img:a');
+  expect([...hoisted.assetBlobs.keys()]).toEqual(assets);
+  expect([...hoisted.blobs.keys()]).toEqual(versions);
 });

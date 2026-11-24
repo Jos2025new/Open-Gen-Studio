@@ -1,6 +1,7 @@
 import { uid } from '../lib/id';
-import { blobDb } from '../lib/idb';
+import { blobDb, deleteAssetBlobs } from '../lib/idb';
 import { setDoc, useStore } from '../store/store';
+import { copyAssetRevision, normalizeAssetRevisions } from './assetRevisions';
 import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
@@ -10,13 +11,13 @@ import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, fromOrigin } from './libraryLayout';
 import { validateTokens } from './libraryTokens';
 import { isKit, KIT_KINDS, type KitActor, type KitKind, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
-import type { DesignDoc, Graph, Layer, Subject } from './types';
+import type { Asset, DesignDoc, Graph, Layer, Subject } from './types';
 
 /* Immutable versioned snapshots (`libver:<id>`) and pixel-safe open/save/restore/delete for Library items. */
 export interface KitVersionSnapshot {
   id: string; subjectId: string; at: number; by: KitActor; space: LibrarySpace;
   label?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc;
-  docRev?: string; storedRasterIds?: string[];
+  docRev?: string; storedRasterIds?: string[]; revs?: Record<string, number>;
 }
 const get = useStore.getState, rKey = (id: string) => `raster:${id}`, vKey = (id: string) => `libver:${id}`;
 const queues = new Map<string, Promise<void>>();
@@ -116,6 +117,16 @@ function validateContent(kind: KitKind, subjectId: string, opts: { graph?: Graph
 
 const snapshotAssets = (s: Pick<Subject, 'frontalAssetId' | 'refAssetIds' | 'videoAssetId'>, graph?: Graph, doc?: DesignDoc) =>
   [...new Set([s.frontalAssetId, ...s.refAssetIds, s.videoAssetId, ...(graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined)), ...(doc?.layers ?? []).map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined))].filter((x): x is string => Boolean(x)))];
+function graphImageRevs(graph: Graph | undefined): Record<string, number> {
+  const assets = get().assets;
+  return Object.fromEntries((graph?.nodes ?? []).flatMap(({ data }) => {
+    const asset = data.kind === 'asset' && data.assetId ? assets[data.assetId] : undefined;
+    if (asset?.kind !== 'image') return [];
+    const { index } = normalizeAssetRevisions(asset);
+    return index ? [[asset.id, index]] : [];
+  }));
+}
+
 const requireItem = (id: string): Subject => { const e = get().library.find((s) => s.id === id); if (!e || !isKit(e)) throw new Error(`No Library item "${id}".`); return e; };
 const detachWorkingDoc = (sessionId: string, docId: string) => setDoc(sessionId, docId, (d) => {
   const { library, board: _board, ...rest } = d;
@@ -132,11 +143,13 @@ function optionalFields(c: { description?: string; graph?: Graph; kits?: string[
 /** Single verified version writer shared by create, save, and restore: writes blob, re-reads live store, cleans up on error. */
 async function commitVersion(
   entry: Subject,
-  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[]; newKitIds?: readonly string[]; createSessionId?: string },
+  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[]; newKitIds?: readonly string[]; createSessionId?: string; copyAssets?: Record<string, Asset>; liveRevs?: ReadonlyMap<string, number> },
   written: string[],
 ): Promise<Subject> {
   const verId = uid('lv'), groupIds = docGroupIds(c.doc), fields = optionalFields({ description: c.description, graph: c.graph, kits: c.kits, tokens: c.tokens, docRev: c.docRev, groupIds });
+  const revs = graphImageRevs(fields.graph);
   const snap: KitVersionSnapshot = { id: verId, subjectId: entry.id, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), ...(fields.graph ? { graph: fields.graph } : {}), ...(fields.kits ? { kits: fields.kits } : {}), ...(fields.tokens ? { tokens: fields.tokens } : {}), ...(c.doc ? { doc: c.doc, ...(c.docRev ? { docRev: c.docRev } : {}), ...(c.storedRasterIds ? { storedRasterIds: c.storedRasterIds } : {}) } : {}) };
+  if (Object.keys(revs).length) snap.revs = revs;
   const encoded = new TextEncoder().encode(JSON.stringify(snap));
   await writeVerified(vKey(verId), new Blob([encoded], { type: 'application/json' }), encoded, written);
   const ref: KitVersionRef = { id: verId, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), assetIds: snapshotAssets(entry, fields.graph, c.doc), ...(c.docRev ? { docRev: c.docRev } : {}), ...(groupIds?.length ? { groupIds } : {}) };
@@ -144,6 +157,9 @@ async function commitVersion(
   useStore.setState((st) => {
     if (c.createSessionId && !st.sessions[c.createSessionId]) throw new Error(`No session "${c.createSessionId}".`);
     const missing = c.checkAssetIds?.find((aid) => !st.assets[aid]);
+    for (const [id, index] of c.liveRevs ?? []) {
+      if (st.assets[id]?.kind !== 'image' || normalizeAssetRevisions(st.assets[id]).index !== index) throw new Error(`Image "${id}" changed while restoring.`);
+    }
     if (missing) throw new Error(`Asset "${missing}" was deleted while saving.`);
     if (fields.kits?.length) { const cy = wouldCreateKitCycle(st.library, entry.id, fields.kits, c.newKitIds); if (!cy.ok) throw new Error(cy.reason); }
     if (c.mode === 'create') { updated = { ...entry, ...fields, versionId: verId, versions: [ref] }; return { library: [...st.library, updated] }; }
@@ -151,7 +167,10 @@ async function commitVersion(
     if (!live || !isKit(live)) return {};
     const { graph: _g, kits: _k, tokens: _t, docRev: _dr, groupIds: _gi, description: _d, ...base } = live;
     updated = { ...base, name: c.name ?? live.name, ...optionalFields({ ...fields, description: c.description !== undefined ? c.description : live.description }), draft: c.clearsDraft ? false : live.draft, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin };
-    return { library: st.library.map((x) => (x.id === entry.id ? updated! : x)) };
+    return {
+      library: st.library.map((x) => (x.id === entry.id ? updated! : x)),
+      ...(c.copyAssets ? { assets: { ...st.assets, ...c.copyAssets } } : {}),
+    };
   });
   if (!updated) throw new Error(`Library item "${entry.id}" was deleted while saving.`);
   return updated;
@@ -308,6 +327,30 @@ export function saveItem(opts: {
   });
 }
 
+async function restoreGraphImages(snap: KitVersionSnapshot, written: string[]) {
+  const assets = get().assets, copies = new Map<string, Asset>(), liveRevs = new Map<string, number>();
+  for (const { data } of snap.graph?.nodes ?? []) {
+    if (data.kind !== 'asset' || !data.assetId) continue;
+    const id = data.assetId, source = assets[id], saved = Object.hasOwn(snap.revs ?? {}, id) ? snap.revs![id] : 0;
+    if (copies.has(id) || liveRevs.has(id)) continue;
+    if (source?.kind !== 'image') {
+      if (saved) throw new Error(`Missing image "${id}" revision ${saved}.`);
+      continue;
+    }
+    const { versions, index } = normalizeAssetRevisions(source);
+    if (index === saved) { liveRevs.set(id, index); continue; }
+    const rev = versions[saved];
+    if (!rev) throw new Error(`Missing image "${id}" revision ${saved}.`);
+    copies.set(id, await copyAssetRevision(source, rev, written));
+  }
+  const graph = snap.graph && copies.size ? { ...snap.graph, nodes: snap.graph.nodes.map((n) => {
+    if (n.data.kind !== 'asset' || !n.data.assetId) return n;
+    const copy = copies.get(n.data.assetId);
+    return copy ? { ...n, data: { ...n.data, assetId: copy.id } } : n;
+  }) } : snap.graph;
+  return { graph, liveRevs, copyAssets: copies.size ? Object.fromEntries([...copies.values()].map(a => [a.id, a])) : undefined };
+}
+
 export function restoreItemVersion(opts: { subjectId: string; versionId: string; space: LibrarySpace; by: KitActor; label?: string }): Promise<Subject> {
   return serialize(opts.subjectId, async () => {
     const cur = requireItem(opts.subjectId), snap = await readKitVersion(opts.versionId);
@@ -315,11 +358,20 @@ export function restoreItemVersion(opts: { subjectId: string; versionId: string;
     if (snap.subjectId !== cur.id) throw new Error(`Version "${opts.versionId}" belongs to another Library entry ("${snap.subjectId}").`);
     validateContent(cur.kind as KitKind, cur.id, { graph: snap.graph, kits: snap.kits, tokens: snap.tokens, checkAssets: false });
     if (snap.doc) for (const id of expectedRasterIds(snap)) if (!(await blobDb.get(rKey(id)))) throw new Error(`Cannot restore version "${opts.versionId}": missing pixel blob "${rKey(id)}".`);
-    return withCleanup((w) => commitVersion(cur, {
-      mode: 'append', at: Date.now(), by: opts.by, space: opts.space, label: opts.label ?? `Restore ${opts.versionId}`,
-      graph: snap.graph, kits: snap.kits, tokens: snap.tokens, doc: snap.doc,
-      docRev: snap.doc ? (snap.docRev ?? uid('drev')) : undefined, storedRasterIds: snap.storedRasterIds, clearsDraft: opts.by === 'user',
-    }, w));
+    const images: string[] = [];
+    try {
+      return await withCleanup(async (written) => {
+        const restored = await restoreGraphImages(snap, images);
+        return commitVersion(cur, {
+          mode: 'append', at: Date.now(), by: opts.by, space: opts.space, label: opts.label ?? `Restore ${opts.versionId}`,
+          ...restored, kits: snap.kits, tokens: snap.tokens, doc: snap.doc,
+          docRev: snap.doc ? (snap.docRev ?? uid('drev')) : undefined, storedRasterIds: snap.storedRasterIds, clearsDraft: opts.by === 'user',
+        }, written);
+      });
+    } catch (error) {
+      if (images.length) await deleteAssetBlobs(images).catch(() => undefined);
+      throw error;
+    }
   });
 }
 

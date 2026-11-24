@@ -32,6 +32,18 @@ async function writeVerifiedBlob(assetId: string, blob: Blob): Promise<boolean> 
   return Boolean(stored && (await sameBlobBytes(blob, stored)));
 }
 
+/** Writes a standalone copy of an immutable revision. The caller publishes the metadata or cleans the attempted blob. */
+export async function copyAssetRevision(source: Asset, revision: AssetRevision, written: string[]): Promise<Asset> {
+  const blob = await getAssetBlob(revision.assetId);
+  if (!blob?.size) throw new Error(`Missing image revision "${revision.assetId}".`);
+  const id = uid('ast');
+  written.push(id);
+  if (!(await writeVerifiedBlob(id, blob))) throw new Error(`Could not verify image revision "${revision.assetId}".`);
+  return { ...source, id, copiedFromAssetId: source.id, width: revision.width, height: revision.height, mime: revision.mime, stored: true,
+    revisions: undefined, revisionIndex: undefined, originalRevision: undefined, revertedAt: undefined,
+    remoteUrl: undefined, thumbnailUrl: undefined, thumbKey: undefined };
+}
+
 function withVersionLabels(list: AssetRevision[]): AssetRevision[] {
   return list.map((r, i) => ({
     ...r,
