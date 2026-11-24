@@ -82,7 +82,7 @@ beforeEach(() => {
 });
 
 describe('Lote E Punto 1: open graph-only Library entry in Studio/Designer', () => {
-  it('arranges cross-session images and texts without overlap, in page order', async () => {
+  it('places cross-session images and texts where the graph keeps them', async () => {
     const [s1, s2] = Object.keys(useStore.getState().sessions);
     const a1 = mkAsset('img_a', s2, 1600, 900);
     const a2 = mkAsset('img_b', s2, 800, 800);
@@ -110,7 +110,11 @@ describe('Lote E Punto 1: open graph-only Library entry in Studio/Designer', () 
     const texts = doc.layers.filter((l): l is TextLayer => l.type === 'text');
     expect(rasters.map((l) => l.sourceAssetId)).toEqual(['img_a', 'img_b']);
     expect(rasters[0].width / rasters[0].height).toBeCloseTo(16 / 9, 1);
-    expect(rasters[1].x).toBeGreaterThanOrEqual(rasters[0].x + rasters[0].width - 1);
+    // Same coordinates, scaled: 200 units apart with cards 260 units wide; the note 200 units below.
+    expect(rasters[1].x - rasters[0].x).toBeCloseTo(rasters[0].width * (200 / 260), 0);
+    expect(rasters[1].y).toBe(rasters[0].y);
+    expect(texts[0].x).toBe(rasters[0].x);
+    expect(texts[0].y - rasters[0].y).toBeCloseTo(rasters[0].width * (200 / 260), 0);
     for (const l of rasters) expect(l.x >= 0 && l.y >= 0 && l.x + l.width <= doc.width && l.y + l.height <= doc.height).toBe(true);
     expect(texts.every((t) => t.x >= 0 && t.x + t.width <= doc.width)).toBe(true);
     expect(texts).toHaveLength(1);

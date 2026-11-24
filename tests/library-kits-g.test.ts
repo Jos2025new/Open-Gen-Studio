@@ -136,7 +136,9 @@ describe('Lote G fixes', () => {
     const v2 = await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'library', by: 'user', graph: { nodes: [nA, nB, nC], edges: [] } });
     const afterAddC = await libraryToDesigner(s.id, mb.id);
     const addedC = afterAddC.layers.find((l) => 'sourceAssetId' in l && l.sourceAssetId === 'c') as { x: number; y: number; width: number; height: number };
-    expect(addedC.width <= afterAddC.width / 3 + 1 && addedC.height <= afterAddC.height / 3 + 1).toBe(true);
+    // At its own coordinates (200 units right of B) and on a page that grew to hold it.
+    const layerB = afterAddC.layers.find((l) => 'sourceAssetId' in l && l.sourceAssetId === 'b') as typeof addedC;
+    expect(addedC.x - layerB.x).toBeCloseTo(layerB.width * (200 / 260), 0);
     expect(addedC.x >= 0 && addedC.x + addedC.width <= afterAddC.width).toBe(true);
     expect(afterAddC.id).toBe(doc1.id);
     expect(rasterSources(afterAddC)).toEqual(['b', 'c']);

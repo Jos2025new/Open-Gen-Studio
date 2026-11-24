@@ -4,7 +4,9 @@ import { isKit, type KitActor, type KitKind } from '../libraryTypes';
 import { createItem, saveItem } from '../libraryVersions';
 import { editCompound, editPresentation } from '../nodecore/edit';
 import type { Asset, Graph, GraphEdge, GraphGroup, GraphNode, Subject } from '../types';
-import { autoLayout, NODE_WIDTH, nodeOutputAsset } from './graph';
+import { NODE_WIDTH, nodeOutputAsset } from './graph';
+import { assetRatio } from '../libraryBoard';
+import { placeNodes } from '../libraryLayout';
 
 /* Sister of chatToNodes: import Library graphs into Nodes as a named group (1 undo step, no run) and save back. */
 const refEdge = (e: GraphEdge, id: string, source: string, target: string): GraphEdge => ({
@@ -29,20 +31,13 @@ export function libraryToNodes(sessionId: string, subjectId: string): { added: G
 
   const idMap = new Map<string, string>();
   const nodes: GraphNode[] = srcNodes.map((n) => { const id = uid('nd'); idMap.set(n.id, id); return { id, position: { ...n.position }, data: structuredClone(n.data) }; });
-  const hasPos = nodes.some((n) => n.position.x !== 0 || n.position.y !== 0);
-  const extraX = hasPos ? Math.max(...nodes.map((n) => n.position.x)) + NODE_WIDTH + 60 : 0, extraY = hasPos ? Math.min(...nodes.map((n) => n.position.y)) : 0;
-  for (const [i, assetId] of extraIds.entries()) nodes.push({ id: uid('nd'), position: hasPos ? { x: extraX + i * (NODE_WIDTH + 60), y: extraY } : { x: 0, y: 0 }, data: { kind: 'asset', title: st.assets[assetId]?.name || 'Asset', assetId } });
+  for (const assetId of extraIds) nodes.push({ id: uid('nd'), position: { x: 0, y: 0 }, data: { kind: 'asset', title: st.assets[assetId]?.name || 'Asset', assetId } });
   const edges = (src?.edges ?? []).filter((e) => idMap.has(e.source) && idMap.has(e.target)).map((e) => refEdge(e, uid('edge'), idMap.get(e.source)!, idMap.get(e.target)!));
   const right = session.graph.nodes.reduce((x, n) => Math.max(x, n.position.x + NODE_WIDTH), -Infinity);
   const top = session.graph.nodes.reduce((y, n) => Math.min(y, n.position.y), Infinity);
   const baseX = Number.isFinite(right) ? right + 200 : 0, baseY = Number.isFinite(top) ? top : 0;
-  if (nodes.some((n) => n.position.x !== 0 || n.position.y !== 0)) {
-    const minX = Math.min(...nodes.map((n) => n.position.x)), minY = Math.min(...nodes.map((n) => n.position.y));
-    for (const n of nodes) n.position = { x: n.position.x - minX + baseX, y: n.position.y - minY + baseY };
-  } else {
-    const pos = autoLayout(nodes, edges, { x: baseX, y: baseY });
-    for (const n of nodes) n.position = pos.get(n.id) ?? n.position;
-  }
+  const placed = placeNodes(nodes, assetRatio), minX = Math.min(...placed.map((r) => r.x)), minY = Math.min(...placed.map((r) => r.y));
+  nodes.forEach((n, i) => { n.position = { x: placed[i].x - minX + baseX, y: placed[i].y - minY + baseY }; });
   const srcGrp = src?.groups?.[0];
   const group: GraphGroup = {
     id: uid('grp'), title: srcGrp?.title || subject.name, nodeIds: nodes.map((n) => n.id),

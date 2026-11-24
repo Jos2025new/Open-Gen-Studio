@@ -1,11 +1,12 @@
 import { uid } from '../lib/id';
 import { blobDb } from '../lib/idb';
 import { setDoc, toast, useStore } from '../store/store';
-import { addDoc, addTextLayer, getDoc, patchLayer, placeAsset, selectDoc } from './design/actions';
+import { addDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
 import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
-import { boardLayout, type BoardBox } from './libraryLayout';
+import { assetRatio, isImageAsset, placeNode, syncDocFromGraph } from './libraryBoard';
+import { boardLayout, graphFromDoc } from './libraryLayout';
 import { validateTokens } from './libraryTokens';
 import { isKit, KIT_KINDS, type KitActor, type KitKind, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
 import type { DesignDoc, Graph, Layer, Subject } from './types';
@@ -190,21 +191,6 @@ export function renameItem(id: string, patch: { name?: string; description?: str
   return result;
 }
 
-async function placeKitImage(sessionId: string, docId: string, assetId: string, title?: string, box?: BoardBox): Promise<boolean> {
-  const label = title?.trim() || get().assets[assetId]?.name || assetId;
-  try {
-    const layerId = await placeAsset(sessionId, docId, assetId, 'new', title || undefined);
-    const layer = layerId && box ? getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId) : undefined;
-    if (layer && box && layer.type === 'raster') {
-      const fit = D.fitRect(box.width, box.height, layer.pxWidth, layer.pxHeight, 'contain');
-      patchLayer(sessionId, docId, layer.id, { ...fit, x: box.x + fit.x, y: box.y + fit.y }, { record: false });
-    }
-    if (layerId) return true;
-  } catch {}
-  toast(`Could not load image "${label}".`, 'error');
-  return false;
-}
-
 function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'designer'): Promise<DesignDoc> {
   return serialize(subjectId, async () => {
     const subject = requireItem(subjectId), session = get().sessions[sessionId];
@@ -220,21 +206,12 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
       }
-      if (!curDocRev && (existing.library?.versionId ?? '') !== curVer) {
-        const prevVer = existing.library?.versionId ?? '';
+      const prevVer = existing.library?.versionId ?? '';
+      if (prevVer !== curVer) {
         const prevSnap = prevVer ? await readKitVersion(prevVer).catch(() => null) : null;
-        if (prevVer && !prevSnap) {
-          toast(`Could not read previous version "${prevVer}" to sync new images.`, 'error');
-        } else {
-          const prevIds = new Set((prevSnap?.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'asset' && n.data.assetId ? [n.data.assetId] : [])));
-          const seen = new Set(existing.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)));
-          for (const n of subject.graph?.nodes ?? []) {
-            if (n.data.kind !== 'asset' || !n.data.assetId || prevIds.has(n.data.assetId) || seen.has(n.data.assetId) || get().assets[n.data.assetId]?.kind !== 'image') continue;
-            // New to a board already open: a third of the page, stepped, so it never covers what is there.
-            const { width: pw, height: ph, layers } = getDoc(sessionId, existing.id) ?? existing, step = 24 * (seen.size % 8);
-            const box = layers.length ? { x: pw / 3 + step, y: ph / 3 + step, width: pw / 3, height: ph / 3, fontSize: 0 } : undefined;
-            if (await placeKitImage(sessionId, existing.id, n.data.assetId, n.data.title, box)) seen.add(n.data.assetId);
-          }
+        if (prevVer && !prevSnap) toast(`Could not read previous version "${prevVer}" to sync its changes.`, 'error');
+        else {
+          await syncDocFromGraph(sessionId, existing.id, prevSnap?.graph, subject.graph);
           setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId ? { ...d, library: { ...d.library, versionId: curVer } } : d));
         }
       }
@@ -251,11 +228,8 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const imgs = gNodes.filter((n) => n.data.kind === 'asset' && n.data.assetId && assets[n.data.assetId]?.kind === 'image');
       const first = imgs[0]?.data.kind === 'asset' ? assets[imgs[0].data.assetId!] : undefined;
       const k = first && first.width > 0 && first.height > 0 ? Math.min(1, 4096 / Math.max(first.width, first.height)) : 0;
-      const texts = gNodes.filter((n) => n.data.kind === 'text' && n.data.text.trim());
-      const board = imgs.length > 1 ? boardLayout(gNodes.filter((n) => imgs.includes(n) || texts.includes(n)).map((n) => {
-        const a = n.data.kind === 'asset' ? assets[n.data.assetId!] : undefined;
-        return { id: n.id, ...n.position, ...(a ? { ratio: a.width > 0 && a.height > 0 ? a.width / a.height : 1 } : { text: n.data.kind === 'text' ? n.data.text : '' }) };
-      })) : undefined;
+      const items = gNodes.filter((n) => imgs.includes(n) || (n.data.kind === 'text' && n.data.text.trim()));
+      const board = imgs.length > 1 ? boardLayout(items, assetRatio) : undefined;
       const [w, h] = board ? [board.width, board.height] : k ? [Math.round(first!.width * k), Math.round(first!.height * k)] : [1080, 1080];
       const doc = snap?.doc
         ? { ...remapDoc(snap.doc, px!, { newDocId: true, library: link }), name: subject.name }
@@ -263,11 +237,12 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
       if (liveExisting) detachWorkingDoc(sessionId, liveExisting.id);
       addDoc(sessionId, doc);
-      for (const n of imgs) if (n.data.kind === 'asset' && n.data.assetId) await placeKitImage(sessionId, doc.id, n.data.assetId, n.data.title, board?.boxes.get(n.id));
-      const box = { x: Math.round(w * 0.08), y: Math.round(h * 0.08), width: Math.round(w * 0.84) };
-      for (const n of texts) if (n.data.kind === 'text') {
-        const at = board?.boxes.get(n.id);
-        addTextLayer(sessionId, doc.id, n.data.text, at ?? box, at ? { fontSize: at.fontSize } : {}, n.data.title || undefined);
+      for (const n of [...imgs, ...items.filter((x) => !imgs.includes(x))]) await placeNode(sessionId, doc.id, n, board?.boxes.get(n.id));
+      // The saved document, plus what Nodes or Add to moodboard changed after it was saved.
+      const docVer = docRev ? subject.versions?.find((v) => v.docRev === docRev)?.id : undefined;
+      if (docVer && docVer !== curVer) {
+        const docSnap = await readKitVersion(docVer).catch(() => null);
+        if (docSnap) await syncDocFromGraph(sessionId, doc.id, docSnap.graph, snap?.graph);
       }
       return getDoc(sessionId, doc.id) ?? doc;
     });
@@ -282,12 +257,17 @@ export function saveItem(opts: {
 }): Promise<Subject> {
   return serialize(opts.subjectId, async () => {
     const cur = requireItem(opts.subjectId), kind = cur.kind as KitKind, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
-    const graph = typeof opts.graph === 'function' ? opts.graph(cur.graph) : opts.graph !== undefined ? opts.graph : cur.graph;
+    let workDoc = opts.docId && opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined;
+    if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
+    const docVer = workDoc?.library?.subjectId === cur.id ? workDoc.library.versionId : '';
+    if (workDoc && docVer && docVer !== cur.versionId) {
+      const docSnap = await readKitVersion(docVer).catch(() => null);
+      if (docSnap) { await syncDocFromGraph(opts.sessionId!, workDoc.id, docSnap.graph, cur.graph); workDoc = getDoc(opts.sessionId!, workDoc.id) ?? workDoc; }
+    }
+    const graph = typeof opts.graph === 'function' ? opts.graph(cur.graph) : opts.graph !== undefined ? opts.graph : workDoc ? graphFromDoc(cur.graph, workDoc, isImageAsset, () => uid('nd')) : cur.graph;
     const kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
     const checkAssetIds = validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined });
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
-    const workDoc = opts.docId && opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined;
-    if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
     if (workDoc) { const assets = get().assets; for (const l of workDoc.layers) if ('sourceAssetId' in l && l.sourceAssetId && assets[l.sourceAssetId]) checkAssetIds.push(l.sourceAssetId); }
     const prevSnap = cur.versionId ? (workDoc ? await readKitVersion(cur.versionId).catch(() => null) : await readKitVersion(cur.versionId)) : null;
     if (!workDoc && cur.versionId && !prevSnap) throw new Error(`Cannot save "${cur.id}": current version "${cur.versionId}" blob is missing.`);
