@@ -1,8 +1,8 @@
 import { uid } from '../../lib/id';
-import { getAssetBlob, putAssetBlob } from '../../lib/idb';
+import { getAssetBlob } from '../../lib/idb';
 import { blobToCanvas, createCanvas, ctx2d, fetchBlob } from '../../lib/media';
 import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, StrokeSpec, TextStyle } from '../types';
-import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
+import { patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
 import { useLayerSelection } from './selection';
@@ -11,7 +11,7 @@ import { pickIds } from './objectOps';
 import { validPicks } from './objectGroupTree';
 import { normalizeObjectTrees } from './objectTreeNormalize';
 import { nodeSegs, pageSegs } from './pathNodes';
-import { placeFor } from '../place';
+import { storeDesignAsset } from './designAssets';
 import {rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, releaseBuffers, setBuffer} from './raster';
 import {composeRaster} from './rasterCompose';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
@@ -24,6 +24,7 @@ import { rebasePaintPixels } from './paintBounds';
 import { paintModeOf, pinPaintMode } from './paintMode';
 import { awaitFrame } from '../../lib/trace';
 
+export { canvasToAsset } from './designAssets';
 export { fxSummary } from '../fx/fxCommands';
 
 const get = useStore.getState;
@@ -409,21 +410,6 @@ export function prunePicks(doc: DesignDoc): void {
     return { layerId: pick.layerId, ids: layer.type === 'vector' ? validPicks(layer, ids) : ids };
   });
   if (kept.some((k, i) => k.ids.length !== picks[i].ids.length)) setObjectPicks(doc.id, kept);
-}
-
-async function storeDesignAsset(sessionId: string, blob: Blob, width: number, height: number, origin: Asset['origin']): Promise<Asset> {
-  const id = uid('ast');
-  await putAssetBlob(id, blob);
-  const ui = useStore.getState().ui;
-  const asset: Asset = { id, kind: 'image', mime: blob.type || 'image/png', width, height, sessionId, origin, place: ui.space ? placeFor(ui, ui.workspace) : 'designer', mode: 'image', stored: true, favorite: false, createdAt: Date.now() };
-  addAssets([asset]);
-  return asset;
-}
-
-/** Save a canvas as a new image asset (PNG). */
-export async function canvasToAsset(sessionId: string, canvas: HTMLCanvasElement, origin: Asset['origin'] = 'design'): Promise<Asset> {
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png'));
-  return storeDesignAsset(sessionId, blob, canvas.width, canvas.height, origin);
 }
 
 /** Snapshot a raster layer's pixels as an asset (input for operations and references). */

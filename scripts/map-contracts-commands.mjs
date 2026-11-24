@@ -135,6 +135,7 @@ export default [
       ['src/engine/libraryGraph.ts', 'export function libraryContextLines'],
       ['src/engine/libraryVersions.ts', 'export function saveItem'],
       ['src/engine/libraryVersions.ts', 'export function restoreItemVersion'],
+      ['src/engine/librarySnapshot.ts', 'export async function copyDocPixels'],
       ['src/engine/assetRevisions.ts', 'export async function copyAssetRevision'],
       ['src/engine/libraryBoard.ts', 'export async function loadBoardImages'],
       ['src/engine/libraryBoard.ts', 'openHistoryGroup(docId, { join: true })'],
