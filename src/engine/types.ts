@@ -624,14 +624,15 @@ export interface AgentMetricsAggregate {
   findModels: number;
 }
 
+import type { KitKind, LibraryKitFields } from './libraryTypes';
 /** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
 export type SubjectKind = 'character' | 'object' | 'product' | 'location' | 'style';
 
-export interface Subject {
+export interface Subject extends LibraryKitFields {
   id: string;
   name: string;
   /** Library tab; older subjects without one are characters. */
-  kind?: SubjectKind;
+  kind?: SubjectKind | KitKind;
   description?: string;
   /** Main (frontal) image. */
   frontalAssetId?: string;

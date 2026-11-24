@@ -14,6 +14,8 @@ export interface DesignDoc {
   /** Guides dragged from the rulers, in page units: vertical lines at x, horizontal lines at y. */
   guides?: { x: number[]; y: number[] };
   activeLayerId: string | null;
+  /** Working-copy link to a Library kit entry (`view: 'studio'` hides it from the full Designer). */
+  library?: { subjectId: string; versionId: string; view?: 'studio' };
   lastExport?: RememberedExport;
   createdAt: number;
   updatedAt: number;
