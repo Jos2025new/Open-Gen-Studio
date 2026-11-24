@@ -65,6 +65,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
 
 import { resizeCanvas } from '../src/engine/design/canvasSize';
 import { createItem, libraryToDesigner, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
+import { settleNewNodes } from '../src/engine/flow/settle';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { addTextLayer, deleteLayer, getDoc, patchLayer, placeAsset, undoDoc } from '../src/engine/design/actions';
 import { addDoc } from '../src/engine/design/actions';
@@ -194,6 +195,17 @@ describe('one position per element, across Designer, Library and Nodes', () => {
     expect([nodeAt(entry(id).graph, 'a'), nodeAt(entry(id).graph, 'b')].map((p) => p.y)).toEqual([110, 100]);
     await restoreItemVersion({ subjectId: id, versionId: inDesigner.versionId!, space: 'library', by: 'user' });
     expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 550, y: 150 });
+  });
+
+  it('elements that overlap keep their places when Nodes first shows them', async () => {
+    const { s, id } = await board();
+    await saveItem({ subjectId: id, mode: 'overwrite', space: 'library', by: 'user', graph: { nodes: [asset('a', 100, 100), asset('b', 150, 150)], edges: [] } });
+    const { added, groupId } = libraryToNodes(s.id, id);
+    const g = () => ({ edges: [], nodes: useStore.getState().sessions[s.id].graph.nodes });
+    settleNewNodes(s.id, new Set(added.map((n) => n.id)), new Map(added.map((n) => [n.id, { width: 260, height: 260 }])));
+    expect([nodeAt(g(), 'b').x - nodeAt(g(), 'a').x, nodeAt(g(), 'b').y - nodeAt(g(), 'a').y]).toEqual([50, 50]);
+    await saveGroup(s.id, id, groupId!);
+    expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 150, y: 150 });
   });
 
   it('each element moved its own way in Nodes keeps every move; edges and their labels are saved', async () => {
