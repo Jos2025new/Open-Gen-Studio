@@ -32,8 +32,8 @@ vi.mock('../src/lib/idb', () => ({
   deleteAssetBlobs: async (ids: string[]) => { for (const id of ids) hoisted.blobs.delete(`asset:${id}`); },
 }));
 
-import { deleteSubject, saveSubject } from '../src/engine/libraryActions';
-import { createItem, libraryToDesigner, readKitVersion, renameItem, restoreItemVersion, saveItem, waitKitQueue } from '../src/engine/libraryVersions';
+import { saveSubject } from '../src/engine/libraryActions';
+import { createItem, libraryToDesigner, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { createDoc, newRasterLayer, newTextLayer, touch } from '../src/engine/design/doc';
 import { addDoc, selectDoc } from '../src/engine/design/actions';
 import { ensureBuffers } from '../src/engine/design/raster';
@@ -135,7 +135,11 @@ describe('Hardening guarantees (versioning, rasters, races, rollback)', () => {
     hoisted.blobs.set(`raster:${lyr.id}`, new Blob([new Uint8Array([1, 2])], { type: 'image/png' }));
 
     let renamedOnce = false;
-    hoisted.setOnSet((k) => { if (!renamedOnce && k.startsWith('libver:')) { renamedOnce = true; renameItem(kit.id, { name: 'RenamedMidSave' }); } });
+    hoisted.setOnSet((k) => {
+      if (renamedOnce || !k.startsWith('libver:')) return;
+      renamedOnce = true;
+      useStore.setState((st) => ({ library: st.library.map((x) => x.id === kit.id ? { ...x, name: 'RenamedMidSave' } : x) }));
+    });
     const v1 = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user' });
     expect(v1.name).toBe('RenamedMidSave');
 
@@ -154,10 +158,10 @@ describe('Hardening guarantees (versioning, rasters, races, rollback)', () => {
     const gate = new Promise<void>((r) => { releaseSave = r; });
     hoisted.setOnSet((k) => k.startsWith('libver:') ? gate : undefined);
     const savePromise = saveItem({ subjectId: kit2.id, mode: 'overwrite', sessionId: s.id, docId: doc2!.id, space: 'studio', by: 'user' });
-    deleteSubject(kit2.id);
+    const deletion = run({ cmd: 'library.subject.delete', args: { id: kit2.id } }, { caller: 'ui' });
     releaseSave();
     const savedV = await savePromise;
-    await waitKitQueue(kit2.id);
+    expect(await deletion).toMatchObject({ ok: true });
     expect(useStore.getState().library.some((x) => x.id === kit2.id)).toBe(false);
     expect(hoisted.blobs.has(`libver:${savedV.versionId}`)).toBe(true);
   });

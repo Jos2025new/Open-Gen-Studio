@@ -24,7 +24,7 @@ import { DocumentPicker } from '../src/components/designer/DocumentPicker';
 import { EmbeddedDesigner } from '../src/components/studio/EmbeddedDesigner';
 import { createDoc } from '../src/engine/design/doc';
 import { addDoc } from '../src/engine/design/actions';
-import { createItem, libraryToDesigner, libraryToStudio, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { createItem, libraryToDesigner, libraryToStudio, saveItem } from '../src/engine/libraryVersions';
 import { createSession, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -71,7 +71,7 @@ describe('Lote D Parte 4: document opened from Library carries the entry name', 
     await act(async () => root.render(createElement(DocumentPicker, { sessionId: s2.id, docs: [openedD], active: openedD })));
     expect(host.querySelector('.document-picker-toggle')?.textContent).toContain('Acme System');
 
-    renameItem(created.subject.id, { name: 'Acme System v2' });
+    await saveItem({ subjectId: created.subject.id, mode: 'overwrite', space: 'library', by: 'user', name: 'Acme System v2' });
     const reopened = await libraryToStudio(s2.id, created.subject.id);
     expect(reopened.name).toBe('Acme System v2');
     await act(async () => root.render(createElement(EmbeddedDesigner)));

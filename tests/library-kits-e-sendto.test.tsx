@@ -30,7 +30,7 @@ vi.mock('../src/lib/idb', () => ({
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { SendToMenu } from '../src/components/assets/AssetActions';
-import { createItem, waitKitQueue } from '../src/engine/libraryVersions';
+import { createItem } from '../src/engine/libraryVersions';
 import { createSession, setUi, useStore } from '../src/store/store';
 import type { Asset } from '../src/engine/types';
 
@@ -115,13 +115,11 @@ describe('Lote E Punto 5: Add to moodboard reads fresh entry from store so back-
     });
     release();
     await act(async () => {
-      await waitKitQueue(mb.id);
-      await new Promise((r) => setTimeout(r, 0));
-      await waitKitQueue(mb.id);
+      await vi.waitFor(() => {
+        const updated = useStore.getState().library.find((s) => s.id === mb.id)!;
+        const ids = (updated.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId : null)).sort();
+        expect(ids).toEqual(['img-1', 'img-2']);
+      });
     });
-
-    const updated = useStore.getState().library.find((s) => s.id === mb.id)!;
-    const ids = (updated.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId : null)).sort();
-    expect(ids).toEqual(['img-1', 'img-2']);
   });
 });

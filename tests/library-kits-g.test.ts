@@ -63,7 +63,7 @@ vi.mock('../src/engine/design/render', async (orig) => ({
   drawDoc: () => undefined,
 }));
 
-import { createItem, libraryToDesigner, readKitVersion, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { createItem, libraryToDesigner, readKitVersion, saveItem } from '../src/engine/libraryVersions';
 import { deleteAssets } from '../src/engine/assetActions';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { CAPABILITIES } from '../src/engine/agent/tools';
@@ -127,7 +127,7 @@ describe('Lote G fixes', () => {
     expect(rasterSources(afterDeleteReopen)).toEqual(['b']);
 
     // Rename kit and reopen: working copy name updates as before
-    renameItem(mb.id, { name: 'Board AB Renamed', by: 'user' });
+    await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'library', by: 'user', name: 'Board AB Renamed' });
     const afterRename = await libraryToDesigner(s.id, mb.id);
     expect(afterRename.name).toBe('Board AB Renamed');
     expect(rasterSources(afterRename)).toEqual(['b']);

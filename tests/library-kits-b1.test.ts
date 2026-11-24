@@ -26,7 +26,7 @@ vi.mock('../src/lib/idb', () => ({
   deleteAssetBlobs: async () => undefined,
 }));
 
-import { createItem, libraryToDesigner, readKitVersion, renameItem, saveItem } from '../src/engine/libraryVersions';
+import { createItem, libraryToDesigner, readKitVersion, saveItem } from '../src/engine/libraryVersions';
 import { newTextLayer } from '../src/engine/design/doc';
 import { createSession, setDoc, useStore } from '../src/store/store';
 import type { Graph } from '../src/engine/types';
@@ -64,14 +64,14 @@ describe('docRev tracking and draft preservation', () => {
     expect(opened2.id).toBe(draftDoc!.id);
   });
 
-  it('agent saves/renames keep draft:true; user save or user rename clears draft', async () => {
+  it('agent saves keep drafts including with a new name, while user saves clear them', async () => {
     const s1 = resetStore();
     const { subject: kit } = await createItem({ name: 'DraftKit', kind: 'design-system', space: 'studio', sessionId: s1.id, by: 'agent' });
     expect(kit.draft).toBe(true);
     const afterAgentSave = await saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', graph: { nodes: [{ id: 'p1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'N', text: 'Note' } }], edges: [] } });
     expect(afterAgentSave.draft).toBe(true);
-    expect(renameItem(kit.id, { name: 'DraftKit v2', by: 'agent' }).draft).toBe(true);
-    expect(renameItem(kit.id, { name: 'Official DS', by: 'user' }).draft).toBe(false);
+    expect(await saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', name: 'DraftKit v2' })).toMatchObject({ name: 'DraftKit v2', draft: true });
+    expect(await saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'user', name: 'Official DS' })).toMatchObject({ name: 'Official DS', draft: false });
 
     const { subject: kit2 } = await createItem({ name: 'DraftKit2', kind: 'moodboard', space: 'studio', sessionId: s1.id, by: 'agent' });
     expect((await saveItem({ subjectId: kit2.id, mode: 'overwrite', sessionId: s1.id, space: 'studio', by: 'agent' })).draft).toBe(true);

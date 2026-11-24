@@ -10,7 +10,7 @@ import { isKit, KIT_KIND_LIST, TOKEN_TYPES } from './libraryTypes';
 import { insertComponent } from './libraryInsert';
 import { getDoc } from './design/actions';
 import { libraryToNodes, nodesToLibrary } from './flow/fromLibrary';
-import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem, waitKitQueue } from './libraryVersions';
+import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem } from './libraryVersions';
 import type { Graph } from './types';
 
 const styleEstimate = () => {
@@ -43,7 +43,7 @@ const requireSubject = <T>(value: T | null | undefined, reason: string): T => { 
 
 export const commands = [
   defineCommand({ id: 'library.subject.save', title: 'Save subject', args: z.object({ subject }).strict(), effect: 'write', available: (_ctx, args) => { const sid = args?.subject?.id; const prev = sid ? useStore.getState().library.find((s) => s.id === sid) : undefined; return prev && isKit(prev) ? `Entry "${prev.id}" is a Library item; use library.item.* commands instead.` : true; }, run: (_ctx, args) => { A.saveSubject(args.subject); return args.subject; } }),
-  defineCommand({ id: 'library.subject.delete', title: 'Delete subject', args: z.object({ id }).strict(), effect: 'delete', available: (_ctx, args) => subjectAvailable(args?.id), run: async (_ctx, args) => { const prev = useStore.getState().library.find((s) => s.id === args.id); A.deleteSubject(args.id); if (prev && isKit(prev)) await waitKitQueue(args.id); return { id: args.id }; } }),
+  defineCommand({ id: 'library.subject.delete', title: 'Delete subject', args: z.object({ id }).strict(), effect: 'delete', available: (_ctx, args) => subjectAvailable(args?.id), run: async (_ctx, args) => { const prev = useStore.getState().library.find((s) => s.id === args.id); if (isKit(prev)) await deleteItem(args.id); else A.deleteSubject(args.id); return { id: args.id }; } }),
   defineCommand({ id: 'library.subject.get', title: 'Read subject', args: z.object({ name }).strict(), effect: 'read', available: (_ctx, args) => !args?.name || A.libraryItem(args.name) ? true : `No subject named "${args.name}".`, run: (_ctx, args) => requireSubject(A.libraryItem(args.name), 'Subject not found.') }),
   defineCommand({ id: 'library.subject.from_asset', title: 'Save subject from image', args: z.object({ asset: id, name, kind: kind.optional(), replace: z.boolean().optional(), views: z.array(id).optional() }).strict(), effect: 'write', available: (_ctx, args) => imageAvailable(args?.asset), run: (_ctx, args) => requireSubject(A.subjectFromAsset(args.asset, args.name, args.kind, { replace: args.replace, views: args.views }), 'Could not save the subject; the name may already exist.') }),
   defineCommand({ id: 'library.subject.from_sheet', title: 'Save subject from sheet', args: z.object({ asset: id, name, kind, replace: z.boolean() }).strict(), effect: 'write', debt: 'Falls back to the active session when the asset has no session; the action hides its failure reason.', available: (_ctx, args) => imageAvailable(args?.asset), run: async (_ctx, args) => requireSubject(await A.saveSheetViews(args.asset, args.name, args.kind, args.replace), 'Could not save the sheet views.') }),

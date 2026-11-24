@@ -33,7 +33,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { sendAgentMessage, stopAgent } from '../src/engine/agent/runtime';
-import { readKitVersion, renameItem, waitKitQueue } from '../src/engine/libraryVersions';
+import { readKitVersion, saveItem } from '../src/engine/libraryVersions';
 import { useStore } from '../src/store/store';
 import { mainThread } from './helpers/threads';
 import type { NoticeFeedItem } from '../src/engine/types';
@@ -48,11 +48,8 @@ const tool = (c: Call) => sse([{ choices: [{ delta: { tool_calls: [{ index: 0, i
 let replies: Array<Response | ((signal?: AbortSignal | null) => Promise<Response>)> = [];
 let sid = '';
 
-async function flushQueues(kitId?: string) {
-  await new Promise((r) => setTimeout(r, 20));
-  if (kitId) await waitKitQueue(kitId);
-  await new Promise((r) => setTimeout(r, 20));
-}
+const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
+const versions = (kitId: string) => useStore.getState().library.find((x) => x.id === kitId)!.versions?.length;
 
 beforeEach(() => {
   hoisted.blobs.clear();
@@ -96,7 +93,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
     await sendAgentMessage('Create a design system draft');
     const kit = useStore.getState().library.find((x) => x.name === 'AutoDS')!;
     expect(kit).toBeDefined();
-    await flushQueues(kit.id);
+    await vi.waitFor(() => expect(versions(kit.id)).toBe(1));
 
     const afterT1 = useStore.getState().library.find((x) => x.id === kit.id)!;
     expect(afterT1.draft).toBe(true);
@@ -107,7 +104,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
     // Turn 2: agent chats without changing the kit doc -> 0 new versions
     replies = [text('No changes made.')];
     await sendAgentMessage('Just checking in');
-    await flushQueues(kit.id);
+    await settle();
     expect(useStore.getState().library.find((x) => x.id === kit.id)!.versions?.length).toBe(1);
 
     // Turn 3: agent edits doc twice then turn FAILS (400 error from provider) -> STILL saves 1 version for the turn!
@@ -125,7 +122,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
       new Response('bad request', { status: 400 }),
     ];
     await sendAgentMessage('Add two subtitles');
-    await flushQueues(kit.id);
+    await vi.waitFor(() => expect(versions(kit.id)).toBe(2));
     const afterT3 = useStore.getState().library.find((x) => x.id === kit.id)!;
     expect(afterT3.versions?.length).toBe(2);
     expect((await readKitVersion(afterT3.versionId!))?.doc?.layers.length).toBe(4);
@@ -142,7 +139,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
       }),
     ];
     await sendAgentMessage('Add canceled edit');
-    await flushQueues(kit.id);
+    await vi.waitFor(() => expect(versions(kit.id)).toBe(3));
     const afterT4 = useStore.getState().library.find((x) => x.id === kit.id)!;
     expect(afterT4.versions?.length).toBe(3);
 
@@ -156,7 +153,8 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
       text('Done editing.'),
     ];
     await expect(sendAgentMessage('Edit with failing storage')).resolves.toBeUndefined();
-    await flushQueues(kit.id);
+    const failedSave = () => useStore.getState().sessions[sid].feed.some((item) => item.type === 'notice' && /storage full/i.test(item.text));
+    await vi.waitFor(() => expect(failedSave()).toBe(true));
     hoisted.setFailSet(null);
     expect(useStore.getState().sessions[sid].agents[Object.keys(useStore.getState().sessions[sid].agents)[0]].busy).toBe(false);
     const notices = useStore.getState().sessions[sid].feed.filter((f): f is NoticeFeedItem => f.type === 'notice');
@@ -164,7 +162,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
     expect(useStore.getState().library.find((x) => x.id === kit.id)!.versions?.length).toBe(3);
 
     // Turn 6: user names the kit -> draft becomes false -> agent edits NO LONGER auto-save!
-    const named = renameItem(kit.id, { name: 'Named DS', by: 'user' });
+    const named = await saveItem({ subjectId: kit.id, name: 'Named DS', mode: 'overwrite', space: 'studio', by: 'user' });
     expect(named.draft).toBe(false);
     replies = [
       tool({
@@ -174,7 +172,7 @@ describe('Part 5: automatic draft kit versioning at agent turn end', () => {
       text('Edited non-draft.'),
     ];
     await sendAgentMessage('Edit named kit');
-    await flushQueues(kit.id);
-    expect(useStore.getState().library.find((x) => x.id === kit.id)!.versions?.length).toBe(3);
+    await settle();
+    expect(versions(kit.id)).toBe(named.versions?.length);
   });
 });

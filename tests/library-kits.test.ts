@@ -32,10 +32,10 @@ vi.mock('../src/lib/idb', () => ({
   deleteAssetBlobs: async (ids: string[]) => { for (const id of ids) hoisted.blobs.delete(`asset:${id}`); },
 }));
 
-import { SUBJECT_KINDS, deleteSubject, libraryItem, saveSubject } from '../src/engine/libraryActions';
+import { SUBJECT_KINDS, libraryItem, saveSubject } from '../src/engine/libraryActions';
 import { isKit, KIT_KIND_LIST, mentionableSubjects } from '../src/engine/libraryTypes';
 import { kitDependencies, kitUsedBy, libraryAssetOwners, libraryAssetSet, subjectAssetIds, wouldCreateKitCycle } from '../src/engine/libraryGraph';
-import { createItem, libraryToDesigner, libraryToStudio, readKitVersion, renameItem, restoreItemVersion, saveItem, waitKitQueue } from '../src/engine/libraryVersions';
+import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { createDoc, newRasterLayer, newVectorLayer } from '../src/engine/design/doc';
 import { addDoc } from '../src/engine/design/actions';
 import { deleteSession } from '../src/engine/actions';
@@ -183,8 +183,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     const origSnap = await readKitVersion(savedOrig.versionId!), copySnap = await readKitVersion(copy.versionId!);
     expect(copySnap!.doc!.layers[0].id).not.toBe(origSnap!.doc!.layers[0].id);
 
-    deleteSubject(orig.id);
-    await waitKitQueue(orig.id);
+    await deleteItem(orig.id);
     expect(hoisted.blobs.has(`libver:${savedOrig.versionId}`)).toBe(true);
     expect(hoisted.blobs.has(`raster:${origSnap!.doc!.layers[0].id}`)).toBe(true);
     expect(await blobBytes(hoisted.blobs.get(`raster:${copySnap!.doc!.layers[0].id}`))).toEqual(px);
@@ -220,7 +219,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     await expect(restoreItemVersion({ subjectId: kit.id, versionId: 'lv_missing', space: 'library', by: 'user' })).rejects.toThrow(/missing/i);
 
     const origOrigin = v1.origin;
-    const updated = renameItem(kit.id, { name: 'RenamedKit' });
+    const updated = await saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'user', name: 'RenamedKit' });
     expect(updated.origin).toEqual(origOrigin);
     expect(libraryItem('RenamedKit')).toBeUndefined();
     saveSubject({ id: 'sub_classic', name: 'ClassicHero', kind: 'character', refAssetIds: [] });

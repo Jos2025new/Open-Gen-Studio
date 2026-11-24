@@ -29,8 +29,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { insertComponent } from '../src/engine/libraryInsert';
-import { createItem, readKitVersion, saveItem, waitKitQueue } from '../src/engine/libraryVersions';
-import { deleteSubject } from '../src/engine/libraryActions';
+import { createItem, deleteItem, readKitVersion, saveItem } from '../src/engine/libraryVersions';
 import { addDoc, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createDoc, newRasterLayer, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
 import { groupLayers, patchGroup } from '../src/engine/design/groups';
@@ -95,8 +94,7 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
     const keptRaster = getDoc(s.id, target.id)!.layers.find((l) => l.type === 'raster') as RasterLayer;
     setDoc(s.id, kitDoc!.id, (d) => ({ ...d, layers: d.layers.map((l) => (l.type === 'text' ? { ...l, text: 'CHANGED V2' } : l)) }));
     await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user' });
-    deleteSubject(kit.id);
-    await waitKitQueue(kit.id);
+    await deleteItem(kit.id);
 
     const stillThere = getDoc(s.id, target.id)!;
     expect(stillThere.groups?.find((g) => g.id === direct.groupId)?.from?.versionId).toBe(v1.versionId);

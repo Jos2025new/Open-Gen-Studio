@@ -32,7 +32,6 @@ function serialize<T>(id: string, fn: () => Promise<T>): Promise<T> {
   void tail.then(() => { if (queues.get(id) === tail) queues.delete(id); });
   return next;
 }
-export async function waitKitQueue(id: string): Promise<void> { await queues.get(id); }
 const sameBytes = (a: Uint8Array, b: Uint8Array) => a.byteLength === b.byteLength && a.every((v, i) => v === b[i]);
 
 async function writeVerified(key: string, blob: Blob, expected: Uint8Array, written: string[]): Promise<void> {
@@ -209,20 +208,6 @@ export async function createItem(opts: {
       throw error;
     }
   });
-}
-
-export function renameItem(id: string, patch: { name?: string; description?: string; by?: KitActor }): Subject {
-  let result: Subject | null = null;
-  useStore.setState((st) => {
-    const cur = st.library.find((x) => x.id === id);
-    if (!cur || !isKit(cur)) return {};
-    const name = patch.name !== undefined ? patch.name.trim() : cur.name;
-    if (!name) throw new Error('Item name cannot be empty.');
-    result = { ...cur, name, ...(patch.description !== undefined ? { description: patch.description } : {}), draft: patch.name !== undefined && (patch.by ?? 'user') === 'user' ? false : cur.draft, origin: cur.origin };
-    return { library: st.library.map((x) => (x.id === id ? result! : x)) };
-  });
-  if (!result) throw new Error(`No Library item "${id}".`);
-  return result;
 }
 
 function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'designer'): Promise<DesignDoc> {
