@@ -193,7 +193,7 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
     const subject = requireItem(subjectId), session = get().sessions[sessionId];
     if (!session) throw new Error(`No session "${sessionId}".`);
     const curVer = subject.versionId ?? '', curDocRev = subject.docRev ?? '', existing = session.docs.find((d) => d.library?.subjectId === subjectId);
-    const same = curDocRev ? existing?.library?.docRev === curDocRev : Boolean(existing && !existing.library?.docRev && existing.library?.versionId === curVer);
+    const same = curDocRev ? existing?.library?.docRev === curDocRev : Boolean(existing && !existing.library?.docRev);
     if (existing && same) {
       const promote = space === 'designer' && Boolean(existing.library?.view || existing.view);
       if (promote || existing.name !== subject.name) {
@@ -202,6 +202,14 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           const lib = d.library && promote ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.docRev ? { docRev: d.library.docRev } : {}) } : d.library;
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
+      }
+      if (!curDocRev) {
+        const seen = new Set(existing.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)));
+        let placed = existing.layers.length;
+        for (const n of subject.graph?.nodes ?? []) {
+          if (n.data.kind !== 'asset' || !n.data.assetId || seen.has(n.data.assetId) || get().assets[n.data.assetId]?.kind !== 'image') continue;
+          try { if (await placeAsset(sessionId, existing.id, n.data.assetId, placed ? 'new' : 'base', n.data.title || undefined)) { seen.add(n.data.assetId); placed++; } } catch {}
+        }
       }
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;

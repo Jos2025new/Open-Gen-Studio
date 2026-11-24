@@ -169,7 +169,7 @@ describe('Lote E Punto 1: open graph-only Library entry in Studio/Designer', () 
       },
     });
     const reopened = await libraryToDesigner(s1, subject.id);
-    expect(reopened.id).not.toBe(doc.id);
+    expect(reopened.id).toBe(doc.id);
     expect(reopened.layers.filter((l): l is RasterLayer => l.type === 'raster').map((l) => l.sourceAssetId)).toEqual(['img_ok', 'img_3']);
   });
 });
